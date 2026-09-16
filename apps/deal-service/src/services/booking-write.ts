@@ -40,6 +40,7 @@ export const BOOKING_WRITE_SELECT = {
   paymentIntentId: true,
   trip: true,
   pricing: true,
+  cancellationTerms: true, // A172
   parcel: true,
   pickup: true,
   trackingEvents: true,
@@ -65,10 +66,16 @@ export const BOOKING_WRITE_SELECT = {
   disputedAt: true,
   disputeTicket: true,
   refundAmountCents: true,
+  refunds: true, // A166 — liste réécrite en entier par chaque remboursement
+  capturedAt: true, // A166 — l'ancien remboursement (date, identifiant) est lu AVANT d'être écrasé
+  refundedAt: true,
+  refundId: true,
 } as const;
 
 export type BookingForWrite = {
   id: string;
+  /** A172 — conditions d'annulation figées à la création ; absentes sur les réservations antérieures. */
+  cancellationTerms?: { fullRefundUntilHours: number; lateRetentionPct: number } | null;
   tripId: string;
   shipperId: string;
   carrierId: string;
@@ -102,6 +109,11 @@ export type BookingForWrite = {
   disputedAt?: Date | null;
   disputeTicket?: string | null;
   refundAmountCents?: number | null;
+  /** A166 — remboursements émis ; absente sur un document antérieur (normalisée à `[]`). */
+  refunds?: Array<{ refundId?: string | null; amountCents: number; refundedAt: Date; kind: string }>;
+  capturedAt?: Date | null;
+  refundedAt?: Date | null;
+  refundId?: string | null;
 } & BookingSnapshotsForLifecycle;
 
 /** Normalise un enregistrement Prisma (ou un mock de test) en BookingForWrite. */
@@ -114,6 +126,7 @@ export function toBookingForWrite(raw: Record<string, unknown>): BookingForWrite
     pickedUpAt: r.pickedUpAt ?? null,
     pickup: r.pickup ?? null,
     trackingEvents: r.trackingEvents ?? [],
+    refunds: r.refunds ?? [],
     deliveryCodeHash: r.deliveryCodeHash ?? null,
     deliveryAttempts: r.deliveryAttempts ?? 0,
     deliveryLockedUntil: r.deliveryLockedUntil ?? null,

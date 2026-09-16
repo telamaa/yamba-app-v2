@@ -9,12 +9,13 @@
  * version lue → 409 si elle a bougé). « Tout réinitialiser » montre son diff avant de partir.
  * L'écriture est bornée par portée : métier = super admin, exploitation = Exploitation.
  */
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, apiFetch, patch, post } from "@/lib/api";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, patch, post } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { dateTime } from "@/lib/format";
-import { SETTING_GROUP_LABEL, SETTING_GROUP_ORDER, formatSetting, inputBounds, inputStep, previewOf, toInput, toStored } from "@/lib/settings-format";
+import { SETTING_GROUP_LABEL, SETTING_GROUP_ORDER, formatSetting, inputBounds, inputStep, previewOf, settingsRefusalMessage, toInput, toStored } from "@/lib/settings-format";
 import type { AdminMe, AdminSettingsResponse, SettingDefinition, SettingsHistoryItem, SettingsWriteResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const REASON_MIN = 20;
 
@@ -25,12 +26,15 @@ export default function PlatformSettingsEditor() {
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Recette § 5.20 — un double clic ne part qu'une fois : l'état React n'a pas encore désactivé le bouton au second clic.
+  const sending = useRef(false);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [resetOpen, setResetOpen] = useState(false);
   const [openInfo, setOpenInfo] = useState<string | null>(null);
   const [history, setHistory] = useState<{ key: string; items: SettingsHistoryItem[] } | null>(null);
 
   const load = useCallback(() => {
-    apiFetch<AdminSettingsResponse>("/admin/settings").then(setData).catch((e) => setMsg({ tone: "err", text: e.message }));
+    apiFetch<AdminSettingsResponse>("/admin/settings").then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas les paramètres.") : setMsg({ tone: "err", text: "Paramètres indisponibles pour le moment. Recharge la page." })));
     apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
   }, []);
   useEffect(load, [load]);
@@ -70,7 +74,8 @@ export default function PlatformSettingsEditor() {
   }
 
   async function submit() {
-    if (!data || diff.length === 0) return;
+    if (!data || diff.length === 0 || sending.current) return;
+    sending.current = true;
     setBusy(true);
     setMsg(null);
     try {
@@ -80,15 +85,18 @@ export default function PlatformSettingsEditor() {
       setReason("");
       load();
     } catch (e) {
-      setMsg({ tone: "err", text: e instanceof ApiError ? (e.status === 409 ? "Les paramètres ont changé entre-temps : la page est rechargée, refais ta modification." : `${e.status} : ${e.message}${detailsOf(e)}`) : "Enregistrement impossible." });
-      if (e instanceof ApiError && e.status === 409) { setPending({}); load(); }
+      const r = settingsRefusalMessage(e as { status?: number; data?: unknown }, data.catalog); // ANO-ADM-54
+      setMsg({ tone: "err", text: r.text });
+      if (r.reload) { setPending({}); load(); }
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   }
 
   async function resetAll() {
-    if (!data || resetDiff.length === 0) return;
+    if (!data || resetDiff.length === 0 || sending.current) return;
+    sending.current = true;
     setBusy(true);
     setMsg(null);
     try {
@@ -99,8 +107,12 @@ export default function PlatformSettingsEditor() {
       setResetOpen(false);
       load();
     } catch (e) {
-      setMsg({ tone: "err", text: e instanceof ApiError ? `${e.status} : ${e.message}${detailsOf(e)}` : "Réinitialisation impossible." });
+      // ANO-ADM-55 — une réinitialisation sur une page périmée disait « 409 : The settings changed… » sans recharger.
+      const r = settingsRefusalMessage(e as { status?: number; data?: unknown }, data.catalog);
+      setMsg({ tone: "err", text: r.text });
+      if (r.reload) { setPending({}); setResetOpen(false); load(); }
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   }
@@ -110,8 +122,8 @@ export default function PlatformSettingsEditor() {
     try {
       const r = await apiFetch<{ items: SettingsHistoryItem[] }>(`/admin/settings/history?key=${encodeURIComponent(key)}`);
       setHistory({ key, items: r.items });
-    } catch (e) {
-      setMsg({ tone: "err", text: e instanceof ApiError ? `${e.status} : ${e.message}` : "Historique indisponible." });
+    } catch {
+      setMsg({ tone: "err", text: "Historique indisponible pour le moment." });
     }
   }
 
@@ -257,12 +269,6 @@ export default function PlatformSettingsEditor() {
       )}
     </div>
   );
-}
-
-function detailsOf(e: ApiError): string {
-  const d = e.data as { details?: { errors?: Record<string, string> } } | undefined;
-  const errors = d?.details?.errors;
-  return errors ? ` — ${Object.entries(errors).map(([k, v]) => `${k} : ${v}`).join(" · ")}` : "";
 }
 
 function ReasonField({ reason, setReason }: { reason: string; setReason: (v: string) => void }) {

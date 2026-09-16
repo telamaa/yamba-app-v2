@@ -114,7 +114,7 @@ test.describe("WEB-E2E-2 — le parcours avec litige", () => {
     expect(recap).toMatch(/Remboursé à l'Expéditeur \(João\) : 15,00 €/);
     expect(recap).toMatch(/Versé au Voyageur \(Thomas\) : 40,00 €/);
     expect(recap).toMatch(/Conservé par Yamba : 6,60 €/);
-    expect(normaliserEspaces(resultat)).toMatch(/Remboursement partiel · deal COMPLETED · remboursé 15,00 € · versé 40,00 €/);
+    expect(normaliserEspaces(resultat)).toMatch(/Remboursement partiel · statut final : Terminée · remboursé 15,00 € · versé 40,00 €/);
 
     /* ── Étape 15 — João lit la décision ── */
     const decisionExpediteur = normaliserEspaces(await signalement.lireLaDecision(deal.id));

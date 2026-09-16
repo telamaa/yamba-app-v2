@@ -3,9 +3,11 @@
 /** DataRequestsList.tsx — le registre des demandes RGPD (C-PR8b, D63 7A) : les plus récentes d'abord, curseur. */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import type { DataRequestItem, DataRequestsResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const TYPE: Record<string, string> = { EXPORT: "Export", ERASURE: "Effacement" };
 const CHANNEL: Record<string, string> = { MEMBER: "par le membre", ADMIN: "par l'admin" };
@@ -16,25 +18,32 @@ export default function DataRequestsList() {
   const [items, setItems] = useState<DataRequestItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [loaded, setLoaded] = useState(false);
+  // A179 (recette § 5.22) — le registre d'un membre, ouvert depuis sa fiche.
+  const userId = useSearchParams().get("userId");
 
   const load = useCallback((after?: string | null) => {
-    apiFetch<DataRequestsResponse>(`/admin/privacy/requests${after ? `?cursor=${after}` : ""}`)
+    const qs = new URLSearchParams({ ...(userId ? { userId } : {}), ...(after ? { cursor: after } : {}) }).toString();
+    apiFetch<DataRequestsResponse>(`/admin/privacy/requests${qs ? `?${qs}` : ""}`)
       .then((r) => {
         setItems((prev) => (after ? [...prev, ...r.items] : r.items));
         setCursor(r.nextCursor);
         setLoaded(true);
       })
-      .catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
-  }, []);
+      .catch((e) => (isPermissionRefusal(e) ? deny("Ton profil n'ouvre pas le registre des données personnelles.") : setError(e instanceof ApiError && e.status === 404 ? "Registre introuvable." : "Registre indisponible pour le moment. Recharge la page.")));
+  }, [userId]);
   useEffect(() => load(), [load]);
 
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
   if (!loaded) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
   return (
     <div className="mt-4">
+      {userId && (
+        <p className="mb-2 text-[12.5px] text-slate-600">Demandes d&apos;un seul membre. <Link href="/privacy" className="underline">Tout le registre</Link></p>
+      )}
       {items.length === 0 ? (
-        <p className="text-[13px] text-slate-500">Aucune demande pour l&apos;instant.</p>
+        <p className="text-[13px] text-slate-500">{userId ? "Aucune demande pour ce membre." : "Aucune demande pour l'instant."}</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="w-full text-[12.5px]">

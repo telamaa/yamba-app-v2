@@ -1,7 +1,7 @@
 {
   "loading": "Chargement…",
-  "empty": "Aucun message pour l'instant. Proposez un rendez-vous pour vous organiser.",
-  "selectOne": "Choisissez une conversation.",
+  "empty": "Aucun message pour l'instant. Propose un rendez-vous pour vous organiser.",
+  "selectOne": "Choisis une conversation.",
   "placeholder": "Écrire un message…",
   "send": "Envoyer",
   "sendFailed": "Le message n'a pas pu être envoyé.",
@@ -10,8 +10,8 @@
   "codeWarning": "Le code de livraison se donne en main propre, jamais par écrit.",
   "list": {
     "emptyTitle": "Aucune conversation",
-    "emptyBody": "Une conversation s'ouvre dès qu'un Voyageur accepte votre colis, ou dès que vous acceptez une demande.",
-    "you": "Vous :",
+    "emptyBody": "Une conversation s'ouvre dès qu'un Voyageur accepte ton colis, ou dès que tu acceptes une demande.",
+    "you": "Toi :",
     "noMessage": "Pas encore de message",
     "toConfirm": "à confirmer"
   },
@@ -23,24 +23,24 @@
       "ready": "Numéro de {name} :",
       "available": "Le numéro est disponible.",
       "opensAt": "Le numéro s'affiche à partir du {time} (2 h avant le rendez-vous confirmé ou le départ).",
-      "needsMeetup": "Le numéro s'affiche 2 h avant le rendez-vous confirmé. Proposez et confirmez un rendez-vous ci-dessous."
+      "needsMeetup": "Le numéro s'affiche 2 h avant le rendez-vous confirmé. Propose et confirme un rendez-vous ci-dessous."
     }
   },
   "closed": {
     "dispute": "Un litige est en cours : les échanges passent par la médiation.",
-    "window": "Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire.",
+    "window": "Cette conversation est fermée à l'écriture. Tu peux toujours la relire.",
     "generic": "Cette conversation est en lecture seule."
   },
   "meetup": {
     "title": "Rendez-vous",
-    "none": "Aucun rendez-vous prévu. Proposez un lieu et un créneau.",
+    "none": "Aucun rendez-vous prévu. Propose un lieu et un créneau.",
     "pickup": "Remise du colis",
     "delivery": "Livraison",
     "propose": "Proposer",
     "counter": "Proposer un autre",
     "accept": "Accepter",
     "accepted": "Confirmé",
-    "toAccept": "À confirmer par vous",
+    "toAccept": "À confirmer par toi",
     "waitingOther": "En attente de l'autre personne",
     "kind": "Type",
     "place": "Lieu",
@@ -73,7 +73,7 @@
     "reason": "Motif",
     "reasons": {
       "OFF_PLATFORM": "Veut sortir de Yamba (paiement ou envoi en dehors)",
-      "SCAM": "Tentative d'arnaque",
+      "SCAM": "Arnaque suspectée",
       "HARASSMENT": "Propos déplacés ou harcèlement",
       "OTHER": "Autre"
     },
@@ -84,5 +84,12 @@
     "done": "Merci, le signalement est transmis à notre équipe.",
     "already": "Tu as déjà signalé ce message.",
     "failed": "Le signalement n'a pas pu être envoyé."
+  },
+  "errors": {
+    "deliveryCode": "Ce message contient le code de livraison. Il se donne en main propre, jamais par écrit.",
+    "meetupTooSoon": "Le rendez-vous doit commencer au moins 30 minutes à l'avance.",
+    "meetupTooFar": "Le rendez-vous doit avoir lieu dans les 90 jours.",
+    "meetupTooLong": "Un rendez-vous dure 12 heures au plus.",
+    "meetupChanged": "Ce rendez-vous vient de changer. Recharge la conversation."
   }
 }

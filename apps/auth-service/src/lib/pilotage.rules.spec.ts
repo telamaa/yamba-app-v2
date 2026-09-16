@@ -1,4 +1,4 @@
-import { buildCorridors, buildSeries, isoWeekKey, isoWeekStart, periodBounds, periodsBetween, ratePct } from "./pilotage.rules";
+import { buildCorridors, buildSeries, isoWeekKey, isoWeekStart, periodBounds, periodsBetween, ratePct, refundDrilldownItems } from "./pilotage.rules";
 
 const d = (s: string) => new Date(s);
 describe("pilotage.rules (C-PR6a, D59)", () => {
@@ -111,5 +111,44 @@ describe("pilotage.rules (C-PR6a, D59)", () => {
     );
     expect(pts[0].finance).toEqual([{ currencyCode: "EUR", capturedCents: 5914, refundedCents: 1479, paidOutCents: 0, revenueCents: 0, retentionCents: 1478 }]);
     expect(pts[1].finance).toEqual([{ currencyCode: "EUR", capturedCents: 0, refundedCents: 0, paidOutCents: 2000, revenueCents: 957, retentionCents: 0 }]);
+  });
+
+  /* ── Recette 02-ADMIN § 5.17 (A167) — la règle d'argent du rapport, lue par le pilotage ── */
+  const P = { totalShipperCents: 3920, currencyCode: "EUR", commissionCents: 1120, premiumCents: 0 };
+  const rembourse = {
+    id: "64b0000000000000000000a1", status: "COMPLETED", trip: { originCity: "Paris", destinationCity: "Brazzaville" }, pricing: P,
+    requestedAt: d("2026-08-01T00:00:00Z"), capturedAt: d("2026-08-02T00:00:00Z"),
+    refundAmountCents: 1500, refundedAt: d("2026-09-03T10:00:00Z"), refundId: "re_2",
+    refunds: [
+      { refundId: "re_1", amountCents: 1000, refundedAt: d("2026-08-15T10:00:00Z"), kind: "CANCELLATION" },
+      { refundId: "re_2", amountCents: 500, refundedAt: d("2026-09-03T10:00:00Z"), kind: "MANUAL" },
+    ],
+  };
+  const annuleAvantCapture = { id: "64b0000000000000000000a2", status: "CANCELLED", trip: { originCity: "Paris", destinationCity: "Brazzaville" }, pricing: P, requestedAt: d("2026-09-01T00:00:00Z"), closedAt: d("2026-09-02T00:00:00Z"), capturedAt: null, refundAmountCents: 3920, refundedAt: d("2026-09-02T00:00:00Z"), refunds: [] };
+
+  it("A167 : la courbe « Remboursé » compte chaque remboursement dans sa période ; une empreinte libérée n'y entre pas", () => {
+    const pts = buildSeries({ userCreatedAts: [], tripPublishedAts: [], bookings: [rembourse, annuleAvantCapture] }, d("2026-08-01T00:00:00Z"), d("2026-10-01T00:00:00Z"), "month");
+    expect(pts.map((p) => [p.period, p.finance.find((f) => f.currencyCode === "EUR")?.refundedCents ?? 0])).toEqual([["2026-08", 1000], ["2026-09", 500]]);
+    // Avant A167 : août 0, septembre 1 500 + 3 920.
+  });
+
+  it("A167 : le drilldown « Remboursé » — un élément par remboursement de la période, son montant, sa date ; Σ = point", () => {
+    const sept = refundDrilldownItems([rembourse, annuleAvantCapture], d("2026-09-01T00:00:00Z"), d("2026-10-01T00:00:00Z"));
+    expect(sept).toEqual([{ kind: "DEAL", id: rembourse.id, label: "Paris → Brazzaville", at: "2026-09-03T10:00:00.000Z", status: "COMPLETED", amountCents: 500, currencyCode: "EUR" }]);
+    const aout = refundDrilldownItems([rembourse], d("2026-08-01T00:00:00Z"), d("2026-09-01T00:00:00Z"));
+    expect(aout.map((i) => i.amountCents)).toEqual([1000]);
+    const deuxFois = refundDrilldownItems([{ ...rembourse, refunds: rembourse.refunds.map((r) => ({ ...r, refundedAt: d("2026-09-10T00:00:00Z") })), refundedAt: d("2026-09-10T00:00:00Z") }], d("2026-09-01T00:00:00Z"), d("2026-10-01T00:00:00Z"));
+    expect(deuxFois.map((i) => [i.id, i.amountCents])).toEqual([[rembourse.id, 1000], [rembourse.id, 500]]);
+  });
+
+  it("A167 (ADM-PIL-6) : un corridor sans aucune activité dans la fenêtre n'est pas listé, même connu du registre des recherches", () => {
+    const out = buildCorridors({
+      trips: [],
+      bookings: [],
+      searchedCorridors: ["ancien>lome", "nantes>cotonou"],
+      stats: new Map([["ancien>lome", { views: 0, searches: 0, noResult: 0 }], ["nantes>cotonou", { views: 0, searches: 3, noResult: 3 }]]),
+    });
+    expect(out.map((c) => c.key)).toEqual(["nantes>cotonou"]);
+    expect(buildCorridors({ trips: [], bookings: [], searchedCorridors: ["ancien>lome"], stats: new Map() })).toEqual([]); // Redis absent : rien d'inventé
   });
 });

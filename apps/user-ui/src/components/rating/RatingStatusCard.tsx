@@ -63,7 +63,7 @@ export default function RatingStatusCard({ dealId, rating, counterpartFirstName,
     return (
       <section className={`rounded-2xl border border-amber-200 bg-amber-50 text-center dark:border-amber-900/40 dark:bg-amber-950/25 ${pad}`}>
         <h3 className="text-[14px] font-bold text-amber-950 dark:text-amber-100">{t("promptTitle", { name: counterpartFirstName })}</h3>
-        <p className="mx-auto mt-1 max-w-sm text-[12.5px] leading-snug text-amber-900/85 dark:text-amber-200/85">{t("promptText", { date: windowEnd })}</p>
+        <p className="mx-auto mt-1 max-w-sm text-[12.5px] leading-snug text-amber-900/85 dark:text-amber-200/85">{windowEnd ? t("promptText", { date: windowEnd }) : t("promptTextNoDate")}</p>
         <button
           type="button"
           onClick={() => router.push(rateHref)}

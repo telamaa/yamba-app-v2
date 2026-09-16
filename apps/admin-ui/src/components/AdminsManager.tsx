@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch, del, patch, post } from "@/lib/api";
-import { dateTime } from "@/lib/format";
+import { adminAccountRefusalMessage, dateTime } from "@/lib/format";
 import { ADMIN_ROLES, ROLE_LABEL, type AdminRole } from "@/lib/permissions";
-import type { AdminAccount } from "@/lib/types";
+import type { AdminAccount, AdminMe } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const ROLE_HINT: Record<AdminRole, string> = {
   SUPER_ADMIN: "tout, comptes admin, remboursements manuels",
@@ -39,24 +40,35 @@ export default function AdminsManager() {
   const [items, setItems] = useState<AdminAccount[]>([]);
   const [form, setForm] = useState<{ email: string; firstName: string; lastName: string; adminRoles: AdminRole[] }>({ email: "", firstName: "", lastName: "", adminRoles: ["SUPPORT"] });
   const [msg, setMsg] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [busy, setBusy] = useState(false);
+  const [me, setMe] = useState<AdminMe | null>(null); // § 5.25 — sa propre ligne ne propose ni cases ni « Retirer » (le serveur refuse de toute façon)
+  /** Recette § 5.25 — un refus en français, lu par son code ; une liste périmée est rechargée. */
+  const refuse = (err: unknown, fallback: string) => {
+    if (err instanceof ApiError) {
+      const m = adminAccountRefusalMessage(err);
+      setMsg(m.text);
+      if (m.reload) load();
+    } else setMsg(fallback);
+  };
 
   const load = useCallback(() => {
-    apiFetch<{ items: AdminAccount[] }>("/admin/admins").then((r) => setItems(r.items)).catch(() => undefined);
+    apiFetch<{ items: AdminAccount[] }>("/admin/admins").then((r) => setItems(r.items)).catch((e) => { if (isPermissionRefusal(e)) deny("Ton profil ne gère pas les comptes admin (super administrateur seulement)."); });
   }, []);
   useEffect(load, [load]);
+  useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
 
   async function invite(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setMsg(null);
     try {
-      const r = await post<{ existingAccount: boolean }>("/admin/admins/invite", form);
-      setMsg(r.existingAccount ? "Profils posés sur un compte existant, email envoyé." : "Compte créé, invitation envoyée (48 h).");
+      const r = await post<{ existingAccount: boolean; passwordRequired?: boolean }>("/admin/admins/invite", form);
+      setMsg(!r.existingAccount ? "Compte créé, invitation envoyée (48 h)." : r.passwordRequired ? "Profils posés sur un compte existant sans mot de passe : lien pour en définir un envoyé (48 h)." : "Profils posés sur un compte existant, email envoyé.");
       setForm({ email: "", firstName: "", lastName: "", adminRoles: ["SUPPORT"] });
       load();
     } catch (err) {
-      setMsg(err instanceof ApiError ? `${err.status} : ${err.message}` : "Invitation impossible.");
+      refuse(err, "Invitation impossible.");
     } finally {
       setBusy(false);
     }
@@ -67,17 +79,36 @@ export default function AdminsManager() {
       await patch(`/admin/admins/${id}`, { adminRoles });
       load();
     } catch (err) {
-      setMsg(err instanceof ApiError ? `${err.status} : ${err.message}` : "Changement impossible.");
+      refuse(err, "Changement impossible.");
       load();
     }
   }
+  /** A189 b — motif FACULTATIF (écrit au journal, jamais dans l'email) : « Annuler » renonce, un champ vide retire sans motif. */
   async function revoke(id: string, name: string) {
-    if (!window.confirm(`Retirer l'accès admin de ${name} ? Sa 2FA et ses sessions admin sont supprimées.`)) return;
+    const answer = window.prompt(`Retirer l'accès admin de ${name} ? Sa 2FA et ses sessions admin sont supprimées.\nMotif (facultatif, écrit au journal) :`, "");
+    if (answer === null) return;
+    setMsg(null);
     try {
-      await del(`/admin/admins/${id}`);
+      const reason = answer.trim();
+      await del(`/admin/admins/${id}`, reason ? { reason } : undefined);
       load();
     } catch (err) {
-      setMsg(err instanceof ApiError ? `${err.status} : ${err.message}` : "Retrait impossible.");
+      refuse(err, "Retrait impossible.");
+    }
+  }
+  /** A189 a — renvoyer une invitation en attente : nouveau lien, l'ancien ne sert plus. */
+  async function resend(a: AdminAccount) {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await post<{ inviteExpiresAt: string }>(`/admin/admins/${a.id}/invite/resend`);
+      setMsg(`Invitation renvoyée à ${a.email} : nouveau lien valable jusqu'au ${dateTime(r.inviteExpiresAt)}, l'ancien ne sert plus.`);
+      load();
+    } catch (err) {
+      refuse(err, "Renvoi impossible.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -89,18 +120,29 @@ export default function AdminsManager() {
             <tr><th className="px-3 py-2">Nom</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Profils (cumulables)</th><th className="px-3 py-2">État</th><th className="px-3 py-2"></th></tr>
           </thead>
           <tbody>
-            {items.map((a) => (
-              <tr key={a.id} className="border-t border-slate-100 align-top">
-                <td className="px-3 py-2 font-semibold">{a.firstName} {a.lastName}</td>
-                <td className="px-3 py-2">{a.email}</td>
-                <td className="px-3 py-2"><RolesPicker compact value={a.adminRoles.length ? a.adminRoles : [a.adminRole]} onChange={(roles) => changeRoles(a.id, roles)} /></td>
-                <td className="px-3 py-2 text-[11.5px] text-slate-600">{!a.inviteAccepted ? "invitation en attente" : a.totpEnabled ? "2FA active" : "2FA à activer"} · {dateTime(a.createdAt)}</td>
-                <td className="px-3 py-2"><button onClick={() => revoke(a.id, `${a.firstName} ${a.lastName}`)} className="text-[12px] text-red-700 hover:underline">Retirer</button></td>
-              </tr>
-            ))}
+            {items.map((a) => {
+              const self = me?.id === a.id;
+              return (
+                <tr key={a.id} className="border-t border-slate-100 align-top">
+                  <td className="px-3 py-2 font-semibold">{a.firstName} {a.lastName}{self && <span className="ml-1 text-[11px] font-normal text-slate-500">(toi)</span>}</td>
+                  <td className="px-3 py-2">{a.email}</td>
+                  <td className="px-3 py-2"><RolesPicker compact disabled={self} value={a.adminRoles.length ? a.adminRoles : [a.adminRole]} onChange={(roles) => changeRoles(a.id, roles)} /></td>
+                  <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                    {!a.inviteAccepted ? "invitation en attente" : a.totpEnabled ? "2FA active" : "2FA à activer"} · {dateTime(a.createdAt)}
+                    {!a.inviteAccepted && (
+                      <span className="mt-0.5 block">
+                        <span data-testid="invite-expiry" className={a.inviteExpiresAt ? "" : "font-semibold text-amber-700"}>{a.inviteExpiresAt ? `lien valable jusqu'au ${dateTime(a.inviteExpiresAt)}` : "lien expiré"}</span>
+                        {!self && <button type="button" disabled={busy} onClick={() => resend(a)} className="ml-2 text-[11.5px] font-medium text-slate-900 underline-offset-2 hover:underline disabled:opacity-60">Renvoyer l&apos;invitation</button>}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">{self ? <span className="text-[11px] text-slate-400" title="Un autre super administrateur doit modifier ou retirer ton accès.">ton accès</span> : <button onClick={() => revoke(a.id, `${a.firstName} ${a.lastName}`)} className="text-[12px] text-red-700 hover:underline">Retirer</button>}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {msg && <p className="px-3 py-2 text-[12px] text-slate-600">{msg}</p>}
+        {msg && <p data-testid="admins-message" role="status" className="px-3 py-2 text-[12px] text-slate-600">{msg}</p>}
       </div>
       <form onSubmit={invite} className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-[13px] font-bold">Inviter</h2>

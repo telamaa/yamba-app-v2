@@ -5,6 +5,7 @@
  * (proposé / accepté), pas une suite de messages ; le fil sert au reste.
  */
 import { z } from "zod";
+import { ReportDecisionSchema } from "../admin/report-decision.schema";
 import { ObjectIdSchema } from "../common";
 
 export const MESSAGE_MAX_LENGTH = 2000;
@@ -174,6 +175,7 @@ export const AdminConversationResponseSchema = z
     conversationId: ObjectIdSchema,
     bookingId: ObjectIdSchema,
     bookingStatus: z.string(),
+    mediationFile: z.boolean().describe("Recette § 5.18 — le deal a un dossier de médiation (litige ouvert, ou retenue arbitrée) : le lien « Dossier de médiation » ne mène jamais à « jamais passé en médiation »"),
     corridor: z.object({ originCity: z.string(), destinationCity: z.string(), departureAt: z.string().datetime().nullable() }),
     shipper: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),
     carrier: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),
@@ -205,6 +207,8 @@ export const AdminMessageReportItemSchema = z
     conversationId: ObjectIdSchema.nullable(),
     bookingId: ObjectIdSchema.nullable(),
     corridor: z.object({ originCity: z.string(), destinationCity: z.string() }).nullable(),
+    /** Décision du 15/09 — qui a décidé, quand, la note (ligne de journal MESSAGE_REPORT_REVIEWED) ; null si ouvert. */
+    decision: ReportDecisionSchema.nullable(),
   })
   .meta({ id: "AdminMessageReportItem" });
 export type AdminMessageReportItem = z.infer<typeof AdminMessageReportItemSchema>;

@@ -6,6 +6,7 @@ import {
   encryptDeliveryCode,
   hashDeliveryCode,
 } from "../../delivery-code/src/index";
+import { REPUTATION_PARAMS } from "../../api-contracts/src/booking/booking-rating.schema";
 
 /**
  * Mot de passe DEV commun aux 12 users du seed (PR5) : Yamba-Dev-2026!
@@ -295,7 +296,11 @@ async function main() {
       // `publicSlug` aussi à la mise à jour : les comptes du seed antérieurs au profil public
       // (`/u/[slug]`) restaient sans slug, et `/u/seed-thomas` répondait « Profil introuvable »
       // (recette WEB-E2E-1, étape 29).
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}` },
+      // Recette 02-ADMIN § 5.3 (ADM-USR-3) : les compteurs INTERNES qui aggravent le TrustScore (D71) survivaient au
+      // rejeu — chaque litige tranché en recette ajoutait 25 points à Chinwe pour toujours (0 → 1 → 2 → 3 litiges perdus
+      // en trois passages) jusqu'à la faire passer « À risque », plafonds CNF-06 compris. Ils repartent de zéro, comme
+      // les litiges et les annulations qu'ils résument (wipe plus bas). Deals terminés et avis : non touchés.
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}`, shipperDisputesLostCount: 0, shipperLateCancellationsCount: 0 },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
@@ -327,6 +332,8 @@ async function main() {
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
         stripePayoutsEnabled: true,
+        disputesLostCount: 0, // ADM-USR-3 — même remise à zéro côté Voyageur (voir l'upsert des users)
+        lateCancellationsCount: 0,
       },
       create: {
         userId,
@@ -349,6 +356,19 @@ async function main() {
   const delD = await prisma.dispute.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // B5 — les avis suivent leurs bookings (recette 5.22 : sans cette purge, les avis des passages precedents
+  // restaient reveles sur les profils publics des comptes du seed — 25 avis orphelins au bout d'une matinee).
+  const delR = await prisma.review.deleteMany({
+    where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
+  });
+  // C-PR8b (D63) — le journal des demandes RGPD des comptes du seed : sans cette purge, un export reussi lors
+  // d'un passage precedent bloque le suivant pendant 24 h (« un export par 24 h », recette 5.25).
+  const delDR = await prisma.dataRequest.deleteMany({ where: { userId: { in: seedIds } } });
+  // D68 — les signalements des comptes du seed (auteur, ou membre visé) suivent aussi : un signalement OUVERT du
+  // passage precedent rendait « Signaler ce profil » 409 des le premier clic (recette 5.24).
+  const delS = await prisma.report.deleteMany({
+    where: { OR: [{ reporterUserId: { in: seedIds } }, { targetType: "USER", targetId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
@@ -369,7 +389,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delDR.count} demandes RGPD, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
@@ -476,6 +496,8 @@ async function main() {
         recipient: b.recipient,
         pickup: b.pickup ? { ...b.pickup, checklist: SEED_CHECKLIST } : undefined,
         trackingEvents: b.trackingEvents ?? [],
+        refunds: [], // A166 — jamais absente
+        deliveryPhotoUrls: [], // recette § 5.16 — le seed la laissait absente (23 documents réparés), comme l'API avant A85
         // D43 — un vrai code (haché + chiffré) dès qu'il y a eu pickup.
         ...(b.pickup
           ? { deliveryCodeHash: seedCodeHash, deliveryCodeEncrypted: encryptDeliveryCode(SEED_DELIVERY_CODE) }
@@ -504,11 +526,16 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "FAILED",
           payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
-          // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
-          payoutLastAttemptAt: days(-1),
-          payoutNextRetryAt: days(-1),
+          // C-PR5 (A111) — « Relancer » dans l'admin n'attend pas l'échéance. Recette 02-ADMIN § 5.1 : une relance
+          // ÉCHUE faisait partir ce versement par le cron des 5 minutes (fournisseur FAKE, compte de Thomas prêt) —
+          // la file « Versements en échec » se vidait seule entre le seed et la fiche. Relance posée à demain.
+          payoutLastAttemptAt: hours(-1),
+          payoutNextRetryAt: hours(23),
         },
       });
     } else if (b.status === "COMPLETED" && b.key.endsWith("-reversed")) {
@@ -519,6 +546,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "REVERSED",
           payoutFailureReason: "PROVIDER_REVERSED",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutSentAt: m.completedAt ?? NOW,
           payoutAttempts: 1,
@@ -555,8 +585,25 @@ async function main() {
           chargeId: `ch_fake_seed_${b.key}`,
           refundedAt: closedAt,
           refundAmountCents: pricing.totalShipperCents - retentionCents,
+          refunds: [{ refundId: null, amountCents: pricing.totalShipperCents - retentionCents, refundedAt: closedAt, kind: "CANCELLATION" }], // A166
           retentionCents,
           retentionDisposition: "HELD_FOR_MEDIATION",
+        },
+      });
+    }
+    if (b.status === "CANCELLED" && !b.key.endsWith("-held") && (b.milestones as { acceptedAt?: Date }).acceptedAt) {
+      // Recette 02-ADMIN § 5.12 (ANO-ADM-30) — un deal ACCEPTÉ (donc débité) puis annulé par l'Expéditeur plus de 48 h
+      // avant le départ est remboursé en entier, comme le fait `deal-lifecycle.service.ts` (ANN-01). Le jeu d'essai
+      // posait le débit sans le remboursement : la fiche argent montrait 33,60 € encaissés sur un deal clos, sans destination.
+      const pricing = (booking as unknown as { pricing: { totalShipperCents: number } }).pricing;
+      const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          refundedAt: closedAt,
+          refundAmountCents: pricing.totalShipperCents,
+          refundId: `re_fake_seed_${b.key}`,
+          refunds: [{ refundId: `re_fake_seed_${b.key}`, amountCents: pricing.totalShipperCents, refundedAt: closedAt, kind: "CANCELLATION" }], // A166
         },
       });
     }
@@ -595,6 +642,25 @@ async function main() {
       });
       console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose, 1 message signale)`);
     }
+    // Recette 02-ADMIN § 6 (ADM-E2E-1, étape 6) — le dossier YAM-2041 renvoie à « la conversation des deux parties » :
+    // sans fil, le Médiateur lisait « Ce deal n'a pas de conversation. » et l'étape ne se jouait pas. Un numéro tapé par
+    // l'Expéditrice prouve le masquage au back-office (ANO-ADM-42, § 5.18).
+    if (b.key === "bzv-disputed") {
+      const shipperId = userIds.get(b.shipperKey)!;
+      const carrierId = userIds.get(t.carrierKey)!;
+      const conversation = await prisma.conversation.create({
+        // Les deux parties ont LU le fil (lastReadAt après le dernier message) : aucun « non lu » ne s'ajoute aux compteurs
+        // du jeu d'essai (WEB-MSG-1 attend UN message non lu chez Thomas, celui de bzv-accepted).
+        data: { bookingId: booking.id, shipperId, carrierId, lastMessageAt: days(-1), lastMessageAuthorRole: "SHIPPER", shipperLastReadAt: hours(-12), carrierLastReadAt: hours(-12), shipperRemindedAt: null, carrierRemindedAt: null },
+      });
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Colis remis ce matin au destinataire, carton ferme comme a la prise en charge.", photoUrls: [], createdAt: days(-2) },
+      });
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Deux jouets manquent dans le carton. Appelle-moi au 06 12 34 56 78 pour qu'on regle ca.", photoUrls: [], createdAt: days(-1) },
+      });
+      console.log(`    · conversation seedee sur ${b.key} (2 messages, dont un numero tape)`);
+    }
     if (b.status === "DISPUTED") {
       await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });
       await prisma.dispute.create({
@@ -608,6 +674,7 @@ async function main() {
           desiredOutcome: "PARTIAL_REFUND",
           photoUrls: [],
           pledgeAcceptedAt: m.disputedAt ?? NOW,
+          responseDueAt: new Date((m.disputedAt ?? NOW).getTime() + 72 * 3_600_000), // ANO-ADM-52 — échéance figée à l'ouverture (défaut 72 h)
         },
       });
     }
@@ -621,6 +688,34 @@ async function main() {
     });
   }
   console.log(`✓ ${BOOKINGS.length} bookings\n`);
+
+  // 4bis. Recette 02-ADMIN § 5.16 — la réputation dénormalisée RECALCULÉE sur les deals recréés. Le rejeu ne remettait à
+  // zéro que les annulations et les litiges perdus : un deal terminé par une fiche précédente (WEB-CNF) laissait
+  // `completedDealsCount: 1` sur un Voyageur qui n'en avait plus aucun, et le premier recalcul réel (refus au pickup,
+  // WEB-PIC-6) « changeait » son profil. Mêmes faits que `apps/deal-service/src/services/reputation.service.ts`
+  // (le jeu d'essai ne crée aucun avis), seuils par défaut du contrat.
+  const levelOf = (t: { confirmedMinDeals: number }, completed: number) => (completed >= t.confirmedMinDeals ? "CONFIRMED" : "NEW");
+  for (const u of USERS) {
+    const userId = userIds.get(u.key)!;
+    const [shipperCompleted, shipperLate] = await Promise.all([
+      prisma.booking.count({ where: { shipperId: userId, status: "COMPLETED", isDeleted: false } }),
+      prisma.booking.count({ where: { shipperId: userId, status: "CANCELLED", isDeleted: false, retentionCents: { gt: 0 } } }),
+    ]);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { shipperRatingsAvg: 0, shipperRatingsCount: 0, shipperCompletedDealsCount: shipperCompleted, shipperLateCancellationsCount: shipperLate, shipperReputationLevel: levelOf(REPUTATION_PARAMS.shipper, shipperCompleted) },
+    });
+    if (!u.carrier) continue;
+    const [carrierCompleted, carrierLate] = await Promise.all([
+      prisma.booking.count({ where: { carrierId: userId, status: "COMPLETED", isDeleted: false } }),
+      prisma.booking.count({ where: { carrierId: userId, status: "CANCELLED", closedBy: "CARRIER", isDeleted: false, acceptedAt: { not: null }, OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }] } }),
+    ]);
+    await prisma.carrierPage.update({
+      where: { userId },
+      data: { ratingsAvg: 0, ratingsCount: 0, completedDealsCount: carrierCompleted, lateCancellationsCount: carrierLate, reputationLevel: levelOf(REPUTATION_PARAMS.carrier, carrierCompleted), isSuperCarrier: false },
+    });
+  }
+  console.log(`✓ réputation recalculée sur les deals recréés (${USERS.length} membres)\n`);
 
   // 5. Sortie — table console + seed-output.json (successeur des magic IDs)
   console.table(output.map(({ key, status, corridor, id }) => ({ key, status, corridor, id })));

@@ -20,6 +20,12 @@ export const ErasureBlockedResponseSchema = z
   .meta({ id: "ErasureBlockedResponse" });
 export type ErasureBlockedResponse = z.infer<typeof ErasureBlockedResponseSchema>;
 
+/** A179 (recette § 5.22) — l'admin lit les bloqueurs AVANT de cliquer « Effacer » (lecture non journalisée, `users.erase`). */
+export const ErasureCheckResponseSchema = z
+  .object({ blockers: z.array(ErasureBlockerSchema), counts: z.record(z.string(), z.number().int()) })
+  .meta({ id: "ErasureCheckResponse", description: "Why this account cannot be erased yet (empty list = erasable now). Re-checked inside the erasure transaction." });
+export type ErasureCheckResponse = z.infer<typeof ErasureCheckResponseSchema>;
+
 /** D65 : les gestes sensibles passent par la fenêtre sudo (`POST /auth/me/sudo/verify`), plus de code dans le corps. */
 export const EraseMyAccountRequestSchema = z
   .object({ confirmation: z.literal(ERASURE_CONFIRMATION_WORD) })

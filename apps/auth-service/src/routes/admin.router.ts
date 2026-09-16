@@ -11,10 +11,10 @@ import isAdminAuthenticated from "@packages/middleware/isAdminAuthenticated";
 import { requireAdminPermission } from "@packages/middleware/requireAdminRole";
 import { makeAdminUsersController } from "../controller/admin-users.controller";
 import { makeAdminUsersService } from "../services/admin-users.service";
-import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
+import { acceptAdminInvite, inviteAdmin, listAdmins, resendAdminInvite, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
 import { getAdminKpis } from "../controller/admin-kpis.controller";
 import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
-import { adminEraseUser, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63)
+import { adminEraseUser, adminErasureBlockers, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63), A179
 import { getMaintenance, getStatus, updateMaintenance } from "../controller/admin-status.controller"; // C-PR8c (D64)
 import { makeReportController } from "../controller/report.controller"; // D68
 import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
@@ -26,9 +26,11 @@ import {
   adminTotpSetup,
   adminTotpVerify,
   getAdminMe,
-  listAdminAudit,
+  listAdminAudit, listAdminAuditAuthors, exportAdminAudit,
   listAdminSessions,
   revokeAdminSessionById,
+  revokeOtherAdminSessions,
+  regenerateAdminBackupCodes,
 } from "../controller/admin-auth.controller";
 
 const router = Router();
@@ -48,8 +50,12 @@ router.get("/admin/kpis", isAdminAuthenticated, requireAdminPermission("kpi.read
 router.get("/admin/pilotage/series", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageSeries); // C-PR6a (D59)
 router.get("/admin/pilotage/corridors", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageCorridors);
 router.get("/admin/pilotage/drilldown", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageDrilldown); // C-PR6c (D60 3A)
+router.delete("/admin/me/sessions", isAdminAuthenticated, revokeOtherAdminSessions); // A190 b
+router.post("/admin/me/backup-codes", isAdminAuthenticated, regenerateAdminBackupCodes); // A190 a
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
+router.get("/admin/audit/authors", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAuditAuthors); // A187 a
+router.get("/admin/audit/export", isAdminAuthenticated, requireAdminPermission("audit.read"), requireAdminPermission("exports.personal"), exportAdminAudit); // A187 c — IP d'admins : donnée personnelle
 
 // C-PR8a (D62) — paramètres : lecture pour tous les profils, écriture bornée par portée DANS le service (une requête peut mêler métier et exploitation).
 router.get("/admin/settings", isAdminAuthenticated, requireAdminPermission("settings.read"), getSettings);
@@ -67,6 +73,7 @@ router.get("/admin/admins", isAdminAuthenticated, requireAdminPermission("admins
 router.post("/admin/admins/invite", isAdminAuthenticated, requireAdminPermission("admins.manage"), inviteAdmin);
 router.patch("/admin/admins/:id", isAdminAuthenticated, requireAdminPermission("admins.manage"), updateAdminRole);
 router.delete("/admin/admins/:id", isAdminAuthenticated, requireAdminPermission("admins.manage"), revokeAdmin);
+router.post("/admin/admins/:id/invite/resend", isAdminAuthenticated, requireAdminPermission("admins.manage"), resendAdminInvite); // A189 a
 
 // C-PR3 (D56) — utilisateurs et suspension
 const adminUsers = makeAdminUsersController(makeAdminUsersService());
@@ -79,6 +86,7 @@ router.delete("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminP
 router.delete("/admin/users/:id/email-suppression", isAdminAuthenticated, requireAdminPermission("users.email.unsuppress"), adminUsers.unsuppressEmail); // D35 4A
 // C-PR8b (D63 6A) — données personnelles : effacement à la demande, registre des demandes
 router.post("/admin/users/:id/erase", isAdminAuthenticated, requireAdminPermission("users.erase"), adminEraseUser);
+router.get("/admin/users/:id/erasure-blockers", isAdminAuthenticated, requireAdminPermission("users.erase"), adminErasureBlockers); // A179
 router.get("/admin/privacy/requests", isAdminAuthenticated, requireAdminPermission("privacy.requests.read"), listDataRequests);
 // D68 3A — file des trajets et membres signalés (les messages restent dans message-service)
 const reports = makeReportController();

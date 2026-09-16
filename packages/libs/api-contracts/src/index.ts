@@ -20,6 +20,8 @@ export * from "./booking/booking.enums";
 export * from "./booking/booking.schema";
 export * from "./booking/booking-events.schema";
 export * from "./booking/booking-request.schema";
+export * from "./booking/booking-refunds"; // A166 / A167 — liste des remboursements, règle partagée
+export * from "./admin/redact-contacts"; // § 5.12, partagée au § 5.18 — coordonnées masquées pour les lectures admin
 export * from "./booking/booking-lifecycle.schema";
 export * from "./booking/booking-transport.schema";
 export * from "./booking/booking-settlement.schema";
@@ -39,9 +41,11 @@ export * from "./admin/admin-alerts.schema";
 export * from "./admin/platform-settings.schema"; // C-PR8a (D62)
 export * from "./admin/admin-privacy.schema"; // C-PR8b (D63)
 export * from "./admin/admin-status.schema"; // C-PR8c (D64)
+export * from "./admin/cron-catalogue"; // A176, A178 (recette § 5.22)
 export * from "./admin/member-sessions.schema"; // D65
 export * from "./admin/member-profile.schema"; // D67
 export * from "./admin/reports.schema"; // D68
+export * from "./admin/report-decision.schema"; // décision du 15/09 : qui a décidé un signalement, quand, avec quelle note
 export * from "./admin/trust.schema"; // D71
 export * from "./booking/tracking-link.schema"; // D69
 export * from "./auth/member-auth.schema"; // A145 — surface membre d'auth-service (OpenAPI)

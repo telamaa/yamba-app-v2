@@ -16,15 +16,18 @@ export const ADMIN_ACTIONS = [
   "ADMIN_LOGOUT",
   "ADMIN_TOTP_ENABLED",
   "ADMIN_BACKUP_CODE_USED",
+  "ADMIN_BACKUP_CODES_REGENERATED", // A190 a (recette § 6)
   "DISPUTE_VIEWED",
   "DISPUTE_RESOLVED",
   "RETENTION_ARBITRATED",
   // C-PR3 (D56)
   "ADMIN_INVITED",
   "ADMIN_INVITE_ACCEPTED",
+  "ADMIN_INVITE_RESENT", // A189 a
   "ADMIN_ROLE_CHANGED",
   "ADMIN_REVOKED",
   "ADMIN_SESSION_REVOKED",
+  "ADMIN_SESSIONS_REVOKED", // A190 b — « toutes mes autres sessions », une ligne avec le nombre
   "USER_VIEWED",
   "USER_SUSPENSION_PROPOSED",
   "USER_SUSPENDED",
@@ -71,10 +74,19 @@ export const ADMIN_ACTIONS = [
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 
+/**
+ * A183 (recette 02-ADMIN § 5.24) — les types de cible réellement écrits. Le filtre « Type de cible » du journal proposait
+ * DISPUTE, MAINTENANCE et EXPORT (jamais écrits : un litige se journalise sur son BOOKING, la maintenance et les exports sur
+ * SETTINGS / la ressource exportée) et oubliait CONVERSATION : trois choix qui rendaient toujours un journal vide, un type
+ * introuvable. Catalogue fermé, typé : un service qui écrirait hors catalogue ne compile plus.
+ */
+export const ADMIN_TARGET_TYPES = ["USER", "BOOKING", "TRIP", "CONVERSATION", "REPORT", "SESSION", "SETTINGS"] as const;
+export type AdminTargetType = (typeof ADMIN_TARGET_TYPES)[number];
+
 export type AdminActionInput = {
   adminUserId: string;
-  action: AdminActionType | (string & {});
-  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | "TRIP" | "SETTINGS" | (string & {});
+  action: AdminActionType; // A183 — catalogue fermé : une action sans libellé au journal ne compile plus
+  targetType: AdminTargetType;
   targetId?: string | null;
   before?: unknown;
   after?: unknown;
@@ -107,4 +119,34 @@ export async function recordAdminAction(db: AdminActionWriter, input: AdminActio
       userAgent: shortUa(input.userAgent),
     },
   });
+}
+
+/* ── A168 (recette 02-ADMIN § 5.18) — lectures coalescées ─────────────────────────────── */
+
+/** Le minimum de Redis dont la coalescence a besoin (ioredis convient tel quel). */
+export type ReadCoalescer = { set(key: string, value: string, mode: "EX", seconds: number, flag: "NX"): Promise<unknown> };
+
+export const READ_COALESCE_SECONDS = 10;
+export const readCoalesceKey = (input: Pick<AdminActionInput, "adminUserId" | "action" | "targetType" | "targetId">) =>
+  `yamba:audit:read:${input.adminUserId}:${input.action}:${input.targetType}:${input.targetId ?? "-"}`;
+
+/**
+ * Une LECTURE déclenchée par l'ouverture d'un écran (USER_VIEWED, DISPUTE_VIEWED, DEAL_MONEY_VIEWED, TRIP_VIEWED,
+ * CONVERSATION_VIEWED) : même admin, même action, même cible dans la fenêtre → une seule ligne. Mesuré en recette : trois
+ * ouvertures de chaque écran écrivaient six lignes (effet de montage rejoué par React en développement, double appel).
+ * Rend `true` si la ligne a été écrite. Sans coalesceur, ou si Redis ne répond pas, la ligne est écrite : un doublon vaut
+ * mieux qu'une lecture perdue. Jamais pour un GESTE : un geste s'écrit toujours, dans sa transaction.
+ */
+export async function recordAdminRead(db: AdminActionWriter, coalescer: ReadCoalescer | null | undefined, input: AdminActionInput, windowSeconds: number = READ_COALESCE_SECONDS): Promise<boolean> {
+  if (coalescer) {
+    let first = true;
+    try {
+      first = (await coalescer.set(readCoalesceKey(input), "1", "EX", windowSeconds, "NX")) !== null;
+    } catch {
+      first = true;
+    }
+    if (!first) return false;
+  }
+  await recordAdminAction(db, input);
+  return true;
 }

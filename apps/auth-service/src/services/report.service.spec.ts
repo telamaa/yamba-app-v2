@@ -43,6 +43,15 @@ describe("createReport (D68 1A/2A)", () => {
     expect(db.tables.report[0]).toMatchObject({ reporterUserId: "u-awa", targetType: "TRIP", targetId: "t1", reason: "SCAM", details: "paie hors Yamba", status: "OPEN" });
     expect(sent).toEqual(["awa@example.com|fr|Ton signalement a bien été reçu"]);
   });
+  it("ANO-WEB-79 — une annonce masquée par Yamba (hiddenByAdminAt) est introuvable pour le signalement : 404, jamais 201", async () => {
+    const masque = { ...trip, id: "t-hidden", hiddenByAdminAt: new Date("2026-09-10T00:00:00.000Z") };
+    const db = fakeDb({ user: [awa, moussa], trip: [trip, masque] });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    await expect(svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t-hidden", reason: "OTHER" })).rejects.toMatchObject({ details: { code: "TRIP_NOT_FOUND" } });
+    // Un trajet sans le champ (antérieur à C-PR4) reste signalable : `isSet: false` le laisse passer.
+    await expect(svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t1", reason: "OTHER" })).resolves.toMatchObject({ reportId: expect.any(String) });
+  });
+
   it("membre par son slug → targetId = id du membre ; page masquée ou compte effacé → 404", async () => {
     const db = fakeDb({ user: [awa, moussa, { ...awa, id: "u-hidden", publicSlug: "hidden", profilePublic: false }] });
     const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
@@ -84,6 +93,18 @@ describe("listReports / reviewReport (D68 3A)", () => {
     expect(list.items[0]).toMatchObject({ targetType: "TRIP", targetLabel: "Paris → Dakar", targetOwner: { id: "u-moussa", firstName: "Moussa" }, reporter: { firstName: "Awa" }, openCountOnTarget: 3, priority: true });
     expect(list.items[0].targetTrustLevel).toBe("HIGH_RISK");
     expect(list.items[3]).toMatchObject({ targetType: "USER", targetId: "u-moussa", targetLabel: "Moussa Ba", targetOwner: null, openCountOnTarget: 1, priority: true, targetTrustLevel: "HIGH_RISK" }); // D71 : à risque → prioritaire malgré un seul signalement
+    expect(list.items.every((i) => i.targetMissing === false)).toBe(true);
+  });
+  it("ANO-ADM-47 — une cible disparue (trajet purgé, membre effacé) ne fait pas sortir le signalement de la file ; il se clôt", async () => {
+    const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t-purge"), open("r22", "u-awa", "USER", "u-efface"), open("r333", "u-awa", "TRIP", "t1")] });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    const list = await svc.listReports("OPEN");
+    expect(list.total).toBe(3);
+    expect(list.items[0]).toMatchObject({ id: "r1", targetType: "TRIP", targetLabel: "Trajet introuvable", targetMissing: true, targetOwner: null, targetTrustLevel: null });
+    expect(list.items[1]).toMatchObject({ id: "r22", targetType: "USER", targetLabel: "Membre introuvable", targetMissing: true });
+    expect(list.items[2]).toMatchObject({ id: "r333", targetLabel: "Paris → Dakar", targetMissing: false });
+    await expect(svc.reviewReport(actor, "r1", { decision: "DISMISSED" })).resolves.toEqual({ id: "r1", status: "DISMISSED" });
+    expect((await svc.listReports("OPEN")).items.map((i) => i.id)).toEqual(["r22", "r333"]);
   });
   it("décision + journal dans la transaction ; deuxième décision → 409 ; un signalement de message n'est pas traité ici", async () => {
     const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1"), open("r5", "u-awa", "MESSAGE", "m1")] });
@@ -93,5 +114,35 @@ describe("listReports / reviewReport (D68 3A)", () => {
     expect(db.tables.adminAction[0]).toMatchObject({ action: "REPORT_REVIEWED", targetType: "REPORT", targetId: "r1", adminUserId: "adm" });
     await expect(svc.reviewReport(actor, "r1", { decision: "REVIEWED" })).rejects.toMatchObject({ statusCode: 409 });
     await expect(svc.reviewReport(actor, "r5", { decision: "REVIEWED" })).rejects.toMatchObject({ statusCode: 404 });
+  });
+  it("décision du 15/09 — sous « traité » / « sans suite » : qui a décidé, quand, la note (ligne de journal) ; ouvert ou donnée ancienne → null", async () => {
+    const nadia = { id: "adm-nadia", firstName: "Nadia", lastName: "Médiatrice", isDeleted: false };
+    const db = fakeDb({ user: [awa, moussa, nadia], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1"), { ...open("r-ancien", "u-awa", "USER", "u-moussa"), status: "REVIEWED" }, open("r3", "u-moussa", "TRIP", "t1")] });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    expect((await svc.listReports("OPEN")).items.every((i) => i.decision === null)).toBe(true);
+    await svc.reviewReport({ ...actor, id: "adm-nadia" }, "r1", { decision: "REVIEWED", note: "Trajet masqué après vérification." });
+    const traites = (await svc.listReports("REVIEWED")).items;
+    expect(traites.map((i) => i.id)).toEqual(["r1", "r-ancien"]);
+    expect(traites[0].decision).toEqual({ by: { id: "adm-nadia", firstName: "Nadia" }, at: expect.any(String), note: "Trajet masqué après vérification." });
+    expect(traites[1].decision).toBeNull(); // décidé avant le journal : pas de ligne, pas d'erreur
+    await svc.reviewReport({ ...actor, id: "adm-nadia" }, "r3", { decision: "DISMISSED" });
+    expect((await svc.listReports("DISMISSED")).items[0].decision).toMatchObject({ by: { firstName: "Nadia" }, note: null });
+  });
+  it("ANO-ADM-46 — conflit d'écriture (P2034) : rejoué ; au réessai l'autre décision a gagné → 409, jamais 500, aucune ligne", async () => {
+    const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1")] });
+    const transaction = db.$transaction;
+    let essais = 0;
+    db.$transaction = async (fn) => {
+      essais++;
+      if (essais === 1) {
+        db.tables.report[0].status = "REVIEWED"; // l'autre administrateur a gagné pendant ce premier essai
+        throw Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" });
+      }
+      return transaction(fn);
+    };
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    await expect(svc.reviewReport(actor, "r1", { decision: "REVIEWED" })).rejects.toMatchObject({ statusCode: 409, details: { code: "REPORT_ALREADY_REVIEWED" } });
+    expect(essais).toBe(2);
+    expect(db.tables.adminAction).toEqual([]);
   });
 });

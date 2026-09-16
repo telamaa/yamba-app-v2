@@ -17,6 +17,7 @@
  * euros est en CENTS entiers.
  */
 import { z } from "zod";
+import { OUTBOX_MAX_RELAY_ATTEMPTS } from "./cron-catalogue";
 
 export type SettingScope = "BUSINESS" | "OPERATIONS";
 export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
@@ -101,8 +102,8 @@ export const SETTINGS_CATALOG = [
   { key: "alerts.disputeUndecidedHours", group: "alerts", label: "Litige décidable sans décision depuis", description: "Heures après lesquelles un litige décidable et non décidé devient une alerte.", rule: "D59 3A · A131", unit: "hours", default: 72, min: 1, max: 336, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   { key: "alerts.retentionHeldDays", group: "alerts", label: "Retenue non arbitrée depuis", description: "Jours après lesquels une retenue d'annulation non arbitrée devient une alerte.", rule: "D59 3A", unit: "days", default: 7, min: 1, max: 60, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   { key: "alerts.reversalOpenHours", group: "alerts", label: "Renversement ouvert depuis", description: "Heures après lesquelles un renversement de versement ouvert devient une alerte.", rule: "D59 3A", unit: "hours", default: 48, min: 1, max: 336, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
-  { key: "alerts.outboxParkedAttempts", group: "alerts", label: "Événement parqué après", description: "Nombre de tentatives de relais à partir duquel un événement de l'outbox est considéré parqué.", rule: "D59 3A", unit: "count", default: 10, min: 1, max: 100, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
-  { key: "alerts.outboxLagMinutes", group: "alerts", label: "Relais en retard depuis", description: "Minutes de retard du relais d'événements à partir desquelles une alerte est levée.", rule: "D59 3A", unit: "minutes", default: 15, min: 1, max: 1440, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
+  { key: "alerts.outboxParkedAttempts", group: "alerts", label: "Événement parqué après", description: "Nombre de tentatives de relais à partir duquel un événement de l'outbox est signalé parqué. Le relais abandonne à 10 tentatives (constante de déploiement) : le seuil peut alerter plus tôt, jamais plus tard.", rule: "D59 3A · A176", unit: "count", default: OUTBOX_MAX_RELAY_ATTEMPTS, min: 1, max: OUTBOX_MAX_RELAY_ATTEMPTS, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
+  { key: "alerts.outboxLagMinutes", group: "alerts", label: "Relais en retard depuis", description: "Minutes de retard du relais d'événements à partir desquelles une alerte est levée.", rule: "D59 3A", unit: "minutes", default: 15, min: 1, max: 1440, step: 1, scope: "OPERATIONS", consumers: ["deal-service", "auth-service"] },
   { key: "alerts.emailsFailedWindowHours", group: "alerts", label: "Emails en échec : fenêtre", description: "Fenêtre glissante (heures) dans laquelle un email en échec déclenche l'alerte.", rule: "D59 3A", unit: "hours", default: 24, min: 1, max: 168, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   { key: "alerts.noTripPublishedDays", group: "alerts", label: "Aucun trajet publié depuis", description: "Jours sans nouvelle publication de trajet avant l'alerte de liquidité.", rule: "D59 3A", unit: "days", default: 7, min: 1, max: 90, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   { key: "alerts.acceptanceRateWindowDays", group: "alerts", label: "Taux d'acceptation : fenêtre", description: "Jours sur lesquels le taux d'acceptation des demandes est calculé.", rule: "D59 3A", unit: "days", default: 7, min: 1, max: 90, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
@@ -170,6 +171,8 @@ export const PlatformSettingsValuesSchema = z
 export function settingsCoherenceIssues(v: PlatformSettingsValues): string[] {
   const issues: string[] = [];
   if (!(v["pricing.sizeCoefS"] <= v["pricing.sizeCoefM"] && v["pricing.sizeCoefM"] <= v["pricing.sizeCoefL"])) issues.push("Les coefficients de taille doivent respecter S ≤ M ≤ L.");
+  // Invariant défensif (arbitrage du 15/09) : avec les bornes actuelles (prime ≤ plafond minimal) il ne peut pas se déclencher,
+  // mais les bornes du catalogue évolueront — la règle reste, testée directement sur cette fonction pure.
   if (v["protection.extendedCapCents"] < v["protection.extendedPremiumCents"]) issues.push("Le plafond de la Garantie étendue doit être supérieur à sa prime.");
   if (v["reputation.carrier.topMinDeals"] < v["reputation.carrier.confirmedMinDeals"]) issues.push("Voyageur : le niveau top exige au moins autant de deals que le niveau confirmé.");
   if (v["reputation.shipper.topMinDeals"] < v["reputation.shipper.confirmedMinDeals"]) issues.push("Expéditeur : le niveau top exige au moins autant de deals que le niveau confirmé.");
@@ -187,7 +190,12 @@ export function mergeSettingsValues(stored: Record<string, unknown> | null | und
   if (stored && typeof stored === "object") {
     for (const key of SETTING_KEYS) {
       const raw = (stored as Record<string, unknown>)[key];
-      if (typeof raw === "number" && Number.isFinite(raw)) out[key] = raw;
+      // A176 (recette § 5.22) — une valeur stockée hors bornes (bornes resserrées depuis, écriture manuelle) est ramenée
+      // dans ses bornes : un consommateur ne lit jamais une valeur que l'écran refuserait d'enregistrer.
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        const def = settingDefinition(key)!;
+        out[key] = Math.min(def.max, Math.max(def.min, raw));
+      }
     }
   }
   return out;
@@ -295,7 +303,12 @@ export const ResetSettingsRequestSchema = z
 export type ResetSettingsRequest = z.infer<typeof ResetSettingsRequestSchema>;
 
 export const SettingsWriteResponseSchema = z
-  .object({ version: z.number().int(), changed: z.array(z.object({ key: z.string(), before: z.number(), after: z.number() })) })
+  .object({
+    version: z.number().int(),
+    changed: z.array(z.object({ key: z.string(), before: z.number(), after: z.number() })),
+    /** A173 — reset global : clés hors portée de l'acteur qui s'écartent du défaut, laissées telles quelles. */
+    skipped: z.array(z.string()).optional(),
+  })
   .meta({ id: "SettingsWriteResponse" });
 export type SettingsWriteResponse = z.infer<typeof SettingsWriteResponseSchema>;
 

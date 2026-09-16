@@ -27,6 +27,8 @@
  * (dev sans clés — le Fake est déjà refusé en production).
  */
 
+import { refundIdempotencyKey } from "../lib/refund-idempotency"; // A165
+import { withRefund } from "../lib/booking-refunds"; // A166
 import prisma from "@packages/libs/prisma";
 import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
@@ -57,7 +59,7 @@ import {
   type BookingForWrite,
 } from "./booking-write";
 import { recomputeBookingParties } from "./reputation.service";
-import { cancellationParamsFromSettings } from "./booking-lifecycle";
+import { cancellationParamsForBooking, cancellationParamsFromSettings } from "./booking-lifecycle";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
 
@@ -201,7 +203,7 @@ export function makeDealLifecycleService(
         // Capturé mais transition perdue (course decline/cancel/expire —
         // rarissime : ces chemins annulent l'intent AVANT d'écrire, donc la
         // capture aurait échoué). On rend l'argent, best effort.
-        await provider.refund(booking.paymentIntentId).catch(() => undefined);
+        await provider.refund(booking.paymentIntentId, undefined, { idempotencyKey: refundIdempotencyKey("capture-rollback", booking.id, "full") }).catch(() => undefined);
         throw e;
       }
 
@@ -275,13 +277,13 @@ export function makeDealLifecycleService(
           totalShipperCents: booking.pricing.totalShipperCents,
           departureAt: booking.trip.departureAt,
           now,
-          params: cancellationParamsFromSettings(await settings.get()), // D62
+          params: cancellationParamsForBooking(booking, cancellationParamsFromSettings(await settings.get())), // D62 · A172 : figées à la création
         });
         if (!booking.paymentIntentId) {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         }
         try {
-          refundId = (await provider.refund(booking.paymentIntentId, refundAmountCents)).refundId;
+          refundId = (await provider.refund(booking.paymentIntentId, refundAmountCents, { idempotencyKey: refundIdempotencyKey("cancel", booking.id, refundAmountCents) })).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -319,6 +321,8 @@ export function makeDealLifecycleService(
           refundedAt: now,
           refundAmountCents,
           ...(refundId ? { refundId } : {}),
+          // A166 — seul un remboursement CAPTURÉ entre dans la liste ; libérer une empreinte n'en est pas un.
+          ...(wasAccepted ? { refunds: withRefund(booking, { refundId, amountCents: refundAmountCents, refundedAt: now, kind: "CANCELLATION" }) } : {}),
           ...(retention
             ? {
                 retentionCents: retention.retentionCents,

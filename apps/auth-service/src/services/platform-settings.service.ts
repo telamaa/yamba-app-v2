@@ -29,7 +29,9 @@ import {
   type UpdateSettingsRequest,
 } from "@packages/api-contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "@packages/error-handler";
+import { reachableRecipientWhere } from "@packages/email";
 import { recordAdminAction } from "@packages/admin-audit";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { PLATFORM_SETTINGS_KEY } from "@packages/libs/settings";
 
 type SettingsRow = { values: unknown; version: number; updatedAt: Date; updatedByAdminId: string | null };
@@ -95,23 +97,26 @@ export function makePlatformSettingsService(deps: {
   }
 
   /** Portée par clé : métier → SUPER_ADMIN seul ; exploitation → OPS ou SUPER_ADMIN. */
+  const canWrite = (actor: SettingsActor, key: SettingKey): boolean =>
+    adminRolesAllow(actor.roles, settingDefinition(key)!.scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write");
   function assertScopes(actor: SettingsActor, keys: readonly SettingKey[]): void {
-    const denied = keys.filter((key) => {
-      const scope = settingDefinition(key)!.scope;
-      return !adminRolesAllow(actor.roles, scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write");
-    });
+    const denied = keys.filter((key) => !canWrite(actor, key));
     if (denied.length) throw new ForbiddenError(`Your admin profile cannot change: ${denied.join(", ")}.`, { code: "ADMIN_ROLE_CHANGE_DENIED" });
   }
 
   async function commit(actor: SettingsActor, expectedVersion: number, changes: SettingsChange[], reason: string, action: "SETTING_CHANGED" | "SETTINGS_RESET"): Promise<SettingsWriteResponse> {
     const now = clock();
-    const nextVersion = await deps.db.$transaction(async (tx) => {
+    // ANO-ADM-51 (recette 02-ADMIN § 5.20) — deux écritures simultanées : MongoDB rejetait la transaction perdante (P2034)
+    // et l'admin lisait 500 ; sur un document absent, deux créations concurrentes butaient sur la clé unique (P2002). Le
+    // conflit d'écriture est rejoué (au réessai, le verrou de version répond 409) ; la collision de création EST le verrou.
+    const nextVersion = await withWriteConflictRetry(() => deps.db.$transaction(async (tx) => {
       const cur = await current(tx);
       if (cur.version !== expectedVersion) throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
       const nextValues: PlatformSettingsValues = { ...cur.values };
       for (const c of changes) nextValues[c.key] = c.after;
       const issues = settingsCoherenceIssues(nextValues);
-      if (issues.length) throw new ValidationError(issues.join(" "), { errors: { coherence: issues.join(" ") } });
+      // ANO-ADM-54 — un code, pour que le refus atteigne l'écran en production (A146) et s'y lise en français.
+      if (issues.length) throw new ValidationError(issues.join(" "), { code: "SETTINGS_INCOHERENT", errors: { coherence: issues.join(" ") } });
       const version = cur.version + 1;
       if (cur.stored) {
         const r = await tx.platformSettings.updateMany({ where: { key: PLATFORM_SETTINGS_KEY, version: cur.version }, data: { values: nextValues, version, updatedByAdminId: actor.id } });
@@ -133,11 +138,14 @@ export function makePlatformSettingsService(deps: {
         });
       }
       return version;
+    })).catch((e: unknown) => {
+      if ((e as { code?: string } | null)?.code === "P2002") throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
+      throw e;
     });
     deps.invalidate?.();
     if (deps.notify) {
       const recipients = await deps.db.user.findMany({
-        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, isDeleted: false },
+        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, AND: [reachableRecipientWhere()] }, // ANO-ADM-11 : D35 4A (effacé, adresse en suppression)
         select: { id: true, email: true, firstName: true, lastName: true, preferredLocale: true },
       });
       await deps.notify({ actorId: actor.id, reset: action === "SETTINGS_RESET", reason, changes, recipients, at: now }).catch(() => undefined);
@@ -160,7 +168,15 @@ export function makePlatformSettingsService(deps: {
       let lastChange: AdminSettingsResponse["lastChange"] = null;
       if (recent.length) {
         const latestVersion = (recent[0].after as { version?: number } | null)?.version ?? null;
-        const batch = recent.filter((r) => ((r.after as { version?: number } | null)?.version ?? null) === latestVersion);
+        // ANO-ADM-56 (recette § 5.20, voisin ADM-ACC-3) — la version seule ne désigne pas une écriture : après une remise à
+        // zéro du document (script de recette, version repartie de 0), plusieurs écritures portent la même version et le
+        // bandeau d'accueil les additionnait. Une écriture = même version, même auteur, même transaction (quelques secondes).
+        const batch = recent.filter(
+          (r) =>
+            ((r.after as { version?: number } | null)?.version ?? null) === latestVersion &&
+            r.adminUserId === recent[0].adminUserId &&
+            Math.abs(r.createdAt.getTime() - recent[0].createdAt.getTime()) < 5_000
+        );
         const by = await deps.db.user.findUnique({ where: { id: recent[0].adminUserId }, select: { id: true, firstName: true, lastName: true } });
         lastChange = {
           at: recent[0].createdAt.toISOString(),
@@ -184,28 +200,43 @@ export function makePlatformSettingsService(deps: {
     /** PATCH : seules les clés modifiées ; 400 hors bornes / inconnue / motif court ; 403 hors portée ; 409 version. */
     async update(actor: SettingsActor, body: UpdateSettingsRequest): Promise<SettingsWriteResponse> {
       if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`, { code: "REASON_TOO_SHORT" });
+      const requested = Object.keys(body.changes);
+      const unknown = requested.filter((k) => !isSettingKey(k));
+      if (unknown.length) throw new ValidationError("Unknown setting.", { code: "SETTING_OUT_OF_BOUNDS", errors: Object.fromEntries(unknown.map((k) => [k, "Unknown setting."])) });
+      if (requested.length === 0) throw new ValidationError("Nothing to change.", { code: "NOTHING_TO_CHANGE" });
+      // A174 (recette § 5.21) — la portée AVANT les bornes : un profil refusé n'apprend pas les bornes d'une clé qu'il ne peut pas écrire.
+      assertScopes(actor, requested as SettingKey[]);
       const { errors, keys } = validateValues(body.changes);
-      if (Object.keys(errors).length) throw new ValidationError("Some values are out of bounds.", { errors });
-      if (keys.length === 0) throw new ValidationError("Nothing to change.", { code: "NOTHING_TO_CHANGE" });
-      assertScopes(actor, keys);
+      if (Object.keys(errors).length) throw new ValidationError("Some values are out of bounds.", { code: "SETTING_OUT_OF_BOUNDS", errors }); // ANO-ADM-54 : code → la clé fautive atteint l'écran (A146)
       const cur = await current(deps.db);
       const changes: SettingsChange[] = keys.map((key) => ({ key, before: cur.values[key], after: body.changes[key] })).filter((c) => c.before !== c.after);
       if (changes.length === 0) throw new ValidationError("Nothing to change: every value equals the current one.", { code: "NOTHING_TO_CHANGE" });
       return commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTING_CHANGED");
     },
 
-    /** POST /reset : clés données (ou toutes) remises au défaut du catalogue ; 400 si rien ne s'écarte du défaut. */
+    /**
+     * POST /reset : clés données (ou toutes) remises au défaut du catalogue ; 400 si rien ne s'écarte du défaut.
+     * A173 (recette § 5.21) — sans liste de clés, seules les clés de la PORTÉE de l'acteur sont remises (OPS → exploitation) ;
+     * les clés hors portée qui s'écartent du défaut sont ignorées et nommées dans `skipped`. Une liste explicite hors portée reste 403.
+     */
     async reset(actor: SettingsActor, body: ResetSettingsRequest): Promise<SettingsWriteResponse> {
       if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`, { code: "REASON_TOO_SHORT" });
-      const wanted = body.keys && body.keys.length ? body.keys : [...SETTINGS_CATALOG.map((d) => d.key)];
+      const explicit = !!(body.keys && body.keys.length);
+      const wanted = explicit ? body.keys! : [...SETTINGS_CATALOG.map((d) => d.key)];
       const unknown = wanted.filter((k) => !isSettingKey(k));
-      if (unknown.length) throw new ValidationError("Unknown setting.", { errors: Object.fromEntries(unknown.map((k) => [k, "Unknown setting."])) });
-      const keys = wanted as SettingKey[];
+      if (unknown.length) throw new ValidationError("Unknown setting.", { code: "SETTING_OUT_OF_BOUNDS", errors: Object.fromEntries(unknown.map((k) => [k, "Unknown setting."])) });
+      const all = wanted as SettingKey[];
+      // ANO-ADM-02 (recette 02-ADMIN § 4.3) : un profil qui ne peut écrire AUCUNE des clés visées est refusé (403), jamais « rien à faire ».
+      if (!all.some((key) => canWrite(actor, key))) assertScopes(actor, all);
       const cur = await current(deps.db);
-      const changes: SettingsChange[] = keys.map((key) => ({ key, before: cur.values[key], after: SETTINGS_DEFAULTS[key] })).filter((c) => c.before !== c.after);
-      if (changes.length === 0) throw new ValidationError("Nothing to reset: every value already equals its default.", { code: "NOTHING_TO_RESET" });
-      assertScopes(actor, changes.map((c) => c.key));
-      return commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTINGS_RESET");
+      const differs = (key: SettingKey) => cur.values[key] !== SETTINGS_DEFAULTS[key];
+      const keys = explicit ? all : all.filter((key) => canWrite(actor, key));
+      const skipped = explicit ? [] : all.filter((key) => !canWrite(actor, key) && differs(key));
+      const changes: SettingsChange[] = keys.filter(differs).map((key) => ({ key, before: cur.values[key], after: SETTINGS_DEFAULTS[key] }));
+      if (explicit) assertScopes(actor, changes.map((c) => c.key));
+      if (changes.length === 0) throw new ValidationError("Nothing to reset: every value already equals its default.", { code: "NOTHING_TO_RESET", ...(skipped.length ? { skipped } : {}) });
+      const written = await commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTINGS_RESET");
+      return skipped.length ? { ...written, skipped } : written;
     },
   };
 }

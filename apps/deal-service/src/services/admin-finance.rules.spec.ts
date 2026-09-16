@@ -1,4 +1,4 @@
-import { buildMoneyTimeline, maskAccountId, nextPayoutRetryAt, payoutFailureDetail, payoutFailureKind, payoutRetryDelayMs, payoutRetryDueFilter, reconcile } from "./admin-finance.rules";
+import { adoptableTransfer, buildMoneyTimeline, maskAccountId, moneyBalance, nextPayoutRetryAt, payoutNeedsTransferLookup, payoutFailureDetail, payoutFailureKind, payoutRetryDelayMs, payoutRetryDueFilter, reconcile } from "./admin-finance.rules";
 
 const NOW = new Date("2026-09-04T10:00:00.000Z");
 const live = (o: Partial<Parameters<typeof reconcile>[1]> = {}) => ({
@@ -86,6 +86,47 @@ describe("admin-finance.rules (C-PR5a, D58)", () => {
       expect(reconcile(db({ payoutStatus: "REVERSED", payoutAmountCents: 2000, transferId: "tr_1" }), live({ transfer: tr(2000, 0) })).map((x) => x.code)).toEqual(["TRANSFER_MARKED_REVERSED_BUT_LIVE_OK"]);
     });
   });
+  it("§ 5.12 — une empreinte jamais capturée est libérée à la fermeture (refus, expiration)", () => {
+    const declined = buildMoneyTimeline({ requestedAt: new Date("2026-09-01T10:00:00Z"), status: "DECLINED", closedAt: new Date("2026-09-01T20:00:00Z"), closedBy: "CARRIER", pricing: { totalShipperCents: 6720, transportCents: 6000 } });
+    expect(declined.map((e) => e.kind)).toEqual(["AUTHORIZED", "AUTHORIZATION_RELEASED"]);
+    expect(declined[1]).toMatchObject({ amountCents: 6720, detail: "CARRIER" });
+    // Débité puis annulé : pas de « libération », c'est un remboursement.
+    const captured = buildMoneyTimeline({ requestedAt: new Date("2026-09-01T10:00:00Z"), capturedAt: new Date("2026-09-01T11:00:00Z"), status: "CANCELLED", closedAt: new Date("2026-09-02T10:00:00Z"), pricing: { totalShipperCents: 1, transportCents: 1 } });
+    expect(captured.map((e) => e.kind)).not.toContain("AUTHORIZATION_RELEASED");
+  });
+  describe("§ 5.12 — moneyBalance : où est chaque centime", () => {
+    const pricing = { totalShipperCents: 3360, transportCents: 3000, commissionCents: 360 };
+    const at = new Date("2026-09-01T10:00:00Z");
+    it("deal terminé et versé : la plateforme garde sa commission, soldé, aucune anomalie", () => {
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, payoutStatus: "SENT", payoutAmountCents: 3000, pricing })).toEqual({ capturedCents: 3360, refundedCents: 0, paidOutCents: 3000, platformHoldsCents: 360, pending: [], settled: true, anomaly: null });
+    });
+    it("ANO-ADM-30 : débité, annulé, jamais remboursé → argent sans destination", () => {
+      const b = moneyBalance({ status: "CANCELLED", capturedAt: at, pricing });
+      expect(b).toMatchObject({ platformHoldsCents: 3360, settled: true, anomaly: "UNALLOCATED_FUNDS" });
+      expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 3360, pricing })).toMatchObject({ platformHoldsCents: 0, anomaly: null });
+    });
+    it("les attentes : versement en échec, renversement ouvert, retenue, proposition, deal en cours, litige, empreinte", () => {
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, payoutStatus: "FAILED", payoutAmountCents: 3000, pricing }).pending).toEqual([{ kind: "PAYOUT_FAILED", cents: 3000 }]);
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, payoutStatus: "REVERSED", payoutAmountCents: 3000, pricing }).pending).toEqual([{ kind: "REVERSAL_OPEN", cents: 3000 }]);
+      expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 1680, retentionCents: 1680, retentionDisposition: "HELD_FOR_MEDIATION", pricing })).toMatchObject({ pending: [{ kind: "RETENTION_HELD", cents: 1680 }], settled: false, anomaly: null });
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, payoutStatus: "SENT", payoutAmountCents: 3000, manualRefundProposedCents: 100, pricing }).pending).toEqual([{ kind: "REFUND_PROPOSED", cents: 100 }]);
+      expect(moneyBalance({ status: "PICKED_UP", capturedAt: at, pricing }).pending).toEqual([{ kind: "DEAL_IN_PROGRESS", cents: 3000 }]);
+      expect(moneyBalance({ status: "DISPUTED", capturedAt: at, payoutStatus: "FROZEN", pricing }).pending).toEqual([{ kind: "PAYOUT_FROZEN", cents: 3000 }]);
+      expect(moneyBalance({ status: "PENDING", pricing })).toMatchObject({ capturedCents: 0, pending: [{ kind: "AUTHORIZATION_OPEN", cents: 3360 }] });
+    });
+    it("retenue arbitrée : compensation (la plateforme garde moins que sa commission) et restitution — jamais d'anomalie", () => {
+      expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 1680, retentionCents: 1680, retentionDisposition: "COMPENSATE_CARRIER", payoutStatus: "SENT", payoutAmountCents: 1500, pricing })).toMatchObject({ platformHoldsCents: 180, anomaly: null });
+      expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 3360, retentionCents: 1680, retentionDisposition: "RESTITUTE_SHIPPER", pricing })).toMatchObject({ platformHoldsCents: 0, anomaly: null });
+    });
+    it("renversement abandonné : la part du Voyageur reste par DÉCISION, pas une anomalie ; versé plus que reçu sans geste → OVERSPENT", () => {
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, payoutStatus: "REVERSED", payoutAmountCents: 3000, payoutReversalResolution: "WRITTEN_OFF", pricing })).toMatchObject({ platformHoldsCents: 3360, anomaly: null });
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, refundAmountCents: 1000, payoutStatus: "SENT", payoutAmountCents: 3000, pricing })).toMatchObject({ platformHoldsCents: -640, anomaly: "OVERSPENT" });
+      expect(moneyBalance({ status: "COMPLETED", capturedAt: at, refundAmountCents: 1000, manualRefundCents: 1000, payoutStatus: "SENT", payoutAmountCents: 3000, pricing })).toMatchObject({ anomaly: null });
+    });
+    it("refusé ou expiré sans capture : rien débité, rien à faire", () => {
+      expect(moneyBalance({ status: "DECLINED", pricing })).toEqual({ capturedCents: 0, refundedCents: 0, paidOutCents: 0, platformHoldsCents: 0, pending: [], settled: true, anomaly: null });
+    });
+  });
   it("maskAccountId : début et fin seulement", () => {
     expect(maskAccountId("acct_1ABCDEFGHIJKLMNO")).toBe("acct_…LMNO");
     expect(maskAccountId(null)).toBeNull();
@@ -165,6 +206,10 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(csvCell(null)).toBe("");
     expect(csvCell('a,"b"')).toBe('"a,""b"""');
     expect(csvCell("=SUM(A1)")).toBe("'=SUM(A1)");
+    // ANO-ADM-14 — la copie locale oubliait la tabulation et le retour chariot ; la bibliothèque partagée les neutralise.
+    expect(csvCell("\t=1+1")).toBe("'\t=1+1");
+    expect(csvCell("\r=1+1")).toBe(`"'\r=1+1"`);
+    expect(csvCell(-120)).toBe("-120");
     expect(csvCell(d("2026-09-01T00:00:00Z"))).toBe("2026-09-01T00:00:00.000Z");
     const row = { id: "a", status: "COMPLETED", pricing: P, shipperId: "s", carrierId: "c", trip: { originCity: "Paris", destinationCity: "Brazzaville", departureAt: d("2026-09-01T00:00:00Z") }, capturedAt: d("2026-08-20T10:00:00Z"), completedAt: d("2026-09-02T10:00:00Z") };
     expect(csvRowInRange(row, FROM, TO)).toBe(true);
@@ -183,5 +228,99 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(manualRefundBounds({ ...base, status: "ACCEPTED" }).allowed).toBe(false);
     expect(manualRefundBounds({ ...base, capturedAt: null })).toMatchObject({ maxRefundableCents: 0, allowed: false });
     expect(manualRefundBounds({ ...base, status: "CANCELLED", refundAmountCents: 1479 })).toMatchObject({ maxRefundableCents: 1478, allowed: true });
+  });
+  it("A165 — manualRefundProposalStaleness : caduque si le deal ne peut plus rien recevoir, ou si la proposition dépasse le reste", () => {
+    const { manualRefundProposalStaleness } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
+    const base = { status: "COMPLETED", capturedAt: d("2026-09-01T00:00:00Z"), paymentIntentId: "pi_1", refundAmountCents: null, pricing: { totalShipperCents: 2957 } };
+    expect(manualRefundProposalStaleness(500, manualRefundBounds(base))).toEqual({ stale: false, staleReason: null });
+    expect(manualRefundProposalStaleness(2957, manualRefundBounds(base))).toEqual({ stale: false, staleReason: null });
+    expect(manualRefundProposalStaleness(1000, manualRefundBounds({ ...base, refundAmountCents: 2000 }))).toEqual({ stale: true, staleReason: "ABOVE_REMAINING" });
+    expect(manualRefundProposalStaleness(100, manualRefundBounds({ ...base, refundAmountCents: 2957 }))).toEqual({ stale: true, staleReason: "NOT_REFUNDABLE" });
+  });
+});
+
+describe("Recette § 5.16 (ANO-ADM-37, A166) — chaque remboursement à sa date", () => {
+  const { buildFinanceReport, buildFinanceCsv, csvRowInRange, buildMoneyTimeline, moneyBalance } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
+  const P = { totalShipperCents: 3920, transportCents: 2800, commissionCents: 1120, premiumCents: 0, currencyCode: "EUR" };
+  const d = (s: string) => new Date(s);
+  const MARS = d("2026-03-01T00:00:00Z"); const AVRIL = d("2026-04-01T00:00:00Z"); const MAI = d("2026-05-01T00:00:00Z");
+  /** Annulé tardivement en mars (remboursé 19,60 €), puis un geste manuel de 5 € en avril. */
+  const deal = {
+    id: "a", status: "CANCELLED", pricing: P, shipperId: "s", carrierId: "c",
+    trip: { originCity: "Paris", destinationCity: "Brazzaville", departureAt: d("2026-03-12T00:00:00Z") },
+    capturedAt: d("2026-03-02T10:00:00Z"), closedAt: d("2026-03-10T10:00:00Z"), retentionCents: 1960,
+    refundAmountCents: 2460, refundedAt: d("2026-04-03T10:00:00Z"), refundId: "re_2",
+    refunds: [
+      { refundId: "re_1", amountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z"), kind: "CANCELLATION" },
+      { refundId: "re_2", amountCents: 500, refundedAt: d("2026-04-03T10:00:00Z"), kind: "MANUAL" },
+    ],
+  };
+
+  it("rapport : le remboursement de mars RESTE en mars après le geste d'avril ; avril ne compte que le geste", () => {
+    const r = buildFinanceReport([deal], MARS, MAI);
+    expect(r.map((m) => [m.month, m.refundedCents, m.refundCount])).toEqual([["2026-04", 500, 1], ["2026-03", 1960, 1]]);
+    // Avant A166 : mars 0 × 0, avril 2 460 € × 1 — le mois clos changeait.
+  });
+
+  it("rapport : une annulation AVANT capture (cumul posé, rien débité) n'est pas un remboursement", () => {
+    const pending = { id: "p", status: "CANCELLED", pricing: P, capturedAt: null, closedAt: d("2026-03-05T00:00:00Z"), refundedAt: d("2026-03-05T00:00:00Z"), refundAmountCents: 3920, refunds: [] };
+    const r = buildFinanceReport([pending], MARS, MAI);
+    expect(r).toEqual([expect.objectContaining({ month: "2026-03", refundedCents: 0, refundCount: 0, cancelledCount: 1 })]);
+  });
+
+  it("rapport : un document antérieur (sans liste) compte encore, daté de son dernier remboursement", () => {
+    const legacy = { ...deal, refunds: undefined, refundAmountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z") };
+    expect(buildFinanceReport([legacy], MARS, MAI).find((m) => m.month === "2026-03")).toMatchObject({ refundedCents: 1960, refundCount: 1 });
+  });
+
+  it("CSV : un deal dont seul le PREMIER remboursement tombe dans la période est exporté, avec le rendu de la période", () => {
+    expect(csvRowInRange({ ...deal, capturedAt: d("2026-02-20T00:00:00Z"), closedAt: d("2026-02-25T00:00:00Z") }, MARS, AVRIL)).toBe(true);
+    const [head, line] = buildFinanceCsv([deal], { from: MARS, to: AVRIL }).split("\r\n");
+    expect(head.endsWith(",chargeId,refundCount,refundedInPeriodCents")).toBe(true);
+    expect(line.endsWith(",2,1960")).toBe(true);
+    const [, avril] = buildFinanceCsv([deal], { from: AVRIL, to: MAI }).split("\r\n");
+    expect(avril.endsWith(",2,500")).toBe(true);
+  });
+
+  it("chronologie : une ligne par remboursement, avec sa nature ; aucune pour une empreinte libérée", () => {
+    const t = buildMoneyTimeline({ ...deal, requestedAt: d("2026-03-01T00:00:00Z") });
+    expect(t.filter((e) => e.kind === "REFUNDED").map((e) => [e.amountCents, e.detail])).toEqual([[1960, "CANCELLATION"], [500, "MANUAL"]]);
+    const pending = buildMoneyTimeline({ requestedAt: MARS, status: "CANCELLED", capturedAt: null, closedAt: d("2026-03-05T00:00:00Z"), refundedAt: d("2026-03-05T00:00:00Z"), refundAmountCents: 3920, pricing: P });
+    expect(pending.map((e) => e.kind)).toEqual(["AUTHORIZED", "CANCELLED", "AUTHORIZATION_RELEASED"]);
+  });
+
+  it("bilan : Σ liste > cumul → REFUND_RECORDS_MISMATCH, en priorité et même sur un deal en cours", () => {
+    const at = d("2026-03-02T10:00:00Z");
+    const list = [{ refundId: "re_1", amountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z"), kind: "CANCELLATION" }];
+    expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: null, refunds: list, pricing: P }).anomaly).toBe("REFUND_RECORDS_MISMATCH");
+    expect(moneyBalance({ status: "ACCEPTED", capturedAt: at, refundAmountCents: 1000, refunds: [...list], pricing: P }).anomaly).toBe("REFUND_RECORDS_MISMATCH");
+    expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 1960, retentionCents: 1960, retentionDisposition: "CARRIER", refunds: list, pricing: P }).anomaly).not.toBe("REFUND_RECORDS_MISMATCH");
+  });
+
+  it("bilan : une annulation avant capture ne rend rien et ne lève aucune anomalie", () => {
+    const b = moneyBalance({ status: "CANCELLED", capturedAt: null, refundAmountCents: 3920, refundedAt: d("2026-03-05T00:00:00Z"), pricing: P });
+    expect(b).toMatchObject({ capturedCents: 0, refundedCents: 0, platformHoldsCents: 0, anomaly: null });
+  });
+});
+
+describe("Recette § 5.14 (A164) — jamais deux fois", () => {
+  it("payoutNeedsTransferLookup : seulement après une tentative (ou un transfert connu)", () => {
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 0, transferId: null })).toBe(false);
+    expect(payoutNeedsTransferLookup({})).toBe(false);
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 1 })).toBe(true);
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 0, transferId: "tr_1" })).toBe(true);
+  });
+  it("adoptableTransfer : vivant, même montant, même motif, même deal — jamais un transfert renversé, même en partie", () => {
+    const expected = { bookingId: "b1", amountCents: 2400, reason: "DELIVERY" };
+    const t = (o: Partial<{ id: string; amountCents: number; reversedCents: number; metadata: Record<string, string> }>) => ({ id: "tr", amountCents: 2400, reversedCents: 0, metadata: { bookingId: "b1", reason: "DELIVERY" }, ...o });
+    expect(adoptableTransfer([], expected)).toBeNull();
+    expect(adoptableTransfer([t({ id: "tr_ok" })], expected)).toEqual({ id: "tr_ok" });
+    expect(adoptableTransfer([t({ reversedCents: 2400 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ reversedCents: 100 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ amountCents: 1200 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ metadata: { bookingId: "b1", reason: "LATE_CANCELLATION" } })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ metadata: { bookingId: "b2", reason: "DELIVERY" } })], expected)).toBeNull();
+    // Transfert ancien sans métadonnées : le montant et le groupe suffisent.
+    expect(adoptableTransfer([t({ id: "tr_legacy", metadata: {} })], expected)).toEqual({ id: "tr_legacy" });
   });
 });

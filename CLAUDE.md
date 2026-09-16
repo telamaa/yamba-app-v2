@@ -45,7 +45,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **989 tests** (trip-service 257, deal-service 575, notification-service 115, message-service 42) + auth-service 249 (also a CI check; +20 le 11/09 — D78 login-policy/geoip/session-device/notify-sign-in) — any deviation must be explained.
+Test platform baseline: **1116 tests** (trip-service 293, deal-service 644, notification-service 122, message-service 57) + auth-service 376 (also a CI check) — any deviation must be explained. Measured 16/09/2026, after the four recette campaigns and D78.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 

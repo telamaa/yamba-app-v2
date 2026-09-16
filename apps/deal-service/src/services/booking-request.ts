@@ -32,6 +32,7 @@ import type {
   CreateBookingRequest,
   ParcelFamily,
 } from "@packages/api-contracts";
+import { effectiveAccountStatus, type SanctionState } from "@packages/middleware/account-status";
 
 /* ══ Erreur métier 409 avec code (le front traduit) ═══════════ */
 
@@ -45,6 +46,17 @@ export class BookingRequestError extends AppError {
   }
 }
 
+/**
+ * A179 (recette 02-ADMIN § 5.22) — clôture du compte de l'Expéditeur dans la transaction de création. L'effacement RGPD
+ * écrit ce même document `User` : MongoDB rejette l'une des deux transactions (P2034), le rejeu recompte, et une réservation
+ * ne peut plus naître sur un compte en cours d'effacement. Compte déjà effacé → 409 `ACCOUNT_DELETED`.
+ */
+export type ShipperFenceTx = { user: { updateMany(args: { where: { id: string; isDeleted: boolean }; data: { updatedAt: Date } }): Promise<{ count: number }> } };
+export async function fenceShipperAccount(tx: ShipperFenceTx, shipperId: string, now: Date): Promise<void> {
+  const fenced = await tx.user.updateMany({ where: { id: shipperId, isDeleted: false }, data: { updatedAt: now } });
+  if (fenced.count !== 1) throw new BookingRequestError("ACCOUNT_DELETED", "This account has been erased.");
+}
+
 /* ══ Vue minimale du Trip nécessaire ici (pas de dépendance Prisma) ══ */
 
 export type TripForBooking = {
@@ -54,6 +66,8 @@ export type TripForBooking = {
   isDeleted: boolean;
   /** C-PR4 (D57 3A) — masqué par Yamba : invisible ET non réservable, par lecture (aucune écriture croisée). */
   hiddenByAdminAt?: Date | null;
+  /** ANO-ADM-08 — le Voyageur : un compte SUSPENDU (sanction en cours) ne reçoit plus de demande, par lecture. */
+  user?: SanctionState | null;
   departureAt: Date | null;
   originCity: string | null;
   originCountryCode: string | null;
@@ -100,6 +114,12 @@ export function checkTripBookable(trip: TripForBooking, shipperId: string, now: 
     throw new BookingRequestError("OWN_TRIP", "You cannot book your own trip.");
   }
   if (trip.isDeleted || trip.status !== "PUBLISHED" || trip.hiddenByAdminAt) {
+    throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
+  }
+  // ANO-ADM-08 — la suspension retirait le trajet de la recherche, pas de la réservation par lien direct :
+  // l'Expéditeur voyait son argent autorisé pour un Voyageur qui ne pouvait même plus se connecter pour accepter.
+  // Même refus, même message qu'un trajet fermé : l'état du compte du Voyageur n'est pas révélé.
+  if (trip.user && effectiveAccountStatus(trip.user, now) === "SUSPENDED") {
     throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
   }
   if (!trip.departureAt || trip.departureAt.getTime() <= now.getTime()) {
@@ -254,5 +274,6 @@ export function buildBookingSnapshots(args: {
     // recette réelle. Les listes existent dès la création.
     trackingEvents: [],
     deliveryPhotoUrls: [],
+    refunds: [], // A166
   };
 }

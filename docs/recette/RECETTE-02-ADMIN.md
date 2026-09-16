@@ -2413,7 +2413,7 @@ Un événement d'outbox `booking.dispute_resolved` est écrit **dans la même tr
 **Préconditions :** session **Médiateur**, **Support** ou **super administrateur**. Le jeu d'essai ne pose **aucun** signalement de trajet ou de membre : il faut en créer.
 
 **Étapes :**
-1. Depuis le **front membre**, connecté en tant qu'Aminata Diallo, ouvrir le profil public de Thomas Nkounkou et cliquer « Signaler ce profil » avec le motif « Tentative d'arnaque ».
+1. Depuis le **front membre**, connecté en tant qu'Aminata Diallo, ouvrir le profil public de Thomas Nkounkou et cliquer « Signaler ce profil » avec le motif « Arnaque suspectée ».
 2. Recommencer avec le **même** compte sur la **même** cible.
 3. Répéter le signalement avec deux autres comptes membres différents.
 4. Dans le back-office, ouvrir `/reports`. Vérifier le titre et le sous-titre.
@@ -2423,7 +2423,7 @@ Un événement d'outbox `booking.dispute_resolved` est écrit **dans la même tr
 **Résultat attendu :**
 - Étape 2 → refus **409** : pas deux signalements ouverts du même auteur sur la même cible.
 - Étape 4 → la page porte deux sections : « Trajets et membres » puis « Messages » (ancre `#messages`, avec la mention « Lis la conversation avant de décider (lecture journalisée). »).
-- Étape 5 → onglets « à traiter » / « traité » / « sans suite », compteur « {n} signalement(s) ». Chaque carte porte : le motif (« Tentative d'arnaque »), l'auteur (prénom) et la date, le type de cible (« Membre »), la cible cliquable, les précisions, un champ « Note pour le journal (facultatif) », et les boutons « Traité » et « Sans suite ».
+- Étape 5 → onglets « à traiter » / « traité » / « sans suite », compteur « {n} signalement(s) ». Chaque carte porte : le motif (« Arnaque suspectée »), l'auteur (prénom) et la date, le type de cible (« Membre »), la cible cliquable, les précisions, un champ « Note pour le journal (facultatif) », et les boutons « Traité » et « Sans suite ».
 - Après le **troisième** signalement ouvert sur la même cible, la carte porte le badge rouge « **Prioritaire · 3 ouverts** ».
 - Si le membre visé est « À surveiller » ou « À risque », un badge de niveau s'affiche (« Standard » et « Compte neuf » ne sont pas affichés).
 - Étape 6 → arrivée sur la fiche membre (ou la fiche trajet pour une cible « Trajet »).
@@ -3366,7 +3366,7 @@ Rejouer le jeu d'essai avant chaque cas.
 
 | # | Acteur | Geste | Résultat attendu | Ligne de journal |
 |---|---|---|---|---|
-| 1 | Aminata (front) | Signaler le profil public de Thomas, motif « Tentative d'arnaque » | Accusé de réception « merci, on regarde » | — (geste membre) |
+| 1 | Aminata (front) | Signaler le profil public de Thomas, motif « Arnaque suspectée » | Accusé de réception « merci, on regarde » | — (geste membre) |
 | 2 | Aminata (front) | Recommencer sur la même cible | **409** : pas deux signalements ouverts du même auteur | — |
 | 3 | João, Chinwe (front) | Signaler la même cible | Trois signalements ouverts au total | — |
 | 4 | Thomas (front) | Ouvrir son espace | **Il n'apprend rien** : ni le signalement, ni son auteur | — |

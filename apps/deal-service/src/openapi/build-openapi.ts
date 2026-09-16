@@ -58,7 +58,7 @@ const response409 = jsonResponse(
   "ErrorResponse",
   "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | " +
     "TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | " +
-    "NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)"
+    "NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)"
 );
 const response500 = jsonResponse("UnhandledError", "Unhandled server error");
 
@@ -786,11 +786,13 @@ export function buildOpenApiDocument() {
           summary: "Reconcile with the payment provider (D58 4A, A112) — read-only, journaled",
           description:
             "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database " +
-            "(REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal. Journal DEAL_RECONCILED.",
+            "(REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal — nor the provider: " +
+            "an intent the provider does not know stays unknown (INTENT_NOT_FOUND). Journal DEAL_RECONCILED. " +
+            "503 details.code = PROVIDER_UNAVAILABLE when the provider cannot be reached (network, key, rate limit): nothing was compared, the attempt is journaled (ANO-ADM-32).",
           operationId: "adminReconcileDeal",
           security: adminSecurity,
           parameters: [dealIdPathParam],
-          responses: { "200": jsonResponse("PaymentReconciliation", "Reconciliation"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+          responses: { "200": jsonResponse("PaymentReconciliation", "Reconciliation"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500, "503": jsonResponse("ErrorResponse", "Payment provider unreachable — details.code = PROVIDER_UNAVAILABLE (nothing compared, attempt journaled)") },
         },
       },
       "/admin/deals/{id}/payout/retry": {

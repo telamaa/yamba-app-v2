@@ -16,6 +16,8 @@ export class Finances {
     await this.page.goto("/fr/dashboard/finances", { waitUntil: "networkidle" });
     await expect(this.page.getByRole("heading", { level: 1, name: "Finances" })).toBeVisible({ timeout: 60_000 });
     await this.page.getByRole("button", { name: onglet, exact: true }).click();
+    // Recette § 5.16 — WEB-CNF-9 lisait le texte pendant « Chargement de tes finances… » (course, trois fois de suite).
+    await expect(this.page.getByText("Chargement de tes finances…")).toHaveCount(0, { timeout: 60_000 });
   }
 
   /** Paiements — la ligne d'un envoi (`/bookings/[id]`), espaces normalisées. */

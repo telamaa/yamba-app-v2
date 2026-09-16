@@ -101,16 +101,48 @@ export type PaymentInspection = {
   transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null;
 };
 
+/**
+ * Recette 02-ADMIN § 5.13 (ANO-ADM-32) — « le fournisseur ne connaît pas ce paiement » est une RÉPONSE, pas une panne.
+ * `inspect` jette cette erreur-là seulement dans ce cas ; toute autre erreur (réseau, clé, limite de débit) remonte
+ * telle quelle, et le rapprochement la dit « fournisseur indisponible » au lieu de « paiement introuvable ».
+ */
+export class PaymentIntentNotFoundError extends Error {
+  readonly code = "INTENT_NOT_FOUND" as const;
+  constructor(readonly intentId: string) {
+    super(`The payment provider does not know this payment intent: ${intentId}`);
+    this.name = "PaymentIntentNotFoundError";
+  }
+}
+
+/** Vrai si l'erreur Stripe dit « cette ressource n'existe pas » (et rien d'autre). */
+export function isStripeResourceMissing(err: unknown): boolean {
+  const e = err as { code?: unknown; statusCode?: unknown; type?: unknown } | null;
+  return !!e && (e.code === "resource_missing" || (e.statusCode === 404 && e.type === "StripeInvalidRequestError"));
+}
+
+/**
+ * Recette 02-ADMIN § 5.14 (A164) — un transfert déjà émis pour un deal, lu par son `transfer_group` (= bookingId).
+ * Sert à ne jamais verser deux fois quand la clé d'idempotence ne protège plus (Stripe l'oublie au bout de 24 h).
+ */
+export type ExistingTransfer = { id: string; amountCents: number; reversedCents: number; metadata: Record<string, string>; createdAt: string | null };
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   authorize(input: AuthorizeInput): Promise<PaymentAuthorization>;
   retrieve(intentId: string): Promise<PaymentAuthorization>;
   capture(intentId: string): Promise<PaymentAuthorization>;
   cancel(intentId: string, reason?: string): Promise<PaymentAuthorization>;
-  refund(intentId: string, amountCents?: number): Promise<{ refundId: string; amountCents: number }>;
+  /**
+   * Recette 02-ADMIN § 5.15 (A165) — `idempotencyKey` : une clé STABLE par geste (deal + nature + état lu), pour que le
+   * même geste rejoué (double clic, reprise après une panne entre l'argent et la base) rende le MÊME remboursement au lieu
+   * d'en émettre un second. Stripe l'honore 24 h ; le Fake l'honore toujours.
+   */
+  refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }): Promise<{ refundId: string; amountCents: number }>;
   transfer(input: TransferInput): Promise<TransferResult>;
   /** Lecture seule : intent + remboursements + transfert (C-PR5). Jette si l'intent est inconnu. */
   inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection>;
+  /** Lecture seule (A164) : les transferts d'un groupe. Optionnel : un fournisseur qui ne l'offre pas n'est pas consulté. */
+  findTransfers?(transferGroup: string): Promise<ExistingTransfer[]>;
 }
 
 /* ══ Stripe ═══════════════════════════════════════════════════ */
@@ -186,11 +218,14 @@ export class StripePaymentProvider implements PaymentProvider {
     );
   }
 
-  async refund(intentId: string, amountCents?: number) {
-    const r = await this.stripe.refunds.create({
-      payment_intent: intentId,
-      ...(amountCents !== undefined ? { amount: amountCents } : {}),
-    });
+  async refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }) {
+    const r = await this.stripe.refunds.create(
+      {
+        payment_intent: intentId,
+        ...(amountCents !== undefined ? { amount: amountCents } : {}),
+      },
+      options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined
+    );
     return { refundId: r.id, amountCents: r.amount };
   }
 
@@ -212,16 +247,31 @@ export class StripePaymentProvider implements PaymentProvider {
     return { provider: "STRIPE", transferId: t.id, amountCents: t.amount, currencyCode: t.currency.toUpperCase() };
   }
 
+  async findTransfers(transferGroup: string): Promise<ExistingTransfer[]> {
+    // Une panne REMONTE : l'appelant ne doit pas conclure « aucun transfert » d'un fournisseur injoignable (ANO-ADM-32).
+    const list = await this.stripe.transfers.list({ transfer_group: transferGroup, limit: 100 });
+    return list.data.map((t) => ({ id: t.id, amountCents: t.amount, reversedCents: t.amount_reversed, metadata: (t.metadata ?? {}) as Record<string, string>, createdAt: new Date(t.created * 1000).toISOString() }));
+  }
+
   async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
-    const pi = await this.stripe.paymentIntents.retrieve(input.intentId);
+    let pi: Stripe.PaymentIntent;
+    try {
+      pi = await this.stripe.paymentIntents.retrieve(input.intentId);
+    } catch (err) {
+      if (isStripeResourceMissing(err)) throw new PaymentIntentNotFoundError(input.intentId);
+      throw err; // panne, clé, limite : pas « introuvable » (ANO-ADM-32)
+    }
     const refunds = await this.stripe.refunds.list({ payment_intent: input.intentId, limit: 100 });
     let transfer: PaymentInspection["transfer"] = null;
     if (input.transferId) {
       try {
         const t = await this.stripe.transfers.retrieve(input.transferId);
         transfer = { id: t.id, amountCents: t.amount, reversedCents: t.amount_reversed, createdAt: new Date(t.created * 1000).toISOString() };
-      } catch {
-        transfer = null; // introuvable = divergence signalée par le rapprochement, pas une erreur
+      } catch (err) {
+        // Introuvable = divergence TRANSFER_MISSING signalée par le rapprochement. Une PANNE n'est pas une absence :
+        // l'avaler ferait accuser un transfert parfaitement réel (ANO-ADM-32).
+        if (!isStripeResourceMissing(err)) throw err;
+        transfer = null;
       }
     }
     return {
@@ -314,13 +364,21 @@ export class FakePaymentProvider implements PaymentProvider {
   /** Remboursements émis (observables par les tests et par `inspect`). */
   private readonly refundsByIntent = new Map<string, Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>>();
 
-  async refund(intentId: string, amountCents?: number) {
+  /** A165 — même clé ⇒ même remboursement, comme Stripe (qui l'oublie au bout de 24 h ; voir `_forgetIdempotencyKeysForTest`). */
+  private readonly refundsByKey = new Map<string, { refundId: string; amountCents: number }>();
+
+  async refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }) {
+    if (options?.idempotencyKey) {
+      const known = this.refundsByKey.get(options.idempotencyKey);
+      if (known) return known;
+    }
     const a = await this.retrieve(intentId);
     const amount = amountCents ?? a.amountCents;
     const list = this.refundsByIntent.get(intentId) ?? [];
     const refundId = `re_fake_${intentId}_${list.length + 1}`;
     list.push({ id: refundId, amountCents: amount, status: "succeeded", createdAt: new Date().toISOString() });
     this.refundsByIntent.set(intentId, list);
+    if (options?.idempotencyKey) this.refundsByKey.set(options.idempotencyKey, { refundId, amountCents: amount });
     return { refundId, amountCents: amount };
   }
 
@@ -342,13 +400,33 @@ export class FakePaymentProvider implements PaymentProvider {
     };
     this.transfers.push(result);
     if (input.idempotencyKey) this.transfersByKey.set(input.idempotencyKey, result);
+    if (input.transferGroup) this.groupByTransfer.set(result.transferId, { group: input.transferGroup, metadata: { ...input.metadata } });
     return result;
+  }
+
+  private readonly groupByTransfer = new Map<string, { group: string; metadata: Record<string, string> }>();
+
+  async findTransfers(transferGroup: string): Promise<ExistingTransfer[]> {
+    return this.transfers
+      .filter((t) => this.groupByTransfer.get(t.transferId)?.group === transferGroup)
+      .map((t) => ({ id: t.transferId, amountCents: t.amountCents, reversedCents: this.reversedByTransfer.get(t.transferId) ?? 0, metadata: { ...(this.groupByTransfer.get(t.transferId)?.metadata ?? {}) }, createdAt: null }));
+  }
+
+  /** aide aux tests (A164) : simuler une clé d'idempotence OUBLIÉE par le fournisseur (Stripe : 24 h). */
+  _forgetIdempotencyKeysForTest() {
+    this.transfersByKey.clear();
+    this.refundsByKey.clear();
   }
 
   private readonly reversedByTransfer = new Map<string, number>();
 
   async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
-    const a = await this.retrieve(input.intentId);
+    // ANO-ADM-31 — lecture SEULE : pas d'`adoptSeeded` ici. `retrieve` matérialise un intent seedé inconnu (utile aux
+    // gestes du dev) ; le rapprochement, lui, créait ainsi l'état qu'il prétendait lire (AUTHORIZED, 0 €) et accusait la
+    // base de divergences inventées. Un intent que ce processus n'a jamais vu est « introuvable », comme chez Stripe.
+    const known = this.intents.get(input.intentId);
+    if (!known) throw new PaymentIntentNotFoundError(input.intentId);
+    const a = { ...known };
     const t = input.transferId ? this.transfers.find((x) => x.transferId === input.transferId) ?? null : null;
     return {
       provider: "FAKE",

@@ -14,6 +14,7 @@ import {
 import {
   computeCancellationRefundCents,
   DEFAULT_CANCELLATION_PARAMS,
+  cancellationParamsForBooking,
   cancellationParamsFromSettings,
   type CancellationParams,
 } from "./booking-lifecycle";
@@ -50,6 +51,8 @@ export function viewParamsFromSettings(v: PlatformSettingsValues): ViewParams {
 
 export type BookingRecord = {
   id: string;
+  /** A172 — conditions d'annulation figées à la création (absentes sur les réservations antérieures). */
+  cancellationTerms?: CancellationParams | null;
   tripId: string;
   shipperId: string;
   carrierId: string;
@@ -168,6 +171,7 @@ export type DisputeRecord = {
   // C-PR2 (D55) — état de la version du Voyageur et décision (optionnels : anciens appels)
   status?: string | null;
   carrierRespondedAt?: Date | null;
+  responseDueAt?: Date | null; // ANO-ADM-52 — échéance figée à l'ouverture (D62)
   resolutionOutcome?: string | null;
   resolutionRefundCents?: number | null;
   resolutionCarrierPayoutCents?: number | null;
@@ -323,6 +327,7 @@ const toCancellationPreview = (
   params: CancellationParams = DEFAULT_CANCELLATION_PARAMS
 ): ShipperBookingView["cancellationPreview"] => {
   if (!allowed.includes("cancel")) return null;
+  params = cancellationParamsForBooking(b, params); // A172 — l'aperçu annonce les conditions de CETTE réservation
   const total = b.pricing.totalShipperCents;
   const refundCents =
     b.status === "ACCEPTED"
@@ -522,7 +527,7 @@ export function toCarrierBookingView(
             category: dispute.category as NonNullable<CarrierBookingView["dispute"]>["category"],
             disputedAt: toIsoRequired(booking.disputedAt),
             canRespond: booking.status === "DISPUTED" && !dispute.carrierRespondedAt && !dispute.resolvedAt,
-            responseDeadlineAt: new Date(booking.disputedAt.getTime() + params.disputeResponseDelayHours * 3_600_000).toISOString(),
+            responseDeadlineAt: (dispute.responseDueAt ?? new Date(booking.disputedAt.getTime() + params.disputeResponseDelayHours * 3_600_000)).toISOString(), // ANO-ADM-52
             respondedAt: toIso(dispute.carrierRespondedAt ?? null),
             resolution: toDisputeResolution(dispute),
           }

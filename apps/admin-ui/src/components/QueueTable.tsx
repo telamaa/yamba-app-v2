@@ -7,10 +7,12 @@ import { apiFetch } from "@/lib/api";
 import { CATEGORY_LABEL, dateTime, daysSince, hoursUntil, money } from "@/lib/format";
 import type { AdminMe, ArbitrationQueueResponse } from "@/lib/types";
 import ExportButton from "./ExportButton";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function QueueTable() {
   const [data, setData] = useState<ArbitrationQueueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   // C-PR7a (D60 2A) — filtres serveur + export. Les tuiles d'accueil et les alertes
   // pointent vers /disputes?decidable=1 ou ?kind=RETENTION : le filtre doit partir de l'URL,
   // sinon le lien promet un tri qui n'arrive jamais (divergence relevée par la documentation).
@@ -26,12 +28,12 @@ export default function QueueTable() {
   const params = () => { const p = new URLSearchParams(); for (const [k, v] of Object.entries(f)) if (v) p.set(k, v); return p; };
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
   useEffect(() => {
-    const h = setTimeout(() => { apiFetch<ArbitrationQueueResponse>(`/admin/disputes?${params().toString()}`).then(setData).catch((e) => setError(e.message)); }, 250);
+    const h = setTimeout(() => { apiFetch<ArbitrationQueueResponse>(`/admin/disputes?${params().toString()}`).then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil n'ouvre pas la file d'arbitrage.") : setError("File indisponible pour le moment. Recharge la page."))); }, 250);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f]);
 
-  if (error) return <p className="mt-6 text-[13px] text-red-700">{error}</p>;
+  if (error) return <p className="mt-6 text-[13px] text-red-700">La file n&apos;a pas pu être chargée : {error}</p>;
 
   return (
     <div className="mt-5">
@@ -44,9 +46,11 @@ export default function QueueTable() {
         <span className="ml-auto"><ExportButton me={me} path="/admin/disputes/export" params={params()} /></span>
       </div>
       {!data && <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>}
-      {data && data.items.length === 0 && <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-6 text-center text-[13px] text-slate-500">Rien à arbitrer avec ces filtres.</p>}
+      {/* Les compteurs de la FILE ENTIÈRE restent visibles quand un filtre ne rend rien : « rien avec ces filtres » ne doit
+          jamais se lire « rien à arbitrer ». */}
+      {data && <p className="mt-3 text-[12.5px] text-slate-500">{data.items.length} affiché(s) · file entière : {data.counts.disputes} litige(s) · {data.counts.retentions} retenue(s)</p>}
+      {data && data.items.length === 0 && <p className="mt-2 rounded-xl border border-dashed border-slate-300 p-6 text-center text-[13px] text-slate-500">Rien à arbitrer avec ces filtres.</p>}
       {data && data.items.length > 0 && (<>
-      <p className="mt-3 text-[12.5px] text-slate-500">{data.items.length} affiché(s) · file entière : {data.counts.disputes} litige(s) · {data.counts.retentions} retenue(s)</p>
       <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-[13px]">
           <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">

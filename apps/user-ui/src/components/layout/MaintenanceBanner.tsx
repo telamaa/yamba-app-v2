@@ -3,13 +3,21 @@
 /**
  * MaintenanceBanner.tsx — annonce et lecture seule (C-PR8c, D64 2A)
  * =================================================================
- * Lit `GET /api/maintenance` (public, servi par le gateway) toutes les 60 s. Rouge en lecture seule,
+ * Lit `GET /api/maintenance` (public, servi par le gateway) toutes les 60 s — toutes les 15 s quand une maintenance est
+ * active ou annoncée (décision du § 5.23, recette 02-ADMIN § 5.24 lot b : la levée se voyait jusqu'à une minute après). Rouge en lecture seule,
  * ambre pour une annonce à venir ; le message personnalisé de l'admin, dans la langue de la page,
  * complète la phrase traduite.
+ *
+ * ANO-WEB-91 (recette 5.28) — il écoute aussi le refus d'écriture émis par le client API
+ * (503 `MAINTENANCE`) : il DIT alors la raison (`writeRefused`, la phrase que le cahier attend et
+ * que personne ne rendait) et relit l'état sans attendre son sondage — un membre qui tombe sur le
+ * refus voit le bandeau dans la seconde, pas au bout d'une minute.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import apiClient from "@/lib/api-client";
+import { toast } from "sonner";
+import { maintenancePollMs } from "@packages/libs/maintenance";
+import apiClient, { MAINTENANCE_REFUSED_EVENT } from "@/lib/api-client";
 
 type PublicMaintenance = { enabled: boolean; message: { fr: string; en: string }; scheduledAt: string | null };
 
@@ -17,13 +25,24 @@ export default function MaintenanceBanner() {
   const t = useTranslations("maintenance");
   const locale = useLocale();
   const [state, setState] = useState<PublicMaintenance | null>(null);
+  const relire = useCallback(() => apiClient.get<PublicMaintenance>("/maintenance").then((r) => setState(r.data)).catch(() => undefined), []);
   useEffect(() => {
-    let alive = true;
-    const load = () => apiClient.get<PublicMaintenance>("/maintenance").then((r) => { if (alive) setState(r.data); }).catch(() => undefined);
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(timer); };
-  }, []);
+    void relire();
+  }, [relire]);
+  // Le rythme suit l'état lu : le minuteur est reposé quand il change (active / annoncée → 15 s, sinon 60 s).
+  const pollMs = maintenancePollMs(state);
+  useEffect(() => {
+    const timer = setInterval(() => void relire(), pollMs);
+    return () => clearInterval(timer);
+  }, [relire, pollMs]);
+  useEffect(() => {
+    const surRefus = () => {
+      toast.error(t("writeRefused"));
+      void relire();
+    };
+    window.addEventListener(MAINTENANCE_REFUSED_EVENT, surRefus);
+    return () => window.removeEventListener(MAINTENANCE_REFUSED_EVENT, surRefus);
+  }, [relire, t]);
   if (!state) return null;
   const scheduled = !state.enabled && state.scheduledAt && new Date(state.scheduledAt).getTime() > Date.now();
   if (!state.enabled && !scheduled) return null;

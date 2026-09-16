@@ -262,12 +262,12 @@
     },
     "booking_dispute_carrier_responded": {
       "SHIPPER": {
-        "title": "—",
-        "line": "—"
+        "title": "Le Voyageur a donné sa version · {ticket}",
+        "line": "{route} · Yamba étudie les deux versions"
       },
       "CARRIER": {
-        "title": "—",
-        "line": "—"
+        "title": "Ta version est transmise · {ticket}",
+        "line": "{route} · Yamba te répond sous 48 h ouvrées"
       }
     }
   }

@@ -1,5 +1,5 @@
 /** error-details.spec.ts — un code d'erreur est public par contrat (A146). */
-import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import { AppError, AuthError, ForbiddenError } from "@packages/error-handler";
 
 type Sent = { status: number; body: Record<string, unknown> };
@@ -71,5 +71,15 @@ describe("errorMiddleware — le code est aussi servi en tête (dette D-5)", () 
     const sent = run(new ForbiddenError("Denied.", { code: "ADMIN_PERMISSION_DENIED", permission: "audit.read" }), "production");
     expect(sent.body.code).toBe("ADMIN_PERMISSION_DENIED");
     expect(sent.body.details).toEqual({ code: "ADMIN_PERMISSION_DENIED", permission: "audit.read" });
+  });
+});
+
+describe("notFoundHandler (ANO-ADM-27)", () => {
+  it("une route inconnue devient un 404 JSON ROUTE_NOT_FOUND, en production aussi — jamais la page HTML d'Express", () => {
+    let forwarded: unknown = null;
+    (notFoundHandler as unknown as (req: unknown, res: unknown, next: (e: unknown) => void) => void)({ method: "GET", url: "/admin/finances" }, {}, (e) => { forwarded = e; });
+    const sent = run(forwarded, "production");
+    expect(sent.status).toBe(404);
+    expect(sent.body).toMatchObject({ status: "error", message: "Route not found.", code: "ROUTE_NOT_FOUND", details: { code: "ROUTE_NOT_FOUND" } });
   });
 });

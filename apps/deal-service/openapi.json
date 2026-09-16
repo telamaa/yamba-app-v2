@@ -250,7 +250,7 @@
             }
           },
           "409": {
-            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)",
+            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)",
             "content": {
               "application/json": {
                 "schema": {
@@ -340,7 +340,7 @@
             }
           },
           "409": {
-            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)",
+            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1521,7 +1521,7 @@
             }
           },
           "409": {
-            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)",
+            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2714,7 +2714,7 @@
           "admin"
         ],
         "summary": "Reconcile with the payment provider (D58 4A, A112) — read-only, journaled",
-        "description": "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database (REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal. Journal DEAL_RECONCILED.",
+        "description": "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database (REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal — nor the provider: an intent the provider does not know stays unknown (INTENT_NOT_FOUND). Journal DEAL_RECONCILED. 503 details.code = PROVIDER_UNAVAILABLE when the provider cannot be reached (network, key, rate limit): nothing was compared, the attempt is journaled (ANO-ADM-32).",
         "operationId": "adminReconcileDeal",
         "security": [
           {
@@ -2789,6 +2789,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Payment provider unreachable — details.code = PROVIDER_UNAVAILABLE (nothing compared, attempt journaled)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3346,7 +3356,7 @@
             }
           },
           "409": {
-            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)",
+            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6917,6 +6927,12 @@
             "type": "string",
             "example": "12 juin 2026",
             "description": "Formaté serveur selon locale"
+          },
+          "departureAt": {
+            "description": "Instant de départ (ISO 8601) — ANO-WEB-30 : permet au client de savoir qu'un trajet est passé (badge « Trajet passé » des favoris) sans interpréter la date formatée",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           },
           "departureTime": {
             "type": "string",
@@ -13678,7 +13694,7 @@
           "REFUNDED",
           "PARTIALLY_REFUNDED"
         ],
-        "description": "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion (ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = late cancellation, ANN-01 retention kept"
+        "description": "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion (ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = part of the payment returned: late cancellation (ANN-01 retention kept) or a refund after completion (mediation, commercial gesture) — see partialKind"
       },
       "WalletPaymentItem": {
         "type": "object",
@@ -13752,7 +13768,35 @@
                 "type": "null"
               }
             ],
-            "description": "PARTIALLY_REFUNDED: amount kept (ANN-01)"
+            "description": "PARTIALLY_REFUNDED after a LATE_CANCELLATION only: the ANN-01 retention kept for the carrier"
+          },
+          "keptCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PARTIALLY_REFUNDED: what the shipper finally paid (total − refunded), whatever the reason (02-ADMIN § 5.15)"
+          },
+          "partialKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "LATE_CANCELLATION",
+                  "AFTER_COMPLETION"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PARTIALLY_REFUNDED: why only part was returned — a late cancellation retention, or a refund after the deal was completed (never a retention)"
           },
           "currencyCode": {
             "type": "string"
@@ -13781,6 +13825,8 @@
           "amountCents",
           "refundAmountCents",
           "retentionCents",
+          "keptCents",
+          "partialKind",
           "currencyCode",
           "date"
         ],
@@ -13799,7 +13845,7 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991,
-            "description": "Σ RELEASED totals + retentions of PARTIALLY_REFUNDED"
+            "description": "Σ RELEASED totals + kept parts of PARTIALLY_REFUNDED"
           },
           "refundedCents": {
             "type": "integer",
@@ -16203,6 +16249,13 @@
               "1"
             ]
           },
+          "proposal": {
+            "description": "1 = a suspension proposal awaits a decision (A194, home tile « Sanctions proposées »)",
+            "type": "string",
+            "enum": [
+              "1"
+            ]
+          },
           "createdFrom": {
             "type": "string",
             "format": "date-time",
@@ -16245,6 +16298,18 @@
           "limit"
         ],
         "additionalProperties": false
+      },
+      "SanctionCategory": {
+        "type": "string",
+        "enum": [
+          "SCAM_SUSPECTED",
+          "PROHIBITED_CONTENT",
+          "ABUSIVE_BEHAVIOUR",
+          "REPEATED_DISPUTES",
+          "IMPERSONATION",
+          "OTHER"
+        ],
+        "description": "Closed list, sent to the member (statement of reasons); the free-text reason stays internal"
       },
       "AdminUserFile": {
         "type": "object",
@@ -16332,6 +16397,9 @@
                   "level": {
                     "$ref": "#/components/schemas/AccountStatus"
                   },
+                  "category": {
+                    "$ref": "#/components/schemas/SanctionCategory"
+                  },
                   "reason": {
                     "type": "string"
                   },
@@ -16358,6 +16426,7 @@
                 },
                 "required": [
                   "level",
+                  "category",
                   "reason",
                   "until",
                   "at",
@@ -16378,6 +16447,9 @@
                   "level": {
                     "type": "string"
                   },
+                  "category": {
+                    "$ref": "#/components/schemas/SanctionCategory"
+                  },
                   "reason": {
                     "type": "string"
                   },
@@ -16392,6 +16464,7 @@
                 },
                 "required": [
                   "level",
+                  "category",
                   "reason",
                   "byAdmin",
                   "at"
@@ -16748,14 +16821,19 @@
               "SUSPENDED"
             ]
           },
+          "category": {
+            "$ref": "#/components/schemas/SanctionCategory"
+          },
           "reason": {
             "type": "string",
             "minLength": 20,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Internal reason — never sent to the member (A191)"
           }
         },
         "required": [
           "level",
+          "category",
           "reason"
         ],
         "additionalProperties": false,
@@ -16771,10 +16849,14 @@
               "SUSPENDED"
             ]
           },
+          "category": {
+            "$ref": "#/components/schemas/SanctionCategory"
+          },
           "reason": {
             "type": "string",
             "minLength": 20,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Internal reason — never sent to the member (A191)"
           },
           "until": {
             "description": "Optional end; absent = until lifted",
@@ -16785,6 +16867,7 @@
         },
         "required": [
           "level",
+          "category",
           "reason"
         ],
         "additionalProperties": false
@@ -16796,6 +16879,21 @@
             "type": "string",
             "minLength": 20,
             "maxLength": 2000
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "UnsuppressEmailRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000,
+            "description": "Why the address can receive emails again (corrected, member request…) — journaled"
           }
         },
         "required": [
@@ -16854,6 +16952,36 @@
         ],
         "additionalProperties": false
       },
+      "RevokeAdminRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional; an empty string after trim means no reason",
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResendAdminInviteResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "inviteExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ok",
+          "inviteExpiresAt"
+        ],
+        "additionalProperties": false
+      },
       "UpdateAdminRoleRequest": {
         "type": "object",
         "properties": {
@@ -16898,6 +17026,18 @@
             "type": "boolean",
             "description": "false while the invited account has no password yet"
           },
+          "inviteExpiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -16913,6 +17053,7 @@
           "adminRoles",
           "totpEnabled",
           "inviteAccepted",
+          "inviteExpiresAt",
           "createdAt"
         ],
         "additionalProperties": false
@@ -16935,13 +17076,28 @@
           },
           "current": {
             "type": "boolean"
+          },
+          "device": {
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "jti",
           "createdAt",
           "lastActivityAt",
-          "current"
+          "current",
+          "device",
+          "ip"
         ],
         "additionalProperties": false
       },
@@ -18176,7 +18332,18 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "description": "Depuis quand l'exception existe (fin du deal ou dernière écriture)"
+            "description": "Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"
+          },
+          "proposalStale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PROPOSED_REFUNDS : la proposition est devenue impossible (A165) ; null pour les autres files"
           }
         },
         "required": [
@@ -18195,7 +18362,8 @@
           "lastAttemptAt",
           "nextRetryAt",
           "disputeTicket",
-          "since"
+          "since",
+          "proposalStale"
         ],
         "additionalProperties": false
       },
@@ -18211,6 +18379,43 @@
               "$ref": "#/components/schemas/FinanceQueueItem"
             }
           },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "FAILED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "REVERSED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "HELD": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "PROPOSED_REFUNDS": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "FAILED",
+              "REVERSED",
+              "HELD",
+              "PROPOSED_REFUNDS"
+            ],
+            "additionalProperties": false,
+            "description": "Taille réelle de CHAQUE file, avec les mêmes filtres que les tuiles de l'accueil (recette § 5.11)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Vrai quand la file compte plus de lignes que les 200 servies"
+          },
           "generatedAt": {
             "type": "string",
             "format": "date-time",
@@ -18220,6 +18425,8 @@
         "required": [
           "kind",
           "items",
+          "counts",
+          "truncated",
           "generatedAt"
         ],
         "additionalProperties": false
@@ -18238,7 +18445,8 @@
           "PAYOUT_REVERSED",
           "REVERSAL_RESOLVED",
           "RETENTION",
-          "RETENTION_DECIDED"
+          "RETENTION_DECIDED",
+          "AUTHORIZATION_RELEASED"
         ]
       },
       "MoneyTimelineEvent": {
@@ -18280,6 +18488,99 @@
           "kind",
           "amountCents",
           "detail"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyPendingKind": {
+        "type": "string",
+        "enum": [
+          "AUTHORIZATION_OPEN",
+          "DEAL_IN_PROGRESS",
+          "PAYOUT_DUE",
+          "PAYOUT_FROZEN",
+          "PAYOUT_FAILED",
+          "REVERSAL_OPEN",
+          "RETENTION_HELD",
+          "REFUND_PROPOSED"
+        ]
+      },
+      "MoneyBalance": {
+        "type": "object",
+        "properties": {
+          "capturedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité chez l'Expéditeur (0 tant que rien n'est capturé)"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "rendu à l'Expéditeur, tous remboursements cumulés"
+          },
+          "paidOutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "versé au Voyageur et non renversé"
+          },
+          "platformHoldsCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité − remboursé − versé : ce que la plateforme détient pour ce deal"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/MoneyPendingKind"
+                },
+                "cents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "cents"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "settled": {
+            "type": "boolean",
+            "description": "plus rien n'est en attente"
+          },
+          "anomaly": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "UNALLOCATED_FUNDS",
+                  "OVERSPENT",
+                  "REFUND_RECORDS_MISMATCH"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT) ; à tout moment, la liste des remboursements enregistre plus que le cumul (REFUND_RECORDS_MISMATCH, recette § 5.16)"
+          }
+        },
+        "required": [
+          "capturedCents",
+          "refundedCents",
+          "paidOutCents",
+          "platformHoldsCents",
+          "pending",
+          "settled",
+          "anomaly"
         ],
         "additionalProperties": false
       },
@@ -18515,6 +18816,53 @@
                     "type": "null"
                   }
                 ]
+              },
+              "refunds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "refundId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "amountCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "refundedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "CANCELLATION",
+                        "PICKUP_REFUSED",
+                        "DISPUTE",
+                        "RETENTION_RESTITUTION",
+                        "MANUAL",
+                        "LEGACY"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "refundId",
+                    "amountCents",
+                    "refundedAt",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "Recette § 5.16 (A166) — chaque remboursement réel, à sa date ; LEGACY = part du cumul antérieure à la liste. Vide sur un deal jamais capturé."
               }
             },
             "required": [
@@ -18524,7 +18872,8 @@
               "capturedAt",
               "refundedAt",
               "refundAmountCents",
-              "refundId"
+              "refundId",
+              "refunds"
             ],
             "additionalProperties": false
           },
@@ -18848,6 +19197,9 @@
               "$ref": "#/components/schemas/MoneyTimelineEvent"
             }
           },
+          "balance": {
+            "$ref": "#/components/schemas/MoneyBalance"
+          },
           "adminActions": {
             "type": "array",
             "items": {
@@ -18915,13 +19267,33 @@
                         "type": "string",
                         "format": "date-time",
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      },
+                      "stale": {
+                        "type": "boolean",
+                        "description": "Recette § 5.15 (A165) — la proposition dépasse le reste remboursable ou le deal ne peut plus rien recevoir"
+                      },
+                      "staleReason": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "ABOVE_REMAINING",
+                              "NOT_REFUNDABLE"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
                       "amountCents",
                       "reason",
                       "byAdmin",
-                      "at"
+                      "at",
+                      "stale",
+                      "staleReason"
                     ],
                     "additionalProperties": false
                   },
@@ -19015,6 +19387,7 @@
           "retention",
           "dates",
           "timeline",
+          "balance",
           "adminActions",
           "manualRefund",
           "allowedActions"
@@ -20388,6 +20761,56 @@
         "additionalProperties": false,
         "description": "Consultation journalisée quand la mesure porte des personnes (inscriptions)"
       },
+      "ReportDecision": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "firstName"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "by",
+          "at",
+          "note"
+        ],
+        "additionalProperties": false,
+        "description": "Decision taken on a report, read from the audit line written in the same transaction"
+      },
       "MessageKind": {
         "type": "string",
         "enum": [
@@ -21186,6 +21609,10 @@
           "bookingStatus": {
             "type": "string"
           },
+          "mediationFile": {
+            "type": "boolean",
+            "description": "Recette § 5.18 — le deal a un dossier de médiation (litige ouvert, ou retenue arbitrée) : le lien « Dossier de médiation » ne mène jamais à « jamais passé en médiation »"
+          },
           "corridor": {
             "type": "object",
             "properties": {
@@ -21311,6 +21738,7 @@
           "conversationId",
           "bookingId",
           "bookingStatus",
+          "mediationFile",
           "corridor",
           "shipper",
           "carrier",
@@ -21500,6 +21928,16 @@
                 "type": "null"
               }
             ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -21514,7 +21952,8 @@
           "message",
           "conversationId",
           "bookingId",
-          "corridor"
+          "corridor",
+          "decision"
         ],
         "additionalProperties": false
       },
@@ -21664,6 +22103,33 @@
         ],
         "additionalProperties": false,
         "description": "Sans état (D59 4A) : recalculées à chaque lecture ; le cron horaire n'envoie un email qu'à la première apparition du jour"
+      },
+      "CronCatalogueEntry": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "service",
+          "name",
+          "schedule",
+          "intervalMs"
+        ],
+        "additionalProperties": false,
+        "description": "An expected cron (A178): service, name, cron expression, expected interval"
       },
       "PlatformSettingsValues": {
         "type": "object",
@@ -21857,8 +22323,8 @@
           "alerts.outboxParkedAttempts": {
             "type": "number",
             "minimum": 1,
-            "maximum": 100,
-            "description": "Événement parqué après (count) — D59 3A"
+            "maximum": 10,
+            "description": "Événement parqué après (count) — D59 3A · A176"
           },
           "alerts.outboxLagMinutes": {
             "type": "number",
@@ -22355,6 +22821,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -22482,6 +22954,34 @@
           "counts"
         ],
         "additionalProperties": false
+      },
+      "ErasureCheckResponse": {
+        "type": "object",
+        "properties": {
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErasureBlocker"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "required": [
+          "blockers",
+          "counts"
+        ],
+        "additionalProperties": false,
+        "description": "Why this account cannot be erased yet (empty list = erasable now). Re-checked inside the erasure transaction."
       },
       "EraseMyAccountRequest": {
         "type": "object",
@@ -23228,7 +23728,79 @@
           "crons": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CronRun"
+              "type": "object",
+              "properties": {
+                "service": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ranAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "schedule": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "late": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "service",
+                "name",
+                "ranAt",
+                "durationMs",
+                "ok",
+                "summary",
+                "error",
+                "schedule",
+                "late"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "missingCrons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CronCatalogueEntry"
             }
           },
           "outbox": {
@@ -23260,13 +23832,29 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "lagMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagThresholdMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagging": {
+                "type": "boolean"
               }
             },
             "required": [
               "unpublished",
               "oldestUnpublishedAt",
               "parked",
-              "parkedThreshold"
+              "parkedThreshold",
+              "lagMinutes",
+              "lagThresholdMinutes",
+              "lagging"
             ],
             "additionalProperties": false
           },
@@ -23282,11 +23870,23 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "deliveredLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "bouncedLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
               }
             },
             "required": [
               "failedLast24h",
-              "sentLast24h"
+              "sentLast24h",
+              "deliveredLast24h",
+              "bouncedLast24h"
             ],
             "additionalProperties": false
           },
@@ -23298,6 +23898,7 @@
           "at",
           "services",
           "crons",
+          "missingCrons",
           "outbox",
           "emails",
           "maintenance"
@@ -23694,6 +24295,9 @@
           "targetLabel": {
             "type": "string"
           },
+          "targetMissing": {
+            "type": "boolean"
+          },
           "targetOwner": {
             "anyOf": [
               {
@@ -23771,6 +24375,16 @@
                 "type": "null"
               }
             ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -23778,6 +24392,7 @@
           "targetType",
           "targetId",
           "targetLabel",
+          "targetMissing",
           "targetOwner",
           "status",
           "reason",
@@ -23786,7 +24401,8 @@
           "reporter",
           "openCountOnTarget",
           "priority",
-          "targetTrustLevel"
+          "targetTrustLevel",
+          "decision"
         ],
         "additionalProperties": false
       },
@@ -26313,6 +26929,10 @@
           "admin": {
             "type": "string"
           },
+          "adminUserId": {
+            "description": "ANO-ADM-68 — author id, so the screen filters on the server",
+            "$ref": "#/components/schemas/ObjectId"
+          },
           "action": {
             "type": "string"
           },
@@ -26360,6 +26980,7 @@
           "id",
           "at",
           "admin",
+          "adminUserId",
           "action",
           "targetType",
           "targetId",
@@ -26415,6 +27036,10 @@
           "existingAccount": {
             "type": "boolean"
           },
+          "passwordRequired": {
+            "type": "boolean",
+            "description": "A185 — true when a password link was emailed (new account, or existing account without password)"
+          },
           "expiresInHours": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -26424,7 +27049,8 @@
         "required": [
           "ok",
           "userId",
-          "existingAccount"
+          "existingAccount",
+          "passwordRequired"
         ],
         "additionalProperties": false
       },

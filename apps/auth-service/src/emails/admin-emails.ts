@@ -4,26 +4,41 @@
  * - adminInvite         : invitation d'un nouvel administrateur (lien 48 h, mot de passe à définir)
  * - adminAccessGranted  : compte existant promu (lien de connexion admin)
  * - adminLoginAlert     : alerte à chaque ouverture de session admin (ip, appareil, date)
+ * - adminRolesChanged / adminAccessRevoked : A189 c — à l'admin dont les accès changent (sécurité : un compte compromis se
+ *   voit ajouter ou retirer des droits). JAMAIS de lien de connexion (on n'offre pas une porte à un compte compromis),
+ *   JAMAIS le motif du retrait (texte interne).
  * - accountRestricted / accountSuspended / accountReinstated : au membre, motif GÉNÉRIQUE
  *   (jamais le contenu d'un signalement), recours par email.
  */
 import type { EmailContent } from "@packages/email";
-import { DEFAULT_LOCALE, resolveLocale, type SupportedLocale } from "@packages/api-contracts";
+import { DEFAULT_LOCALE, resolveLocale, type SanctionCategory, type SupportedLocale } from "@packages/api-contracts";
 
 export type AdminEmail = { subject: string; content: EmailContent };
 
 export type AdminInviteParams = { firstName: string; invitedBy: string; roleLabel: string; acceptUrl: string; expiresInHours: number; supportEmail: string };
 export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; roleLabel: string; loginUrl: string; supportEmail: string };
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
-export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
+export type AdminRolesChangedParams = { firstName: string; changedBy: string; before: string; after: string; supportEmail: string };
+export type AdminAccessRevokedParams = { firstName: string; revokedBy: string; supportEmail: string };
+/** ANO-ADM-87 (recette § 6, ADM-E2E-2) — pas de champ `reason` : le motif saisi au back-office (souvent recopié de la proposition du
+ *  Support, parfois nourri des signalements) ne quitte JAMAIS le back-office. Le membre lit un motif générique et l'adresse de recours. */
+export type AccountStatusParams = { firstName: string; category: SanctionCategory; until: string | null; supportEmail: string };
+/** A193 — l'exposé des motifs que lit le membre : une catégorie FERMÉE, dans sa langue ; jamais le texte saisi au back-office. */
+export const SANCTION_CATEGORY_LABELS: Record<SupportedLocale, Record<SanctionCategory, string>> = {
+  fr: { SCAM_SUSPECTED: "Arnaque suspectée", PROHIBITED_CONTENT: "Contenu ou objet interdit", ABUSIVE_BEHAVIOUR: "Comportement abusif envers un membre", REPEATED_DISPUTES: "Litiges ou annulations répétés", IMPERSONATION: "Usurpation d'identité", OTHER: "Autre manquement aux règles d'utilisation" },
+  en: { SCAM_SUSPECTED: "Suspected scam", PROHIBITED_CONTENT: "Prohibited content or item", ABUSIVE_BEHAVIOUR: "Abusive behaviour towards a member", REPEATED_DISPUTES: "Repeated disputes or cancellations", IMPERSONATION: "Identity theft", OTHER: "Other breach of the terms of use" },
+};
 /** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
-export type MaintenanceChangedParams = { firstName: string; byName: string; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
+/** `kind` (A181) : la transition choisit le sujet — lever une maintenance annoncée n'est pas une maintenance planifiée. */
+export type MaintenanceChangedParams = { firstName: string; byName: string; kind: "ENABLED" | "LIFTED" | "SCHEDULED" | "UNSCHEDULED" | "UPDATED"; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
 export type SettingsChangedParams = { firstName: string; byName: string; at: string; reason: string; changes: Array<{ label: string; before: string; after: string }>; settingsUrl: string; reset: boolean };
 
 export type AdminEmailDictionary = {
   adminInvite(p: AdminInviteParams): AdminEmail;
   adminAccessGranted(p: AdminAccessGrantedParams): AdminEmail;
   adminLoginAlert(p: AdminLoginAlertParams): AdminEmail;
+  adminRolesChanged(p: AdminRolesChangedParams): AdminEmail;
+  adminAccessRevoked(p: AdminAccessRevokedParams): AdminEmail;
   accountRestricted(p: AccountStatusParams): AdminEmail;
   accountSuspended(p: AccountStatusParams): AdminEmail;
   accountReinstated(p: Pick<AccountStatusParams, "firstName" | "supportEmail">): AdminEmail;
@@ -65,6 +80,30 @@ const fr: AdminEmailDictionary = {
       footnotes: [`Si ce n'est pas attendu, écris-nous : ${p.supportEmail}`],
     },
   }),
+  adminRolesChanged: (p) => ({
+    subject: "Tes profils sur le back-office Yamba ont changé",
+    content: {
+      preheader: `${p.before} → ${p.after}`,
+      title: "Profils modifiés",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [`${p.changedBy} a modifié tes profils sur le back-office Yamba : « ${p.before} » devient « ${p.after} ». Tes permissions suivent dès ta prochaine action.`],
+      notice: { tone: "warning", text: "Si tu ne t'attendais pas à ce changement, préviens tout de suite le support : quelqu'un a peut-être accès à un compte super administrateur." },
+      reason: "Tu reçois cet email à chaque changement de tes accès au back-office (sécurité).",
+      footnotes: [`Signaler : ${p.supportEmail}`],
+    },
+  }),
+  adminAccessRevoked: (p) => ({
+    subject: "Ton accès au back-office Yamba a été retiré",
+    content: {
+      preheader: `Accès retiré par ${p.revokedBy}.`,
+      title: "Accès retiré",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [`${p.revokedBy} a retiré ton accès au back-office Yamba. Tes sessions admin sont fermées et ta double authentification admin est supprimée.`, "Ton compte Yamba, s'il sert aussi à envoyer ou transporter des colis, n'est pas touché."],
+      notice: { tone: "info", text: "Si tu ne t'attendais pas à ce retrait, écris au support." },
+      reason: "Tu reçois cet email à chaque changement de tes accès au back-office (sécurité).",
+      footnotes: [`Une question ? ${p.supportEmail}`],
+    },
+  }),
   adminLoginAlert: (p) => ({
     subject: "Nouvelle connexion au back-office Yamba",
     content: {
@@ -84,7 +123,8 @@ const fr: AdminEmailDictionary = {
       title: "Compte restreint",
       greeting: `Bonjour ${p.firstName},`,
       paragraphs: [
-        `Ton compte ne peut plus publier de trajet ni réserver d'envoi${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"}. Motif : ${p.reason}`,
+        `Ton compte ne peut plus publier de trajet ni réserver d'envoi${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"}, à la suite d'un manquement aux règles d'utilisation de Yamba constaté par notre équipe.`,
+        `Motif : ${SANCTION_CATEGORY_LABELS.fr[p.category]}.`,
         "Tes deals en cours continuent normalement.",
       ],
       notice: { tone: "warning", text: `Pour contester, écris-nous à ${p.supportEmail}.` },
@@ -98,7 +138,8 @@ const fr: AdminEmailDictionary = {
       title: "Compte suspendu",
       greeting: `Bonjour ${p.firstName},`,
       paragraphs: [
-        `Ton compte est suspendu${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"} : la connexion est refusée et tes trajets ne sont plus visibles. Motif : ${p.reason}`,
+        `Ton compte est suspendu${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"} : la connexion est refusée et tes trajets ne sont plus visibles. Cette décision fait suite à un manquement aux règles d'utilisation de Yamba constaté par notre équipe.`,
+        `Motif : ${SANCTION_CATEGORY_LABELS.fr[p.category]}.`,
         "Tes deals en cours sont pris en charge par notre équipe.",
       ],
       notice: { tone: "warning", text: `Pour contester, écris-nous à ${p.supportEmail}.` },
@@ -121,21 +162,27 @@ const fr: AdminEmailDictionary = {
       reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque modification de paramètre est annoncée à tous les super administrateurs (D62).",
     },
   }),
-  maintenanceChanged: (p) => ({
-    subject: p.enabled ? "Maintenance activée sur Yamba" : p.scheduledAt ? "Maintenance planifiée sur Yamba" : "Maintenance levée sur Yamba",
-    content: {
-      preheader: `${p.byName} a modifié l'état de maintenance.`,
-      title: p.enabled ? "Plateforme en lecture seule" : p.scheduledAt ? "Maintenance annoncée" : "Retour à la normale",
-      greeting: `Bonjour ${p.firstName},`,
-      paragraphs: [
-        p.enabled ? `${p.byName} a passé la plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office).` : p.scheduledAt ? `${p.byName} a annoncé une maintenance pour le ${new Date(p.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} : le bandeau est affiché sur les deux fronts.` : `${p.byName} a levé la maintenance : la plateforme est de nouveau ouverte aux écritures.`,
-        p.message ? `Message affiché : « ${p.message} »` : "Aucun message personnalisé.",
-        `Motif : ${p.reason}`,
-      ],
-      cta: { label: "Voir l'état des services", url: p.statusUrl },
-      reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque changement d'état de maintenance est annoncé à tous les super administrateurs (D64).",
-    },
-  }),
+  maintenanceChanged: (p) => {
+    const quand = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" }) : null;
+    const texte = {
+      ENABLED: { subject: "Maintenance activée sur Yamba", title: "Plateforme en lecture seule", body: `${p.byName} a passé la plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office).` },
+      LIFTED: { subject: "Maintenance levée sur Yamba", title: "Retour à la normale", body: `${p.byName} a levé la maintenance : la plateforme est de nouveau ouverte aux écritures, les bandeaux disparaissent.` },
+      SCHEDULED: { subject: "Maintenance planifiée sur Yamba", title: "Maintenance annoncée", body: `${p.byName} a annoncé une maintenance pour le ${quand} : le bandeau est affiché sur les deux fronts, rien n'est bloqué.` },
+      UNSCHEDULED: { subject: "Annonce de maintenance retirée sur Yamba", title: "Annonce retirée", body: `${p.byName} a retiré l'annonce de maintenance : plus aucun bandeau n'est affiché.` },
+      UPDATED: { subject: "Maintenance modifiée sur Yamba", title: p.enabled ? "Lecture seule : message modifié" : "Annonce modifiée", body: p.enabled ? `${p.byName} a modifié le message de la lecture seule en cours.` : quand ? `${p.byName} a modifié l'annonce de maintenance du ${quand}.` : `${p.byName} a modifié l'état de maintenance.` },
+    }[p.kind];
+    return {
+      subject: texte.subject,
+      content: {
+        preheader: `${p.byName} a modifié l'état de maintenance.`,
+        title: texte.title,
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [texte.body, p.message ? `Message affiché : « ${p.message} »` : "Aucun message personnalisé.", `Motif : ${p.reason}`],
+        cta: { label: "Voir l'état des services", url: p.statusUrl },
+        reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque changement d'état de maintenance est annoncé à tous les super administrateurs (D64).",
+      },
+    };
+  },
   accountReinstated: (p) => ({
     subject: "Ton compte Yamba est rétabli",
     content: {
@@ -178,6 +225,30 @@ const en: AdminEmailDictionary = {
       footnotes: [`Unexpected? Write to us: ${p.supportEmail}`],
     },
   }),
+  adminRolesChanged: (p) => ({
+    subject: "Your Yamba back-office profiles changed",
+    content: {
+      preheader: `${p.before} → ${p.after}`,
+      title: "Profiles changed",
+      greeting: `Hi ${p.firstName},`,
+      paragraphs: [`${p.changedBy} changed your Yamba back-office profiles: "${p.before}" becomes "${p.after}". Your permissions follow from your next action.`],
+      notice: { tone: "warning", text: "If you did not expect this change, tell support right away: someone may have access to a super administrator account." },
+      reason: "You receive this email whenever your back-office access changes (security).",
+      footnotes: [`Report: ${p.supportEmail}`],
+    },
+  }),
+  adminAccessRevoked: (p) => ({
+    subject: "Your Yamba back-office access was removed",
+    content: {
+      preheader: `Access removed by ${p.revokedBy}.`,
+      title: "Access removed",
+      greeting: `Hi ${p.firstName},`,
+      paragraphs: [`${p.revokedBy} removed your access to the Yamba back-office. Your admin sessions are closed and your admin two-factor authentication is deleted.`, "Your Yamba account, if you also use it to send or carry parcels, is not affected."],
+      notice: { tone: "info", text: "If you did not expect this, write to support." },
+      reason: "You receive this email whenever your back-office access changes (security).",
+      footnotes: [`Any question? ${p.supportEmail}`],
+    },
+  }),
   adminLoginAlert: (p) => ({
     subject: "New sign-in to the Yamba back-office",
     content: {
@@ -196,7 +267,7 @@ const en: AdminEmailDictionary = {
       preheader: "You can no longer publish or book for now.",
       title: "Account restricted",
       greeting: `Hi ${p.firstName},`,
-      paragraphs: [`Your account can no longer publish trips or book shipments${p.until ? ` until ${p.until}` : ", until further notice"}. Reason: ${p.reason}`, "Your ongoing deals continue normally."],
+      paragraphs: [`Your account can no longer publish trips or book shipments${p.until ? ` until ${p.until}` : ", until further notice"}, following a breach of Yamba's terms of use found by our team.`, `Reason: ${SANCTION_CATEGORY_LABELS.en[p.category]}.`, "Your ongoing deals continue normally."],
       notice: { tone: "warning", text: `To contest, write to ${p.supportEmail}.` },
       reason: "You receive this email because a decision was made on your Yamba account.",
     },
@@ -207,7 +278,7 @@ const en: AdminEmailDictionary = {
       preheader: "Sign-in is refused during the suspension.",
       title: "Account suspended",
       greeting: `Hi ${p.firstName},`,
-      paragraphs: [`Your account is suspended${p.until ? ` until ${p.until}` : ", until further notice"}: sign-in is refused and your trips are hidden. Reason: ${p.reason}`, "Your ongoing deals are handled by our team."],
+      paragraphs: [`Your account is suspended${p.until ? ` until ${p.until}` : ", until further notice"}: sign-in is refused and your trips are hidden. This decision follows a breach of Yamba's terms of use found by our team.`, `Reason: ${SANCTION_CATEGORY_LABELS.en[p.category]}.`, "Your ongoing deals are handled by our team."],
       notice: { tone: "warning", text: `To contest, write to ${p.supportEmail}.` },
       reason: "You receive this email because a decision was made on your Yamba account.",
     },
@@ -228,21 +299,27 @@ const en: AdminEmailDictionary = {
       reason: "You receive this email because you are a Yamba super administrator: every settings change is announced to all super administrators (D62).",
     },
   }),
-  maintenanceChanged: (p) => ({
-    subject: p.enabled ? "Maintenance enabled on Yamba" : p.scheduledAt ? "Maintenance scheduled on Yamba" : "Maintenance lifted on Yamba",
-    content: {
-      preheader: `${p.byName} changed the maintenance state.`,
-      title: p.enabled ? "Platform in read-only mode" : p.scheduledAt ? "Maintenance announced" : "Back to normal",
-      greeting: `Hello ${p.firstName},`,
-      paragraphs: [
-        p.enabled ? `${p.byName} switched the platform to read-only: members can read, no write goes through (except sign-in and the back-office).` : p.scheduledAt ? `${p.byName} announced a maintenance for ${new Date(p.scheduledAt).toLocaleString("en-GB", { timeZone: "Europe/Paris" })}: the banner is shown on both fronts.` : `${p.byName} lifted the maintenance: the platform is open to writes again.`,
-        p.message ? `Displayed message: “${p.message}”` : "No custom message.",
-        `Reason: ${p.reason}`,
-      ],
-      cta: { label: "Open the service status", url: p.statusUrl },
-      reason: "You receive this email because you are a Yamba super administrator: every maintenance change is announced to all super administrators (D64).",
-    },
-  }),
+  maintenanceChanged: (p) => {
+    const when = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString("en-GB", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" }) : null;
+    const text = {
+      ENABLED: { subject: "Maintenance enabled on Yamba", title: "Platform in read-only mode", body: `${p.byName} switched the platform to read-only: members can read, no write goes through (except sign-in and the back-office).` },
+      LIFTED: { subject: "Maintenance lifted on Yamba", title: "Back to normal", body: `${p.byName} lifted the maintenance: the platform is open to writes again, the banners disappear.` },
+      SCHEDULED: { subject: "Maintenance scheduled on Yamba", title: "Maintenance announced", body: `${p.byName} announced a maintenance for ${when}: the banner is shown on both fronts, nothing is blocked.` },
+      UNSCHEDULED: { subject: "Maintenance announcement withdrawn on Yamba", title: "Announcement withdrawn", body: `${p.byName} withdrew the maintenance announcement: no banner is shown any more.` },
+      UPDATED: { subject: "Maintenance updated on Yamba", title: p.enabled ? "Read-only: message updated" : "Announcement updated", body: p.enabled ? `${p.byName} updated the message of the ongoing read-only mode.` : when ? `${p.byName} updated the maintenance announcement for ${when}.` : `${p.byName} changed the maintenance state.` },
+    }[p.kind];
+    return {
+      subject: text.subject,
+      content: {
+        preheader: `${p.byName} changed the maintenance state.`,
+        title: text.title,
+        greeting: `Hello ${p.firstName},`,
+        paragraphs: [text.body, p.message ? `Displayed message: “${p.message}”` : "No custom message.", `Reason: ${p.reason}`],
+        cta: { label: "Open the service status", url: p.statusUrl },
+        reason: "You receive this email because you are a Yamba super administrator: every maintenance change is announced to all super administrators (D64).",
+      },
+    };
+  },
   accountReinstated: (p) => ({
     subject: "Your Yamba account is reinstated",
     content: {
@@ -262,4 +339,27 @@ export function getAdminEmails(locale: string | null | undefined): AdminEmailDic
 }
 export function adminRoleLabel(locale: string | null | undefined, role: string): string {
   return ADMIN_ROLE_LABELS[resolveLocale(locale)]?.[role] ?? role;
+}
+
+/**
+ * ANO-ADM-53 (recette 02-ADMIN § 5.20) — la valeur d'un paramètre dans l'email aux super administrateurs, dans la langue du
+ * destinataire. L'email français annonçait « 48 hours → 50 hours » et « 3.00 € » : l'unité brute du catalogue et le point
+ * décimal anglais. Même règle d'affichage que l'écran (`apps/admin-ui/src/lib/settings-format.ts`).
+ */
+const SETTING_UNIT_SUFFIX: Record<SupportedLocale, Record<string, string>> = {
+  fr: { kg: "kg", hours: "h", days: "j", minutes: "min", mb: "Mo" },
+  en: { kg: "kg", hours: "h", days: "d", minutes: "min", mb: "MB" },
+};
+export function formatSettingValue(locale: string | null | undefined, unit: string, value: number): string {
+  const loc = resolveLocale(locale);
+  const tag = loc === "fr" ? "fr-FR" : "en-GB";
+  const n = (v: number, digits?: number) => v.toLocaleString(tag, digits === undefined ? undefined : { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  switch (unit) {
+    case "cents": return `${n(value / 100, 2)} €`;
+    case "percent": return loc === "fr" ? `${n(value)} %` : `${n(value)}%`;
+    case "coef": return `× ${n(value)}`;
+    case "rating": return `${n(value)} / 5`;
+    case "count": return n(value);
+    default: return SETTING_UNIT_SUFFIX[loc][unit] ? `${n(value)} ${SETTING_UNIT_SUFFIX[loc][unit]}` : n(value);
+  }
 }

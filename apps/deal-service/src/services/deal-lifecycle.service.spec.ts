@@ -283,7 +283,7 @@ describe("A — accept (capture D39, gate D31)", () => {
     await expect(makeService(provider).accept(CARRIER, BOOKING_ID, { charterAccepted: true })).rejects.toMatchObject({
       code: "TRANSITION_NOT_ALLOWED",
     });
-    expect(refundSpy).toHaveBeenCalledWith(intentId);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, undefined, { idempotencyKey: `yamba:refund:capture-rollback:${BOOKING_ID}:full` }); // A165
   });
 });
 
@@ -386,9 +386,44 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
 
     const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
 
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, { idempotencyKey: `yamba:refund:cancel:${BOOKING_ID}:2957` }); // A165
     expect(writtenEventPayload("booking.cancelled")).toMatchObject({ wasAccepted: true });
     expect(result.refundAmountCents).toBe(2957);
+  });
+
+  it("A172 — paramètres changés APRÈS la création : l'annulation applique les conditions figées de la réservation", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    const refundSpy = jest.spyOn(provider, "refund");
+    // Départ dans 24 h. Paramètres courants (défauts 48 h / 50 %) → 50 % rendus ; figés à la création 12 h / 50 % → 100 %.
+    prismaMock.booking.findUnique.mockResolvedValue({ ...makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(24) }), cancellationTerms: { fullRefundUntilHours: 12, lateRetentionPct: 50 } });
+    const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, expect.anything());
+    expect(result.refundAmountCents).toBe(2957);
+  });
+
+  it("A172 — réservation sans conditions figées (antérieure) : les paramètres courants s'appliquent", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(24) }));
+    const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(result.refundAmountCents).toBe(Math.round(2957 * 0.5));
+  });
+
+  it("A166 — ACCEPTED : le remboursement entre dans la liste ; PENDING : l'empreinte libérée n'y entre pas", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(12) })
+    );
+    await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    const accepted = prismaMock.booking.updateMany.mock.calls.at(-1)![0].data as { refunds: unknown; refundId: string };
+    expect(accepted.refunds).toEqual([{ refundId: accepted.refundId, amountCents: 1479, refundedAt: NOW, kind: "CANCELLATION" }]);
+
+    const pending = await makeProviderWithAuth();
+    prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ paymentIntentId: pending.intentId }));
+    await makeService(pending.provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(prismaMock.booking.updateMany.mock.calls.at(-1)![0].data).not.toHaveProperty("refunds");
   });
 
   it("ACCEPTED à moins de 48 h : retenue 50 % (arrondi) — la retenue reste tracée", async () => {
@@ -401,7 +436,7 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
 
     const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
 
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 1479); // 2957 × 50 % arrondi
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 1479, { idempotencyKey: `yamba:refund:cancel:${BOOKING_ID}:1479` }); // 2957 × 50 % arrondi — A165 : clé par geste
     expect(prismaMock.booking.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ refundAmountCents: 1479 }) })
     );

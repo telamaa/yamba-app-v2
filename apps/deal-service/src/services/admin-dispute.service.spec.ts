@@ -4,6 +4,7 @@
 import { AdminDisputeFileSchema, ArbitrationQueueItemSchema } from "@packages/api-contracts";
 import {
   arbitrationKindOf,
+  fileKindOf,
   toDisputeFile,
   toQueueItem,
   type AdminBookingRecord,
@@ -122,7 +123,19 @@ describe("admin-dispute.service — mapper pur (C-PR1)", () => {
       shipper,
       carrier
     );
-    expect(decided).toBeNull(); // COMPLETED : plus dans la file
+    // A160 — hors de la FILE, mais le DOSSIER se relit : décision servie, plus rien à décider.
+    expect(AdminDisputeFileSchema.parse(decided)).toEqual(decided);
+    expect(decided).toMatchObject({ kind: "DISPUTE", status: "COMPLETED", canDecide: false, dispute: { resolution: { outcome: "PARTIAL_REFUND", refundCents: 2000, carrierPayoutCents: 2500 } } });
+    expect(toQueueItem(booking({ status: "COMPLETED" }), dispute, { shipperFirstName: "a", carrierFirstName: "b" })).toBeNull(); // la file ne le montre plus
+  });
+
+  it("fileKindOf (A160) : un deal jamais passé en médiation reste introuvable ; une retenue arbitrée se relit", () => {
+    expect(fileKindOf({ status: "COMPLETED", retentionDisposition: null, retentionDecidedAt: null }, null)).toBeNull();
+    expect(fileKindOf({ status: "CANCELLED", retentionDisposition: "SHIPPER", retentionDecidedAt: D("2026-09-05T09:00:00Z") }, null)).toBe("RETENTION");
+    expect(fileKindOf({ status: "CANCELLED", retentionDisposition: "SHIPPER", retentionDecidedAt: null }, null)).toBeNull();
+    expect(fileKindOf({ status: "CANCELLED", retentionDisposition: null, retentionDecidedAt: null }, dispute)).toBe("DISPUTE");
+    // un litige non tranché mais dont le deal n'est plus DISPUTED (état incohérent) ne se décide pas
+    expect(toDisputeFile(booking({ status: "CANCELLED" }), dispute, party("64b000000000000000000010"), party("64b000000000000000000020"), D("2026-09-09T09:00:00Z"))?.canDecide).toBe(false);
   });
 
   it("toDisputeFile : retenue → montants proposés calculés serveur (prorata A79 ou retenue entière)", () => {

@@ -42,7 +42,7 @@ import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
 import { recomputeBookingParties } from "./reputation.service";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
-import { nextPayoutRetryAt, payoutRetryDueFilter } from "./admin-finance.rules";
+import { adoptableTransfer, nextPayoutRetryAt, payoutNeedsTransferLookup, payoutRetryDueFilter } from "./admin-finance.rules";
 import {
   BOOKING_WRITE_SELECT,
   applyBookingTransition,
@@ -169,8 +169,12 @@ export function makeDealSettlementService(
 
   async function markPayoutFailed(booking: BookingForWrite, reason: string, now: Date): Promise<PayoutOutcome> {
     const attemptsDone = (booking.payoutAttempts ?? 0) + 1;
-    await prisma.booking.updateMany({
-      where: { id: booking.id, status: booking.status as never },
+    // ANO-ADM-33 (recette § 5.14) — l'échec ne s'écrit QUE sur un versement encore à envoyer. Avant, `where` ne portait
+    // que le statut du deal : un exécuteur concurrent qui avait déjà écrit SENT (Stripe répond 409 à la seconde requête
+    // d'une même clé en cours) voyait son SENT écrasé en FAILED, transfert réel compris — et le rejeu suivant, une fois
+    // la clé d'idempotence expirée (24 h), aurait versé une SECONDE fois.
+    const written = await prisma.booking.updateMany({
+      where: { id: booking.id, status: booking.status as never, payoutStatus: { in: ["PENDING", "FAILED"] } } as never,
       data: {
         payoutStatus: "FAILED",
         payoutFailureReason: reason,
@@ -180,6 +184,14 @@ export function makeDealSettlementService(
         payoutNextRetryAt: nextPayoutRetryAt(attemptsDone, now), // A111
       },
     });
+    if (written.count === 0) {
+      // Un autre exécuteur a conclu entre-temps : on rend ce qui est VRAI en base, pas l'échec de cette tentative.
+      const current = await prisma.booking.findUnique({ where: { id: booking.id }, select: { payoutStatus: true, transferId: true } });
+      if (current?.payoutStatus === "SENT") {
+        logger.info({ bookingId: booking.id, reason }, "Payout failure ignored: a concurrent run already sent it");
+        return { payoutStatus: "SENT", transferId: current.transferId ?? null, reason: null };
+      }
+    }
     logger.warn({ bookingId: booking.id, reason }, "Carrier payout failed — will be retried by the payout cron");
     return { payoutStatus: "FAILED", transferId: null, reason };
   }
@@ -217,22 +229,39 @@ export function makeDealSettlementService(
     if (!destination) return markPayoutFailed(booking, "CARRIER_ACCOUNT_NOT_READY", now);
 
     let transferId: string;
-    try {
-      const result = await provider.transfer({
-        amountCents,
-        currencyCode,
-        destinationAccountId: destination,
-        description: reason === "DELIVERY" ? `Yamba — payout for deal ${booking.id}` : `Yamba — late cancellation compensation for deal ${booking.id}`,
-        metadata: { bookingId: booking.id, tripId: booking.tripId, carrierId: booking.carrierId, reason },
-        transferGroup: booking.id,
-        sourceTransactionId: booking.chargeId ?? undefined, // A69
-        // C-PR5 (D58) : après un renversement re-versé, l'admin a posé une nouvelle clé — sinon la clé historique (RG-PAY-04)
-        idempotencyKey: booking.payoutIdempotencyKey ?? `payout:${booking.id}`,
-      });
-      transferId = result.transferId;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return markPayoutFailed(booking, `PROVIDER_ERROR:${message}`.slice(0, 500), now);
+    // A164 — après une tentative, on DEMANDE d'abord au fournisseur si un transfert vivant existe déjà pour ce deal :
+    // la clé d'idempotence ne protège que 24 h (Stripe), le rejeu quotidien la dépasse. Fournisseur injoignable → on
+    // n'émet rien (un versement retardé vaut mieux qu'un versement double) et le rejeu repassera.
+    let adopted: { id: string } | null = null;
+    if (provider.findTransfers && payoutNeedsTransferLookup(booking)) {
+      try {
+        adopted = adoptableTransfer(await provider.findTransfers(booking.id), { bookingId: booking.id, amountCents, reason });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return markPayoutFailed(booking, `PROVIDER_ERROR:transfer lookup failed — ${message}`.slice(0, 500), now);
+      }
+    }
+    if (adopted) {
+      transferId = adopted.id;
+      logger.warn({ bookingId: booking.id, transferId }, "Live transfer found at the provider: adopted, nothing sent again (A164)");
+    } else {
+      try {
+        const result = await provider.transfer({
+          amountCents,
+          currencyCode,
+          destinationAccountId: destination,
+          description: reason === "DELIVERY" ? `Yamba — payout for deal ${booking.id}` : `Yamba — late cancellation compensation for deal ${booking.id}`,
+          metadata: { bookingId: booking.id, tripId: booking.tripId, carrierId: booking.carrierId, reason },
+          transferGroup: booking.id,
+          sourceTransactionId: booking.chargeId ?? undefined, // A69
+          // C-PR5 (D58) : après un renversement re-versé, l'admin a posé une nouvelle clé — sinon la clé historique (RG-PAY-04)
+          idempotencyKey: booking.payoutIdempotencyKey ?? `payout:${booking.id}`,
+        });
+        transferId = result.transferId;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return markPayoutFailed(booking, `PROVIDER_ERROR:${message}`.slice(0, 500), now);
+      }
     }
 
     try {
@@ -309,6 +338,8 @@ export function makeDealSettlementService(
         });
       }
 
+      // ANO-ADM-52 (D62) — l'échéance de la version du Voyageur est figée ici, avec le délai en vigueur à l'ouverture.
+      const responseDueAt = new Date(now.getTime() + (await settings.get())["dispute.responseDelayHours"] * 3_600_000); // = disputeResponseDeadline
       for (let attempt = 0; ; attempt += 1) {
         const ticketNumber = generateDisputeTicket(attempt);
         try {
@@ -347,6 +378,7 @@ export function makeDealSettlementService(
                   desiredOutcome: input.desiredOutcome ?? null,
                   photoUrls: input.photoUrls,
                   pledgeAcceptedAt: now,
+                  responseDueAt,
                 },
               });
             },

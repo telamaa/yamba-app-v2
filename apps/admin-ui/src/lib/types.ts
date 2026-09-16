@@ -128,6 +128,8 @@ export type AdminUserSummary = {
 };
 export type AdminUsersResponse = { items: AdminUserSummary[]; total: number; nextCursor?: string | null };
 export type ReputationFacts = { reputationLevel: string | null; ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number; disputesLostCount: number };
+/** A193 — miroir de `SANCTION_CATEGORIES` (@packages/api-contracts). */
+export type SanctionCategory = "SCAM_SUSPECTED" | "PROHIBITED_CONTENT" | "ABUSIVE_BEHAVIOUR" | "REPEATED_DISPUTES" | "IMPERSONATION" | "OTHER";
 export type AdminUserFile = {
   id: string;
   firstName: string;
@@ -140,8 +142,8 @@ export type AdminUserFile = {
   adminRole: import("./permissions").AdminRole | null;
   adminRoles: import("./permissions").AdminRole[];
   accountStatus: AccountStatus;
-  suspension: { level: AccountStatus; reason: string; until: string | null; at: string; byAdmin: string } | null;
-  suspensionProposal: { level: string; reason: string; byAdmin: string; at: string } | null;
+  suspension: { level: AccountStatus; category: SanctionCategory; reason: string; until: string | null; at: string; byAdmin: string } | null;
+  suspensionProposal: { level: string; category: SanctionCategory; reason: string; byAdmin: string; at: string } | null;
   createdAt: string;
   isDeleted: boolean;
   isMe: boolean;
@@ -156,13 +158,14 @@ export type AdminUserFile = {
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
   trust: TrustAssessment | null; // D71
 };
-export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
-export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean };
+export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; inviteExpiresAt: string | null; createdAt: string };
+export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean; device: string; ip: string | null };
 
 export type AuditItem = {
   id: string;
   at: string;
   admin: string;
+  adminUserId: string; // ANO-ADM-68 — filtre serveur « auteur »
   action: string;
   targetType: string;
   targetId: string | null;
@@ -212,22 +215,26 @@ export type FinanceQueueItem = {
   amountCents: number; currencyCode: string; payoutStatus: string | null; payoutAttempts: number;
   payoutFailureKind: "ACCOUNT_NOT_READY" | "PROVIDER_ERROR" | "REVERSED" | null; payoutFailureDetail: string | null;
   lastAttemptAt: string | null; nextRetryAt: string | null; disputeTicket: string | null; since: string;
+  proposalStale?: boolean | null; // recette § 5.15 (A165) — PROPOSED_REFUNDS : proposition devenue impossible
 };
-export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; generatedAt: string };
+export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; counts: Record<FinanceQueueKind, number>; truncated: boolean; generatedAt: string }; // recette § 5.11 — compte de chaque file, troncature
 export type MoneyTimelineEvent = { at: string; kind: string; amountCents: number | null; detail: string | null };
+export type MoneyPendingKind = "AUTHORIZATION_OPEN" | "DEAL_IN_PROGRESS" | "PAYOUT_DUE" | "PAYOUT_FROZEN" | "PAYOUT_FAILED" | "REVERSAL_OPEN" | "RETENTION_HELD" | "REFUND_PROPOSED";
+export type MoneyBalance = { capturedCents: number; refundedCents: number; paidOutCents: number; platformHoldsCents: number; pending: Array<{ kind: MoneyPendingKind; cents: number }>; settled: boolean; anomaly: "UNALLOCATED_FUNDS" | "OVERSPENT" | "REFUND_RECORDS_MISMATCH" | null };
 export type AdminDealMoneyFile = {
   id: string; status: string; disputeTicket: string | null;
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
   shipper: { id: string; firstName: string; lastName: string };
   carrier: { id: string; firstName: string; lastName: string; stripeAccountIdMasked: string | null; stripePayoutsEnabled: boolean | null };
   pricing: { pricingModel: string; weightKg: number; transportCents: number; commissionCents: number; premiumCents: number; totalShipperCents: number; currencyCode: string };
-  payment: { provider: string | null; intentId: string | null; chargeId: string | null; capturedAt: string | null; refundedAt: string | null; refundAmountCents: number | null; refundId: string | null };
+  payment: { provider: string | null; intentId: string | null; chargeId: string | null; capturedAt: string | null; refundedAt: string | null; refundAmountCents: number | null; refundId: string | null; refunds?: Array<{ refundId: string | null; amountCents: number; refundedAt: string; kind: string }> };
   payout: { status: string | null; amountCents: number | null; sentAt: string | null; attempts: number; failureKind: string | null; failureDetail: string | null; lastAttemptAt: string | null; nextRetryAt: string | null; transferId: string | null; reversal: { resolution: string; reason: string; at: string; byAdmin: string } | null };
   retention: { cents: number; disposition: string | null; decisionReason: string | null; decidedAt: string | null } | null;
   dates: { requestedAt: string; acceptedAt: string | null; pickedUpAt: string | null; deliveredAt: string | null; disputedAt: string | null; completedAt: string | null; completedBy: string | null; closedAt: string | null; closedBy: string | null };
   timeline: MoneyTimelineEvent[];
+  balance: MoneyBalance; // recette § 5.12 — où est chaque centime
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
-  manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
+  manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string; stale?: boolean; staleReason?: "ABOVE_REMAINING" | "NOT_REFUNDABLE" | null } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
   allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean; proposeRefund: boolean; applyRefund: boolean };
 };
 export type FinanceReportMonth = { month: string; currencyCode: string; capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number; paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number; avgRevenuePerCompletedCents: number | null };
@@ -269,7 +276,7 @@ export type AdminChatMessage = {
   reports: { id: string; reason: MessageReportReason; details: string | null; status: MessageReportStatus; reporterRole: "SHIPPER" | "CARRIER"; createdAt: string }[];
 };
 export type AdminConversation = {
-  conversationId: string; bookingId: string; bookingStatus: string;
+  conversationId: string; bookingId: string; bookingStatus: string; mediationFile?: boolean; // § 5.18
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
   shipper: { id: string; firstName: string; lastName: string };
   carrier: { id: string; firstName: string; lastName: string };
@@ -285,6 +292,8 @@ export type AdminMessageReportItem = {
   author: { id: string | null; firstName: string; role: "SHIPPER" | "CARRIER" | "SYSTEM" } | null;
   message: { id: string; body: string | null; createdAt: string | null };
   conversationId: string | null; bookingId: string | null; corridor: { originCity: string; destinationCity: string } | null;
+  /** Décision du 15/09 — qui a décidé, quand, la note (ligne de journal) ; null si ouvert ou décision antérieure au journal. */
+  decision: ReportDecision | null;
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
 
@@ -300,10 +309,12 @@ export type TrustAssessment = {
 export type ReportTargetType = "TRIP" | "USER";
 export type ReportReason = "ILLEGAL_CONTENT" | "SCAM" | "INAPPROPRIATE" | "IMPERSONATION" | "OTHER";
 export type AdminReportItem = {
-  id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetOwner: { id: string; firstName: string } | null;
+  id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetMissing: boolean; targetOwner: { id: string; firstName: string } | null;
   status: MessageReportStatus; reason: ReportReason; details: string | null; createdAt: string;
   reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean; targetTrustLevel: TrustLevel | null;
+  decision: ReportDecision | null; // décision du 15/09
 };
+export type ReportDecision = { by: { id: string; firstName: string } | null; at: string; note: string | null };
 export type AdminReportsResponse = { items: AdminReportItem[]; total: number };
 
 /* ── C-PR8a (D62) — paramètres de la plateforme ── */
@@ -340,9 +351,10 @@ export type HealthReport = { status: "ok" | "degraded"; service: string; version
 export type ServiceStatus = { name: string; url: string; reachable: boolean; ms: number; report: HealthReport | null; error: string | null };
 export type CronRun = { service: string; name: string; ranAt: string; durationMs: number; ok: boolean; summary: string | null; error: string | null; schedule: string | null };
 export type AdminStatusResponse = {
-  at: string; services: ServiceStatus[]; crons: CronRun[];
-  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number };
-  emails: { failedLast24h: number; sentLast24h: number };
+  at: string; services: ServiceStatus[]; crons: Array<CronRun & { late: boolean }>;
+  missingCrons: Array<{ service: string; name: string; schedule: string; intervalMs: number }>; // A178
+  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number; lagMinutes: number; lagThresholdMinutes: number; lagging: boolean };
+  emails: { failedLast24h: number; sentLast24h: number; deliveredLast24h: number; bouncedLast24h: number }; // A177
   maintenance: MaintenanceState;
 };
 export type PublicMaintenance = { enabled: boolean; message: { fr: string; en: string }; scheduledAt: string | null };

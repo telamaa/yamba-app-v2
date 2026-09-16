@@ -1,5 +1,5 @@
 /** platform-settings.service.spec.ts — écriture des paramètres (C-PR8a, D62 5A) : bornes, portée, cohérence, verrou, journal, email. */
-import { SETTINGS_DEFAULTS } from "@packages/api-contracts";
+import { SETTINGS_DEFAULTS, settingsCoherenceIssues } from "@packages/api-contracts";
 import { makePlatformSettingsService, type SettingsWriterDb } from "./platform-settings.service";
 
 type Row = { key: string; values: Record<string, number>; version: number; updatedAt: Date; updatedByAdminId: string | null };
@@ -53,6 +53,13 @@ describe("platform-settings.service — update", () => {
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0].recipients.map((u: { id: string }) => u.id)).toEqual(["sa1", "sa2"]);
   });
+  it("ANO-ADM-11 — les destinataires excluent les comptes effacés ET les adresses en suppression (D35 4A)", async () => {
+    const db = fakeDb();
+    const spy = jest.spyOn(db.user, "findMany");
+    const svc = makePlatformSettingsService({ db, notify: jest.fn().mockResolvedValue(undefined) });
+    await svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 0 });
+    expect((spy.mock.calls[0][0] as { where: unknown }).where).toMatchObject({ AND: [{ isDeleted: false, OR: [{ emailSuppressedAt: null }, { emailSuppressedAt: { isSet: false } }] }] });
+  });
   it("refuse hors bornes (400 avec la clé), une clé inconnue, un motif trop court, et « rien à changer »", async () => {
     const svc = makePlatformSettingsService({ db: fakeDb() });
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 25 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { errors: { "pricing.commissionPct": expect.stringContaining("between 5 and 20") } } });
@@ -70,6 +77,24 @@ describe("platform-settings.service — update", () => {
     expect(db.actions).toHaveLength(0);
     await expect(svc.update(OPS, { changes: { "alerts.outboxLagMinutes": 30 }, reason, expectedVersion: 0 })).resolves.toMatchObject({ version: 1 });
   });
+  it("A174 — la portée avant les bornes : OPS sur une clé métier HORS bornes reçoit 403 sans min/max ; une clé inconnue reste 400", async () => {
+    const db = fakeDb();
+    const svc = makePlatformSettingsService({ db });
+    const refus = await svc.update(OPS, { changes: { "pricing.commissionPct": 99 }, reason, expectedVersion: 0 }).catch((e) => e);
+    expect(refus).toMatchObject({ statusCode: 403, details: { code: "ADMIN_ROLE_CHANGE_DENIED" } });
+    expect(refus.details).toEqual({ code: "ADMIN_ROLE_CHANGE_DENIED" });
+    expect(refus.message).not.toMatch(/between/);
+    await expect(svc.update(OPS, { changes: { "pricing.nope": 1 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { code: "SETTING_OUT_OF_BOUNDS" } });
+    // Dans sa portée, les bornes parlent : OPS hors bornes sur une clé d'exploitation → 400 avec la clé.
+    await expect(svc.update(OPS, { changes: { "alerts.outboxLagMinutes": 100000 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { errors: { "alerts.outboxLagMinutes": expect.stringContaining("between") } } });
+    expect(db.actions).toHaveLength(0);
+  });
+  it("invariant défensif plafond ≥ prime (arbitrage du 15/09) : exercé directement sur la règle pure", () => {
+    expect(settingsCoherenceIssues({ ...SETTINGS_DEFAULTS })).toEqual([]);
+    const issues = settingsCoherenceIssues({ ...SETTINGS_DEFAULTS, "protection.extendedPremiumCents": 5000, "protection.extendedCapCents": 4999 });
+    expect(issues).toEqual(["Le plafond de la Garantie étendue doit être supérieur à sa prime."]);
+    expect(settingsCoherenceIssues({ ...SETTINGS_DEFAULTS, "protection.extendedPremiumCents": 5000, "protection.extendedCapCents": 5000 })).toEqual([]);
+  });
   it("cohérence : S ≤ M ≤ L et intervalle ≥ délai sont refusés en 400, rien n'est écrit", async () => {
     const db = fakeDb();
     const svc = makePlatformSettingsService({ db });
@@ -83,6 +108,37 @@ describe("platform-settings.service — update", () => {
     const svc = makePlatformSettingsService({ db });
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 409 });
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 3 })).resolves.toMatchObject({ version: 4, changed: [{ key: "pricing.commissionPct", before: 14, after: 15 }] });
+  });
+  it("ANO-ADM-51 — conflit d'écriture (P2034) : rejoué ; au réessai la version a bougé → 409 STALE_VERSION, jamais 500, aucune ligne", async () => {
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS }, version: 1, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const transaction = db.$transaction.bind(db);
+    let essais = 0;
+    db.$transaction = (async (fn: Parameters<typeof db.$transaction>[0]) => {
+      essais++;
+      if (essais === 1) {
+        await db.platformSettings.updateMany({ where: { key: "current", version: 1 }, data: { values: { ...SETTINGS_DEFAULTS, "alerts.outboxLagMinutes": 20 }, version: 2, updatedByAdminId: "ops1" } }); // l'autre admin a gagné
+        throw Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" });
+      }
+      return transaction(fn);
+    }) as typeof db.$transaction;
+    const notify = jest.fn().mockResolvedValue(undefined);
+    await expect(makePlatformSettingsService({ db, notify }).update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 1 })).rejects.toMatchObject({ statusCode: 409, details: { code: "STALE_VERSION" } });
+    expect(essais).toBe(2);
+    expect(db.actions).toEqual([]);
+    expect(notify).not.toHaveBeenCalled();
+  });
+  it("ANO-ADM-51 — document absent, deux créations concurrentes : la collision de clé unique (P2002) EST le verrou → 409", async () => {
+    const db = fakeDb();
+    db.platformSettings.create = async () => { throw Object.assign(new Error("Unique constraint failed on the constraint: `PlatformSettings_key_key`"), { code: "P2002" }); };
+    await expect(makePlatformSettingsService({ db }).update(OPS, { changes: { "alerts.outboxLagMinutes": 21 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 409, details: { code: "STALE_VERSION" } });
+    expect(db.actions).toEqual([]);
+  });
+  it("une autre erreur de base n'est ni rejouée ni déguisée en 409", async () => {
+    const db = fakeDb();
+    let essais = 0;
+    db.$transaction = (async () => { essais++; throw new Error("panne"); }) as typeof db.$transaction;
+    await expect(makePlatformSettingsService({ db }).update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 0 })).rejects.toThrow("panne");
+    expect(essais).toBe(1);
   });
 });
 
@@ -101,6 +157,31 @@ describe("platform-settings.service — reset et read", () => {
     await expect(svc.reset(OPS, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
     await expect(svc.reset(OPS, { keys: ["alerts.outboxLagMinutes"], reason, expectedVersion: 2 })).resolves.toMatchObject({ version: 3 });
   });
+  it("A173 — « Tout réinitialiser » par OPS : ses clés d'exploitation seulement, les clés métier ignorées et nommées, jamais 403 global", async () => {
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS, "pricing.commissionPct": 14, "alerts.outboxLagMinutes": 30 }, version: 2, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const svc = makePlatformSettingsService({ db });
+    const r = await svc.reset(OPS, { reason, expectedVersion: 2 });
+    expect(r).toEqual({ version: 3, changed: [{ key: "alerts.outboxLagMinutes", before: 30, after: 15 }], skipped: ["pricing.commissionPct"] });
+    expect(db.actions.map((a) => `${a.action} ${a.targetId}`)).toEqual(["SETTINGS_RESET alerts.outboxLagMinutes"]);
+    expect((db.row()!.values as Record<string, number>)["pricing.commissionPct"]).toBe(14);
+    // Plus rien dans sa portée : 400 « rien à remettre », la clé métier restante toujours nommée.
+    await expect(svc.reset(OPS, { reason, expectedVersion: 3 })).rejects.toMatchObject({ statusCode: 400, details: { code: "NOTHING_TO_RESET", skipped: ["pricing.commissionPct"] } });
+    // SUPER_ADMIN inchangé : tout ce qui s'écarte.
+    await expect(svc.reset(SUPER, { reason, expectedVersion: 3 })).resolves.toEqual({ version: 4, changed: [{ key: "pricing.commissionPct", before: 14, after: 12 }] });
+  });
+  it("ANO-ADM-02 — rien à remettre : un profil sans aucun droit d'écriture est REFUSÉ (403), un profil qui peut écrire reçoit 400", async () => {
+    const MEDIATOR = { id: "med1", roles: ["MEDIATOR"] as const };
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS }, version: 2, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const svc = makePlatformSettingsService({ db });
+    // Toutes les valeurs sont déjà par défaut : le Médiateur n'a aucune portée d'écriture — refus, pas « rien à faire ».
+    await expect(svc.reset(MEDIATOR, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    await expect(svc.reset(MEDIATOR, { reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    // OPS peut écrire les clés d'exploitation : une remise globale sans effet reste un 400 « Nothing to reset ».
+    await expect(svc.reset(OPS, { reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 400 });
+    // OPS visant une clé MÉTIER déjà par défaut : il ne peut en écrire aucune → 403.
+    await expect(svc.reset(OPS, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    expect(db.actions).toEqual([]);
+  });
   it("read : défauts quand rien n'est stocké (version 0), puis valeurs, auteur, dernière modification groupée par version", async () => {
     const db = fakeDb();
     const svc = makePlatformSettingsService({ db });
@@ -116,5 +197,17 @@ describe("platform-settings.service — reset et read", () => {
     expect(after.values["pricing.commissionPct"]).toBe(15);
     expect(after.updatedBy).toEqual({ id: "sa1", firstName: "Ada", lastName: "Lovelace" });
     expect(after.lastChange).toMatchObject({ byName: "Ada L.", keys: expect.arrayContaining(["pricing.commissionPct", "pricing.commissionFloorCents"]) });
+  });
+  it("ANO-ADM-56 — dernière modification : une version réutilisée (document remis à zéro) ne fusionne pas deux écritures", async () => {
+    const db = fakeDb();
+    const t = (s: number) => new Date(Date.UTC(2026, 8, 15, 10, 0, s));
+    // Deux écritures « version 1 » : une ancienne (autre admin, avant la remise à zéro), la dernière.
+    db.adminAction.findMany = async () => [
+      { adminUserId: "sa1", createdAt: t(40), after: { key: "alerts.payoutFailedHours", version: 1 } },
+      { adminUserId: "ops1", createdAt: t(0), after: { key: "pricing.commissionPct", version: 1 } },
+      { adminUserId: "ops1", createdAt: t(0), after: { key: "alerts.outboxLagMinutes", version: 1 } },
+    ];
+    const r = await makePlatformSettingsService({ db, clock: () => t(50) }).read();
+    expect(r.lastChange?.keys).toEqual(["alerts.payoutFailedHours"]);
   });
 });

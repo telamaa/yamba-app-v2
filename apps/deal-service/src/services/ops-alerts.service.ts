@@ -6,9 +6,9 @@
  */
 import prisma from "@packages/libs/prisma";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
-import type { OpsAlert, OpsAlertsResponse } from "@packages/api-contracts";
+import { DISPUTE_RESPONSE_DELAY_HOURS, type OpsAlert, type OpsAlertsResponse } from "@packages/api-contracts";
 import { OPS_EMAILS } from "../emails/ops-emails";
-import { ALERT_SENT_TTL_SECONDS, ALERT_THRESHOLDS, alertSentKey, evaluateAlerts, type AlertThresholds, type OpsSnapshot } from "./ops-alerts.rules";
+import { ALERT_SENT_TTL_SECONDS, ALERT_THRESHOLDS, alertSentKey, countUndecidedDisputes, evaluateAlerts, type AlertThresholds, type OpsSnapshot } from "./ops-alerts.rules";
 import { alertThresholdsFromSettings } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
@@ -21,11 +21,11 @@ export type AlertDedupStore = { set(key: string, value: string, mode: "EX", seco
 
 const H = 3_600_000; const D = 86_400_000;
 
-export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_THRESHOLDS): Promise<OpsSnapshot> {
+export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_THRESHOLDS, responseDelayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): Promise<OpsSnapshot> {
   const unresolvedReversal = { OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
   const [failedPayouts, disputes, held, reversals, parked, oldestUnpublished, failedEmails, lastTrip, requests, accepted] = await Promise.all([
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "FAILED", status: { in: ["COMPLETED", "CANCELLED"] }, OR: [{ completedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }, { closedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }] } as never }),
-    prisma.dispute.findMany({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } }, select: { createdAt: true, carrierRespondedAt: true } }),
+    prisma.dispute.findMany({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } }, select: { createdAt: true, carrierRespondedAt: true, responseDueAt: true, bookingId: true } }),
     prisma.booking.count({ where: { isDeleted: false, status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION", closedAt: { lt: new Date(now.getTime() - T.retentionHeldDays * D) } } }),
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "REVERSED", updatedAt: { lt: new Date(now.getTime() - T.reversalOpenHours * H) }, ...unresolvedReversal } as never }),
     prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { gte: T.outboxParkedAttempts } } as never }),
@@ -35,9 +35,17 @@ export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_T
     prisma.booking.count({ where: { isDeleted: false, requestedAt: { gte: new Date(now.getTime() - T.acceptanceRateWindowDays * D) } } }),
     prisma.booking.count({ where: { isDeleted: false, requestedAt: { gte: new Date(now.getTime() - T.acceptanceRateWindowDays * D) }, acceptedAt: { not: null } } }),
   ]);
-  // Litige décidable (réponse reçue OU 72 h passées) et toujours sans décision depuis plus de 72 h
-  const decidableSince = (d: { createdAt: Date; carrierRespondedAt: Date | null }) => d.carrierRespondedAt ?? new Date(d.createdAt.getTime() + 72 * H);
-  const undecided = disputes.filter((d) => now.getTime() - decidableSince(d).getTime() > T.disputeUndecidedHours * H).length;
+  // ANO-ADM-24 — la même décidabilité que l'écran de médiation : ouverture = `Booking.disputedAt`, délai = le PARAMÈTRE
+  // `dispute.responseDelayHours` (le calcul codait 72 h en dur et partait de la création du dossier).
+  const openedAt = disputes.length
+    ? new Map((await prisma.booking.findMany({ where: { id: { in: disputes.map((d) => d.bookingId) } }, select: { id: true, disputedAt: true } })).map((b) => [b.id, b.disputedAt]))
+    : new Map<string, Date | null>();
+  const undecided = countUndecidedDisputes(
+    disputes.map((d) => ({ openedAt: openedAt.get(d.bookingId) ?? d.createdAt, carrierRespondedAt: d.carrierRespondedAt, responseDueAt: d.responseDueAt })),
+    now,
+    responseDelayHours,
+    T.disputeUndecidedHours
+  );
   return {
     failedPayoutsOverThreshold: failedPayouts,
     undecidedDisputesOverThreshold: undecided,
@@ -57,14 +65,15 @@ export function makeOpsAlertsService(clock: () => Date = () => new Date(), setti
     async evaluate(): Promise<OpsAlertsResponse> {
       const now = clock();
       const T = alertThresholdsFromSettings(await settings.get()); // D62
-      const alerts = evaluateAlerts(await collectOpsSnapshot(now, T), now, T);
+      const v = await settings.get();
+      const alerts = evaluateAlerts(await collectOpsSnapshot(now, T, v["dispute.responseDelayHours"]), now, T);
       return { alerts, evaluatedAt: now.toISOString(), thresholds: { ...T } };
     },
     /** Cron horaire : email au support pour les alertes qui apparaissent pour la première fois aujourd'hui. Retourne les règles envoyées. */
     async notifyNewAlerts(store: AlertDedupStore, alerts?: OpsAlert[]): Promise<string[]> {
       const now = clock();
       const T = alertThresholdsFromSettings(await settings.get()); // D62
-      const active = alerts ?? evaluateAlerts(await collectOpsSnapshot(now, T), now, T);
+      const active = alerts ?? evaluateAlerts(await collectOpsSnapshot(now, T, (await settings.get())["dispute.responseDelayHours"]), now, T);
       const fresh: OpsAlert[] = [];
       for (const a of active) {
         const first = await store.set(alertSentKey(a.rule, now), "1", "EX", ALERT_SENT_TTL_SECONDS, "NX");

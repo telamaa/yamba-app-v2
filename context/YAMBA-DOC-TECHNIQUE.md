@@ -3979,6 +3979,5815 @@ user-ui : typecheck et i18n verts. Aucun service modifié.
 
 ---
 
+# WEB-E2E-4 : le compte neuf, deux plafonds qui tombaient trop tard, un export qui ne s'ouvrait pas
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième parcours du cahier 01-WEB (gravité majeure) : un compte créé sur place, plafonné
+pendant trente jours (CNF-06, D71), et la vie ordinaire du compte — export des données, session
+qui expire, appareils, suppression bloquée. Quatorze étapes, 1 min 06.
+
+```
+apps/e2e/src/fixtures/compte-neuf.ts   une adresse unique par exécution, le mot de passe de recette
+apps/e2e/src/pages/inscription.ts      formulaire, case des conditions, code à six chiffres, « Compte activé »
+apps/e2e/src/pages/securite.ts         export par la porte (téléchargement réel), sessions actives, suppression bloquée, reconnexion dans la fenêtre
+apps/e2e/src/pages/reservation.ts      + tenterDeReserver() : le refus à l'intention, le refus au clic, ou le deal
+apps/e2e/src/parcours/web-e2e-4.spec.ts
+```
+
+## Deux anomalies produit, corrigées
+
+**ANO-WEB-08** — l'intention de paiement partait sans la valeur déclarée : le plafond « valeur
+déclarée » ne tombait qu'à la création du deal, après l'autorisation bancaire. Le contrat le
+prévoyait depuis ANO-API-12 ; `booking.api.ts` l'envoie désormais (conversion factorisée).
+
+**ANO-WEB-09** — l'export « Mes données » demande la réponse en `blob` : le 403 `SUDO_REQUIRED`
+arrivait en blob, le code n'était jamais lu, la porte ne s'ouvrait jamais. Le corps d'erreur en
+blob est relu en JSON avant d'être relancé. L'export RGPD était inutilisable pour tout membre.
+
+## Ce que le harnais a appris
+
+- **Un refus peut tomber à deux moments** : à l'intention (encadré dans la carte de paiement) ou
+  au clic « Payer » (toast). `tenterDeReserver()` écoute la réponse de l'intention, puis celle
+  du deal, et rend le refus tel qu'il est écrit, ou l'identifiant du deal.
+- **L'assistant garde son brouillon en `sessionStorage`** : `ouvrir()` l'oublie et recharge.
+- **Un téléchargement réel se capture** : `page.waitForEvent("download")` armé avant le clic qui
+  déclenche l'ancre `download` sur un blob ; le fichier est relu sur le disque.
+- **Une heure d'inactivité se simule fidèlement** : SES-01 fait du délai d'inactivité la durée de
+  vie de la clé Redis `refresh_jti:<userId>:<jti>` ; la supprimer (manœuvre consignée) et
+  retirer le cookie d'accès de quinze minutes, c'est exactement l'avoir laissée expirer.
+- **La fenêtre « Ta session a expiré » embarque un formulaire complet** : on la vise par son
+  `dialog`, jamais par `#email` seul.
+
+## Tests
+
+`apps/e2e` : **18 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 4).
+user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-5 : le refus au pickup, et une annulation qui n'en était pas une
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième parcours du cahier 01-WEB (gravité majeure) : un deal accepté et capturé, puis
+refusé par le Voyageur à la prise en charge — remboursement intégral, kilos rendus, deux emails,
+et une ligne de faits qui ne bouge pas. Huit étapes, 1 min 06.
+
+```
+apps/e2e/src/pages/transport-voyageur.ts   + refuserLeColis() : l'écran de prise en charge, la fenêtre, la raison, le toast, la réponse du serveur
+apps/e2e/src/pages/profil-public.ts        la page publique d'un membre : le publicSlug (via /auth/me), la ligne de faits, le compte d'annulations tardives
+apps/e2e/src/pages/mes-trajets.ts          + kilosRestants() partagé (sorti de web-e2e-3, qui l'importe désormais)
+apps/e2e/src/parcours/web-e2e-5.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-10
+
+La machine d'états déclare le refus au pickup **sans pénalité** (`refusePickup` : `FULL_REFUND`,
+`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de `PENALIZE_CARRIER`). Mais la réputation (D29 ①)
+est un **modèle de lecture** recalculé à part, dans `apps/deal-service/src/services/reputation.service.ts`,
+et sa requête des « annulations tardives » du Voyageur disait : `status: CANCELLED, closedBy:
+CARRIER, acceptedAt ≠ null`. Un refus au pickup coche les trois. Comme l'annulation ANN-02 par
+le Voyageur n'existe pas encore côté service (ANO-WEB-07, lot à part), ce compteur ne comptait
+en pratique **que** des refus au pickup — l'inverse exact de son intention.
+
+Pourquoi personne ne l'avait vu : le refus ne déclenchait aucun recalcul. La page publique
+restait juste jusqu'au prochain fait de réputation (un deal terminé, un avis révélé), où le refus
+apparaissait rétroactivement comme une annulation fautive. La première version du parcours passait
+donc « pour rien » (piège 7 du handoff : une assertion doit pouvoir échouer) ; la preuve a été
+faite en base — l'ancien filtre comptait 1 sur le deal refusé, le nouveau 0.
+
+Trois gestes, dans trois fichiers :
+
+1. **Une marque en base.** `Booking.pickupRefusedAt DateTime?` (`prisma/schema.prisma`). La raison
+   du refus est facultative (`pickupRefusalReason` peut être `null` sur un vrai refus), elle ne
+   pouvait pas servir de discriminant. `refusePickup` pose la marque avec `now` dans la même
+   transaction que le reste (`deal-transport.service.ts`).
+2. **Une requête qui exclut la marque, champ absent compris.** Les deals antérieurs à la marque
+   n'ont pas le champ ; sur Mongo, `pickupRefusedAt: null` ne les verrait pas (piège payé six
+   fois). D'où `OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }]`.
+3. **Le refus recalcule la réputation des deux parties** (`recomputeBookingParties`, best effort,
+   comme l'annulation tardive) : la page publique dit vrai tout de suite, et l'étape 7 du parcours
+   devient une vraie relecture avant / après.
+
+Aucun DTO n'expose la marque : elle sert la réputation, pas les écrans.
+
+## Ce que le harnais a appris
+
+- **Une relecture « inchangé » n'a de valeur que si le produit a eu l'occasion de changer.** La
+  ligne de faits est lue avant la réservation et après le refus ; c'est le recalcul déclenché par
+  le refus qui rend la comparaison probante. Sans lui, l'assertion passait par inertie.
+- **Deux fenêtres pour un seul geste.** La modale (desktop) et le tiroir (mobile) portent toutes
+  deux `role="dialog"` ; le tiroir fermé est `aria-hidden`, donc absent de l'arbre des rôles.
+  On vise la fenêtre ouverte par son titre, et on confirme DANS la fenêtre — « Refuser le colis »
+  est aussi le bouton du pied de page.
+- **Le remboursement se prouve par la réponse du serveur ET par l'écran.** `refundAmountCents`
+  de `POST /deals/:id/pickup/refuse` égale le total lu à l'étape 1 ; la ligne Finances écrit le
+  même montant ; l'email de remboursement ne contient pas le mot « retenue ».
+
+## Tests
+
+deal-service : **576** tests (+1 : la requête des faits Voyageur exclut la marque, absent compris ;
+la marque et le recalcul sont vérifiés dans le spec du transport). Plateforme : 990.
+`apps/e2e` : **19 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 5).
+
+---
+
+# WEB-E2E-6 : le destinataire, et quatre liens qui menaient à un bouchon
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième et dernier parcours du chapitre 6 (gravité majeure) : la page publique de suivi
+(D69) rechargée à chaque pas du colis, par un visiteur qui n'a qu'un lien. Neuf étapes, 1 min 00.
+Le chapitre 6 est clos.
+
+```
+apps/e2e/src/pages/suivi-destinataire.ts   + aideCourante(), jalonsAtteints(), neReveleRien(secrets) (écran + source),
+                                             clesServiesParLApi() (liste fermée), mentionDeConfidentialite(),
+                                             suivreLeLienDAcquisition(), lienInvalide(), refusDeLApi()
+apps/e2e/src/parcours/web-e2e-6.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-11
+
+`/become/carrier` et `/become/shipper` étaient deux bouchons de la migration next-intl —
+« Become a carrier (UI only) » — jamais remplacés, et `/become-yamber` (pied de page, menu
+visiteur) n'a jamais existé. Quatre entrées « Devenir Voyageur » menaient à du vide : la page
+destinataire, l'appel final de l'accueil, le pied de page, le menu « Découvrir ».
+
+La correction tient en six fichiers : les deux bouchons deviennent des **redirections
+serveur** (`redirect` de `@/i18n/navigation`, qui garde la locale) vers l'écran réel —
+`/carrier/onboarding` et `/search` — pour tout lien déjà partagé ; les quatre liens visent
+directement l'onboarding. L'assistant d'onboarding envoie déjà un visiteur à
+`/login?redirect=/carrier/onboarding` et le ramène après connexion : c'est l'écran attendu par
+WEB-VOY-1.
+
+## Ce que le harnais a appris
+
+- **Une absence se prouve sur trois surfaces.** Le texte de l'écran, le code source
+  (`page.content()` — une donnée peut être dans le HTML sans être visible), et la réponse de
+  l'API dont les clés sont comparées à une liste FERMÉE : toute clé ajoutée au contrat fait
+  échouer le parcours, ce qui est le but.
+- **Les secrets connus se cherchent nommément.** Le harnais connaît le code de livraison, le
+  numéro du destinataire, le montant payé et les lieux de remise du trajet : `neReveleRien()`
+  les reçoit et les cherche, en plus des motifs génériques.
+- **Un `Link` Next navigue côté client** : `networkidle` ne dit rien de la navigation, on attend
+  l'URL attendue (`toHaveURL`). Et l'en-tête du site porte les mêmes libellés que le bloc
+  d'acquisition : on vise le lien DANS le bloc.
+- **Un 404 uniforme se prouve par comparaison** : le corps de la réponse pour un jeton altéré
+  d'un caractère est identique, octet pour octet, à celui d'un jeton inventé.
+
+## Tests
+
+`apps/e2e` : **20 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 6).
+user-ui : typecheck vert. Aucun service modifié.
+
+---
+
+# Chapitre 5.1 du cahier 01-WEB : l'accueil du visiteur, et six anomalies derrière la première recherche
+
+*(PR `chore/recette-web-5-1`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le premier des 32 chapitres « fiches » du cahier 01-WEB : `WEB-ACC` (découverte, accueil et
+navigation), douze fiches jouées dans l'ordre du cahier, en desktop, par le harnais
+(`apps/e2e/src/chapitres/web-acc.spec.ts`, 1 min 24). Dix passent sur le produit tel quel ; les
+deux qui touchent la recherche depuis l'accueil ont fait tomber trois anomalies (deux bloquantes,
+une majeure), et trois fiches d'apparence anodine (bascule de langue, textes légaux, réseaux
+sociaux) trois anomalies mineures. Toutes closes dans la PR.
+
+```
+apps/e2e/src/chapitres/web-acc.spec.ts         NOUVEAU — 12 fiches WEB-ACC-1 à 12 ; aides : clesBrutesAffichees()
+                                                 (balayage des nœuds de texte), ecouterLesErreurs(), lienVisible()
+                                                 (le libellé VISIBLE d'un bloc qui en porte deux), choisirUneVille()
+                                                 (frappe touche par touche + journal des réponses Google), ORIGINE_GOOGLE
+apps/user-ui/src/components/home/HeroSection.tsx          « Rechercher » → router.push("/search")             (ANO-WEB-12)
+apps/user-ui/src/components/search/TripSearchBar.tsx      exporte TRIP_SEARCH_STORAGE_KEY, initialSearchDraft, SEARCH_VERSION
+apps/user-ui/src/components/search/SearchResultsView.tsx  interroge le brouillon mémorisé (même clé)          (ANO-WEB-12)
+apps/trip-service/src/lib/place-text.ts (+ .spec.ts)      placeSearchTerm() : « Ville, Pays » → « Ville »       (ANO-WEB-13)
+apps/trip-service/src/controllers/trip-search.controller.ts  buildBaseWhere() passe from/to par placeSearchTerm()
+apps/user-ui/src/lib/googlePlaces.ts                      callback= de Google au lieu de onload ; prêt = importLibrary (ANO-WEB-14)
+apps/user-ui/src/components/search/CityAutocomplete.tsx   le catch journalise (console.warn)                    (ANO-WEB-14)
+apps/user-ui/src/components/layout/Footer.tsx             SOCIAL_LINKS_ENABLED = false                          (ANO-WEB-15)
+apps/user-ui/src/app/layout.tsx                           <html lang={await getLocale()}>                       (ANO-WEB-16)
+apps/user-ui/src/components/layout/HtmlLang.tsx           NOUVEAU — aligne document.documentElement.lang après une bascule
+apps/user-ui/src/app/[locale]/layout.tsx                  monte <HtmlLang locale={locale} />
+apps/user-ui/src/app/[locale]/(marketing)/legal/layout.tsx  <main> → <div> (plus de main imbriqué)              (ANO-WEB-17)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                    ANO-WEB-12 à 17, chapitre 5.1, observations
+```
+
+## Les six anomalies, et pourquoi elles tenaient ensemble
+
+**ANO-WEB-12 (bloquante) — « Rechercher » ne cherchait pas.** `HeroSection` montait
+`<TripSearchBar>` sans `onSearchAction` ; le composant documente lui-même ce cas comme
+« comportement par défaut : log ». Le bouton faisait un `console.log` et rien d'autre. Deuxième
+moitié du même défaut : `SearchResultsView` interrogeait un brouillon `useState` VIDE, alors que la
+barre mémorise le sien en `sessionStorage` (`usePersistedFormState("trip-search")`). Correction en
+deux gestes cohérents : l'accueil navigue vers `/search`, et la page de résultats lit le MÊME
+brouillon (clé, brouillon initial et version désormais exportés par `TripSearchBar`). Une seule
+source pour ce que le visiteur a saisi ; en arrivant, les résultats correspondent.
+
+**ANO-WEB-13 (bloquante) — une ville choisie dans la liste ne trouvait rien.** L'autocomplétion
+pose « Ville, Pays » dans le champ (`CityAutocomplete.select`, « on rétablit toujours le pays »).
+La recherche comparait ce libellé ENTIER à `destinationCity` et `destinationCountry` par
+`contains` : « Brazzaville, République du Congo » n'est contenu dans aucun des deux. Toute ville
+étrangère donnait zéro résultat ; Paris passait par accident (Google omet le pays du domicile).
+La règle est désormais dans `lib/place-text.ts` : le terme cherché est le premier segment avant
+une virgule. Le pays n'est pas un critère — il est dans la langue de l'écran, la base le porte
+dans la langue du Voyageur qui a publié. Fonction pure, trois tests. Le contrôleur ne change que
+sur deux lignes.
+
+**ANO-WEB-14 (majeure) — la première liste de suggestions était perdue.** `googlePlaces.ts`
+chargeait l'API avec `loading=async` et se résolvait sur `script.onload` — qui arrive avant que
+`google.maps.importLibrary` n'existe. La toute première requête (celle qui déclenche le
+chargement) échouait sur « importLibrary is not a function » ; les suivantes trouvaient tout prêt.
+D'où un symptôme qui dépend du RYTHME de frappe : « Paris » à 60 ms par touche → rien ; à
+250 ms → la liste (chaque frappe relance, la deuxième arrive après le chargement). Le contrat de
+Google pour `loading=async` est le paramètre `callback=` : c'est lui qui dit « prêt ». Et le
+composant avalait l'erreur (`catch {}`) : il journalise maintenant.
+
+**ANO-WEB-15, 16, 17 (mineures)** — les icônes sociales ouvraient `instagram.com/yamba` (pas à
+nous) : `SOCIAL_LINKS_ENABLED = false`, l'état inactif était déjà écrit. `<html lang="fr">` sur
+`/en` : le layout racine lit `getLocale()` (rendu serveur), `HtmlLang` aligne l'attribut après une
+bascule côté client (le layout racine, partagé, ne se re-rend pas). Deux `<main>` imbriqués sur
+les pages légales : le cadre devient un `<div>`.
+
+## Ce que le harnais a appris
+
+- **Le libellé visible d'un bloc qui en porte deux.** L'en-tête et le pied de page ont chacun un
+  arbre mobile et un arbre desktop dans le DOM ; `first()` tombe souvent sur le mobile, caché.
+  `filter({ visible: true })` avant `first()`, systématiquement.
+- **Une porte se vise par son nom.** Quatre autres `role="dialog" aria-modal="true"` vivent en
+  permanence dans la page (feuilles de la recherche mobile, fermées) ; un sélecteur par rôle seul
+  en trouve cinq.
+- **`fill()` n'est pas taper.** L'autocomplétion n'interroge Google qu'au fil des frappes ;
+  `pressSequentially` — et l'échec journalise ce que Google a répondu (référent refusé, clé
+  absente), pour que le rapport dise la cause.
+- **La clé Google est restreinte par référent à `localhost`** : sur l'adresse LAN du poste,
+  Places répond 403. Les fiches d'autocomplétion se jouent en visiteur, sans cookie : le harnais
+  ouvre le même front par `localhost` (`ORIGINE_GOOGLE`, surchargeable).
+- **Les 401 de la sonde de session sont rouges dans la console de tout visiteur.** Filtrés et
+  consignés comme observation (le marqueur `yamba:session` permettrait de ne pas sonder).
+
+## Tests
+
+trip-service **257 → 260** (`lib/place-text.spec.ts`). `apps/e2e` : **32 scénarios** verts sur le
+poste (20 + WEB-ACC ×12). user-ui et trip-service : typecheck vert.
+
+---
+
+# Chapitre 5.2 du cahier 01-WEB : l'inscription, seize fiches et une preuve en base
+
+*(PR `chore/recette-web-5-2`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le deuxième chapitre « fiches » du cahier 01-WEB : `WEB-INS` (inscription par code email,
+consentement, Google). Seize fiches ; douze se jouent par le harnais
+(`apps/e2e/src/chapitres/web-ins.spec.ts`), quatre (le parcours Google, 13 à 16) sont déclarées
+`⏭` tant que `NEXT_PUBLIC_GOOGLE_CLIENT_ID` n'est pas posée — et resteront à jouer à la main
+ensuite, la fenêtre de consentement Google ne se pilotant pas. Une anomalie mineure (ANO-WEB-18,
+un « Connectez-vous » qui vouvoyait), close dans la PR ; trois écarts de cahier consignés (adresse
+masquée sur l'écran du code, ordre des règles de mot de passe sur une date, titre « Deviens
+Voyageur »).
+
+```
+apps/e2e/src/chapitres/web-ins.spec.ts            NOUVEAU — 16 fiches ; aides : formulaire() (le <form> de la PAGE, pas celui
+                                                    d'une fenêtre de connexion), remplir(), erreurSous() (#<champ>-error),
+                                                    creerMonCompte() (rend la réponse de POST /auth/register ou null),
+                                                    jusquAuCode(), saisirLeCode() (six cases + « Valider mon code »),
+                                                    collerLeCode() (un vrai événement paste), codeDe()
+apps/e2e/src/fixtures/compte-neuf.ts              compteNeuf(prenom, nom) : un compte par exécution (neuf-<horodatage>@recette.yamba.dev)
+apps/e2e/src/fixtures/jeu-essai.ts                inspecterCompte(email) → inspect-user.ts par execFileSync ; type CompteInspecte
+packages/libs/prisma/scripts/inspect-user.ts      NOUVEAU — ce que la base sait d'un compte, en JSON, sans secret
+                                                    (consentements, preferredLocale, hasPassword, identités)
+apps/user-ui/src/lib/auth/auth-error-codes.ts     registerCodeMessage tutoie (ANO-WEB-18)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-18, chapitre 5.2, à trancher, pièges
+```
+
+## Comment le chapitre est construit
+
+**Une histoire en quatre fiches.** Les fiches 6 à 9 décrivent le même compte — créé, bloqué
+après cinq codes faux, code renvoyé, activé. Le barème de blocage (7) ne se comprend qu'après la
+création (6) et avant le renvoi (8) : elles sont jouées dans UN scénario, chaque fiche en
+`test.step`, pour que le rapport Playwright nomme l'étape qui tombe. Le blocage dure une vraie
+minute et le scénario l'attend (`toBeEnabled({ timeout: 75_000 })`) ; le simuler reviendrait à ne
+pas tester la règle. `test.setTimeout(8 * 60_000)`.
+
+**Une adresse par exécution.** `compteNeuf()` fabrique `neuf-<horodatage>@recette.yamba.dev`.
+Le cahier propose `recette+neuf@seed.yamba.dev` en dur ; un compte créé la veille ferait tomber la
+fiche 6 sur « adresse déjà utilisée ». Mailpit accepte tout domaine, la base de développement
+garde les comptes (sans conséquence).
+
+**Le compteur qui ne repart pas.** Après cinq échecs et un renvoi de code, le sixième échec
+annonce « 4 essais restants » — exactement ce qu'un PREMIER échec d'un nouveau lot dirait. La
+preuve n'est pas dans le chiffre du 6e mais dans le 7e (« 3 ») et dans l'absence de nouveau
+blocage entre les deux : le serveur compte 6 puis 7, pas 1 puis 2.
+
+**La preuve en base.** Le cahier demande de vérifier `ConsentLog` et `preferredLocale` — ce que
+l'écran ne montre pas. `inspect-user.ts` répond une ligne JSON sans rien de secret (jamais
+l'empreinte, seulement `hasPassword`) ; le harnais l'appelle par `execFileSync` (`tsx`,
+`--env-file=.env`) et lit la dernière ligne. Le premier passage a payé le prix d'un script non
+exécuté seul : un `select` sur `isVerified`, champ que `User` n'a pas, ne casse qu'à
+l'exécution — sur la dernière assertion du scénario, trois minutes après son début.
+
+**Le collage.** « Le collage doit remplir les six cases d'un coup » : `collerLeCode()` construit
+un `DataTransfer`, y pose le texte et dispatche un `ClipboardEvent("paste")` sur la première
+case — un vrai événement, celui que le composant écoute ; six `fill()` prouveraient autre chose.
+
+## ANO-WEB-18
+
+`registerCodeMessage` est antérieur au passage au tutoiement (décision du 03/09) ; les phrases
+voisines des règles de mot de passe sont impersonnelles (« Le mot de passe doit… ») et n'avaient
+rien à changer — la seule qui s'adresse à la personne avait échappé. « Connecte-toi ou utilise
+« Mot de passe oublié ». » ; la version anglaise ne bouge pas.
+
+## Ce que le harnais a appris
+
+- **Le `role="alert"` qui n'est pas le tien.** Next 16 monte en développement l'indicateur
+  « Open Next.js Dev Tools » avec `role="alert"`, hors `<main>`. « Aucune alerte visible » se
+  vérifie dans `page.locator("main")`, jamais sur la page entière.
+- **Un formulaire se vise par la page.** Une fenêtre de connexion peut monter un second `<form>`
+  avec les mêmes `id` (observation du chapitre 6) : `page.locator("main form").first()`.
+- **Le libellé n'est pas la donnée, encore.** L'écran du code affiche `maskEmail(email)` ; le
+  spec vérifie premier caractère, `@` et domaine — et le rapport consigne l'écart de cahier au
+  lieu de plier l'assertion en silence.
+- **Un script externe se lance seul avant d'être branché** (voir « la preuve en base »).
+
+## Tests
+
+Aucun test unitaire ajouté (une chaîne de message). `apps/e2e` : **45 scénarios** (41 joués,
+4 `⏭` Google) — 32 + WEB-INS ×13. user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.3 du cahier 01-WEB : connexion, sessions, porte sudo — treize fiches et une vraie faille
+
+*(PR `chore/recette-web-5-3`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le troisième chapitre « fiches » du cahier 01-WEB : `WEB-CNX` (connexion, « Rester connecté »,
+session expirée, appareils connectés, porte de confirmation). Treize fiches, toutes jouées, plus
+les trois vérifications historiques d'`ANO-WEB-01` conservées en tête du fichier
+(`apps/e2e/src/chapitres/web-cnx.spec.ts`). Douze fiches conformes ; une anomalie **majeure
+ouverte** (ANO-WEB-19 : aucune protection anti-force-brute sur la connexion) — décision et PR
+dédiées, hors recette ; une anomalie **mineure close** (ANO-WEB-20 : pas de message après avoir
+déconnecté un appareil) ; plusieurs écarts de cahier consignés.
+
+```
+apps/e2e/src/chapitres/web-cnx.spec.ts            13 fiches + ANO-WEB-01 ; aides : formulaire(), seConnecter(),
+                                                    erreurDeConnexion(), sessionsParApi(), ouvrirLaSecurite(),
+                                                    lignesAppareils()/ligneCetAppareil(), fenetreSessionExpiree(),
+                                                    actionServeurSansRechargement(), ouvrirFenetreSudo() (tolérante au cooldown)
+apps/e2e/src/fixtures/yamba.ts                     navigateurConnecte accepte { memoriser } → coche « Rester connecté » (implique parEcran)
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts  securityPage.sessionRevoked (« Appareil déconnecté. »)   (ANO-WEB-20)
+apps/user-ui/src/components/dashboard/sections/Security.tsx  doRevoke pose le message                                (ANO-WEB-20)
+packages/libs/prisma/scripts/clear-sudo-locks.ts  NOUVEAU — purge les verrous OTP sudo d'un compte (rerun propre)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-19, 20, chapitre 5.3, à trancher, pièges
+```
+
+## ANO-WEB-19 — la connexion par mot de passe n'a aucun verrou
+
+C'est la trouvaille du chapitre, et elle était déjà écrite dans le cahier de recette API. L'OTP a
+ses paliers de verrou (1 min → 30 min → 24 h) et un email d'alerte ; `loginUser`, lui, n'a rien.
+Le seul rempart est le limiteur de la passerelle (100 requêtes / 15 min par IP), déclaré
+`skipFailedRequests: true` : une tentative en échec n'est PAS comptée. Douze mauvais mots de passe
+d'affilée donnent douze 401 et jamais un 429. La fiche WEB-CNX-4 est jouée et marquée `test.fail` :
+le jour où le verrou existe, elle « passe » et Playwright le signale. Correctif proposé (PR
+dédiée) : la mécanique OTP réutilisée, compteur par `emailNormalized`, email d'alerte, refus
+indistinguable (même corps, même statut — ANO-API-08/18).
+
+## Ce que la mécanique sudo a imposé au harnais
+
+La porte de confirmation (D65) est un objet plus subtil qu'il n'y paraît, et trois de ses
+propriétés ont façonné le test :
+
+1. **Un changement de mot de passe FERME la fenêtre sudo** (`closeSudoWindow`), l'export ne la
+   ferme pas. L'ordre littéral du cahier (WEB-CNX-11 : « suite immédiate » de WEB-CNX-10, donc
+   export après un changement de mot de passe) redemanderait donc un code. C'est une bonne
+   sécurité, pas un bug. Le harnais ouvre UNE fenêtre dédiée et y enchaîne les gestes qui ne la
+   ferment pas (export, puis le rétablissement du mot de passe en dernier).
+2. **Six codes sudo par heure, un par minute** (anti-spam OTP). Une première version du test
+   sondait `/auth/me/sudo/request` toutes les trois secondes pour « attendre » le cooldown : elle
+   a grillé le quota (verrou d'une heure). La règle : demander UNE fois, attendre le cooldown
+   d'une minute, redemander UNE fois — et comme une fenêtre couvre plusieurs gestes, on n'en
+   ouvre qu'une.
+3. **La fenêtre est liée au `jti`** de la session (donc à l'appareil), pas au compte : `verifySudo`
+   pose `sudo:<userId>:<jti>`, `requireSudo` lit le même `jti`. WEB-CNX-12 le prouve avec deux
+   contextes.
+
+## Deux profils de session, lus sur le cookie
+
+Le cookie de rafraîchissement dit tout : session standard = cookie de **session** (`expires` = −1,
+le « 60 min » d'inactivité vit côté serveur) ; « Rester connecté » = cookie **persistant**,
+`expires` ≈ +30 jours — la vie ABSOLUE (D27/SES-02), pas l'inactivité de 7 jours. La première
+version du test attendait « ≈ 7 jours » sur le cookie : faux, c'est 30. La mention « connexion
+mémorisée » de la page Sécurité, elle, se lit sur la session (`rememberMe`), pas sur le cookie.
+
+## Ce que le harnais a appris
+
+- **Deux navigateurs, un compte.** A et B sont deux `BrowserContext` connectés à Aminata : c'est
+  la seule façon de prouver qu'une session tuée depuis A meurt dans B (WEB-CNX-8, 9). Le harnais
+  connecte toujours par l'écran (`parEcran`), jamais depuis la mémoire, puisque les fiches parlent
+  de la naissance et de la mort des sessions.
+- **Une action serveur sans rechargement**, c'est un lien de la barre latérale du tableau de bord
+  (navigation côté client ; la section qui arrive interroge l'API) — pas un `reload`, qui ne
+  prouverait pas « la page ne change pas ».
+- **Rendre le mot de passe quoi qu'il arrive.** WEB-CNX-10 change le mot de passe d'Aminata ; un
+  `finally` le rétablit, et si la fenêtre sudo a été fermée entre-temps, il en rouvre une. Un
+  échec de rétablissement lève une erreur explicite (« rejouer seed-deals.ts »).
+
+## Tests
+
+Aucun test unitaire ajouté (un libellé). `apps/e2e` : le chapitre 5.3 fait passer le harnais à
+**58 scénarios** (45 + WEB-CNX ×13). user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.4 du cahier 01-WEB : mot de passe et adresse email — des comptes jetables
+
+*(PR `chore/recette-web-5-4`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième chapitre « fiches » du cahier 01-WEB : `WEB-MDP` (mot de passe oublié, changement de
+mot de passe, changement d'adresse email). Six fiches, jouées en quatre scénarios
+(`apps/e2e/src/chapitres/web-mdp.spec.ts`), toutes conformes — **aucune anomalie**.
+
+```
+apps/e2e/src/chapitres/web-mdp.spec.ts   NOUVEAU — 6 fiches ; aides : creerCompteActive() (register + activation par
+                                           code), connecter(), ouvrirLaSecurite(), ouvrirFenetreSudo() (autonome, cooldown),
+                                           sessionVivante(), codeDe()
+context/YAMBA-RECETTE-WEB-RESULTATS.md   section chapitre 5.4 (aucune anomalie), pièges
+```
+
+## Le principe : des comptes qui ne survivent pas au test
+
+Ce chapitre change des mots de passe ET une adresse email **définitivement**. Le faire sur un
+compte du seed le laisserait cassé, et fausserait `seed-output.json`. Chaque scénario crée donc
+son propre compte neuf (`compteNeuf()` → `neuf-<horodatage>@recette.yamba.dev`) et l'active par le
+vrai parcours (registration + code email, `creerCompteActive`). Un compte par test, jeté ensuite ;
+la base de développement les garde sans conséquence (piège 22). Bénéfice de bord : sur une adresse
+neuve, tous les compteurs d'OTP (activation, réinitialisation, sudo, changement d'adresse) sont
+vierges — aucun verrou hérité d'un run précédent.
+
+## Ce que chaque flux impose
+
+- **Mot de passe oublié (WEB-MDP-1/2/3)** — trois écrans : `/password/forgot` (adresse →
+  `sessionStorage`, `/auth/password/forgot`), `/password/verify` (code, `/auth/password/verify`),
+  `/password/reset` (nouveau mot de passe, `/auth/password/reset`). La réponse ne révèle jamais si
+  le compte existe : une adresse inexistante fait avancer l'écran et n'envoie aucun email. Les
+  règles de force valent aussi ici (`abc` → « au moins 8 caractères »).
+- **Changer son mot de passe (WEB-MDP-4)** — derrière la porte sudo : le nouveau doit différer de
+  l'actuel (`PASSWORD_SAME_AS_CURRENT`, un refus qui NE ferme PAS la fenêtre), puis un mot de
+  passe valide déclenche l'email « Ton mot de passe Yamba a été modifié » et **ferme toutes les
+  autres sessions** (le second navigateur meurt, la courante reste).
+- **Changer son adresse (WEB-MDP-5/6)** — le code part **sur la nouvelle adresse** (jamais sur
+  l'ancienne) ; une adresse déjà prise est refusée avant tout envoi (`EMAIL_ALREADY_USED`) ; après
+  confirmation, l'adresse du compte change, l'**ancienne** reçoit une simple information « …a
+  changé » **sans code**, les autres sessions tombent, et la connexion se fait avec la nouvelle
+  adresse. `requestEmailChange` exige la fenêtre sudo mais ne la ferme pas ; `confirmEmailChange`
+  la ferme.
+
+## Un piège de mot de passe de test
+
+Le premier jet du nouveau mot de passe, `Yamba-Recette-…`, contenait le prénom « Recette » du
+compte neuf : refus `PASSWORD_CONTAINS_PERSONAL_INFO`. La règle de force compare le mot de passe au
+prénom, au nom et à l'adresse — un mot de passe d'essai se choisit à l'écart de ces valeurs
+(`Kola-Mangue-7x-Teal!`).
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.4 porte le harnais à **62 scénarios**
+(58 + WEB-MDP ×4). Harnais : typecheck vert.
+
+---
+
+# Chapitre 5.5 du cahier 01-WEB : profil, avatar et page publique — le drapeau qu'on n'affichait pas
+
+*(PR `chore/recette-web-5-5`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième chapitre « fiches » du cahier 01-WEB : `WEB-PRO` (écran Profil, bornes des champs,
+avatar, page publique `/u/<slug>` et sa visibilité). Dix fiches ; huit jouées et conformes, deux
+`⏭` (avatar réel sur ImageKit, et « Afficher ma ville » que le seed ne peut pas alimenter). Une
+anomalie mineure trouvée et **corrigée** : `ANO-WEB-21`.
+
+```
+apps/e2e/src/chapitres/web-pro.spec.ts                       NOUVEAU — 10 fiches ; instantané/restauration du profil,
+                                                               garde-fou avatar (Buffer 2,05 Mo, aucune requête)
+apps/user-ui/src/lib/public-user.types.ts                    PublicUser.hidden ajouté (déjà présent dans la réponse API)  (ANO-WEB-21)
+apps/user-ui/src/components/users/profile/UserProfileView.tsx bannière « masquée » quand user.hidden                       (ANO-WEB-21)
+apps/user-ui/messages/{fr,en}/user-profile.json              clé hiddenBanner                                              (ANO-WEB-21)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                       ANO-WEB-21, chapitre 5.5, à trancher, observations, pièges
+```
+
+## ANO-WEB-21 — un drapeau serveur que le front ignorait
+
+Quand un membre masque sa page publique, l'API `getUserPublic` répond 404 à tout le monde SAUF au
+propriétaire, à qui elle renvoie la page avec `hidden: true` (D67 1A). Le propriétaire voyait donc
+sa page — mais sans aucune mention qu'elle était masquée, parce que le front ne portait même pas ce
+drapeau : `hidden` était absent du type `PublicUser`, et rien ne le lisait. Encore une intention
+écrite côté serveur qu'aucun rendu n'honorait (le même motif que ANO-WEB-01 et 16). Correctif
+minimal : `hidden` déclaré au type (la valeur arrivait déjà), et une bannière en tête de
+`UserProfileView`.
+
+## Le garde-fou d'avatar, sans écriture externe
+
+WEB-PRO-5 et 6 téléversent sur ImageKit (service externe réel) : le harnais joue le seul geste qui
+n'écrit rien — le refus, côté navigateur, d'un fichier de plus de 2 Mo. `setInputFiles` avec un
+`Buffer` de 2,05 Mo et un type `image/png` déclenche `validateFile` (`useImageKitUpload`,
+`maxSizeBytes` = 2 Mo) AVANT tout appel réseau ; on écoute les requêtes vers `imagekit` / `upload`
+/ `/auth/me/avatar` et on vérifie qu'aucune n'est partie. Le téléversement réel et le retrait (dont
+la contre-épreuve « l'ancienne image répond introuvable ») restent `⏭`, joués à la main.
+
+## Deux écarts, une observation
+
+- **La page publique identifie par « Prénom N. »**, pas par le « nom affiché » du profil
+  (`CarrierPage.name`). Le cahier attendait le nom affiché « à jour » sur la page publique. À
+  trancher ; l'identité par prénom + initiale est cohérente avec la vie privée.
+- **Le réseau et les actions vivent dans l'`<aside>`**, pas dans `<main>` : une assertion scopée à
+  `main` sur « abonnés » ou « Signaler ce profil » échoue à tort.
+- **Le seed ne pose pas de ville** sur l'adresse des Voyageurs : WEB-PRO-10 se saute proprement
+  (lecture de la ville via `/auth/me`, `test.skip` si absente). À compléter dans `seed-deals.ts`.
+
+## Tests
+
+Aucun test unitaire ajouté (un champ de type, une bannière, une clé i18n). `apps/e2e` : le chapitre
+5.5 porte le harnais à **72 scénarios** (62 + WEB-PRO ×10, dont 2 `⏭`). user-ui : typecheck vert,
+miroir i18n FR/EN respecté.
+
+---
+
+# Chapitre 5.6 du cahier 01-WEB : devenir Voyageur — onboarding, et les limites de Stripe Express
+
+*(PR `chore/recette-web-5-6`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième chapitre « fiches » du cahier 01-WEB : `WEB-VOY` (onboarding Voyageur en deux étapes,
+et ce qu'il conditionne). Sept fiches ; quatre jouées et conformes (`web-voy.spec.ts`), trois `⏭`
+motivées (complétion Stripe Express, refus d'accept, tableau de bord Stripe). Aucune anomalie.
+
+```
+apps/e2e/src/chapitres/web-voy.spec.ts   NOUVEAU — 4 fiches jouées + 3 ⏭ ; compte neuf créé+activé, profil via API,
+                                           trajet PER_KG publiable, redirection réelle vers connect.stripe.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.6, automatisation Stripe (couvert / non couvert), pièges
+```
+
+## Ce que l'onboarding conditionne (et ce qu'il ne conditionne pas)
+
+Le résultat marquant du chapitre : **publier un trajet n'exige pas Stripe**. Un compte neuf qui a
+franchi la seule étape « Profil » (`POST /carrier/onboarding/profile` → `onboardingStep=STRIPE`)
+publie un trajet (`POST /trips` avec `publish:true` → `PUBLISHED`). Le verrou D31 (profil + Stripe
+prêts) est au moment d'**accepter** une demande, pas de publier — `createTrip` lit le `carrierPage`
+mais ne le gate pas. La vieille doc `RG-01` disait l'inverse ; le code fait foi.
+
+## La partie Stripe : jusqu'où on peut aller
+
+La clé du poste est `sk_test_` et le produit crée de **vrais** comptes Connect **Express** de test.
+Le harnais vérifie tout le côté Yamba : le clic « Connecter avec Stripe » crée le compte Express
+et son lien, redirige vers `connect.stripe.com`, et aucun IBAN n'est demandé dans un formulaire
+Yamba (WEB-VOY-4).
+
+Ce qu'on ne peut **pas** automatiser proprement : la complétion de l'onboarding Express. Deux
+tentatives ont tranché la question :
+1. **Par l'API** — impossible : pour un compte Express (`controller[requirement_collection]=stripe`),
+   la plateforme ne peut ni accepter les CGU ni soumettre les justificatifs
+   (« You cannot accept the Terms of Service on behalf of Express accounts », erreur vérifiée en
+   isolant un `accounts.update`). Stripe réserve cela à son flux hébergé.
+2. **Par le flux hébergé** — un pilotage heuristique de `connect.stripe.com` a été écrit et
+   essayé : il est lent (~7 min/exécution, vraie API Stripe) et se bloque à l'étape téléphone
+   (raccourci « numéro de test » puis « Envoyer » qui ne fait pas avancer de façon stable). Ces
+   pages changent souvent : les inclure rendrait la recette lente et fragile.
+
+**Décision d'ingénierie** : ne pas mettre le flux hébergé Stripe dans la suite. VOY-4 prouve le
+contrat Yamba ; VOY-5 (complétion → « Voyageur actif » + email) et la branche « tableau de bord »
+de VOY-7 sont documentées comme **manuelles en mode test**, avec la procédure exacte dans le
+rapport.
+
+## VOY-6 : un verrou déjà couvert au bon endroit
+
+Refuser l'acceptation d'un deal par un Voyageur non finalisé (D31) exige une demande de réservation
+en attente — le parcours de réservation du chapitre 5.12. Plutôt que de le reconstruire ici, on
+constate que la règle est **testée unitairement** : `deal-lifecycle.service.ts` répond
+`CARRIER_ONBOARDING_REQUIRED` (profil incomplet OU Stripe non prêt), couvert par
+`deal-lifecycle.service.spec.ts`. La fiche est `⏭`, à rejouer de bout en bout avec 5.12.
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.6 porte le harnais à **76 scénarios**
+(72 + WEB-VOY ×4, dont 3 `⏭`). Harnais : typecheck vert.
+
+
+---
+
+# Chapitre 5.7 du cahier 01-WEB : publier un trajet et son cycle de vie — le wizard éprouvé en édition, et un mapper inverse qui ne relisait que sa propre écriture
+
+*(PR `chore/recette-web-5-7` (#272), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le septième chapitre « fiches » du cahier 01-WEB : `WEB-TRJ` (assistant de création en trois
+étapes, gardes de publication, six statuts, actions permises, D72, masquage administratif).
+Vingt et une fiches ; vingt jouées et conformes, une `⏭` (l'étape 1 passe par Google Places).
+Une anomalie mineure trouvée et corrigée (`ANO-WEB-22`), une mineure ouverte (`ANO-WEB-23`).
+
+```
+apps/e2e/src/chapitres/web-trj.spec.ts                        NOUVEAU — 14 scénarios (13 joués + 1 ⏭), 1 min 36
+apps/e2e/src/pages/mes-trajets.ts                             ligne visée par l'id du trajet ; menu « … » rouvert si la liste s'est re-rendue
+apps/user-ui/src/components/trips/create/create-trip.reverse-mapper.ts   ANO-WEB-22 — dates dérivées de departureAt / arrivalAt
+context/YAMBA-RECETTE-WEB-RESULTATS.md                        chapitre 5.7, ANO-WEB-22, ANO-WEB-23, écarts à trancher, pièges
+```
+
+## Le choix de méthode : exercer, pas re-prouver
+
+La machine à états du trajet est déjà couverte par un test unitaire de cinq cents lignes
+(`apps/trip-service/src/services/trip-state-machine.spec.ts`). Rejouer ses tables de vérité au
+navigateur n'apporterait rien ; ce que la recette doit prouver, c'est que **le système entier**
+respecte la machine : le contrôleur applique la transition, l'outbox part, la recherche publique
+voit ou ne voit plus le trajet, l'écran lit `allowedActions` et ne décide rien. D'où la forme du
+chapitre : des brouillons créés par l'API (`POST /trips` avec `publish:false`), les gestes tentés
+(`/publish`, `/pause`, `/resume`, `/cancel`, `/restore`, `/archive`, `PUT`), les statuts et les
+codes lus, la visibilité vérifiée par `GET /trips/search?from&to`.
+
+Pour l'assistant lui-même, le verrou était l'étape 1 : l'itinéraire passe par l'autocomplétion
+Google Places, hors périmètre du harnais (décision prise en 5.2, tenue en 5.6). L'astuce du
+chapitre : **ouvrir le wizard en édition** (`/fr/trips/create?edit=<id>`) sur un brouillon créé
+par l'API. Les villes sont rendues depuis le trajet, l'étape 1 est valide, « Continuer » ouvre
+l'étape « Conditions » — et tout ce que le cahier demande aux étapes 2 et 3 (prix, curseurs,
+gain, familles, forfaits, lieux, aperçu) se vérifie sur l'interface réelle. Trois brouillons
+suffisent : le complet (11,50 €/kg, 23 kg, une famille surchargée, une refusée), un à 5 kg (les
+forfaits grisés), un à 23 kg avec un forfait soute (l'équivalent au kilo). Un brouillon `TRAIN`
+prouve que la carte « À la gare » existe.
+
+## ANO-WEB-22 : le mapper inverse ne savait relire que ce que le mapper avait écrit
+
+Première ouverture du wizard en édition sur un brouillon de l'API : « 4 champs à compléter »,
+« Date requise » ×2, « Heure requise » ×2. Les dates sont pourtant en base. La cause tient en
+quatre lignes de `create-trip.reverse-mapper.ts` :
+
+```ts
+departureDate: toDate(trip.departureDateLocal),
+arrivalDate: toDate(trip.arrivalDateLocal),
+departureTime: trip.departureTimeLocal ?? "",
+arrivalTime: trip.arrivalTimeLocal ?? "",
+```
+
+`departureDateLocal` et `departureTimeLocal` sont des chaînes (« 2026-10-01 », « 14:00 ») que le
+mapper d'écriture du wizard ajoute à côté de l'instant `departureAt` — pour ré-afficher
+exactement ce qui a été tapé. Le mapper inverse ne lisait **que** ces chaînes : un trajet venu
+d'un autre canal (l'API, le seed, un futur client mobile) n'en a pas, et son édition s'ouvrait
+avec les dates vides. Enregistrer aurait renvoyé `departureAt: null`.
+
+Le correctif est un repli, pas un remplacement — les chaînes locales gardent la priorité :
+
+```ts
+function localDateTimeParts(iso, timeZone): { date?: Date; time: string } {
+  const instant = iso instanceof Date ? iso : new Date(iso);
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false };
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-CA", { ...options, timeZone: timeZone ?? undefined }).formatToParts(instant);
+  } catch {
+    parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(instant); // fuseau inconnu → navigateur
+  }
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return { date: toDate(`${get("year")}-${get("month")}-${get("day")}`), time: `${hour}:${get("minute")}` };
+}
+// …
+departureDate: toDate(trip.departureDateLocal) ?? departureFallback.date,
+departureTime: trip.departureTimeLocal || departureFallback.time,
+```
+
+Trois détails qui comptent : `formatToParts` (pas `toLocaleString` + découpage de chaîne) donne
+chaque composant sans dépendre du format d'une locale ; le fuseau vient du lieu
+(`originTimezone`) quand il est connu et sinon du **navigateur** — c'est le fuseau que le mapper
+d'écriture utilise, donc la même convention dans les deux sens ; un fuseau que le moteur ne
+connaît pas (`RangeError`) retombe sur le navigateur au lieu de casser l'écran. `hour12:false`
+peut rendre « 24 » à minuit selon les moteurs : normalisé en « 00 ».
+
+Aucun test unitaire n'est ajouté (user-ui n'a pas de jest) ; la contre-épreuve est la fiche
+WEB-TRJ-3…9 elle-même, qui ouvre un brouillon de l'API et exige l'absence de « Date requise ».
+
+## ANO-WEB-23 : le fuseau du navigateur n'est pas celui du lieu
+
+En lisant le mapper d'écriture pour ANO-WEB-22, une seconde chose apparaît : le wizard n'envoie
+**aucun** fuseau. `toDateTimeIso(date, "14:00")` fait `setHours(14)` sur une `Date` du navigateur
+et sérialise en ISO : « 14:00 » est 14 h dans le fuseau du poste du Voyageur, pas à Bruxelles ni
+à Kinshasa. Les chaînes locales sauvent l'affichage (tout le monde voit « 14:00 »), mais
+l'instant absolu — celui que lisent les crons d'expiration et de complétion et la garde « départ
+passé » — est décalé dès que le lieu et le navigateur ne partagent pas le fuseau. Côté serveur,
+`computeDenormalizedFields` retombe sur `Europe/Paris` faute d'`originTimezone`. La fiche
+WEB-TRJ-2 est `⏭` (Google), l'anomalie est consignée ouverte avec une proposition : dériver le
+fuseau des coordonnées **côté serveur** (`originLat/Lng` existent déjà ; une table hors-ligne,
+aucun appel réseau), calculer `departureAt` dans ce fuseau, remplir `originTimezone` /
+`destinationTimezone` que les mappers d'affichage consomment déjà. Décision produit, PR dédiée.
+
+## Le harnais : trois pièges de rendu
+
+1. **`innerText` rend le texte après CSS** : « Aperçu public » est `uppercase` → « APERÇU
+   PUBLIC ». Les comparaisons sur `innerText` sont insensibles à la casse ; `getByText` lit le DOM.
+2. **Une infobulle qui se ferme au défilement** (`window.addEventListener("scroll", close, true)`)
+   contre un `click()` qui fait défiler avant de cliquer : `scrollIntoViewIfNeeded()` d'abord,
+   puis `expect.poll` qui re-clique tant que `aria-expanded` n'est pas `true`, et le contenu lu par
+   l'`id` que donne `aria-controls` (un `useId` React contient des « : », d'où `[id="…"]`).
+3. **Un menu qui se ferme parce que la liste se re-rend** (TanStack Query rafraîchit « Mes
+   trajets » après les mutations des fiches précédentes — le scénario passait seul, échouait dans
+   la suite) : la page-objet réessaie l'ouverture jusqu'à voir « Annuler ». Et comme Thomas a
+   trois trajets Paris → Brazzaville, la ligne se vise par l'`href` du lien (`…/dashboard/trips/<id>`).
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : le chapitre 5.7 porte le harnais à
+**88 scénarios** listés par `playwright --list` (74 avant, + WEB-TRJ ×14 dont 1 `⏭`).
+Typecheck user-ui (`tsc -p apps/user-ui/tsconfig.json`) et harnais verts.
+
+
+---
+
+# Chapitre 5.8 du cahier 01-WEB : justificatifs et billet vérifié — deux refus muets, et un `.env` de projet qui parlait à Gmail
+
+*(PR `chore/recette-web-5-8` (#273), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le huitième chapitre « fiches » du cahier 01-WEB : `WEB-DOC` (dépôt de justificatifs sur un
+trajet, cycle de vérification du billet, emails du back-office, badge public). Six fiches, six
+jouées et conformes — deux après correction (`ANO-WEB-25`, `ANO-WEB-26`), une anomalie ouverte
+(`ANO-WEB-24`, décision produit), et un piège de poste sérieux consigné au rapport.
+
+```
+apps/e2e/src/chapitres/web-doc.spec.ts                          NOUVEAU — 6 scénarios, ImageKit intercepté, admin SUPPORT par l'API, Mailpit
+apps/user-ui/src/components/trips/create/TripDocumentsManager.tsx  ANO-WEB-26 (plus de reset() après l'envoi) + ANO-WEB-25 (limite dite)
+apps/user-ui/src/components/trips/create/DocumentUpload.tsx        idem, prop `limitHint`
+apps/user-ui/src/components/trips/create/steps/StepTrip.tsx        passe `copy.docLimitReached(5)`
+apps/user-ui/src/components/trips/create/create-trip.copy.ts       clé `docLimitReached` (FR/EN) ; `create-trip.types.ts` la déclare
+apps/trip-service/src/controllers/admin-trips.controller.ts        l'échec d'un email de billet / masquage est journalisé, plus avalé
+context/YAMBA-RECETTE-WEB-RESULTATS.md                           chapitre 5.8, ANO-WEB-24/25/26, piège `.env` de projet
+```
+
+## Le dépôt sans écrire chez le tiers
+
+Le front téléverse chez ImageKit (XHR vers `upload.imagekit.io/api/v1/files/upload`, jeton signé
+par `GET /uploads/imagekit-auth`), puis envoie au trip-service les références rendues
+(`POST /trips/:id/documents` : `type`, `fileId`, `url`, nom, type MIME, taille). Le harnais pose
+`intercepterImageKit(page)` — la même interception que pour les photos de colis — et le reste de
+la chaîne est réel : le hook refuse un mauvais type ou plus de 5 Mo **avant tout réseau**, le
+serveur borne à 5 documents (`documents.maxDocsPerTrip`, D62) et 5 Mo (`documents.maxDocSizeMb`),
+et fait passer `ticketVerificationStatus` de `NOT_SUBMITTED` / `REJECTED` à `PENDING` dès qu'un
+`TICKET_PROOF` arrive. Un PDF minimal (en-tête, `xref`, `%%EOF`) suffit ; pour la borne de
+taille, `Buffer.concat([pdf, Buffer.alloc(5 Mo + 1 − pdf.length)])`.
+
+## ANO-WEB-26 : le refus existait, il n'était jamais affiché
+
+`useImageKitUpload.validateFile` pose bien `{ code: "TOO_LARGE", message: "Le fichier dépasse
+5 Mo." }`. Mais les deux composants de dépôt faisaient :
+
+```ts
+for (const file of filesToUpload) { const uploaded = await upload(file); … }
+reset();                       // ← setError(null) : l'erreur posée par `upload` disparaît ici
+if (inputRef.current) inputRef.current.value = "";
+```
+
+`reset()` du hook remet progression, `isUploading` **et l'erreur** à zéro. L'erreur de validation
+était donc effacée dans le même tour que sa pose : l'utilisateur choisissait un fichier trop
+lourd et rien ne se passait. Le correctif retire l'appel : le hook remet déjà l'erreur à `null` au
+**début** de chaque `upload` et `isUploading` à faux dans son `finally`, il n'y a rien à
+réinitialiser après coup. Même correction aux deux endroits (détail du trajet, wizard étape 1).
+
+## ANO-WEB-25 : une limite qui se dit
+
+À cinq documents, `canAddMore` passait à faux et la zone de dépôt disparaissait sans un mot. Un
+paragraphe la remplace : `TripDocumentsManager` a la locale (`isFr`) et rend la phrase
+directement ; `DocumentUpload` n'en a pas et reçoit une prop `limitHint`, alimentée par
+`copy.docLimitReached(5)` depuis `StepTrip`. Le type `CreateTripCopy` déclare la clé — TypeScript
+strict refuse une clé de copy non déclarée (`TS2353`), c'est voulu : le copy FR/EN reste
+exhaustif par construction.
+
+## Le piège : `apps/trip-service/.env`
+
+DOC-4 et DOC-5 attendaient un email dans Mailpit et n'en recevaient aucun — alors que la revue
+répondait 200 et que le statut changeait. Rien dans les journaux : `emailCarrier` faisait
+`sendTransactionalEmail(...).catch(() => undefined)`. Par élimination : la bibliothèque envoie
+bien en processus isolé (sonde `tsx --env-file=.env`), le fournisseur est « configuré » et
+l'utilisateur trouvé (sondes temporaires)… puis `ps eww` sur le processus trip-service :
+`SMTP_HOST=smtp.gmail…`, `SMTP_USER=…`. Un `apps/trip-service/.env` du 13 mai — gitignoré,
+oublié — portait un SMTP Gmail réel et des clés ImageKit. Nx fusionne l'env racine et celui du
+projet ; trip-service, et lui seul, envoyait ses emails par Gmail pendant que les autres services
+parlaient à Mailpit. C'est exactement le piège consigné dans CLAUDE.md pour ImageKit (upload OK
+depuis trip-service, suppression KO depuis auth-service), rejoué avec l'email.
+
+Deux remèdes : le fichier est **déplacé hors du dépôt** (`~/.yamba-leftovers/`), et le `catch`
+journalise (`console.error("[admin-trips] email « … » non envoyé à … :", message)`) — un
+best-effort se lit, il ne se tait pas. Subtilité de poste : après le déplacement, `kill` du
+service ne suffit pas, le processus parent `nx run-many` avait lu l'env du projet au démarrage et
+le réinjectait à chaque redémarrage ; il faut relancer `nx run-many` (ou `nx serve` du service).
+
+## Le back-office par l'API
+
+`POST /admin/tickets/:documentId/review` (permission `tickets.review` : SUPPORT, MEDIATOR) prend
+`{ decision: "VERIFY" | "REJECT", reason? }` — un rejet sans motif est refusé par le schéma Zod
+(`ReviewTicketRequestSchema.refine`), les motifs sont fermés (`ILLEGIBLE`, `DATES_MISMATCH`,
+`NAME_MISMATCH`, `SUSPICIOUS`) et traduits en clair dans l'email (`TICKET_REJECTION_LABELS`,
+FR/EN, langue du DESTINATAIRE). La transaction met à jour le document (`updateMany … status:
+PENDING` = verrou optimiste, `TICKET_ALREADY_REVIEWED` sinon), le trajet, et écrit le journal
+d'audit (`recordAdminAction`, D54) ; l'email part après. `ADMIN_IS_OWNER` interdit d'examiner son
+propre billet.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229 ; `admin-trips.controller.spec` 6/6). `apps/e2e` : **94
+scénarios** (`playwright --list` ; 88 + WEB-DOC ×6). Typecheck user-ui, trip-service et harnais
+verts.
+
+
+---
+
+# Chapitre 5.9 du cahier 01-WEB : recherche, filtres, tri, état vide — la page qui tombait pour un avatar, et l'index unique qui n'était pas épars
+
+*(PR `chore/recette-web-5-9` (#274), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le neuvième chapitre « fiches » du cahier 01-WEB : `WEB-RCH` (l'écran `/search`, les cartes et
+leurs prix, le poids du colis, les tris, les familles, les filtres de confiance, les états vide
+et d'erreur, la page publique, le compteur de vues, un trajet disparu, un compte suspendu).
+Quinze fiches, quinze jouées et conformes — trois après correction d'une anomalie **bloquante**
+(`ANO-WEB-27`) — et une seconde anomalie bloquante trouvée en posant la contre-épreuve
+(`ANO-WEB-28`, ouverte, `test.fail`). Le rapport porte, pour la première fois, une section
+« regard d'expert » par fiche (consigne du 11/09).
+
+```
+apps/e2e/src/chapitres/web-rch.spec.ts   NOUVEAU — 16 scénarios (15 fiches + ANO-WEB-27 ; ANO-WEB-28 en test.fail), 2 min 06
+apps/user-ui/next.config.js              ANO-WEB-27 — images.remotePatterns : ik.imagekit.io, lh3.googleusercontent.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.9, ANO-WEB-27/28, à trancher, regard d'expert, pièges
+```
+
+## Viser une recherche sans piloter Google
+
+La barre de recherche interroge Google Places pour les villes. Le chapitre 5.1 l'avait pilotée
+(frappe touche par touche, origine `localhost` pour le référent) ; ici il y a douze recherches
+différentes, et chaque frappe Google est lente et fragile. L'observation qui change tout : ce que
+`/search` lit en arrivant, c'est le **brouillon persistant** de la barre —
+`usePersistedFormState("trip-search")`, en `sessionStorage`, clé `yamba:form:trip-search`,
+enveloppe `{ version: 2, data: { from, to, dateValue } }`, les dates sérialisées avec un
+marqueur (`{ __yamba_date__: iso }`, rétablies en `Date` par un `reviver`). Le harnais pose ce
+brouillon par `page.addInitScript` **avant** la navigation :
+
+```ts
+await page.addInitScript(({ cle, valeur }) => { window.sessionStorage.setItem(cle, valeur); },
+  { cle: "yamba:form:trip-search", valeur: JSON.stringify({ version: 2, data }) });
+await page.goto("/fr/search");
+```
+
+et l'écran cherche exactement ce qu'il aurait cherché après une saisie. Douze recherches en
+deux minutes, sans une requête Google. Même principe pour le poids (`localStorage`,
+`yamba.search.weightKg`).
+
+Seconde règle : **rien n'est codé en dur**. L'ordre des cartes est comparé à l'ordre que rend
+`GET /trips/search?sort=…`, les comptes des puces à `GET /trips/search/facets`, le prix pour
+3 kg au `totalForWeight` de l'API (38,64) — la carte n'en montre que l'arrondi (« ≈ 39 € »).
+
+## ANO-WEB-27 : un composant qui jette tue la page
+
+Trois fiches échouaient sur trois symptômes différents (onglet introuvable, zéro carte après
+« Tout effacer », zéro carte après « Réessayer »). Le point commun n'était pas dans les
+sélecteurs mais dans la **console** : « Invalid src prop (https://ik.imagekit.io/…) on
+`next/image`, hostname "ik.imagekit.io" is not configured under images ». `next/image` refuse
+tout hôte distant absent de `images.remotePatterns` — et il refuse en **jetant**, donc la page
+entière bascule sur l'error boundary (`app/[locale]/error.tsx`, « Cette page n'a pas pu
+s'afficher »). Il suffisait qu'un Voyageur listé ait un avatar ; le seed n'en a aucun, le poste
+en avait un.
+
+Correctif : la section `images` de `next.config.js` (ImageKit + `lh3.googleusercontent.com`,
+l'hôte des avatars Google, `payload.picture`). La config n'est pas rechargée à chaud : redémarrer
+le front. Contre-épreuve durable : un scénario pose un avatar ImageKit **en base** sur Thomas
+(référence seule, aucun téléversement — `jeuEssai.manoeuvre`), ouvre la recherche et la page
+publique, exige l'absence de la page d'incident et d'erreur `next/image`, et retire l'avatar dans
+un `finally`.
+
+## ANO-WEB-28 : trouvée en posant la contre-épreuve
+
+La manœuvre `image.create({ userId })` a répondu `P2002 … Image_carrierPageId_key`. Le modèle
+`Image` sert deux relations 1-1 (`userId? @unique` pour l'avatar d'un membre, `carrierPageId?
+@unique` pour celui d'une page Voyageur) : sur MongoDB, Prisma crée pour `@unique` un index
+unique **non épars** (`listIndexes` : `unique: true`, aucun `sparse`), donc deux documents à
+`carrierPageId: null` — deux avatars de membres — sont interdits. Vérifié par l'API réelle :
+`POST /auth/me/avatar` pour Joséphine, pendant qu'un autre compte a un avatar → **500**. Un seul
+membre de la plateforme peut avoir un avatar ; c'est le piège « nullable unique fields collide on
+null » de CLAUDE.md, jamais payé ici parce que 5.5 n'avait pas joué le téléversement réel.
+
+Prisma ne sait pas déclarer un index épars ou partiel sur Mongo. La voie propre est de scinder
+`Image` en deux modèles 1-1 dont la clé est **requise** (`UserAvatar`, `CarrierAvatar`) — une
+migration d'un document, deux écrivains et les lecteurs à ajuster : candidat au registre, PR
+dédiée. La fiche est en `test.fail` (elle attend 200) ; la contre-épreuve d'ANO-WEB-27 contourne
+le piège en posant `carrierPageId` sur l'image de test.
+
+## Le harnais : ce qui a coûté
+
+- **Deux arbres** : chaque carte, chaque panneau de filtres existe deux fois (mobile masqué par
+  CSS, desktop). `first()` tombe sur la copie `hidden` → `.filter({ visible: true })` partout.
+- **Le tri par défaut** : cliquer « Départ le plus tôt » en premier ne déclenche rien.
+- **Lire `pageerror` avant de corriger des sélecteurs** quand plusieurs fiches tombent sur une
+  même page : un `test.only` de dix lignes qui imprime la console a donné la cause en quinze
+  secondes.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **110 scénarios** (`playwright --list` ;
+94 + WEB-RCH ×16, dont 1 `test.fail`). Typecheck harnais vert ; `next.config.js` est du
+JavaScript (aucun typecheck), le front redémarré le sert.
+
+
+---
+
+# Chapitre 5.10 du cahier 01-WEB : alertes de route — l'effet d'une alerte prouvé par l'email, et le toast qu'un composant démonté ne peut plus afficher
+
+*(PR `chore/recette-web-5-10` (#275), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dixième chapitre « fiches » du cahier 01-WEB : `WEB-ALR` (création, gestion et EFFET des
+alertes de route). Neuf fiches, neuf jouées et conformes, une après correction (`ANO-WEB-29`).
+
+```
+apps/e2e/src/chapitres/web-alr.spec.ts                 NOUVEAU — 9 scénarios en série, 1 min 45
+apps/e2e/src/pages/recherche.ts                        NOUVEAU — « poser la recherche » (brouillon sessionStorage), partagé 5.9 / 5.10
+apps/e2e/src/chapitres/web-rch.spec.ts                 importe la page-objet au lieu de ses aides locales
+apps/user-ui/src/hooks/useSavedRouteMutations.ts       ANO-WEB-29 — `useDeleteSavedRoute({ onSuccess, onError })` : retours au niveau du hook
+apps/user-ui/src/components/saved-routes/SavedRouteCard.tsx   les toasts de suppression passent par le hook
+context/YAMBA-RECETTE-WEB-RESULTATS.md                 chapitre 5.10, ANO-WEB-29, à trancher, regard d'expert
+```
+
+## Prouver l'EFFET, pas seulement l'écran
+
+Une alerte de route n'a de valeur que par l'email qu'elle déclenche. Le chapitre est donc bâti
+autour de Mailpit : Aminata porte les alertes, Joséphine publie les trajets (par l'API du
+trip-service, `publish: true`, coordonnées comprises), et chaque fiche dit ce que la boîte doit
+contenir — ou ne pas contenir (`mailpit.aucunEmailPour(adresse, 10 s)` après un `vider()`).
+
+Trois règles du serveur sont ainsi éprouvées telles qu'elles sont codées :
+
+- **l'exclusion du Voyageur** — `baseWhere.userId = { not: trip.userId }` dans
+  `dispatchTripPublishedNotifications` : Joséphine porte la même alerte que Aminata et ne reçoit
+  rien ;
+- **l'anti-spam de 24 h** — `lastNotifiedAt` filtré en JS (`NOTIFICATION_COOLDOWN_HOURS = 24`) :
+  un second trajet dans la foulée ne produit aucun email ;
+- **l'appariement à trois niveaux** (`saved-route-matching.helper.ts`) — placeId exact (100),
+  ville + pays exacts (100), pays + haversine < 50 km (70, seulement si `includeNearby`) : Orly
+  (≈ 15 km de Paris) ne déclenche rien sans l'option et déclenche avec ; Lille (≈ 204 km) jamais.
+  Subtilité : le niveau 3 exige des coordonnées valides des DEUX côtés (alerte ET trajet), donc
+  les corps d'API portent `originLat/Lng` et `destinationLat/Lng` — le seed n'en a pas.
+
+Pour que l'anti-spam d'Aminata ne masque pas le troisième cas, Lille est testée sur une alerte
+NEUVE (Pauline) : isoler la règle qu'on veut prouver de celle qui pourrait la cacher.
+
+## Le formulaire sans Google
+
+`CreateSavedRouteModal` choisit ses villes par `CityAutocomplete` (Google Places). Le harnais
+éprouve le panneau (titres, quatre périodes dont « Personnalisé » qui révèle deux dates, deux
+bascules `role="switch"` cochées avec leurs aides), le refus sans ville (le bouton « Créer
+l'alerte » est `disabled` : aucune requête, même en forçant le clic), puis ferme le panneau et
+crée l'alerte par `POST /saved-routes` avec exactement le corps que le formulaire enverrait
+(`corpsAlerte()` : villes, pays ISO, coordonnées, `latestDate` = J+90 pour « 3 mois »,
+`emailEnabled`, `includeNearby`). La carte, ses badges et le compteur sont ensuite lus à l'écran.
+
+## ANO-WEB-29 : un callback qui meurt avec son composant
+
+« Supprimer » puis « Confirmer » retirait la carte et décrémentait le compteur, mais le toast
+« Alerte supprimée » ne venait jamais (deux exécutions). La cause est dans TanStack Query :
+
+```ts
+// SavedRouteCard — AVANT
+deleteSavedRoute(savedRoute.id, { onSuccess: () => toast.success(t("deleteSuccess")) });
+// useDeleteSavedRoute — la suppression est OPTIMISTE
+onMutate: (id) => queryClient.setQueryData(["saved-routes", …], previous.filter((r) => r.id !== id)),
+```
+
+`onMutate` retire la carte de la liste avant la réponse → `SavedRouteCard` est démonté → son
+observateur de mutation est détaché → les callbacks passés à `mutate(...)` (portés par
+l'observateur) ne sont jamais appelés. Les callbacks déclarés dans `useMutation({ onSuccess })`,
+eux, sont portés par la mutation et survivent au démontage. Correctif : le hook accepte ses
+retours (`useDeleteSavedRoute({ onSuccess, onError })`) et les appelle depuis ses options ; la
+carte lui passe ses toasts et appelle `deleteSavedRoute(id)` nu. « Prolonger » et « Email
+activé » ne démontent pas la carte : leurs callbacks `mutate` restent valables.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **119 scénarios** (`playwright --list` ;
+110 + WEB-ALR ×9). Typecheck user-ui et harnais verts.
+
+
+---
+
+# Chapitre 5.11 du cahier 01-WEB : favoris et Voyageurs suivis — une date que le client ne pouvait pas lire, un masquage que le favori ignorait, et le même toast perdu qu'en 5.10
+
+*(PR `chore/recette-web-5-11` (#276), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le onzième chapitre « fiches » du cahier 01-WEB : `WEB-FAV` (le cœur, « Mes favoris », le suivi
+d'un Voyageur et ses notifications). Douze fiches, douze jouées et conformes, trois après
+correction (`ANO-WEB-30`, `31`, `32`).
+
+```
+apps/e2e/src/chapitres/web-fav.spec.ts                  NOUVEAU — 12 scénarios en série, 1 min 50
+apps/e2e/src/chapitres/web-rch.spec.ts                  le cœur se vise DANS le lien de la carte
+packages/libs/api-contracts/src/trip/trip-search.schema.ts   ANO-WEB-30 — `departureAt` (ISO) sur la carte de recherche
+apps/*/openapi.json (×5)                                régénérés (registre de schémas partagé)
+apps/trip-service/src/lib/trip-mappers.ts               renseigne `departureAt`
+apps/user-ui/src/components/search/search-results.types.ts   le type front
+apps/user-ui/src/components/favorites/FavoriteTripsList.tsx  badge « Trajet passé »
+apps/user-ui/src/hooks/useFollowMutations.ts            ANO-WEB-31 — `useUnfollowUser({ onSuccess, onError })`
+apps/user-ui/src/components/following/FollowedTripperCard.tsx   toasts via le hook
+apps/trip-service/src/services/trip-favorite.service.ts ANO-WEB-32 — un trajet masqué par Yamba ne se met pas en favori
+apps/trip-service/src/services/trip-favorite.service.spec.ts   +1 test (261)
+```
+
+## Le geste repris après connexion, prouvé de bout en bout
+
+La porte d'identité du cœur (`AuthGateModal`, A63) monte un `LoginForm` dans la fenêtre et, à la
+connexion, rappelle `onSignedInAction` — le bouton qui l'a ouverte rejoue `toggle.mutate({ tripId,
+next: true })`. Le harnais le prouve sans rien supposer : un visiteur clique le cœur, remplit le
+formulaire DE LA FENÊTRE (`form:has(#email)` visible — la page en monte d'autres, masqués), et
+attend le `POST /trips/:id/favorite` qui part après la connexion ; l'URL reste `/fr/search`, le
+cœur est `aria-pressed`, et `GET /trips/favorites` contient le trajet.
+
+C'est là qu'un sélecteur a menti : le favori enregistré était `bzv-upcoming`, pas `bzv-perkg`.
+Le cœur est rendu DANS le `<Link>` de la carte ; `carte.locator("xpath=..")` remontait au
+conteneur de la liste et `.first()` prenait le premier cœur venu. `carte.getByRole("button")`
+suffit — et la fiche 5.9 qui portait le même sélecteur (présence seulement) est corrigée avec.
+
+## ANO-WEB-30 : une date formatée n'est pas une date
+
+« Trajet passé » avait sa clé i18n et pas de rendu. La carte de recherche (`YambaTripResult`)
+n'expose que `travelDate` (« 12 juin 2026 » / « June 12, 2026 ») : un client ne peut pas la
+comparer à « maintenant » sans réinterpréter la chaîne selon la locale — l'erreur classique. Le
+contrat gagne `departureAt` (ISO 8601, optionnel), le mapper le renseigne
+(`new Date(trip.departureAt).toISOString()`), et `FavoriteTripsList` rend le badge quand
+`new Date(item.departureAt) < new Date()`. Le schéma est dans le registre Zod partagé : les
+cinq `openapi.json` bougent (`npm run generate:openapi`), la CI les diffe.
+
+## ANO-WEB-32 : le masquage n'est pas un statut
+
+Le masquage administratif (D57) laisse le trajet PUBLISHED — c'est ce qui le distingue de la
+pause et préserve les réservations en cours — mais `addFavorite` ne testait que le statut.
+`loadTripForFavorite` lit désormais `hiddenByAdminAt` et répond 409 `TRIP_NOT_FAVORITABLE`
+(même code que « non publié », donc même message à l'écran : « Ce trajet n'est plus
+disponible »). Le retrait reste idempotent et toujours possible. Un cas de test unitaire
+(`hiddenByAdminAt: new Date()` → 409, aucun `upsert`) porte trip-service à 261.
+
+## ANO-WEB-31 : troisième fois le même motif
+
+Comme en 5.10 (`ANO-WEB-29`) : `useUnfollowUser.onMutate` retire la carte, la carte est démontée,
+son callback `mutate(slug, { onSuccess })` n'est jamais appelé. Même correctif (retours au niveau
+du hook). Ce motif est maintenant vu deux fois en deux chapitres : le regard d'expert demande une
+revue de tous les `mutate(x, { onSuccess })` du front dont le hook a un `onMutate` qui retire
+l'élément.
+
+## Tests
+
+trip-service **261** (+1, ANO-WEB-32) — plateforme **994** ; auth 229 inchangé. `apps/e2e` :
+**131 scénarios** (119 + WEB-FAV ×12). Typecheck trip-service, user-ui et harnais verts ; OpenAPI
+régénérés.
+
+
+---
+
+# Chapitre 5.12 du cahier 01-WEB : l'assistant de réservation — sept défauts sur l'écran cœur, tous des branchements
+
+*(PR `chore/recette-web-5-12` (#277), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le douzième chapitre « fiches » du cahier 01-WEB : `WEB-RSV` (le tunnel de réservation en quatre
+étapes et le devis). Vingt-deux fiches : vingt et une jouées et conformes (sept après correction),
+une `⏭` (carte refusée : fournisseur FAKE). Sept anomalies closes (`ANO-WEB-33` à `39`).
+
+```
+apps/e2e/src/chapitres/web-rsv-devis.spec.ts                12 scénarios, 2 min 05 (complète web-rsv.spec.ts et web-rsv-assistant.spec.ts)
+apps/user-ui/src/components/booking/booking.config.ts       ANO-WEB-33 (« Garantie Yamba », pas « assurance »)
+apps/user-ui/src/components/booking/booking.copy.ts         ANO-WEB-33 (copy legacy)
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-34 (buildInitialDraft(trip))
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-34
+apps/user-ui/src/app/[locale]/trips/[tripId]/book/BookingClient.tsx   ANO-WEB-35 / 38 (propre trajet, trajet parti : refus à l'ouverture)
+apps/user-ui/src/components/booking/useBookingCheckout.ts   ANO-WEB-36 (trajet relu après QUOTE_DIVERGENCE)
+apps/user-ui/src/components/booking/BookingSummarySidebar.tsx   ANO-WEB-37 (jamais « 0 € »)
+apps/user-ui/src/components/booking/BookingBottomSheet.tsx  ANO-WEB-37
+apps/user-ui/src/components/booking/steps/StepParcel.tsx    ANO-WEB-39 (photo > 10 Mo refusée à la sélection)
+```
+
+## Le devis au centime, contre la note de calcul
+
+Le cahier donne la règle (`transport = max(€/kg × poids facturable × coefficient × (1 + supplément), 8 €)`,
+`service = max(12 %, 3 €)`) et sept montants attendus. Le harnais les lit dans la colonne de droite
+(« Total 32,20 € », le détail « × S · +20 % 34,50 € », « Minimum par colis appliqué : 8 € ») et sur
+le bouton « Payer … » à l'étape 4 — tous exacts. Deux subtilités de lecture : les décimales nulles
+tombent (« 8 € », « 42 € ») et les kilos s'écrivent avec un point (« 15.5 kg ») — consignés à
+trancher, absorbés par le harnais (`eur()`, `[.,]`).
+
+## Sept anomalies, une seule famille
+
+Aucune règle de calcul n'était fausse ; les sept défauts sont des **branchements** :
+
+1. **`buildInitialDraft(trip)` n'était appelée par personne** (ANO-WEB-34) : la fabrique du
+   brouillon (poids 2 kg ou mémorisé, première famille acceptée, lieu unique pré-sélectionné)
+   existait, testée nulle part, et les deux wizards partaient du brouillon vide. `useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]))`,
+   la reprise `sessionStorage` gardant la priorité.
+2. **Le récapitulatif rendait des zéros** quand le devis était indisponible (ANO-WEB-37) :
+   `computeTotal` renvoie `{ transport: 0, …, quoteError }` et les deux composants affichaient les
+   lignes avant l'indice. Quand `quote === null && quoteError`, l'indice seul.
+3. **Le message « nouveau total affiché » mentait** (ANO-WEB-36) : le devis client se calcule sur
+   le trajet en cache TanStack (`["public-trip", id]`) ; après `QUOTE_DIVERGENCE` on redemandait
+   l'intention (bon montant) sans relire le trajet (ancien montant à l'écran).
+   `invalidateQueries` avant `refreshIntent()`.
+4. **Deux gardes serveur sans miroir à l'ouverture** (ANO-WEB-35, 38) : `checkTripBookable`
+   refuse son propre trajet et un trajet parti — à l'intention de paiement. `BookingClient`
+   applique les deux règles à l'ouverture (`user.id === trip.carrier.id`, `dates.departureAt`
+   passé) avec les messages de l'étape 4. Le regard d'expert propose de servir `bookable: { ok,
+   reason }` dans le DTO public pour ne pas dupliquer la règle.
+5. **La borne de taille des photos se jouait au paiement** (ANO-WEB-39) : le hook la vérifie à
+   l'envoi, et l'envoi part au clic « Payer ». `handleAddPhotos` filtre dès la sélection.
+6. **Le mot « assurance »** (ANO-WEB-33) dans un message de validation et cinq chaînes mortes.
+
+Leçon transversale (regard d'expert) : un test de composant sur le wizard avec un trajet fixture
+aurait pris 1, 2 et 3 avant la recette.
+
+## Le harnais
+
+- Les deux Expéditeurs du « dernier kilo » (Aminata, João) sont menés chacun à l'étape 4 sur un
+  trajet de Joséphine à **2 kg** ; A paie, B paie → `409 CAPACITY_EXCEEDED` et rien dans ses
+  réservations (`GET /me/bookings`).
+- Le devis divergent : Joséphine `PUT /trips/:id` (prix 15,00) pendant qu'Aminata est à l'étape 4.
+- Les kilos restants se lisent dans le DTO **public** (`remainingKg`) : le DTO propriétaire répond
+  403 à l'Expéditrice, et la valeur bouge à chaque tour (RSV-17 réserve 2,5 kg).
+- ImageKit intercepté pour les photos ; Mailpit pour les deux emails (32,20 chez l'Expéditrice,
+  28,75 chez le Voyageur, jamais l'inverse).
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **143 scénarios** (131 + WEB-RSV ×12, dont
+1 `⏭`). Typecheck user-ui et harnais verts.
+
+---
+
+# Chapitre 5.13 du cahier 01-WEB : les plafonds du compte neuf — le levier mesuré, l'écran qui ne se contredit plus
+
+*(PR `chore/recette-web-5-13` (#278), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le treizième chapitre « fiches » du cahier 01-WEB : `WEB-TRU` (CNF-06 / D71 — les trois plafonds
+d'un compte de moins de 30 jours sans trois envois terminés). Cinq fiches jouées et conformes (une
+après correction), une anomalie mineure close (`ANO-WEB-40`, observée au chapitre 5.12 et réservée
+à celui-ci).
+
+```
+apps/e2e/src/chapitres/web-tru.spec.ts                      5 scénarios en série, 2 min 00
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-40 (« Payer » grisé sans autorisation)
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-40
+```
+
+## Ce que le chapitre ajoute au parcours WEB-E2E-4
+
+Le parcours prouvait les refus (450 €, 12 kg, la sixième) ; le chapitre prouve aussi **ce qui passe
+juste sous le plafond** (250 €, 8 kg), le **compte ancien** sans plafond (Aminata, 12 kg à 450 €,
+DTO relu : `weightKg: 12`, `declaredValueCents: 45000`), et trois preuves nouvelles :
+
+1. **Le levier du back-office** (`[TRU7]`). L'OPS du seed (`navigateurAdmin("exploitation")`) écrit
+   `trust.newAccount.maxShipmentsPerMonth` 5 → 6 par `PATCH /admin/settings` (`changes`, `reason`
+   ≥ 20, `expectedVersion`). Puis le harnais clique **« Réessayer »** sur la carte de paiement toutes
+   les cinq secondes (`expect.poll` + `waitForResponse` sur `POST /deals/payment-intents`) jusqu'à ce
+   que l'intention soit acceptée : **6 s** après l'écriture (journal `AdminAction` `SETTING_CHANGED`
+   12:48:24,3 → `Booking.createdAt` 12:48:29,9), sous la contrainte « < 30 s » du lecteur de
+   paramètres (cache mémoire, D62). La remise à 5 est dans un `finally`, avec un `expectedVersion`
+   relu (le verrou a bougé), et la valeur est relue après.
+2. **Les réponses brutes de l'API au membre** : `/auth/me`, `/me/bookings`, `/deals/:id` ne contiennent
+   ni `trustScore`, ni `riskLevel`, ni `caps`, ni `capsReason` — le score est calculé à la lecture et
+   jamais servi (D71 ②), la whitelist des DTO le garantit, le harnais le vérifie.
+3. **Le suivi d'un envoi** et « Mes envois » rejoignent la liste des écrans fouillés (tableau de bord,
+   profil, page publique) ; l'export de données passe par la porte sudo comme au chapitre 6.
+
+## ANO-WEB-40 : un bouton qui contredit l'encadré
+
+À l'étape 4, le bouton principal du récapitulatif (`BookingSummarySidebar` / `BookingBottomSheet`)
+n'était grisé que pendant l'envoi (`isSubmitting`). Après un refus de plafond, la carte affichait
+l'encadré et « Réessayer » — et le bouton « Payer 32,20 € » restait actif à côté (sans danger : le
+serveur refuse aussi la demande, et `submit` sort si `!intent` — mais l'écran se contredisait). Même
+cause pour le « clic muet » avant le retour de l'intention (piège 18 du handoff). Une seule règle,
+dans les deux wizards :
+
+```ts
+// ANO-WEB-40 (D71) : à l'étape 4, « Payer » attend l'autorisation de paiement — et reste grisé
+// quand elle a été refusée (plafond du compte neuf) : le bouton ne contredit plus l'encadré.
+const ctaDisabled = isSubmitting || (step === 4 && !checkout.intent);
+```
+
+Le page object `tenterDeReserver` n'a pas bougé : il lisait déjà le texte du mode test avant de
+cliquer (Playwright attend un bouton actif), et la contre-épreuve est `toBeDisabled()` sur le bouton
+**visible** (`getByRole("button", { name: /^Payer/ }).filter({ visible: true })` — la feuille mobile
+est aussi dans le DOM sur écran large).
+
+## Le harnais
+
+- Mode **série** : la fiche 1 crée le compte par l'écran d'inscription (`Inscription.creer`, code
+  Mailpit) et le garde en module ; chaque fiche suivante ouvre un navigateur neuf et se connecte par
+  l'écran (`connexion`), le compte n'étant pas du seed.
+- Les demandes sont réparties sur `bzv-perkg`, `fih`, `gru`, `yul`, `bzv-upcoming` (capacités
+  restantes lues dans le seed : `gru` n'a que 7 kg libres) ; Aminata prend 12 kg sur `bzv-perkg`
+  après les 4 kg du compte neuf.
+- `mesReservations` (`GET /me/bookings`) compte avant et après chaque tentative : un refus qui
+  aurait laissé une trace se verrait.
+- Attention : `--reporter=list` sur la ligne de commande **remplace** le rapport HTML du
+  `playwright.config.ts` ; les annotations ne sont alors écrites nulle part.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **148 scénarios** (143 + WEB-TRU ×5). Typecheck
+user-ui et harnais verts.
+
+---
+
+# Chapitre 5.14 du cahier 01-WEB : la demande côté Voyageur — deux données servies par l'API que le front ne lisait pas
+
+*(PR `chore/recette-web-5-14` (#279), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatorzième chapitre « fiches » du cahier 01-WEB : `WEB-DEA` (accepter, refuser, expirer, deux
+onglets, états fermés, « Mon Deal accepté »). Neuf fiches jouées et conformes (trois après correction),
+trois anomalies closes (`ANO-WEB-41` MAJEURE, `ANO-WEB-42` mineure, `ANO-WEB-44` MAJEURE), une ouverte
+(`ANO-WEB-43`, DTO à enrichir).
+
+```
+apps/e2e/src/chapitres/web-dea.spec.ts                          9 scénarios en série, 2 min 20
+apps/user-ui/src/components/trips/list/trip-local-dates.ts     ANO-WEB-41 (dates locales dérivées de departureAt, pure)
+apps/user-ui/src/hooks/useTrip.ts                               ANO-WEB-41 (useMyTrips / useTrip normalisent à la lecture)
+apps/user-ui/src/components/trips/list/my-trips.config.ts       ANO-WEB-41 (TripListItem : departureAt, arrivalAt, fuseaux)
+apps/user-ui/src/components/carrier/deal/deal.adapter.ts        ANO-WEB-42 (un lieu, une ligne) + ANO-WEB-44 (recipientFirstName)
+apps/user-ui/src/components/carrier/deal/deal.types.ts          ANO-WEB-44
+apps/user-ui/src/components/carrier/deal/views/accepted/*.tsx   ANO-WEB-44 (Desktop, Mobile), ANO-WEB-42 (Recap : ville non répétée)
+apps/user-ui/src/components/carrier/deal/views/settled/DealSettledView.tsx   ANO-WEB-44
+```
+
+## ANO-WEB-41 : le tableau de bord ne connaissait que les dates du wizard
+
+`TripListItem` (accueil, « Mes trajets », badge de navigation, fiche du trajet) ne portait que
+`departureDateLocal` / `departureTimeLocal` — des chaînes que SEUL le wizard de création écrit. Un
+trajet créé par l'API, le seed ou un futur client mobile n'en a pas : l'adapter des actions repliait
+sur `new Date(0)` (« jeu. 1 janv. » partout), `isTripPastDeparture(null)` répondait « pas parti » (un
+trajet parti depuis six jours dans « à venir »), le tri par date était faux. Même famille qu'ANO-WEB-22
+(le wizard en édition), côté lecture cette fois.
+
+Le remède est UNE fonction pure appliquée UNE fois, à la source :
+
+```ts
+// apps/user-ui/src/components/trips/list/trip-local-dates.ts
+export function withLocalDates<T extends TripDatesLike>(trip: T): T {
+  const dep = localDateTime(trip.departureAt, trip.originTimezone);      // « 2026-09-26 » / « 14:00 » dans le fuseau du lieu
+  const arr = localDateTime(trip.arrivalAt, trip.destinationTimezone);   // repli : fuseau du navigateur (celui du mapper d'écriture)
+  …
+  return { ...trip, departureDateLocal: trip.departureDateLocal || dep?.date || …, … }; // le wizard garde la priorité
+}
+```
+
+Branchée dans `useMyTrips` (`withLocalDatesInList(res.data)`) et `useTrip` (`withLocalDates(res.data.trip)`) :
+les sept consommateurs des chaînes locales n'ont pas bougé et sont tous corrigés. `Intl.DateTimeFormat("en-CA")`
+donne directement `AAAA-MM-JJ` ; un fuseau inconnu (`RangeError`) retombe sur le navigateur.
+
+## ANO-WEB-44 : un « TODO Phase backend » devenu un prénom
+
+« Mon Deal accepté » écrivait « Aminata le révèle à **Hall** quand tu confirmes le pickup » : le prénom
+du destinataire était `deliveryLocation.name.split(" ")[0]` (« Hall d'arrivée · Brazzaville »). L'API
+sert pourtant `recipient.firstName` dès la création — `recipientForCarrier` ne retient que le téléphone
+avant le pickup — mais l'adapter n'exposait `recipient` qu'après le pickup (philosophie É4, qui ne
+vaut que pour le téléphone). `DealDetail.recipientFirstName` est désormais toujours posé ; `recipient`
+(avec téléphone) attend toujours le pickup : les vues « livrer » et « suivi » n'ont pas changé.
+
+## ANO-WEB-42 : un lieu, une ligne
+
+`toLocation` posait `name = details || city` ET `detail = details` : la même ligne deux fois sous
+« REMISE DU COLIS », et la ligne de repli de la livraison (« Téléphone du destinataire communiqué à la
+prise en charge »), qui ne s'affiche que sans `detail`, n'apparaissait jamais. `detail` n'est gardé
+que s'il diffère de `name`. Même motif sur le récapitulatif accepté (« … · Brazzaville · Brazzaville ») :
+la ville n'est ajoutée que si le lieu ne la porte pas.
+
+## Le harnais
+
+- Les demandes vivantes sont créées par l'assistant (2,5 kg S 150 € : 32,20 / 28,75), avec photos
+  (ImageKit intercepté) pour la fiche 2 ; `bzv-pending` sert au refus, `gru-pending` à l'expiration
+  (manœuvre `scripts/recette/deal-eligible.ts <id> -1500`, puis passe forcée `scripts/recette/expire.ts`),
+  les trois deals clos du seed aux états fermés.
+- **Deux onglets « sans recharger »** : TanStack Query relit le deal au retour du focus — l'onglet 2
+  rejoue sa première lecture (`page.route` → `fulfill`) jusqu'au clic « Refuser le Deal », puis `unroute` :
+  le 409 `TRANSITION_NOT_ALLOWED`, le toast et la relecture sont ceux du produit.
+- La puce d'expiration : `expiresAt` reculé à +90 min → classe `red-*` et `role="alert"`, remis à +23 h.
+- « Aucune pénalité » : le profil public de Thomas (`GET /users/seed-thomas/public`) est comparé
+  octet pour octet avant et après le refus ; les kilos par le DTO propriétaire.
+- Ce qu'un membre ne doit pas voir se lit aussi dans les DTO : ni `totalShipperCents` / `commissionCents`
+  chez le Voyageur, ni `deliveryCode`.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **157 scénarios** (148 + WEB-DEA ×9). Typecheck
+user-ui (`tsc -p apps/user-ui`, comme la CI) et harnais verts. Poste : la cible inférée `nx typecheck`
+des deux fronts Next a disparu en cours de session (les services l'ont encore) — `npx tsc --noEmit -p
+apps/user-ui/tsconfig.json` est l'équivalent exact de la CI.
+
+---
+
+# Chapitre 5.15 du cahier 01-WEB : la messagerie — une garde de sécurité contournable par un espace, et trois écrans qui parlaient anglais ou se taisaient
+
+*(PR `chore/recette-web-5-15` (#280), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quinzième chapitre « fiches » du cahier 01-WEB : `WEB-MSG` (le fil par deal, D61). Vingt-deux fiches
+jouées et conformes (quatre après correction), quatre anomalies closes — `ANO-WEB-46` **BLOQUANTE**,
+`ANO-WEB-47` MAJEURE, `ANO-WEB-45` et `ANO-WEB-48` mineures. Plateforme de tests : message-service
+42 → **44** (996 au total).
+
+```
+apps/e2e/src/chapitres/web-msg.spec.ts                             21 scénarios en série (22 fiches), 3 min 24
+apps/e2e/src/pages/fil-messagerie.ts                               accepterRendezVous : la dernière ligne « confirmé »
+apps/message-service/src/lib/message-guard.rules.ts               ANO-WEB-46 (séparateurs entre chiffres retirés)
+apps/message-service/src/lib/message-guard.rules.spec.ts          +1
+apps/message-service/src/lib/meetup.rules.ts                      ANO-WEB-47 (une re-proposition prime)
+apps/message-service/src/lib/meetup.rules.spec.ts                 +1
+apps/message-service/src/services/conversation.service.ts         ANO-WEB-47 (accepter remplace le confirmé du même type)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx   ANO-WEB-45 (code → texte), ANO-WEB-48 (isError)
+apps/user-ui/src/components/dashboard/messages/MeetupPanel.tsx    ANO-WEB-45 (bornes traduites)
+apps/user-ui/messages/{fr,en}/messaging.json                       clés errors.*
+```
+
+## ANO-WEB-46 : « Le code : 742 891 » passait
+
+La garde du code de livraison (D43 / D61 4A) extrayait les groupes de six chiffres avec `\b\d{6}\b`
+et les comparait au hash bcrypt du deal. Six chiffres collés étaient refusés ; un espace, un tiret ou
+un point entre les chiffres — la façon la plus naturelle d'écrire un code — passait. L'invariant
+« le code ne circule jamais par écrit » était rompu par la forme la plus courante.
+
+```ts
+// apps/message-service/src/lib/message-guard.rules.ts
+const DIGIT_SEPARATOR = /(?<=\d)[\s.\-–_'’/]+(?=\d)/g;
+export function sixDigitCandidates(text: string): string[] {
+  const isolated = text.match(SIX_DIGITS) ?? [];
+  const collapsed = text.replace(DIGIT_SEPARATOR, "").match(SIX_DIGITS) ?? [];   // « 742 891 » → « 742891 »
+  return [...new Set([...isolated, ...collapsed])].slice(0, MAX_CODE_CANDIDATES); // trois bcrypt au plus
+}
+```
+
+Un téléphone (« 06 12 34 56 78 » → dix chiffres) et une date (« 11 09 2026 » → huit) ne forment
+toujours pas un groupe de six isolé : les coordonnées restent repérées, pas bloquées (D61 5A). La
+leçon de revue : **un filtre de sécurité se teste avec ses contournements évidents** — la règle avait
+ses tests, aucun n'essayait la forme aérée.
+
+## ANO-WEB-47 : une re-proposition invisible
+
+Le panneau de rendez-vous n'affiche que « le rendez-vous qui compte » (`nextMeetupOf`) et la règle
+préférait TOUJOURS le prochain accepté. Après une confirmation, une nouvelle proposition (changer
+l'heure ou le lieu) n'apparaissait chez personne : impossible de replanifier. Deux changements :
+
+1. `nextMeetupOf` fait primer une proposition **plus récente que l'acceptation**
+   (`createdAt > acceptedAt ?? createdAt`) — c'est une re-proposition, elle doit être acceptable ;
+2. `acceptMeetup` annule les autres rendez-vous ACCEPTÉS du même type : **un seul confirmé par type**,
+   l'ancre du numéro (`revealPhone`, `thread`) et la liste ne balancent plus entre deux.
+
+Candidat registre : compléter D61 1A avec cette règle.
+
+## ANO-WEB-45 : le `message` anglais de l'API sous la saisie
+
+Le fil (`send`) et le panneau (`submit`) affichaient `err.response.data.message` — la phrase ANGLAISE
+de l'API — au membre. Les deux lisent désormais `details.code` (A146 : le code atteint le client) et
+traduisent : `DELIVERY_CODE_IN_MESSAGE`, `INVALID_MEETUP_SLOT` + `reason` (`TOO_SOON` / `TOO_FAR` /
+`WINDOW_TOO_LONG`), `MEETUP_CHANGED`, `CONVERSATION_READ_ONLY` — clés `messaging.errors.*` en FR et EN,
+repli sur les messages génériques existants. Un `grep "response?.data?.message"` dans le front est le
+prochain geste utile.
+
+## ANO-WEB-48 : « Chargement… » sans fin
+
+`ConversationThread` ne rendait que `isLoading || !data` : un fil refusé (403 `NOT_A_PARTY`) ou
+introuvable restait sur « Chargement… ». `isError` → « La conversation n'a pas pu être ouverte. »
+(clé déjà présente). L'API, elle, refusait proprement sans rien révéler.
+
+## Le harnais
+
+- Deux navigateurs (Pauline, Thomas) sur `bzv-accepted` ; le fil est demandé à l'API
+  (`FilMessagerie.identifiantDuFil`) ; la bulle de l'en-tête se lit AVANT d'ouvrir la messagerie
+  (sur écran large le premier fil s'ouvre seul et se marque lu).
+- La langue des réponses rapides suit le COMPTE (D44) : la fiche bascule par le sélecteur de
+  l'en-tête (qui enregistre la préférence), puis revient en français.
+- Les refus sont lus sur la réponse (`400` + code) ET sous la saisie (le texte traduit) ; « le
+  message n'apparaît pas dans le fil » se prouve par l'absence de BULLE (`getByText` compte la
+  valeur de la zone de saisie).
+- Les coordonnées repérées se prouvent côté équipe : `GET /admin/conversations/by-deal/:id`
+  (session SUPPORT) → `flaggedContact: true` sur les deux messages.
+- Le numéro « à l'heure » : Pauline propose à +40 min, Thomas accepte (ANO-WEB-47 nécessaire),
+  « Voir le numéro » → 200, ligne système unique même après rechargement.
+- La relance : `scripts/recette/relance-eligible.ts <fil> SHIPPER` (dernier message vieilli d'une
+  heure) puis `relance.ts` deux fois (`sent: 1` puis `sent: 0`) ; l'email est vérifié SANS le texte.
+- La fenêtre de 14 jours : `completedAt` / `closedAt` reculés à J−15 par une manœuvre consignée.
+- Le limiteur de la passerelle a répondu 429 après treize passages : passerelle relancée en bundle.
+
+## Tests
+
+message-service **44** (+2 : ANO-WEB-46, ANO-WEB-47) → plateforme **996** (+ auth 229). `apps/e2e` :
+**178 scénarios** (157 + WEB-MSG ×21). Typecheck user-ui (`tsc -p apps/user-ui`), message-service et
+harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.16 du cahier 01-WEB : la prise en charge et le transit — de la copie écrite mais jamais branchée
+
+*(PR `chore/recette-web-5-16` (#281), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le seizième chapitre « fiches » du cahier 01-WEB : `WEB-PIC` (l'écran de prise en charge, ses refus, la
+confirmation, le refus du colis, l'écran de transit et ses jalons). Dix fiches jouées et conformes (cinq
+après correction), cinq anomalies closes (`ANO-WEB-51` MAJEURE, `49`, `50`, `52`, `54` mineures), une
+ouverte (`ANO-WEB-53`, instantané du trajet sans heure d'arrivée).
+
+```
+apps/e2e/src/chapitres/web-pic.spec.ts                                      8 scénarios en série (10 fiches), 1 min 48
+apps/user-ui/src/lib/elision.ts                                             ANO-WEB-49 (« que Pauline » / « qu'Aminata »)
+apps/user-ui/messages/{fr,en}/carrierDealPickup.json, carrierDealDeliver.json   ANO-WEB-49 ({queShipper}, {deShipper})
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupDeclaredCard.tsx, PickupChecklist.tsx, DealPickupDesktop.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverInfoBox.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupDesktop.tsx, DealPickupMobile.tsx   ANO-WEB-50 (recipientFirstName), ANO-WEB-51 (blockingHint)
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupConfirmCard.tsx, PickupFooter.tsx      ANO-WEB-51 (l'indice sous le bouton inactif)
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupClient.tsx  ANO-WEB-52 (taille et format à la sélection)
+apps/user-ui/src/components/booking/booking-tracker/shared/BookingTrackingLinkCard.tsx   ANO-WEB-54 (variable manquante)
+```
+
+## ANO-WEB-51 : un bouton gris et muet
+
+Les deux textes « Coche les 5 points de vérification avant de confirmer » et « Ajoute au moins 1 photo
+avant de confirmer » existaient dans `carrierDealPickup.json` (`validation.*`) ; aucun composant ne les
+rendait. Le bouton était simplement `disabled`. `PickupConfirmCard` (écran large) connaît
+`checkedCount` / `photoCount` et rend l'indice sous le bouton ; `PickupFooter` (mobile) reçoit un
+`blockingHint` calculé par `DealPickupMobile`. Même famille que la carte « demandes en attente » de
+l'accueil (5.14) : de la copie écrite, jamais branchée — un `grep` des clés JSON absentes du code est
+un contrôle qui vaut la peine (voir regard d'expert).
+
+## ANO-WEB-49 : l'élision n'est pas une affaire de message
+
+« Ce qu''{shipperFirstName} a déclaré » est juste devant Aminata et faux devant Pauline. ICU ne sait pas
+élider ; le composant le fait :
+
+```ts
+// apps/user-ui/src/lib/elision.ts
+export function elider(mot: "de" | "que" | "le" | "la", nom: string): string {
+  const elide = /^[aeiouyàâäéèêëîïôöùûüÿæœh]/i.test(nom.trim());   // voyelle ou h (muet par défaut)
+  if (mot === "le" || mot === "la") return elide ? `l'${nom}` : `${mot} ${nom}`;
+  return elide ? `${mot.slice(0, -1)}'${nom}` : `${mot} ${nom}`;   // « qu'Aminata », « que Pauline », « d'Aminata », « de Pauline »
+}
+```
+
+Les cinq messages reçoivent `{queShipper}` / `{deShipper}` ; l'anglais garde ses variables (ICU ignore
+les variables en trop). Le cahier a la même faute et est à corriger.
+
+## ANO-WEB-52 : la borne de taille au bon moment
+
+Comme ANO-WEB-39 sur l'assistant : les photos de prise en charge ne partent qu'à la confirmation, la
+borne de 10 Mo ne se voyait donc qu'au clic « Confirmer ». `addPhoto` filtre taille (`PHOTO_MAX_SIZE_BYTES`)
+et format (`PHOTO_MIME_TYPES`) à la sélection, avec les textes `errors.uploadTooLarge` /
+`errors.uploadInvalidType` — « rien n'a été envoyé » redevient vrai au moment où l'utilisateur agit.
+
+## ANO-WEB-50, ANO-WEB-54, ANO-WEB-53
+
+- `split(" ")[0]` sur le lieu de livraison pour nommer le destinataire — le dernier survivant de la
+  maquette (ANO-WEB-44 avait corrigé « Mon Deal accepté ») : `deal.recipientFirstName`.
+- `t("subtitle")` sans `{recipientFirstName}` : next-intl rend alors le chemin de la clé
+  (« bookingTracker.trackingLink.subtitle ») ; la variable est passée. En développement, faire échouer
+  `onError` de next-intl rendrait ce défaut impossible à manquer.
+- « arrivée prévue à — » : `BookingTripSnapshot` fige `departureAt` mais pas `arrivalAt` ; le DTO
+  Expéditeur ne peut rien dériver. Évolution de schéma + contrat, PR dédiée (ANO-WEB-53 ouverte).
+
+## Le harnais
+
+- Les fiches 1 à 4 rejouent l'écran sans confirmer (points, photo, > 10 Mo, ImageKit abandonné par
+  `page.route`) et prouvent « rien n'est enregistré » par l'absence d'appel `POST /pickup` ET le statut
+  relu (`ACCEPTED`).
+- La fiche 5 lit le code dans le suivi de Pauline (`SuiviExpediteur.lireLeCode`) et vérifie qu'il n'est
+  ni dans l'email ni dans le texte de l'écran Voyageur.
+- La fiche 6 lit le total payé dans le DTO de Marie-Claire (le DTO Voyageur ne le porte pas, 5.14) et le
+  compare au `refundAmountCents` du refus ; kilos et profil public avant / après.
+- Les fiches 8, 9, 10 sont un seul scénario à deux navigateurs : l'annulation dans les cinq secondes
+  (aucune requête), puis les trois jalons, chacun observé côté Expéditrice (bannière, cloche, Mailpit).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **186 scénarios** (178 + WEB-PIC ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.17 du cahier 01-WEB : le code de livraison — le retour d'action qui n'existe que dans un état transitoire
+
+*(PR `chore/recette-web-5-17` (#282), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-septième chapitre « fiches » du cahier 01-WEB : `WEB-COD` (l'apparition du code, sa copie, son
+partage, sa régénération et son plafond, ce que le Voyageur ne voit jamais, l'après-remise). Huit fiches
+jouées et conformes (quatre après correction), cinq anomalies closes (`ANO-WEB-56` MAJEURE, `55`, `57`,
+`58`, `59` mineures). Aucune correction côté service : le serveur était juste partout (code chez
+l'Expéditrice seule, 409 `CODE_REGENERATION_LIMIT`, email sans le code).
+
+```
+apps/e2e/src/chapitres/web-cod.spec.ts                                            8 scénarios en série, 1 min 48
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingCodeCard.tsx     ANO-WEB-55 (toast + aria-label), 57 (compteur permanent), 58 (409 traduit), 59 (échec de copie)
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx    ANO-WEB-56 (wa.me/<numéro>, sms:<numéro>), 55 (toast), 59
+apps/user-ui/src/components/booking/booking-tracker/views/in-transit/SenderCodeCard.tsx     ANO-WEB-56 (repartager), 57, 58
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `pickedUp.code.copyFailed` (ANO-WEB-59)
+```
+
+## ANO-WEB-56 : le numéro était là, le lien ne le prenait pas
+
+`BookingShareCode` ouvrait `https://wa.me/?text=…` et `sms:?&body=…` : message pré-rempli, destinataire à
+chercher. Or le DTO Expéditeur porte `recipient.phoneE164` depuis D69, et la carte du lien de suivi
+(`BookingTrackingLinkCard`) construisait déjà `wa.me/<chiffres>` et `sms:<numéro>`. Les deux cartes du code
+(phase pickup et phase voyage) font maintenant pareil :
+
+```ts
+// apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx
+const phone = booking.recipient.phoneE164 ?? "";
+const whatsappTarget = phone.replace(/[^\d]/g, "");            // wa.me veut les chiffres, sans « + »
+window.open(`https://wa.me/${whatsappTarget}?text=${encodeURIComponent(message)}`, "_blank");
+window.location.href = `sms:${phone}?&body=${encodeURIComponent(message)}`;   // « ?& » : iOS et Android
+```
+
+Sans numéro, le lien reste ouvert : l'utilisatrice choisit le contact, comme avant.
+
+## ANO-WEB-57 et ANO-WEB-58 : un compteur enfermé, une erreur traduite puis ignorée
+
+Le compteur « {n} régénérations restantes » n'était rendu QUE dans la boîte de confirmation : après le
+geste, plus de compteur ; après la cinquième, le bouton inactif n'ouvre plus la boîte, donc « Aucune
+régénération restante » (la forme `=0` du message ICU) était inatteignable. Le compteur vit maintenant sous
+l'avertissement de confidentialité, en permanence.
+
+Le serveur refuse la sixième par un 409 `CODE_REGENERATION_LIMIT` ; `booking-tracker.api.ts` le
+traduisait déjà en `BookingApiError.code` — et les cartes faisaient `catch {}` sans le lire :
+
+```ts
+} catch (e) {
+  const plafond = e instanceof BookingApiError && e.code === "CODE_REGENERATION_LIMIT";
+  toast.error(t(plafond ? "pickedUp.code.toastMaxReached" : "pickedUp.code.toastError"));
+  if (plafond) setConfirmingRegen(false);
+}
+```
+
+Le cas qui le déclenche est réel : un second onglet resté sur « 1 régénération restante ». Règle à
+retenir : **un `details.code` traduit par la couche API doit avoir un lecteur dans la vue**, sinon la
+traduction est du code mort.
+
+## ANO-WEB-55 et ANO-WEB-59 : dire ce qui vient de se passer, et dire juste
+
+« Code copié ! » existait au catalogue et n'était jamais rendu (seule l'icône changeait, l'`aria-label`
+restait « Copier le code ») ; le message n'avait qu'un libellé de bouton. Les deux ont un toast, et
+l'`aria-label` bascule. À l'échec (pas de `navigator.clipboard` hors contexte sécurisé — le LAN en http),
+le bouton du code affichait « Erreur lors de la régénération. Réessaye. » — le `toastError` d'une autre
+action — et celui du message se taisait : nouvelle clé `pickedUp.code.copyFailed`, FR et EN.
+
+## Le harnais
+
+- Le presse-papiers est observé en mémoire de page (`fixtures/presse-papiers.ts`) ; `window.open` est
+  capturé par un `addInitScript` (`__ouverturesYamba`) et l'URL WhatsApp est relue avec `new URL()` —
+  hôte, chemin (le numéro), paramètre `text`.
+- `sms:` et `mailto:` ne sont pas cliqués (Messages / Mail du poste s'ouvriraient) : l'objet de l'email
+  est lu au catalogue FR.
+- La fiche 2 fouille neuf sources côté Voyageur (texte ET source HTML de trois pages, le fil, deux
+  réponses d'API) ; la fiche 7 constate que la source porte tout le catalogue `bookingTracker` — l'assertion
+  vise l'interface rendue et le chemin d'API, pas un libellé.
+- La fiche 6 ouvre un second onglet avant la dernière régénération : c'est lui l'« essai forcé »
+  (React ré-applique `disabled` à un bouton dé-grisé à la main).
+- `waitForResponse` ignore le 401 : la session mémorisée expire, `api-client` rafraîchit et rejoue.
+- Les toasts s'empilent cinq secondes : `.last()`.
+- L'identifiant du deal est posé paresseusement (`dealPicked(jeuEssai)`) : chaque fiche reste jouable seule
+  (`--grep`), le seed étant rejoué par `beforeAll`.
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **194 scénarios** (186 + WEB-COD ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert (nouvelle clé `copyFailed` FR / EN).
+
+---
+
+# Chapitre 5.18 du cahier 01-WEB : la remise du colis — l'étape optionnelle qui verrouillait le chemin, et l'erreur qui ne se libérait pas
+
+*(PR `chore/recette-web-5-18` (#283), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-huitième chapitre « fiches » du cahier 01-WEB : `WEB-REM` (l'écran de saisie du code, le barème
+d'essais, le verrou, sa levée par une régénération, la photo facultative, la livraison, l'absence
+d'annulation). Sept fiches jouées et conformes (deux après correction), deux anomalies closes
+(`ANO-WEB-60` MAJEURE, `ANO-WEB-61` mineure). Le serveur était juste partout (essais comptés côté serveur,
+verrou qui survit au rechargement, bon code refusé sous verrou, régénération qui remet à zéro, notifications
+et email de remise sans le code).
+
+```
+apps/e2e/src/chapitres/web-rem.spec.ts                                            7 scénarios en série, 55 s
+apps/e2e/src/pages/suivi-expediteur.ts                                            `regenerer()` (partagé 5.17 / 5.18), `lireLeCode()` sur les deux formes de carte
+apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx     ANO-WEB-60 (chemin direct vers la remise)
+apps/user-ui/messages/{fr,en}/carrierDealTracking.json                            `spotlight.deliverEarly`
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverOtpInput.tsx        ANO-WEB-61 (compteur rendu, erreur effacée à la ressaisie, effet rearmé par le compteur)
+```
+
+## ANO-WEB-60 : « Optionnel » ne doit pas verrouiller le chemin principal
+
+La carte-projecteur du suivi de transit calcule le prochain geste (`getNextEvent`) : aéroport, décollage,
+atterrissage, puis `DELIVER`. « Valider la livraison » n'existait que dans cette dernière variante. Les trois
+jalons portent le badge « Optionnel » et l'API livre depuis `PICKED_UP` sans condition — mais l'interface,
+elle, exigeait les trois clics. La variante « jalon optionnel » offre désormais le chemin direct sous le bouton
+du jalon :
+
+```tsx
+// apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx
+<span>{t("spotlight.deliverEarly", { recipientFirstName })}</span>   // « Đức est déjà devant toi ? … »
+<button type="button" onClick={onDeliverAction}>{t("spotlight.DELIVER.button")}</button>
+```
+
+Règle : un état qui masque l'action principale doit avoir une sortie explicite.
+
+## ANO-WEB-61 : trois défauts dans une seule ligne d'état
+
+`DeliverOtpInput` rendait, sous les cases, SOIT l'erreur, SOIT « Tentative n sur 3 ». Conséquences :
+`otp.attemptsLeft` (« {n} tentatives restantes » / « Dernière tentative ») n'était jamais rendu ; l'erreur
+restait pendant la ressaisie (« Tentative 2 sur 3 » ne revenait pas) ; et l'effet « secousse + cases vidées »
+dépendait du texte de l'erreur — identique d'un essai à l'autre — donc muet au deuxième échec :
+
+```ts
+// avant : useEffect(() => { … }, [errorMessage]);   — même texte, pas de nouvel effet
+useEffect(() => { … }, [errorMessage, attemptsUsed]); // le compteur signale l'échec, pas le texte
+const [erreurMasquee, setErreurMasquee] = useState(false);          // effacée au premier chiffre ressaisi
+const erreurVisible = !!errorMessage && !erreurMasquee;
+```
+
+La ligne d'état rend l'erreur + le compteur, ou « Tentative n sur 3 · n tentatives restantes ».
+
+## Le harnais
+
+- `tenter(page, code)` saisit chiffre par chiffre (`getByLabel("Chiffre n")`) et attend la réponse
+  DÉFINITIVE du `POST /deliver` (le client rejoue après un 401 de session expirée) ; le statut et le corps
+  sont relus (`DELIVERY_CODE_INVALID`, `DELIVERY_LOCKED`, `lockedUntil`).
+- Le verrou de 15 minutes n'est jamais attendu : la fiche 4 le lève par une régénération côté Mai
+  (`SuiviExpediteur.regenerer()`, désormais dans le page object et partagé avec 5.17). Le suivi de Mai est
+  la forme « phase voyage » (un jalon confirmé) : `lireLeCode()` lit la carte monumentale (aria-label) ou la
+  carte compacte (texte « 742 891 »), et `regenerer()` attend que le code affiché CHANGE (`expect.poll`) —
+  la carte relit le serveur après le toast.
+- « Un essai raté n'est pas un événement » se prouve par `GET /me/notifications` identique avant / après
+  (le chemin exact — la fiche COD-2 utilisait `/notifications` derrière un `if (ok)`, corrigée).
+- L'absence d'annulation vise la LIGNE du deal dans « Mes envois » (les autres envois gardent leur bouton)
+  et double la preuve par l'API : 409 `TRANSITION_NOT_ALLOWED` (Expéditrice), 403 (Voyageur).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **201 scénarios** (194 + WEB-REM ×7). Typecheck
+user-ui et harnais verts ; miroir i18n vert (`spotlight.deliverEarly` FR / EN).
+
+---
+
+# Chapitre 5.19 du cahier 01-WEB : confirmation, complétion et versement — les textes qui ne suivaient pas la donnée, et le bandeau orphelin
+
+*(PR `chore/recette-web-5-19` (#284), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-neuvième chapitre « fiches » du cahier 01-WEB : `WEB-CNF` (la période de vérification, la
+confirmation anticipée, le rappel de la veille, la complétion automatique, l'après-J+4, l'étanchéité de
+l'état du versement côté Expéditeur, les trois états du versement côté Voyageur, le portefeuille, les
+paiements, le bloc « TON PAIEMENT »). Onze fiches jouées et conformes (quatre après correction, une avec
+réserve), six anomalies : quatre closes (`ANO-WEB-66` MAJEURE, `ANO-WEB-64`, `65`, `67` mineures) et deux
+ouvertes qui touchent le contrat et la machine (`ANO-WEB-62` MAJEURE, `ANO-WEB-63` mineure) — proposées au
+registre, jamais tranchées dans un contrôleur.
+
+```
+apps/e2e/src/chapitres/web-cnf.spec.ts                                            13 scénarios en série (11 fiches + 2 `test.fail`), 2 min 54
+apps/e2e/src/pages/mes-trajets.ts                                                 `ligneDuDeal()` déplie chaque trajet (« n colis ») jusqu'à la ligne
+scripts/recette/livraison-ancienne.ts                                             recule `deliveredAt` ET `payoutDueAt` (rappel, après-J+4, cron)
+scripts/recette/versement-bloque.ts                                               refige FAILED / ACCOUNT_NOT_READY, rejeu repoussé d'un jour
+apps/user-ui/src/components/trips/list/MyTripsList.tsx                            ANO-WEB-66 (le bandeau des versements bloqués sur la vraie page)
+apps/user-ui/src/components/dashboard/trips/TripsClient.tsx                       ANO-WEB-66 (page pleine aussi, pas seulement la page vide)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx   ANO-WEB-64 (note du paiement selon `completedBy`)
+apps/user-ui/src/components/rating/RatingStatusCard.tsx                           ANO-WEB-65 (invitation sans échéance)
+apps/user-ui/messages/{fr,en}/bookingTracker.json · rating.json                   `delivered.payment.noteReleasedAuto`, `status.promptTextNoDate`
+apps/deal-service/src/services/wallet.service.ts (+ .spec)                         ANO-WEB-67 (date de remboursement, repli sur `updatedAt`) — deal 577
+packages/libs/prisma/scripts/seed-deals.ts                                        `ratingWindowEndsAt` sur les deals -blocked / -reversed
+```
+
+## Deux crons forcés, sur le fournisseur FAKE
+
+Le chapitre dépend de `payout-bookings` (passes `reminder` et `due`, toutes les 5 minutes). Le harnais ne
+les attend jamais : `scripts/recette/payout.ts <passe>` appelle directement le service de règlement, avec
+l'environnement du processus qui l'emporte sur le `.env` (`STRIPE_SECRET_KEY=""` → FAKE, comme le bundle) :
+
+```ts
+// apps/e2e/src/chapitres/web-cnf.spec.ts
+function scriptDeRecette(nom: string, ...args: string[]): string {
+  const sortie = execFileSync("npx", ["tsx", "--env-file=.env", `scripts/recette/${nom}.ts`, ...args], {
+    cwd: RACINE, encoding: "utf-8", timeout: 120_000,
+    env: { ...process.env, STRIPE_SECRET_KEY: "", FORCE_COLOR: "0", NO_COLOR: "1" },
+  });
+  return sortie.replace(/\[[0-9;]*m/g, ""); // Playwright pose FORCE_COLOR : « 0 » sortait « [33m0[39m »
+}
+```
+
+La manœuvre de date recule `deliveredAt` ET `payoutDueAt` (le compte à rebours de l'écran est calculé dans
+le navigateur à partir de `deliveredAt` : ne bouger que l'échéance ferait mentir l'écran). Le FAKE a un
+effet de bord : le cron REJOUE le versement « bloqué » du seed et le fait partir — `versement-bloque.ts`
+refige l'échec et repousse `payoutNextRetryAt` d'un jour, juste après le seed puis avant les fiches 6 / 7.
+
+## ANO-WEB-66 : un bandeau posé dans le mauvais composant
+
+`PayoutBlockedBanner` (A75) était rendu par `TripsClient` — et seulement dans sa branche « aucun trajet ».
+Or `/dashboard/trips` rend `MyTripsList` (`components/trips/list/`), qui ne le posait pas. Un Voyageur au
+versement bloqué (le cas nominal : il A des trajets) ne voyait jamais « {montant} en attente : finalise ton
+compte Stripe ». Le bandeau est posé par la page réelle, avant « À traiter », et sur la page pleine de
+`TripsClient`. Leçon : un composant transversal se pose au niveau de la page, et deux listes de trajets pour
+une même route sont une dette (`TripsClient` ne sert plus que la prévisualisation et la section du tableau
+de bord).
+
+## ANO-WEB-64, 65, 67 : trois textes qui ne suivaient pas la donnée
+
+- **64** — `DeliveredPaymentCard` (réutilisée par la vue « terminé ») disait « Tu as confirmé la livraison »
+  à tout deal clos, même clos par le SYSTÈME (« sans signalement de ta part » deux cartes plus haut). La
+  note suit `booking.completedBy` : `noteReleased` (SHIPPER) ou `noteReleasedAuto` (le reste).
+- **65** — `RatingStatusCard` rendait `promptText` avec `date: ""` quand `windowEndsAt` était `null` :
+  « Tu as jusqu'au . ». Sans date, `promptTextNoDate`. La cause de la donnée absente est dans le seed (les
+  deals `-blocked` / `-reversed` n'écrivaient pas `ratingWindowEndsAt`) — corrigé aussi, mais le composant
+  ne doit jamais dépendre d'un seed.
+- **67** — `wallet.service` rendait `date: iso(b.refundedAt)` pour REFUNDED / PARTIALLY_REFUNDED ; sans
+  `refundedAt` la ligne disait « Remboursé 33,60 € le ». Repli sur `updatedAt` (comme RELEASED_NO_CHARGE),
+  un test qui pose `refundedAt: null`.
+
+```ts
+// apps/deal-service/src/services/wallet.service.ts
+const refundDate = iso(b.refundedAt ?? b.updatedAt);
+```
+
+## Les deux anomalies ouvertes — au registre, pas dans le code
+
+- **ANO-WEB-62** — la vue Expéditeur porte `payoutStatus` / `payoutSentAt` et `ConfirmDealResponse` rend
+  `payoutStatus` ; le contrat le dit voulu (A68 « both roles read it »). Les écrans n'en montrent rien, mais
+  la réponse brute sert `"payoutStatus":"FAILED"` à l'Expéditrice d'un deal au versement bloqué. Retirer
+  ces champs de la vue Expéditeur est un changement de contrat (OpenAPI, D-next) : scénario 6 bis en
+  `test.fail`, il passera au vert quand la décision sera prise et codée.
+- **ANO-WEB-63** — la machine retire `dispute` après `payoutDueAt` (`beforePayoutDue`) mais pas
+  `confirmEarly` ; « Confirmer la livraison » reste proposé jusqu'au passage du cron. La garde jumelle
+  coûte trois lignes et un test de machine, mais une transition est une règle du registre : scénario 5 bis
+  en `test.fail`.
+
+## Le harnais
+
+- L'ordre de jeu n'est pas celui du cahier : un seul deal livré par rôle. `bzv-delivered` sert la lecture
+  (1, 11) puis la confirmation (2) ; `yul-delivered` sert le rappel (4, échéance dans 18 h), l'après-J+4
+  (5, échéance passée de 2 h, joué tout de suite car le vrai cron passe dans les 5 minutes) puis la
+  complétion (3, passe `due` forcée — et si le vrai cron a devancé, `expect.poll` sur `COMPLETED` suffit).
+- Les preuves d'étanchéité (6, 7) lisent `body` (les pages de suivi n'ont pas de `<main>`) après avoir
+  retiré la description du colis du seed, qui dit elle-même « compte Stripe incomplet ».
+- Les totaux des cartes Finances sont comparés à `GET /me/wallet` (jamais recalculés) et chaque ligne servie
+  est visée par son lien (`/bookings/<id>`, `/carrier/deals/<id>`) et confrontée à son état exact.
+- Les notifications survivent au seed : « une seule fois » se compte par lien du deal. Les montants portent
+  une espace fine insécable avant « € » (cloches, objets d'email) : `[\s  ]?€`.
+
+## Tests
+
+Plateforme **997** (deal 577, +1 ANO-WEB-67) + auth 229. `apps/e2e` : **214 scénarios** (201 + WEB-CNF ×13).
+Typecheck user-ui, deal-service et harnais verts ; miroir i18n vert (`noteReleasedAuto`, `promptTextNoDate`
+FR / EN).
+
+---
+
+# Chapitre 5.20 du cahier 01-WEB : les annulations — la transition sans route ni écran, l'instantané que le barème lit, et deux restes de maquette
+
+*(PR `chore/recette-web-5-20` (#285), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingtième chapitre « fiches » du cahier 01-WEB : `WEB-ANN` (le barème ANN-01 en quatre moments, le montant
+servi, l'annulation Voyageur, rien après la prise en charge, le suivi sans doublon, deux onglets). Neuf fiches
+jouées, sept conformes (deux après correction, une avec réserve), une NON CONFORME (`ANO-WEB-68`, majeure,
+ouverte : l'annulation par le Voyageur n'existe ni au service ni à l'écran), une réserve (`ANO-WEB-69`, la
+retenue conservée dite « reversée »), deux anomalies closes (`ANO-WEB-70`, `ANO-WEB-71`).
+
+```
+apps/e2e/src/chapitres/web-ann.spec.ts                                            9 scénarios en série (1 `test.fail`), 3 min 18
+apps/e2e/src/pages/mes-envois.ts                                                  toast « Envoi annulé. » avec ou sans remboursement
+apps/user-ui/src/components/booking/booking-tracker/views/accepted/BookingAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes envois »)
+apps/user-ui/src/components/carrier/deal/views/accepted/DealAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes trajets »)
+apps/user-ui/src/components/dashboard/shipments/ShipmentsClient.tsx               ANO-WEB-71 (toast sans « remboursement » pour une demande en attente)
+```
+
+## Un deal fabriqué par l'API, en deux appels
+
+Le chapitre a besoin de quatre deals acceptés et le seed n'en a que deux. Plutôt que l'assistant (une minute
+par réservation), le harnais réserve par l'API : le premier `POST /deals/payment-intents` porte un total
+délibérément faux, le serveur répond 409 `QUOTE_DIVERGENCE` avec `actualTotalCents` (D17), le second porte le
+vrai total, puis `POST /deals` (FAKE : `clientSecret` null) et `POST /deals/:id/accept` par le Voyageur :
+
+```ts
+// apps/e2e/src/chapitres/web-ann.spec.ts
+const sonde = await contexte.request.post(`${api()}/deals/payment-intents`, { data: { ...devis, expectedTotalCents: 1 } });
+const totalCents = ((await sonde.json()) as { details: { actualTotalCents: number } }).details.actualTotalCents;
+```
+
+## Le barème lit l'instantané du deal
+
+`toCancellationPreview` et `cancel` calculent le remboursement à partir de `booking.trip.departureAt` — l'instantané
+figé à la réservation, pas le trajet. Déplacer `trip.departureAt` (WEB-E2E-3) ne change rien à un deal déjà
+créé : la manœuvre du chapitre déplace le trajet ET chaque deal (`data: { trip: { update: { departureAt } } }`
+sur le composite). Conséquence produit, à trancher : un vol repoussé après l'acceptation ne déplace pas la
+fenêtre des 48 h de l'Expéditrice.
+
+## ANO-WEB-68 : trois couches en désaccord
+
+La machine déclare `ACCEPTED --cancel(CARRIER)--> CANCELLED` (effets `FULL_REFUND`, `RELEASE_CAPACITY`,
+`PENALIZE_CARRIER`, `NOTIFY_SHIPPER`) ; le service refuse tout autre acteur que l'Expéditeur (403
+`SHIPPER_ONLY`) ; aucun écran Voyageur ne propose le geste — et le refus D72 (« annule-les d'abord depuis
+« Mes trajets » ») renvoie vers une action qui n'existe pas. Le scénario 6 est en `test.fail` (il attend 200) ;
+la correction est un chantier : branche CARRIER du service (remboursement intégral par le fournisseur, kilos,
+`closedBy`, événement, emails), écran, tests, registre.
+
+## ANO-WEB-70 et 71 : deux restes de maquette
+
+- **70** — « Voir le Deal dans mon dashboard → » était un `<button onClick={() => console.info(…)}>` dans les
+  deux vues « accepté » (Expéditeur, Voyageur) : `Link` de `@/i18n/navigation` vers `/dashboard/shipments` et
+  `/dashboard/trips`.
+- **71** — le toast choisissait « Remboursement de {montant} en cours » dès que la réponse portait
+  `refundAmountCents` ; une demande en attente n'a jamais été débitée (D40 : l'empreinte est levée, Paiements dit
+  « Jamais débité ») : le remboursement ne se dit que si `item.status !== "PENDING"`.
+
+## Le harnais
+
+- Les kilos restants se lisent par `GET /trips/:id` avec la session du VOYAGEUR (403 `NOT_TRIP_OWNER` sinon),
+  avant et après chaque annulation.
+- ANN-4 prouve « servi par le serveur » par l'absence : la liste est lue une fois (`cancellationPreview` dans
+  `GET /me/bookings`), et l'ouverture de la fenêtre ne déclenche aucune requête `/deals` ni `/bookings`.
+- ANN-3 refait l'arithmétique à partir des montants servis (`totalShipperCents`, `transportCents`) et
+  confronte `payoutAmountCents` à `arrondi(retenue × net ÷ total)` ; l'exemple du cahier (32,20 / 28,75 →
+  16,10 / 14,38) est vérifié par la même formule.
+- ANN-9 fige `GET /me/bookings*` de l'onglet 2 (`page.route` avec la réponse lue), libère avant le clic, et
+  prouve « aucun double remboursement » par `refundAmountCents` et les kilos.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **223 scénarios** (214 + WEB-ANN ×9). Typecheck user-ui et
+harnais verts ; miroir i18n vert (aucune clé ajoutée).
+
+---
+
+# Chapitre 5.21 du cahier 01-WEB : litige et médiation, vue membre — la table de présentation en retard sur le catalogue, et les textes qui ignorent la cause de la clôture
+
+*(PR `chore/recette-web-5-21` (#286), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-et-unième chapitre « fiches » du cahier 01-WEB : `WEB-LIT` (le signalement en transit, l'écran de
+signalement, ses refus, l'envoi, le dossier vu des deux côtés, la version du Voyageur, les trois décisions du
+back-office, la notation interdite, deux onglets, l'accès sans droit). Treize fiches jouées et conformes (trois
+après correction), quatre anomalies : trois closes (`ANO-WEB-75` MAJEURE, `ANO-WEB-72`, `ANO-WEB-73` mineures) et une
+ouverte au contrat (`ANO-WEB-74`, MAJEURE : le payload de notification aux deux rôles).
+
+```
+apps/e2e/src/chapitres/web-lit.spec.ts                                            14 scénarios en série (1 `test.fail`), 4 min 42
+apps/user-ui/src/components/dashboard/notifications/notifications.types.ts        ANO-WEB-75 (quatre entrées de présentation)
+apps/user-ui/src/components/booking/booking-tracker/views/status/BookingStatusNotice.tsx   ANO-WEB-73 (« Clos par la médiation »)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx  ANO-WEB-72 (note du paiement sur completedBy ADMIN)
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `statusNotice.cancelledByMediation.*`, `delivered.payment.noteReleasedMediation`
+```
+
+## ANO-WEB-75 : la porte du texte
+
+La boîte de notifications ne rend le texte d'un événement (`copy.<type>.<rôle>.title`) que si son type a une entrée
+dans `PRESENTATION` (`isKnownNotificationType`) ; sinon, le titre neutre « Notification ». Quatre événements avaient
+leur texte et pas leur entrée : « Décision rendue · YAM-… » (la fiche 10 attend cette cloche), « Code de livraison
+renouvelé », « Remboursement émis », « Paiement autorisé ». Les entrées sont ajoutées ; le regard d'expert propose
+le test qui aligne les deux listes en CI (`Object.keys(copy)` ⊆ `PRESENTATION`).
+
+## ANO-WEB-72 et 73 : deux textes qui ignoraient la cause de la clôture
+
+- **73** — un remboursement total tranché par la médiation clôt le deal en `CANCELLED` (D55). `BookingStatusNotice`
+  titrait donc « Demande annulée · Cette demande est close. Si un remboursement s'applique… Annulée le … » au-dessus
+  de « Décision rendue » — sur un colis livré. Quand `dispute.resolution` (ou `retentionDecision`) existe, la
+  clôture a son propre texte (`statusNotice.cancelledByMediation`).
+- **72** — la note du bloc « TON PAIEMENT » suivait déjà `completedBy` (ANO-WEB-64) mais ne connaissait que
+  SHIPPER / autre ; `ADMIN` recevait « la période de vérification est terminée — les fonds sont en cours de
+  versement à … », faux après un rejet ou un partiel. Troisième variante : « Clos par la médiation — le sort des
+  fonds est celui de la décision ci-dessus. »
+
+## ANO-WEB-74 : un payload servi tel quel
+
+`GET /me/notifications` renvoie, pour chaque notification, le payload de l'événement d'outbox. Pour
+`booking.dispute_resolved`, il porte `refundCents` ET `carrierPayoutCents` ; l'Expéditrice lit donc le montant versé
+au Voyageur, et réciproquement. L'écran n'affiche aucun montant (la ligne dit « lis la décision et le motif sur ton
+envoi »), mais la règle « chaque partie voit uniquement le montant qui la concerne » vaut pour la réponse brute.
+Correction proposée (contrat, registre) : une projection par rôle du payload à la lecture — liste blanche par
+événement, comme `analyticsEventsFor` (D66) — jamais un spread. Scénario 10 bis en `test.fail`.
+
+## Le harnais
+
+- Une décision n'est possible qu'après la version du Voyageur (ou 72 h) : `POST /deals/:id/dispute/statement`
+  (201) par l'API sur `los-disputed` (Adebayo) et sur le dossier de João (Thomas) avant de trancher ;
+  `bzv-disputed` reçoit la version par l'écran (fiche 9).
+- Les trois décisions passent par le back-office réel (`navigateurAdmin("mediateur")`, `MediationAdmin` :
+  file → dossier → trancher) ; chaque partie est ensuite lue à l'écran (texte, montant, motif) puis par sa cloche
+  (`a[href*=id]` + « Décision rendue · YAM-… ») et son email — Thomas en reçoit deux sur le même corridor, chacun
+  visé par son ticket dans le corps.
+- LIT-4 simule les trois cas réseau : ImageKit ralenti (route qui attend 4 s), ImageKit en échec (500), et un
+  400 sur le `POST /dispute` (le serveur réel n'est jamais atteint avec un dossier incomplet : le bouton est
+  inactif).
+- LIT-13 prouve l'étanchéité par l'absence : aucune donnée du deal, aucun code HTTP ni JSON à l'écran, l'API à 403.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **237 scénarios** (223 + WEB-LIT ×14). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`cancelledByMediation`, `noteReleasedMediation` FR / EN).
+
+---
+
+# Chapitre 5.22 du cahier 01-WEB : la notation croisée — l'accueil réel en retard sur sa prévisualisation, deux états sans nom, et les avis qui survivaient au seed
+
+*(PR `chore/recette-web-5-22` (#287), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-deuxième chapitre « fiches » du cahier 01-WEB : `WEB-NOT` (où noter, l'écran, les critères par rôle, la
+note seule requise, la limite du commentaire, le double-aveugle, l'intermédiaire, une seule fois, les relances, la
+révélation à 14 jours, l'avis public). Onze fiches jouées et conformes (trois après correction), trois anomalies
+closes (`ANO-WEB-76` MAJEURE, `ANO-WEB-77`, `ANO-WEB-78` mineures) et une purge du jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-not.spec.ts                                            11 scénarios en série, 3 min 18
+apps/user-ui/src/components/dashboard/home/HomeClient.tsx                         ANO-WEB-76 (les envois réels dans « À traiter »)
+apps/user-ui/src/components/rating/RatingDone.tsx                                 ANO-WEB-77 (« indisponible » ≠ « fermée »)
+apps/user-ui/src/components/users/profile/{TripperBlock,ShipperBlock}.tsx        ANO-WEB-78 (note d'un avis nommée)
+apps/user-ui/messages/{fr,en}/rating.json                                         `done.unavailableTitle`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Review des comptes du seed
+```
+
+## ANO-WEB-76 : deux accueils, une seule logique
+
+`HomeClient` a deux rendus : `HomePreview` (vitrine, données fictives) qui appelle `deriveHomeActions(shipments,
+carrierTrips)`, et `HomeLive` (réel) qui ne lisait que `useMyTrips` + `useMyDeals` — les actions du VOYAGEUR
+(répondre, prise en charge, livraison, noter) et les trajets en brouillon / en pause. Les envois de l'Expéditeur
+n'étaient jamais lus : un Expéditeur pur lisait « Tout est à jour, rien à traiter. » avec un deal à noter, un code
+à transmettre ou une livraison à vérifier. `HomeLive` lit désormais `getMyShipments` (TanStack, 30 s) et rend les
+actions Expéditeur (`ShipmentRow` + chip de rôle, comme la vitrine) en tête de « À traiter ».
+
+```tsx
+// apps/user-ui/src/components/dashboard/home/HomeClient.tsx
+const shipperActions = useMemo(
+  () => deriveHomeActions(shipments ?? [], []).filter((a): a is Extract<HomeAction, { role: "SHIPPER" }> => a.role === "SHIPPER"),
+  [shipments]
+);
+```
+
+## ANO-WEB-77 et 78 : deux états sans nom
+
+- **77** — `RatingDone` n'avait que trois branches (révélé / ma note existe / sinon « fermée »). Un deal en litige
+  (fenêtre jamais ouverte, `windowEndsAt` null) tombait dans « La fenêtre de 14 jours est passée ». La branche
+  « indisponible » (échéance absente ou future) rend `done.unavailableTitle` + `done.unavailable`.
+- **78** — les cinq `<Star>` d'un avis public n'avaient ni texte ni nom : `role="img"` + `aria-label="{n}/5"` sur
+  le groupe, `aria-hidden` sur les icônes — la même forme que `RatingStatusCard`.
+
+## Les avis survivaient au seed
+
+`seed-deals.ts` efface les bookings des comptes du seed mais pas leurs `Review` : chaque passage laissait des avis
+révélés sur les profils publics (25 orphelins après une matinée), et « l'avis n'est pas public avant la
+réciprocité » (NOT-6) échouait sur l'avis du passage précédent. Le seed purge les avis dont l'auteur OU le sujet est
+un compte du seed, avant les bookings, et le journalise (« n avis »).
+
+## Le harnais
+
+- Le double-aveugle se joue en deux navigateurs (A Mai, B Thomas) : après la première note, la page publique du
+  noté est lue par A (rien), `revealedAt` par l'API (null) ; après la seconde, l'écran de B dit la révélation et A
+  relit « Vos avis » ; la cloche « Les notes sont révélées » est visée par le lien du deal ; l'absence d'email se
+  prouve par `mailpit.compter` après un délai.
+- Le cron `rating` se force en deux temps (`notation-eligible.ts` pose `completedAt` / `ratingWindowEndsAt` /
+  `ratingRemindersSent`, `notation.ts` joue la passe) ; « une seule fois » = deux emails à Inês, zéro à João, et une
+  troisième passe silencieuse.
+- La page publique se lit dans un contexte neuf (`browser.newContext()`), la note par `[aria-label="5/5"]`, le
+  signalement par le `mailto:` décodé (« Signalement d'un avis (#id) »).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **248 scénarios** (237 + WEB-NOT ×11). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`done.unavailableTitle` FR / EN).
+
+---
+
+# Chapitre 5.23 du cahier 01-WEB : la page destinataire — un chapitre sans anomalie, et comment prouver une absence
+
+*(PR `chore/recette-web-5-23`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-troisième chapitre « fiches » du cahier 01-WEB : `WEB-DES` (le lien de suivi, ses canaux, la page publique,
+ce qu'elle ne montre jamais, sa progression, l'absence côté Voyageur et avant l'acceptation, le lien invalide, le
+vrai numéro côté Voyageur). Neuf fiches jouées, neuf conformes, aucune anomalie — le contrat fermé de D69 tient.
+
+```
+apps/e2e/src/chapitres/web-des.spec.ts                                            9 scénarios en série, 2 min 24
+```
+
+## Prouver une absence
+
+La moitié du chapitre affirme que quelque chose n'existe pas. Trois techniques :
+
+- **Les valeurs, pas les symboles.** Le code source d'une page next-intl embarque tout le catalogue de messages :
+  « € » y figure dans des textes génériques. Le harnais cherche les VALEURS du deal (le code `742891`, le numéro
+  E.164 et local, le nom, le montant formaté), à l'écran ET dans `page.content()`.
+- **La liste fermée.** `GET /track/:token` sert exactement huit clés (`CLES_PUBLIQUES_DU_SUIVI`) ; le test compare les
+  clés triées, pas la présence de quelques-unes.
+- **Le 404 uniforme.** Un jeton altéré et un jeton dont le destinataire a été effacé reçoivent le même corps de
+  réponse ; l'écran, le même texte ; le bloc d'acquisition reste.
+
+## Un canal qu'on ne peut pas cliquer
+
+WhatsApp ouvre une fenêtre (`window.open`, capturé par `addInitScript`) ; le SMS assigne `window.location.href =
+"sms:…"`, un schéma externe que le navigateur du poste ne journalise pas et que le harnais ne doit pas déclencher
+(il ouvrirait Messages). La preuve passe par la donnée : le lien est (re)demandé par la page et sa réponse porte
+`recipientPhoneE164`, le numéro que les DEUX canaux utilisent — comparé à celui de la réservation.
+
+```ts
+// apps/e2e/src/chapitres/web-des.spec.ts
+const reponse = page.waitForResponse((r) => r.url().includes("/tracking-link") && r.request().method() === "POST");
+await carte.getByRole("button", { name: "WhatsApp" }).click();
+const lienServi = (await (await reponse).json()) as { path: string; recipientPhoneE164: string | null };
+```
+
+## Un jeton, une fois
+
+« Le même lien est produit au second clic » se prouve à deux niveaux : dans la page, le second clic n'émet aucun
+`POST /tracking-link` (la carte garde le lien en mémoire) ; après rechargement, un nouveau POST rend le même jeton
+(le service réutilise le lien vivant du deal). L'effacement du destinataire (fiche 8) enchaîne la confirmation par
+l'API, `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) et `destinataire.ts` (la passe de rétention).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **257 scénarios** (248 + WEB-DES ×9). Typecheck harnais vert ;
+aucune clé i18n ni code produit touché.
+
+---
+
+# Chapitre 5.24 du cahier 01-WEB : signaler un trajet, un profil, un message — la règle de visibilité dupliquée, et le 404 traduit à la hache
+
+*(PR `chore/recette-web-5-24`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-quatrième chapitre « fiches » du cahier 01-WEB : `WEB-SIG` (la porte d'identité, la fenêtre de signalement
+d'une annonce, le doublon, soi-même, le profil, la cible invisible, trois signalements, l'avis). Huit fiches jouées et
+conformes (deux après correction), deux anomalies closes (`ANO-WEB-79` MAJEURE, `ANO-WEB-80` mineure) et une purge du
+jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-sig.spec.ts                                            8 scénarios en série, 2 min 54
+apps/auth-service/src/services/report.service.ts (+ .spec)                         ANO-WEB-79 (annonce masquée = introuvable) — auth 230
+apps/user-ui/src/components/shared/ReportDialog.tsx                               ANO-WEB-80 (404 → « introuvable »)
+apps/user-ui/messages/{fr,en}/common.json                                         `report.notFound`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Report des comptes du seed
+```
+
+## ANO-WEB-79 : trois causes d'invisibilité, une seule connue
+
+`resolveTarget` chargeait un trajet par `{ id, isDeleted: false }` : une annonce MASQUÉE par Yamba (`hiddenByAdminAt`,
+C-PR4 — la recherche, la page publique et la réservation la connaissent déjà) restait signalable, `POST /reports`
+répondait 201 et l'accusé partait — l'existence de la cible était révélée par le seul succès. Le service exige
+désormais un champ null OU absent (pitfall Mongo : `null` ne voit pas un champ absent, d'où `OR isSet`) :
+
+```ts
+// apps/auth-service/src/services/report.service.ts
+const trip = await db.trip.findFirst({
+  where: { id: targetRef, isDeleted: false, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }] },
+  select: { id: true, userId: true },
+});
+```
+
+Le test unitaire pose un trajet masqué (404) et un trajet sans le champ (accepté). Le regard d'expert propose une règle
+de visibilité unique, partagée par les trois services qui la réinventent.
+
+## ANO-WEB-80 : traduire par le code, pas par le statut
+
+`ReportDialog` mappait 409 → « déjà signalé », 400 → « ton propre contenu », le reste → « n'a pas pu être envoyé.
+Réessaie. » Un 404 (cible disparue entre l'ouverture et l'envoi, ou masquée) invitait donc à réessayer. La branche
+404 rend `report.notFound` ; la vraie correction (à trancher) est de mapper `details.code` — `OWN_TARGET` est un refus
+de droit, pas une requête mal formée.
+
+## Le harnais
+
+- La porte d'identité se joue en fenêtre privée, puis la connexion DANS la fenêtre (le formulaire visible qui porte
+  `#email`, comme en 5.11) ; on vérifie le 200 du `POST /auth/login`, la porte fermée et l'annonce toujours ouverte.
+- « Le membre signalé n'apprend rien » se prouve sur les cloches NOUVELLES qui parlent de signalement ou de la cible
+  (le cron FAKE écrit d'autres cloches au même compte pendant la fiche) et sur les emails par sujet.
+- La cible invisible est fabriquée par l'API admin (`POST …/admin/trips/:id/hide`, contexte `navigateurAdmin`) et par
+  une manœuvre (`profilePublic: false`), toutes deux défaites dans un `finally`.
+- La file du back-office (« Prioritaire · 3 ouverts ») est lue par `GET /admin/reports?status=OPEN` avec un contexte
+  SUPPORT : trois lignes sur la cible, `openCountOnTarget = 3`, `priority = true`.
+- SIG-8 fabrique un avis révélé par l'API (`POST /deals/:id/rating` des deux côtés) et lit le `mailto:` décodé.
+
+## Tests
+
+Plateforme 997 + auth **230** (+1, ANO-WEB-79). `apps/e2e` : **265 scénarios** (257 + WEB-SIG ×8). Typecheck
+auth-service, user-ui et harnais verts ; miroir i18n vert (`report.notFound` FR / EN).
+
+---
+
+# Chapitre 5.25 du cahier 01-WEB : données personnelles — la préférence lue au mauvais endroit, et l'en-tête que CORS cachait
+
+*(PR `chore/recette-web-5-25` (#290), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-cinquième chapitre « fiches » du cahier 01-WEB : `WEB-RGP` (l'écran « Mes données », l'export derrière la
+porte par code, son contenu, la règle des 24 h, les bloqueurs de suppression, l'avertissement, la suppression réelle,
+« Membre supprimé », l'effacement du tiers destinataire). Neuf fiches jouées et conformes (cinq après correction),
+cinq anomalies closes (`ANO-WEB-81` MAJEURE, `82`, `83`, `84`, `85`) et une purge de plus au jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-rgp.spec.ts                                            9 scénarios en série, 1 min 24
+apps/user-ui/src/components/dashboard/sections/PrivacySection.tsx                 ANO-WEB-81 (bascule servie par le compte), ANO-WEB-84 (refus par son code)
+apps/user-ui/src/hooks/useUser.ts                                                 les deux préférences dans le type `User`
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts                         `privacy.exportRateLimited`
+apps/api-gateway/src/main.ts                                                      ANO-WEB-82 (`exposedHeaders: Content-Disposition`)
+apps/message-service/src/lib/counterpart-label.ts (+ .spec)                        ANO-WEB-83 (« Membre supprimé ») — message 47
+apps/message-service/src/services/conversation.service.ts                         le libellé dans les deux vues (liste, fil)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx             ANO-WEB-85 (le refus de révélation est dit)
+packages/libs/prisma/scripts/seed-deals.ts                                        purge du journal `DataRequest`
+scripts/recette/otp-debloquer.ts                                                  lève le quota de codes (rejeu du chapitre dans l'heure)
+```
+
+## ANO-WEB-81 : une préférence a une seule source
+
+La bascule « Mesure d'audience » n'était rendue que si le FRONT portait une clé PostHog, et son état venait de
+`readConsent()` — le `localStorage` du navigateur. Or `analyticsOptIn` est une préférence **du compte** (servie par
+`/auth/me`) qui gouverne aussi la capture **serveur** (D66, `analyticsEventsFor` n'émet que pour les consentants) :
+
+- sur un déploiement où seul le serveur mesure, le membre n'avait aucun moyen de se retirer ;
+- sur un second appareil, la bascule affichait « non » alors que le compte disait « oui ».
+
+La ligne est désormais toujours rendue, son état vient du compte, l'écriture est confirmée (et revient en arrière si
+le serveur refuse) ; seule l'initialisation du PostHog navigateur reste conditionnée à la clé.
+
+## ANO-WEB-82 : ce que CORS ne donne pas
+
+Le fichier se téléchargeait sous `yamba-mes-donnees.json` au lieu de `yamba-mes-donnees-2026-09-12.json`. Le serveur
+posait pourtant le bon `Content-Disposition` : **le navigateur le cachait**. Une réponse cross-origin n'expose que six
+en-têtes ; tout le reste doit être déclaré. La passerelle expose maintenant `Content-Disposition` et `x-correlation-id`.
+
+```ts
+// apps/api-gateway/src/main.ts
+credentials: true,
+exposedHeaders: ["Content-Disposition", "x-correlation-id"],
+```
+
+## ANO-WEB-83 : nommer, pas recomposer
+
+L'effacement anonymise `firstName = "Membre"` / `lastName = "supprimé"`. La messagerie n'affiche que le prénom : le fil
+disait « Membre », qui se lit comme un prénom ordinaire. Une règle pure nomme la contrepartie, et les deux vues
+(liste et fil) l'utilisent :
+
+```ts
+// apps/message-service/src/lib/counterpart-label.ts
+export function nomDeLaContrepartie(user: { firstName?: string | null; isDeleted?: boolean | null } | null | undefined): string {
+  if (!user) return "—";
+  if (user.isDeleted) return LIBELLE_MEMBRE_SUPPRIME; // « Membre supprimé », comme le back-office
+  return user.firstName ?? "—";
+}
+```
+
+## ANO-WEB-84 et 85 : un refus se dit
+
+Le refus « un export par 24 h » arrivait en anglais (le `message` brut du serveur, affiché tel quel) : il se dit
+maintenant par son `details.code` (A146). Et dans un fil, « Voir le numéro » refusé (400 `TOO_EARLY`) ne produisait
+**rien** : le motif ne vivait que dans l'attribut `title` du bouton, le bandeau n'apparaissant qu'en arrivant par
+« Appeler » (`?focus=phone`). Un refus affiche désormais la même phrase, en ligne.
+
+## Le harnais
+
+- La suppression réelle se joue sur un compte **créé par l'écran** dans la fiche 6, qui réserve par l'API, se fait
+  accepter, écrit un message puis annule (remboursement intégral) : la fiche 7 le supprime, la fiche 8 lit son fil
+  côté Thomas. Aucun compte du jeu d'essai n'est jamais supprimé.
+- L'export du VOYAGEUR est obtenu par l'API (porte sudo + `POST /auth/me/data-export`) : c'est la seule façon de
+  prouver « aucune coordonnée du destinataire quand le membre est le Voyageur ».
+- Le quota de codes (6 par heure) est levé au démarrage du chapitre (`otp-debloquer.ts`) : sans cela, un rejeu dans
+  l'heure n'envoie aucun code **et rien ne le dit à l'écran**.
+
+## Tests
+
+Plateforme **1000** (message 47, +3) + auth 230. `apps/e2e` : **274 scénarios** (265 + WEB-RGP ×9). Typecheck
+user-ui, message-service, api-gateway et harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.26 du cahier 01-WEB : préférences et langue — trois conventions qui n'allaient pas jusqu'au bout
+
+*(PR `chore/recette-web-5-26`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-sixième chapitre « fiches » du cahier 01-WEB : `WEB-PRF` (la bascule de langue qui écrit le compte, la langue
+d'un email qui est celle de son destinataire, les emails sans compte qui suivent la langue de l'écran, la relance des
+messages non lus qu'on peut couper, l'écran « Paramètres », une langue non prise en charge). Six fiches jouées et
+conformes (trois après correction), trois anomalies closes (`ANO-WEB-87` MAJEURE, `86`, `88`).
+
+```
+apps/e2e/src/chapitres/web-prf.spec.ts                                            6 scénarios en série, 1 min 24
+apps/user-ui/src/services/auth.api.ts                                             ANO-WEB-87 (`x-locale` sur le client des flux sans compte)
+apps/user-ui/src/components/dashboard/sections/SettingsSection.tsx                 ANO-WEB-86 (l'écran « Paramètres » porte les vrais réglages)
+apps/user-ui/src/components/dashboard/DashboardUI.tsx                             `ToggleRow` contrôlée + `role="switch"` ; `SettingRow` sans bouton décoratif
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts                         libellés des trois thèmes, vérité des deux lignes de notifications
+apps/user-ui/src/app/[locale]/[...rest]/page.tsx                                  ANO-WEB-88 (route attrape-tout → `[locale]/not-found.tsx`)
+docs/recette/RECETTE-01-WEB.md                                                    § 5.26 amendé (l'écran attendu n'est plus celui de la maquette)
+```
+
+## ANO-WEB-87 : un second client HTTP qui avait oublié une convention du premier
+
+D44 dit que la langue d'un email est celle de son **destinataire**, et que les flux **sans compte** (il n'y a pas
+encore de `User.preferredLocale` à lire) suivent la langue de la requête — portée par l'en-tête `x-locale` que le
+front pose sur chaque appel. `apiClient` (axios, `withCredentials`, refresh automatique) le faisait. Mais les écrans
+d'inscription, de mot de passe oublié et de renvoi de code n'utilisent pas `apiClient` : ils passent par `authApi`, un
+second client axios créé pour ne pas déclencher la mécanique de refresh sur des routes publiques. Ce client, lui, ne
+posait pas l'en-tête.
+
+Deux conséquences, dont la seconde est durable :
+
+1. l'email de code d'activation partait **toujours en français**, même pour une inscription menée entièrement en
+   anglais ;
+2. le compte naissait avec `preferredLocale: "fr"` — donc **tous** ses emails suivants aussi, jusqu'à ce que le membre
+   trouve la bascule de langue.
+
+```ts
+// apps/user-ui/src/services/auth.api.ts
+authApi.interceptors.request.use((config) => {
+  const locale = getCurrentLocale();
+  if (locale) config.headers.set("x-locale", locale);
+  return config;
+});
+```
+
+La correction est de trois lignes ; la leçon ne l'est pas. Deux clients HTTP, c'est deux endroits où une convention
+doit être répétée — et une convention répétée est une convention qui se perd. `authApi` n'existe que pour éviter le
+refresh : un simple `requireAuth: false` sur `apiClient` (l'option existe déjà) rendrait le second client inutile.
+Consigné comme axe dans le rapport de recette.
+
+## ANO-WEB-86 : un composant de maquette pris pour un composant de produit
+
+L'écran « Paramètres » affichait quatre lignes. Deux portaient un bouton « Changer » — `SettingRow` accepte un
+`onAction` **optionnel**, et personne ne le passait : le bouton était donc dessiné, cliquable, et sans effet. Les deux
+autres étaient des `ToggleRow`, dont l'état vivait dans un `useState` **local au composant** :
+
+```tsx
+// avant — la bascule bougeait, et rien n'était enregistré
+export function ToggleRow({ label, description, defaultOn = false }) {
+  const [on, setOn] = useState(defaultOn);
+  …
+}
+```
+
+Un membre pouvait donc « couper ses notifications email », voir la bascule basculer, et recevoir ses emails comme
+avant — l'état repartant à `defaultOn` au rechargement suivant. C'est exactement la classe d'anomalie d'`ANO-WEB-81`
+(la bascule d'audience lue dans le navigateur), en pire : ici, il n'y avait aucune écriture du tout.
+
+La correction pose une règle simple : **chaque réglage vit là où il a un effet**, et un contrôle qui n'écrit nulle
+part n'existe pas.
+
+| Ligne | Où vit le réglage | Pourquoi |
+|---|---|---|
+| Langue | le **compte** (`PATCH /auth/me/locale`) | c'est elle qui décide la langue des emails (D44) — le sélecteur de l'en-tête est réutilisé tel quel |
+| Thème | le **navigateur** (next-themes) | préférence d'affichage, aucun effet serveur ; trois choix, dont l'« Automatique » que le libellé annonçait déjà |
+| Notifications email | le **compte** (`messagingReminderEmails`, D61) | la seule préférence email qui existe ; le libellé dit aussi ce qu'elle ne couvre pas — les emails d'un Deal en cours sont contractuels |
+| Notifications push | nulle part | rien n'est branché : la ligne informe, sans contrôle |
+
+Et les deux composants partagés sont durcis pour que le défaut ne puisse pas revenir : `ToggleRow` est **contrôlée**
+(`checked` + `onChangeAction`, avec `role="switch"` et `aria-checked` — elle n'était pas annonçable à un lecteur
+d'écran), et `SettingRow` n'affiche son bouton que si un gestionnaire **et** un libellé existent ; sans eux, la ligne
+est en lecture. Un « Changer » sans effet n'est plus exprimable.
+
+## ANO-WEB-88 : une page d'erreur écrite mais jamais atteinte
+
+`/es` n'est pas une langue prise en charge. Le middleware next-intl (`localePrefix: "always"`) réécrit l'adresse sous
+une langue connue — `/fr/es` — ce qui est le bon comportement. Mais `/fr/es` ne correspond à **aucune route** : aucun
+`page.tsx` n'est rendu, donc personne n'appelle `notFound()`, et Next sert son 404 **interne** :
+« This page could not be found. » — en anglais quelle que soit la langue de l'URL, sans en-tête, sans pied de page et
+sans un lien pour revenir au site.
+
+La page introuvable du produit existait pourtant déjà (`[locale]/not-found.tsx`, soignée au chapitre 5.3 : elle
+propose de chercher un trajet, d'en publier un, ou de rentrer à l'accueil). Elle n'était simplement jamais atteinte
+pour ce cas. La façon documentée par next-intl de lui rendre la main est une route attrape-tout :
+
+```tsx
+// apps/user-ui/src/app/[locale]/[...rest]/page.tsx
+import { notFound } from "next/navigation";
+export default function PageInconnue() {
+  notFound();
+}
+```
+
+Les routes réelles, plus spécifiques, gagnent toujours contre un segment `[...rest]` : elle n'attrape que ce qui
+n'existe pas. `/es` répond maintenant 404 avec la page du produit en français, `/en/es` la même traduite.
+
+## Ce que le harnais a appris ici
+
+- **Les préférences d'un compte survivent au seed** (`seed-deals.ts` recrée trajets et deals, pas les réglages) :
+  Aminata arrivait avec sa relance déjà coupée par un passage précédent. Un chapitre qui éprouve des réglages **pose
+  son état de départ** et le remet ensuite (`beforeAll` / `afterAll`). Ici, c'est même un outil : Aminata arrive avec
+  la relance **coupée**, donc l'écran doit l'afficher coupée — ce qui prouve d'un coup que la bascule lit le serveur,
+  et que le profil est chargé avant que la fiche ne touche aux contrôles.
+- **Un seul processus pour toutes les préconditions** : trois `npx tsx --env-file=.env -e …` de suite dépassaient les
+  60 s sur un poste qui recompile le front en même temps (`spawnSync npx ETIMEDOUT`).
+- La bascule de langue de l'en-tête écrit le compte **en best-effort et seulement si le profil est chargé**
+  (`if (user)`) : cliquer trop tôt navigue sans rien enregistrer. Le harnais attend donc un signal de chargement ; le
+  rapport en fait un axe (rejouer l'écriture après le chargement).
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **280 scénarios**
+(274 + WEB-PRF ×6). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (les libellés de l'écran vivent dans
+`dashboard.copy.ts`), miroir i18n donc inchangé.
+
+---
+
+# Chapitre 5.27 du cahier 01-WEB : la mesure d'audience — une bannière qui condamnait un bouton, et un corridor jamais mesuré
+
+*(PR `chore/recette-web-5-27`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-septième chapitre « fiches » du cahier 01-WEB : `WEB-ANA` (la bannière de consentement, ses deux issues, ce
+qui part quand on accepte, la reprise du choix du compte sur un autre appareil, le retrait de l'accord, l'absence de
+clé). Six fiches jouées et conformes (deux après correction) **plus une contre-épreuve**, deux anomalies closes
+(`ANO-WEB-89`, `ANO-WEB-90`).
+
+```
+apps/e2e/src/chapitres/web-ana.spec.ts                                            7 scénarios, DEUX passes (avec clé / sans clé)
+scripts/recette/collecteur-audience.ts                                            un faux PostHog local qui journalise ce qui part
+apps/user-ui/src/components/layout/ConsentBanner.tsx                              ANO-WEB-89 (la bannière publie sa hauteur)
+apps/user-ui/src/app/global.css                                                   `--yamba-consent-space`, `--yamba-viewport`
+apps/user-ui/src/app/[locale]/layout.tsx                                          la place réservée en bas de page
+apps/user-ui/src/app/[locale]/(marketing)/layout.tsx, dashboard/layout.tsx        `100vh` → `var(--yamba-viewport)`
+apps/user-ui/src/components/auth/forms/*.tsx, auth/skeleton/*.tsx                 idem (onze écrans d'authentification)
+apps/user-ui/src/hooks/useTripsSearch.ts                                          ANO-WEB-90 (`from` / `to`, pas `origin` / `destination`)
+```
+
+## Le montage : un faux PostHog, local, qui dit la vérité
+
+Le cahier déclare ce chapitre `⏭` sans clé PostHog. S'en contenter aurait laissé sans preuve la promesse la plus
+sensible du produit : « aucune donnée personnelle ne part à la mesure ». On a donc posé une clé de recette et un hôte
+local dans `apps/user-ui/.env.local`, et écrit un **collecteur** :
+
+```
+npx tsx scripts/recette/collecteur-audience.ts --out <fichier> --clear
+```
+
+Il écoute sur `127.0.0.1:9977` et répond comme PostHog : `404` sur `/array/<clé>/config.js` (le SDK retombe alors sur
+la variante JSON), une configuration minimale où tout ce qui capture de lui-même est coupé, des drapeaux vides, des
+« extensions » inertes mais bien formées, et `{"status":1}` sur les points d'entrée d'événements — dont il écrit le
+contenu, **une ligne de JSON par événement**, dans un fichier que la fiche relit. Le corps est décodé quelle que soit
+sa forme (JSON nu, `data=` encodé en base64, gzip).
+
+Pourquoi un vrai serveur plutôt qu'une interception Playwright ? Parce qu'un collecteur qui répond mal **casse le SDK
+en silence** : sans configuration crédible — ou avec les extensions servies vides — la fin de `init()` échoue,
+`capture()` est appelé et rien ne part. On aurait « prouvé » qu'aucune donnée ne fuit… en ayant cassé la mesure
+soi-même. Mesuré, puis corrigé.
+
+Deuxième piège, plus vicieux : **posthog-js refuse de capturer depuis un navigateur automatisé**. Dans le `dist` du
+SDK (1.427.2) :
+
+```js
+var ol = function (t, i) { … return !!t.webdriver };   // _is_bot()
+…
+if (this.is_capturing()) { var c = !this.config.opt_out_useragent_filter && this._is_bot(); if (!c || …) { … } }
+```
+
+`navigator.webdriver` vaut `true` sous Playwright : `capture()` s'arrête là, sans un mot. Le harnais masque donc ce
+**seul** drapeau (`Object.defineProperty(navigator, "webdriver", { get: () => false })`) — l'application n'est pas
+touchée. Sans cela, les fiches « rien ne part » seraient vertes pour la mauvaise raison.
+
+## ANO-WEB-89 : une bannière `fixed` qui ne réservait pas sa place
+
+`ConsentBanner` est `fixed inset-x-3 bottom-3 z-50`. Rien ne réservait sa hauteur : sur les pages calées sur la
+hauteur de la fenêtre — les onze écrans d'authentification (`lg:min-h-[calc(100vh-64px)]`), la vitrine, le tableau de
+bord — elle **recouvrait** le bas de la carte. Mesuré sur `/fr/login` en 1280×720 : « Se connecter » et
+« Inscris-toi » sous le dialogue, le clic intercepté (`… intercepts pointer events`), et aucun défilement possible
+puisque le document tenait dans la fenêtre. Il fallait répondre à la bannière pour pouvoir se connecter.
+
+La correction ne déplace pas la bannière : elle lui fait **annoncer sa taille**.
+
+```tsx
+// ConsentBanner.tsx — tant qu'elle est là, elle publie sa hauteur
+const hauteur = boite.current?.offsetHeight ?? 0;
+racine.style.setProperty("--yamba-consent-space", `${hauteur + 24}px`);
+```
+
+```css
+/* global.css — la hauteur d'écran UTILE */
+:root {
+  --yamba-consent-space: 0px;
+  --yamba-viewport: calc(100vh - var(--yamba-consent-space));
+}
+```
+
+Les quatorze mises en page qui raisonnaient en `calc(100vh-…)` utilisent désormais `calc(var(--yamba-viewport)-…)`,
+et le conteneur de page réserve la même hauteur (`pb-[var(--yamba-consent-space,0px)]`). Effet mesuré : la bannière
+fait 163 px, la variable vaut 187 px, la page peut défiler d'autant, un défilement libère le bouton
+(`document.elementFromPoint` renvoie bien le bouton), et **tout est rendu** dès qu'on a répondu.
+
+La leçon est générale : un élément `fixed` qui recouvre du contenu doit publier sa taille, et la mise en page doit la
+retirer de la hauteur utile. Le bandeau de maintenance (D64), lui, est en flux — il n'a jamais eu ce défaut.
+
+## ANO-WEB-90 : un cast qui mentait, et un corridor jamais mesuré
+
+`search_performed` est le premier événement du funnel (D66 3A). Il partait ainsi :
+
+```ts
+void track("search_performed", {
+  origin: (params as { origin?: string }).origin ?? null,        // ← n'existe pas
+  destination: (params as { destination?: string }).destination ?? null,
+  …
+});
+```
+
+`SearchTripsParams` n'a pas de `origin` ni de `destination` : les critères s'appellent **`from`** et **`to`**. Les deux
+propriétés partaient donc **toujours à `null`** — la mesure n'a jamais pu dire quel corridor était cherché, alors que
+c'est exactement le signal dont le pilotage (D59, D74) et la « demande visible » ont besoin. Le typage ne pouvait rien
+dire : les deux lectures étaient **castées**. Une ligne corrigée, un cast supprimé, et les noms de propriétés — le
+contrat de la mesure, en anglais — inchangés.
+
+À retenir : `as { … }` sur un objet dont le type est connu ne convertit rien, il **fait taire** le compilateur. C'est
+la deuxième anomalie de cette campagne née d'un accès de champ jamais vérifié.
+
+## Ce que le harnais a appris ici
+
+- **`storageState` mémorise aussi le `localStorage`.** Dès qu'une fiche a accepté, la session enregistrée d'Aminata
+  porte `yamba.analytics.consent` : la bannière ne se présente plus, ni dans ce chapitre au passage suivant, ni dans
+  les chapitres d'après. Chaque fiche repart donc « sans choix » (`partirSansChoix` : on efface la clé sur l'origine
+  puis on recharge) et l'`afterAll` oublie la session mémorisée.
+- **`networkidle` n'arrive jamais quand le SDK tourne** (le collecteur est sollicité en continu) : `page.goto` en
+  délai d'attente de 120 s. Tout le chapitre navigue en `domcontentloaded`.
+- **Un événement se rate en naviguant trop vite.** Chaque étape attend SON événement (`expect.poll` sur le journal du
+  collecteur) au lieu d'un `waitForTimeout` global.
+- **Deux passes valent mieux qu'un `⏭`.** Les fiches 1 à 5 se sautent sans clé, la fiche 6 se saute avec : le fichier
+  est rejouable dans les deux états du poste, et chaque passe dit ce qu'elle prouve.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **287 scénarios**
+(280 + WEB-ANA ×6 + la contre-épreuve ANO-WEB-89). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.
+
+---
+
+# Chapitre 5.28 du cahier 01-WEB : la maintenance — un refus que personne ne disait
+
+*(PR `chore/recette-web-5-28`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-huitième chapitre « fiches » du cahier 01-WEB : `WEB-MNT` (le bandeau d'annonce, la lecture seule, sa levée,
+et la maintenance qui tombe pendant une réservation). Quatre fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-91`).
+
+```
+apps/e2e/src/chapitres/web-mnt.spec.ts                                            4 scénarios en série, 1 min 42
+apps/user-ui/src/lib/api-client.ts                                                ANO-WEB-91 (signal `yamba:maintenance-refused`)
+apps/user-ui/src/components/layout/MaintenanceBanner.tsx                          il dit le refus et relit son état aussitôt
+```
+
+## Le montage : deux interrupteurs, trois horloges
+
+L'état de maintenance vit dans **un** document `PlatformSettings` (clé `maintenance`, D64 1A), écrit par un OPS ou un
+super administrateur avec un motif d'au moins 20 caractères, journalisé et annoncé par email. Trois horloges le
+propagent, et il faut les connaître pour lire ce chapitre :
+
+| Qui | Quoi | Rythme |
+|---|---|---|
+| Passerelle | relit le document, refuse les écritures (`503 MAINTENANCE`, `Retry-After: 300`) sauf `/api/auth/*`, `/api/admin/*`, `/api/maintenance` | **10 s** |
+| Front membre | `GET /api/maintenance` → bandeau ambre (annonce) ou rouge (lecture seule) | **60 s** |
+| Back-office | page « État des services » → l'éditeur se remonte à chaque sondage | **30 s** |
+
+Le chapitre pose l'annonce **par l'écran du back-office** (le geste du cahier) et bascule ensuite par l'API
+d'administration. Filet indispensable : `beforeAll` et `afterAll` remettent le document à plat **directement en
+base** — sans passer par une session d'administration qui pourrait, elle aussi, avoir échoué. Une maintenance
+oubliée condamnerait tous les chapitres suivants.
+
+## ANO-WEB-91 : le serveur refusait bien, l'écran ne le disait pas
+
+La passerelle fait exactement ce que D64 demande :
+
+```ts
+res.setHeader("Retry-After", String(MAINTENANCE_RETRY_AFTER_SECONDS));
+return res.status(503).json({ code: "MAINTENANCE", message: state.message.fr || "Maintenance en cours.", … });
+```
+
+Mais côté membre, chaque écran traduit **son** échec : le fil de messagerie affichait « Le message n'a pas pu être
+envoyé. », l'assistant de réservation son erreur générique. La phrase prévue pour ce cas —
+`maintenance.writeRefused`, « La plateforme est en maintenance : réessaie dans quelques minutes. », présente en FR et
+en EN depuis D64 — n'était rendue **nulle part** : une clé morte.
+
+Deux raisons de ne pas corriger écran par écran : il y en a une dizaine, et la cause n'est pas métier (elle ne dépend
+ni du geste ni de l'écran). Le projet a déjà le bon patron, celui de la session expirée (A89) : **un signal global,
+une surface qui l'écoute**.
+
+```ts
+// api-client.ts — la passerelle refuse une écriture : on le dit UNE fois, pour tout le monde
+const donnees = error.response?.data as { code?: string; details?: { code?: string } } | undefined;
+if (error.response?.status === 503 && (donnees?.code === "MAINTENANCE" || donnees?.details?.code === "MAINTENANCE")) {
+  window.dispatchEvent(new CustomEvent(MAINTENANCE_REFUSED_EVENT));
+}
+```
+
+```tsx
+// MaintenanceBanner.tsx — la surface « maintenance » écoute, dit la raison, et relit son état
+const surRefus = () => { toast.error(t("writeRefused")); void relire(); };
+```
+
+Le `relire()` n'est pas décoratif : un membre déjà sur sa page voyait le bandeau rouge jusqu'à **60 s** après la
+bascule (le sondage du front). Désormais, son premier geste refusé le lui apprend dans la seconde — la phrase **et**
+le bandeau.
+
+À noter au passage, et consigné comme axe : la passerelle rend son code à la **racine** (`code`), alors que toute la
+plateforme lit `details.code` (A146). C'est précisément pourquoi aucun écran ne le reconnaissait. Le correctif
+accepte les deux formes ; aligner la passerelle serait plus propre.
+
+## Ce que le harnais a appris ici
+
+- **Une fixture de navigateur vit le temps d'UNE fiche.** Ouvrir le navigateur d'administration dans un `beforeAll`
+  donne « Target page, context or browser has been closed » dès la fiche suivante : chaque fiche ouvre le sien (la
+  session est mémorisée, donc c'est peu coûteux).
+- **Un formulaire qui se remonte périodiquement se remplit… puis s'oublie.** L'éditeur du back-office se remonte à
+  chaque sondage (30 s) : la première version de la fiche enregistrait une annonce **sans date**, et le PUT
+  répondait 200. On attend la phrase qui n'apparaît qu'avec les données, on remplit, et l'on **vérifie la valeur**
+  (`inputValue`) avant de cliquer.
+- **`input[type="text"]` ne matche pas un `<input>` sans `type`** — les champs « Message FR / EN » du back-office.
+- **Attendre la propagation avant d'observer** : la passerelle garde son état 10 s ; chaque fiche attend que
+  `GET /api/maintenance` ait basculé avant d'ouvrir l'écran du membre, sinon on conclut « pas de bandeau » dans la
+  fenêtre de cache.
+- **Le bon compte pour le bon fil** : `bzv-accepted` est le deal de Pauline — c'est son écran qui doit tenter
+  l'écriture refusée.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **291 scénarios**
+(287 + WEB-MNT ×4). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (`maintenance.writeRefused` existait
+déjà — c'est bien le problème qu'elle ne servait pas).
+
+
+---
+
+# Chapitre 5.29 du cahier 01-WEB : les pages d'erreur — et comment faire tomber une application qui ne tombe pas
+
+*(PR `chore/recette-web-5-29`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-neuvième chapitre « fiches » du cahier 01-WEB : `WEB-ERR` (page introuvable, ressources inexistantes, page
+d'erreur générale dedans et hors du tunnel de réservation, variante « nouvelle version publiée », et la règle qui a
+motivé ces écrans — un membre ne voit jamais de code). Cinq fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-92`).
+
+```
+apps/e2e/src/chapitres/web-err.spec.ts                                            5 scénarios en série, 2 min 06
+apps/user-ui/src/app/[locale]/dev/panne.ts                                        le déclencheur de panne, inerte en production
+apps/user-ui/src/app/[locale]/dev/erreur/page.tsx                                 panne HORS tunnel
+apps/user-ui/src/app/[locale]/bookings/dev-erreur/page.tsx                        panne DANS le tunnel (la phrase du paiement)
+apps/user-ui/src/app/[locale]/error.tsx                                           ANO-WEB-92 (l'échec de copie est dit)
+apps/user-ui/messages/{fr,en}/errors.json                                         `boundary.copyFailed`
+```
+
+## Faire tomber une application qui ne tombe pas
+
+La page d'erreur (`[locale]/error.tsx`) est une **frontière React** : elle ne s'affiche que si un rendu lève une
+exception. Encore faut-il en provoquer une. Quatre méthodes ont été essayées, mesurées, et **aucune n'a produit la
+frontière** :
+
+| Méthode | Résultat |
+|---|---|
+| Couper la passerelle (suggestion du cahier) | les écrans se chargent **côté navigateur** : chacun affiche son propre état d'erreur, la frontière ne bouge pas |
+| Réponse d'API malformée (`{"notifications": 42}`, `{"booking": null}`, `{"bookings": 42}`) | les composants sont gardés (`?? []`, états vides) : aucun rendu ne lève |
+| Charge RSC d'une navigation client en 500 | le routeur ne casse pas |
+| Morceau de code (chunk) coupé | rien tant que la page n'en charge pas ; l'unique import dynamique du produit est l'étape de paiement |
+
+**C'est une bonne nouvelle déguisée en difficulté** : les gardes tiennent. Restait donc la porte que le cahier
+prévoit explicitement — « demander à un développeur un moyen sûr de déclencher l'erreur » :
+
+```ts
+// apps/user-ui/src/app/[locale]/dev/panne.ts
+export function declencherLaPanneDeRecette(type?: string): never {
+  if (process.env.NODE_ENV === "production") notFound();
+  if (type === "chunk") { const e = new Error("Loading chunk 4229 failed (panne simulée, recette 5.29)"); e.name = "ChunkLoadError"; throw e; }
+  throw new Error("Panne simulée (recette 5.29) : cette page n'existe que hors production.");
+}
+```
+
+Deux routes l'appellent : `/[locale]/dev/erreur` et `/[locale]/bookings/dev-erreur`. La seconde n'est pas un
+doublon — la frontière n'ajoute la phrase « aucun paiement n'a été effectué » que si le chemin est sous `/book` ou
+`/bookings`, et c'est **précisément** ce comportement qu'il faut éprouver. En production, les deux répondent « page
+introuvable ». Comme la panne est levée **côté serveur**, Next fournit un `digest` : la référence d'incident existe
+même sans Sentry, ce qui permet d'éprouver tout le bloc (référence, copie, aide, lien support) sur ce poste.
+
+## ANO-WEB-92 : le bouton qui ne répond rien, au pire moment
+
+La référence d'incident se copie par `navigator.clipboard.writeText` — qui **n'existe pas hors contexte sécurisé**.
+Le code attrapait l'échec et ne faisait rien :
+
+```ts
+} catch {
+  /* presse-papiers indisponible : la référence reste lisible à l'écran */
+}
+```
+
+Le commentaire dit vrai — la référence reste affichée — mais le membre, lui, a cliqué sur « Référence de
+l'incident » et n'a rien vu se passer. Au moment où il essaie de transmettre une panne au support, un bouton muet
+est une seconde panne. Le chapitre 5.17 avait tranché exactement la même question pour le code de livraison
+(`ANO-WEB-59`) : **un échec se dit**. La page d'erreur affiche donc `errors.boundary.copyFailed`, ajoutée en FR et
+en EN (le miroir i18n de la CI est vert).
+
+Le harnais, lui, interpose un presse-papiers en mémoire de page (`observerLePressePapiers`, déjà utilisé aux
+chapitres 5.17 et 5.23) : le chemin nominal est éprouvé **et** le contenu copié est vérifié (`lirePressePapiers`),
+pas seulement le libellé qui change.
+
+## Ce que le harnais a appris ici
+
+- **`innerText` sur un `body` cloné (donc détaché) retombe sur `textContent`** : on récupère le contenu des
+  `<script>`, charge RSC comprise — des milliers de caractères qui ressemblent à une fuite technique et font échouer
+  une garde « aucune trace ». Le `body` **vivant** ne rend que ce qui est affiché, et la fenêtre d'erreur de Next
+  (un `nextjs-portal` à racine fantôme) n'en fait pas partie : c'est exactement la lecture qu'il faut.
+- **`domcontentloaded` rend la main avant le rendu** : lire le corps aussitôt donne une chaîne vide. On attend le
+  titre visé, puis on lit.
+- **Quatre échecs de provocation valent une ligne de rapport** : quand une application refuse de tomber, on ne
+  s'acharne pas — on consigne que les gardes tiennent, et on demande la porte.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **296 scénarios**
+(291 + WEB-ERR ×5). Typecheck user-ui et harnais verts ; miroir i18n vert (`errors.boundary.copyFailed` FR/EN).
+
+
+---
+
+# Chapitre 5.30 du cahier 01-WEB : le mobile — émuler un téléphone, et prouver qu'une page ne déborde pas
+
+*(PR `chore/recette-web-5-30`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le trentième chapitre « fiches » du cahier 01-WEB : `WEB-MOB` (accueil et menu, filtres en feuille du bas, barre de
+réservation collante, assistant, bulles de messagerie, croix de la porte d'identité, zone 768–1024 px, six cases du
+code, listes du tableau de bord, page destinataire). Dix fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-93`).
+
+```
+apps/e2e/src/chapitres/web-mob.spec.ts                                            10 scénarios, iPhone 14 émulé
+apps/e2e/src/fixtures/yamba.ts                                                    `{ mobile: true }` sur les deux fabriques de navigateur
+apps/user-ui/src/components/search/SearchResultsView.tsx                          ANO-WEB-93 (le panneau des filtres est une fenêtre)
+```
+
+## Émuler un téléphone, ce n'est pas rétrécir une fenêtre
+
+Le produit ne se contente pas de changer de style sous 768 px : il rend des **arbres différents**
+(`useIsMobile`, feuilles du bas, barres collantes, double arbre `BookingStepperDesktop` /
+`BookingStepperMobile`). Un `viewport: { width: 390 }` seul aurait donc éprouvé l'interface desktop dans une fenêtre
+étroite — et validé la mauvaise chose. La fabrique de contexte du harnais pose les trois marqueurs :
+
+```ts
+{ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: "…iPhone…" }
+```
+
+`{ mobile: { width: 800 } }` sert la fiche 7, qui vise la zone intermédiaire où la colonne de droite du Voyageur
+avait disparu — le point aveugle classique d'une grille qui ne déclare ses colonnes qu'à partir de `lg:`.
+
+## Prouver qu'une page ne déborde pas (sans interdire ce qui doit défiler)
+
+La règle du cahier est « la page ne défile jamais horizontalement ; un contenu large défile **dans son propre
+cadre** ». Deux garde-fous, partagés par toutes les fiches :
+
+1. `aucunDebordement()` compare `scrollWidth` et `clientWidth` **et**, en cas d'échec, parcourt le DOM pour nommer
+   l'élément le plus à droite : « `div.flex.gap-2` (bord droit 612 px pour 390 px d'écran) ». Un échec anonyme ne se
+   corrige pas ; un échec nommé se corrige en une minute.
+2. `rienNeSortDuCadre()` cherche les éléments dont le bord droit sort de l'écran, **sauf** ceux qu'un ancêtre fait
+   défiler horizontalement (`overflow-x: auto|scroll` avec `scrollWidth > clientWidth`). Sans cette exemption, la
+   rangée de réponses rapides de la messagerie — qui défile volontairement — ferait échouer la fiche alors qu'elle
+   respecte exactement la règle.
+
+## ANO-WEB-93 : une feuille sur trois n'était pas une fenêtre
+
+Le panneau des filtres de recherche occupe tout l'écran (`fixed inset-0 z-[150]`) mais n'était qu'un `div` : ni
+`role="dialog"`, ni `aria-modal`, ni nom accessible — et Échap ne le fermait pas. Les deux autres feuilles de la
+recherche le faisaient déjà. Conséquences concrètes : un lecteur d'écran continue de parcourir la page **en
+dessous**, et un membre au clavier n'a aucune porte de sortie.
+
+```tsx
+<div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[150] …">
+```
+
+```tsx
+useEffect(() => {
+  if (!mobileFiltersOpen) return;
+  const surEchap = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileFiltersOpen(false); };
+  window.addEventListener("keydown", surEchap);
+  return () => window.removeEventListener("keydown", surEchap);
+}, [mobileFiltersOpen]);
+```
+
+Le piège de focus reste à poser (tabulation qui sort vers la page) : c'est le sujet du chapitre 5.31, et il est
+consigné comme tel.
+
+## Ce que le harnais a appris ici
+
+- **« Fermer le menu » est le voile plein écran** : son centre est couvert par la feuille, le clic doit viser le
+  haut — le geste réel d'un doigt qui tape à côté.
+- **La croix de la porte d'identité s'appelle « Plus tard »** (comme le lien du bas et le voile) : on la reconnaît à
+  sa position, et l'on consigne le problème de nom.
+- **Le titre d'une page de résultats s'affiche avant les cartes** : attendre le nom de la ville ne prouve rien, il
+  faut attendre un prix.
+- **`POST /deals/:id/tracking-link` rend un chemin relatif** : `new URL(...)` lève « Invalid URL ».
+- **Le clavier virtuel n'existe pas en émulation** : « le clavier ne masque pas le bouton » (fiche 4) ne peut être
+  vérifié que sur un vrai téléphone — consigné, pas simulé.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **306 scénarios**
+(296 + WEB-MOB ×10). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.
+
+---
+
+# Chapitre 5.31 du cahier 01-WEB : l'accessibilité clavier — un crochet pour toutes les fenêtres
+
+*(PR `chore/recette-web-5-31`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le trente et unième chapitre « fiches » du cahier 01-WEB : `WEB-A11Y` (parcours de l'accueil au clavier, connexion
+au clavier, fermeture par Échap avec retour du focus, piège de focus, libellés des contrôles sans texte, champs en
+erreur, contraste en mode sombre, zoom à 200 %). Huit fiches jouées et conformes (quatre après correction), quatre
+anomalies closes (`ANO-WEB-94` à `97`), et le constat du 5.30 sur la croix « Plus tard » réglé.
+
+```
+apps/e2e/src/chapitres/web-a11y.spec.ts                                   8 scénarios, au clavier réel
+apps/e2e/src/pages/mes-envois.ts                                          `ligne()` devient publique (viser l'ouvreur)
+apps/e2e/src/chapitres/web-acc.spec.ts, web-mob.spec.ts                   la croix s'appelle « Fermer » (+ ACC-5 stabilisé)
+apps/e2e/src/chapitres/web-dea.spec.ts, web-pic.spec.ts                   fiches anciennes remises d'aplomb (date, assertion périmée)
+apps/user-ui/src/hooks/useDialogFocus.ts                                  NOUVEAU — entrée, boucle, restitution, Échap
+apps/user-ui/src/components/**  (14 fenêtres modales)                     ANO-WEB-94 / 95 — le crochet, et `inert` sur 4 feuilles
+apps/user-ui/src/components/shared/photos/PhotoThumbs.tsx                 ANO-WEB-96 — vignettes nommées par leur rang
+apps/user-ui/src/components/{dashboard,trips}/…  (4 listes)               ANO-WEB-97 — en-têtes de groupe lisibles
+apps/user-ui/messages/{fr,en}/common.json                                 lightbox.open / lightbox.more / authGate.close
+```
+
+## Ce qu'une fenêtre modale promet
+
+`role="dialog"` + `aria-modal="true"` disent à un lecteur d'écran « tout le reste est inerte ». Pour que ce soit
+vrai au clavier, trois gestes sont nécessaires (WCAG 2.4.3, *focus order*) — et **aucun** n'existait dans le
+produit : 19 `role="dialog"`, zéro lecture de `document.activeElement`.
+
+1. **Entrer** : à l'ouverture, le focus va dans la fenêtre (sinon `Tab` continue sur la page du dessous).
+2. **Boucler** : `Tab` sur le dernier élément revient au premier, `Maj+Tab` sur le premier va au dernier.
+3. **Rendre** : à la fermeture, le focus revient sur l'élément qui a ouvert la fenêtre (sinon il tombe sur
+   `<body>`, et le membre repart du haut de la page).
+
+## Le crochet `useDialogFocus`
+
+```ts
+export function useDialogFocus(ref: RefObject<HTMLElement | null>, active = true, onEscape?: () => void): void {
+  const surEchap = useRef(onEscape);
+  useEffect(() => { surEchap.current = onEscape; });
+
+  useEffect(() => {
+    if (!active) return;
+    const conteneur = ref.current;
+    if (!conteneur) return;
+    const origine = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pile.push(conteneur);
+    const raf = requestAnimationFrame(() => {
+      if (conteneur.contains(document.activeElement)) return;   // un enfant a posé son propre focus : priorité
+      focalisables(conteneur)[0]?.focus();
+    });
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (pile[pile.length - 1] !== conteneur) return;          // seule la fenêtre du DESSUS réagit
+      if (e.key === "Escape" && surEchap.current) return surEchap.current();
+      if (e.key !== "Tab") return;
+      /* … boucle premier ↔ dernier … */
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      /* … retirer l'écoute, dépiler … */
+      const actif = document.activeElement;
+      const perdu = !actif || actif === document.body || conteneur.contains(actif);
+      if (perdu && origine?.isConnected) origine.focus({ preventScroll: true });
+    };
+  }, [ref, active]);
+}
+```
+
+Quatre décisions dans ces lignes :
+
+- **La pile de module.** Une confirmation peut s'ouvrir au-dessus d'un formulaire. Sans pile, les deux écoutes
+  `keydown` se battraient pour le focus, et un Échap fermerait les deux fenêtres d'un coup.
+- **`onEscape` passe par une référence.** Les appelants écrivent `onCloseAction={() => setOpen(false)}` : une
+  fonction **nouvelle à chaque rendu**. Mise en dépendance de l'effet, elle le relancerait à chaque frappe — et le
+  nettoyage rendrait le focus à l'ouvreur **en pleine saisie** dans la fenêtre. La première version l'avait ; elle
+  a été corrigée avant d'être jouée.
+- **On ne vole pas un focus posé ailleurs.** Si le membre a navigué ou cliqué un autre champ pendant la fermeture,
+  le crochet ne ramène rien : il ne rend la main que si le focus est perdu (`<body>`) ou encore dans la fenêtre.
+- **« Focalisable » veut dire « a une boîte ».** Un bouton dans un bloc replié (`display: none`) ou sous `[inert]`
+  est exclu de la boucle (`getClientRects().length > 0`).
+
+## `inert` : une feuille fermée n'est pas une feuille absente
+
+Quatre feuilles restent **montées** pour animer leur fondu ou leur glissement (`opacity-0`, `translateY(100%)`).
+`aria-hidden` les retire de l'arbre d'accessibilité, mais **pas de la tabulation** : fermées, leurs boutons
+restaient atteignables, invisibles ou hors écran. L'attribut HTML `inert` fait les deux (ni focus, ni clic, ni
+lecteur d'écran) ; React 19 le prend comme booléen :
+
+```tsx
+<div ref={dialogRef} role="dialog" aria-modal="true" aria-hidden={!isOpen} inert={!isOpen} className={…}>
+```
+
+## Le voile et la croix de la porte d'identité
+
+Le voile était un `<button aria-label="Plus tard">` : le **premier** arrêt de la boucle, et un troisième contrôle
+du même nom que la croix et le lien. Il garde son clic (souris, doigt) mais sort de la tabulation et de l'arbre :
+`aria-hidden="true" tabIndex={-1}`. La croix s'appelle « Fermer » (`common.authGate.close`).
+
+## Les vignettes de photo et les compteurs
+
+```tsx
+ariaLabel={[photo.label, t("open", { current: i + 1, total: photos.length })].filter(Boolean).join(" — ")}
+// « Agrandir la photo 1 sur 2 » ; le « +N » devient t("more", { count }) → « Voir 2 photos de plus »
+```
+
+Les en-têtes de groupe des listes (« À traiter · 3 ») passent de `text-slate-400` / `slate-300` (clair) et
+`slate-500` / `slate-600` (sombre) à `text-slate-500 dark:text-slate-400` : ≥ 4,5:1 dans les deux thèmes.
+
+## Ce que le harnais a appris ici
+
+- **Mesurer un contraste, c'est composer les fonds.** `getComputedStyle().backgroundColor` d'une puce
+  `bg-[#FF9900]/15` rend `rgba(255, 153, 0, 0.15)` : la traiter comme opaque donnait des faux positifs à 1,25:1. La
+  mesure empile les couches jusqu'au premier fond opaque et les compose de bas en haut.
+- **Vérifier le retour du focus sur l'ÉLÉMENT.** On pose `data-recette-ouvreur` sur l'ouvreur avant `Entrée`, et
+  l'on regarde si `document.activeElement` le porte après `Échap` — deux « Annuler » cohabitent sur « Mes envois ».
+- **Désigner la fenêtre par le focus**, pas par « le dialog visible » : les feuilles hors écran ont une boîte.
+- **Taper avant l'hydratation perd des frappes**, et un formulaire validé avant l'hydratation part en natif sans
+  aucune validation (`aria-invalid` absent partout) : attendre le premier appel d'API du client.
+- **Une fiche qui écrit `if (await bouton.count())` peut passer sans rien jouer** : la feuille des filtres est
+  `md:hidden`, il faut un écran de téléphone (`{ mobile: true }`).
+
+## Trois fiches anciennes remises d'aplomb
+
+La non-régression a fait tomber trois fiches ; rejouées sur le produit SANS les correctifs, elles tombaient aussi.
+C'est la méthode à retenir : **avant d'accuser son changement, rejouer sans lui** (`git stash push -- apps/user-ui`).
+
+- `web-dea.spec.ts` (DEA-1) : une date en dur contre un jeu d'essai relatif (`days(15)`) → `Intl.DateTimeFormat("fr-FR",
+  { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" })` sur `Date.now() + 15 j`.
+- `web-pic.spec.ts` (PIC-7) : assertion périmée par ANO-WEB-60 (le raccourci « Valider la livraison » est voulu) ;
+  (PIC-8) lecture du suivi par `expect.poll` au lieu d'un `innerText` immédiat qui rendait `""`.
+- `web-acc.spec.ts` (ACC-5) : clic après `goBack` enveloppé dans `expect(async () => …).toPass({ timeout })`.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **314 scénarios**
+(306 + WEB-A11Y ×8) ; non-régression rejouée sur les chapitres qui ouvrent les fenêtres modifiées (signalement,
+annulation, mobile, recherche, prise en charge, deal Voyageur, messagerie, favoris, porte d'accès). Typecheck
+user-ui vert ; i18n : trois clés ajoutées (`common.lightbox.open`, `common.lightbox.more`, `common.authGate.close`),
+miroir FR/EN parfait.
+
+
+---
+
+# Chapitre 5.32 du cahier 01-WEB : le vocabulaire — relire 62 écrans, et garder le lexique à la source
+
+*(PR `chore/recette-web-5-32`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le dernier chapitre du § 5 du cahier 01-WEB : `WEB-VOC` (mots de rôle, « assurance », noms de catégories,
+tutoiement, textes de démonstration, libellés vides ou clés techniques). Six fiches conformes (quatre après
+correction), cinq anomalies closes (`ANO-WEB-98` à `102`), une règle de CI ajoutée.
+
+```
+apps/e2e/src/chapitres/web-voc.spec.ts                          relevé commun (62 écrans FR/EN) + 6 fiches
+apps/e2e/src/chapitres/web-{rch,msg,rsv-devis,rem,dea,trj,voy}   20 citations d'anciens textes mises à jour
+apps/e2e/src/pages/fil-messagerie.ts                            idem
+scripts/check-i18n-messages.mjs                                 RÈGLE 6 — le vocabulaire des messages
+apps/user-ui/messages/{fr,en}/*.json                            ANO-WEB-98/99/100/101 — ~90 valeurs réécrites
+apps/user-ui/src/**  (≈ 20 fichiers)                            textes en dur : tutoiement, rôles, étiquettes traduites
+apps/user-ui/src/components/trips/detail/ReviewsCard.tsx        ANO-WEB-102 — le lien des avis
+apps/user-ui/src/app/[locale]/dashboard/*/preview/page.tsx      vitrines de démo introuvables en production
+apps/notification-service/src/emails/**                         emails anglais : « Traveler »
+apps/trip-service/src/utils/templates/trip-notifications/*.ejs  emails d'alerte : tutoiement
+```
+
+## Relire, pas refaire : un relevé commun
+
+Le cahier dit « en relisant les écrans déjà parcourus ». Une fiche par écran aurait rejoué 62 navigations six
+fois. Le harnais fait donc UN relevé (`WEB-VOC-0`) et six requêtes dessus :
+
+```ts
+async function texteVisible(page: Page): Promise<string> {
+  // innerText (ce qui est rendu) + ce qu'entend un lecteur d'écran, sur les éléments qui ont une boîte
+  document.querySelectorAll("[aria-label], [placeholder], [title], img[alt]") …
+}
+function occurrences(motif: RegExp, filtre = (e: Ecran) => true, exclure?: RegExp): string[]
+  // → « [en] finances (aminata) : « …retention passed on to the carrier + €14.56… » »
+```
+
+Le relevé est écrit sur disque (`resultats/releve-web-voc.json`) : après l'échec d'une fiche, Playwright remplace
+le processus de travail, et un relevé gardé en mémoire serait perdu pour les suivantes. Le chapitre n'est donc
+**pas en série** — une fiche qui échoue n'empêche pas les autres de rendre leur inventaire.
+
+Trois garde-fous d'instrument, tous payés : un écran « introuvable » est refusé (sinon il passe le seuil de
+longueur) ; la stabilité exige trois lectures identiques et zéro `.animate-pulse` ; les adresses (`…shipper@…`) et
+les chemins d'URL (`/carrier/deals/`) ne sont pas des mots.
+
+## VOC-3 : créer la donnée que la fiche doit relire
+
+Le jeu d'essai n'a aucun envoi « bagage en soute » VIVANT (le seul est refusé, et un envoi refusé n'apparaît dans
+aucune liste). Une fiche « verte » sur des écrans qui ne montrent pas l'objet ne prouve rien — c'est ce qu'a fait la
+première version. La fiche réserve donc un bagage en soute sur `bzv-perkg` (assistant, paiement FAKE) et exige que
+chaque écran **nomme** l'objet avant de comparer les formulations.
+
+## La règle 6 du contrôle i18n
+
+```js
+const VOCABULAIRE = {
+  fr: [
+    { motif: /\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\b/i, raison: "mot de rôle refusé" },
+    { motif: /\b(assurances?|IPID)\b/i, raison: "« assurance »" },
+    { motif: /(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])/iu, raison: "vouvoiement",
+      sauf: /tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir/i },
+  ],
+  en: [ /\b(carriers?|trippers?|yambers?|travellers?)\b/i, /\b(insurance|insured|IPID)\b/i ],
+};
+// + toute valeur vide ou « — » ; + garde du garde : moins de 1000 textes lus → erreur
+```
+
+`(?<![-\p{L}])vous(?![-\p{L}])` : un `\b` ASCII ne suffit pas en français (« rendez-vous » contient « vous » entre
+deux frontières de mot, et `\b` ne connaît pas les lettres accentuées) ; les assertions arrière/avant avec `\p{L}`
+(drapeau `u`) excluent le trait d'union et toute lettre Unicode.
+
+## La non-régression, et ce qu'un inventaire de citations ne voit pas
+
+Avant de jouer, un script liste chaque chaîne RETIRÉE par le diff (`git diff -U0 | grep "^-"`, littéraux entre
+guillemets ou accents graves) et la cherche dans le harnais (`grep -rnF`) : vingt citations trouvées et mises à
+jour. Il en a manqué deux, dans `web-alr.spec.ts` : le texte d'un gabarit EJS (« Un nouveau trajet correspond à
+votre alerte ») n'est pas un littéral, le script ne pouvait pas l'extraire. La non-régression les a trouvées — la
+preuve qu'un inventaire aide mais ne remplace pas le rejeu.
+
+WEB-ACC-8 est tombée sur un `POST /auth/refresh` intermittent ; rejouée sans les correctifs (`git stash push --
+apps/user-ui/src apps/user-ui/messages`), elle tombait aussi. La requête est la sonde de session du visiteur ; la
+fiche l'exclut avec sa raison.
+
+## Améliorations au GO : un lexique, une règle 7, et des fiches qui nettoient derrière elles
+
+- **`scripts/lexique-yamba.json`** : les motifs (source + drapeaux) et leurs exceptions de sens, lus par
+  `check-i18n-messages.mjs` (`new RegExp(r.motif, r.drapeaux)`) et par `web-voc.spec.ts` (`regle("fr", "vouvoiement")`).
+  Avant, la liste des « vous » pluriels existait en deux copies — la première divergence aurait donné une CI verte et
+  une recette rouge.
+- **Règle 7** : `BOOKING_EVENT_TYPES` est lu dans le contrat (`api-contracts`) par expression régulière, et chaque type
+  doit avoir `copy.<type_avec_underscores>.<SHIPPER|CARRIER>.{title,line}` (ou des sous-étapes pour
+  `tracking_event`). Garde du garde : moins de 10 types lus → erreur.
+- **VOC-3** crée une réservation puis l'annule dans un `finally` (`POST /deals/:id/cancel`) : une fiche qui
+  consomme la capacité d'un trajet du jeu d'essai fausse silencieusement les chapitres joués après elle.
+- **Relevé parallèle** : `await Promise.all([lireVisiteur(), lireExpeditrice(), lireVoyageur()])`, un onglet par
+  compte ; `LANGUES = SUPPORTED_LOCALES` importé en relatif depuis `api-contracts/src/locale.ts` (fichier sans zod).
+- **Refresh du visiteur : non fait**, voir le rapport — le marqueur localStorage n'est pas une preuve d'absence de
+  session.
+
+## Ce qui n'a PAS été touché, volontairement
+
+Les messages d'erreur de l'API (deal-service) et l'OpenAPI disent « carrier » : c'est la surface publique en
+anglais et le vocabulaire du code (CLAUDE.md). Le client ne les affiche jamais bruts (A146 : il traduit
+`details.code`).
+
+## Tests
+
+Plateforme inchangée en nombre (**1000** + auth 230) ; notification-service 115 et trip-service 261 rejoués verts
+après la réécriture des emails. `apps/e2e` : **321 scénarios** (314 + WEB-VOC ×7). Typecheck user-ui et harnais
+verts ; i18n : règle 6 verte, contre-épreuve rouge comme attendu.
+
+
+---
+
+# Chapitre 7 du cahier 01-WEB : la non-régression — douze gardes, et deux fonctions mortes retrouvées
+
+*(PR `chore/recette-web-7`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le chapitre « Non-régression » du cahier 01-WEB : douze points qui ont déjà cassé, joués en un fichier
+(`web-nrg.spec.ts`, 11 scénarios — NRG-6 et 12 partagent un relevé). Tous conformes, trois après correction ; trois
+anomalies closes (`ANO-WEB-103` à `105`).
+
+```
+apps/e2e/src/chapitres/web-nrg.spec.ts                                   11 scénarios, non séquentiels
+apps/e2e/src/pages/ecran.ts                                              NOUVEAU — gardes d'écran + écoute de console
+apps/e2e/src/chapitres/web-mob.spec.ts                                   importe les gardes au lieu de les définir
+apps/e2e/src/fixtures/jeu-essai.ts                                       tousLesTrajets()
+apps/e2e/src/pages/mes-trajets.ts, fil-messagerie.ts                     actionDuMenu() ; « Proposer un autre »
+apps/user-ui/src/components/dashboard/sections/FinancesSection.tsx       ANO-WEB-103 (onglet dérivé) + ANO-WEB-104 (le serveur décide)
+apps/user-ui/src/components/layout/header/HeaderShareTripCTA.tsx         ANO-WEB-105 (nom accessible complet)
+```
+
+## ANO-WEB-104 : un front qui décidait à la place du serveur
+
+```tsx
+// Avant
+const stripeAccountReady = Boolean(user?.carrierPage?.stripeAccountId);
+<button onClick={stripeAccountReady ? openStripe : () => toast.info(t("stripeMissing"))}>
+```
+
+`/auth/me` sert `carrierPage` par une **liste blanche** (règle non négociable des DTO) : `stripeOnboardingComplete`,
+`stripeChargesEnabled`… jamais `stripeAccountId`. La condition était donc toujours fausse — pour tous les
+Voyageurs, et sans aucune erreur : un toast d'information poli, un serveur jamais appelé. Le serveur, lui, fait déjà
+le bon contrôle, dans le bon ordre :
+
+```ts
+await requireSudo(req);                       // 403 SUDO_REQUIRED → la porte par code
+if (!carrierPage?.stripeAccountId) return next(new ConflictError("…", { type: "carrier", code: "STRIPE_ACCOUNT_MISSING" }));
+```
+
+Correction : `onClick={openStripe}` toujours, et le front traduit les deux codes (`SUDO_REQUIRED` → la porte,
+`STRIPE_ACCOUNT_MISSING` → « Finalise d'abord ton compte Stripe »). C'est A146 appliquée : le code de refus arrive au
+client, le client ne devine pas.
+
+## ANO-WEB-103 : `useState` n'est pas réactif
+
+```tsx
+// Avant : évalué UNE fois, au montage — `user` n'est pas encore chargé, isCarrier vaut false
+const [tab, setTab] = useState<FinancesTab>(isCarrier ? "wallet" : "payments");
+// Après : dérivé tant que le membre n'a pas choisi
+const [choix, setTab] = useState<FinancesTab | null>(null);
+const tab: FinancesTab = choix ?? (isCarrier ? "wallet" : "payments");
+```
+
+L'argument de `useState` est une valeur **initiale** : ce qui change ensuite (ici, l'arrivée du membre) ne la met pas
+à jour. En navigation interne, le cache de TanStack Query sert `user` dès le premier rendu et le défaut disparaît ;
+à l'ouverture directe de `/dashboard/finances`, il est systématique.
+
+## NRG-10 : mesurer contre la production, pas contre le poste
+
+Le poste relève les plafonds du limiteur (`RATE_LIMIT_ANONYMOUS_MAX=2000`, `RATE_LIMIT_AUTHENTICATED_MAX=5000`) pour
+que la recette ne se bloque pas elle-même. « Aucun 429 sur le poste » ne dit donc rien de la production. La fiche
+importe les défauts du code (`RATE_LIMIT_ANONYMOUS`, `RATE_LIMIT_AUTHENTICATED` de
+`packages/middleware/rate-limit-tier.ts`), mesure le coût d'une page (6,2 appels) et projette à un rythme humain.
+La répartition par route est publiée : `GET /api/maintenance` à 1,99 par page — un seul composant qui lit au montage,
+doublé par `page.goto` (rechargement) et le StrictMode de `next dev`. La mesure est donc pessimiste, et écrite comme
+telle.
+
+## Les gestes sensibles sans griller le quota, ni un compte
+
+NRG-7 attend la réponse (`403` + `details.code === "SUDO_REQUIRED"`) et la porte à l'écran, puis s'arrête : aucun
+« M'envoyer le code ». La suppression se joue sur un compte neuf créé par la fiche : confirmer « SUPPRIMER » sur un
+compte du jeu d'essai qui aurait une fenêtre sudo ouverte l'effacerait pour de bon.
+
+## Améliorations au GO : refuser franchement, et un type qui ne ment plus
+
+- **CORS** (`apps/api-gateway/src/libs/origins.ts`) : `origineAutorisee(origin)` (pure), et un middleware AVANT `cors()`
+  qui répond `403 { details: { code: "ORIGIN_NOT_ALLOWED" } }`. Pourquoi pas simplement `callback(null, false)` ? Parce
+  que CORS protège la LECTURE de la réponse par le navigateur, pas l'EXÉCUTION de la requête : un formulaire d'un site
+  tiers enverrait son POST, et le service l'exécuterait. Le refus doit couper la requête avant le proxy — NRG-11 le
+  vérifie par un `POST /auth/login` d'une origine étrangère, refusé en 403.
+- **`useUser`** : `stripeAccountId?` retiré du type `CarrierPage`. Un champ « optionnel » dans le type d'une réponse
+  est une promesse que le compilateur ne peut pas vérifier ; retiré, toute lecture future échoue au typecheck.
+- **NRG-10** mesure en deux phases : 6,0 appels par page par rechargement, **0,8 par liens** — la seconde est celle
+  d'un membre réel.
+
+## Tests
+
+Plateforme inchangée (**1000** + auth 230) : aucun code de service touché. `apps/e2e` : **332 scénarios** (321 + 11).
+web-mob 10/10 et web-msg 21/21 rejoués après l'extraction des gardes et l'assouplissement du page object. Typecheck
+user-ui et harnais verts.
+
+---
+
+# Décision du 13/09 : le rôle prend la majuscule — « Voyageur », « Traveler », partout
+
+*(PR `chore/recette-voyageur-majuscule`, 13/09/2026 — le point « à trancher » du chapitre 5.32.)*
+
+Le produit écrivait tantôt « Voyageur » (le rôle), tantôt « le voyageur » (souvent le même rôle) ; en anglais,
+« Traveler » et « the traveler ». Décision : **le rôle prend toujours la majuscule**, dans les deux langues.
+
+- **Messages** : 71 valeurs réécrites par une expression qui ne touche QUE la valeur (le texte après `"clé": `) —
+  aucune clé ne change, le miroir FR/EN reste parfait.
+- **Code** : 33 lignes, uniquement dans les littéraux de chaîne et le texte JSX ; les commentaires (`// le voyageur a
+  refusé`) ne sont pas du texte affiché et restent tels quels.
+- **Emails** : une phrase de l'email d'accueil anglais (auth-service).
+- **Garde** : règle `role-majuscule` dans `scripts/lexique-yamba.json`, avec des frontières Unicode
+  (`(?<![\p{L}-])voyageu(r|rs|se|ses)(?![\p{L}])`, drapeau `u`, SANS `i` : c'est la minuscule qui est refusée). Contre-épreuve :
+  « Lieu convenu avec le voyageur » réintroduit → refusé, clé nommée.
+- **Harnais** : 12 citations mises à jour (web-fav, web-rch, web-rsv-devis, web-lit).
+
+
+
+---
+
+# Cahier 02-ADMIN, § 4.1 : la connexion en deux étapes — et un outil pour relire le journal
+
+*(PR `chore/recette-admin-4-1`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le premier chapitre du cahier du back-office : six fiches (ADM-SEC-1 à 6), conformes, une après correction
+(`ANO-ADM-01`).
+
+```
+apps/e2e/src/admin/adm-sec-connexion.spec.ts        7 scénarios en série (compte admin jetable, attentes réelles)
+apps/e2e/src/pages/journal-admin.ts                 NOUVEAU — lireLeJournal / actionsDuJournal (API de /audit)
+apps/admin-ui/src/components/LoginFlow.tsx          ANO-ADM-01 — le code du refus d'abord
+```
+
+## Relire le journal comme un administrateur
+
+`GET /admin/audit` (permission `audit.read`) est l'API de l'écran `/audit`. L'outil pagine par `nextCursor`, borne par
+`from` (le journal n'est jamais purgé : sans borne, il rend les exécutions précédentes) et retourne la liste dans l'ordre
+**chronologique** — le serveur la sert du plus récent au plus ancien. Piège payé : une borne « maintenant moins une
+seconde » a ramassé la dernière connexion de la fiche précédente ; la borne se pose après deux secondes de silence
+quand la fiche d'avant a agi sur le même compte.
+
+## Un compte admin jetable
+
+```ts
+await new Inscription(page).creer(neuf, mailpit);                        // un membre normal
+grantAdmin(neuf.email, "--role", "OPS");                                 // § 2.5, sortie du script vérifiée
+// … enrôlement : le secret lu à l'écran, totpCode(secret) calculé …
+// afterAll : grantAdmin(email, "--revoke") puis suppression du compte
+```
+
+Le blocage de SEC-5 dure quinze minutes et SEC-4 consomme six codes de secours : sur un compte de recette, les
+chapitres suivants seraient bloqués.
+
+## ANO-ADM-01 : un 401 n'est pas une explication
+
+```tsx
+const code = codeDuRefus(err);                // (err.data as { details?: { code } }).details.code
+if (code === "TOO_MANY_ATTEMPTS") setError("Trop de tentatives : ce compte est bloqué pendant 15 minutes. …");
+else if (code === "ADMIN_PREAUTH_EXPIRED" || code === "ADMIN_PREAUTH_REQUIRED" || /expired|required/i.test(err.message)) …
+else setError(err.status === 401 ? "Code invalide." : …);
+```
+
+Le serveur servait déjà le bon code (A146) ; l'écran ne le lisait pas et rangeait tout 401 sous « Code invalide. ».
+
+## Tests
+
+`apps/e2e` : **339 scénarios** (332 + 7). Plateforme inchangée (1000 + auth 230). Typecheck admin-ui et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 4.2, § 4.3 et § 5.1 : sessions, permissions, accueil — et trois gardes serveur resserrées
+
+*(PR `chore/recette-admin-4-2`, empilée sur #301, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Trois chapitres du back-office, 17 scénarios : les sessions (ADM-SEC-7 à 10), la matrice des permissions profil par
+profil (ADM-PRM-0 à 9) et l'accueil (ADM-ACC-1 à 3). Trois anomalies trouvées, trois closes (`ANO-ADM-02`, `03`, `04`).
+
+```
+apps/e2e/src/admin/adm-sec-sessions.spec.ts         § 4.2 — deux vraies sessions, TTL Redis lus, 46 min d'attente réelle
+apps/e2e/src/admin/adm-prm-profils.spec.ts          § 4.3 — menu = contrat = cahier, un geste réussi, des refus serveur
+apps/e2e/src/admin/adm-prm-garde-serveur.spec.ts    § 4.3 — chaque route admin × chaque compte (routeurs LUS)
+apps/e2e/src/admin/adm-acc-accueil.spec.ts          § 5.1 — écran = API = cahier, et base pour les tuiles polluées
+apps/e2e/src/pages/ecran-admin.ts                   NOUVEAU — tuilesDeLaSection, attendreLeChargement, lireCoteServeur
+apps/e2e/src/fixtures/yamba.ts                      la sonde de session admin renouvelle un jeton à < 5 min de sa fin
+packages/middleware/session-revocation.ts           ANO-ADM-04 — adminSessionKey, isAdminSessionRevoked (échec fermé)
+packages/middleware/isAdminAuthenticated.ts         ANO-ADM-04 — la session du jeton existe-t-elle encore ?
+apps/auth-service/src/controller/admin-auth.controller.ts   ANO-ADM-04 — le jeton d'accès porte le jti
+apps/auth-service/src/services/platform-settings.service.ts ANO-ADM-02 — « rien à remettre » ne masque plus un refus
+packages/libs/api-contracts/src/admin/admin-users.schema.ts ANO-ADM-03 / A153 — users.read ouvert à PRIVACY
+apps/admin-ui/src/lib/permissions.ts                        miroir front de la même matrice
+packages/libs/prisma/scripts/seed-deals.ts          la relance du versement en échec posée à +23 h
+nx.json                                             packages/**, schéma Prisma et tsconfig.base.json en sharedGlobals
+```
+
+## ANO-ADM-04 : révoquer une session admin doit couper l'accès, pas seulement le renouvellement
+
+Avant : « Révoquer » (page Mes sessions) supprimait l'enregistrement `admin_jti:<userId>:<jti>` dans Redis. Le
+**renouvellement** échouait donc bien, mais le **jeton d'accès** (un JWT signé, valable 15 minutes) ne portait aucun
+identifiant de session : `isAdminAuthenticated` le vérifiait par sa signature seule. Un navigateur volé gardait la main
+jusqu'à un quart d'heure après la révocation. La fiche ADM-SEC-10 le prouve : `GET /admin/kpis` avec le jeton de la
+session révoquée répondait **200**.
+
+Correction en trois points :
+
+```ts
+// admin-auth.controller.ts — à l'ouverture ET au renouvellement, le jeton d'accès porte le jti de sa session
+jwt.sign({ id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], … }, ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+
+// session-revocation.ts — UNE seule définition de la clé, importée par l'écrivain (auth-service) ET le lecteur (middleware)
+export const adminSessionKey = (userId: string, jti: string): string => `admin_jti:${userId}:${jti}`;
+
+export function isAdminSessionRevoked(jti: string | undefined | null, exists: number | null): boolean {
+  if (!jti) return false;          // jeton émis avant la correction : il expire seul en 15 min
+  if (exists === null) return true; // Redis muet → REFUS (échec fermé)
+  return exists === 0;
+}
+```
+
+Pourquoi l'échec **fermé**, alors que la plateforme membre (`isSessionRevoked`) échoue **ouvert** ? Côté membre, une
+panne de Redis déconnecterait des milliers d'utilisateurs. Côté back-office, il y a une poignée de comptes à fort
+pouvoir, et leur renouvellement dépend déjà de Redis : refuser l'accès pendant la panne coûte peu, laisser passer une
+session révoquée coûterait beaucoup. La fonction de décision est **pure** (elle reçoit le résultat de `redis.exists`,
+ou `null` si l'appel a levé) : on la teste sans Redis.
+
+## ANO-ADM-02 : « rien à remettre » ne doit pas masquer « tu n'as pas le droit »
+
+`POST /admin/settings/reset` n'est gardé que par `settings.read` (tous les profils lisent les paramètres) ; la portée
+d'écriture se vérifie ensuite, clé par clé, **sur les clés qui changent**. Or, si toutes les clés visées valaient déjà
+leur défaut, la liste des changements était vide et le service répondait `400 NOTHING_TO_RESET` **avant** de
+vérifier la portée. Un Médiateur recevait donc « rien à faire » là où il devait recevoir « refusé ». Ce n'est pas une
+faille (rien n'est écrit), mais un refus qui se déguise en succès vide trompe l'écran et le testeur.
+
+```ts
+if (changes.length === 0) {
+  const peutEcrire = keys.some((key) => adminRolesAllow(actor.roles, settingDefinition(key)!.scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write"));
+  if (!peutEcrire) assertScopes(actor, keys);   // 403 : aucune des clés visées n'est à sa portée
+  throw new ValidationError("Nothing to reset: …", { code: "NOTHING_TO_RESET" });
+}
+```
+
+La fiche ADM-PRM-2 le prouve aussi par la voie forte : le super administrateur **modifie** réellement la commission, le
+Médiateur tente de la remettre par défaut (403) et la valeur **reste** ; le super administrateur la rétablit dans un
+`finally`.
+
+## ANO-ADM-03 / A153 : le profil PRIVACY ne pouvait pas atteindre ses propres gestes
+
+L'export nominatif et l'effacement RGPD vivent sur `/users` et `/users/:id`, tous deux gardés par `users.read`, que
+PRIVACY n'avait pas. La décision A153 ouvre la **lecture** (le contrat et son miroir front), rien d'autre. La matrice
+vit en deux exemplaires (`admin-users.schema.ts` côté serveur, `apps/admin-ui/src/lib/permissions.ts` côté écran) :
+la fiche **ADM-PRM-0** lit les deux fichiers et exige qu'ils soient identiques. Une divergence cacherait un bouton
+autorisé ou montrerait un bouton refusé, sans qu'aucun test unitaire ne le voie.
+
+## ADM-PRM-9 : la matrice générée depuis le code
+
+Plutôt qu'une dizaine de routes choisies à la main, la fiche **lit les quatre routeurs** avec une expression
+régulière (`router.<verbe>("/admin/…", …, requireAdminPermission("…"))`), puis appelle chaque route avec chacun des
+sept comptes :
+
+- permission absente → exige `403` **et** `details.code = "ADMIN_PERMISSION_DENIED"` **et** la permission nommée ;
+- permission présente → interdit ce 403-là (un 400 ou un 404 sur un identifiant inexistant est normal).
+
+Deux sécurités : tous les identifiants sont un ObjectId valide que rien ne porte, et une **écriture sans identifiant**
+(réinitialiser, poser la maintenance, inviter) n'est appelée que par un compte à qui elle est refusée. Une route
+ajoutée demain est éprouvée sans toucher la fiche. Garde du garde : moins de 50 routes lues = la lecture a cassé.
+
+## ADM-SEC-8 et 9 : la durée de vie d'une session, prouvée par Redis
+
+- **SEC-8** (45 min d'inactivité) se joue en vrai : la fiche lit le TTL de `admin_jti:…`, ferme l'onglet
+  (`about:blank`, une page qui se rafraîchit seule fausserait l'inactivité), attend 46 minutes, constate que la clé
+  a expiré d'elle-même, puis que l'écran renvoie à `/login` et que le journal n'a **rien** écrit.
+- **SEC-9** (12 h de vie absolue) ne tient pas dans une journée. Ses deux substituts sont prouvés : le TTL d'une
+  session neuve vaut 45 min, le renouvellement fait tourner le `jti` en conservant `createdAt`. Puis une **manœuvre
+  consignée** vieillit la session à 11 h 59 dans Redis : le renouvellement suivant ne pose plus qu'un TTL ≤ 60 s ; à
+  12 h 01, il répond 401.
+
+## ADM-ACC : trois sources à comparer, pas deux
+
+Chaque tuile de l'accueil est comparée à `GET /admin/kpis` (l'écran dit ce que l'API dit), puis au cahier sur les files
+que le jeu d'essai pose exactement (litiges, billets, versements…). Les tuiles que la campagne pollue (comptes créés
+par les inscriptions des chapitres web, trajets publiés) sont comptées **à part, en base** (`lireCoteServeur`, un
+script `tsx` qui imprime une ligne `@@<json>`) : un écart au cahier y est une donnée, pas un défaut. Pour ACC-2, la
+liste des tuiles attendues par profil se **déduit** du contrat des permissions, et les compteurs d'un profil sans la
+permission doivent être servis à `null` (pas seulement cachés).
+
+**Piège payé sur la fiche ACC-3** : `locator.isVisible({ timeout })` **n'attend pas** — Playwright ignore ce
+paramètre et répond immédiatement. Dans une boucle `expect.poll` qui recharge l'accueil, la lecture tombait avant la
+réponse de `/admin/alerts` (chargée côté client, après `domcontentloaded`) : la fiche échouait alors que le résumé vert
+était bien affiché (capture de l'échec). Remplacé par `locator.waitFor({ state: "visible", timeout })`.
+
+**Second piège, au deuxième passage (PRM-2)** : `navigateurAdmin` rouvre une session mémorisée (`apps/e2e/.sessions/`)
+après une sonde `GET /admin/me`. La sonde a répondu 200 ; le cookie `admin_access_token` (`maxAge` 15 min) a expiré
+quelques secondes plus tard ; l'appel suivant est parti **sans cookie** — auth-service : « Admin token missing ». Rien à
+voir avec ANO-ADM-04 : la sonde acceptait une session à l'agonie. `sessionAdminVivante` (`apps/e2e/src/fixtures/yamba.ts`)
+renouvelle désormais la session si le jeton d'accès expire dans moins de cinq minutes :
+
+```ts
+const acces = (await contexte.cookies()).find((c) => c.name === "admin_access_token");
+if (acces && acces.expires > 0 && acces.expires - Date.now() / 1000 < MARGE_JETON_ADMIN_S) {
+  return (await contexte.request.post(`${api}/auth/admin/refresh`, { timeout: 15_000 })).ok();
+}
+```
+
+La sonde membre (`sessionMembreVivante`) a la même forme et le même risque ; elle n'a pas été touchée faute d'échec
+mesuré.
+
+## Le versement en échec du jeu d'essai partait tout seul
+
+`seed-deals.ts` posait la relance du versement en échec **échue** (`payoutNextRetryAt` = hier). Avec le fournisseur
+FAKE et le compte de Thomas prêt, le cron des 5 minutes le relançait… et réussissait : la file « Versements en échec »
+se vidait entre le seed et la fiche. La relance est posée à +23 h ; le bouton « Relancer » de l'admin n'attend pas
+l'échéance, le chapitre finances garde donc son geste.
+
+## nx.json : un test « vert » en cache après un changement dans `packages/`
+
+`packages/` n'est pas un projet Nx : l'empreinte d'`auth-service:test` ne couvre que `{projectRoot}/**` et les
+`sharedGlobals`, si bien qu'une modification de `packages/middleware/session-revocation.ts` risquait de laisser Nx
+rejouer le résultat **en cache** d'avant la modification. `packages/**/*`,
+`prisma/schema.prisma` et `tsconfig.base.json` rejoignent `sharedGlobals` : toute modification invalide le cache de
+tous les projets. Plus de recalculs, mais plus jamais un vert fantôme.
+
+## Tests
+
+- auth-service **235** (230 + 5) : `isAdminSessionRevoked` (clé, présente / absente, sans `jti`, Redis muet) et le
+  refus de la remise à zéro par un profil sans portée ; l'assertion PRIVACY rejoint `admin-permissions.spec.ts`.
+- `apps/e2e` : **356 scénarios** (339 + 17), les 17 verts sur la pile réelle (deal-service en FAKE) ; les 16 hors
+  SEC-8 rejoués une seconde fois, verts, après la correction de la sonde de session.
+- Typecheck des six projets vert.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.2 : les alertes de seuil — piloter une alerte par son seuil
+
+*(PR `chore/recette-admin-5-2`, empilée sur #302, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre fiches (ADM-ALR-1 à 4), conformes, aucun code produit modifié.
+
+```
+apps/e2e/src/admin/adm-alr-alertes.spec.ts    4 scénarios en série — seuils posés puis rétablis (finally)
+```
+
+## Une alerte sans état se teste par son seuil
+
+`GET /admin/alerts` (deal-service) recalcule neuf règles pures (`ops-alerts.rules.ts`) sur un instantané de la base
+(`collectOpsSnapshot`), avec des seuils lus dans `PlatformSettings` à travers un cache de 30 s. Rien n'est stocké : pour
+faire apparaître ou disparaître une alerte, on **change son seuil**. Trois outils dans la spec :
+
+```ts
+poserSeuils(ctx, { "alerts.payoutFailedHours": 336 }, motif);   // PATCH /admin/settings, seules les clés qui changent
+alertesQuand(ctx, (a) => a.length === 0, "…");                  // expect.poll sur /admin/alerts : absorbe le cache de 30 s
+retablir(ctx, cles, motif);                                     // dans le finally : défauts lus dans la réponse GET
+```
+
+## Mesurer le jeu d'essai AVANT d'écrire la fiche
+
+Une sonde en base (litiges, retenues, renversements, versements en échec, outbox, emails, demandes, dernier trajet) a
+montré, avant la première ligne de spec :
+
+- le versement en échec de `bzv-completed-blocked` est **terminé à J−3** : la requête compte les deals dont
+  `completedAt` (ou `closedAt`) dépasse le seuil — il franchit donc déjà les 48 h par défaut. Le cahier le croit « en
+  échec depuis 24 h » et suppose l'état vide ; `YAMBA-DOC-METIER` (ALR01) attend bien l'alerte au seed. **Le code et la
+  doc métier font foi** : l'état vide d'ALR-1 et l'« apparition » d'ALR-2 se jouent en relevant d'abord le seuil à 336 h ;
+- les deux litiges sont créés **au moment du seed** et un litige n'est décidable qu'à `createdAt + 72 h` (ou à la réponse
+  du Voyageur) : `DISPUTE_UNDECIDED_72H` est infranchissable juste après le seed, même seuil à 1 h ;
+- le renversement a `updatedAt` = l'heure du seed : `REVERSAL_OPEN_48H` ne franchit 1 h qu'une heure après le seed ;
+- aucune ligne d'outbox non publiée, aucun email en échec, un trajet publié le jour même.
+
+ALR-4 abaisse donc toutes les clés au minimum de leurs bornes et **constate** les règles franchies
+(`PAYOUT_FAILED_48H`, `RETENTION_HELD_7D`, `ACCEPTANCE_RATE_LOW_7D` avec taux minimum 100 % sur 90 jours) ; pour les
+autres, elle ouvre l'URL de destination du cahier et vérifie le filtre présélectionné (le point de non-régression de
+`QueueTable`, qui lit `kind` et `decidable` dans l'URL).
+
+## ALR-2 : la valeur en vigueur, prouvée par un écart volontaire
+
+Le tableau « Seuils utilisés » doit montrer les seuils **en vigueur**, pas les constantes du code. Une valeur par défaut
+ne permet pas de distinguer les deux : ALR-1 lit le tableau **pendant que** `payoutFailedHours` vaut 336 et exige
+« 336 » (la constante `ALERT_THRESHOLDS.payoutFailedHours` vaut 48).
+
+## ALR-3 : forcer le cron sans le simuler
+
+Le cron horaire (`ops-alerts.cron.ts`, minute 5) appelle `opsAlertsService.notifyNewAlerts(redis)`. La fiche appelle
+**la même méthode avec le vrai Redis**, par un script `tsx` (`lireCoteServeur`), après trois précautions :
+
+1. s'écarter de la fenêtre du cron réel (minutes 3 à 7) pour ne pas se disputer la clé ;
+2. purger les verrous `yamba:alerts:sent:*:<jour UTC>` du jour — manœuvre consignée dans la sortie ;
+3. compter les emails de `support@yamba.app` avant, pour prouver « un » puis « aucun second ».
+
+« Le lendemain » ne s'attend pas : la fiche instancie `makeOpsAlertsService(() => demain)` avec un **magasin en mémoire**
+qui contient déjà la clé d'aujourd'hui, et coupe l'envoi réel (`EMAIL_PROVIDER=fake` avant le premier envoi : le
+fournisseur est créé paresseusement par `getEmailProvider`). La règle repart ; Mailpit n'a rien reçu de plus.
+
+## Tests
+
+`apps/e2e` : **360 scénarios** (356 + 4), les 4 verts deux fois de suite. Plateforme inchangée (auth 235).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.3 : utilisateurs — une recherche qui n'échappait pas son terme, un jeu d'essai qui oubliait des compteurs
+
+*(PR `chore/recette-admin-5-3`, empilée sur #303, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Trois fiches (ADM-USR-1 à 3), conformes après deux corrections (`ANO-ADM-05`, `ANO-ADM-06`).
+
+```
+apps/e2e/src/admin/adm-usr-utilisateurs.spec.ts        3 scénarios en série — jeu d'essai rejoué avant ET après
+apps/auth-service/src/lib/admin-users.query.ts         ANO-ADM-05 — escapeRegex, phoneNeedle, matchedOnFor, textSearchOr
+apps/auth-service/src/lib/admin-users.query.spec.ts    +3 tests
+apps/auth-service/src/services/admin-users.service.ts  les deux recherches passent par les mêmes fonctions
+packages/libs/prisma/scripts/seed-deals.ts             ANO-ADM-06 — compteurs internes remis à zéro au rejeu
+```
+
+## ANO-ADM-05 : `contains` est une expression régulière sur MongoDB
+
+Avec le connecteur MongoDB, Prisma traduit `{ contains: t }` en `{ $regex: t }` **sans échapper `t`**. Mesuré en base :
+
+| Terme | Résultat |
+|---|---|
+| `+33612345601` | 0 compte — le `+` initial est un quantificateur |
+| `33612345601` | 1 compte (Thomas) |
+| `a.b` | 52 comptes — le `.` vaut n'importe quel caractère |
+| `(` | erreur Mongo 51111 → 500 |
+
+Le placeholder de l'écran propose lui-même `+33…` : la recherche par téléphone ne marchait donc jamais sous sa forme
+naturelle. Correction : trois fonctions pures, testées sans base.
+
+```ts
+export function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** « +33 6 12 34 56 01 », « 0033612345601 », « 06 12 34 56 01 » → un morceau contenu dans « +33612345601 ». */
+export function phoneNeedle(term: string): string | null {
+  const digits = term.replace(/[^\d+]/g, "");
+  if (digits.length < 6) return null;              // règle C-PR7a inchangée
+  const bare = digits.replace(/\+/g, "");
+  if (bare.startsWith("00")) return bare.slice(2);
+  if (bare.startsWith("0")) return bare.slice(1);  // « 0 » national : « 612345601 » est contenu dans le E.164
+  return bare;
+}
+```
+
+`textSearchOr(term)` construit le `OR` (email, prénom, nom échappés ; téléphone par `phoneNeedle`) pour les **deux**
+recherches du service — `searchAdvanced`, appelée par l'écran, et `search`, l'ancienne. Second défaut corrigé au passage :
+`searchAdvanced` calculait la mention « via … » avec « email sinon name », jamais « phone » ; `matchedOnFor(row, term)`
+est désormais la seule définition.
+
+**Même défaut ailleurs, non corrigé ici** : `apps/trip-service/src/lib/admin-trips.rules.ts` et
+`trip-search.controller.ts` (recherche publique). Hors périmètre du chapitre, consigné au rapport pour le § 5.7.
+
+## ANO-ADM-06 : un rejeu qui n'efface que la moitié de l'histoire
+
+`seed-deals.ts` supprime et recrée litiges, deals et avis des comptes du seed, mais les **compteurs dénormalisés** du
+document utilisateur (`shipperDisputesLostCount`…) et de la page Voyageur (`disputesLostCount`…) survivaient. Chaque
+litige tranché en recette ajoutait donc un litige perdu « pour toujours » : mesuré 2 puis 3 pour Chinwe en trois
+passages d'USR-3, score 46 → 56. Au suivant, elle devenait « À risque » et ses réservations étaient plafonnées : les
+chapitres web de réservation auraient échoué pour une raison sans rapport. Les deux `upsert` remettent à zéro
+litiges perdus et annulations tardives (Expéditeur et Voyageur). Deals terminés et avis ne sont pas touchés : des
+écrans des chapitres web les affichent, et le seed ne les a jamais posés.
+
+## USR-2 : deux lignes de journal par ouverture, en développement
+
+La fiche charge `GET /admin/users/:id` dans un `useEffect` ; le contrôleur journalise `USER_VIEWED` à chaque `GET`. En
+développement, React 18+ en mode strict **monte deux fois** les effets : deux `GET` (vus dans les logs du gateway, par
+paires), deux lignes. La fiche accepte « au moins une par ouverture, rien d'autre » et consigne le chiffre ; le
+dédoublonnage serveur est proposé (rapport, « à trancher »).
+
+## USR-3 : le score est une somme bornée
+
+`computeTrustScore` additionne les facteurs puis borne à 0..100. Un crédit (−4 par deal terminé) masqué par le plancher
+absorbe une partie des 25 points d'un litige perdu : 0 → 21. La fiche vérifie l'invariant réel — `score =
+clamp(Σ facteurs)` et `Δ Σ = Δ facteur litiges` — plutôt que « +25 ».
+
+## Redémarrer un service sous `nx run-many` : piège de poste
+
+Modifier `auth-service` pendant que `nx run-many --target=serve` tourne a déclenché « Recursive task invocation
+detected » : la reconstruction a échoué, **l'ancien processus a continué de répondre 200 sur `/health`**. Seul un
+compteur (`grep -c escapeRegex dist/main.js`) et le rejeu de la fiche le montraient. Remède utilisé : `nx build
+auth-service`, arrêt du processus sur 6001, `node --env-file=../../.env dist/main.js`.
+
+## Tests
+
+- auth-service **238** (235 + 3).
+- `apps/e2e` : **363 scénarios** (360 + 3), les 3 verts deux fois de suite après corrections, identiques.
+- Typecheck auth-service et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.4 : sanctions — le statut effectif, un filtre de plus, et un piège de comparaison à null
+
+*(PR `chore/recette-admin-5-4`, empilée sur #304, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq fiches du cahier et deux fiches d'anomalie (7 scénarios), trois anomalies closes (`ANO-ADM-07`, `08`, `09`), cinq
+améliorations d'expert implémentées.
+
+```
+apps/e2e/src/admin/adm-snc-sanctions.spec.ts                 7 scénarios en série, afterAll = membres remis actifs
+packages/middleware/account-status.ts                        NOUVEAU — effectiveAccountStatus, notSuspendedOwnerFilter, activeSanctionFilter
+packages/middleware/isAuthenticated.ts                       ANO-ADM-07 — statut effectif
+packages/middleware/requireActiveAccount.ts                  ANO-ADM-07 — statut effectif
+apps/auth-service/src/controller/auth.controller.ts          ANO-ADM-07 connexion ; ANO-ADM-09 Google + renouvellement
+apps/auth-service/src/controller/admin-kpis.controller.ts    ANO-ADM-07 tuiles ; amélioration : escalades comptées
+apps/trip-service/src/controllers/trip-search.controller.ts  ANO-ADM-07 — suspension échue = trajets visibles
+apps/trip-service/src/lib/public-visibility.rules.ts         ANO-ADM-08 — page publique d'un suspendu : 404
+apps/deal-service/src/services/booking-request.ts            ANO-ADM-08 — TRIP_NOT_BOOKABLE si Voyageur suspendu
+apps/deal-service/src/services/deal-request.service.ts       ANO-ADM-08 — le trajet charge l'état du Voyageur
+apps/admin-ui/src/components/UserFileView.tsx                statut effectif, messages, refus par code, fin de journée, min
+apps/auth-service/src/utils/account-status.spec.ts           NOUVEAU — 4 tests
+apps/trip-service/src/lib/public-visibility.rules.spec.ts    +1 test ; apps/deal-service/src/services/booking-request.spec.ts +1 test
+```
+
+## ANO-ADM-07 : une donnée écrite que personne ne lit
+
+`suspensionUntil` était écrit par `POST /admin/users/:id/suspension`, affiché et envoyé au membre — et lu par l'export
+CSV seulement. La méthode de diagnostic tient en une commande : chercher **tous les lecteurs** d'un champ (`grep -rn
+suspensionUntil apps packages`) avant de jouer la fiche. Le correctif respecte D56 (« une sanction agit par lecture,
+jamais par écriture croisée ») : pas de cron qui remettrait `ACTIVE`, une **règle pure** que chaque garde lit.
+
+```ts
+// packages/middleware/account-status.ts
+export function effectiveAccountStatus(u: SanctionState, now: Date = new Date()): AccountStatus {
+  const status = (u.accountStatus ?? "ACTIVE") as AccountStatus;
+  if (status === "ACTIVE" || sanctionExpired(u, now)) return "ACTIVE";
+  return status;
+}
+```
+
+Les gardes (`isAuthenticated`, `requireActiveAccount`, connexion) lisent `effectiveAccountStatus(user)`. Les **requêtes**
+ne peuvent pas appeler une fonction : elles reçoivent son équivalent en filtre Prisma, écrit à côté et testé contre la
+même intention (`notSuspendedOwnerFilter` pour la recherche et la page publique, `activeSanctionFilter` pour les tuiles).
+
+## Le piège : `lte` sur une date nulle, dans un filtre de relation
+
+Premier rejeu après correction : les trajets de Thomas, suspendu **sans** date de fin, revenaient dans la recherche. Une
+sonde sur la base a isolé la cause :
+
+```
+user: { is: { accountStatus: { not: "SUSPENDED" } } }                                   → 0 trajet (attendu)
+user: { is: { OR: [{ accountStatus: { not: "SUSPENDED" } }, { suspensionUntil: { lte: now } }] } } → 3 trajets
+user: { is: { suspensionUntil: { lte: now } } }  (suspensionUntil = null)                → 3 trajets
+```
+
+Un filtre de relation Prisma sur Mongo s'exécute dans un pipeline d'agrégation (`$lookup` puis `$expr`), où la comparaison
+suit l'**ordre BSON** : `null` est inférieur à toute date, donc `null <= now` est vrai. Remède mesuré sur les quatre cas :
+
+```ts
+{ suspensionUntil: { lte: now, gt: EPOCH } }   // null : 0 · absent : 0 · fin à venir : 0 · fin passée : visibles
+```
+
+C'est le cousin des pièges déjà gravés au CLAUDE.md (`field: null` ne matche pas un champ absent) : ici, c'est l'inverse,
+une borne supérieure matche un `null`. Toute comparaison de date optionnelle dans un filtre de relation doit porter sa
+borne basse.
+
+## ANO-ADM-08 : un filtre de lecture doit couvrir toutes les portes
+
+La suspension retirait les trajets de la **recherche** (`buildBaseWhere`), mais la **page publique** (`publicTripWhere`)
+et la **réservation** (`checkTripBookable`) ne connaissaient que « publié, non supprimé, non masqué ». Deux corrections :
+
+```ts
+// trip-service — public-visibility.rules.ts
+return { id, status: "PUBLISHED", isDeleted: false, AND: [notHiddenFilter()], user: { is: notSuspendedOwnerFilter(now) } };
+
+// deal-service — booking-request.ts (TRIP_SELECT charge user.accountStatus / suspensionUntil)
+if (trip.user && effectiveAccountStatus(trip.user, now) === "SUSPENDED") {
+  throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
+}
+```
+
+Même code, même message qu'un trajet fermé : l'Expéditeur n'apprend pas que le Voyageur est sanctionné (403 vs 404, règle
+non négociable).
+
+## ANO-ADM-09 : trois portes d'entrée, une seule vérifiée
+
+`login` refusait un compte suspendu ; `googleSignIn` et `refreshAuthTokens` non. Les deux lisent maintenant
+`effectiveAccountStatus` ; la connexion Google refuse **avant** `issueSession` (aucun cookie posé).
+
+## Améliorations faites (UserFileView.tsx, admin-kpis.controller.ts)
+
+- `refusDeSanction(e)` lit `details.code` (A146) : cinq codes traduits, message anglais en repli.
+- Messages de résultat nommant le geste, la date et l'email envoyé.
+- `finDeJournee(jour)` : `new Date("2026-09-20T23:59:59")` (heure locale de l'écran) au lieu de `new Date("2026-09-20")`
+  (minuit **UTC** — une chaîne date seule est lue en UTC par la spécification ECMAScript, une chaîne date-heure sans
+  fuseau en heure locale) ; `min` = demain sur le champ.
+- Badge « Actif (sanction échue) » calculé depuis `suspension.until`.
+- Tuile « Sanctions proposées » : `suspensionProposedAt: { not: null }` sans condition sur le statut.
+
+## Poste
+
+auth-service, trip-service et deal-service tournent **en bundle, détachés** (`nohup … node --env-file=../../.env
+dist/main.js`, deal-service avec `STRIPE_SECRET_KEY=` pour le fournisseur FAKE). Piège vécu : après `nx build`, un
+bundle déjà lancé garde l'ancien code en mémoire (`grep -c EPOCH dist/main.js` = 4, mais le processus ne l'avait pas) —
+toujours relancer le processus après la reconstruction ; et la reconstruction sous `nx run-many serve` a fait tomber
+trip-service sur 6002.
+
+## Tests
+
+- auth-service **242** (238 + 4) · trip-service **262** (261 + 1) · deal-service **578** (577 + 1).
+- `apps/e2e` : **370 scénarios** (363 + 7), les 7 verts deux fois de suite.
+- Typecheck auth-service, trip-service, deal-service, admin-ui et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.5 : la liste de suppression d'adresses — une règle partagée, une levée motivée, une concurrence sans 500
+
+*(PR `chore/recette-admin-5-5`, empilée sur #305, 14/09/2026.)*
+
+## Ce qui a été fait
+
+```
+packages/libs/email/src/recipient.ts                 NOUVEAU — canReceiveEmail, reachableRecipientWhere, suppressionReasonLabel
+packages/libs/email/src/index.ts                     export de recipient
+packages/libs/prisma/write-conflict-retry.ts         NOUVEAU (remonté de deal-service) — withWriteConflictRetry
+apps/deal-service/src/lib/write-conflict-retry.ts    ré-export (imports et tests inchangés)
+apps/trip-service/src/lib/carrier-mailer.ts          NOUVEAU — ANO-ADM-10 : makeCarrierMailer (+ spec, 5 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   emailCarrier = makeCarrierMailer(…)
+apps/auth-service/src/services/email-suppression.service.ts   NOUVEAU — A155 : levée motivée, conditionnelle, rejouée (+ spec, 5 tests)
+apps/auth-service/src/controller/admin-users.controller.ts    unsuppressEmail délègue au service
+apps/auth-service/src/services/platform-settings.service.ts   ANO-ADM-11 : destinataires joignables (+ 1 test)
+apps/auth-service/src/controller/admin-status.controller.ts   ANO-ADM-11 : idem (email de maintenance)
+packages/libs/api-contracts/src/admin/admin-users.schema.ts   UnsuppressEmailRequestSchema (≥ 20)
+apps/auth-service/src/openapi/build-openapi.ts + apps/*/openapi.json   corps et 400 documentés, contrats régénérés
+apps/admin-ui/src/components/UserFileView.tsx        formulaire de levée, plainte, refus par code, message nommé
+apps/notification-service/src/lib/email-recipient.spec.ts    4 tests de la règle partagée
+apps/e2e/src/admin/adm-eml-suppression.spec.ts       4 scénarios en série
+```
+
+## Une règle écrite six fois finit par être oubliée deux fois
+
+D35 4A dit : « chaque résolveur de destinataire respecte `emailSuppressedAt` comme `isDeleted` ». Avant ce chapitre,
+chaque service réécrivait son test (`if (!u?.email || u.isDeleted || u.emailSuppressedAt)` dans notification-service,
+message-service, trip-service, deal-service, auth-service…). Un audit des appelants de `sendTransactionalEmail` /
+`sendAuthEmail` en a trouvé deux qui l'avaient oublié : `emailCarrier` (trip-service, ANO-ADM-10) et les destinataires
+super administrateurs (auth-service, ANO-ADM-11). La règle devient une fonction pure de `@packages/email` :
+
+```ts
+export function canReceiveEmail(u: EmailRecipientCandidate | null | undefined): boolean {
+  if (!u || !u.email || !u.email.trim()) return false;
+  if (u.isDeleted) return false;
+  return !u.emailSuppressedAt;
+}
+/** À combiner sous AND : un OR de l'appelant n'est jamais écrasé. */
+export function reachableRecipientWhere() {
+  return { isDeleted: false, OR: [{ emailSuppressedAt: null }, { emailSuppressedAt: { isSet: false } }] };
+}
+```
+
+Pourquoi `AND: [reachableRecipientWhere()]` plutôt qu'un étalement (`...reachableRecipientWhere()`) ? Parce que le
+fragment contient un `OR` (piège Mongo : `null` ne voit pas un champ absent) ; étalé dans une requête qui a déjà son
+`OR`, l'un écraserait l'autre en silence. Les anciens résolveurs corrects n'ont pas été réécrits (aucune valeur ajoutée,
+risque réel) : la règle sert aux nouveaux et aux corrigés.
+
+## `emailCarrier` testable : injecter ce qui touche le monde
+
+L'ancienne fonction lisait Prisma, testait `isEmailConfigured` et envoyait, dans un contrôleur non testé. Elle devient une
+fabrique à dépendances injectées qui rend un **résultat nommé** (`SENT`, `NOT_CONFIGURED`, `NO_ACCOUNT`,
+`UNREACHABLE`, `FAILED`) et journalise les deux cas silencieux :
+
+```ts
+const emailCarrier = makeCarrierMailer({
+  isConfigured: isEmailConfigured,
+  findUser: (userId) => prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, email: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true } }),
+  send: (mail) => sendTransactionalEmail(mail),
+  log: (message) => console.error(message),
+});
+```
+
+## A155 : lever une suppression, motivé, conditionnel, rejoué
+
+Trois défauts de la levée, mesurés en recette : aucun motif (une plainte levée sans raison écrite), une erreur avalée par
+le bouton (`try { … } finally`), et **un 500** quand deux administrateurs lèvent en même temps — MongoDB rejette la
+transaction perdante (`P2034`, « Transaction failed due to a write conflict »). Le service :
+
+```ts
+const parsed = UnsuppressEmailRequestSchema.safeParse(body ?? {});          // 400 REASON_REQUIRED
+await withWriteConflictRetry(() => db.$transaction(async (tx) => {
+  const r = await tx.user.updateMany({ where: { id: user.id, emailSuppressedAt: suppressedAt }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
+  if (r.count === 0) throw new ValidationError("This address is not suppressed.", { code: "EMAIL_NOT_SUPPRESSED" });
+  await record(tx, { action: "EMAIL_SUPPRESSION_LIFTED", before: { emailSuppressedAt, reason }, after: { emailSuppressedAt: null, liftReason }, … });
+}));
+```
+
+L'`updateMany` conditionnel sur la date **lue** est la garde ; le réessai transforme le conflit d'infrastructure en
+réponse métier : au second essai, l'autre a levé, `count` vaut 0, le perdant reçoit 400 et le journal n'a qu'une ligne.
+`withWriteConflictRetry` existait déjà dans deal-service (ANO-API-19) ; il est remonté dans `packages/libs/prisma` —
+deal-service garde un ré-export d'une ligne pour ne toucher à aucun import.
+
+`after.liftReason` (et non `after.reason`) : `before.reason` est déjà le motif **du fournisseur** (`HARD_BOUNCE`,
+`COMPLAINT`) ; réutiliser le nom mélangerait deux informations dans le journal.
+
+## L'écran : le message doit survivre au rechargement
+
+Le formulaire de levée vit **dans** le bandeau ; quand la levée réussit — ou qu'un autre onglet l'a déjà faite — la fiche
+se recharge et le bandeau disparaît, emportant tout message local. Le message passe donc au niveau de la fiche
+(`flash`, déclaré avec les autres `useState` **avant** les `return` anticipés : l'ordre des hooks ne doit pas dépendre du
+chargement).
+
+## Le harnais : signer un webhook comme le fournisseur
+
+```ts
+const corps = JSON.stringify(evenement);                 // compact : ce qui est signé est ce qui est envoyé
+const s = signer(corps);                                 // svixSign(RESEND_WEBHOOK_SECRET, id, ts, corps) côté serveur (tsx --env-file)
+await ctx.request.post(`${adresseDeLApi()}/webhooks/email/resend`, { headers: { "svix-id": s.id, "svix-timestamp": s.ts, "svix-signature": s.signature }, data: corps });
+```
+
+Le secret n'entre jamais dans le processus Playwright : la signature est calculée par un script `tsx` qui lit le `.env`.
+
+## Tests
+
+- auth-service **248** (242 + 6), trip-service **267** (262 + 5), notification-service **119** (115 + 4), deal-service
+  **578** (inchangé ; un passage parallèle a expiré sur `deal-transport.service.spec.ts` sous charge, vert isolé et au
+  passage complet suivant).
+- `apps/e2e` : **374 scénarios** (370 + 4), les 4 verts deux fois de suite.
+- Typecheck auth, trip, deal, notification, message, gateway, admin-ui et harnais verts ; contrats OpenAPI régénérés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.6 : les exports CSV — prouver le fichier, pas le bouton
+
+*(PR `chore/recette-admin-5-6`, empilée sur #306, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre fiches (ADM-EXP-1 à 4), conformes, trois anomalies closes (`ANO-ADM-12` bloquante, `13`, `14`), une décision
+(A156).
+
+```
+packages/libs/csv/index.ts                              csvCell (nombres non neutralisés), EXPORT_MAX_ROWS, capExportRows, csvResponseHeaders
+apps/trip-service/src/lib/csv-export.spec.ts            NOUVEAU — 5 tests de la bibliothèque (packages/ n'a pas de projet de test)
+apps/trip-service/src/lib/admin-trips.rules.ts          ANO-ADM-12 — TICKETS_CSV_COLUMNS sans originalName, fileExtensionOf (+ 2 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   exports trajets et billets : plafond + troncature dite
+apps/auth-service/src/services/admin-users.service.ts   exportRows rend { rows, truncated }
+apps/auth-service/src/controller/admin-users.controller.ts    journal truncated, en-têtes communs
+apps/deal-service/src/controllers/admin-dispute.controller.ts  idem + INVALID_QUERY porte son code (A146)
+apps/deal-service/src/services/admin-finance.rules.ts   ANO-ADM-14 — réexporte csvCell (test étendu)
+apps/admin-ui/src/lib/api.ts                            ANO-ADM-13 — downloadFile (fetch + rafraîchissement + lien download)
+apps/admin-ui/src/components/ExportButton.tsx           refus par code, compteur du motif, lignes / troncature annoncées
+apps/e2e/src/admin/adm-csv-exports.spec.ts              4 scénarios
+```
+
+## ANO-ADM-12 : un champ libre n'est pas un identifiant
+
+D60 2A promettait des exports opérationnels « identifiants seulement ». La colonne `originalName` de l'export des
+billets était pourtant le nom du fichier **tel que le membre l'a déposé**. Une sonde en base a trouvé
+« sfr-facture-0752426937-0.pdf » : un numéro de téléphone dans un export qu'un Médiateur ou un profil Finance télécharge
+sans motif. La colonne devient `fileExtension` :
+
+```ts
+export function fileExtensionOf(name: string | null | undefined): string {
+  const m = /\.([A-Za-z0-9]{1,5})$/.exec((name ?? "").trim());
+  return m ? m[1].toLowerCase() : "";   // « nom.0612345678 » → "" : dix chiffres ne sont pas une extension
+}
+```
+
+A156 généralise : une colonne d'export opérationnel est un identifiant, une énumération, une date, un montant ou une
+ville du référentiel — jamais un champ libre.
+
+## ANO-ADM-13 : un onglet ouvert sur une URL ne sait pas rafraîchir une session
+
+`ExportButton` faisait `window.open(apiUrl(path))`. Le cookie `admin_access_token` vit 15 minutes ; passé ce délai,
+l'onglet partait avec le seul cookie de renouvellement, recevait **401** et affichait le JSON brut. Aucun code client
+ne tournait dans cet onglet pour appeler `/auth/admin/refresh`. Même chose pour un 400 ou un 403. `downloadFile` :
+
+```ts
+let res = await attempt();
+if (res.status === 401 && (await tryRefresh())) res = await attempt();   // le même rafraîchissement qu'apiFetch
+if (!res.ok) throw new ApiError(message, res.status, data);             // ExportButton le traduit par details.code
+const url = URL.createObjectURL(await res.blob());                       // puis un <a download> cliqué
+```
+
+Le nom vient de `Content-Disposition`, le nombre de lignes de `X-Row-Count`, la troncature de `X-Truncated`
+(`Access-Control-Expose-Headers` les rend lisibles même hors du proxy de même origine).
+
+## Une seule bibliothèque, et une troncature qui se dit
+
+- **ANO-ADM-14** : `admin-finance.rules.ts` avait sa propre `csvCell`, sans `\t` ni `\r` dans les préfixes neutralisés.
+  Elle réexporte désormais `@packages/libs/csv`.
+- **Un nombre n'est pas une formule** : l'ancienne `csvCell` convertissait tout en chaîne avant de tester le premier
+  caractère, `-500` devenait `'-500`, un texte dans le tableur. Seules les chaînes sont neutralisées.
+- **La troncature** : chaque export lit `EXPORT_MAX_ROWS + 1` lignes et passe par `capExportRows`, qui sait s'il en
+  restait sans compter la collection. `truncated` va au journal et dans `X-Truncated` ; l'écran affiche « Export
+  tronqué à 5 000 lignes : affine les filtres ».
+
+## La spec : prouver le fichier
+
+- **Téléchargé par l'écran**, puis relu : `dl.path()` → `Buffer` (les trois octets du BOM), puis un parseur RFC 4180
+  de trente lignes dans la spec (guillemets doublés, virgules et retours ligne encadrés).
+- **Filtres écran = fichier** : la fiche capture l'URL de la requête que la page envoie à la liste
+  (`page.waitForResponse`), retire le curseur, relit toutes les pages à `limit=100`, et compare les ensembles
+  d'identifiants.
+- **Fouille** : expressions email et téléphone (`\b0[1-9](?:[ .-]?\d{2}){4}\b`, `(?:\+|\b00)\d{8,14}\b`) vérifiées
+  d'abord sur le nom mesuré (détecté) et sur un ObjectId et une date ISO (ignorés).
+- **Contre-épreuves** : formule posée en base sur le nom de Thomas, nom piégé sur le billet en attente, cookie
+  `admin_access_token` retiré (`contexte.clearCookies({ name })`) avec la preuve du 401 que montrait l'onglet ; toutes
+  défaites en `finally`.
+- **Refus simulé** (EXP-4) : `page.route("**/admin/disputes/export**", …)` rend un 403 à la frontière réseau ; la fiche
+  vérifie le message, et qu'aucun `download` ni aucune page ne s'est ouvert.
+
+## Tests
+
+- trip-service **274** (+7 : bibliothèque CSV ×5, `fileExtensionOf` et colonnes ×2) ; deal-service 578 (test Finances
+  étendu) ; auth-service 248.
+- `apps/e2e` : **378 scénarios** (374 + 4), les 4 verts deux fois de suite.
+- Typecheck auth, trip, deal, admin-ui (tsc) et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.7 : les trajets — une regex qu'on n'avait pas écrite, un état que le temps change, deux clics en même temps
+
+*(PR `chore/recette-admin-5-7`, empilée sur #307, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Sept scénarios (ADM-TRJ-1 à 5, plus deux fiches de preuve), quatre anomalies closes (`ANO-ADM-15` à `18`), un défaut de
+concurrence clos, une décision au registre (**A157**).
+
+```
+packages/libs/prisma/text-search.ts                         NOUVEAU — escapeRegex, containsText, equalsText
+apps/trip-service/src/lib/admin-trips.rules.ts              filtres échappés ; effectiveTicketStatus ; borne ticketPending
+apps/trip-service/src/controllers/trip-search.controller.ts recherche publique et facettes échappées
+apps/trip-service/src/controllers/admin-trips.controller.ts statut effectif ; masquer / rétablir / proposer conditionnels + réessai
+apps/trip-service/src/emails/admin-trip-emails.ts           bouton « Voir mon trajet » dans l'email de masquage
+apps/auth-service/src/controller/saved-route.controller.ts  contrôle de doublon des alertes route échappé
+apps/auth-service/src/lib/admin-users.query.ts              réexporte escapeRegex partagé
+apps/admin-ui/src/lib/format.ts                             libellés statut / mode / réservation / billet expiré
+apps/admin-ui/src/components/TripsList.tsx                  q et villes lus dans l'URL, statuts en français
+apps/admin-ui/src/components/TripFileView.tsx               carte Masquage : messages nommés, refus par code, conflit d'intérêts
+apps/trip-service/src/lib/text-search.spec.ts               NOUVEAU (5 tests) · admin-trips.rules.spec.ts (+3)
+apps/e2e/src/admin/adm-trj-trajets.spec.ts                  7 scénarios
+```
+
+## ANO-ADM-15 : Prisma n'échappe pas ce qu'il transforme en regex
+
+Le connecteur MongoDB de Prisma n'a pas d'opérateur « contient » natif : il construit un `$regex` avec la valeur telle
+quelle. Une sonde de sept requêtes l'a établi avant d'écrire la moindre ligne :
+
+```
+equals "(" insensible      → erreur « Kind: … Raw query failed »     (Mongo refuse la regex)
+equals "P.ris" insensible  → 20                                        (« . » = n'importe quel caractère)
+contains "."               → 41 sur 41
+contains "\\."             → 0                                         (échappé : pris à la lettre)
+```
+
+La recherche publique (`trip-search.controller.ts`) passait la saisie du champ « Départ » directement dans `contains` :
+un visiteur qui tapait « ( » recevait **500**, et ses facettes aussi. La même construction existait dans la liste admin
+des trajets, la file des billets (villes, par la relation) et le contrôle de doublon des alertes route (`equals`
+insensible = regex ancrée). Au § 5.3, auth-service avait déjà corrigé sa recherche d'utilisateurs avec une fonction
+locale ; elle devient le module partagé, sans aucune dépendance :
+
+```ts
+// packages/libs/prisma/text-search.ts
+export function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+export function containsText(term: string) { return { contains: escapeRegex(term), mode: "insensitive" as const }; }
+export function equalsText(term: string)   { return { equals: escapeRegex(term), mode: "insensitive" as const }; }
+```
+
+Il vit sous `packages/libs/prisma` parce que c'est un contrat **du connecteur Prisma-Mongo**, pas d'un domaine ; l'alias
+générique `@packages` des `webpack.config.js` le résout déjà, aucun alias à ajouter. Au-delà du 500, une regex fournie
+par un visiteur est une attaque par retour arrière catastrophique en puissance (`(a+)+$` sur une chaîne longue) : le test
+unitaire le prouve inerte une fois échappé.
+
+## ANO-ADM-16 : un état que le temps a changé se calcule à la lecture
+
+Un trajet porte `ticketVerificationStatus`, une pièce porte `status`. Quand la file des billets voit une pièce en attente
+d'un trajet déjà parti, elle la passe `EXPIRED` (8A) — mais personne ne réécrit le trajet. Résultat mesuré : 5 trajets
+partis depuis avril à juin, toutes pièces `EXPIRED`, toujours « à vérifier ». Plutôt qu'un cron ou qu'une écriture de
+plus dans la file, la lecture calcule l'état effectif, comme pour la sanction échue (A154) :
+
+```ts
+export function effectiveTicketStatus(trip, now) {
+  return trip.ticketVerificationStatus === "PENDING" && isTicketExpired(trip, now) ? "EXPIRED" : trip.ticketVerificationStatus;
+}
+// buildTripsWhere(q, now) — ticketPending=1 : départ >= maintenant, sans écraser une borne `from` plus tardive
+departure.gte = new Date(Math.max(departure.gte?.getTime() ?? 0, now.getTime()));
+```
+
+`buildTripsWhere` reçoit désormais `now` en paramètre (valeur par défaut `new Date()`) : la règle reste pure et testable
+à date fixe.
+
+## Masquer, rétablir, proposer : écrire sous condition
+
+La garde « déjà masqué ? » était une **lecture** avant l'écriture : deux administrateurs qui cliquent en même temps la
+passent tous les deux. Mesuré (fiche ADM-TRJ-4 bis, `Promise.all`) : un 200 et un **500** — MongoDB a rejeté la seconde
+transaction (P2034) ; sans ce rejet, on aurait eu deux lignes `TRIP_HIDDEN` et deux emails. Correction, dans les trois
+gestes :
+
+```ts
+await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+  const r = await tx.trip.updateMany({ where: { id, ...notHiddenFilter() }, data: { hiddenByAdminAt: now, … } });
+  if (r.count !== 1) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
+  await recordAdminAction(tx, { action: "TRIP_HIDDEN", … });
+}));
+```
+
+`updateMany` renvoie le nombre de documents modifiés : c'est lui qui dit si l'état attendu était encore vrai au moment
+de l'écriture. `notHiddenFilter()` couvre `null` ET champ absent (piège Mongo). `withWriteConflictRetry`
+(`packages/libs/prisma`, § 5.5) rejoue la transaction rejetée : au second essai, `count` vaut 0 et le perdant reçoit un
+400 lisible. Le même garde ferme **ANO-ADM-17** : proposer un masquage sur un trajet masqué est refusé, sinon la
+proposition, invisible pendant le masquage, ressurgissait au rétablissement. Une proposition qui en remplace une autre
+écrit l'ancienne en `before` au journal.
+
+## Carte « Masquage » : ce que l'écran dit après le geste
+
+- Le motif part **vide** : pré-rempli avec la proposition du Support, il était journalisé comme motif de rétablissement
+  par un Médiateur qui ne l'avait pas écrit.
+- Les messages nomment le geste et ses suites (« Trajet masqué : retiré de la recherche et de sa page publique, Voyageur
+  prévenu par email. 1 réservation(s) en cours continue(nt). ») ; les refus sont lus par `details.code` (A146) et, sur un
+  conflit, la fiche est rechargée.
+- Sur son propre trajet, la carte dit le conflit d'intérêts au lieu de « Ton profil ne propose ni n'exécute de masquage ».
+
+## Tests
+
+- trip-service **282** (+8 : `text-search.spec.ts` ×5 dont email de masquage FR/EN, `admin-trips.rules.spec.ts` ×3) ;
+  auth-service 248 (inchangé, sa suite `admin-users.query.spec.ts` passe sur la fonction partagée).
+- `apps/e2e` : **385 scénarios** (378 + 7), les 7 verts deux fois de suite.
+- Typecheck trip, auth (tsc), admin-ui, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.8 : les billets à vérifier — un badge qui se déduit au lieu de s'écrire
+
+*(PR `chore/recette-admin-5-8`, empilée sur #308, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Huit fiches (ADM-BIL-1 à 4 du cahier, 5 à 8 ajoutées), trois anomalies closes (`ANO-ADM-19`, `20`, `21`), une décision
+(A158), et des améliorations d'écran.
+
+```
+apps/trip-service/src/lib/ticket-status.rules.ts        NOUVEAU — synthèse du statut, faits vérifiés, trajet décidable
+apps/trip-service/src/lib/ticket-status.rules.spec.ts   NOUVEAU — 8 tests
+apps/trip-service/src/lib/admin-trips.rules.ts          buildTicketsWhere (décidables), departedTicketsWhere (+ 2 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   file, décision (ordre des gardes, synthèse, retry)
+apps/trip-service/src/controllers/trip.controller.ts    syncTripTicketStatus au dépôt / à la suppression, faits changés
+apps/admin-ui/src/components/TicketsQueue.tsx           refus par code, sa propre carte, occupé, mode et type de fichier
+apps/admin-ui/src/components/TripFileView.tsx, lib/format.ts   documents en français
+apps/e2e/src/admin/adm-bil-billets.spec.ts              8 scénarios en série
+```
+
+## Un champ dérivé ne s'écrit pas, il se recalcule
+
+`Trip.ticketVerificationStatus` est **dénormalisé** : la recherche publique filtre dessus (`verifiedTicket`) et le DTO
+public en tire `ticketVerified`. Tant qu'il était **écrit** par chaque geste (« la décision vaut VERIFIED », « le dépôt
+vaut PENDING si le trajet était NOT_SUBMITTED ou REJECTED », « la suppression vaut NOT_SUBMITTED s'il ne reste aucun
+billet »), il divergeait dès qu'un trajet avait plusieurs billets. La règle devient une fonction pure de ses sources :
+
+```ts
+export function tripTicketStatusFromDocuments(documents: ReadonlyArray<{ type: string; status: string }>): TripTicketStatus {
+  const billets = documents.filter((d) => d.type === "TICKET_PROOF");
+  if (billets.some((d) => d.status === "VERIFIED")) return "VERIFIED";
+  if (billets.some((d) => d.status === "PENDING" || d.status === "EXPIRED")) return "PENDING";
+  if (billets.some((d) => d.status === "REJECTED")) return "REJECTED";
+  return "NOT_SUBMITTED";
+}
+```
+
+Côté admin, elle est appelée **dans la transaction** de décision, après l'`updateMany` conditionnel : la synthèse lit
+l'état que la transaction vient d'écrire. Côté membre, `syncTripTicketStatus` écrit par `updateMany` conditionnel
+(`NOT: { ticketVerificationStatus: synthese }`) : aucune écriture quand rien ne change.
+
+## Les faits vérifiés (A158)
+
+```ts
+const factsChanged = changedTicketFacts({ departureAt: trip.departureAt, originCity: trip.originCity, destinationCity: trip.destinationCity }, updateData);
+if (factsChanged.length > 0) {
+  const reopened = await prisma.tripDocument.updateMany({ where: { tripId: id, type: "TICKET_PROOF", status: "VERIFIED" }, data: { status: "PENDING", verifiedAt: null, reviewedByAdminId: null } });
+  if (reopened.count > 0) await syncTripTicketStatus(id);
+}
+```
+
+`changedTicketFacts` compare des **valeurs** : un champ absent du patch est inchangé, une date se compare par instant
+(chaîne ISO ou `Date`), une ville sans casse ni espaces. Renvoyer le même payload que l'écran d'édition ne rouvre donc rien.
+
+## La file ne lit que des billets décidables
+
+Avant, `listTickets` lisait les 200 premiers billets `PENDING`, puis écartait ceux des trajets partis en mémoire. Deux
+défauts : l'export (même `where`) sortait ces billets partis ; et 200 billets partis masquaient un billet à venir. Les
+deux requêtes sont désormais séparées :
+
+```ts
+const expired = await prisma.tripDocument.findMany({ where: departedTicketsWhere(now), select: { id: true } });  // à expirer
+const pending = await prisma.tripDocument.findMany({ where: buildTicketsWhere(q, now), orderBy: { createdAt: "asc" }, take: 200 });
+```
+
+`buildTicketsWhere` porte le filtre de relation `trip.is = { isDeleted: false, status ∈ {DRAFT, PUBLISHED, PAUSED},
+OR: [departureAt ≥ now, departureAt null, departureAt absent] }` ; `departedTicketsWhere` borne `departureAt` par
+`gt: new Date(0)` : dans un filtre de relation Prisma + Mongo, `lt` matche une date nulle (piège payé au § 5.4).
+
+## L'ordre des gardes
+
+La décision vérifie maintenant : billet introuvable (404) → **son propre billet (403)** → déjà traité (400) → trajet parti
+ou fermé (400). Un propriétaire qui rejouait sur un billet déjà traité recevait 400 : un refus qui en masquait un autre,
+comme ANO-ADM-02.
+
+## Écran : un refus dit la suite
+
+`TicketsQueue` associe chaque `details.code` à un texte ET à un rechargement (`reload`) : « déjà traité », « billet
+supprimé », « trajet parti / annulé » rechargent la file, puisqu'elle est périmée ; « c'est ton propre trajet » ne recharge
+rien. Le message est rendu hors du bloc « Chargement… » : un refus au tout premier appel n'était jamais visible.
+
+## Tests
+
+- trip-service **292** (+10 : `ticket-status.rules.spec.ts` ×8, `admin-trips.rules.spec.ts` ×2) ; autres services inchangés.
+- `apps/e2e` : **393 scénarios** (385 + 8) ; chaque fiche jouée seule AVANT correction (BIL-1, 5, 6, 7, 8 en échec sur
+  leur défaut), puis 8/8 verts deux fois.
+- Typecheck trip-service, admin-ui, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.9 : la médiation — un verrou avant l'argent, un dossier qui se relit, un email qui ne ment plus
+
+*(PR `chore/recette-admin-5-9`, empilée sur #309, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Neuf scénarios (ADM-MED-1 à 6 du cahier, 7 à 9 ajoutés), trois anomalies closes dont une **bloquante**, deux décisions
+au registre (A159, A160).
+
+```
+apps/e2e/src/admin/adm-med-mediation.spec.ts                 9 scénarios, 5 sources de preuve par décision
+apps/deal-service/src/lib/decision-lock.ts (+ spec)          NOUVEAU — ANO-ADM-22 / A159, verrou Redis par deal
+apps/deal-service/src/services/deal-mediation.service.ts     gestes de médiation sous verrou (échec fermé sans magasin)
+apps/deal-service/src/routes/deal.routes.ts                  câblage du Redis partagé
+packages/libs/api-contracts/src/booking/booking-lifecycle.schema.ts   code 409 DECISION_IN_PROGRESS
+apps/deal-service/src/services/admin-dispute.service.ts (+ spec)      A160 — fileKindOf : un dossier tranché se relit
+apps/deal-service/src/services/ops-alerts.rules.ts (+ spec)  ANO-ADM-24 — countUndecidedDisputes, délai = paramètre
+apps/deal-service/src/services/ops-alerts.service.ts         branchement du paramètre dispute.responseDelayHours
+apps/notification-service/src/emails/settlement-emails.ts (+ spec)    ANO-ADM-23 — partiel au-delà du net
+apps/admin-ui/src/components/DecisionForm.tsx                refus par code, montant « 1 234,50 », rechargement, « déjà tranché »
+apps/admin-ui/src/components/DisputeFileView.tsx, QueueTable.tsx, lib/format.ts, app/(back)/disputes/page.tsx
+```
+
+## ANO-ADM-22 : le verrou optimiste protège la base, pas l'argent
+
+`resolveDispute` suit D39 : **l'argent d'abord**. L'ordre était :
+
+```
+loadBookingForWrite → canPerform → dispute.resolvedAt ? → isDisputeDecidable → provider.refund(…) → applyBookingTransition (updateMany conditionnel)
+```
+
+Deux administrateurs qui valident au même instant lisent tous deux un dossier non tranché, passent toutes les
+vérifications, et appellent tous deux `provider.refund`. Le verrou optimiste (`updateMany` sur `from: "DISPUTED"`) fait
+échouer la seconde **transaction** — mais son **remboursement** est déjà parti. Mesuré avec le fournisseur FAKE, dont les
+remboursements sont relus par la fiche argent (`POST /admin/deals/:id/money/reconcile` → `provider.inspect`) : `[784, 1568]`
+pour un deal, 784 en base.
+
+Correction : réserver le geste **avant toute lecture**.
+
+```ts
+// apps/deal-service/src/lib/decision-lock.ts
+export async function withDecisionLock<T>(store: DecisionLockStore, dealId: string, fn: () => Promise<T>, ttlMs = 60_000): Promise<T> {
+  const key = `yamba:deal:decision:${dealId}`;
+  const token = randomUUID();
+  if ((await store.set(key, token, "PX", ttlMs, "NX")) !== "OK") {
+    throw new BookingLifecycleError("DECISION_IN_PROGRESS", "Another decision is being recorded on this deal: reload it in a few seconds.");
+  }
+  try { return await fn(); }
+  finally { await store.eval(RELEASE, 1, key, token).catch(() => undefined); } // compare-and-delete : jamais le verrou d'un autre
+}
+
+// deal-mediation.service.ts — le gagnant RELIT le deal sous verrou
+resolveDispute: (admin, dealId, input) => withDecisionLock(requireLock(), dealId, () => gestures.resolveDisputeUnlocked(admin, dealId, input)),
+```
+
+Trois choix : (1) **verrou avant lecture**, sinon le perdant qui obtient le verrou après la libération agirait sur une
+lecture périmée ; (2) **jeton + compare-and-delete** (script Lua), pour qu'un geste plus long que le TTL ne libère pas le
+verrou d'un autre ; (3) **échec fermé** : le magasin est injecté (`deal.routes.ts` passe le Redis partagé), et un service
+construit sans magasin lève une erreur plutôt que de trancher sans verrou. Le module ne charge pas Redis lui-même : ses
+tests unitaires utilisent une `Map`.
+
+Ce que le verrou ne couvre pas : une **panne** entre le remboursement et la transaction (le deal reste DISPUTED, un nouvel
+essai rembourserait à nouveau). La défense est une clé d'idempotence du fournisseur (`refunds.create(…, { idempotencyKey })`),
+proposée. Le même risque de concurrence existe sur le remboursement manuel appliqué (§ 5.15).
+
+## A160 : un dossier tranché se relit
+
+`getFile` refusait tout deal que `arbitrationKindOf` ne rangeait pas dans la file (DISPUTED, ou CANCELLED +
+HELD_FOR_MEDIATION). Après une décision, le dossier répondait 404 et le bloc « Décision rendue » de `DisputeFileView` — déjà
+écrit — n'était jamais atteint pour un litige. `fileKindOf(booking, dispute)` ajoute deux cas : une fiche `Dispute` existe
+(litige tranché), ou une retenue a été arbitrée (`retentionDecidedAt` + disposition CARRIER/SHIPPER). La file garde
+`arbitrationKindOf` ; `canDecide` exige désormais aussi `status === "DISPUTED"`.
+
+## ANO-ADM-24 : deux définitions de « décidable »
+
+L'écran de médiation : `isDisputeDecidable({ disputedAt, carrierRespondedAt }, now, settings["dispute.responseDelayHours"])`.
+L'alerte : `carrierRespondedAt ?? createdAt + 72 h`. Deux sources de date et une constante là où il y a un paramètre. La
+règle pure `countUndecidedDisputes(disputes, now, responseDelayHours, thresholdHours)` reprend la définition de l'écran ;
+le service charge `Booking.disputedAt` des litiges ouverts et passe le paramètre.
+
+## Le harnais : cinq preuves, et deux pièges
+
+- **Le fournisseur FAKE indexe par intent**, et l'intent d'un deal du jeu d'essai (`pi_fake_seed_bzv-disputed`) est le même
+  d'un rejeu à l'autre : sa liste de remboursements cumule les fiches précédentes. La fiche relève la liste avant le geste
+  et compare la **différence**.
+- **`nx serve` recharge un service modifié pendant un passage** : notification-service a pris la correction d'ANO-ADM-23
+  au milieu du passage « avant correction ». La preuve « avant » d'un défaut dans un service sous `nx serve` doit être
+  unitaire (ou le service lancé en bundle).
+- Le cache de 30 s des paramètres côté deal-service impose d'attendre `canDecide` (sonde sur l'API du dossier) après chaque
+  changement de délai — y compris le retour à 72 h de la fiche précédente.
+
+## Tests
+
+- deal-service **586** (+8 : `decision-lock.spec.ts` ×4, `ops-alerts.rules.spec.ts` ×3, `admin-dispute.service.spec.ts` ×1)
+  ; notification-service **120** (+1) ; autres services inchangés.
+- `apps/e2e` : **402 scénarios** (393 + 9) ; passage contre le code non corrigé (MED-1/2/3 sur l'écran, MED-7 double
+  remboursement, MED-8 404), puis 9/9 verts deux fois.
+- Typecheck deal, notification, auth, trip, message, admin-ui, harnais verts ; contrats OpenAPI inchangés (le code d'erreur
+  n'est pas exposé en énumération).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.10 : la retenue d'annulation tardive — ce qu'un email affirme doit être vrai
+
+*(PR `chore/recette-admin-5-10`, empilée sur #310, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre scénarios (ADM-RET-1 et 2 du cahier, 3 et 4 ajoutés), une anomalie close, trois améliorations d'écran.
+
+```
+apps/e2e/src/admin/adm-ret-retenue.spec.ts                  NOUVEAU — 6 preuves par arbitrage, jeu d'essai rejoué avant chaque fiche
+apps/notification-service/src/emails/settlement-emails.ts   ANO-ADM-25 — part Yamba, plus de justification inventée ; ANO-ADM-26 — jamais le montant de l'autre partie
+apps/notification-service/src/emails/booking-emails.spec.ts +1 test
+apps/admin-ui/src/lib/format.ts                             RETENTION_DISPOSITION_LABEL
+apps/admin-ui/src/components/DecisionForm.tsx               indices (part Yamba, total remboursé), panneau en français
+apps/admin-ui/src/components/DisputeFileView.tsx            disposition lisible
+apps/admin-ui/src/components/DealMoneyView.tsx              disposition lisible
+apps/e2e/src/admin/adm-med-mediation.spec.ts, apps/e2e/src/parcours/web-e2e-2.spec.ts   « statut final : Terminée »
+```
+
+## Le verrou A159 couvrait déjà la retenue
+
+`makeDealMediationService` expose `resolveRetention` à travers `withDecisionLock(requireLock(), dealId, …)` (ligne 430) :
+la fiche ADM-RET-3, jouée contre le code non corrigé, envoie deux restitutions simultanées et compte les remboursements
+**émis chez le fournisseur** (rapprochement, en différence) : 200 + 409 `DECISION_IN_PROGRESS`, un seul remboursement.
+Aucune correction : un soupçon hérité d'un chapitre voisin se mesure avant de se corriger.
+
+## Le calcul, du serveur à l'écran
+
+```ts
+// booking-lifecycle.ts — la compensation est la part NETTE de la retenue (ANN-01, A80)
+Math.round((retentionCents * transportCents) / totalShipperCents)   // 1456 × 2600 / 2912 = 1300
+```
+
+`admin-dispute.service.ts` sert ce montant dans `proposedAmounts.compensateCarrierCents` ; `DecisionForm` n'en calcule
+aucun autre : l'indice et le récapitulatif lisent la même valeur, la part de Yamba est la différence
+`retentionCents − compensateCarrierCents`. La fiche vérifie les trois : formule, API, écran.
+
+## ANO-ADM-25 : un modèle d'email ne justifie pas une décision à la place du décideur
+
+La branche `COMPENSATE_CARRIER` de `disputeResolvedShipper` portait une phrase figée : « personne n'a pu attester de la
+prise en charge, et il s'était déplacé ». Le Médiateur écrit son motif (≥ 50 caractères), déjà repris dans l'email ; la
+phrase ajoutait un fait qu'il n'avait pas établi — contredit par le jeu d'essai (« Le Voyageur ne s'est pas présenté ») —
+et un montant faux (« la retenue est versée au Voyageur » : 13,00 € sur 14,56 €). Le modèle dit maintenant ce qui est
+vrai par construction :
+
+```ts
+"La retenue d'annulation ne t'est pas restituée : le Voyageur en reçoit une part en compensation, le reste correspond à la commission Yamba."
+```
+
+## ANO-ADM-26 : « chacun son montant », une règle que seul un parcours de bout en bout gardait
+
+La première rédaction de la correction nommait « 13,00 € sont versés au Voyageur ». Rejouer WEB-E2E-2 (le parcours du
+litige, qui lit aussi le gabarit `disputeResolvedShipper`) a échoué à l'étape 18 : **l'email de l'Expéditeur ne contient
+jamais le montant du Voyageur, et inversement** (A13 étendu aux décisions). Le parcours a révélé que la correction
+d'ANO-ADM-23 (§ 5.9) avait déjà franchi cette règle (« Le Voyageur reçoit 40,00 € »). Les deux phrases disent désormais
+le fait sans le montant ; les tests unitaires portent la règle (`not.toMatch(/20,00/)`, `/13,00/`, `/14,56/`) pour
+qu'elle ne dépende plus d'un parcours de 19 étapes. Leçon : un gabarit partagé se corrige contre la liste de ses
+lecteurs (`grep -rn disputeResolvedShipper`, puis les specs e2e qui lisent son sujet).
+
+## Lire l'outbox : l'enveloppe, puis le contenu
+
+`applyBookingTransition` écrit dans `OutboxEvent.payload` l'**enveloppe** validée par `BookingDomainEventSchema`
+(`eventId`, `occurredAt`, `schemaVersion`, `aggregateId`…) ; le contenu métier est sous `payload.payload`. Une assertion
+`toMatchObject` sur le premier niveau échoue en listant 28 champs « reçus en plus » : c'est le signe qu'on lit une couche
+trop haut.
+
+## Tests
+
+- notification-service **121** (+1 test, ANO-ADM-25 ; ANO-ADM-23 renforcé pour ANO-ADM-26) ; autres services inchangés.
+- `apps/e2e` : **406 scénarios** (402 + 4), 4/4 verts deux fois sur le code final ; WEB-E2E-2, ADM-MED-4 et ADM-MED-9 rejoués verts.
+- Typecheck admin-ui, notification-service, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.11 : les files d'exception de /finances — un filtre, un compte, une erreur qui reste JSON
+
+*(PR `chore/recette-admin-5-11`, empilée sur #311, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-FIN-1 à 5), deux anomalies closes (ANO-ADM-27, 28), décision A161.
+
+```
+apps/e2e/src/admin/adm-fin-files.spec.ts                         5 scénarios en série
+packages/error-handler/error-middleware.ts                       notFoundHandler (ANO-ADM-27)
+apps/{auth,trip,deal,message,notification}-service/src/main.ts   app.use(notFoundHandler) avant errorMiddleware
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts   financeQueueWhere, FINANCE_QUEUE_PAGE, counts, truncated
+apps/deal-service/src/services/admin-finance.service.ts          file = filtre partagé + comptes des quatre files
+apps/deal-service/src/controllers/admin-finance.controller.ts    INVALID_QUEUE_KIND
+apps/auth-service/src/controller/admin-kpis.controller.ts         tuiles = filtre partagé
+apps/admin-ui/src/components/FinanceQueues.tsx                   compteurs, adresse, libellés, refus, Relancer
+apps/admin-ui/src/components/AlertsView.tsx                      lien d'alerte selon la permission (ANO-ADM-28)
+apps/*/openapi.json                                              régénérés (FinanceQueueResponse)
+```
+
+## ANO-ADM-27 : la page HTML d'Express
+
+Express termine toute requête qu'aucune route n'a prise par son gestionnaire par défaut, qui écrit une page HTML
+`Cannot GET <chemin>`. Un middleware d'erreur (`(err, req, res, next)`) ne l'intercepte pas : il n'y a pas d'erreur, il
+n'y a juste personne. La correction est un middleware ORDINAIRE, placé après toutes les routes, qui fabrique l'erreur :
+
+```ts
+export const notFoundHandler = (req: Request, _res: Response, next: NextFunction) => {
+  next(new NotFoundError("Route not found.", { code: "ROUTE_NOT_FOUND" }));
+};
+// main.ts de chaque service
+app.use(notFoundHandler);
+app.use(errorMiddleware);
+```
+
+L'ordre est tout : placé avant un routeur, il répondrait 404 à des routes existantes. Le script de revue du chapitre
+vérifie qu'aucun `app.use` / `app.get` ne suit `notFoundHandler` dans les cinq `main.ts`. La passerelle n'a pas eu besoin
+d'être touchée : son proxy de repli transmet à auth-service, qui répond désormais en JSON.
+
+## Un filtre partagé entre deux services
+
+Les tuiles de l'accueil (auth-service) et la file (deal-service) comptaient les mêmes choses avec deux filtres écrits
+séparément. `financeQueueWhere(kind)` vit dans `api-contracts`, que les deux services importent déjà : c'est un objet
+Prisma en JSON (`isSet`, `in`, `gt`), sans dépendance à Prisma. La file sert en plus le compte des quatre files
+(`prisma.booking.count` en parallèle de la page) et `truncated` (`counts[kind] > items.length`) :
+
+```ts
+const [rows, ...sizes] = await Promise.all([
+  prisma.booking.findMany({ where: financeQueueWhere(kind), take: FINANCE_QUEUE_PAGE, … }),
+  ...FinanceQueueKindSchema.options.map((k) => prisma.booking.count({ where: financeQueueWhere(k) })),
+]);
+```
+
+Le test unitaire reconnaît chaque appel `count` à son filtre sérialisé, ce qui prouve que les QUATRE comptes utilisent
+bien la fonction partagée.
+
+## admin-ui : un nom accessible stable, une adresse qui suit l'onglet
+
+Le compteur est un `<span data-count>` dans le bouton ; `aria-label={label}` garde le nom accessible « Versements en
+échec » intact, et les fiches qui cliquent le bouton par son nom exact (ADM-ALR-2, ALR-4) n'ont pas bougé. L'onglet
+s'écrit dans l'adresse par `router.replace(`${pathname}?kind=${k}`, { scroll: false })` — `replace` et non `push` :
+changer d'onglet ne remplit pas l'historique. Piège de test payé : `router.replace` est asynchrone ; recharger
+immédiatement après le clic recharge l'ANCIENNE adresse. La fiche attend `toHaveURL(…?kind=HELD)` avant `reload()`.
+
+## ANO-ADM-28 : un lien vers un 403
+
+`AlertsView` associe chaque destination à sa permission (`/finances` → `finances.read`, `/disputes` → `disputes.read`,
+`/pilotage` → `pilotage.read`) et lit `/admin/me` ; la carte n'est un `<Link>` que si `can(adminRoles, permission)`.
+Tant que `/admin/me` n'a pas répondu, la carte reste un lien (état d'avant, jamais pire).
+
+## Tests
+
+- auth-service **249** (+1, `notFoundHandler`), deal-service **587** (+1, comptes et troncature). Un passage parallèle de
+  deal-service a expiré deux fois sous charge ; vert en isolé (même constat qu'au § 5.5).
+- `apps/e2e` : **411 scénarios** (406 + 5), 5/5 verts deux fois ; ADM-ALR et ADM-ACC rejouées (7/7).
+- Typecheck des cinq services, d'admin-ui et du harnais verts ; OpenAPI régénérés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.12 : la fiche argent — un bilan qui dit où est chaque centime
+
+*(PR `chore/recette-admin-5-12`, empilée sur #312, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Deux fiches du cahier (ADM-ARG-1, 2) et trois ajoutées (ARG-3 invariants comptables, ARG-4 bilan et libellés, ARG-5
+le Support et la chronologie). Deux anomalies closes (`ANO-ADM-29`, `ANO-ADM-30`), neuf améliorations.
+
+```
+apps/deal-service/src/services/admin-finance.rules.ts        moneyBalance (règle pure) ; AUTHORIZATION_RELEASED dans la chronologie
+apps/deal-service/src/services/admin-finance.service.ts      la fiche sert `balance`
+apps/deal-service/src/services/admin-history.service.ts      redactContacts : erreurs techniques sans adresse ni numéro
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts  MoneyBalanceSchema, MoneyPendingKind ; 5 openapi.json régénérés
+apps/admin-ui/src/components/DealMoneyView.tsx               carte Bilan ; vue réduite sur 403 (ANO-ADM-29) ; libellés ; erreurs nommées
+apps/admin-ui/src/components/DisputeFileView.tsx             le lien dit ce qu'il ouvre selon le profil
+apps/admin-ui/src/lib/format.ts + types.ts                   libellés (attentes, anomalies, acteurs, modèle, états), adminAfterSummary
+packages/libs/prisma/scripts/seed-deals.ts                   ANO-ADM-30 : un deal accepté puis annulé est remboursé
+apps/e2e/src/admin/adm-arg-fiche-argent.spec.ts              5 scénarios en série (jeu d'essai rejoué avant et après)
+```
+
+## Sonder le terrain avant d'écrire
+
+Un script de sonde (lu puis supprimé) a relevé, pour les 23 deals du jeu d'essai : prix figé (et `net + commission +
+prime = payé`), débit, remboursement, retenue, versement, transfert. Tout additionnait, sauf un fait : `bzv-cancelled`
+était **capturé** (accepté) puis **annulé**, sans aucun remboursement. Le produit rembourse en entier une annulation plus
+de 48 h avant le départ (`deal-lifecycle.service.ts`, `computeCancellationRefundCents`) : c'est le jeu d'essai qui mentait
+(`ANO-ADM-30`). La leçon technique n'est pas la correction du seed, c'est la question qu'elle pose : **qui aurait vu ce
+deal en production ?** Personne — aucune file ne montre un deal clos dont l'argent n'a pas de destination. D'où le bilan.
+
+## `moneyBalance` : une règle pure, testée cas par cas
+
+```ts
+export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
+  const capturedCents = b.capturedAt ? b.pricing.totalShipperCents : 0;
+  const refundedCents = b.refundAmountCents ?? 0;
+  const paidOutCents = b.payoutStatus === "SENT" ? (b.payoutAmountCents ?? 0) : 0;
+  const platformHoldsCents = capturedCents - refundedCents - paidOutCents;
+  // pending : AUTHORIZATION_OPEN, DEAL_IN_PROGRESS, PAYOUT_FROZEN, PAYOUT_DUE, PAYOUT_FAILED, REVERSAL_OPEN, RETENTION_HELD, REFUND_PROPOSED
+  …
+  if (settled && CLOSED.has(b.status)) {
+    const writtenOff = b.payoutStatus === "REVERSED" && b.payoutReversalResolution === "WRITTEN_OFF";
+    if (!writtenOff && platformHoldsCents > b.pricing.commissionCents) anomaly = "UNALLOCATED_FUNDS";
+    else if (platformHoldsCents < 0 && !(b.manualRefundCents ?? 0)) anomaly = "OVERSPENT";
+  }
+}
+```
+
+Pourquoi « plus que sa commission » et pas « différent de sa commission » ? Parce que plusieurs issues légitimes laissent
+à la plateforme **moins** que sa commission : une retenue compensée au prorata (la plateforme garde la part de commission
+de la retenue — 1,56 € au § 5.10), une retenue restituée (0), un geste commercial (négatif, expliqué par
+`manualRefundCents`). Seul le cas « la plateforme détient plus que ce qu'elle facture, et rien n'attend » est sans
+explication. Un renversement **abandonné** (`WRITTEN_OFF`) garde la part du Voyageur par décision tracée : exclu.
+L'écran n'additionne rien ; il affiche ce que le serveur calcule.
+
+## ANO-ADM-29 : une permission sans écran
+
+Les permissions sont justes (`deals.history.read` au Support, `finances.read` non) mais la seule carte qui sert la
+première vit sur une page qui charge d'abord la seconde. Plutôt que d'ouvrir `finances.read` (le Support lirait alors
+tout l'argent), l'écran traite le 403 comme une information :
+
+```tsx
+.catch((e) => {
+  if (e instanceof ApiError && e.status === 403) setDenied(true);          // vue réduite, pas une erreur
+  else if (e instanceof ApiError && e.status === 404) setError("Deal introuvable. …");
+  …
+});
+if (denied) { if (!me) return <Chargement/>; return can(me.adminRoles, "deals.history.read") ? <DealHistoryCard/> : <raison/>; }
+```
+
+On attend `/admin/me` avant de choisir le message : sans cela, la vue affichait un instant « ton profil n'ouvre rien »
+avant de se reprendre.
+
+## `redactContacts` : ce qu'une erreur technique révèle
+
+Une erreur SMTP typique est `550 5.1.1 <aminata.diallo@…>: mailbox unavailable`. La chronologie servait `lastError`
+tel quel à des profils qui n'ont pas la lecture des coordonnées. La fonction masque les adresses, puis les suites de
+chiffres **d'au moins neuf chiffres** — piège payé en écrivant le test : une première version à « 9 caractères chiffres,
+espaces, points » masquait `550 5.1.1`, le code SMTP lui-même.
+
+## Chronologie de l'argent : dire aussi ce qui n'a pas eu lieu
+
+`buildMoneyTimeline` ne pose qu'une ligne par fait écrit en base. Un deal refusé n'a qu'un fait : l'empreinte
+(`AUTHORIZED` à `requestedAt`) — sa chronologie se terminait sur « Empreinte posée 67,20 € », ce qu'un lecteur prend pour
+un débit. La libération de l'empreinte n'est pas un champ, mais elle se **déduit** sans ambiguïté : statut fermé
+(`DECLINED`, `EXPIRED`, `CANCELLED`) et jamais `capturedAt`. Nouveau fait `AUTHORIZATION_RELEASED` à `closedAt`, avec
+l'acteur en détail.
+
+## La contre-épreuve d'un invariant
+
+ARG-3 vérifie « aucune anomalie » sur les 23 deals. Vert, cela peut vouloir dire que le calcul est juste… ou qu'il ne
+lève jamais rien. La fiche remet donc le défaut d'origine en base (manœuvre consignée : `refundAmountCents: null` sur
+`bzv-cancelled`), exige `UNALLOCATED_FUNDS` à l'API et le message rouge à l'écran, et le jeu d'essai est rejoué en
+`afterAll`.
+
+## Tests
+
+- deal-service **595** (+8) : `moneyBalance` (6), `AUTHORIZATION_RELEASED` (1), `redactContacts` (1).
+- `apps/e2e` : **416 scénarios** (411 + 5), 5/5 verts deux fois ; ADM-RET et ADM-FIN rejouées.
+- Typecheck deal-service, admin-ui et harnais verts ; les cinq `openapi.json` régénérés (nouveau schéma `MoneyBalance`).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.13 : le rapprochement avec le fournisseur — une lecture qui ne crée rien, une panne qui ne ment pas
+
+*(PR `chore/recette-admin-5-13`, empilée sur #313, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Trois fiches (ADM-RAP-1 à 3), deux anomalies closes (`ANO-ADM-31`, `ANO-ADM-32`), décision **A163**.
+
+```
+packages/libs/payments/src/index.ts                     PaymentIntentNotFoundError, isStripeResourceMissing ; Fake.inspect sans adoption ;
+                                                        Stripe.inspect : seule l'absence vaut « introuvable »
+apps/deal-service/src/services/admin-finance.service.ts reconcileDeal : introuvable → INTENT_NOT_FOUND ; panne → 503 PROVIDER_UNAVAILABLE journalisé
+apps/deal-service/src/openapi/build-openapi.ts          503 documenté (+ les cinq openapi.json régénérés)
+apps/admin-ui/src/components/DealMoneyView.tsx          carte : fournisseur nommé, refus par code, aide par divergence, statuts FR
+apps/admin-ui/src/lib/format.ts                         DIVERGENCE_HELP, INTENT_STATUS_LABEL, REFUND_STATUS_LABEL, PROVIDER_LABEL
+apps/e2e/src/admin/adm-rap-rapprochement.spec.ts        NOUVEAU — 3 scénarios
+apps/e2e/src/admin/adm-ret-retenue.spec.ts              RET-1 : transfert lu en base quand l'intent seedé est inconnu du Fake
+```
+
+## ANO-ADM-31 : une lecture qui écrit
+
+Le Fake est en mémoire. Pour que les gestes du développeur (accepter, annuler) marchent sur les deals du jeu d'essai,
+`retrieve` **adopte** tout id `pi_fake_seed_…` inconnu : il le matérialise AUTHORIZED à 0 €. `inspect` passait par
+`retrieve` : le premier rapprochement créait donc un paiement « autorisé, rien encaissé », puis le comparait à une base
+qui dit « capturé » — `CAPTURE_RECORDED_NOT_LIVE`, `TRANSFER_MISSING`. Deux défauts en un : une divergence inventée, et
+une lecture qui modifie l'état du fournisseur.
+
+```ts
+async inspect(input) {
+  const known = this.intents.get(input.intentId);          // pas d'adoptSeeded ici
+  if (!known) throw new PaymentIntentNotFoundError(input.intentId);
+  …
+}
+```
+
+Conséquence assumée (A163) : un intent seedé qu'aucun geste d'argent n'a touché dans ce processus est illisible par le
+rapprochement — exactement comme un intent inconnu de Stripe. ADM-RET-1 (compensation sans remboursement) lit donc le
+transfert en base ; ADM-RAP-2 prouve la lecture du transfert chez le fournisseur après un vrai geste.
+
+## ANO-ADM-32 : « introuvable » est une réponse, « injoignable » n'en est pas une
+
+```ts
+export function isStripeResourceMissing(err: unknown): boolean {
+  const e = err as { code?: unknown; statusCode?: unknown; type?: unknown } | null;
+  return !!e && (e.code === "resource_missing" || (e.statusCode === 404 && e.type === "StripeInvalidRequestError"));
+}
+```
+
+`StripePaymentProvider.inspect` ne traduit en `PaymentIntentNotFoundError` que cette erreur-là, et la lecture du transfert
+ne met `null` (→ `TRANSFER_MISSING`) que sur une absence. Le service :
+
+```ts
+} catch (err) {
+  if (!(err instanceof PaymentIntentNotFoundError) && err?.name !== "PaymentIntentNotFoundError") {
+    await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: [], providerError: "PROVIDER_UNAVAILABLE" }));
+    throw new AppError("The payment provider could not be reached: nothing was compared, try again later.", 503, true, { code: "PROVIDER_UNAVAILABLE" });
+  }
+  divergences = [{ code: "INTENT_NOT_FOUND", message: "The payment provider does not know this payment intent.", dbCents: null, liveCents: null }];
+}
+```
+
+Le double test (`instanceof` ET `name`) protège d'un bundle qui chargerait deux copies de la bibliothèque. La tentative est
+journalisée : un administrateur a bien demandé à lire l'argent chez le fournisseur.
+
+## La fiche : prouver « rien n'est modifié » sans se mentir
+
+- **Base** : le document Mongo du deal relu avant / après, comparé en entier.
+- **Fiche argent** : identique, **sauf** `adminActions` (le journal du deal, qui gagne des lignes par construction) — et
+  la fiche vérifie que les lignes ajoutées ne sont QUE `DEAL_MONEY_VIEWED` et `DEAL_RECONCILED`.
+- **Fournisseur** : deux rapprochements successifs répondent la même chose.
+- **Divergences réelles en local** : un geste d'argent réel (relance du versement, remboursement manuel de 1 €) fait
+  connaître l'intent au Fake ; la base est ensuite décalée champ par champ (manœuvres consignées), chaque écart est exigé
+  avec ses deux montants. Le Fake **cumule** ses remboursements d'un rejeu à l'autre : la fiche part de ce qu'il montre
+  (`L`) et pose la base à `L`, `L−100`, `L+400`.
+- **Rejouabilité** : la mémoire du Fake survit au rejeu du jeu d'essai ; RAP-1 choisit le premier deal dont l'intent est
+  encore inconnu (le sonder ne change rien : c'est le sujet même de la fiche).
+
+## Tests
+
+- deal-service **598** (+3) : Fake sans adoption, `isStripeResourceMissing`, 503 journalisé.
+- `apps/e2e` : **419 scénarios** (416 + 3), 3/3 verts deux fois ; ADM-ARG, FIN, RET (adaptée), MED rejouées (27/27).
+- Typecheck deal-service, admin-ui, harnais verts ; les cinq `openapi.json` régénérés (503 du rapprochement).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.14 : versements — rejeu et renversement, et l'argent qui ne part jamais deux fois
+
+*(PR `chore/recette-admin-5-14`, empilée sur #314, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Sept scénarios (ADM-VER-1, 2, 3 du cahier ; VER-1 bis, VER-1 ter, VER-2 bis, VER-4 ajoutées), une anomalie bloquante
+close (`ANO-ADM-33`), une décision (`A164`), sept améliorations.
+
+```
+apps/e2e/src/admin/adm-ver-versements.spec.ts                 7 scénarios — jeu d'essai rejoué avant chacun
+packages/libs/payments/src/index.ts                           A164 — findTransfers (Stripe transfers.list, Fake) ; aide _forgetIdempotencyKeysForTest
+apps/deal-service/src/services/deal-settlement.service.ts     ANO-ADM-33 — échec conditionnel + relecture ; A164 — adopter le transfert vivant
+apps/deal-service/src/services/admin-finance.rules.ts         A164 — payoutNeedsTransferLookup, adoptableTransfer (purs)
+apps/deal-service/src/services/admin-finance.service.ts       journal PAYOUT_REVERSAL_RESOLVED : previousTransferId
+apps/admin-ui/src/lib/format.ts                               payoutReasonLabel, payoutRefusalMessage, libellé « transfert renversé »
+apps/admin-ui/src/components/DealMoneyView.tsx                garde de double clic (ref), messages, formulaire de renversement
+apps/admin-ui/src/components/FinanceQueues.tsx                même lecteur de refus, motif d'échec lisible
+```
+
+## Ce que la recette a mesuré d'abord
+
+Les six premiers scénarios ont été joués contre le code non corrigé : **tous verts**. Quatre `POST /payout/retry` lancés
+ensemble rendaient quatre fois `200 SENT` avec le **même** `transferId`, un seul événement `booking.payout_sent`, un
+compteur à +1 ; deux « Re-verser » simultanés, `200 + 400`. La protection locale est réelle : la clé d'idempotence
+(`payout:<id>`) fait rendre au fournisseur le transfert existant, et l'écriture `SENT` est conditionnelle
+(`payoutStatus ∈ {PENDING, FAILED}`). Le défaut n'était pas là où la fiche regardait.
+
+## ANO-ADM-33 : l'échec écrasait le succès
+
+```ts
+// avant — markPayoutFailed
+await prisma.booking.updateMany({ where: { id: booking.id, status: booking.status }, data: { payoutStatus: "FAILED", … } });
+```
+
+Deux exécuteurs sur le même versement (un admin qui relance pendant le passage du cron, ou deux admins) : A obtient le
+transfert et écrit `SENT` ; B, dont la requête arrive pendant que la clé est « en cours », reçoit de Stripe une erreur 409
+(`idempotency_error`) et écrit `FAILED` **par-dessus** — `transferId` compris, alors que l'argent est parti. Au rejeu
+suivant, si la clé a expiré (24 h chez Stripe ; le rejeu passe à une tentative par jour après 24 essais), un second
+transfert part. Correction :
+
+```ts
+const written = await prisma.booking.updateMany({
+  where: { id: booking.id, status: booking.status, payoutStatus: { in: ["PENDING", "FAILED"] } },
+  data: { payoutStatus: "FAILED", … },
+});
+if (written.count === 0) {
+  const current = await prisma.booking.findUnique({ where: { id: booking.id }, select: { payoutStatus: true, transferId: true } });
+  if (current?.payoutStatus === "SENT") return { payoutStatus: "SENT", transferId: current.transferId ?? null, reason: null };
+}
+```
+
+Le Fake ne sait pas répondre « clé en cours » : la preuve est unitaire (`deal-settlement.service.spec.ts`, « ANO-ADM-33 :
+course… »).
+
+## A164 : demander au fournisseur avant de réémettre
+
+```ts
+if (provider.findTransfers && payoutNeedsTransferLookup(booking)) {        // une tentative a déjà eu lieu
+  try { adopted = adoptableTransfer(await provider.findTransfers(booking.id), { bookingId: booking.id, amountCents, reason }); }
+  catch (err) { return markPayoutFailed(booking, `PROVIDER_ERROR:transfer lookup failed — ${message}`, now); }
+}
+if (adopted) transferId = adopted.id;                                       // aucun nouvel appel à transfer()
+else { … provider.transfer({ …, transferGroup: booking.id, idempotencyKey }) … }
+```
+
+- `findTransfers` est **optionnel** dans l'interface : un fournisseur (ou une doublure de test) qui ne l'offre pas n'est
+  pas consulté.
+- `adoptableTransfer` n'adopte qu'un transfert **vivant** : même montant, même motif (`DELIVERY` / `LATE_CANCELLATION`),
+  même deal si les métadonnées le disent, `reversedCents === 0`. C'est ce qui laisse « Re-verser » émettre un nouveau
+  transfert après un renversement : l'ancien est renversé, donc ignoré.
+- Première tentative : pas de recherche (rien n'a pu partir ; on évite un appel sur chaque versement).
+- Recherche en panne : on écrit l'échec et on **n'émet rien** — le rejeu repassera.
+
+## Les améliorations
+
+- **Refus lus par leur code** (`payoutRefusalMessage`) : `PAYOUT_NOT_RETRYABLE` et `REVERSAL_NOT_OPEN` disent « traité
+  entre-temps » et **rechargent** la fiche ; `ADMIN_IS_PARTY`, `NO_PAYOUT_FOR_STATUS`, permission, motif. Plus jamais
+  `400 : This payout is not an open reversal.`. Pour une erreur réseau, le message ne promet pas que rien n'est parti : il
+  demande de recharger la fiche.
+- **Motif d'échec lisible** (`payoutReasonLabel`) : « compte Stripe du Voyageur non prêt », « refus du fournisseur
+  (…message…) », et le nouveau cas « le fournisseur n'a pas pu dire si un transfert était déjà parti ».
+- **Garde de double clic synchrone** (`useRef`) sur « Relancer le versement » et le formulaire de renversement.
+- **Message de succès** qui nomme montant, Voyageur et identifiant de transfert.
+- **Formulaire de renversement** : le fournisseur réel (« le fournisseur de test (Fake) » en local, comme le rapprochement
+  du § 5.13), compteur `n / 20`, conséquence de chaque bouton écrite sous les boutons.
+- **Journal** : `PAYOUT_REVERSAL_RESOLVED.after.previousTransferId` — « Re-verser » remplace `transferId` en base, l'identifiant
+  du transfert renversé (à retrouver dans le tableau de bord Stripe) ne survivait nulle part.
+
+## Tests
+
+- deal-service **607** (+9) : ANO-ADM-33 (course), A164 (adoption, exclusions, pas de recherche à la première tentative,
+  recherche en panne, bout en bout sur le Fake avec clé oubliée), règles pures, `findTransfers` du Fake, journal
+  `previousTransferId`. Un passage parallèle a échoué une fois sous charge (`admin-finance.service.spec.ts`), vert en
+  isolé et sur deux passages complets suivants (parallèle et `--runInBand`).
+- `apps/e2e` : **426 scénarios** (419 + 7).
+- Typecheck deal-service, admin-ui, harnais verts ; aucun contrat OpenAPI modifié.
+
+# Cahier 02-ADMIN, § 5.15 : remboursement manuel en deux gestes — le verrou protégeait la base, pas l'argent
+
+*(PR `chore/recette-admin-5-15`, empilée sur #315, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Six scénarios (ADM-REM-1, 2, 3 du cahier ; REM-4, 5, 6 ajoutées), trois anomalies closes (`ANO-ADM-34` bloquante,
+`ANO-ADM-35`, `ANO-ADM-36`), une décision (`A165`), neuf améliorations.
+
+```
+apps/e2e/src/admin/adm-rmb-remboursement.spec.ts                    6 scénarios — jeu d'essai rejoué avant chacun
+apps/e2e/src/chapitres/web-cnf.spec.ts                              WEB-CNF-10 : libellé AFTER_COMPLETION dans la table miroir
+packages/libs/payments/src/index.ts                                 A165 — refund(…, { idempotencyKey }) : Stripe + Fake qui honore la clé
+apps/deal-service/src/lib/refund-idempotency.ts (+ spec)            A165 — refundIdempotencyKey(geste, deal, montant, cumulAvant?)
+apps/deal-service/src/services/admin-finance.service.ts             ANO-ADM-34 — verrou de décision ; A165 — clé ; caducité (fiche, file)
+apps/deal-service/src/services/admin-finance.rules.ts               A165 — manualRefundProposalStaleness (pure)
+apps/deal-service/src/routes/deal.routes.ts                         Redis câblé comme magasin de verrou du service finances
+apps/deal-service/src/services/deal-lifecycle|transport|mediation   A165 — clé sur annulation, retour de capture, refus au pickup, décision, retenue
+apps/deal-service/src/services/wallet.service.ts                    ANO-ADM-36 — partialKind, keptCents ; « Dépensé » compte la part gardée
+packages/libs/api-contracts/src/booking/booking-wallet.schema.ts    keptCents, partialKind ; retentionCents réservé à l'annulation tardive
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts      proposal.stale / staleReason ; FinanceQueueItem.proposalStale
+apps/notification-service/src/emails/booking-emails.ts (+ .ejs)     ANO-ADM-35 — commercialGesture, pas de retenue pour un acteur ADMIN
+apps/user-ui/…/finances/WalletRows.tsx + messages fr/en             libellé PARTIALLY_REFUNDED_AFTER_COMPLETION
+apps/admin-ui/src/components/DealMoneyView.tsx                      carte de remboursement : saisie FR, garde ref, refus par code, caducité
+apps/admin-ui/src/lib/format.ts                                     parseEurosToCents (partagé), manualRefundRefusal, REFUND_PROPOSAL_STALE_LABEL
+apps/admin-ui/src/components/FinanceQueues.tsx, DecisionForm.tsx    badge « caduque » ; parseur de montant déplacé dans format.ts
+```
+
+## Ce que la recette a mesuré d'abord — la contre-épreuve
+
+Le § 5.14 l'avait appris : une fiche verte ne prouve rien tant qu'elle n'a pas été jouée contre le code non corrigé. Ici,
+écraser les sources du répertoire de travail étant refusé, la contre-épreuve passe par un **worktree** :
+
+```sh
+git worktree add --detach <scratchpad>/wt-5-14 5b35ef9
+ln -sfn $PWD/node_modules <scratchpad>/wt-5-14/node_modules
+(cd <scratchpad>/wt-5-14 && NX_DAEMON=false npx nx run-many -t build -p deal-service,notification-service)
+# on arrête les processus des ports 6003 / 6004, on lance les bundles du worktree avec le .env racine
+```
+
+L'écran reste celui de la branche (seul le serveur change). Résultats :
+
+- **ADM-REM-4** : `200 · 409 TRANSITION_NOT_ALLOWED · 409 TRANSITION_NOT_ALLOWED` et **3 remboursements chez le
+  fournisseur** pour un seul enregistré ;
+- **ADM-REM-2** : portefeuille « Remboursé 5,00 € le 14 sept. · retenue 34,20 € reversée au Voyageur » ; email « Annulation à
+  moins de 48 h du départ : une retenue de 34,20 € s'applique… ».
+
+## ANO-ADM-34 : l'argent part avant la base, le verrou doit donc venir avant l'argent
+
+```ts
+// avant — applyManualRefund
+const raw = await loadMoney(id);                  // trois requêtes lisent refundAmountCents = null
+const bounds = manualRefundBounds(raw);           // toutes passent
+refundId = (await provider.refund(intent, amount)).refundId;   // trois remboursements réels
+await prisma.booking.updateMany({ where: { id, refundAmountCents: raw.refundAmountCents }, … }); // un seul count: 1
+```
+
+La condition sur le cumul est un verrou **optimiste** : parfait pour une écriture en base, inutile quand l'effet
+irréversible (l'appel au fournisseur, D39) a lieu **avant** l'écriture. Le remède est celui de la médiation (A159) : un
+verrou **pessimiste** court, pris avant la lecture.
+
+```ts
+async applyManualRefund(admin, id, input) {
+  if (!decisionLocks) throw new Error("admin-finance: no decision lock store wired (ANO-ADM-34)");
+  return withDecisionLock(decisionLocks, id, () => applyManualRefundUnlocked(admin, id, input));
+}
+```
+
+- `withDecisionLock` (`apps/deal-service/src/lib/decision-lock.ts`) : `SET key token PX 60000 NX`, puis suppression
+  conditionnelle par script Lua (on ne libère que son propre jeton). Clé `yamba:deal:decision:<id>` — **la même que la
+  médiation** : un remboursement manuel et une décision de litige sur le même deal s'excluent.
+- Le perdant reçoit `409 DECISION_IN_PROGRESS` **sans** appel fournisseur.
+- Sans magasin câblé, le service jette : **échec fermé**. Une doublure oubliée dans un test ou une route ne dégrade pas
+  silencieusement en « pas de verrou ».
+
+## A165 : une clé d'idempotence qui décrit le geste, pas l'instant
+
+Le verrou couvre la course ; il ne couvre pas la **reprise** : un processus qui meurt entre `provider.refund` et la
+transaction, puis un admin qui reclique. La clé fournisseur le couvre, à condition d'être **stable** pour le même geste
+et **différente** pour un geste nouveau :
+
+```ts
+export function refundIdempotencyKey(gesture, dealId, amountCents, previousRefundedCents?) {
+  const parts = ["yamba", "refund", gesture, dealId];
+  if (gesture === "manual") parts.push(`after-${previousRefundedCents ?? 0}`);
+  parts.push(String(amountCents));
+  return parts.join(":");
+}
+```
+
+- Annulation, refus au pickup, décision de litige, restitution de retenue, retour de capture : **une fois par deal** — le
+  montant suffit.
+- Remboursement manuel : répétable (deux gestes de 5 € à une semaine d'écart sont légitimes) → la clé porte le **cumul lu
+  avant le geste**. Rejoué sur le même état (rien écrit) : même clé, même remboursement. Après écriture : cumul changé,
+  nouvelle clé.
+- Le montant est dans chaque clé : Stripe refuse une clé réutilisée avec d'autres paramètres.
+- `FakePaymentProvider.refund` honore la clé (`refundsByKey`) ; `_forgetIdempotencyKeysForTest` l'oublie, comme Stripe au
+  bout de 24 h.
+
+## Proposition caduque
+
+```ts
+export function manualRefundProposalStaleness(proposedCents, bounds) {
+  if (!bounds.allowed) return { stale: true, staleReason: "NOT_REFUNDABLE" };
+  if (proposedCents > bounds.maxRefundableCents) return { stale: true, staleReason: "ABOVE_REMAINING" };
+  return { stale: false, staleReason: null };
+}
+```
+
+Calculée à la lecture (fiche argent, file `PROPOSED_REFUNDS`), jamais stockée. La fiche peint le bandeau en rouge et dit
+combien il reste ; la file porte un badge. Appliquer tel quel reste refusé par `manualRefundBounds` (`REFUND_ABOVE_MAX`).
+
+## ANO-ADM-35 et ANO-ADM-36 : un remboursement partiel n'est pas toujours une retenue
+
+Deux lecteurs du même fait avaient hérité du seul cas connu au moment de leur écriture (l'annulation tardive, ANN-01) :
+
+```ts
+// notification-service — avant
+retainedForCarrier: event.payload.amountCents < p.totalShipperCents ? formatMoney(total - amount) : null,
+// après
+commercialGesture: event.payload.actor === "ADMIN",
+retainedForCarrier: event.payload.actor !== "ADMIN" && event.payload.amountCents < p.totalShipperCents ? … : null,
+```
+
+```ts
+// deal-service, wallet — branche COMPLETED, avant
+return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, … };
+// après
+return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, keptCents: total - refund, partialKind: "AFTER_COMPLETION", … };
+```
+
+Le contrat gagne `keptCents` (ce que l'Expéditeur a finalement payé, quel que soit le motif) et `partialKind` ;
+`retentionCents` ne vaut plus que pour `LATE_CANCELLATION`. `spentCents` somme `keptCents`. Le front choisit la clé
+`PARTIALLY_REFUNDED_AFTER_COMPLETION` (« {kept} ont réglé ton envoi »). Aujourd'hui seul le remboursement manuel émet
+`booking.refund_issued` en acteur `ADMIN` (la médiation n'émet pas cet événement) : c'est ce qui rend `actor === "ADMIN"`
+suffisant — un champ explicite est proposé si un autre geste admin devait l'émettre.
+
+## Les améliorations (admin-ui)
+
+- **Saisie à la française** : `parseEurosToCents` (« 12,50 », « 1 234,50 », espaces insécables) déplacé de
+  `DecisionForm.tsx` vers `lib/format.ts`, partagé ; message sous le champ (« Montant illisible… », « Au-dessus du
+  plafond : … au plus. »).
+- **Garde de double clic synchrone** (`inFlight` en `useRef`).
+- **Refus par code** (`manualRefundRefusal`) : `DECISION_IN_PROGRESS`, `REFUND_ABOVE_MAX`, `REFUND_NOT_ALLOWED`,
+  `TRANSITION_NOT_ALLOWED` rechargent la fiche et disent si de l'argent a pu partir ; `REFUND_PROVIDER_FAILED`,
+  `ADMIN_IS_PARTY`, permission, 400 restent dans la carte ; une erreur inconnue demande de recharger avant de réessayer.
+- **Caducité** affichée (bandeau rouge, badge de file), formulaire non prérempli par une proposition caduque.
+- **Compteur de motif** `n / 50` et rappel « l'Expéditeur reçoit l'email… ; le motif reste au journal ».
+- **Remplacement signalé** : « Une proposition existe déjà : en proposer une autre la remplace. »
+- **Identifiant du remboursement** dans le message de succès.
+- La carte est remontée (`key` = cumul + date de proposition) après chaque rechargement : l'état local ne survit pas à un
+  changement de fond.
+
+## Tests
+
+- deal-service **615** (+8) : ANO-ADM-34 (deux applications simultanées → un remboursement, `DECISION_IN_PROGRESS` ;
+  échec fermé sans verrou), A165 (reprise après base non écrite → même remboursement ; clés de chaque geste ; Fake qui
+  honore et oublie), caducité (règle pure, fiche, file), ANO-ADM-36 (portefeuille). Specs lifecycle / transport ajustées à
+  la nouvelle signature de `refund`.
+- notification-service **122** (+1) : ANO-ADM-35, rendu EJS FR et EN.
+- `apps/e2e` : **432 scénarios** (426 + 6) ; WEB-CNF-10 ajusté.
+- Typecheck des huit projets de la CI vert ; les cinq `openapi.json` régénérés (schémas partagés `FinanceQueueItem`,
+  `AdminDealMoneyFile`, `WalletPaymentItem`) ; miroir i18n FR/EN parfait.
+
+# Cahier 02-ADMIN, § 5.16 : rapport mensuel et export — un deal garde la liste de ses remboursements
+
+*(PR `chore/recette-admin-5-16`, empilée sur #316, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-RPT-1, 2, 3 du cahier ; RPT-4, 5 ajoutées), trois anomalies closes (`ANO-ADM-37`, `ANO-ADM-38`
+majeures, `ANO-ADM-39` mineure), une décision (`A166`), sept améliorations.
+
+```
+prisma/schema.prisma                                               A166 — type BookingRefund, Booking.refunds
+apps/deal-service/src/lib/booking-refunds.ts (+ spec)              withRefund (écrire), refundEntries / refundedTotalCents (lire)
+apps/deal-service/src/services/booking-write.ts                    sélection : refunds, capturedAt, refundedAt, refundId
+apps/deal-service/src/services/deal-lifecycle.service.ts           annulation capturée → CANCELLATION (pas l'empreinte libérée)
+apps/deal-service/src/services/deal-transport.service.ts           refus au pickup → PICKUP_REFUSED
+apps/deal-service/src/services/deal-mediation.service.ts           décision → DISPUTE ; restitution → RETENTION_RESTITUTION
+apps/deal-service/src/services/admin-finance.service.ts            geste → MANUAL ; fiche argent payment.refunds ; nom de fichier
+apps/deal-service/src/services/admin-finance.rules.ts              rapport, CSV (+ 2 colonnes), chronologie, bilan lisent la liste
+apps/deal-service/src/services/booking-request.ts                  refunds: [] à la naissance
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts     AdminDealMoneyFile.payment.refunds
+packages/libs/prisma/scripts/repair-absent-lists.ts, seed-deals.ts refunds (et deliveryPhotoUrls oubliée par le seed)
+apps/admin-ui/src/components/FinanceReportView.tsx                 ANO-ADM-39 — downloadFile, période vérifiée, pied en UTC
+apps/admin-ui/src/components/DealMoneyView.tsx, lib/format.ts      liste des remboursements, libellés de nature
+apps/e2e/src/admin/adm-rpt-rapport.spec.ts                         5 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+La pile tournait encore sur le serveur de la branche précédente (sans A166) : la contre-épreuve s'est jouée avant d'écrire
+le code, sans worktree. Deux fiches ajoutées, deux rouges :
+
+- **RPT-4** : 10 € remboursés le 15 août, 5 € remboursés aujourd'hui → août passe de `10,00 € ×1` à `0,00 € ×0`.
+- **RPT-5** : une demande en attente annulée → « Remboursé » du mois `+28,00 € ×1`, fiche argent `anomaly: OVERSPENT`.
+
+## ANO-ADM-37 : un cumul n'est pas un historique
+
+```ts
+// avant — buildFinanceReport
+if (inRange(r.refundedAt, from, to) && (r.refundAmountCents ?? 0) > 0) {
+  const m = get(r.refundedAt!, cur);
+  m.refundedCents += r.refundAmountCents ?? 0;   // le cumul, daté du DERNIER remboursement
+  m.refundCount += 1;
+}
+```
+
+Chaque chemin de remboursement écrit `refundedAt: now, refundAmountCents: previous + montant, refundId`. Le passé est
+écrasé. Tant qu'un deal ne recevait qu'un remboursement, c'était invisible ; le remboursement manuel (répétable, § 5.15) et
+la médiation après une annulation l'ont rendu courant.
+
+### Le modèle
+
+```prisma
+type BookingRefund {
+  refundId    String?
+  amountCents Int
+  refundedAt  DateTime
+  kind        String // CANCELLATION | PICKUP_REFUSED | DISPUTE | RETENTION_RESTITUTION | MANUAL
+}
+model Booking { … refunds BookingRefund[] … }
+```
+
+Les champs du dernier état restent : les écrans, le portefeuille, le rapprochement (§ 5.13) et les bornes du remboursement
+manuel les lisent déjà et n'ont pas besoin de l'historique.
+
+### Écrire
+
+```ts
+export function withRefund(before: RefundHistorySource, entry) {
+  return [...refundEntries(before).map(…), entry];
+}
+// deal-transport.service.ts
+refunds: withRefund(booking, { refundId, amountCents: total, refundedAt: now, kind: "PICKUP_REFUSED" }),
+```
+
+- La liste est **lue puis réécrite en entier** dans la même transaction que le cumul. Pas de `{ push }` : son comportement
+  sur un document où la liste est ABSENTE n'a pas été mesuré, et Prisma+Mongo a déjà trahi deux fois sur un champ absent
+  (`{ increment }` → null, filtres de liste) — une réécriture complète ne dépend pas de l'état du document. La garde
+  conditionnelle de chaque transition (statut, cumul, `retentionDisposition`) empêche deux écritures concurrentes.
+- `withRefund` part de `refundEntries(before)`, pas de `before.refunds` : sur un document antérieur (cumul sans liste), le
+  remboursement ancien est **matérialisé en entrée `LEGACY` à sa date** au moment précis où `refundedAt` va être écrasé.
+  Sans cela, la part ancienne aurait été datée du nouveau remboursement — ANO-ADM-37 reproduite sur toutes les données
+  existantes. RPT-4 joue exactement ce cas.
+- L'annulation d'une demande en attente n'ajoute rien (`wasAccepted` faux) : libérer une empreinte n'est pas rembourser.
+- Création : `booking-request.ts` et le seed posent `refunds: []` ; `repair-absent-lists.ts` le pose sur l'existant
+  (3 documents en local).
+
+### Lire
+
+```ts
+export function refundEntries(b) {
+  if (!b.capturedAt) return [];                                       // ANO-ADM-38
+  const listed = (b.refunds ?? []).map(…);
+  const unexplained = (b.refundAmountCents ?? 0) - Σ listed;
+  if (unexplained > 0) listed.push({ …, amountCents: unexplained, refundedAt: b.refundedAt ?? b.capturedAt, kind: "LEGACY" });
+  return listed.sort(par date);
+}
+```
+
+- **Rapport** : une entrée = un remboursement dans SON mois. La requête ne change pas : `refundedAt >= from` reste un
+  sur-ensemble (le dernier remboursement est postérieur à tous les autres).
+- **Export CSV** : un deal entre dans la période si l'un de ses remboursements y tombe ; `refundCount` et
+  `refundedInPeriodCents` ajoutés en fin de ligne (les 29 colonnes du cahier gardent leur ordre ; `refundAmountCents` reste
+  le cumul, `refundId` le dernier).
+- **Chronologie** (§ 5.12) : une ligne `REFUNDED` par remboursement, `detail` = la nature.
+- **Bilan** (§ 5.12) : `refundedCents = refundedTotalCents(b)` — plus d'`OVERSPENT` sur une empreinte libérée.
+- **Fiche argent** : `payment.refunds` servi (contrat `AdminDealMoneyFile`), affiché ligne par ligne avec nature et
+  identifiant.
+
+### L'invariant Σ liste = cumul
+
+```ts
+export function refundListExcessCents(b) {
+  const listed = Σ (b.refunds ?? []).amountCents;
+  if (!b.capturedAt) return listed;                       // aucun remboursement ne peut exister sans débit
+  return Math.max(0, listed - (b.refundAmountCents ?? 0)); // moins que le cumul = part LEGACY, normal ; plus = défaut
+}
+// moneyBalance — après les autres anomalies, prioritaire et à tout moment
+if (refundListExcessCents(b) > 0) anomaly = "REFUND_RECORDS_MISMATCH";
+```
+
+Deux sources pour un même fait finissent par diverger si rien ne les compare : le bilan de la fiche argent le dit
+(« Remboursements incohérents… »), ADM-ARG-3 l'exige sur chaque deal du jeu d'essai et le contre-éprouve en remettant le
+cumul de `bzv-held` à zéro. Asymétrie voulue : une liste plus courte que le cumul est l'état normal d'un document antérieur.
+
+## ANO-ADM-39 : l'export oublié
+
+Le § 5.6 avait remplacé `window.open` par `downloadFile` (`apps/admin-ui/src/lib/api.ts`) sur les exports utilisateurs,
+trajets, billets, arbitrage. `FinanceReportView.tsx` ouvrait encore un onglet. Désormais :
+
+```ts
+const periodProblem = exportPeriodProblem(from, to);                 // jours inclus, 366 au plus, fin ≥ début
+const out = await downloadFile(`/admin/finances/export?from=…&to=…`);
+setExportMsg({ ok: true, text: `${out.rows} lignes exportées (${out.filename}). L'export est inscrit au journal.` });
+// refus : financeExportRefusal(e) — PERIOD_TOO_LONG, INVALID_PERIOD, 403
+```
+
+Le serveur nomme le fichier avec le **dernier jour inclus** (`to` est exclu : `new Date(to.getTime() - 1)`), et le pied du
+rapport passe par `reportPeriodLabel` (UTC, borne de fin moins un jour) au lieu de `dateTime` en heure locale.
+
+## Ce que la non-régression a appris au harnais
+
+- **Jeu d'essai et réputation** : `seed-deals.ts` remettait à zéro annulations et litiges perdus, pas `completedDealsCount`
+  ni les notes. Un deal terminé par une fiche précédente laissait un compteur rémanent ; WEB-PIC-6 échouait selon l'ordre
+  des fichiers. Étape « 4bis » du seed : mêmes `count` que `carrierFacts` / `shipperFacts`, seuils `REPUTATION_PARAMS`
+  importés du contrat en relatif, notes à 0 (le seed ne crée aucun avis).
+- **`Finances.ouvrir`** (`apps/e2e/src/pages/finances.ts`) attend la disparition de « Chargement de tes finances… ».
+- **Fiches qui lisaient l'ancien modèle** : ADM-ARG-3 (manœuvre « jamais remboursé » qui efface aussi la liste) et
+  ADM-REM-2 (la carte liste les remboursements au lieu d'une ligne « Remboursement »).
+
+## Tests
+
+- deal-service **635** (+20) : invariant Σ liste = cumul (3 : cohérent, incohérent, anomalie de bilan) ; `booking-refunds.spec.ts` (9 : écriture sur liste absente, matérialisation LEGACY à sa
+  date, lecture, empreinte libérée, cumul sans date), règles (6 : rapport deux mois, annulation avant capture, document
+  antérieur, CSV par période, chronologie, bilan), annulation capturée / en attente (1), geste manuel qui s'ajoute (1) ;
+  spec du refus au pickup ajustée. Les écrivains de la médiation n'ont pas de test unitaire (aucun n'existait) : RPT-3 lit
+  la liste en base après une décision réelle.
+- `apps/e2e` : **437 scénarios** (432 + 5) ; ADM-ARG-3 porte l'invariant et sa contre-épreuve.
+- Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminDealMoneyFile`, `MoneyBalance`).
+
+# Cahier 02-ADMIN, § 5.17 : pilotage et drilldown — une règle d'argent, une implémentation
+
+*(PR `chore/recette-admin-5-17`, empilée sur #317, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Six scénarios (ADM-PIL-1 à 4 du cahier ; PIL-5, 6 ajoutées), deux anomalies closes (`ANO-ADM-40` majeure, `ANO-ADM-41`
+mineure), une décision (`A167`), cinq améliorations.
+
+```
+packages/libs/api-contracts/src/booking/booking-refunds.ts   A167 — la règle de A166 déménage (git mv), exportée par l'index
+apps/deal-service/src/lib/booking-refunds.ts                 réexportation (les imports de deal-service ne changent pas)
+apps/auth-service/src/lib/pilotage.rules.ts                  buildSeries lit refundEntries ; refundDrilldownItems ; corridors filtrés
+apps/auth-service/src/controller/admin-pilotage.controller.ts  select refunds ; branche « refunded » du drilldown
+apps/admin-ui/src/components/PilotageView.tsx                pied du drilldown en UTC, erreurs en français
+apps/admin-ui/src/lib/format.ts                              utcPeriodLabel (reportPeriodLabel s'appuie dessus)
+apps/e2e/src/admin/adm-pil-pilotage.spec.ts                  6 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+Chaque fiche jouée seule contre le code du § 5.16 (le mode série arrête le fichier au premier rouge) :
+- PIL-1, 2, 4 conformes — sur le jeu d'essai neuf, aucun deal n'a deux remboursements : pilotage et rapport concordent ;
+- PIL-5 : août pilotage **0 €** / rapport 10 € ; septembre **91,16 €** / 53,16 € ;
+- PIL-6 : un corridor du registre sans compteur ressort sur 7 jours, tout à zéro ;
+- PIL-3 : pied « du 14 sept. 2026, 02:00 au 21 sept. 2026, 02:00 ».
+
+## ANO-ADM-40 : la copie qui n'a pas suivi
+
+Le pilotage (auth-service) et le rapport (deal-service) calculent le même « Remboursé » dans deux services. Au § 5.16, le
+rapport a appris à lire `Booking.refunds` ; le pilotage avait sa propre ligne :
+
+```ts
+// avant — buildSeries
+if ((b.refundAmountCents ?? 0) > 0) { p = at(b.refundedAt); if (p) fin(p, cur).refundedCents += b.refundAmountCents ?? 0; }
+// après
+for (const refund of refundEntries(b)) { p = at(refund.refundedAt); if (p) fin(p, cur).refundedCents += refund.amountCents; }
+```
+
+`refundEntries` n'était pas importable par auth-service (fichier de deal-service). A167 la déplace dans
+`@packages/api-contracts`, déjà résolu par tous les services (tsconfig + alias webpack) :
+
+```sh
+git mv apps/deal-service/src/lib/booking-refunds.ts packages/libs/api-contracts/src/booking/booking-refunds.ts
+```
+
+et laisse à sa place une réexportation d'une ligne, pour ne toucher aucun import de deal-service. La spec
+`booking-refunds.spec.ts` reste dans deal-service (api-contracts n'a pas de projet de tests) et passe par la réexportation.
+
+### Le drilldown « Remboursé »
+
+```ts
+export function refundDrilldownItems(bookings, start, end): PilotageDrilldownItem[] {
+  for (const b of bookings) for (const r of refundEntries(b))
+    if (r.refundedAt in [start, end)) items.push({ kind: "DEAL", id: b.id, at: r.refundedAt, amountCents: r.amountCents, … });
+  return items.sort(par date);
+}
+```
+
+La requête prend `refundedAt >= start` (sur-ensemble : le dernier remboursement d'un deal est postérieur aux autres), le
+tri et la borne de 200 se font après. Un deal remboursé deux fois dans la période apparaît deux fois : chaque ligne est un
+fait, et Σ lignes = point.
+
+## ANO-ADM-41 : un registre permanent, des compteurs datés
+
+`searchedCorridors(redis)` rend l'ensemble `yamba:stats:search:corridors`, qui ne se vide jamais ; les compteurs
+(`…:search:corridor:<corridor>:<jour>`) vivent 400 jours et sont lus sur la fenêtre. `buildCorridors` gardait toute clé du
+registre. Désormais :
+
+```ts
+if (r.tripsPublished + r.requests + (s?.views ?? 0) + (s?.searches ?? 0) === 0) continue;
+```
+
+Redis absent → `stats` vide → un corridor seulement cherché n'apparaît pas (rien d'inventé), les corridors à trajets ou
+demandes restent.
+
+## Tests
+
+- auth-service **252** (+3) : courbe « Remboursé » par remboursement et sans empreinte libérée, drilldown un élément par
+  remboursement (Σ = point, deux remboursements du même deal), corridors sans activité exclus et Redis absent.
+- deal-service **635** (inchangé : la règle est la même, importée autrement).
+- `apps/e2e` : **443 scénarios** (437 + 6).
+- Typecheck des huit projets CI et du harnais ; OpenAPI inchangé (fonctions pures, aucun schéma).
+
+# Cahier 02-ADMIN, § 5.18 : conversations — ce que la page promet, le serveur le tient
+
+*(PR `chore/recette-admin-5-18`, empilée sur #318, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-CNV-1, 2, 3 du cahier ; CNV-4, 5 ajoutées), quatre anomalies closes (`ANO-ADM-42`, `ANO-ADM-44`
+majeures ; `ANO-ADM-43`, `ANO-ADM-45` mineures), une décision (`A168`), quatre améliorations.
+
+```
+packages/libs/admin-audit/src/index.ts                        A168 — recordAdminRead, ReadCoalescer, readCoalesceKey
+apps/auth-service/src/controller/admin-users.controller.ts    USER_VIEWED coalescé
+apps/trip-service/src/controllers/admin-trips.controller.ts   TRIP_VIEWED coalescé
+apps/deal-service/src/services/admin-dispute.service.ts       DISPUTE_VIEWED coalescé (coalesceur injecté)
+apps/deal-service/src/services/admin-finance.service.ts       DEAL_MONEY_VIEWED coalescé (coalesceur injecté)
+apps/deal-service/src/routes/deal.routes.ts                   Redis câblé comme coalesceur des deux services
+packages/libs/api-contracts/src/admin/redact-contacts.ts      redactContacts déplacée (surcharges string → string)
+apps/deal-service/src/services/admin-history.service.ts       importe et réexporte redactContacts
+apps/message-service/src/services/admin-conversation.service.ts  ANO-ADM-42 masquage ; mediationFile ; CONVERSATION_VIEWED coalescé
+apps/message-service/src/routes/admin.router.ts               Redis câblé comme coalesceur
+packages/libs/api-contracts/src/messaging/messaging.schema.ts AdminConversationResponse.mediationFile
+apps/admin-ui/src/components/ConversationView.tsx             « ← Fiche du deal », « ← Dossier de médiation », refus en français
+apps/message-service/src/services/admin-conversation-view.spec.ts  4 tests
+apps/e2e/src/admin/adm-cnv-conversations.spec.ts              5 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+Les cinq fiches, jouées seules contre le code du § 5.17, étaient rouges. Une première série l'était pour une mauvaise
+raison — le harnais relisait le journal avec le compte Médiateur, qui n'a pas `audit.read` (403) ; corrigée (relecture par
+le super administrateur, cahier § 2.7), la contre-épreuve a mesuré :
+- « ← Dossier du deal » → « Ce deal n'est jamais passé en médiation. » ;
+- `CONVERSATION_VIEWED` en **deux** exemplaires par ouverture, puis 6 lignes pour 3 ouvertures sur **cinq** écrans ;
+- « Appelle-moi plutôt au 06 12 34 56 78 ou écris à thomas.perso@exemple.fr » lu par le Médiateur ;
+- la Finance ouvrant l'écran directement : message anglais du serveur.
+
+## ANO-ADM-44 / A168 : une lecture n'est pas un geste
+
+Les écrans admin chargent leur fiche dans un `useEffect` au montage ; le serveur journalise la lecture. En développement,
+React (StrictMode) monte, démonte et remonte chaque composant : l'effet part deux fois, deux requêtes, deux lignes. Garder
+chaque écran (un `useRef`) ne protégerait pas d'un rechargement réflexe ni d'un futur client. La garde va donc au serveur,
+dans la bibliothèque d'audit :
+
+```ts
+export async function recordAdminRead(db, coalescer, input, windowSeconds = READ_COALESCE_SECONDS /* 10 */) {
+  if (coalescer) {
+    let first = true;
+    try { first = (await coalescer.set(readCoalesceKey(input), "1", "EX", windowSeconds, "NX")) !== null; }
+    catch { first = true; }                  // Redis en panne : un doublon plutôt qu'une lecture perdue
+    if (!first) return false;
+  }
+  await recordAdminAction(db, input);
+  return true;
+}
+// clé : yamba:audit:read:<admin>:<action>:<type>:<cible>
+```
+
+- `ReadCoalescer` est un type structurel (`set(key, value, "EX", s, "NX")`) : la bibliothèque reste sans dépendance ;
+  ioredis convient tel quel.
+- Seules les cinq lectures déclenchées par l'**ouverture** d'un écran l'utilisent. Les lectures déclenchées par un clic
+  (document, chronologie, drilldown, exports) et tous les gestes gardent `recordAdminAction`, écrit à chaque fois.
+- Dans deal-service et message-service, le coalesceur est **injecté** (argument optionnel du service, Redis câblé par les
+  routes) : les specs qui importent ces services n'ouvrent aucune connexion Redis. La spec de la fiche argent, qui simule
+  `@packages/admin-audit`, expose `recordAdminRead` délégué au `recordAdminAction` observé.
+
+## ANO-ADM-42 : masquer ce qu'un membre a tapé
+
+```ts
+body: m.kind === "TEXT" ? redactContacts(m.body) : m.body,       // messages système : une clé, pas un texte libre
+details: redactContacts(r.details),                             // précisions d'un signalement (fil ET file de modération)
+message: { id, body: redactContacts(message.body), createdAt }, // file des messages signalés
+```
+
+`redactContacts` existait dans deal-service (§ 5.12, erreurs SMTP de la chronologie). Même principe qu'A167 : elle part
+dans `@packages/api-contracts` (`admin/redact-contacts.ts`), deal-service l'importe et la réexporte (sa spec ne change pas).
+Deux surcharges TypeScript (`string → string`, `string | null → string | null`) évitent un `?? ""` à chaque appel sur un
+champ non nullable du contrat.
+
+## ANO-ADM-43 : un lien qui dépend de l'état du deal
+
+Le contrat gagne `mediationFile` : `!!disputedAt || retentionDisposition === "HELD_FOR_MEDIATION" || !!retentionDecidedAt`
+— la définition du dossier d'arbitrage d'A160 (`fileKindOf`). L'écran affiche toujours « ← Fiche du deal » et, seulement
+si le dossier existe, « ← Dossier de médiation ».
+
+## Tests
+
+- message-service **51** (+4) : masquage (message, précisions, messages système intacts), `mediationFile`, coalescence
+  (deux lectures → une ligne, autre admin → sa ligne), `recordAdminRead` Redis en panne et sans coalesceur.
+- deal-service 635, auth-service 252, trip-service 292 — inchangés en nombre ; spec de la fiche argent ajustée.
+- `apps/e2e` : **448 scénarios** (443 + 5).
+- Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminConversationResponse`).
+
+# Cahier 02-ADMIN, § 5.19 : signalements — rien de perdu, une décision une fois
+
+*(PR `chore/recette-admin-5-19`, empilée sur #319, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Neuf scénarios (ADM-SIG-1 à 5 du cahier ; SIG-6 à 9 ajoutées), cinq anomalies closes (`ANO-ADM-46`, `ANO-ADM-47`
+majeures ; `ANO-ADM-48`, `49`, `50` mineures), aucune décision nouvelle : le rejeu du conflit d'écriture existant
+(ANO-API-19, remonté dans `packages/libs/prisma` au § 5.5) est réemployé.
+
+```
+apps/auth-service/src/services/report.service.ts                 ANO-ADM-46 rejeu P2034 ; ANO-ADM-47 cible disparue gardée (targetMissing)
+apps/message-service/src/services/admin-conversation.service.ts  ANO-ADM-46 rejeu P2034 (file des messages)
+packages/libs/api-contracts/src/admin/reports.schema.ts          AdminReportItem.targetMissing
+apps/admin-ui/src/lib/format.ts                                  reportRefusalMessage, isAlertTrustLevel
+apps/admin-ui/src/components/ReportsQueue.tsx                    bouton occupé, refus par code, « Trajet introuvable » sans lien, badge WATCH / HIGH_RISK seuls
+apps/admin-ui/src/components/MessageReportsQueue.tsx             bouton occupé, refus par code (chargement et décision)
+apps/admin-ui/src/lib/types.ts                                   targetMissing
+apps/auth-service/src/services/report.service.spec.ts            +2 tests
+apps/message-service/src/services/admin-report-review.spec.ts    3 tests (nouveau)
+apps/e2e/src/admin/adm-sig-signalements.spec.ts                  9 scénarios
+apps/*/openapi.json                                              régénérés (targetMissing)
+```
+
+## Ce que la recette a mesuré d'abord
+
+Fiche par fiche, sur le code du § 5.18 (corrections mises de côté, bundles auth-service et message-service rebâtis) :
+- trois `PATCH` simultanés d'une décision : `[200, 500, 500]` dans les deux files ;
+- un signalement OPEN sur un trajet qui n'existe plus : absent de `GET /admin/reports?status=OPEN` ;
+- un double clic sur « Traité » : deux `PATCH` au réseau ;
+- un compte créé le jour même : badge « Compte neuf » sur la carte ;
+- la Finance sur `/reports` : « Your admin profile does not allow this action. » puis « Chargement… » sans fin, deux fois.
+
+## Pourquoi un 500 sur une décision concurrente
+
+La décision s'écrit dans une transaction : `updateMany({ where: { id, status: "OPEN" } })` puis la ligne de journal. La
+garde conditionnelle est juste — elle garantit une seule décision. Mais MongoDB ne laisse pas deux transactions modifier
+le même document : la seconde est ANNULÉE avec « write conflict » (Prisma `P2034`) avant même d'avoir lu `count: 0`. Le
+middleware d'erreur ne connaît pas `P2034` → 500. `withWriteConflictRetry(fn)` rejoue la transaction sur ce seul code ;
+au second essai la première décision est validée, la garde lit `count !== 1` et lève `ConflictError`
+(`REPORT_ALREADY_REVIEWED`, 409). Toute autre erreur remonte sans rejeu (spec « une autre erreur n'est jamais rejouée »).
+
+```ts
+await withWriteConflictRetry(() => db.$transaction(async (tx) => {
+  const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
+  if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
+  await recordAdminAction(tx as never, { … });
+}));
+```
+
+## Pourquoi un signalement disparaissait
+
+`listReports` joignait chaque signalement à sa cible (trajets et membres lus en lot) et faisait `continue` si la cible
+manquait. Or la conservation purge des trajets (et un document membre peut manquer — l'effacement RGPD, lui, anonymise
+sans supprimer) : le
+signalement restait OPEN en base, hors de toute file. Désormais la carte est rendue avec `targetMissing: true`, un
+libellé explicite et `targetOwner: null` ; le compteur `total` et les onglets le comptent ; « Traité » / « Sans suite »
+le clôt (la décision ne lit pas la cible). L'écran n'affiche pas de lien vers une fiche qui répondrait 404.
+
+## Côté écran
+
+- `busy` (id de la carte en cours) : le handler sort si une décision est en vol, les deux boutons sont `disabled` — un
+  double clic natif n'envoie qu'une requête (React applique l'état avant le second clic, événement discret).
+- `reportRefusalMessage(e)` lit `details.code` (A146) : `REPORT_ALREADY_REVIEWED` et `REPORT_NOT_FOUND` → texte français +
+  `reload: true` ; `ADMIN_PERMISSION_DENIED` → « Ton profil ne traite pas les signalements. ». Le chargement de la file
+  l'utilise aussi et pose `failed` pour ne plus afficher « Chargement… » après un refus.
+- `isAlertTrustLevel(level)` : garde de type (`level is "WATCH" | "HIGH_RISK"`) — le badge d'une file n'affiche que ce qui
+  appelle la vigilance (D71 : un compte neuf a des plafonds, pas un soupçon).
+
+## Tests
+
+- auth-service **254** (+2) : cible disparue (trajet, membre) gardée et close ; conflit P2034 rejoué → 409, aucune ligne.
+- message-service **54** (+3) : P2034 puis garde → 409 ; P2034 puis voie libre → décision, une ligne ; autre erreur non
+  rejouée.
+- `apps/e2e` : **457 scénarios** (448 + 9). Voisins rejoués : ADM-CNV (5) et WEB-SIG (8) verts.
+- Typecheck auth-service, message-service, admin-ui ; cinq `openapi.json` régénérés.
+
+
+# Cahier 02-ADMIN, § 5.20 : paramètres de la plateforme — un gagnant, un délai tenu, un refus lisible
+
+*(PR `chore/recette-admin-5-20`, empilée sur #320, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Douze scénarios ADM-PAR (1 à 7 du cahier ; 8 à 12 ajoutées), six anomalies closes (`ANO-ADM-51`, `52` majeures ;
+`53`, `54`, `55`, `56` mineures), trois arbitrages (A169 échéance de litige figée, A170 refus de page unique, A171 décision de
+signalement lue au journal) et trois décisions de l'utilisateur du 15/09 intégrées comme lots à part : libellé `SCAM`
+unique, décision visible sous « traité / sans suite », refus de page unique.
+
+```
+apps/auth-service/src/services/platform-settings.service.ts     ANO-ADM-51 rejeu P2034 + P2002 → 409 STALE_VERSION ; ANO-ADM-54 codes SETTING_OUT_OF_BOUNDS / SETTINGS_INCOHERENT
+apps/auth-service/src/controller/admin-settings.controller.ts   ANO-ADM-53 valeurs de l'email par formatSettingValue ; code INVALID_SETTINGS_REQUEST
+apps/auth-service/src/emails/admin-emails.ts                    formatSettingValue(locale, unit, value)
+apps/auth-service/src/services/platform-settings.service.ts     ANO-ADM-56 « dernière modification » = même version, même auteur, même transaction
+prisma/schema.prisma                                            Dispute.responseDueAt (A169)
+apps/deal-service/src/services/deal-settlement.service.ts       responseDueAt écrit à l'ouverture
+apps/deal-service/src/services/deal-mediation.service.ts        disputeResponseDeadline / isDisputeDecidable préfèrent responseDueAt
+apps/deal-service/src/services/admin-dispute.service.ts         file et dossier : responseDueAt
+apps/deal-service/src/services/booking-view.mapper.ts           vue Voyageur : responseDeadlineAt = responseDueAt
+apps/deal-service/src/services/ops-alerts.{rules,service}.ts    alerte « litige décidable » : responseDueAt
+apps/deal-service/src/controllers/deal.controller.ts            select responseDueAt
+packages/libs/prisma/scripts/seed-deals.ts                      responseDueAt sur les litiges du jeu d'essai
+apps/admin-ui/src/lib/settings-format.ts                        settingsRefusalMessage ; aperçu « 3,00 € »
+apps/admin-ui/src/components/PlatformSettingsEditor.tsx         envoi unique (useRef), refus par code, réinitialisation périmée rechargée
+apps/admin-ui/src/components/HomeKpis.tsx                       bandeau « Paramètres modifiés » : libellés, pas les clés
+apps/trip-service/src/controllers/pricing-params.controller.ts   Cache-Control « public, no-cache » (le max-age=30 navigateur s'ajoutait au cache 30 s du lecteur)
+--- décisions du 15/09 ---
+packages/libs/api-contracts/src/admin/report-decision.schema.ts ReportDecisionSchema + reportDecisionsFrom (A171)
+packages/libs/api-contracts/src/admin/reports.schema.ts         AdminReportItem.decision
+packages/libs/api-contracts/src/messaging/messaging.schema.ts   AdminMessageReportItem.decision
+apps/auth-service/src/services/report.service.ts                décision lue au journal (REPORT_REVIEWED)
+apps/message-service/src/services/admin-conversation.service.ts décision lue au journal (MESSAGE_REPORT_REVIEWED)
+apps/admin-ui/src/lib/format.ts                                 reportDecisionLine ; SCAM « Arnaque suspectée »
+apps/admin-ui/src/components/{Reports,MessageReports}Queue.tsx  ligne de décision ; refus de page
+apps/admin-ui/src/components/PageAccess.tsx                     refus de page unique (A170)
+apps/admin-ui/src/app/(back)/<14 pages>/page.tsx                enveloppées de <PageAccess>
+apps/admin-ui/src/components/<12 écrans>.tsx                    lecture principale : 403 → useDenyPage()
+apps/user-ui/messages/{fr,en}/messaging.json                    SCAM « Arnaque suspectée » / « Suspected scam »
+docs/recette, docs/livrables                                     libellé SCAM aligné
+tests : platform-settings.service.spec (+3), admin-emails.spec (4, nouveau), report.service.spec (+1),
+        deal-mediation.service.spec (+1), ops-alerts.rules.spec (+1), deal-settlement.service.spec (ajusté),
+        admin-report-decision.spec (3, nouveau), admin-report-queue.spec (mock adminAction), pricing-params.controller.spec (1, nouveau)
+e2e   : adm-par-parametres.spec.ts (12), adm-sig-signalements.spec.ts (SIG-5 renforcée, SIG-10, SIG-11), web-msg (libellé),
+        pages/ecran-admin.ts reouvrirLesLitigesSousUnDelai (ADM-MED, ADM-RPT), adm-acc-accueil (libellé du bandeau), adm-med-mediation (MED-9 attend son email)
+```
+
+## Ce que la recette a mesuré d'abord
+
+Premier passage, sur le code du § 5.19 :
+- trois `PATCH /admin/settings` simultanés sur un document ABSENT : `[200, 500, 500]` ;
+- trois seuils modifiés par l'Exploitation : l'email français dit « 48 hours → 50 hours », « 7 days → 8 days » ;
+- une commission de 50 % saisie à l'écran : « 400 : Some values are out of bounds. — pricing.commissionPct : Must be
+  between 5 and 20 (percent). » ;
+- en lisant le code avant d'écrire la fiche PAR-9 : l'échéance d'un litige ouvert (`disputedAt + delayHours`) était
+  recalculée à chaque lecture avec le paramètre COURANT — la vue Voyageur, le dossier, la garde de décision et l'alerte.
+
+Contre-épreuve (corrections mises de côté, bundles auth / deal / message / trip rebâtis) : document absent `[200, 409, 500]`,
+présent `[200, 500, 500]` ; PAR-9 : délai ramené à 12 h → échéance du 17/09 10:25 affichée au 14/09 22:25, dans le dossier
+d'arbitrage ET dans la vue du Voyageur ; PAR-12, SIG-5, SIG-11 : aucune des quatorze pages ne rendait un bloc de refus ;
+SIG-10 : aucune décision servie.
+
+## Pourquoi un 500 quand deux administrateurs enregistrent
+
+Le verrou de version était déjà juste (`updateMany({ where: { key, version } })`, 409 si `count !== 1`). Deux accidents
+passaient à côté : (1) sur un document présent, MongoDB annule la transaction perdante (`P2034`) avant la garde — même
+cause qu'ANO-ADM-46 ; (2) sur un document ABSENT (après `seed-settings.ts`, ou au premier réglage en production), les
+trois transactions voient « pas de document » et font `create` : la clé unique `key` refuse les deux dernières (`P2002`).
+Correction : `withWriteConflictRetry` autour de la transaction (au réessai, la version a bougé → 409), et `P2002` sur
+cette écriture traduit en `ConflictError(STALE_VERSION)` — la collision de création EST le verrou.
+
+```ts
+const nextVersion = await withWriteConflictRetry(() => deps.db.$transaction(async (tx) => { … })).catch((e: unknown) => {
+  if ((e as { code?: string } | null)?.code === "P2002") throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
+  throw e;
+});
+```
+
+## Pourquoi figer l'échéance d'un litige (A169)
+
+« Jamais rétroactif » (D62) était tenu pour le prix — snapshot dans le deal — mais pas pour le délai de réponse : il
+n'était stocké nulle part. Le Voyageur lit « tu as jusqu'au … » ; si l'on raccourcit le paramètre, la date qu'il a lue
+recule et le médiateur peut trancher sans sa version. `Dispute.responseDueAt` est écrit à l'ouverture ; les lecteurs font
+`dispute.responseDueAt ?? disputedAt + délai courant`. Champ optionnel : aucune migration, aucun rattrapage — un dossier
+antérieur garde le comportement d'avant jusqu'à sa clôture (lecture seulement, cf. le piège Prisma + Mongo sur les champs
+absents : ici on ne FILTRE jamais sur `responseDueAt`, on le lit).
+
+## Côté écran
+
+- `settingsRefusalMessage(e, catalog)` lit `details.code` (A146) : pour que la clé fautive atteigne l'écran en production,
+  le serveur pose désormais un code sur ses 400 (`SETTING_OUT_OF_BOUNDS`, `SETTINGS_INCOHERENT`,
+  `INVALID_SETTINGS_REQUEST`) — sans code, le middleware masque `details` en production.
+- Envoi unique : `sending = useRef(false)` testé et posé AVANT le premier `await` ; un `useState` seul ne suffit pas si
+  deux clics arrivent avant le rendu.
+- `resetAll` : même lecture du refus ; un 409 ferme le panneau, vide les saisies et recharge.
+- `PageAccess` (A170) : un contexte React fournit `deny(texte)` ; la page enveloppée se remplace par titre + refus.
+- La ligne de décision d'un signalement (`reportDecisionLine`) : « Traité par Nadia le … · note : « … » ».
+
+## Tests
+
+- auth-service **263** (+9), deal-service **637** (+2), message-service **57** (+3), trip-service **293** (+1).
+- Harnais aligné sur A169 : ADM-MED et ADM-RPT abaissaient le délai de réponse APRÈS l'ouverture pour rendre un litige
+  décidable — c'est précisément ce qui ne marche plus ; `reouvrirLesLitigesSousUnDelai(heures)` pose l'échéance en base
+  (manœuvre consignée). ADM-ACC-3, en rejouant, a révélé ANO-ADM-56 : le bandeau d'accueil groupait la dernière écriture
+  par sa seule version, réutilisée après une remise à zéro du document.
+- `apps/e2e` : **471 scénarios** (457 + 12 ADM-PAR + 2 ADM-SIG).
+- Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés (`ReportDecision`).
+
+
+# Cahier 02-ADMIN, § 5.21 : données personnelles — une preuve par demande, un effacement par compte, des conditions acceptées qui tiennent
+
+Six scénarios ADM-RGP (1 à 4 du cahier ; 5 et 6 ajoutés), deux ADM-PAR ajoutés (13, 14), quatre anomalies closes
+(`ANO-ADM-57`, `58` majeures ; `59`, `60`), et les six arbitrages délégués du 15/09 sur les points ouverts du § 5.20
+(A172 → A175). Branche `chore/recette-admin-5-21`, empilée sur `chore/recette-admin-5-20`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Registre RGPD journalisé une fois** (`apps/auth-service/src/controller/privacy.controller.ts`, `listDataRequests`) :
+  la première page passe par `recordAdminRead(prisma, redis, …)` (A168) ; une page suivante (curseur) reste écrite par
+  `recordAdminAction`. Test : `privacy-requests.controller.spec.ts` (le contrôleur est chargé par `require` APRÈS les
+  mocks : il construit son service au chargement, un `import` serait remonté avant les constantes des mocks).
+- **Effacement concurrent** (`apps/auth-service/src/services/privacy.service.ts`) : la transaction est enveloppée par
+  `withWriteConflictRetry` ; un compte absent ou déjà effacé lève `AccountNotFoundError`, que les deux contrôleurs
+  (membre, admin) traduisent en 404 `USER_NOT_FOUND`. Tests : conflit puis compte déjà effacé → 404, rien en double,
+  pas d'`afterErase` ; conflit puis voie libre → effacé une fois.
+- **Carte d'effacement** (`apps/admin-ui/src/components/UserFileView.tsx`) : l'issue (succès, ou « effacé par un autre
+  administrateur ») remonte dans la fiche via `onOutcome` — la carte est démontée quand le compte devient `isDeleted` ;
+  refus en français par statut ; rechargement sur 404.
+
+## A172 — les conditions d'annulation figées à la création
+
+- Schéma (`prisma/schema.prisma`) : type composite `BookingCancellationTerms { fullRefundUntilHours Int, lateRetentionPct
+  Int }`, champ **optionnel** `Booking.cancellationTerms` (les réservations existantes ne l'ont pas : c'est voulu, pas de
+  rattrapage).
+- Writer unique : `deal-request.service.ts` `createBooking` lit les paramètres UNE fois (`settingsNow`) pour le devis ET
+  pour `cancellationParamsFromSettings`, écrit `cancellationTerms` dans le même `booking.create`.
+- Lecture : `cancellationParamsForBooking(booking, courants)` (`booking-lifecycle.ts`) — snapshot complet sinon
+  courants ; utilisée par `cancel` (`deal-lifecycle.service.ts`) et `toCancellationPreview` (`booking-view.mapper.ts`) ;
+  `BOOKING_WRITE_SELECT` sélectionne le champ.
+- Tests : `settings-defaults.spec.ts` (règle pure), `booking-view.mapper.spec.ts` (aperçu figé / ancien),
+  `deal-lifecycle.service.spec.ts` (barème changé après création → snapshot appliqué ; sans snapshot → courants). Preuve
+  navigateur du writer : ADM-PAR-13.
+- Déploiement : `npx prisma generate` + `npx prisma db push` + rebâtir deal-service.
+
+## A173 · A174 · A175 — les paramètres
+
+- `platform-settings.service.ts` : `canWrite(actor, key)` factorisé ; `update` refuse les clés inconnues (400), puis la
+  PORTÉE (403 `ADMIN_ROLE_CHANGE_DENIED`, détails = le code seul), puis les bornes (400 avec la clé) ; `reset` sans liste
+  ne garde que les clés de la portée et renvoie `skipped` (contrat `SettingsWriteResponse.skipped`, optionnel ; aussi
+  dans les détails de `NOTHING_TO_RESET`). L'écran envoie toujours une liste explicite : inchangé.
+- `seed-settings.ts` : `update` du document avec `values: {}` et `version + 1` au lieu de `delete`. Le harnais ADM-PAR lit
+  la version laissée (`base`) ; PAR-7 (repli sûr) et PAR-8 (création concurrente) suppriment le document par manœuvre.
+- `settingsCoherenceIssues` : commentaire d'invariant défensif + test direct.
+
+## Chiffres
+
+- auth-service **270** (+7 : ANO-ADM-57 ×2, 58 ×2, A173, A174, invariant) ; deal-service **641** (+4, A172) ; message 57,
+  trip 293 inchangés.
+- `apps/e2e` : **479 scénarios** (471 + 6 ADM-RGP + 2 ADM-PAR).
+- Typecheck auth, deal, admin-ui, harnais ; cinq `openapi.json` régénérés (`SettingsWriteResponse.skipped`).
+
+# Cahier 02-ADMIN, § 5.22 : état des services — dire vrai sur ce qui tourne, ce qui manque et ce qui attend
+
+Sept scénarios ADM-ETA (1 à 3 du cahier ; 4 à 7 ajoutés), ADM-RGP-2 réalignée et ADM-RGP-7 ajoutée, deux anomalies
+majeures closes (`ANO-ADM-61`, `62`), cinq arbitrages délégués (A176 → A180) dont les trois lots RGPD proposés au § 5.21.
+Branche `chore/recette-admin-5-22`, empilée sur `chore/recette-admin-5-21`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Compteurs d'emails (A177, ANO-ADM-61)** — `apps/auth-service/src/controller/admin-status.controller.ts` lisait deux
+  `count` (`FAILED`, `SENT`). Le webhook Resend (D35, `notification-service/src/controllers/email-webhook.controller.ts`)
+  réécrit le statut en `DELIVERED` / `BOUNCED` / `COMPLAINED` : l'email sortait des deux compteurs. Désormais un seul
+  `groupBy({ by: ["status"] })` et une règle pure `emailCounters` (`apps/auth-service/src/utils/status.rules.ts`) ; le
+  contrat `AdminStatusResponse.emails` gagne `deliveredLast24h` et `bouncedLast24h`.
+- **Seuil « parqué » (A176, ANO-ADM-62)** — `OUTBOX_MAX_RELAY_ATTEMPTS = 10` naît dans
+  `packages/libs/api-contracts/src/admin/cron-catalogue.ts` ; `outbox-relay.ts` (deal) et `messaging-relay.ts` (message)
+  exportent toujours `MAX_RELAY_ATTEMPTS`, mais égal à la constante partagée ; `requeue-parked-outbox.ts` aussi. Le
+  catalogue des paramètres borne `alerts.outboxParkedAttempts` à `[1, OUTBOX_MAX_RELAY_ATTEMPTS]`, et
+  `mergeSettingsValues` ramène toute valeur stockée dans les bornes de sa clé (`Math.min(max, Math.max(min, raw))`) — une
+  valeur écrite avant le resserrement ne fuit jamais vers un consommateur.
+- **Catalogue des crons (A178)** — `CRON_CATALOGUE` (service, nom, expression, `intervalMs`), `missingCrons(runs)` et
+  `isCronLate(run, now)` purs. `GET /admin/status` sert `missingCrons` et `crons[].late` (calculé côté serveur, le front ne
+  lit plus l'expression cron par expression régulière). Garde-fou : `status.rules.spec.ts` lit
+  `apps/*/src/cron/*.cron.ts`, extrait `name: "…"` de l'appel `withHeartbeat` et `SCHEDULE = "…"`, et exige l'égalité
+  des deux ensembles — un cron ajouté sans sa ligne au catalogue (ou sans battement) casse la CI.
+- **Écran** (`apps/admin-ui/src/components/StatusView.tsx`) — un minuteur de 5 s fait vivre « Relu il y a {n} s » et les
+  âges ; `reloadFailure(e)` dit l'échec en français (`role="alert"` quand rien n'a jamais été lu) ; la vérification
+  `maintenance` de la passerelle s'affiche « ⏸ » en ambre et le bandeau mentionne la lecture seule ; « démarré » passe
+  par `ago()` ; bandeau ambre des crons absents ; bloc emails à trois lignes.
+- **Battement de `payout-bookings`** — `runPayoutPasses` rend `{ completed, retried, reminded }` et `payoutPassesSummary`
+  le résume (le battement disait « ok » seul).
+
+## A179 — l'effacement et la réservation ne se croisent plus
+
+- **Recompter dans la transaction** (`apps/auth-service/src/services/privacy.service.ts`) : la pré-vérification hors
+  transaction reste (elle inscrit le refus au registre sans ouvrir de transaction) ; DANS la transaction, après la relecture
+  du `User`, `erasureBlockers(tx, userId)` recompte. Un bloqueur découvert là lève `ErasureBlockedError` ; le `catch`
+  autour de `withWriteConflictRetry` inscrit le refus au registre HORS de la transaction annulée (`refuse(check)`).
+- **Clôture par la réservation** (`apps/deal-service/src/services/booking-request.ts`, `fenceShipperAccount`) : dans la
+  transaction de `createBooking`, `tx.user.updateMany({ where: { id, isDeleted: false }, data: { updatedAt: now } })`.
+  Pourquoi écrire ? Une transaction MongoDB lit un instantané : elle ne voit pas ce qu'une autre transaction valide après
+  son début, et deux transactions qui écrivent des documents DIFFÉRENTS ne se gênent jamais. En écrivant le même `User`
+  que l'effacement, les deux transactions entrent en conflit ; MongoDB en rejette une (P2034), `withWriteConflictRetry`
+  la rejoue et le rejeu voit l'autre. `count === 0` (compte effacé) → 409 `ACCOUNT_DELETED` (nouveau code de
+  `BOOKING_REQUEST_ERROR_CODES`, traduit FR/EN dans `messages/*/booking.json`, décrit dans l'OpenAPI de deal-service).
+- **Avant le clic** : `GET /admin/users/:id/erasure-blockers` (`adminErasureBlockers`, permission `users.erase`, contrat
+  `ErasureCheckResponse`, non journalisé) ; `EraseCard` le lit au montage, affiche les libellés et garde le bouton inactif.
+- **Registre d'un membre** : `listDataRequests` accepte `?userId=` (ObjectId sinon 400 `INVALID_ID`), la ligne
+  `DATA_REQUESTS_VIEWED` porte le membre en `targetId` ; `DataRequestsList` lit `useSearchParams()` — d'où la frontière
+  `<Suspense>` ajoutée dans `app/(back)/privacy/page.tsx` (Next refuse `useSearchParams` sans elle au rendu statique).
+- **A180** : aucun code — alternative écartée au registre.
+
+## Harnais
+
+- `adm-eta-etat-services.spec.ts` : `pidDuPort` (`lsof`), `relancerMessageService` (spawn détaché, log dans `tmpdir()`),
+  `redis(script)` via `lireCoteServeur` ; relectures « espacées » (StrictMode double la première) ; stabilisation des
+  compteurs d'emails avant ETA-4.
+- `adm-rgp-donnees-personnelles.spec.ts` : RGP-2 lit les bloqueurs avant le clic et prouve le refus serveur par appel
+  direct ; RGP-7 ajoutée.
+
+## Chiffres
+
+- auth-service **282** (+12 : `status.rules.spec.ts` ×7, `privacy.service.spec.ts` ×2 A179, `privacy-requests.controller.spec.ts` ×3) ;
+  deal-service **643** (+2, `booking-request-fence.spec.ts`) ; message 57, trip 293, notification 122 inchangés.
+- `apps/e2e` : **487 scénarios** (479 + 7 ADM-ETA + ADM-RGP-7).
+- Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés ; `YAMBA-PARAMETRES.md`
+  régénéré (borne de `alerts.outboxParkedAttempts`).
+- Déploiement : rebâtir auth, deal, message (aucun changement de schéma Prisma).
+
+# Cahier 02-ADMIN, § 5.23 : maintenance — des transitions, pas des valeurs, et l'interrupteur lu là où il s'applique
+
+Six scénarios ADM-MNT (1 à 4 du cahier ; 5, 6 ajoutés), ADM-ETA-8, 9 et ADM-RGP-8 ajoutées, ADM-RGP-2 réalignée, quatre
+anomalies majeures et une mineure closes (`ANO-ADM-63` à `67`), deux arbitrages délégués (A181, A182) et les trois lots
+proposés au § 5.22. Branche `chore/recette-admin-5-23`, empilée sur `chore/recette-admin-5-22`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Transitions de la maintenance (A181, ANO-ADM-63, 67)** — `apps/auth-service/src/services/maintenance.service.ts`
+  gagne deux fonctions pures. `resolveMaintenanceWrite(before, body, now)` calcule ce qui est réellement écrit : lever
+  (`before.enabled && !body.enabled`) remet `scheduledAt` à `null` ; une date d'annonce NOUVELLE (différente de celle
+  stockée) et passée, hors lecture seule, lève `ValidationError` `MAINTENANCE_SCHEDULE_IN_PAST` — une date devenue passée
+  mais déjà enregistrée ne bloque pas une autre modification. Elle est appelée DANS la transaction, sur l'état relu.
+  `maintenanceChangeKind(before, after)` rend `ENABLED | LIFTED | SCHEDULED | UNSCHEDULED | UPDATED` ; la notification
+  la reçoit (`kind`) et `apps/auth-service/src/emails/admin-emails.ts` choisit sujet, titre et phrase par transition, FR
+  et EN.
+- **Conflits (ANO-ADM-65)** — la transaction est enveloppée dans `withWriteConflictRetry`
+  (`packages/libs/prisma/write-conflict-retry.ts`) : au rejeu, le verrou `expectedVersion` répond 409 `STALE_VERSION`.
+  Document absent : deux `create` concurrents butent sur la clé unique `key` (`P2002`) — ce n'est pas un conflit à
+  rejouer, c'est déjà la réponse, traduite en 409 `STALE_VERSION` dans le `catch`.
+- **Interrupteur d'environnement (A182, ANO-ADM-64)** — `packages/libs/maintenance/index.ts` exporte
+  `MAINTENANCE_ENV_CHECK_ERROR = "maintenance (env)"`, `maintenanceCheckError(state)` (utilisé par `/gateway-health` dans
+  `apps/api-gateway/src/main.ts`) et `isForcedByEnvironment(report)`. Le service reçoit `forcedByEnvironment()` :
+  `admin-status.controller.ts` sonde `/gateway-health` (repli : `process.env.MAINTENANCE_MODE` local si le gateway ne
+  répond pas) ; `GET /admin/status` réutilise la santé du gateway déjà sondée (`read({ envOverride })`, pas de seconde
+  sonde). `update()` refuse d'emblée 409 `MAINTENANCE_FORCED_BY_ENVIRONMENT` : ni écriture, ni journal, ni email.
+- **Écran** (`apps/admin-ui/src/components/StatusView.tsx`, `MaintenanceEditor`) — `toLocalDateTimeInput(iso)`
+  (`lib/format.ts`) remplace `iso.slice(0, 16)` (ANO-ADM-66) ; l'effet qui recopie l'état dans le formulaire dépend de
+  `state.version` et non plus de l'objet `state` recréé à chaque sondage ; `maintenanceRefusal(e)` lit `details.code` ;
+  `envOverride` → paragraphe explicatif à la place du formulaire.
+- **Gateway** (`apps/api-gateway/src/libs/maintenance.ts`) — le 503 porte aussi `details: { code: "MAINTENANCE" }`.
+
+## Les lots du § 5.22
+
+- **a, retard du relais** — `outboxLagMinutes(oldest, now)` et `isOutboxLagging(oldest, now, seuil)` dans
+  `packages/libs/api-contracts/src/admin/cron-catalogue.ts` (à côté de `OUTBOX_MAX_RELAY_ATTEMPTS`). `evaluateAlerts`
+  (`apps/deal-service/src/services/ops-alerts.rules.ts`) les utilise ; `getStatus` sert `outbox.lagMinutes`,
+  `lagThresholdMinutes` (`alerts.outboxLagMinutes`), `lagging`. L'écran ne compare rien : il colore selon `lagging`. Test
+  « l'alerte et la page tranchent pareil » dans `ops-alerts.rules.spec.ts`.
+- **b, bloqueurs comptés** — `GET /admin/users/:id/erasure-blockers` renvoyait déjà `counts` ; `EraseCard`
+  (`UserFileView.tsx`) les garde (lecture et refus 409) et `erasureBlockerLabel(blocker, count)` accorde le pluriel.
+- **c, service injoignable** — middleware d'erreur Express à quatre paramètres placé après le proxy fourre-tout : codes
+  `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENOTFOUND` → 502 JSON `UPSTREAM_UNREACHABLE` (jamais
+  l'adresse interne) ; les autres erreurs suivent leur cours. `StatusView` retient l'heure de la dernière relecture
+  réussie et affiche le bandeau quand le code est `UPSTREAM_UNREACHABLE`.
+
+## Harnais
+
+- `adm-mnt-maintenance.spec.ts` : `relancerLeGateway(forcer)` tue le processus du port 8080 (`lsof -t`) et relance
+  `dist/main.js` détaché avec `env` explicite ; `remettreAPlat()` en base avant / après ; journal lu par une session
+  super administrateur (l'Exploitation n'a pas `audit.read`).
+- `adm-eta-etat-services.spec.ts` : ETA-8 (événement d'un agrégat sans relais, vieilli), ETA-9 (auth-service tué puis
+  relancé en `finally`). `adm-rgp-donnees-personnelles.spec.ts` : RGP-8, RGP-2 réalignée.
+
+## Vérifications
+
+- Tests : auth-service **293** (+11), deal-service **644** (+1) ; harnais **496 scénarios** (487 + MNT 6 + ETA-8, 9 +
+  RGP-8).
+- Typecheck auth, deal, message, trip, notification, gateway, admin-ui, harnais ; cinq `openapi.json` régénérés ;
+  `YAMBA-PARAMETRES.md` régénéré (consommateur auth-service de `alerts.outboxLagMinutes`).
+- Déploiement : rebâtir auth-service, deal-service et api-gateway ; aucun changement de schéma Prisma.
+
+# Cahier 02-ADMIN, § 5.24 : journal d'audit — un filtre qui ment invalide la preuve de tout le cahier
+
+Sept scénarios ADM-JRN (1 à 4 du cahier ; 5 à 7 ajoutés), ADM-ETA-10 et ADM-MNT-7, 8 ajoutées (lots du § 5.23), quatre
+anomalies majeures et trois mineures closes (`ANO-ADM-68` à `74`), deux décisions inscrites au registre avant le code
+(A183, A184). Branche `chore/recette-admin-5-24`, empilée sur `chore/recette-admin-5-23`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Auteur filtré côté serveur (ANO-ADM-68)** — « Filtrer sur cet auteur » écrivait le nom dans la recherche libre, qui ne
+  porte que sur les 50 lignes chargées : le geste ADM-JRN-3 « filtrer sur le Médiateur, dérouler » ne montrait jamais les
+  lignes au-delà de la première page. `listAdminAudit` (`apps/auth-service/src/controller/admin-auth.controller.ts`) sert
+  désormais `adminUserId` dans chaque ligne (`AdminAuditItemSchema`, `packages/libs/api-contracts/src/auth/member-auth.schema.ts`) ;
+  `AuditTable.tsx` pose le filtre serveur et affiche une pastille « Auteur : {nom} ✕ » (le filtre existait côté serveur
+  depuis A149, aucun écran ne s'en servait).
+- **Journées locales (ANO-ADM-69)** — le champ `<input type="date">` rend `2026-09-15` ; envoyé tel quel, le serveur le lit
+  `new Date("2026-09-15")` = minuit **UTC**. À Paris l'été, « du 15 au 15 » commençait à 02:00 et débordait sur le 16
+  jusqu'à 01:59. `localBound(day, end)` construit `new Date("2026-09-15T00:00:00.000")` (sans `Z` : heure locale) et envoie
+  `toISOString()` ; le serveur, qui accepte déjà un instant ISO, n'a pas changé.
+- **Catalogues fermés (A183, ANO-ADM-70, 71)** — `packages/libs/admin-audit/src/index.ts` exporte `ADMIN_TARGET_TYPES`
+  (`USER`, `BOOKING`, `TRIP`, `CONVERSATION`, `REPORT`, `SESSION`, `SETTINGS`) et type `AdminActionInput.action` /
+  `targetType` sur les deux catalogues (plus de `| (string & {})`). Le typage a débusqué deux écrivains qui élargissaient la
+  valeur en `string` (`privacy.controller.ts` : `as const` ; `admin-finance.service.ts` : paramètre `AdminActionType`).
+  L'écran : `ACTIONS` = toutes les clés de `ACTION_LABEL` triées par libellé (le select se construisait sur les lignes
+  chargées : un filtre posé cachait toutes les autres actions) ; `TARGET_TYPE_LABEL` en français (le select proposait
+  `DISPUTE`, `MAINTENANCE`, `EXPORT`, jamais écrits, et oubliait `CONVERSATION`). admin-ui n'importe pas `@packages/*` : les
+  listes sont des miroirs, et c'est le harnais (ADM-JRN-2) qui compare les deux côtés, plus la base (`groupBy`).
+- **Panne lisible (ANO-ADM-72)** — une lecture en échec laissait `items` vide et affichait « Aucune action journalisée. ».
+  État `error` + bloc `role="alert"` + « Réessayer » ; « Charger la suite » en échec ne jette plus une promesse rejetée.
+  Un compteur `seq` (`useRef`) ignore la réponse d'une lecture dépassée : taper vite dans un filtre ne laisse plus une
+  réponse ancienne écraser la dernière.
+- **Détail lisible (ANO-ADM-73)** — `auditDetail(after)` (`apps/admin-ui/src/lib/format.ts`) aplatit listes (`, `), objets
+  imbriqués et objets vides (« aucun ») ; utilisé par le journal ET les cartes « Actions admin sur ce compte / ce trajet »
+  (`UserFileView.tsx`, `TripFileView.tsx`), qui faisaient `JSON.stringify(a.after)`.
+- **Identifiant de cible non ObjectId (ANO-ADM-74)** — `buildAuditWhere` (`apps/auth-service/src/lib/admin-audit.query.ts`)
+  n'acceptait qu'un ObjectId : une clé de paramètre (`pricing.commissionPct`), `maintenance` ou l'identifiant d'une session
+  (32 hex) étaient IGNORÉS, et l'écran affichait le champ rempli au-dessus de toutes les lignes `SETTINGS`. Jeu de
+  caractères sûr `^[A-Za-z0-9._:-]{1,100}$` ; l'écran signale « Ignoré (format non reconnu) : … » pour tout champ rempli
+  que `appliedFilters` ne reprend pas. OpenAPI documente le motif.
+- **Index** — `@@index([ip, createdAt])` sur `AdminAction` (`prisma/schema.prisma`) : le filtre IP parcourait la collection.
+  `prisma db push` au déploiement.
+
+## Les lots du § 5.23 (A184)
+
+- **a, garde de session** — `AdminShell.tsx` : `ApiError.status === 401` → `/login` ; toute autre erreur → écran
+  « Back-office momentanément injoignable » + « Réessayer » (compteur `attempt` dans les dépendances de l'effet). Le
+  rafraîchissement d'`apiFetch` ne se déclenche que sur 401 : un 502 ne passe jamais par lui.
+- **b, rythme du bandeau** — `maintenancePollMs(state, now)` (`packages/libs/maintenance/index.ts`) : 15 s si active ou
+  annoncée, 60 s sinon. `MaintenanceBanner.tsx` (user-ui) sépare la lecture d'ouverture du minuteur, dont l'effet dépend de
+  `pollMs`. user-ui gagne l'alias `@packages/libs/maintenance` dans `paths` ET `include` de `tsconfig.json` (sinon TS6307).
+- **c, exemptions par segment** — `isExemptPath(path)` : `p === prefix || p.startsWith(prefix + "/")`, en minuscules.
+  Avant, `"/api/maintenance"` sans barre finale exemptait `/api/maintenanceX`.
+
+## Harnais
+
+- `adm-jrn-journal.spec.ts` : lit ce que l'écran demande (URL de la requête `/api/admin/audit`, `appliedFilters`) plutôt
+  que de supposer ; importe `ADMIN_ACTIONS` / `ADMIN_TARGET_TYPES` et `ACTION_LABEL` / `TARGET_TYPE_LABEL` pour comparer les
+  catalogues ; `alerte(page)` exclut l'annonceur de route de Next (`#__next-route-announcer__`, lui aussi `role="alert"`) ;
+  ADM-JRN-5 simule la panne par `page.route` (502 JSON).
+- `adm-eta-etat-services.spec.ts` : ETA-10 tue auth-service, navigue (« Mes sessions »), vérifie l'absence de `/login`,
+  relance en `finally`. `adm-mnt-maintenance.spec.ts` : MNT-7 horodate les requêtes `/api/maintenance` du navigateur
+  membre ; MNT-8 poste sur des chemins voisins des préfixes en lecture seule.
+
+## Vérifications
+
+- Tests : auth-service **296** (+3 : `admin-audit.query.spec.ts` 1, `maintenance-rules.spec.ts` 2), deal-service **644**,
+  message-service **57** (inchangés, typage seulement) ; harnais **506 scénarios** (496 + JRN 7, ETA-10, MNT-7, 8).
+- Contre-épreuve : écran et garde d'origine remis (admin-ui rechargé à chaud) → JRN-1, 2, 3, 5, 6, 7 rouges (JRN-4 ne
+  touche aucun code corrigé) ; `AdminShell`, bandeau et règle d'exemption d'origine (gateway rebâti) → ETA-10, MNT-7, 8
+  rouges ; `buildAuditWhere` d'origine (auth-service rebâti) → JRN-3 rouge (clé de paramètre ignorée).
+- Typecheck auth, deal, trip, message, notification, gateway, admin-ui, user-ui, harnais ; cinq `openapi.json`
+  régénérés.
+- Déploiement : `prisma generate` + `prisma db push` (index), rebâtir auth-service, deal-service (types seulement) et
+  api-gateway.
+
+# Cahier 02-ADMIN, § 5.25 : comptes admin — la porte du back-office sous gestes simultanés
+
+Onze scénarios ADM-CPT (1 à 5 du cahier ; 6 à 9 ajoutés ; 10 et 11 pour les lots décidés au § 5.24), cinq anomalies
+majeures et une mineure closes (`ANO-ADM-75` à `80`), trois décisions inscrites au registre avant le code (A185, A186,
+A187). Branche `chore/recette-admin-5-25`, empilée sur `chore/recette-admin-5-24`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Règles pures (`apps/auth-service/src/utils/admin-accounts.rules.ts`)** — `inviteMode(existing)` rend `NEW`,
+  `GRANT_ACCESS` (compte avec mot de passe), `PASSWORD_LINK` (compte sans mot de passe) ou `REFUSED`
+  (`ADMIN_ALREADY_GRANTED`, `ACCOUNT_DELETED`) ; `removesSuperAdmin(before, after)` ; `inServiceSuperAdminsWhere(cible)` ;
+  les clés Redis `inviteKey` / `inviteUserKey` ; `isUniqueViolation`. Le contrôleur ne décide plus rien lui-même.
+- **Compte sans mot de passe réinvité (ANO-ADM-75)** — la branche « compte existant » envoyait toujours
+  `adminAccessGranted` (lien vers `/login`). Un invité retiré avant d'avoir accepté n'a pas de `passwordHash` : il ne
+  pouvait plus jamais entrer. `PASSWORD_LINK` émet un jeton et `adminInvite` ; la réponse porte `passwordRequired`
+  (`InviteAdminResponseSchema`, `packages/libs/api-contracts/src/auth/member-auth.schema.ts`).
+- **Un lien vivant par compte (ANO-ADM-76, A185 a)** — `issueInviteToken(userId)` lit `admin_invite_user:<id>`, efface
+  l'ancien `admin_invite:<jeton>`, pose le nouveau (48 h) ; `dropInviteToken(userId)` est appelé par `revokeAdmin`. Avant :
+  le jeton de la première invitation, inoffensif tant que le compte n'avait pas de profil, redevenait valide à la
+  réinvitation.
+- **Lien à usage unique sous clics simultanés (ANO-ADM-77, A185 b)** — `acceptAdminInvite` valide le mot de passe, puis
+  RÉCLAME le jeton (`redis.del(key) !== 1` → 400 `INVITATION_INVALID`) avant la transaction ; en cas d'échec de la
+  transaction, le jeton est reposé pour son TTL restant. Avant : `get` → écriture → `del`, trois clics = trois mots de passe
+  et trois lignes `ADMIN_INVITE_ACCEPTED`.
+- **Dernier super administrateur sous gestes croisés (ANO-ADM-78, A186)** — `updateAdminRole` et `revokeAdmin` comptaient
+  `superAdminCount()` HORS transaction : deux super administrateurs qui se rétrogradent au même instant voyaient chacun
+  « 2 », les deux passaient. Désormais, dans une transaction rejouée (`withWriteConflictRetry`) : relire la cible, puis, si
+  le geste retire `SUPER_ADMIN`, `assertAnotherSuperAdminInService(tx, cible)` écrit le document de garde
+  `PlatformSettings { key: "admin-accounts" }` (`version` + 1) et compte `inServiceSuperAdminsWhere(cible)` (non supprimé,
+  mot de passe, 2FA). L'écriture commune transforme le « write skew » en conflit d'écriture (`P2034`) ; la transaction
+  rejouée recompte et répond 403 `LAST_SUPER_ADMIN`. `ensureGuardDocument()` crée la garde hors transaction (une création
+  concurrente lève `P2002`, ignorée). `superAdminCount` (`utils/admin-roles.ts`) est supprimé : il comptait une invitation
+  en attente comme un filet. La garde `ADMIN_IS_SELF` passe avant toute lecture.
+- **Invitations simultanées (ANO-ADM-79, A185 d)** — adresse inconnue : `P2002` (unicité `emailNormalized`) → 400
+  `ADMIN_ALREADY_GRANTED` au lieu de 500 ; compte existant : la transaction relit le compte (`inviteMode(fresh)`) et
+  l'écriture concurrente du même document est rejouée → le perdant lit le profil posé → 400, ni ligne ni email. Un compte
+  `isDeleted` n'est jamais promu (400 `ACCOUNT_DELETED`).
+- **Écran en français (ANO-ADM-80, mineure)** — `AdminsManager.tsx` affichait `403 : You cannot change your own profile.`,
+  `InviteAccept.tsx` le message anglais du serveur. `adminAccountRefusalMessage(err)` (`apps/admin-ui/src/lib/format.ts`) lit
+  `details.code` et dit s'il faut recharger la liste ; la ligne de l'administrateur connecté affiche « (toi) », des cases
+  désactivées et « ton accès » à la place de « Retirer » ; le message porte `data-testid="admins-message"` et `role="status"`.
+  OpenAPI : les 403 `ADMIN_IS_SELF` / `LAST_SUPER_ADMIN` étaient documentés en 409 sur `DELETE`, absents sur `PATCH`.
+
+## Lots décidés au § 5.24 (A187)
+
+- **a. Auteur choisi dans une liste** — `GET /admin/audit/authors` (`audit.read`, `listAdminAuditAuthors`) : `groupBy`
+  des `adminUserId` du journal, noms lus en base, `auditAuthors(ids, users)` (pur, `apps/auth-service/src/lib/admin-audit.query.ts`)
+  trie par nom et marque `active: false` un admin retiré. `AuditTable.tsx` : select « Auteur » (option « (accès retiré) »),
+  la pastille reste. Pas `/admin/admins` : réservé à `admins.manage`, et il oublie les admins retirés.
+- **b. « avant → après »** — `auditChange(before, after)` et `auditChangeKeys(before)` (`format.ts`) : champ par champ,
+  profils et statut traduits, forme `{ key, value }` des paramètres, clés sensibles jamais lues ; la cellule « Détail »
+  affiche la ligne de changement (`data-testid="audit-change"`) puis le reste de `after` sans répéter les champs dits.
+  `auditDetail(after, omit)` gagne un second paramètre.
+- **c. Export du journal filtré** — `GET /admin/audit/export` (`exportAdminAudit`) : `auditQueryFrom(req.query)` →
+  `buildAuditWhere` → `take: EXPORT_MAX_ROWS + 1` → `capExportRows` → `auditCsvRow` (JSON fidèle de `before` / `after`) →
+  `buildCsv(AUDIT_CSV_COLUMNS, …)` ; ligne `EXPORTED` `{ domain: "audit", personal: true, reason, filters:
+  appliedAuditFilterValues(q), rows, truncated }`. Route gardée par `requireAdminPermission("audit.read")` PUIS
+  `requireAdminPermission("exports.personal")`. À l'écran, `ExportButton` (`personal`) reçoit `query(filters)` : il ne
+  s'affiche que pour qui a `exports.personal`, et la page n'est lisible qu'avec `audit.read`.
+
+## Harnais
+
+`apps/e2e/src/admin/adm-cpt-comptes-admin.spec.ts`. Les administrateurs « jetables » sont posés en base par
+`creerAdminEnrole` (mot de passe du seed, secret TOTP connu, manœuvre consignée) et connectés par l'API
+(`connecterParApi` : `/auth/admin/login` puis `/auth/admin/totp/verify`) ; chaque fiche retire ce qu'elle a ouvert.
+ADM-CPT-8 mesure d'abord les AUTRES super administrateurs en service : sur le poste, le compte du propriétaire en est un,
+la course ne peut donc pas fermer la porte et l'attendu devient « les deux passent, la garde est écrite deux fois » ; sans
+lui, « un 200, un 403 `LAST_SUPER_ADMIN` ». `restaurerLeSuperAdministrateur()` remet le super administrateur du seed en
+`finally`. ADM-JRN-3 est réalignée : un paramètre se lit « clé : avant → après », puis le motif.
+
+## Vérifications
+
+- Tests : auth-service (+23 : `admin-accounts.rules.spec.ts` 8, `admin-admins.controller.spec.ts` 12,
+  `admin-audit.query.spec.ts` 3) ; harnais **517 scénarios** (506 + CPT 11).
+- Typecheck auth-service, admin-ui, harnais ; cinq `openapi.json` régénérés.
+- Déploiement : rebâtir auth-service ; aucun changement de schéma (le document de garde est créé à la première écriture).
+
+---
+
+# Cahier 02-ADMIN, § 5.26 : mes sessions — une session qu'on reconnaît, une déconnexion qui ne ment pas
+
+Cinq scénarios ADM-SES (1 du cahier ; 2 à 5 ajoutés) et deux fiches ADM-CPT (12, 13) pour les lots décidés au § 5.25 ;
+deux anomalies majeures et deux mineures closes (`ANO-ADM-81` à `84`) ; deux décisions inscrites au registre avant le code
+(A188, A189). Branche `chore/recette-admin-5-26`, empilée sur `chore/recette-admin-5-25`. Dernier chapitre du § 5.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Une session se reconnaît (ANO-ADM-81, A188 a)** — `AdminSessionRecord` (`apps/auth-service/src/utils/admin-session.ts`)
+  ne portait que `createdAt` / `lastActivityAt`. Il porte désormais, en option, `ip`, `userAgent` (tronqué par
+  `shortUserAgent`, 200 caractères) et `device` (`describeUserAgent`, le libellé « Chrome · macOS » de D65) :
+  `adminSessionClient(req)` les lit, `storeAdminSession(userId, jti, createdAt, now, client)` les écrit.
+  `issueAdminSession(req, res, user)` (dans `admin-auth.controller.ts`) les pose à l'ouverture ; `adminRefresh` les RECOPIE
+  depuis l'ancien enregistrement (`session.device ? session : adminSessionClient(req)`) — l'appareil d'ouverture suit la
+  session à travers les rotations du jti, et une session d'avant la correction devient reconnaissable à son premier
+  renouvellement. `listAdminSessions` sert `device` (« Appareil inconnu » si absent) et `ip` ; l'user-agent brut ne
+  quitte pas Redis. Contrat : `AdminSessionItemSchema` gagne `device` et `ip` (`admin-users.schema.ts`).
+- **Le journal ne compte que ce qui a eu lieu (ANO-ADM-83, A188 b)** — `revokeAdminSession` rend
+  `(await redis.del(clé)) === 1`. `adminLogout` n'écrit `ADMIN_LOGOUT` que si la session existait (un rejeu du même jeton
+  répond 200, sans ligne) ; `revokeAdminSessionById` répond 404 `ADMIN_SESSION_NOT_FOUND` sans ligne pour une session
+  absente. `DEL` sert ici deux fois : c'est l'effacement ET la preuve qu'il a eu lieu, sans lecture préalable (pas de
+  fenêtre entre « existe-t-elle ? » et « efface-la »).
+- **« Se déconnecter » ne ment plus (ANO-ADM-82, A188 c)** — `AdminShell.tsx` faisait
+  `await post("/auth/admin/logout").catch(() => undefined); router.replace("/login")`. Les cookies `admin_*` sont
+  `httpOnly` : seul le serveur peut les effacer ; un 502 laissait la session ouverte derrière un écran de connexion.
+  Désormais `/login` après un 200 ou un 401 (session déjà close), sinon un `role="alert"` « Déconnexion impossible : le
+  service ne répond pas, ta session est toujours ouverte. » ; le bouton passe « Déconnexion… » et ne part qu'une fois.
+  `SessionsList.tsx` applique la même règle à « Révoquer » sa propre session.
+- **L'écran parle juste (ANO-ADM-84)** — `backupCodesWarning(n)` (`apps/admin-ui/src/lib/format.ts`) accorde le pluriel et,
+  à zéro, dit le recours (un super administrateur réinitialise la double authentification) ; `SessionsList` distingue
+  « chargement », « panne » (`role="alert"` + « Réessayer ») et « liste vide », verrouille « Révoquer » pendant l'envoi et
+  lit un 404 comme « Cette session était déjà fermée. ».
+
+## Lots décidés au § 5.25 (A189)
+
+- **a. Renvoyer une invitation** — `POST /admin/admins/:id/invite/resend` (`resendAdminInvite`, `admins.manage`) :
+  `isPendingInvitation(user)` (règle pure, `admin-accounts.rules.ts` : profil admin, pas de mot de passe, non supprimé),
+  sinon 409 `ADMIN_INVITE_NOT_PENDING` ; `issueInviteToken` (A185 : l'ancien lien meurt), email `adminInvite`, ligne
+  `ADMIN_INVITE_RESENT` (ajoutée à `ADMIN_ACTIONS`, `packages/libs/admin-audit`, et à son libellé `format.ts` — la liste
+  fermée d'A183 fait échouer la compilation si l'un manque). `listAdmins` ajoute `inviteExpiresAt` (TTL Redis de
+  `admin_invite_user:<id>`, `null` sans lien vivant) ; `AdminsManager` affiche « lien valable jusqu'au … » ou « lien
+  expiré » et le bouton « Renvoyer l'invitation ».
+- **b. Motif facultatif du retrait** — `RevokeAdminRequestSchema` (`{ reason?: string }`, trim, ≤ 500) ; `revokeAdmin` écrit
+  `after: { reason }` seulement s'il est non vide. Pas de `.transform()` dans un schéma du registre Zod : le générateur
+  OpenAPI refuse (« Transforms cannot be represented in JSON Schema ») — la chaîne vide est ramenée à `undefined` dans le
+  contrôleur. À l'écran, `window.confirm` devient `window.prompt` (Annuler renonce, champ vide = sans motif).
+- **c. Emails de sécurité** — `adminRolesChanged` et `adminAccessRevoked` (`apps/auth-service/src/emails/admin-emails.ts`,
+  FR/EN, `notice` de ton `warning`), SANS `cta` ni motif. `notifyAccessChange(userId, build)` relit le compte APRÈS la
+  transaction, saute `isDeleted` / `emailSuppressedAt` (`canReceiveAccountEmail`), n'échoue jamais. `updateAdminRole`
+  n'écrit que si `rolesChanged(before, next)` (l'ordre ne compte pas).
+
+## Harnais
+
+`apps/e2e/src/admin/adm-ses-mes-sessions.spec.ts` : administrateurs jetables enrôlés en base (`creerAdminEnrole`, avec un
+nombre de codes de secours réglable), connectés par l'écran dans un contexte au user-agent choisi (`navigateurDe`) ;
+`retirerLAcces` en `finally`. SES-3 et 5 simulent la panne par `page.route(…, fulfill 502)`. ADM-CPT-12 et 13 dans
+`adm-cpt-comptes-admin.spec.ts` ; CPT-4 réalignée sur l'invite du motif. Piège de poste : `npx nx build auth-service` sans
+`--skip-sync` s'est arrêté sur la question « sync generators » en mode non interactif, sans rebâtir — le bundle relancé
+était l'ancien ; toujours vérifier une chaîne attendue dans `dist/main.js` (`grep -c`).
+
+## Vérifications
+
+- Tests : auth-service **334** (+15 : `admin-auth-sessions.controller.spec.ts` 5, `admin-admins.controller.spec.ts` +4,
+  `admin-emails.spec.ts` +3, `admin-accounts.rules.spec.ts` +3) ; harnais **524 scénarios** (517 + SES 5 + CPT 2).
+- Typecheck auth, deal, trip, message, notification, admin-ui, harnais ; cinq `openapi.json` régénérés.
+- Déploiement : rebâtir auth-service ; aucun changement de schéma ; les sessions admin ouvertes avant le déploiement
+  affichent « Appareil inconnu » jusqu'à leur premier renouvellement.
+
+# Cahier 02-ADMIN, § 6 : cas de bout en bout — la cohérence entre écrans, services, emails et journal
+
+Branche `chore/recette-admin-6`, empilée sur `chore/recette-admin-5-26`. Huit parcours du cahier joués d'une traite avec les
+vrais profils, plus les lots décidés au § 5.26 (A190) et une correction de fond sur les emails de sanction (A191).
+
+## Ce qui a été corrigé
+
+- **ANO-ADM-87 — motif interne dans l'email de sanction** (`apps/auth-service/src/emails/admin-emails.ts`,
+  `controller/admin-users.controller.ts`). `AccountStatusParams` perd son champ `reason` : le contrôleur ne peut plus le
+  passer (erreur de compilation), et `accountRestricted` / `accountSuspended` disent un motif générique en FR et EN. Pourquoi
+  par le TYPE plutôt qu'en retirant une interpolation : l'en-tête du fichier promettait déjà « motif GÉNÉRIQUE » et le code
+  passait `p.reason` quand même ; une promesse en commentaire ne protège rien, un type si. Test :
+  `admin-emails.spec.ts` (texte générique, adresse de recours, `@ts-expect-error` sur un appel avec `reason`).
+- **ANO-ADM-85** — `DisputeFileView.tsx` : « rapprochement fournisseur ».
+- **ANO-ADM-86** — `ConversationView.tsx` : un 404 « pas de conversation » est un état normal, texte explicatif en gris ;
+  `adm-cnv-conversations.spec.ts` réaligné.
+- **Jeu d'essai** — `packages/libs/prisma/scripts/seed-deals.ts` : conversation de deux messages sur `bzv-disputed`
+  (Thomas, puis Chinwe avec un numéro tapé), supprimée comme les autres fils du seed au rejeu.
+  Piège payé : un fil posé NON LU change les compteurs de la bulle « Messages » que d'autres chapitres lisent (WEB-MSG-1
+  attend un seul non lu chez Thomas) — `shipperLastReadAt` et `carrierLastReadAt` sont posés après le dernier message.
+
+## Lots décidés au § 5.26 (A190)
+
+- **a. Régénérer ses codes de secours** — `POST /admin/me/backup-codes` (`regenerateAdminBackupCodes`). Code TOTP à six
+  chiffres vérifié avec `totpLastUsedStep` (anti-rejeu) et le compteur d'échecs de la connexion (`registerTotpFailure`,
+  `totpFailuresExceeded`). Un code de secours est refusé : la régénération remplace la clé de secours, elle ne peut pas être
+  autorisée par elle. `prisma.$transaction` : `user.update({ totpLastUsedStep, totpBackupCodeHashes })` + ligne
+  `ADMIN_BACKUP_CODES_REGENERATED { before: { remaining }, after: { remaining } }`. Erreurs : 400 `OTP_INCORRECT`, 403
+  `TOO_MANY_ATTEMPTS` / `TOTP_NOT_ENABLED` — **jamais 401** : le client `apps/admin-ui/src/lib/api.ts` traite un 401 comme
+  une session expirée (renouvellement puis rejeu de la requête, donc second échec compté, puis `/login`). Écran
+  (`SessionsList.tsx`) : champ « Code à 6 chiffres », bouton actif sur six chiffres, codes affichés une fois, « Je les ai
+  notés » les efface de la mémoire du composant.
+- **b. Révoquer toutes mes autres sessions** — `DELETE /admin/me/sessions` (`revokeOtherAdminSessions`) : `SCAN
+  admin_jti:<user>:*`, `revokeAdminSession` sur chaque jti ≠ celui du jeton présenté (`currentJti`), une ligne
+  `ADMIN_SESSIONS_REVOKED { count }` si au moins une session a été fermée. Le bouton n'apparaît que s'il existe une autre
+  session. Route déclarée AVANT `DELETE /admin/me/sessions/:jti` (lisibilité ; Express ne confond pas les deux chemins).
+- **c. Jeton renouvelé complet** — `adminAccessClaims(user, jti)` : une seule fonction pour `issueAdminSession` et
+  `adminRefresh` (le renouvellement signait `{ id, jti, roles, adm, amr }` sans `adminRole` / `adminRoles`).
+- **d. Rotation réclamée** — dans `adminRefresh`, avant toute écriture :
+  `redis.set("admin_rotated:<user>:<ancien jti>", candidat, "EX", 30, "NX")`. Le gagnant (`"OK"`) relit l'ancienne session,
+  écrit la nouvelle (`storeAdminSession`), efface l'ancienne. Un perdant (`null`) relit le successeur, attend au plus
+  10 × 50 ms que sa session existe, et signe des jetons pour CE jti. Pourquoi `SET NX` et pas « `DEL` = 1 gagne » : avec
+  `DEL`, le gagnant efface puis écrit la clé de rotation ; un perdant qui lit entre les deux ne trouve rien et perd sa session
+  (le test unitaire de la course l'a montré). `SET NX` fait de la clé de rotation elle-même le verrou.
+- `ADMIN_ACTIONS` (`packages/libs/admin-audit`) et `ACTION_LABEL` (`apps/admin-ui/src/lib/format.ts`) : deux actions
+  ajoutées (liste fermée A183 : la compilation échoue si l'une manque). `backupCodesWarning` dit le nouveau recours. OpenAPI
+  (`build-openapi.ts`) : les deux routes documentées.
+
+## Harnais
+
+- `adm-e2e-bout-en-bout-1-4.spec.ts` (litige, sanction, signalements, paramètre) et `adm-e2e-bout-en-bout-5-8.spec.ts`
+  (maintenance, effacement, versements, billet et masquage) : `mode: "default"` (un échec n'arrête pas les autres cas),
+  `beforeEach` rejoue le jeu d'essai (et remet la maintenance à plat dans le second fichier). Chaque cas se termine par
+  `lireLeJournal` filtré (cible, type, auteur) avec un compte `finance` (le Support et le Médiateur n'ont pas `audit.read`).
+- Pièges payés : le rapport `/admin/finances/report` agrège par mois (pas d'identifiant de deal) — comparer un relevé avant /
+  après ; `/api/conversations` n'existe pas, le préfixe est `/api/messages/…` ; un colis de 2 kg ne montre pas un passage de
+  commission de 12 à 15 % (plancher de 3 €) ; l'`<input>` de note des signalements n'a pas d'attribut `type` (viser par
+  placeholder) ; « Prioritaire » disparaît dès que les ouverts passent sous trois.
+- `adm-ses-mes-sessions.spec.ts` : SES-6 (lots a, b, écran + API + journal) et SES-7 (trois renouvellements simultanés du
+  même cookie par trois contextes API) ; SES-1 et SES-5 réalignés (bouton de régénération présent, nouveau texte).
+
+## Vérifications
+
+- Tests : auth-service **342** (+8 : `admin-auth-sessions.controller.spec.ts` +6, `admin-emails.spec.ts` +2) ; deal 644,
+  message 57, trip 293, notification 122 inchangés ; harnais **534 scénarios** (524 + E2E 8 + SES 2).
+- Typecheck auth-service, admin-ui, harnais ; `npm run generate:openapi` (seul `apps/auth-service/openapi.json` change).
+- Déploiement : rebâtir auth-service (vérifier `grep -c admin_rotated dist/main.js`) et admin-ui ; aucun changement de
+  schéma ; rejouer `seed-deals.ts` sur les environnements de recette pour le fil de YAM-2041.
+
+# Cahier 02-ADMIN, § 7 : non-régression — l'engagement « jamais 500 sous deux clics » tenu, et la sanction enfin expliquée au membre
+
+Branche `chore/recette-admin-7`, empilée sur `chore/recette-admin-6`. Le § 7 rejoue sept défauts déjà payés une fois. Deux
+fiches lui ont été ajoutées, et ce sont elles qui portent le travail : **ADM-NRG-8** solde l'engagement pris au § 5.19 (plus
+aucun geste admin « lu puis écrit » ne rend 500 sous des clics simultanés) et **ADM-NRG-9** livre la catégorie de sanction en
+liste fermée proposée au § 6.
+
+## Ce qui a été corrigé
+
+- **ANO-ADM-89 (majeure) — proposer, appliquer, lever une sanction : trois clics, trois emails, ou 500**
+  (`apps/auth-service/src/controller/admin-users.controller.ts`). Les trois gestes lisaient le compte (`loadTarget`) puis
+  l'écrivaient sans condition : deux administrateurs qui tranchaient au même instant écrivaient chacun leur ligne de journal
+  et envoyaient chacun leur email au membre — ou, quand Mongo détectait le conflit, rendaient un 500 `P2034` brut.
+  Correction : `user.updateMany({ where: { id, updatedAt: <valeur LUE> }, … })` — un verrou optimiste sur un champ REQUIS,
+  toujours présent (le piège Prisma+Mongo des champs absents ne s'y applique pas) — enveloppé dans
+  `withWriteConflictRetry` ; `written.count !== 1` lève 409 `ACCOUNT_STATE_CHANGED`. L'écran (`UserFileView.tsx`) traduit ce
+  code (« Un autre administrateur vient d'agir sur ce compte… ») et **recharge la fiche** pour montrer la décision gagnante.
+- **ANO-ADM-88 (majeure) — le même code TOTP servait trois fois** (`controller/admin-auth.controller.ts`). `totpVerify`,
+  `totpEnable` et la régénération des codes de secours (A190 a) vérifiaient l'anti-rejeu sur une valeur LUE avant la
+  transaction : trois requêtes simultanées portant le même code passaient toutes, ouvraient trois sessions, et l'activation
+  rendait trois jeux de codes de secours dont deux étaient déjà morts à l'affichage. Correction : la garde entre DANS
+  l'écriture — `updateMany({ where: { id, OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { isSet: false } },
+  { totpLastUsedStep: { lt: step } }] } })` pour le pas TOTP (les trois branches sont obligatoires : `null` ET absent ET
+  antérieur), `{ totpEnabledAt: null | isSet: false }` pour l'activation, `updatedAt` pour la consommation d'un code de
+  secours. Un perdant lit le refus d'un code rejoué (401 / 400 `OTP_INCORRECT`), jamais un 500.
+- **ANO-ADM-90 (majeure) — `GET /auth/me` servait le motif interne au membre sanctionné**
+  (`apps/auth-service/src/utils/me-projection.ts`). La liste blanche gardait `suspensionReason` « pour que le membre puisse
+  lire sa sanction » : depuis A191, ce champ est le texte rédigé par l'administrateur, souvent recopié d'un signalement (qui,
+  quoi, parfois le nom du signalant). Correction : `suspensionReason` passe dans `ME_EXCLUDED_FIELDS` (avec son pourquoi) et
+  la projection sert `suspensionCategory` — la liste fermée d'A193, la seule chose que le membre doit lire.
+- **ANO-ADM-91 (cosmétique) — la note du journal mentait** (`AuditTable.tsx`) : « le détail est du JSON, il ne s'indexe
+  pas » était faux depuis ANO-ADM-73 (le détail est rendu lisible et la recherche « contient » le parcourt). Nouveau texte :
+  « … ne porte que sur les lignes déjà chargées, détail compris : pour chercher dans tout le journal, pose un filtre serveur ».
+- **ANO-ADM-92 (mineure) — le formulaire de décision récitait « 72 h »** (`DecisionForm.tsx`) : le délai est un paramètre
+  (`disputes.responseHours`) figé à l'ouverture du litige. Le texte renvoie au paramètre et garde la date calculée.
+
+## Lots décidés au § 7 (A192, A193, A194)
+
+- **A192 — la règle, et son inventaire.** Un geste admin qui lit un document puis l'écrit conditionne son `updateMany` à
+  l'état LU et passe par `withWriteConflictRetry` ; au réessai, la garde répond le refus métier (409 / 403 / 401), jamais
+  500, une seule ligne de journal, un seul email. Après grep, il ne reste AUCUN `$transaction` admin sans rejeu. Hors
+  périmètre admin, listés pour une passe membre : `auth.controller`, `profile.controller`, `google-auth.service`,
+  `conversation.service`, `conversation-retention.service`.
+- **A193 — catégorie de sanction en liste FERMÉE.** `SANCTION_CATEGORIES` / `SanctionCategorySchema` /
+  `sanctionCategoryOf` (`packages/libs/api-contracts/src/admin/admin-users.schema.ts`) : six valeurs, requises pour
+  proposer et pour appliquer, écrites dans `User.suspensionCategory` / `suspensionProposedCategory` et dans le journal
+  (`after.category`). `SANCTION_CATEGORY_LABELS` (FR/EN, `admin-emails.ts`) porte l'exposé des motifs dans la langue du
+  membre ; `AccountStatusParams` n'a toujours pas de champ `reason` (A191). Lecture TOLÉRANTE : un compte sanctionné avant
+  A193 n'a pas de catégorie et se lit `OTHER` (`sanctionCategoryOf`) — aucun back-fill, aucune erreur. L'écran nomme les
+  deux textes : « Catégorie envoyée au membre » (select) et « Motif interne (jamais envoyé au membre) » (le placeholder
+  disait l'inverse, et c'est l'erreur qui poussait à écrire ce qu'il ne faut pas envoyer).
+- **A194 — une tuile qui compte n objets mène à une liste qui montre ces n objets.** Filtre serveur `proposal=1`
+  (`buildUsersWhere` : `suspensionProposedAt: { not: null }`, le MÊME critère que le compteur), `UsersSearch` initialise ses
+  filtres depuis l'URL (`q`, `role`, `accountStatus`, `proposal`) sous un `<Suspense>` (exigence Next 16 pour
+  `useSearchParams`), et les tuiles « Sanctions proposées », « Comptes restreints », « Comptes suspendus » emportent leur
+  filtre.
+- **Lecture d'argent** — `platformHoldsRow` (`DealMoneyView.tsx`) : un solde plateforme négatif après un geste commercial se
+  lit « Avancé par Yamba 0,80 € » au lieu de « Détenu par la plateforme −0,80 € » (proposition du § 6, faite ici).
+
+## Harnais
+
+`apps/e2e/src/admin/adm-nrg-non-regression.spec.ts` — neuf fiches, `mode: "default"` (un rouge ne masque pas les huit
+autres). NRG-8 joue les courses réelles : trois `POST /admin/users/:id/suspension` simultanés depuis deux navigateurs admin,
+trois `DELETE` de levée, trois `POST /auth/admin/totp/verify` du même code (une seule session Redis), trois
+`POST /admin/me/backup-codes` du même code — sur un administrateur JETABLE enrôlé en base, dont l'accès est retiré en
+`finally`. NRG-9 lit l'email du membre dans Mailpit, puis `GET /auth/me` avec la session du membre, puis la fiche admin, et
+efface la catégorie en base pour prouver la lecture tolérante. Pièges payés : le menu latéral porte le même `href="/alerts"`
+que le résumé d'accueil (viser `main`) ; le pas TOTP qui vient de servir à la connexion est brûlé — une fiche qui enchaîne
+deux gestes TOTP doit attendre le pas SUIVANT ; depuis ANO-ADM-74 un identifiant de cible COURT est une valeur légitime (une
+clé de paramètre), seul un caractère interdit fait un filtre « ignoré ».
+
+## Vérifications
+
+- Tests : auth-service **356** (+14 : `admin-users-concurrency.controller.spec.ts` 6, `admin-auth-totp-concurrency.controller.spec.ts` 4,
+  `admin-emails.spec.ts` +1, `me-projection.spec.ts` +1, `admin-users.query.spec.ts` +1, `admin-auth-sessions.controller.spec.ts` +1) ;
+  deal 644, trip 293, notification 122, message 57 inchangés ; harnais **543 scénarios** (534 + 9).
+- Contre-épreuve : les quatre fichiers corrigés remis dans leur état d'origine → **16 rouges sur 356** dans cinq suites
+  (concurrence sanctions, concurrence TOTP, sessions admin, emails, projection `/me`) ; corrections remises : 356/356.
+- Typecheck des huit projets de la CI + harnais ; `npm run generate:openapi` (aucun écart après régénération).
+- Déploiement : rebâtir auth-service et admin-ui ; `prisma db push` non requis (deux champs optionnels ajoutés sans index).
+
 # Sécurité de la connexion : throttling + email de nouvelle connexion (D78)
 
 *(PR `feat/login-security`, 11/09/2026 — suite d'ANO-WEB-19.)*

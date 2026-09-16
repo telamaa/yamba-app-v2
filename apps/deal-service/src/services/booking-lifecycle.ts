@@ -43,6 +43,16 @@ export function cancellationParamsFromSettings(v: { "cancellation.fullRefundUnti
   return { fullRefundUntilHours: v["cancellation.fullRefundUntilHours"], lateRetentionPct: v["cancellation.lateRetentionPct"] };
 }
 
+/**
+ * A172 — les conditions qui s'appliquent à UNE réservation : celles figées à sa création (`Booking.cancellationTerms`) ;
+ * à défaut (réservation antérieure au snapshot), les paramètres courants. Jamais l'inverse : un barème changé après la
+ * réservation ne touche pas ce que l'Expéditeur a accepté.
+ */
+export function cancellationParamsForBooking(booking: { cancellationTerms?: CancellationParams | null }, current: CancellationParams): CancellationParams {
+  const t = booking.cancellationTerms;
+  return t && Number.isFinite(t.fullRefundUntilHours) && Number.isFinite(t.lateRetentionPct) ? { fullRefundUntilHours: t.fullRefundUntilHours, lateRetentionPct: t.lateRetentionPct } : current;
+}
+
 /* ══ Vue minimale du Booking nécessaire ici ═══════════════════ */
 
 export type BookingSnapshotsForLifecycle = {

@@ -8,17 +8,37 @@
  * ne garde qu'un résumé d'une ligne ; le détail vit ici, groupé par gravité, avec les seuils
  * qui ont servi au calcul.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import type { OpsAlertsResponse } from "@/lib/types";
+import { can, type AdminPermission } from "@/lib/permissions";
+import type { AdminMe, OpsAlertsResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
+
+/**
+ * Recette 02-ADMIN § 5.11 — une alerte de versement menait le Support (kpi.read, sans finances.read) vers un écran qui
+ * lui répond 403. L'alerte reste visible (tout profil à kpi.read doit savoir que la plateforme souffre), mais le lien
+ * n'est offert qu'au profil qui peut ouvrir la destination ; les autres lisent à qui la transmettre.
+ */
+const DESTINATION: Array<{ prefix: string; permission: AdminPermission; who: string }> = [
+  { prefix: "/finances", permission: "finances.read", who: "Finance ou Médiateur" },
+  { prefix: "/disputes", permission: "disputes.read", who: "Médiateur, Support ou Finance" },
+  { prefix: "/pilotage", permission: "pilotage.read", who: "Finance ou Médiateur" },
+];
+const destinationOf = (href: string) => DESTINATION.find((d) => href.startsWith(d.prefix)) ?? null;
 
 export default function AlertsView() {
   const [data, setData] = useState<OpsAlertsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
+  const [me, setMe] = useState<AdminMe | null>(null);
 
   useEffect(() => {
-    apiFetch<OpsAlertsResponse>("/admin/alerts").then(setData).catch((e) => setError(e.message));
+    apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    apiFetch<OpsAlertsResponse>("/admin/alerts").then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas les alertes de seuil.") : setError("Alertes indisponibles pour le moment. Recharge la page.")));
   }, []);
 
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
@@ -36,9 +56,10 @@ export default function AlertsView() {
         <ul className="mt-2 space-y-2">
           {list.map((a) => (
             <li key={a.rule}>
-              <Link
+              <Card
                 href={a.href}
-                className={`block rounded-xl border px-3 py-2.5 hover:opacity-90 ${tone === "critical" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}
+                actionable={!me || !destinationOf(a.href) || can(me.adminRoles, destinationOf(a.href)!.permission)}
+                className={`block rounded-xl border px-3 py-2.5 ${tone === "critical" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}
               >
                 <div className="flex flex-wrap items-baseline gap-2">
                   <b className="text-[13.5px]">{a.title}</b>
@@ -46,8 +67,12 @@ export default function AlertsView() {
                   <span className="ml-auto text-[11px] opacity-70">{a.rule}</span>
                 </div>
                 <p className="mt-0.5 text-[12.5px]">{a.detail}</p>
-                <p className="mt-1 text-[11px] underline underline-offset-2">Aller traiter →</p>
-              </Link>
+                {!me || !destinationOf(a.href) || can(me.adminRoles, destinationOf(a.href)!.permission) ? (
+                  <p className="mt-1 text-[11px] underline underline-offset-2">Aller traiter →</p>
+                ) : (
+                  <p className="mt-1 text-[11px]">Ton profil n&apos;ouvre pas cette file : transmets à {destinationOf(a.href)!.who}.</p>
+                )}
+              </Card>
             </li>
           ))}
         </ul>
@@ -90,4 +115,9 @@ export default function AlertsView() {
       </section>
     </>
   );
+}
+
+/** Une carte d'alerte : un lien quand le profil peut agir, un simple bloc sinon (jamais un lien vers un 403). */
+function Card({ href, actionable, className, children }: { href: string; actionable: boolean; className: string; children: ReactNode }) {
+  return actionable ? <Link href={href} className={`${className} hover:opacity-90`}>{children}</Link> : <div className={className}>{children}</div>;
 }

@@ -10,6 +10,7 @@
 import type { NextFunction, Request, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import { DEFAULT_MAINTENANCE_SNAPSHOT, envOverride, isBlocked, snapshotFrom, type MaintenanceSnapshot } from "@packages/libs/maintenance";
+export { maintenanceCheckError } from "@packages/libs/maintenance";
 
 export const MAINTENANCE_POLL_MS = 10_000;
 export const MAINTENANCE_RETRY_AFTER_SECONDS = 300;
@@ -47,7 +48,8 @@ export function maintenanceMiddleware() {
     const state = await currentMaintenance();
     if (!isBlocked(req.method, req.path, state)) return next();
     res.setHeader("Retry-After", String(MAINTENANCE_RETRY_AFTER_SECONDS));
-    return res.status(503).json({ code: "MAINTENANCE", message: state.message.fr || "Maintenance en cours.", messages: state.message, retryAfterSeconds: MAINTENANCE_RETRY_AFTER_SECONDS });
+    // Recette § 5.23 — le code est aussi là où tout refus métier le porte (`details.code`, A146) ; `code` reste pour les clients existants.
+    return res.status(503).json({ code: "MAINTENANCE", message: state.message.fr || "Maintenance en cours.", messages: state.message, retryAfterSeconds: MAINTENANCE_RETRY_AFTER_SECONDS, details: { code: "MAINTENANCE" } });
   };
 }
 

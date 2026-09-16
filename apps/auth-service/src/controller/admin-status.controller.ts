@@ -11,12 +11,15 @@ import redis from "@packages/libs/redis";
 import { listCronRuns } from "@packages/libs/redis/cron-heartbeat";
 import { probeService, serviceEntries } from "@packages/libs/health"; // D70
 import { platformSettings } from "@packages/libs/settings/default";
-import { UpdateMaintenanceRequestSchema, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
+import { UpdateMaintenanceRequestSchema, isCronLate, isOutboxLagging, missingCrons, outboxLagMinutes, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
 import { ValidationError } from "@packages/error-handler";
+import { reachableRecipientWhere } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
-import { makeMaintenanceService, type MaintenanceDb } from "../services/maintenance.service";
+import { makeMaintenanceService, type MaintenanceChangeKind, type MaintenanceDb } from "../services/maintenance.service";
+import { isForcedByEnvironment } from "@packages/libs/maintenance";
+import { emailCounters } from "../utils/status.rules";
 
 const ADMIN_UI_URL = process.env.ADMIN_UI_URL || "http://localhost:3001";
 const HEALTH_TIMEOUT_MS = 2_500;
@@ -33,21 +36,27 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
   return errors;
 }
 
-async function notifySuperAdmins(n: { actorId: string; before: { enabled: boolean }; after: { enabled: boolean; scheduledAt: string | null; messageFr: string }; reason: string }): Promise<void> {
+async function notifySuperAdmins(n: { actorId: string; before: { enabled: boolean }; after: { enabled: boolean; scheduledAt: string | null; messageFr: string }; reason: string; kind: MaintenanceChangeKind }): Promise<void> {
   const [actor, admins] = await Promise.all([
     prisma.user.findUnique({ where: { id: n.actorId }, select: { firstName: true, lastName: true } }),
-    prisma.user.findMany({ where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, isDeleted: false }, select: { email: true, firstName: true, preferredLocale: true } }),
+    prisma.user.findMany({ where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, AND: [reachableRecipientWhere()] } /* ANO-ADM-11 : D35 4A */, select: { email: true, firstName: true, preferredLocale: true } }),
   ]);
   const byName = actor ? `${actor.firstName} ${actor.lastName.charAt(0)}.` : "un administrateur";
   await Promise.all(
     admins.map((a) => {
       const locale = resolveLocale(a.preferredLocale);
-      return sendAuthEmail(a.email, locale, getAdminEmails(locale).maintenanceChanged({ firstName: a.firstName, byName, enabled: n.after.enabled, scheduledAt: n.after.scheduledAt, message: n.after.messageFr, reason: n.reason, statusUrl: `${ADMIN_UI_URL}/status` })).catch(() => undefined);
+      return sendAuthEmail(a.email, locale, getAdminEmails(locale).maintenanceChanged({ firstName: a.firstName, byName, kind: n.kind, enabled: n.after.enabled, scheduledAt: n.after.scheduledAt, message: n.after.messageFr, reason: n.reason, statusUrl: `${ADMIN_UI_URL}/status` })).catch(() => undefined);
     })
   );
 }
 
-export const maintenanceService = makeMaintenanceService({ db: prisma as unknown as MaintenanceDb, notify: notifySuperAdmins });
+/** A182 — le gateway est le seul à appliquer `MAINTENANCE_MODE` : on lit SA santé ; injoignable → l'environnement local. */
+async function gatewayForcesMaintenance(): Promise<boolean> {
+  const p = await probeService(SERVICE_URLS[0], HEALTH_TIMEOUT_MS);
+  return p.report ? isForcedByEnvironment(p.report) : process.env.MAINTENANCE_MODE === "on";
+}
+
+export const maintenanceService = makeMaintenanceService({ db: prisma as unknown as MaintenanceDb, notify: notifySuperAdmins, forcedByEnvironment: gatewayForcesMaintenance });
 
 export const getMaintenance = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -76,23 +85,27 @@ export const getStatus = async (_req: AuthenticatedRequest, res: Response, next:
   try {
     const now = new Date();
     const dayAgo = new Date(now.getTime() - 86_400_000);
-    const parkedThreshold = (await platformSettings().get())["alerts.outboxParkedAttempts"];
-    const [services, crons, unpublished, oldest, parked, failed, sent, maintenance] = await Promise.all([
-      Promise.all(SERVICE_URLS.map(probe)),
+    const settings = await platformSettings().get();
+    const parkedThreshold = settings["alerts.outboxParkedAttempts"];
+    const lagThresholdMinutes = settings["alerts.outboxLagMinutes"]; // § 5.23 — le seuil de l'alerte OUTBOX_LAGGING, pas un second
+    const servicesProbe = Promise.all(SERVICE_URLS.map(probe));
+    const [services, crons, unpublished, oldest, parked, emailsByStatus, maintenance] = await Promise.all([
+      servicesProbe,
       listCronRuns(redis).catch(() => []),
       prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never }),
       prisma.outboxEvent.findFirst({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
       prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { gte: parkedThreshold } } as never }),
-      prisma.emailDelivery.count({ where: { status: "FAILED", claimedAt: { gte: dayAgo } } }),
-      prisma.emailDelivery.count({ where: { status: "SENT", claimedAt: { gte: dayAgo } } }),
-      maintenanceService.read(),
+      prisma.emailDelivery.groupBy({ by: ["status"], where: { claimedAt: { gte: dayAgo } }, _count: { _all: true } }),
+      // A182 — l'état « forcé par l'environnement » se lit dans la santé du gateway déjà sondée (pas de seconde sonde).
+      servicesProbe.then((all) => maintenanceService.read(all[0].report ? { envOverride: isForcedByEnvironment(all[0].report) } : {})),
     ]);
     const body: AdminStatusResponse = {
       at: now.toISOString(),
       services,
-      crons,
-      outbox: { unpublished, oldestUnpublishedAt: oldest?.occurredAt.toISOString() ?? null, parked, parkedThreshold },
-      emails: { failedLast24h: failed, sentLast24h: sent },
+      crons: crons.map((c) => ({ ...c, late: c.ok && isCronLate(c, now) })),
+      missingCrons: missingCrons(crons), // A178
+      emails: emailCounters(emailsByStatus.map((g) => ({ status: g.status, count: g._count._all }))), // A177
+      outbox: { unpublished, oldestUnpublishedAt: oldest?.occurredAt.toISOString() ?? null, parked, parkedThreshold, lagMinutes: Math.floor(outboxLagMinutes(oldest?.occurredAt ?? null, now)), lagThresholdMinutes, lagging: isOutboxLagging(oldest?.occurredAt ?? null, now, lagThresholdMinutes) },
       maintenance,
     };
     res.setHeader("Cache-Control", "no-store");

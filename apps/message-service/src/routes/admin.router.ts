@@ -14,9 +14,11 @@ import isAdminAuthenticated from "@packages/middleware/isAdminAuthenticated";
 import { requireAdminPermission } from "@packages/middleware/requireAdminRole";
 import { makeAdminConversationsController } from "../controllers/admin-conversations.controller";
 import { makeAdminConversationService } from "../services/admin-conversation.service";
+import redis from "@packages/libs/redis";
+import type { ReadCoalescer } from "@packages/admin-audit";
 
 const router = Router();
-const controller = makeAdminConversationsController(makeAdminConversationService());
+const controller = makeAdminConversationsController(makeAdminConversationService(redis as unknown as ReadCoalescer)); // A168 — lectures coalescées
 
 router.get("/reports", isAdminAuthenticated, requireAdminPermission("reports.review"), controller.listReports);
 router.patch("/reports/:id", isAdminAuthenticated, requireAdminPermission("reports.review"), controller.reviewReport);

@@ -2,31 +2,44 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ApiError, apiFetch } from "@/lib/api";
-import { CATEGORY_LABEL, dateTime, money } from "@/lib/format";
+import { ApiError, apiFetch, downloadFile } from "@/lib/api";
+import { CATEGORY_LABEL, dateTime, exportPeriodProblem, financeExportRefusal, money, reportPeriodLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, FinanceReport } from "@/lib/types";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function FinanceReportView() {
   const [months, setMonths] = useState(12);
   const [report, setReport] = useState<FinanceReport | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [from, setFrom] = useState(() => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => {
     setReport(null);
-    apiFetch<FinanceReport>(`/admin/finances/report?months=${months}`).then(setReport).catch((e) => setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+    // Recette § 5.16 — jamais « 500 : Internal… » : un refus se dit en français.
+    apiFetch<FinanceReport>(`/admin/finances/report?months=${months}`).then(setReport).catch((e) => isPermissionRefusal(e) ? deny("Ton profil ne lit pas le rapport financier.") : setErr(e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas le rapport financier." : "Le rapport n'a pas pu être calculé. Recharge la page ; si le problème revient, préviens l'équipe technique."));
   }, [months]);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
 
-  function exportCsv() {
-    // Téléchargement direct : le cookie admin suit (même origine via le proxy /api) ; l'export est journalisé côté serveur.
+  /* ANO-ADM-39 (recette § 5.16) — l'export ouvrait un onglet sur l'URL (`window.open`), comme les exports corrigés au § 5.6
+     (ANO-ADM-13) : un refus s'y lisait en JSON anglais, un jeton expiré en « Unauthorized! ». Même outil que les autres
+     exports : `downloadFile` (rafraîchissement de session, refus lisible), et la période se vérifie avant l'appel. */
+  const periodProblem = exportPeriodProblem(from, to);
+  async function exportCsv() {
+    if (periodProblem || exporting) return;
     const f = new Date(from + "T00:00:00Z").toISOString();
-    const t = new Date(new Date(to + "T00:00:00Z").getTime() + 86_400_000).toISOString();
-    window.open(`${API_BASE}/admin/finances/export?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`, "_blank", "noopener");
+    const t = new Date(new Date(to + "T00:00:00Z").getTime() + 86_400_000).toISOString(); // lendemain du dernier jour : borne EXCLUE
+    setExporting(true); setExportMsg(null);
+    try {
+      const out = await downloadFile(`/admin/finances/export?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`);
+      setExportMsg({ ok: true, text: `${out.rows ?? "?"} ligne${out.rows === 1 ? "" : "s"} exportée${out.rows === 1 ? "" : "s"} (${out.filename}). L'export est inscrit au journal.` });
+    } catch (e) {
+      setExportMsg({ ok: false, text: financeExportRefusal(e instanceof ApiError ? e : null) });
+    } finally { setExporting(false); }
   }
 
   if (err) return <p className="mt-4 text-[13px] text-red-700">{err}</p>;
@@ -78,7 +91,7 @@ export default function FinanceReportView() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-1 text-[11px] text-slate-400">Du {dateTime(report.from)} au {dateTime(report.to)} · calculé le {dateTime(report.generatedAt)}. Un deal capturé en mars et terminé en avril compte dans les deux mois, chaque fait à sa date.</p>
+            <p className="mt-1 text-[11px] text-slate-400">{reportPeriodLabel(report.from, report.to)} · calculé le {dateTime(report.generatedAt)}. Un deal capturé en mars et terminé en avril compte dans les deux mois, chaque fait à sa date.</p>
           </section>
           <section className="mt-5">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sinistralité (litiges tranchés)</h2>
@@ -112,8 +125,10 @@ export default function FinanceReportView() {
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]">
                 <label>du <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-300 px-2 py-1" /></label>
                 <label>au <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-300 px-2 py-1" /></label>
-                <button onClick={exportCsv} className="rounded-lg bg-slate-900 px-3 py-1.5 font-semibold text-white">Télécharger le CSV</button>
+                <button onClick={exportCsv} disabled={!!periodProblem || exporting} className="rounded-lg bg-slate-900 px-3 py-1.5 font-semibold text-white disabled:opacity-50">{exporting ? "Export en cours…" : "Télécharger le CSV"}</button>
               </div>
+              {periodProblem && <p className="mt-1 text-[12px] text-amber-800">{periodProblem}</p>}
+              {exportMsg && <p className={`mt-1 text-[12px] ${exportMsg.ok ? "text-slate-600" : "text-red-700"}`}>{exportMsg.text}</p>}
             </section>
           )}
         </>

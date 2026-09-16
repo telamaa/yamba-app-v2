@@ -50,11 +50,13 @@ model User {
   adminInvitedAt   DateTime?
   accountStatus    AccountStatus @default(ACTIVE) // ACTIVE | RESTRICTED (ni publier ni réserver) | SUSPENDED (connexion refusée)
   suspensionReason         String?
+  suspensionCategory       String?   // A193 — catégorie FERMÉE communiquée au membre (absente avant A193 → lue OTHER)
   suspensionUntil          DateTime?
   suspendedAt              DateTime?
   suspendedByAdminId       String?   @db.ObjectId
   suspensionProposedLevel  String?   // proposition SUPPORT en attente d'exécution (3A : deux clics)
   suspensionProposedReason String?
+  suspensionProposedCategory String? // A193
   suspensionProposedByAdminId String? @db.ObjectId
   suspensionProposedAt     DateTime?
 
@@ -670,6 +672,12 @@ model TripDocument {
 // Agnostique au modèle de pricing : PER_CATEGORY (moteur actuel,
 // TripCategoryCondition forfaitaire) ou PER_KG (cible D13 post-refonte).
 // Un changement de moteur ne migre JAMAIS les bookings existants.
+// A172 — conditions d'annulation acceptées = conditions appliquées (information précontractuelle).
+type BookingCancellationTerms {
+  fullRefundUntilHours Int
+  lateRetentionPct     Int
+}
+
 type BookingPricingSnapshot {
   pricingModel PricingModel
 
@@ -755,6 +763,16 @@ type BookingTrackingEvent {
   confirmedAt DateTime
 }
 
+// A166 (recette 02-ADMIN § 5.16, ANO-ADM-37) — un remboursement RÉELLEMENT émis chez le fournisseur.
+// Le cumul (`refundAmountCents`) et le dernier état (`refundedAt`, `refundId`) restent sur Booking ;
+// la liste garde chaque remboursement à sa date, pour le rapport mensuel et l'export.
+type BookingRefund {
+  refundId    String?
+  amountCents Int
+  refundedAt  DateTime
+  kind        String // CANCELLATION | PICKUP_REFUSED | DISPUTE | RETENTION_RESTITUTION | MANUAL
+}
+
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -770,6 +788,9 @@ model Booking {
   recipient BookingRecipientSnapshot
   pickupPlace   BookingPlaceSnapshot?
   deliveryPlace BookingPlaceSnapshot?
+  /// A172 — conditions d'annulation ANN-01 figées à la création (comme le prix) ; absent sur les réservations antérieures
+  /// → paramètres courants. Jamais réécrit.
+  cancellationTerms BookingCancellationTerms?
 
   // ─── Jalons (horodatage SERVEUR) + échéances pré-calculées ───
   requestedAt   DateTime      @default(now())
@@ -787,6 +808,9 @@ model Booking {
   declineReason String? // refus PENDING (5 raisons — DeclineReason du contrat)
   cancelReason  String? // annulation Expéditeur (texte libre court, B2)
   pickupRefusalReason String? // refus au pickup (5 raisons — PickupRefusalReason, B3/A40)
+  /// ANO-WEB-10 — la marque d'un refus au pickup (la raison est facultative, donc ambiguë) :
+  /// la réputation exclut ces annulations, « sans pénalité » comme le dit la machine.
+  pickupRefusedAt     DateTime?
 
   // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
   deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier (validation seule)
@@ -806,6 +830,7 @@ model Booking {
   refundedAt        DateTime?
   refundAmountCents Int?
   refundId          String? // C-PR5 (D58) — dernier remboursement fournisseur (rapprochement exact)
+  refunds           BookingRefund[] // A166 — chaque remboursement émis, à sa date ; écrite en entier, créée [] (jamais absente)
   transferId        String?
 
   // ─── Versement Voyageur (B4, D49) ───
@@ -897,6 +922,10 @@ model Dispute {
   carrierStatement         String?
   carrierStatementPhotoUrls String[] // ≤ 5, ImageKit deals/dispute/ (liste créée [] — pitfall Mongo)
   carrierRespondedAt       DateTime?
+  // ANO-ADM-52 (recette 02-ADMIN § 5.20, D62 « jamais rétroactif ») — échéance de la version du Voyageur FIGÉE à
+  // l'ouverture (disputedAt + dispute.responseDelayHours lu à cet instant). Absente sur un dossier antérieur : repli
+  // sur le paramètre courant (lecture, jamais d'écriture de rattrapage).
+  responseDueAt            DateTime?
 
   // ── C-PR2 (D55, 2A/7A) : la décision, gravée sur le dossier ──
   resolutionOutcome            String?   // REJECTED | PARTIAL_REFUND | FULL_REFUND
@@ -1097,7 +1126,7 @@ model AdminAction {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
   adminUserId String  @db.ObjectId
   action      String // ADMIN_LOGIN | ADMIN_TOTP_ENABLED | DISPUTE_VIEWED | … (ADMIN_ACTIONS)
-  targetType  String // USER | BOOKING | DISPUTE | SESSION
+  targetType  String // ADMIN_TARGET_TYPES (A183) : USER | BOOKING | TRIP | CONVERSATION | REPORT | SESSION | SETTINGS
   targetId    String?
   before      Json?
   after       Json?
@@ -1109,6 +1138,7 @@ model AdminAction {
   @@index([targetType, targetId])
   @@index([adminUserId, createdAt])
   @@index([action, createdAt]) // A149 — filtre « Action » du journal
+  @@index([ip, createdAt]) // recette § 5.24 — le filtre « IP » parcourait toute la collection
 }
 
 // ─────────────────────────────────────────────

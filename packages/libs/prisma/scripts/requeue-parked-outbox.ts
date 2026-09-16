@@ -20,9 +20,9 @@
  *   npx tsx --env-file=.env packages/libs/prisma/scripts/requeue-parked-outbox.ts [--dry-run] [--type=booking]
  */
 import prisma from "../index";
-import { BookingDomainEventSchema, MessagingDomainEventSchema } from "@packages/api-contracts";
+import { BookingDomainEventSchema, MessagingDomainEventSchema, OUTBOX_MAX_RELAY_ATTEMPTS } from "@packages/api-contracts";
 
-const MAX_RELAY_ATTEMPTS = 10;
+const MAX_RELAY_ATTEMPTS = OUTBOX_MAX_RELAY_ATTEMPTS; // A176
 
 /** Le contrat qui gouverne un agrégat — le même que celui du relais correspondant. */
 function contratDe(aggregateType: string) {

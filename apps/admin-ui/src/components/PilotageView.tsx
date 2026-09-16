@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch } from "@/lib/api";
-import { dateTime, money } from "@/lib/format";
+import { dateTime, money, utcPeriodLabel } from "@/lib/format";
 import type { CorridorsResponse, PilotageDrilldownResponse, PilotageMetric, PilotageSeriesPoint, PilotageSeriesResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 /* Une courbe = une mesure, une couleur (slot 1 de la palette validée), un seul axe. Agrandie : tableau dessous, clic = drill-down (D60 3A). */
 type Metric = { key: PilotageMetric; label: string; hint: string; money?: boolean };
@@ -54,17 +55,18 @@ export default function PilotageView() {
   const [months, setMonths] = useState(3);
   const [days, setDays] = useState(30);
   const [currency, setCurrency] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [series, setSeries] = useState<PilotageSeriesResponse | null>(null);
   const [corridors, setCorridors] = useState<CorridorsResponse | null>(null);
   const [expanded, setExpanded] = useState<PilotageMetric | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     setSeries(null);
-    apiFetch<PilotageSeriesResponse>(`/admin/pilotage/series?granularity=${granularity}&months=${months}`).then(setSeries).catch((e) => setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+    apiFetch<PilotageSeriesResponse>(`/admin/pilotage/series?granularity=${granularity}&months=${months}`).then(setSeries).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas le pilotage.") : setErr(pilotageRefusal(e))));
   }, [granularity, months]);
   useEffect(() => {
     setCorridors(null);
-    apiFetch<CorridorsResponse>(`/admin/pilotage/corridors?days=${days}`).then(setCorridors).catch((e) => setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+    apiFetch<CorridorsResponse>(`/admin/pilotage/corridors?days=${days}`).then(setCorridors).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas le pilotage.") : setErr(pilotageRefusal(e))));
   }, [days]);
   const currencies = useMemo(() => [...new Set((series?.points ?? []).flatMap((p) => p.finance.map((f) => f.currencyCode)))].sort(), [series]);
   useEffect(() => { if (!currency && currencies.length) setCurrency(currencies[0]); }, [currencies, currency]);
@@ -212,6 +214,13 @@ export default function PilotageView() {
   );
 }
 
+/** Recette § 5.17 — jamais « 500 : Internal… » : un refus du pilotage se dit en français. */
+function pilotageRefusal(e: unknown): string {
+  if (e instanceof ApiError && e.status === 403) return "Ton profil ne lit pas le pilotage.";
+  if (e instanceof ApiError && e.status === 400) return "Période ou mesure invalide : recharge la page.";
+  return "Le pilotage n'a pas pu être calculé. Recharge la page ; si le problème revient, préviens l'équipe technique.";
+}
+
 function Tile({ label, v }: { label: string; v: string }) {
   return <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xl font-black tabular-nums">{v}</p><p className="text-[11.5px] text-slate-600">{label}</p></div>;
 }
@@ -226,7 +235,7 @@ function ExpandedChart({ metric, points, currency, granularity, onClose }: { met
   useEffect(() => {
     if (!selected) { setDrill(null); return; }
     setBusy(true); setErr(null);
-    apiFetch<PilotageDrilldownResponse>(`/admin/pilotage/drilldown?metric=${metric.key}&granularity=${granularity}&period=${encodeURIComponent(selected)}`).then(setDrill).catch((e) => setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible.")).finally(() => setBusy(false));
+    apiFetch<PilotageDrilldownResponse>(`/admin/pilotage/drilldown?metric=${metric.key}&granularity=${granularity}&period=${encodeURIComponent(selected)}`).then(setDrill).catch((e) => setErr(pilotageRefusal(e))).finally(() => setBusy(false));
   }, [selected, metric.key, granularity]);
   const unit = metric.money ? currency : undefined;
   const fmt = (y: number) => (unit ? money(y, unit) : String(y));
@@ -266,7 +275,7 @@ function ExpandedChart({ metric, points, currency, granularity, onClose }: { met
           {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
           {drill && !busy && (
             <>
-              <p className="mt-1 text-[11.5px] text-slate-500">{drill.total} élément(s){drill.truncated ? " · 200 premiers affichés" : ""} · du {dateTime(drill.periodStart)} au {dateTime(drill.periodEnd)}</p>
+              <p className="mt-1 text-[11.5px] text-slate-500">{drill.total} élément(s){drill.truncated ? " · 200 premiers affichés" : ""} · du {utcPeriodLabel(drill.periodStart, drill.periodEnd)} (UTC){metric.key === "refunded" ? " · un élément par remboursement" : ""}</p>
               {drill.items.length === 0 ? <p className="mt-2 text-[12.5px] text-slate-500">Rien sur cette période.</p> : (
                 <ul className="mt-2 max-h-96 space-y-1 overflow-y-auto text-[12.5px]">
                   {drill.items.map((it) => (

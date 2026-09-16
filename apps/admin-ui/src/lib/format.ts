@@ -1,3 +1,5 @@
+import type { SanctionCategory } from "./types";
+
 export function money(cents: number | null | undefined, currency = "EUR"): string {
   if (cents == null) return "—";
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(cents / 100);
@@ -21,6 +23,13 @@ export const CATEGORY_LABEL: Record<string, string> = {
   OTHER: "Autre",
 };
 
+/** Catégories du colis déclaré (ParcelCategory) — mêmes libellés que le site (messages/fr/booking.json). */
+export const PARCEL_CATEGORY_LABEL: Record<string, string> = {
+  CLOTHES: "Vêtements", SHOES: "Chaussures", FASHION_ACCESSORIES: "Accessoires de mode", OTHER_ACCESSORIES: "Autres accessoires",
+  BOOKS: "Livres", DOCUMENTS: "Documents", SMALL_TOYS: "Petits jouets", PHONE: "Téléphone", COMPUTER: "Ordinateur",
+  OTHER_ELECTRONICS: "Autre électronique", CHECKED_BAG_23KG: "Bagage en soute 23 kg", CABIN_BAG_12KG: "Bagage cabine 12 kg",
+};
+
 export const OUTCOME_LABEL: Record<string, string> = {
   FULL_REFUND: "Remboursement total",
   PARTIAL_REFUND: "Remboursement partiel",
@@ -39,14 +48,17 @@ export const ACTION_LABEL: Record<string, string> = {
   ADMIN_LOGOUT: "Déconnexion",
   ADMIN_TOTP_ENABLED: "2FA activée",
   ADMIN_BACKUP_CODE_USED: "Code de secours utilisé",
+  ADMIN_BACKUP_CODES_REGENERATED: "Codes de secours régénérés",
   DISPUTE_VIEWED: "Dossier consulté",
   DISPUTE_RESOLVED: "Litige tranché",
   RETENTION_ARBITRATED: "Retenue arbitrée",
   ADMIN_INVITED: "Admin invité",
   ADMIN_INVITE_ACCEPTED: "Invitation acceptée",
+  ADMIN_INVITE_RESENT: "Invitation renvoyée",
   ADMIN_ROLE_CHANGED: "Profil admin modifié",
   ADMIN_REVOKED: "Accès admin retiré",
   ADMIN_SESSION_REVOKED: "Session révoquée",
+  ADMIN_SESSIONS_REVOKED: "Autres sessions révoquées",
   USER_VIEWED: "Fiche consultée",
   USER_SUSPENSION_PROPOSED: "Suspension proposée",
   USER_SUSPENDED: "Compte suspendu",
@@ -60,7 +72,7 @@ export const ACTION_LABEL: Record<string, string> = {
   TICKET_VERIFIED: "Billet vérifié",
   TICKET_REJECTED: "Billet rejeté",
   DEAL_MONEY_VIEWED: "Fiche argent consultée",
-  DEAL_RECONCILED: "Rapprochement Stripe",
+  DEAL_RECONCILED: "Rapprochement fournisseur", // § 5.13 : en local le fournisseur est Fake, pas Stripe
   PAYOUT_RETRIED: "Versement rejoué",
   PAYOUT_REVERSAL_RESOLVED: "Renversement clos",
   FINANCE_EXPORTED: "Export finances",
@@ -74,10 +86,87 @@ export const ACTION_LABEL: Record<string, string> = {
   REPORT_REVIEWED: "Signalement traité", // D68
 };
 
+/**
+ * A183 (recette 02-ADMIN § 5.24) — les types de cible réellement écrits (miroir de `ADMIN_TARGET_TYPES`,
+ * packages/libs/admin-audit), en français. Le harnais ADM-JRN-2 compare les deux listes.
+ */
+export const TARGET_TYPE_LABEL: Record<string, string> = {
+  USER: "Membre",
+  BOOKING: "Deal",
+  TRIP: "Trajet",
+  CONVERSATION: "Conversation",
+  REPORT: "Signalement",
+  SESSION: "Session admin",
+  SETTINGS: "Paramètres",
+};
+
+/** Les filtres serveur renvoyés par `/admin/audit` (`appliedFilters`), dits en français. */
+export const AUDIT_FILTER_LABEL: Record<string, string> = { createdAt: "période", adminUserId: "auteur", action: "action", targetType: "type de cible", targetId: "identifiant de cible", ip: "IP" };
+
+function auditValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "oui" : "non";
+  if (Array.isArray(v)) return v.length ? v.map(auditValue).join(", ") : "aucun";
+  if (typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>);
+    return entries.length ? entries.map(([k, x]) => `${k} ${auditValue(x)}`).join(", ") : "aucun";
+  }
+  return String(v);
+}
+
+/**
+ * ANO-ADM-73 (recette 02-ADMIN § 5.24) — le détail lisible d'une ligne de journal : les clés du `after` séparées par « · ».
+ * Un tableau ou un objet imbriqué s'affichait en JSON brut (`divergences : ["CAPTURE_RECORDED_NOT_LIVE"]`, `filters : {}`),
+ * et les cartes « Actions admin sur ce compte / ce trajet » affichaient tout le `after` en JSON. Une seule règle, partout.
+ */
+export function auditDetail(after: unknown, omit: readonly string[] = []): string {
+  if (!after || typeof after !== "object") return "";
+  return Object.entries(after as Record<string, unknown>)
+    .filter(([k]) => !omit.includes(k) && !SECRET_KEY.test(k))
+    .map(([k, v]) => `${k} : ${auditValue(v)}`)
+    .join(" · ");
+}
+
+/** A187 b — jamais un secret dans un détail, même si une ligne en portait un par erreur. */
+const SECRET_KEY = /secret|hash|token|password|backup|totp/i;
+const CHANGE_KEY_LABEL: Record<string, string> = { adminRoles: "Profils", accountStatus: "Statut du compte" };
+const ADMIN_ROLE_FR: Record<string, string> = { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation", PRIVACY: "Données personnelles" };
+function changeValue(key: string, v: unknown): string {
+  if (key === "adminRoles" && Array.isArray(v)) return v.length ? v.map((r) => ADMIN_ROLE_FR[String(r)] ?? String(r)).join(" + ") : "aucun";
+  if (key === "accountStatus" && typeof v === "string") return STATUS_LABEL[v] ?? v;
+  return auditValue(v);
+}
+
+/**
+ * A187 lot b (recette § 5.25) — « avant → après », champ par champ, en français, pour une ligne qui porte un `before` :
+ * profils admin, statut de compte, paramètres (`{ key, value }`). Rend null quand rien n'a changé ou qu'il n'y a pas d'avant.
+ * Un champ retiré (révocation : `after` vide) se lit « Profils : Finance → retiré ». Les clés sensibles ne sont jamais lues.
+ */
+export function auditChange(before: unknown, after: unknown): string | null {
+  if (!before || typeof before !== "object" || Array.isArray(before)) return null;
+  const b = before as Record<string, unknown>;
+  const a = after && typeof after === "object" && !Array.isArray(after) ? (after as Record<string, unknown>) : {};
+  if ("key" in b && "value" in b) {
+    return JSON.stringify(b.value) === JSON.stringify(a.value) ? null : `${String(b.key)} : ${auditValue(b.value)} → ${"value" in a ? auditValue(a.value) : "retiré"}`;
+  }
+  const parts = Object.keys(b)
+    .filter((k) => !SECRET_KEY.test(k) && k !== "version")
+    .filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]))
+    .map((k) => `${CHANGE_KEY_LABEL[k] ?? k} : ${changeValue(k, b[k])} → ${k in a ? changeValue(k, a[k]) : "retiré"}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** Les clés du `after` déjà dites par `auditChange` (le détail ne les répète pas). */
+export function auditChangeKeys(before: unknown): string[] {
+  if (!before || typeof before !== "object" || Array.isArray(before)) return [];
+  const keys = Object.keys(before as Record<string, unknown>);
+  return keys.includes("key") && keys.includes("value") ? ["key", "value", "version"] : keys;
+}
+
 /* F-PR3 (D61 7A) — messages signalés */
 export const REPORT_REASON_LABEL: Record<string, string> = {
   OFF_PLATFORM: "Veut sortir de Yamba",
-  SCAM: "Tentative d'arnaque",
+  SCAM: "Arnaque suspectée", // décision du 15/09 (recette § 5.19) : un seul libellé, front et back-office
   HARASSMENT: "Propos déplacés / harcèlement",
   OTHER: "Autre",
   // D68 — trajets et membres
@@ -93,10 +182,69 @@ export const CHAT_ROLE_LABEL: Record<string, string> = { SHIPPER: "Expéditeur",
 /* C-PR5a (D58) */
 export const PAYOUT_STATUS_LABEL: Record<string, string> = { PENDING: "en attente d'envoi", SENT: "envoyé", FAILED: "en échec", FROZEN: "gelé (litige)", REVERSED: "renversé" };
 export const PAYOUT_FAILURE_LABEL: Record<string, string> = { ACCOUNT_NOT_READY: "compte Stripe du Voyageur non prêt", PROVIDER_ERROR: "refus du fournisseur", REVERSED: "transfert renversé par Stripe" };
+/**
+ * Recette § 5.14 — le motif d'un échec de versement tel que le serveur le rend (`CARRIER_ACCOUNT_NOT_READY`,
+ * `PROVIDER_ERROR:<message>`), dit en français. Le message brut du fournisseur reste lisible entre parenthèses.
+ */
+export function payoutReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return "motif inconnu";
+  if (reason === "CARRIER_ACCOUNT_NOT_READY") return PAYOUT_FAILURE_LABEL.ACCOUNT_NOT_READY;
+  if (reason.startsWith("PROVIDER_ERROR:transfer lookup failed")) return "le fournisseur n'a pas pu dire si un transfert était déjà parti : rien n'est reparti, par prudence";
+  if (reason.startsWith("PROVIDER_ERROR:")) {
+    const detail = reason.slice("PROVIDER_ERROR:".length).trim();
+    return detail ? `${PAYOUT_FAILURE_LABEL.PROVIDER_ERROR} (${detail})` : PAYOUT_FAILURE_LABEL.PROVIDER_ERROR;
+  }
+  return reason;
+}
+
+/** Recette § 5.14 — un refus d'un geste de versement (relancer, re-verser, abandonner), lu par son code (A146). */
+export function payoutRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "PAYOUT_NOT_RETRYABLE") return { text: "Rien à relancer : ce versement n'est plus en échec (envoyé ou traité entre-temps). La fiche est rechargée.", reload: true };
+  if (code === "NO_PAYOUT_FOR_STATUS") return { text: "Ce deal n'a pas de versement : seul un deal terminé, ou annulé tardivement, en a un.", reload: false };
+  if (code === "REVERSAL_NOT_OPEN") return { text: "Ce renversement est déjà clos (un autre administrateur vient de décider ?). La fiche est rechargée.", reload: true };
+  if (code === "ADMIN_IS_PARTY") return { text: "Tu es partie à ce deal : un autre administrateur doit décider.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne permet pas ce geste.", reload: false };
+  if (e?.status === 400) return { text: "Demande refusée : vérifie le motif (20 caractères au moins) et réessaie.", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: false };
+}
+/**
+ * Recette § 5.19 — un refus d'une décision de signalement (les deux files), lu par son code (A146). `reload` : la file affichée
+ * est périmée (un autre administrateur a décidé, le signalement n'existe plus).
+ */
+export function reportRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "REPORT_ALREADY_REVIEWED") return { text: "Ce signalement vient d'être traité par un autre administrateur : la file est rechargée.", reload: true };
+  if (code === "REPORT_NOT_FOUND") return { text: "Ce signalement n'existe plus : la file est rechargée.", reload: true };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne traite pas les signalements.", reload: false };
+  if (e?.status === 400) return { text: "Décision refusée : la note est trop longue ou la décision inconnue.", reload: false };
+  return { text: "Décision impossible pour le moment. Recharge la file avant de réessayer.", reload: false };
+}
+/**
+ * Recette § 5.25 — un refus de l'écran « Comptes admin » (et de la page d'invitation), lu par son code (A146). `reload` : la
+ * liste affichée est périmée (un autre administrateur a retiré ou modifié ce compte).
+ */
+export function adminAccountRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "ADMIN_IS_SELF") return { text: "Tu ne peux ni modifier ni retirer ton propre accès : un autre super administrateur doit le faire.", reload: false };
+  if (code === "LAST_SUPER_ADMIN") return { text: "Il doit rester au moins un super administrateur en service (mot de passe posé, 2FA activée). La liste est rechargée.", reload: true };
+  if (code === "ADMIN_NOT_FOUND") return { text: "Ce compte n'a plus d'accès admin. La liste est rechargée.", reload: true };
+  if (code === "ADMIN_ALREADY_GRANTED") return { text: "Ce compte a déjà un profil admin.", reload: true };
+  if (code === "ACCOUNT_DELETED") return { text: "Ce compte est supprimé : il ne peut pas recevoir d'accès admin.", reload: false };
+  if (code === "INVITATION_INVALID") return { text: "Ce lien d'invitation n'est plus valable. Demande une nouvelle invitation à un super administrateur.", reload: false };
+  if (code === "ADMIN_INVITE_NOT_PENDING") return { text: "Cette invitation n'est plus en attente (acceptée ou accès retiré). La liste est rechargée.", reload: true }; // A189 a
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne gère pas les comptes admin (super administrateur seulement).", reload: false };
+  if (e?.status === 400 && (e?.data as { details?: { errors?: Record<string, string> } } | undefined)?.details?.errors?.reason) return { text: "Motif trop long : 500 caractères au plus.", reload: false }; // A189 b
+  if (e?.status === 400) return { text: "Demande refusée : vérifie l'adresse, le prénom, le nom (ou le mot de passe : 8 caractères au moins, sans ton nom ni ton email).", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la page avant de réessayer.", reload: true };
+}
+/** D71 — seuls les niveaux qui appellent la vigilance sont affichés dans une file (cahier § 5.19 : ni « Standard » ni « Compte neuf »). */
+export const isAlertTrustLevel = (level: string | null | undefined): level is "WATCH" | "HIGH_RISK" => level === "WATCH" || level === "HIGH_RISK";
 export const TIMELINE_LABEL: Record<string, string> = {
   AUTHORIZED: "Empreinte posée (autorisation)", CAPTURED: "Débité (capture)", REFUNDED: "Remboursé à l'Expéditeur", DISPUTED: "Litige ouvert",
   COMPLETED: "Deal terminé", CANCELLED: "Deal annulé", PAYOUT_SENT: "Versement envoyé au Voyageur", PAYOUT_FAILED: "Versement en échec",
   PAYOUT_REVERSED: "Transfert renversé", REVERSAL_RESOLVED: "Renversement clos", RETENTION: "Retenue conservée", RETENTION_DECIDED: "Retenue arbitrée",
+  AUTHORIZATION_RELEASED: "Empreinte libérée (jamais débitée)", // recette § 5.12
 };
 export const DIVERGENCE_LABEL: Record<string, string> = {
   CAPTURE_NOT_RECORDED: "Débit chez Stripe, non enregistré en base",
@@ -109,6 +257,29 @@ export const DIVERGENCE_LABEL: Record<string, string> = {
   TRANSFER_MARKED_REVERSED_BUT_LIVE_OK: "Marqué renversé en base, pas de renversement chez Stripe",
   INTENT_NOT_FOUND: "Paiement introuvable chez le fournisseur",
 };
+/**
+ * Recette § 5.13 — ce que veut dire chaque divergence et QUI agit. L'écran affichait sous le libellé le message
+ * anglais du serveur ; l'administrateur y lit maintenant la conséquence et le geste, jamais une correction automatique.
+ */
+export const DIVERGENCE_HELP: Record<string, string> = {
+  CAPTURE_NOT_RECORDED: "L'Expéditeur a été débité mais la base l'ignore : ne rien relancer, signaler au développement avec l'identifiant du deal.",
+  CAPTURE_RECORDED_NOT_LIVE: "La base croit l'argent encaissé : aucun versement ni remboursement ne doit partir avant vérification dans le tableau de bord du fournisseur.",
+  REFUND_NOT_RECORDED: "De l'argent est reparti sans trace en base (souvent un remboursement fait à la main dans le tableau de bord) : ne pas rembourser à nouveau.",
+  REFUND_RECORDED_NOT_LIVE: "La base annonce un remboursement que le fournisseur ne montre pas : l'Expéditeur n'a peut-être rien reçu. Vérifier avant de lui répondre.",
+  TRANSFER_MISSING: "Le versement est noté envoyé mais le transfert n'existe pas chez le fournisseur : le Voyageur n'a probablement rien reçu.",
+  TRANSFER_AMOUNT_MISMATCH: "Le montant versé diffère du montant enregistré : comparer au prix figé avant tout geste.",
+  TRANSFER_REVERSED_NOT_MARKED: "Le fournisseur a repris l'argent du Voyageur mais la base dit « envoyé » : le deal doit passer par la file « Transferts renversés ».",
+  TRANSFER_MARKED_REVERSED_BUT_LIVE_OK: "La base croit le transfert renversé alors qu'il est intact : ne pas re-verser, l'argent est déjà chez le Voyageur.",
+  INTENT_NOT_FOUND: "Le fournisseur ne connaît pas ce paiement (en local : deal du jeu d'essai, attendu). En production, signaler au développement.",
+};
+/** Statut d'un paiement chez le fournisseur (PaymentAuthorizationStatus). */
+export const INTENT_STATUS_LABEL: Record<string, string> = {
+  REQUIRES_PAYMENT_METHOD: "en attente de carte", PROCESSING: "en cours", AUTHORIZED: "empreinte posée", CAPTURED: "encaissé", CANCELED: "annulé", UNKNOWN: "état inconnu",
+};
+/** Statut d'un remboursement chez le fournisseur (Stripe `refund.status`). */
+export const REFUND_STATUS_LABEL: Record<string, string> = { succeeded: "réussi", pending: "en cours", failed: "échoué", canceled: "annulé", requires_action: "action requise" };
+/** Nom du fournisseur tel qu'on le dit à un administrateur. */
+export const PROVIDER_LABEL: Record<string, string> = { STRIPE: "Stripe", FAKE: "le fournisseur de test (Fake)" };
 
 export const TICKET_REASON_LABEL: Record<string, string> = {
   ILLEGIBLE: "Document illisible",
@@ -116,9 +287,28 @@ export const TICKET_REASON_LABEL: Record<string, string> = {
   NAME_MISMATCH: "Le nom ne correspond pas au compte",
   SUSPICIOUS: "Document non recevable",
 };
-export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté" };
+// ANO-ADM-16 — « expiré » : billet en attente d'un trajet déjà parti (le serveur le calcule, `effectiveTicketStatus`).
+export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté", EXPIRED: "expiré (trajet parti)" };
+/** Recette § 5.7 — statut et mode d'un trajet en français ; le code reste lisible au survol (`title`). */
+/** Recette § 5.8 — types de documents d'un trajet, en français (le code reste lisible au survol). */
+export const DOCUMENT_TYPE_LABEL: Record<string, string> = { TICKET_PROOF: "Billet", ITINERARY_PROOF: "Itinéraire", VEHICLE_PROOF: "Véhicule", IDENTITY_PROOF: "Pièce d'identité", OTHER: "Autre" };
+/** Recette § 5.8 — le type de fichier d'un billet, lu avant de l'ouvrir (PDF, image). */
+export const DOCUMENT_MIME_LABEL = (mime: string): string => (mime === "application/pdf" ? "PDF" : mime.startsWith("image/") ? `image ${mime.slice(6).toUpperCase()}` : mime);
+export const TRIP_STATUS_LABEL: Record<string, string> = { DRAFT: "Brouillon", PUBLISHED: "Publié", PAUSED: "En pause", COMPLETED: "Terminé", CANCELLED: "Annulé", ARCHIVED: "Archivé" };
+export const TRANSPORT_MODE_LABEL: Record<string, string> = { PLANE: "Avion", TRAIN: "Train", CAR: "Voiture" };
+/** Statuts d'une réservation, tels que l'admin les lit (9 statuts de la machine D37/D39/D55). */
+export const BOOKING_STATUS_LABEL: Record<string, string> = { PENDING: "En attente", ACCEPTED: "Acceptée", DECLINED: "Refusée", EXPIRED: "Expirée", CANCELLED: "Annulée", PICKED_UP: "Prise en charge", DELIVERED: "Livrée", COMPLETED: "Terminée", DISPUTED: "En litige" };
 
 export const STATUS_LABEL: Record<string, string> = { ACTIVE: "Actif", RESTRICTED: "Restreint", SUSPENDED: "Suspendu" };
+/** A193 — catégorie FERMÉE d'une sanction : c'est elle (et elle seule) que le membre lit dans l'email. Miroir de `SANCTION_CATEGORIES`. */
+export const SANCTION_CATEGORY_LABEL: Record<SanctionCategory, string> = {
+  SCAM_SUSPECTED: "Arnaque suspectée",
+  PROHIBITED_CONTENT: "Contenu ou objet interdit",
+  ABUSIVE_BEHAVIOUR: "Comportement abusif envers un membre",
+  REPEATED_DISPUTES: "Litiges ou annulations répétés",
+  IMPERSONATION: "Usurpation d'identité",
+  OTHER: "Autre manquement aux règles d'utilisation",
+};
 
 export const RESOLUTION_LABEL: Record<string, string> = {
   REJECTED: "Rejet : le Voyageur est payé en entier",
@@ -126,6 +316,13 @@ export const RESOLUTION_LABEL: Record<string, string> = {
   FULL_REFUND: "Remboursement total : le Voyageur ne reçoit rien",
   COMPENSATE_CARRIER: "Compensation au Voyageur (prorata)",
   RESTITUTE_SHIPPER: "Restitution de la retenue à l'Expéditeur",
+};
+
+/** § 5.10 — la disposition d'une retenue d'annulation tardive, lisible (le code reste au survol et dans l'API). */
+export const RETENTION_DISPOSITION_LABEL: Record<string, string> = {
+  HELD_FOR_MEDIATION: "en attente d'arbitrage",
+  CARRIER: "compensation versée au Voyageur",
+  SHIPPER: "restituée à l'Expéditeur",
 };
 
 export function hoursUntil(iso: string): number {
@@ -137,3 +334,175 @@ export const STEP_LABEL: Record<string, string> = {
   FLIGHT_DEPARTED: "Vol parti",
   FLIGHT_ARRIVED: "Vol arrivé",
 };
+
+/* Recette § 5.12 — fiche argent en français : bilan, acteurs, modèle de prix, chronologie du deal. */
+export const MONEY_PENDING_LABEL: Record<string, string> = {
+  AUTHORIZATION_OPEN: "empreinte posée, en attente de la décision du Voyageur",
+  DEAL_IN_PROGRESS: "deal en cours : le versement partira à la fin",
+  PAYOUT_DUE: "versement dû, pas encore envoyé",
+  PAYOUT_FROZEN: "versement gelé par le litige",
+  PAYOUT_FAILED: "versement en échec",
+  REVERSAL_OPEN: "transfert renversé, décision à prendre",
+  RETENTION_HELD: "retenue à arbitrer",
+  REFUND_PROPOSED: "remboursement proposé, à appliquer",
+};
+export const MONEY_ANOMALY_LABEL: Record<string, string> = {
+  UNALLOCATED_FUNDS: "Argent sans destination : le deal est clos, rien n'est en attente, et la plateforme détient plus que sa commission.",
+  REFUND_RECORDS_MISMATCH: "Remboursements incohérents : la liste des remboursements enregistre plus que le cumul du deal. Rapproche avec le fournisseur avant tout geste d'argent.",
+  OVERSPENT: "La plateforme a versé et remboursé plus qu'elle n'a reçu, sans geste commercial qui l'explique.",
+};
+export const ACTOR_LABEL: Record<string, string> = { SHIPPER: "par l'Expéditeur", CARRIER: "par le Voyageur", SYSTEM: "automatique", ADMIN: "par un admin" };
+export const PRICING_MODEL_LABEL: Record<string, string> = { PER_CATEGORY: "au colis (catégorie)", PER_KG: "au kilo" };
+export const HISTORY_STATUS_LABEL: Record<string, string> = { PUBLISHED: "publié", PENDING: "en attente", PARKED: "parqué", READ: "lue", UNREAD: "non lue", SENT: "envoyé", DELIVERED: "remis", FAILED: "en échec", BOUNCED: "rebond", COMPLAINED: "plainte" };
+/** Le détail d'une ligne de chronologie de l'argent, lisible : acteur, issue de retenue, nature d'échec, décision de renversement. */
+export function timelineDetailLabel(detail: string | null): string | null {
+  if (!detail) return null;
+  return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? REFUND_KIND_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
+}
+const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert", previousTransferId: "transfert renversé", providerError: "échec" };
+/** § 5.13 — valeurs codées du journal qui ont un libellé. */
+const AFTER_VALUE_LABEL: Record<string, string> = { PROVIDER_UNAVAILABLE: "fournisseur injoignable, rien comparé" };
+/** Le « after » d'une action admin en une ligne lisible (montants en euros, codes traduits) ; une clé inconnue garde son nom. */
+export function adminAfterSummary(after: unknown, currency = "EUR"): string | null {
+  if (!after || typeof after !== "object") return null;
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(after as Record<string, unknown>)) {
+    if (v === null || v === undefined || (Array.isArray(v) && v.length === 0)) continue;
+    const label = AFTER_KEY_LABEL[k] ?? k;
+    const value = /Cents$/.test(k) && typeof v === "number" ? money(v, currency) : k === "outcome" && typeof v === "string" ? (RESOLUTION_LABEL[v] ?? v) : k === "payoutStatus" && typeof v === "string" ? (PAYOUT_STATUS_LABEL[v] ?? v) : Array.isArray(v) ? v.map((x) => DIVERGENCE_LABEL[String(x)] ?? String(x)).join(", ") : (AFTER_VALUE_LABEL[String(v)] ?? String(v));
+    parts.push(`${label} : ${value}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** Montant saisi en euros (« 15 », « 15,5 », « 1 234,50 ») → centimes ; NaN si illisible. Partagé par la décision de
+ *  médiation (§ 5.9) et le remboursement manuel (§ 5.15). */
+export function parseEurosToCents(saisie: string): number {
+  const propre = saisie.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(propre)) return NaN;
+  return Math.round(Number(propre) * 100);
+}
+
+/** Recette § 5.15 (A165) — pourquoi une proposition de remboursement manuel est devenue impossible. */
+export const REFUND_PROPOSAL_STALE_LABEL: Record<string, string> = {
+  ABOVE_REMAINING: "caduque : elle dépasse ce qui reste remboursable",
+  NOT_REFUNDABLE: "caduque : ce deal ne peut plus recevoir de remboursement (déjà remboursé en totalité, ou plus fermé)",
+};
+
+/**
+ * Recette § 5.15 — un refus de remboursement manuel, en français et selon son code, en disant si de l'argent est parti.
+ * `reload` : l'état du deal a changé sous l'écran (autre geste, remboursement ailleurs) — la fiche doit être relue.
+ */
+export function manualRefundRefusal(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "DECISION_IN_PROGRESS") return { text: "Un autre geste d'argent est en cours sur ce deal : rien n'a été émis. La fiche est rechargée, vérifie avant de réessayer.", reload: true };
+  if (code === "REFUND_ABOVE_MAX") return { text: "Montant refusé : il dépasse ce qui reste remboursable sur ce deal (un remboursement a pu arriver entre-temps). Rien n'a été émis ; la fiche est rechargée.", reload: true };
+  if (code === "REFUND_NOT_ALLOWED") return { text: "Plus aucun remboursement manuel possible sur ce deal (déjà remboursé en totalité, ou deal pas fermé). Rien n'a été émis ; la fiche est rechargée.", reload: true };
+  if (code === "TRANSITION_NOT_ALLOWED") return { text: "Ce deal vient d'être remboursé par ailleurs : l'argent de ce geste a pu partir. La fiche est rechargée : vérifie le rapprochement avant tout nouveau geste.", reload: true };
+  if (code === "REFUND_PROVIDER_FAILED") return { text: "Le fournisseur de paiement a refusé le remboursement : rien n'a été enregistré. Réessaie plus tard ou vérifie le paiement.", reload: false };
+  if (code === "ADMIN_IS_PARTY") return { text: "Tu es partie à ce deal : un autre administrateur doit décider.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne permet pas ce geste.", reload: false };
+  if (e?.status === 400) return { text: "Demande refusée : vérifie le montant et le motif (50 caractères au moins).", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: true };
+}
+
+/* ── Recette § 5.16 — rapport mensuel et export finances ─────────────── */
+
+const DAY_MS = 86_400_000;
+/** « du 1 oct. 2025 au 30 sept. 2026 (mois UTC) » — la borne de fin servie est EXCLUE (1er du mois suivant, minuit UTC) :
+ *  on affiche le dernier jour inclus, en UTC, jamais « au 01 oct. 2026, 02:00 » (heure locale d'une borne exclue). */
+export function reportPeriodLabel(fromIso: string, toExclusiveIso: string): string {
+  return `Du ${utcPeriodLabel(fromIso, toExclusiveIso)} (mois UTC)`;
+}
+
+/** « 14 sept. 2026 au 20 sept. 2026 » — une période [début, fin EXCLUE) en jours UTC, dernier jour inclus (§ 5.16, § 5.17). */
+export function utcPeriodLabel(fromIso: string, toExclusiveIso: string): string {
+  const f = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `${f.format(new Date(fromIso))} au ${f.format(new Date(new Date(toExclusiveIso).getTime() - DAY_MS))}`;
+}
+
+/** Période d'export saisie en jours inclus (AAAA-MM-JJ) : null si acceptable, sinon la raison en français (au plus 366 jours). */
+export function exportPeriodProblem(from: string, to: string, maxDays = 366): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return "Choisis une date de début et une date de fin.";
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
+  if (days < 1) return "La fin précède le début : choisis une date de fin postérieure.";
+  if (days > maxDays) return `Période trop longue : ${days} jours, ${maxDays} au plus. Exporte en plusieurs fois.`;
+  return null;
+}
+
+/** Un refus d'export finances, en français selon son code (A146). */
+export function financeExportRefusal(e: { status?: number; data?: unknown } | null | undefined): string {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "PERIOD_TOO_LONG") return "Période trop longue : 366 jours au plus. Exporte en plusieurs fois.";
+  if (code === "INVALID_PERIOD") return "Période invalide : la fin doit suivre le début.";
+  if (code === "ADMIN_PERMISSION_DENIED" || e?.status === 403) return "Ton profil ne permet pas l'export finances.";
+  return "L'export n'a pas pu être produit. Réessaie ; rien n'a été téléchargé.";
+}
+
+/** A166 — nature d'un remboursement (fiche argent, chronologie). */
+export const REFUND_KIND_LABEL: Record<string, string> = {
+  CANCELLATION: "annulation",
+  PICKUP_REFUSED: "colis refusé au pickup",
+  DISPUTE: "décision de litige",
+  RETENTION_RESTITUTION: "retenue restituée",
+  MANUAL: "geste commercial",
+  LEGACY: "antérieur à la liste (date du dernier remboursement)",
+};
+/**
+ * Décision du 15/09/2026 (recette § 5.19) — la ligne de décision sous « traité » / « sans suite » : qui, quand, la note.
+ * « Décision antérieure au journal » quand le serveur n'en a pas trouvé la ligne (donnée ancienne).
+ */
+export function reportDecisionLine(status: string, decision: { by: { firstName: string } | null; at: string; note: string | null } | null): string | null {
+  if (status === "OPEN") return null;
+  const verbe = status === "REVIEWED" ? "Traité" : "Classé sans suite";
+  if (!decision) return `${verbe} — décision antérieure au journal.`;
+  return `${verbe} par ${decision.by?.firstName ?? "un administrateur"} le ${dateTime(decision.at)}${decision.note ? ` · note : « ${decision.note} »` : " · sans note"}`;
+}
+/**
+ * Recette § 5.23 (ANO-ADM-66) — un `datetime-local` attend l'heure LOCALE « AAAA-MM-JJThh:mm ». `iso.slice(0, 16)` donnait
+ * l'heure UTC présentée comme locale : à Paris, l'annonce relue reculait de deux heures, et un second enregistrement la
+ * déplaçait vraiment.
+ */
+export function toLocalDateTimeInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/** Recette § 5.23 (ANO-ADM-67) — un refus d'écriture de la maintenance, lu par son code (A146), en français. */
+export function maintenanceRefusal(e: { status?: number; data?: unknown } | null | undefined): { text: string; reload: boolean } {
+  const d = e?.data as { details?: { code?: string; errors?: Record<string, string> } } | undefined;
+  const code = d?.details?.code;
+  if (code === "STALE_VERSION") return { text: "L'état a changé entre-temps : la page est rechargée.", reload: true };
+  if (code === "MAINTENANCE_FORCED_BY_ENVIRONMENT") return { text: "L'environnement du gateway force la lecture seule : l'écran ne peut pas la lever.", reload: true };
+  if (code === "MAINTENANCE_SCHEDULE_IN_PAST") return { text: "La date annoncée est déjà passée : choisis une date à venir.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne modifie pas la maintenance.", reload: false };
+  if (e?.status === 400) return { text: d?.details?.errors?.reason ? "Motif trop court : 20 caractères au moins." : "Enregistrement refusé : vérifie la date et la longueur des messages (300 caractères).", reload: false };
+  return { text: "Enregistrement impossible pour le moment. Recharge la page avant de réessayer.", reload: false };
+}
+/**
+ * Recette § 5.23 (lot b du § 5.22) — un bloqueur d'effacement avec son nombre (« 2 deals en cours ») : l'admin sait d'un
+ * coup d'œil l'ampleur du travail avant de pouvoir effacer. Sans nombre connu (réponse ancienne), la forme au singulier.
+ */
+export function erasureBlockerLabel(blocker: string, count: number | undefined): string {
+  const n = count && count > 0 ? count : 1;
+  const s = n > 1 ? "s" : "";
+  const nombre = count && count > 0 ? String(count) : "un";
+  const une = count && count > 0 ? String(count) : "une";
+  switch (blocker) {
+    case "ACTIVE_DEAL": return `${nombre} deal${s} en cours`;
+    case "PENDING_REQUEST": return `${une} demande${s} en attente`;
+    case "PAYOUT_PENDING": return `${nombre} versement${s} ${n > 1 ? "dus" : "dû"} ou en échec`;
+    case "RETENTION_HELD": return `${une} retenue${s} en médiation`;
+    case "PUBLISHED_TRIP": return `${nombre} trajet${s} publié${s} ou en pause`;
+    case "ADMIN_ACCOUNT": return "un profil admin (à révoquer d'abord)";
+    default: return blocker;
+  }
+}
+
+/** A188 d (ANO-ADM-84) — « 2 code(s) » : pluriel accordé. A190 a — le recours est la régénération depuis « Mes sessions ». */
+export function backupCodesWarning(n: number): string {
+  if (n <= 0) return "Tu n'as plus de code de secours : régénère-les depuis « Mes sessions » avec un code de ton application d'authentification.";
+  return `Il te reste ${n} ${n === 1 ? "code" : "codes"} de secours — tu peux les régénérer depuis « Mes sessions ».`;
+}

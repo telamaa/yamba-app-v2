@@ -9,7 +9,8 @@
 import prisma from "@packages/libs/prisma";
 import { ConflictError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import type { AdminReportItem, AdminReportsResponse, CreateReportRequest, CreateReportResponse, ReportStatus, ReportTargetType, ReviewReportRequest, TrustLevel } from "@packages/api-contracts";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
+import { reportDecisionsFrom, type AdminReportItem, type AdminReportsResponse, type CreateReportRequest, type CreateReportResponse, type ReportDecisionLine, type ReportStatus, type ReportTargetType, type ReviewReportRequest, type TrustLevel } from "@packages/api-contracts";
 import { canReport, needsPriorityReview } from "../utils/report.rules";
 import { assessTrust } from "./admin-users.service"; // D71
 import { getAuthEmails } from "../emails/auth-emails";
@@ -21,7 +22,7 @@ export type ReportDb = {
   trip: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]> };
   user: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]> };
   report: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]>; create(args: Row): Promise<Row>; updateMany(args: Row): Promise<{ count: number }> };
-  adminAction: { create(args: Row): Promise<Row> };
+  adminAction: { create(args: Row): Promise<Row>; findMany(args: Row): Promise<Row[]> };
   $transaction<T>(fn: (tx: ReportDb) => Promise<T>): Promise<T>;
 };
 
@@ -35,7 +36,12 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
   /** Résout la cible depuis son identifiant public : { id, ownerId } ou 404 si invisible. */
   async function resolveTarget(targetType: ReportTargetType, targetRef: string): Promise<{ id: string; ownerId: string }> {
     if (targetType === "TRIP") {
-      const trip = await db.trip.findFirst({ where: { id: targetRef, isDeleted: false }, select: { id: true, userId: true } });
+      // ANO-WEB-79 (recette 5.24) — une annonce MASQUÉE par Yamba (C-PR4, `hiddenByAdminAt`) n'est pas visible : la
+      // signaler répondait 201 et révélait son existence. Pitfall Mongo : `null` ne voit pas un champ ABSENT → OR isSet.
+      const trip = await db.trip.findFirst({
+        where: { id: targetRef, isDeleted: false, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }] },
+        select: { id: true, userId: true },
+      });
       if (!trip) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
       return { id: trip.id as string, ownerId: trip.userId as string };
     }
@@ -84,22 +90,43 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       // D71 — niveau de risque du membre visé (ou du propriétaire du trajet) : un HIGH_RISK passe en priorité
       const trustTargets = [...new Set([...userTargetIds, ...trips.map((t) => t.userId as string)])];
       const trustOf = new Map(await Promise.all(trustTargets.map(async (id) => [id, (await trustFor(id))?.level ?? null] as const)));
+      // Décision du 15/09 — sous « traité » / « sans suite », qui a décidé, quand et la note : la ligne de journal écrite dans
+      // la même transaction que la décision (lecture seule). Une décision sans ligne (donnée ancienne) reste sans décision.
+      let decisions = new Map<string, NonNullable<AdminReportItem["decision"]>>();
+      if (status !== "OPEN") {
+        const lines = (await db.adminAction.findMany({ where: { action: "REPORT_REVIEWED", targetType: "REPORT", targetId: { in: reports.map((r) => r.id as string) } }, select: { targetId: true, adminUserId: true, createdAt: true, after: true } })) as unknown as ReportDecisionLine[];
+        const adminIds = [...new Set(lines.map((l) => l.adminUserId))];
+        const admins = adminIds.length ? await db.user.findMany({ where: { id: { in: adminIds } }, select: { id: true, firstName: true } }) : [];
+        const adminName = new Map(admins.map((a) => [a.id as string, a.firstName as string]));
+        decisions = reportDecisionsFrom(lines, (id) => adminName.get(id));
+      }
       const items: AdminReportItem[] = [];
       for (const r of reports) {
         const targetId = r.targetId as string;
         const type = r.targetType as ReportTargetType;
         let targetLabel = "—";
         let targetOwner: AdminReportItem["targetOwner"] = null;
+        // ANO-ADM-47 (recette 02-ADMIN § 5.19) — une cible disparue (trajet purgé, document effacé) faisait sortir le
+        // signalement de la file par un `continue` : OPEN pour toujours, jamais relu par personne. Il reste dans la file,
+        // marqué `targetMissing`, et se clôt comme les autres (même règle que ANO-CRON-09 pour les messages).
+        let targetMissing = false;
         if (type === "TRIP") {
           const trip = byTrip.get(targetId);
-          if (!trip) continue; // trajet purgé : hors file
-          targetLabel = `${trip.originCity} → ${trip.destinationCity}`;
-          const owner = byUser.get(trip.userId as string);
-          targetOwner = { id: trip.userId as string, firstName: (owner?.firstName as string) ?? "—" };
+          if (trip) {
+            targetLabel = `${trip.originCity} → ${trip.destinationCity}`;
+            const owner = byUser.get(trip.userId as string);
+            targetOwner = { id: trip.userId as string, firstName: (owner?.firstName as string) ?? "—" };
+          } else {
+            targetMissing = true;
+            targetLabel = "Trajet introuvable";
+          }
         } else {
           const u = byUser.get(targetId);
-          if (!u) continue;
-          targetLabel = `${u.firstName} ${u.lastName}`.trim();
+          if (u) targetLabel = `${u.firstName} ${u.lastName}`.trim();
+          else {
+            targetMissing = true;
+            targetLabel = "Membre introuvable";
+          }
         }
         const reporter = byUser.get(r.reporterUserId as string);
         const count = openCount.get(targetId) ?? 0;
@@ -109,6 +136,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           targetType: type,
           targetId,
           targetLabel,
+          targetMissing,
           targetOwner,
           status: r.status as ReportStatus,
           reason: r.reason as AdminReportItem["reason"],
@@ -118,6 +146,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           openCountOnTarget: count,
           priority: needsPriorityReview(count) || targetTrustLevel === "HIGH_RISK",
           targetTrustLevel,
+          decision: decisions.get(r.id as string) ?? null,
         });
       }
       return { items, total: items.length };
@@ -128,7 +157,9 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       const report = await db.report.findFirst({ where: { id: reportId, targetType: { in: ["TRIP", "USER"] } }, select: { id: true, status: true, targetType: true, targetId: true } });
       if (!report) throw new NotFoundError("Report not found.", { code: "REPORT_NOT_FOUND" });
       if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
-      await db.$transaction(async (tx) => {
+      // ANO-ADM-46 (recette 02-ADMIN § 5.19) — deux décisions simultanées : MongoDB rejette l'une des transactions (P2034) et
+      // l'admin lisait 500. Au réessai, la garde conditionnelle ci-dessous répond proprement 409.
+      await withWriteConflictRetry(() => db.$transaction(async (tx) => {
         const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
         if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
         await recordAdminAction(tx as never, {
@@ -141,7 +172,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           ip: actor.ip,
           userAgent: actor.userAgent,
         });
-      });
+      }));
       return { id: report.id as string, status: input.decision };
     },
   };

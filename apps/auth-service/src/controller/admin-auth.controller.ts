@@ -21,8 +21,9 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf } from "../utils/admin-roles";
-import { AuthError, ForbiddenError, ValidationError } from "@packages/error-handler";
+import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import {
   consumeBackupCode,
   decryptTotpSecret,
@@ -40,16 +41,21 @@ import redis from "@packages/libs/redis";
 import { resolveLocale } from "@packages/api-contracts";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
+import { UNKNOWN_DEVICE } from "../utils/session-device";
 import { adminRemainingLifetimeMs, loadAdminSessionPolicy } from "../utils/admin-session-policy";
 import {
+  adminSessionClient,
   clearTotpFailures,
   getAdminSession,
+  type AdminSessionRecord,
   registerTotpFailure,
   revokeAdminSession,
   storeAdminSession,
   totpFailuresExceeded,
 } from "../utils/admin-session";
-import { appliedAuditFilters, buildAuditWhere } from "../lib/admin-audit.query"; // A149
+import { AUDIT_CSV_COLUMNS, appliedAuditFilterValues, appliedAuditFilters, auditAuthors, auditCsvRow, auditQueryFrom, buildAuditWhere } from "../lib/admin-audit.query"; // A149, A187
+import { CSV_BOM, EXPORT_MAX_ROWS, buildCsv, capExportRows, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
+import { EXPORT_REASON_MIN_LENGTH } from "@packages/api-contracts";
 import {
   ADMIN_PREAUTH_COOKIE,
   ADMIN_REFRESH_COOKIE,
@@ -88,6 +94,16 @@ function clientMeta(req: Request) {
   return { ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
 
+/**
+ * Recette 02-ADMIN § 7 (engagement du § 5.19, ANO-ADM-88) — les écritures TOTP étaient lues puis écrites sans garde :
+ * trois requêtes simultanées portant le MÊME code passaient toutes la vérification anti-rejeu (`totpLastUsedStep` lu avant),
+ * ouvraient trois sessions, et l'activation émettait trois jeux de codes de secours dont deux déjà invalides à l'affichage.
+ * Chaque écriture est désormais conditionnelle (la garde lit l'état DANS la transaction) et rejouée sur conflit d'écriture
+ * (P2034) : un seul gagnant, les autres lisent le même refus qu'un code rejoué.
+ */
+/** Le pas TOTP n'a pas encore servi : champ optionnel → `null` ET absent (piège Prisma+Mongo), ou strictement antérieur. */
+const unusedStepGuard = (step: number) => ({ OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { isSet: false } }, { totpLastUsedStep: { lt: step } }] });
+
 /** Lit et vérifie le cookie de pré-authentification ; charge l'utilisateur ADMIN. */
 async function requirePreauth(req: Request) {
   const token = req.cookies?.[ADMIN_PREAUTH_COOKIE];
@@ -104,14 +120,28 @@ async function requirePreauth(req: Request) {
   return user;
 }
 
+/**
+ * Les revendications du jeton d'accès admin — une seule définition pour l'ouverture ET le renouvellement.
+ * A190 c (recette § 6) : le renouvellement ne remettait pas `adminRole` / `adminRoles` dans le jeton ; sans effet tant que
+ * le middleware relit la base, mais deux jetons d'une même session ne disaient pas la même chose.
+ */
+function adminAccessClaims(user: { id: string; roles: string[]; adminRole?: string | null; adminRoles?: string[] | null }, jti: string) {
+  return { id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: user.adminRole ?? null, adminRoles: adminRolesOf(user) };
+}
+
+/** A190 d — clé de rotation : l'ancien jti renouvelé pointe vers le nouveau pendant ROTATION_GRACE_SECONDS. */
+const ROTATION_GRACE_SECONDS = 30;
+const rotatedKey = (userId: string, jti: string) => `admin_rotated:${userId}:${jti}`;
+
 /** Ouvre la session admin : cookies + record Redis + JWT porteur de `amr: ["pwd","totp"]`. */
-async function issueAdminSession(res: Response, user: { id: string; roles: string[] }): Promise<void> {
+async function issueAdminSession(req: Request, res: Response, user: { id: string; roles: string[] }): Promise<void> {
   const createdAt = Date.now();
   const jti = createRefreshJti();
-  const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
+  const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt, adminSessionClient(req)); // A188 a
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.", { code: "ADMIN_SESSION_FAILED" });
   const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
+    // ANO-ADM-04 — le jeton d'accès porte le jti de sa session : isAdminAuthenticated vérifie qu'elle existe encore.
+    adminAccessClaims(user, jti),
     process.env.ACCESS_TOKEN_SECRET as string,
     { expiresIn: "15m" }
   );
@@ -175,15 +205,16 @@ export const adminTotpEnable = async (req: Request, res: Response, next: NextFun
     if (!verdict.ok) return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
 
     const backupCodes = generateBackupCodes();
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: user.id },
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const written = await tx.user.updateMany({
+        where: { id: user.id, OR: [{ totpEnabledAt: null }, { totpEnabledAt: { isSet: false } }] },
         data: { totpEnabledAt: new Date(), totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) },
       });
+      if (written.count !== 1) throw new ForbiddenError("Two-factor authentication is already enabled.", { code: "TOTP_ALREADY_ENABLED" });
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_TOTP_ENABLED", targetType: "USER", targetId: user.id, ...clientMeta(req) });
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp-setup" }, ...clientMeta(req) });
-    });
-    await issueAdminSession(res, user);
+    }));
+    await issueAdminSession(req, res, user);
     await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, backupCodes });
   } catch (e) {
@@ -209,10 +240,11 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
         await registerTotpFailure(user.id);
         return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
       }
-      await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { totpLastUsedStep: verdict.step } });
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+        const written = await tx.user.updateMany({ where: { id: user.id, ...unusedStepGuard(verdict.step) }, data: { totpLastUsedStep: verdict.step } });
+        if (written.count !== 1) throw new AuthError("Invalid code.", { code: "OTP_INCORRECT" }); // rejeu simultané du même code
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp" }, ...clientMeta(req) });
-      });
+      }));
     } else if (isBackupCodeFormat(raw)) {
       const remaining = consumeBackupCode(raw, user.totpBackupCodeHashes);
       if (!remaining) {
@@ -221,18 +253,21 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
       }
       usedBackup = true;
       remainingBackupCodes = remaining.length;
-      await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { totpBackupCodeHashes: remaining } });
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+        // Verrou optimiste : la liste restante est calculée sur la lecture ; deux codes (ou le même) consommés en même temps
+        // ne doivent ni servir deux fois ni ressusciter un code déjà utilisé.
+        const written = await tx.user.updateMany({ where: { id: user.id, updatedAt: user.updatedAt }, data: { totpBackupCodeHashes: remaining } });
+        if (written.count !== 1) throw new AuthError("Invalid code.", { code: "OTP_INCORRECT" });
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_BACKUP_CODE_USED", targetType: "USER", targetId: user.id, after: { remaining: remaining.length }, ...clientMeta(req) });
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "backup-code" }, ...clientMeta(req) });
-      });
+      }));
     } else {
       await registerTotpFailure(user.id);
       return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
     }
 
     await clearTotpFailures(user.id);
-    await issueAdminSession(res, user);
+    await issueAdminSession(req, res, user);
     await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, usedBackupCode: usedBackup, remainingBackupCodes });
   } catch (e) {
@@ -255,28 +290,54 @@ export const adminRefresh = async (req: Request, res: Response, next: NextFuncti
       clearAdminCookies(res);
       return next(new AuthError("Admin refresh token invalid.", { code: "ADMIN_REFRESH_INVALID" }));
     }
-    const session = await getAdminSession(decoded.id, decoded.jti);
-    if (!session) {
-      clearAdminCookies(res);
-      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
-    }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.totpEnabledAt) {
       clearAdminCookies(res);
       return next(new ForbiddenError("Not an admin account.", { code: "NOT_AN_ADMIN" }));
     }
-    // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne la vie absolue).
     const now = Date.now();
-    const newJti = createRefreshJti();
-    const ttl = await storeAdminSession(user.id, newJti, session.createdAt, now);
-    await revokeAdminSession(user.id, decoded.jti);
-    if (ttl <= 0) {
-      clearAdminCookies(res);
-      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+    // A190 d (recette § 6) — deux onglets qui renouvellent au même instant présentent le MÊME jeton. Avant : chacun créait
+    // une session, le navigateur n'en gardait qu'une, l'autre restait « fantôme » dans « Mes sessions » jusqu'à
+    // l'inactivité (45 min). Le renouvellement d'un jti est désormais RÉCLAMÉ par un SET NX atomique : un seul gagnant crée
+    // la session suivante ; le perdant reçoit, pendant la fenêtre de grâce, des jetons pour cette MÊME session.
+    const candidate = createRefreshJti();
+    const won = (await redis.set(rotatedKey(user.id, decoded.jti), candidate, "EX", ROTATION_GRACE_SECONDS, "NX")) === "OK";
+    let newJti: string;
+    let createdAt: number;
+    if (won) {
+      const session = await getAdminSession(user.id, decoded.jti);
+      if (!session) {
+        await redis.del(rotatedKey(user.id, decoded.jti));
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+      newJti = candidate;
+      createdAt = session.createdAt;
+      // A188 a — l'appareil et l'IP d'OUVERTURE suivent la session (ceux d'une session d'avant la correction : ceux du renouvellement).
+      const ttl = await storeAdminSession(user.id, newJti, createdAt, now, session.device ? session : adminSessionClient(req));
+      await revokeAdminSession(user.id, decoded.jti);
+      if (ttl <= 0) {
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+    } else {
+      // Le gagnant écrit sa session juste après sa réclamation : quelques allers-retours d'attente au plus.
+      const successor = await redis.get(rotatedKey(user.id, decoded.jti));
+      let suivante = successor ? await getAdminSession(user.id, successor) : null;
+      for (let i = 0; successor && !suivante && i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        suivante = await getAdminSession(user.id, successor);
+      }
+      if (!successor || !suivante) {
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+      newJti = successor;
+      createdAt = suivante.createdAt;
     }
-    const accessToken = jwt.sign({ id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"] }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
-    const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(session.createdAt, loadAdminSessionPolicy(), now) / 1000);
-    const refreshToken = jwt.sign({ id: user.id, jti: newJti, adm: true, sca: session.createdAt } satisfies AdminRefreshPayload, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: lifetimeSeconds });
+    const accessToken = jwt.sign(adminAccessClaims(user, newJti), process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
+    const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(createdAt, loadAdminSessionPolicy(), now) / 1000);
+    const refreshToken = jwt.sign({ id: user.id, jti: newJti, adm: true, sca: createdAt } satisfies AdminRefreshPayload, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: lifetimeSeconds });
     setAdminSessionCookies(res, accessToken, refreshToken, lifetimeSeconds * 1000);
     return res.status(200).json({ ok: true });
   } catch (e) {
@@ -290,8 +351,9 @@ export const adminLogout = async (req: Request, res: Response, next: NextFunctio
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as AdminRefreshPayload;
-        if (decoded?.id && decoded?.jti) {
-          await revokeAdminSession(decoded.id, decoded.jti);
+        // A188 b (ANO-ADM-83) — seule une session réellement fermée se journalise : un rejeu (deuxième onglet, double clic)
+        // répond 200 sans seconde ligne.
+        if (decoded?.id && decoded?.jti && (await revokeAdminSession(decoded.id, decoded.jti))) {
           await recordAdminAction(prisma, { adminUserId: decoded.id, action: "ADMIN_LOGOUT", targetType: "SESSION", ...clientMeta(req) });
         }
       } catch {
@@ -345,6 +407,9 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
         id: r.id,
         at: r.createdAt.toISOString(),
         admin: byId.get(r.adminUserId) ?? r.adminUserId,
+        // ANO-ADM-68 (recette 02-ADMIN § 5.24) — l'identifiant de l'auteur : « Filtrer sur cet auteur » pose le filtre SERVEUR
+        // `adminUserId` au lieu d'une recherche dans les cinquante lignes chargées.
+        adminUserId: r.adminUserId,
         action: r.action,
         targetType: r.targetType,
         targetId: r.targetId,
@@ -355,6 +420,45 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
       nextCursor: rows.length > AUDIT_PAGE ? page[page.length - 1].id : null,
       appliedFilters: appliedAuditFilters({ from: q.from, to: q.to, adminUserId: q.adminUserId, action: q.action, targetType: q.targetType, targetId: q.targetId, ip: q.ip }),
     });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A187 lot a (recette § 5.25) — les auteurs du journal, pour le champ « Auteur » : lecture `audit.read` (la liste des comptes
+ * admin est réservée à `admins.manage`, et un admin retiré reste l'auteur de ses lignes).
+ */
+export const listAdminAuditAuthors = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const groups = await prisma.adminAction.groupBy({ by: ["adminUserId"] });
+    const ids = groups.map((g) => g.adminUserId);
+    const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true, adminRole: true, adminRoles: true } }) : [];
+    return res.status(200).json({ items: auditAuthors(ids, users) });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A187 lot c — export CSV du journal FILTRÉ. Il contient des IP et des navigateurs d'administrateurs : donnée personnelle →
+ * `audit.read` ET `exports.personal` (le super administrateur, en pratique), motif ≥ 20 caractères, ligne `EXPORTED` avec
+ * les filtres retenus, le nombre de lignes et la troncature (plafond `EXPORT_MAX_ROWS`, dit dans `X-Truncated`).
+ */
+export const exportAdminAudit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const reason = typeof req.query.reason === "string" ? req.query.reason.trim() : "";
+    if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`, { code: "REASON_TOO_SHORT" });
+    const q = auditQueryFrom(req.query as Record<string, unknown>);
+    const found = await prisma.adminAction.findMany({ where: buildAuditWhere(q), orderBy: { createdAt: "desc" }, take: EXPORT_MAX_ROWS + 1 });
+    const { rows, truncated } = capExportRows(found);
+    const ids = [...new Set(rows.map((r) => r.adminUserId))];
+    const admins = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true } }) : [];
+    const names = new Map(admins.map((a) => [a.id, `${a.firstName} ${a.lastName}`.trim()]));
+    const now = new Date();
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "USER", after: { domain: "audit", personal: true, reason, filters: appliedAuditFilterValues(q), rows: rows.length, truncated }, ...clientMeta(req) });
+    res.set(csvResponseHeaders(csvFilename("journal-admin", now), rows.length, truncated));
+    return res.status(200).send(CSV_BOM + buildCsv(AUDIT_CSV_COLUMNS, rows.map((r) => auditCsvRow(r, names.get(r.adminUserId)))));
   } catch (e) {
     return next(e);
   }
@@ -375,7 +479,7 @@ function currentJti(req: Request): string | null {
 export const listAdminSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const mine = currentJti(req);
-    const items: Array<{ jti: string; createdAt: string; lastActivityAt: string; current: boolean }> = [];
+    const items: Array<{ jti: string; createdAt: string; lastActivityAt: string; current: boolean; device: string; ip: string | null }> = [];
     let cursor = "0";
     do {
       const [nextCursor, keys] = await redis.scan(cursor, "MATCH", `admin_jti:${req.user.id}:*`, "COUNT", 100);
@@ -384,9 +488,10 @@ export const listAdminSessions = async (req: AuthenticatedRequest, res: Response
         const raw = await redis.get(key);
         if (!raw) continue;
         try {
-          const rec = JSON.parse(raw) as { createdAt: number; lastActivityAt: number };
+          const rec = JSON.parse(raw) as AdminSessionRecord;
           const jti = key.split(":").pop() as string;
-          items.push({ jti, createdAt: new Date(rec.createdAt).toISOString(), lastActivityAt: new Date(rec.lastActivityAt).toISOString(), current: jti === mine });
+          // A188 a — une session d'avant la correction n'a ni appareil ni IP : « Appareil inconnu ».
+          items.push({ jti, createdAt: new Date(rec.createdAt).toISOString(), lastActivityAt: new Date(rec.lastActivityAt).toISOString(), current: jti === mine, device: rec.device ?? UNKNOWN_DEVICE, ip: rec.ip ?? null });
         } catch {
           // record illisible : ignoré
         }
@@ -403,10 +508,69 @@ export const revokeAdminSessionById = async (req: AuthenticatedRequest, res: Res
   try {
     const jti = String(req.params.jti ?? "");
     if (!/^[a-f0-9]{32}$/.test(jti)) return next(new ValidationError("Invalid session id.", { code: "INVALID_ID" }));
-    await revokeAdminSession(req.user.id, jti);
+    // A188 b (ANO-ADM-83) — une session déjà fermée (double clic, révoquée ailleurs) : 404, aucune ligne de journal.
+    if (!(await revokeAdminSession(req.user.id, jti))) return next(new NotFoundError("Admin session not found.", { code: "ADMIN_SESSION_NOT_FOUND" }));
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSION_REVOKED", targetType: "SESSION", targetId: jti, ...clientMeta(req) });
     if (jti === currentJti(req)) clearAdminCookies(res);
     return res.status(200).json({ ok: true });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A190 b (recette § 6) — « Révoquer toutes mes autres sessions » : la session courante reste ouverte, les autres sont
+ * fermées d'un geste. UNE ligne de journal avec le nombre (rien si aucune autre session : pas de ligne pour un geste nul).
+ */
+export const revokeOtherAdminSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const mine = currentJti(req);
+    let cursor = "0";
+    const others: string[] = [];
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", `admin_jti:${req.user.id}:*`, "COUNT", 100);
+      cursor = nextCursor;
+      for (const key of keys) {
+        const jti = key.split(":").pop() as string;
+        if (jti !== mine) others.push(jti);
+      }
+    } while (cursor !== "0");
+    let revoked = 0;
+    for (const jti of others) if (await revokeAdminSession(req.user.id, jti)) revoked++;
+    if (revoked > 0) await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSIONS_REVOKED", targetType: "SESSION", after: { count: revoked }, ...clientMeta(req) });
+    return res.status(200).json({ ok: true, revoked });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A190 a (recette § 6) — régénérer ses codes de secours depuis « Mes sessions », sur présentation d'un code TOTP valide
+ * (jamais un code de secours : on ne renouvelle pas la clé de secours avec la clé de secours). Les anciens codes sont
+ * invalidés dans la MÊME écriture que la ligne de journal ; les nouveaux ne sont montrés qu'une fois (jamais relus).
+ */
+export const regenerateAdminBackupCodes = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || !user.totpEnabledAt || !user.totpSecretEncrypted) return next(new ForbiddenError("Two-factor authentication is not enabled.", { code: "TOTP_NOT_ENABLED" }));
+    // Session ouverte : un mauvais code n'est pas une session invalide — 400/403, jamais 401 (le client relancerait un renouvellement).
+    if (await totpFailuresExceeded(user.id)) return next(new ForbiddenError("Too many attempts. Try again in 15 minutes.", { code: "TOO_MANY_ATTEMPTS" }));
+    const raw = String((req.body as { code?: string })?.code ?? "").replace(/\s+/g, "");
+    const secret = decryptTotpSecret(user.totpSecretEncrypted);
+    if (!secret) return next(new ForbiddenError("Stored secret unreadable.", { code: "TOTP_SECRET_UNREADABLE" }));
+    const verdict = /^\d{6}$/.test(raw) ? verifyTotp(secret, raw, { lastUsedStep: user.totpLastUsedStep }) : { ok: false as const };
+    if (!verdict.ok) {
+      await registerTotpFailure(user.id);
+      return next(new ValidationError("Invalid code.", { code: "OTP_INCORRECT" }));
+    }
+    await clearTotpFailures(user.id);
+    const backupCodes = generateBackupCodes();
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const written = await tx.user.updateMany({ where: { id: user.id, ...unusedStepGuard(verdict.step) }, data: { totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) } });
+      if (written.count !== 1) throw new ValidationError("Invalid code.", { code: "OTP_INCORRECT" }); // même code présenté deux fois en même temps
+      await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_BACKUP_CODES_REGENERATED", targetType: "USER", targetId: user.id, before: { remaining: user.totpBackupCodeHashes.length }, after: { remaining: backupCodes.length }, ...clientMeta(req) });
+    }));
+    return res.status(200).json({ backupCodes });
   } catch (e) {
     return next(e);
   }

@@ -7,7 +7,7 @@ import express from 'express';
 import { startCompleteTripsCron } from "./cron/complete-trips.cron";
 import cors from "cors";
 import cookieParser = require("cookie-parser");
-import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import tripRouter from "./routes/trip.router";
 import uploadRouter from "./routes/upload.routes";
 import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
@@ -62,6 +62,7 @@ app.use("/trips", tripRouter);
 app.use("/uploads", uploadRouter);
 app.use("/admin", adminRouter); // C-PR4 (D57) — trajets, masquage, billets
 
+app.use(notFoundHandler); // ANO-ADM-27 — route inconnue : 404 JSON ROUTE_NOT_FOUND, jamais la page HTML d'Express
 app.use(errorMiddleware);
 
 const port = process.env.PORT || 6002;

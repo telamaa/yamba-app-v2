@@ -18,7 +18,7 @@ export type AccountStatus = z.infer<typeof AccountStatusSchema>;
 export const ADMIN_PERMISSIONS = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
   "disputes.decide": ["MEDIATOR"],
-  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE", "PRIVACY"], // A153 — le profil RGPD ouvre la fiche du compte qu'il exporte ou efface
   "users.suspension.propose": ["SUPPORT", "MEDIATOR"],
   "users.suspension.apply": ["MEDIATOR"],
   "audit.read": ["FINANCE"],
@@ -127,6 +127,7 @@ export const AdminUsersQuerySchema = z
     accountStatus: AccountStatusSchema.optional(),
     carrierStatus: z.string().trim().max(40).optional(),
     stripeReady: z.enum(["1", "0"]).optional().meta({ description: "1 = compte Connect avec virements activés" }),
+    proposal: z.enum(["1"]).optional().meta({ description: "1 = a suspension proposal awaits a decision (A194, home tile « Sanctions proposées »)" }),
     createdFrom: z.string().datetime().optional(),
     createdTo: z.string().datetime().optional(),
     sort: z.enum(["createdAt", "lastName"]).default("createdAt"),
@@ -151,6 +152,18 @@ const DealLineSchema = z.object({
   requestedAt: z.string().datetime(),
 });
 
+/**
+ * A193 (recette 02-ADMIN § 7) — catégorie de motif d'une sanction, liste FERMÉE : elle part au membre (exposé des motifs,
+ * esprit DSA art. 17) dans sa langue ; le motif libre reste interne (A191). Un compte sanctionné avant A193 n'a pas de
+ * catégorie : il se lit `OTHER` (`sanctionCategoryOf`), jamais une erreur.
+ */
+export const SANCTION_CATEGORIES = ["SCAM_SUSPECTED", "PROHIBITED_CONTENT", "ABUSIVE_BEHAVIOUR", "REPEATED_DISPUTES", "IMPERSONATION", "OTHER"] as const;
+export const SanctionCategorySchema = z.enum(SANCTION_CATEGORIES).meta({ id: "SanctionCategory", description: "Closed list, sent to the member (statement of reasons); the free-text reason stays internal" });
+export type SanctionCategory = z.infer<typeof SanctionCategorySchema>;
+export function sanctionCategoryOf(raw: unknown): SanctionCategory {
+  return (SANCTION_CATEGORIES as readonly string[]).includes(raw as string) ? (raw as SanctionCategory) : "OTHER";
+}
+
 export const AdminUserFileSchema = z
   .object({
     id: ObjectIdSchema,
@@ -166,10 +179,10 @@ export const AdminUserFileSchema = z
     adminRoles: z.array(AdminRoleSchema),
     accountStatus: AccountStatusSchema,
     suspension: z
-      .object({ level: AccountStatusSchema, reason: z.string(), until: z.string().datetime().nullable(), at: z.string().datetime(), byAdmin: z.string() })
+      .object({ level: AccountStatusSchema, category: SanctionCategorySchema, reason: z.string(), until: z.string().datetime().nullable(), at: z.string().datetime(), byAdmin: z.string() })
       .nullable(),
     suspensionProposal: z
-      .object({ level: z.string(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() })
+      .object({ level: z.string(), category: SanctionCategorySchema, reason: z.string(), byAdmin: z.string(), at: z.string().datetime() })
       .nullable(),
     createdAt: z.string().datetime(),
     isDeleted: z.boolean(),
@@ -214,7 +227,8 @@ export type AdminUserFile = z.infer<typeof AdminUserFileSchema>;
 export const ProposeSuspensionRequestSchema = z
   .object({
     level: z.enum(["RESTRICTED", "SUSPENDED"]),
-    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000),
+    category: SanctionCategorySchema,
+    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000).meta({ description: "Internal reason — never sent to the member (A191)" }),
   })
   .meta({ id: "ProposeSuspensionRequest", description: "SUPPORT proposes; MEDIATOR / SUPER_ADMIN executes (D56 3A)" });
 export type ProposeSuspensionRequest = z.infer<typeof ProposeSuspensionRequestSchema>;
@@ -222,7 +236,8 @@ export type ProposeSuspensionRequest = z.infer<typeof ProposeSuspensionRequestSc
 export const ApplySuspensionRequestSchema = z
   .object({
     level: z.enum(["RESTRICTED", "SUSPENDED"]),
-    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000),
+    category: SanctionCategorySchema,
+    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000).meta({ description: "Internal reason — never sent to the member (A191)" }),
     until: z.string().datetime().optional().meta({ description: "Optional end; absent = until lifted" }),
   })
   .meta({ id: "ApplySuspensionRequest" });
@@ -232,6 +247,14 @@ export const LiftSuspensionRequestSchema = z
   .object({ reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000) })
   .meta({ id: "LiftSuspensionRequest" });
 export type LiftSuspensionRequest = z.infer<typeof LiftSuspensionRequestSchema>;
+
+/** A155 (recette 02-ADMIN § 5.5) — lever une suppression d'adresse porte un motif, comme lever une sanction : une plainte levée
+ *  sans raison écrite rouvre l'envoi vers quelqu'un qui a dit « spam ». Réponse : l'état de la fiche après levée. */
+export const EMAIL_UNSUPPRESS_MIN_REASON_LENGTH = 20;
+export const UnsuppressEmailRequestSchema = z
+  .object({ reason: z.string().trim().min(EMAIL_UNSUPPRESS_MIN_REASON_LENGTH).max(2000).meta({ description: "Why the address can receive emails again (corrected, member request…) — journaled" }) })
+  .meta({ id: "UnsuppressEmailRequest" });
+export type UnsuppressEmailRequest = z.infer<typeof UnsuppressEmailRequestSchema>;
 
 export const InviteAdminRequestSchema = z
   .object({
@@ -248,6 +271,18 @@ export const AcceptAdminInviteRequestSchema = z
   .meta({ id: "AcceptAdminInviteRequest" });
 export type AcceptAdminInviteRequest = z.infer<typeof AcceptAdminInviteRequestSchema>;
 
+/** A189 b — motif FACULTATIF du retrait (un retrait d'urgence n'attend pas un texte) ; écrit au journal, jamais dans l'email. */
+export const RevokeAdminRequestSchema = z
+  .object({ reason: z.string().trim().max(500).optional().meta({ description: "Optional; an empty string after trim means no reason" }) })
+  .meta({ id: "RevokeAdminRequest" });
+export type RevokeAdminRequest = z.infer<typeof RevokeAdminRequestSchema>;
+
+/** A189 a — un nouveau lien d'invitation (l'ancien meurt). */
+export const ResendAdminInviteResponseSchema = z
+  .object({ ok: z.literal(true), inviteExpiresAt: z.string().datetime() })
+  .meta({ id: "ResendAdminInviteResponse" });
+export type ResendAdminInviteResponse = z.infer<typeof ResendAdminInviteResponseSchema>;
+
 export const UpdateAdminRoleRequestSchema = z.object({ adminRoles: AdminRolesSchema }).meta({ id: "UpdateAdminRoleRequest", description: "C-PR3bis : la liste complète des profils (remplace)" });
 export type UpdateAdminRoleRequest = z.infer<typeof UpdateAdminRoleRequestSchema>;
 
@@ -261,12 +296,23 @@ export const AdminAccountSchema = z
     adminRoles: z.array(AdminRoleSchema),
     totpEnabled: z.boolean(),
     inviteAccepted: z.boolean().meta({ description: "false while the invited account has no password yet" }),
+    /** A189 a — fin de validité du lien d'invitation vivant ; null = aucun lien vivant (accepté, ou expiré : à renvoyer). */
+    inviteExpiresAt: z.string().datetime().nullable(),
     createdAt: z.string().datetime(),
   })
   .meta({ id: "AdminAccount" });
 export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 
 export const AdminSessionItemSchema = z
-  .object({ jti: z.string(), createdAt: z.string().datetime(), lastActivityAt: z.string().datetime(), current: z.boolean() })
+  .object({
+    jti: z.string(),
+    createdAt: z.string().datetime(),
+    lastActivityAt: z.string().datetime(),
+    current: z.boolean(),
+    /** A188 a — navigateur · système lu à l'ouverture (« Appareil inconnu » pour une session d'avant la correction). */
+    device: z.string(),
+    /** A188 a — adresse IP d'ouverture ; null pour une session d'avant la correction. */
+    ip: z.string().nullable(),
+  })
   .meta({ id: "AdminSessionItem" });
 export type AdminSessionItem = z.infer<typeof AdminSessionItemSchema>;

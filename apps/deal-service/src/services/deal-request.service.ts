@@ -29,6 +29,7 @@ import type { PaymentProvider } from "@packages/payments";
 import { QuoteError, type PricingParams, type ShipperQuote } from "@packages/pricing";
 import { pricingParamsFromSettings } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
+import { cancellationParamsFromSettings } from "./booking-lifecycle";
 import type { SettingsReader } from "@packages/libs/settings";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { makeTrustService, type TrustService } from "./trust.service"; // D71
@@ -41,6 +42,7 @@ import {
 } from "@packages/api-contracts";
 import {
   BookingRequestError,
+  fenceShipperAccount,
   assertQuoteMatches,
   buildBookingSnapshots,
   capacityReservationWhere,
@@ -59,6 +61,7 @@ const TRIP_SELECT = {
   status: true,
   isDeleted: true,
   hiddenByAdminAt: true, // C-PR4 (D57) — lecture seule
+  user: { select: { accountStatus: true, suspensionUntil: true } }, // ANO-ADM-08 — Voyageur suspendu = non réservable
   departureAt: true,
   originCity: true,
   originCountryCode: true,
@@ -174,7 +177,10 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
       await trust.assertWithinCaps(user.id, { declaredValueCents: input.declaredValueCents, weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null }); // D71 — plafonds CNF-06 (valeur déclarée comprise)
-      const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
+      const settingsNow = await settings.get();
+      const quote = quoteOr400(trip, input, pricingParamsFromSettings(settingsNow)); // D62
+      // A172 — les conditions d'annulation lues au MÊME instant que le prix, figées avec lui dans la réservation.
+      const cancellationTerms = cancellationParamsFromSettings(settingsNow);
       assertQuoteMatches(quote, input.expectedTotalCents);
       const kg = kgToReserve(quote);
       checkCapacity(trip, kg);
@@ -213,6 +219,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
             select: { id: true },
           });
           if (reused) throw new BookingRequestError("PAYMENT_ALREADY_USED", "This payment is already attached to a request.");
+          await fenceShipperAccount(tx, user.id, now); // A179 — jamais une réservation sur un compte en cours d'effacement
 
           // CAP-01 — réservation ATOMIQUE : la condition est dans le WHERE
           // (helper pur, robuste au champ reservedKg absent — pitfall isSet).
@@ -240,6 +247,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
               expiresAt: snapshots.expiresAt,
               paymentIntentId: auth.intentId,
               paymentProvider: auth.provider,
+              cancellationTerms, // A172
             },
           });
 

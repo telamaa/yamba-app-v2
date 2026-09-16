@@ -3,6 +3,7 @@
  * =======================================================================
  */
 import { z } from "zod";
+import { CronCatalogueEntrySchema } from "./cron-catalogue";
 
 export const MAINTENANCE_REASON_MIN_LENGTH = 20;
 export const MAINTENANCE_RETRY_AFTER_SECONDS = 300;
@@ -17,7 +18,7 @@ export const MaintenanceStateSchema = z
     updatedAt: z.string().datetime().nullable(),
     updatedBy: z.string().nullable(),
     version: z.number().int(),
-    /** Interrupteur d'environnement du gateway (MAINTENANCE_MODE=on) — lecture seule ici. */
+    /** Interrupteur d'environnement du gateway (MAINTENANCE_MODE=on), lu dans la santé DU GATEWAY (A182) — tant qu'il est vrai, l'écriture répond 409. */
     envOverride: z.boolean().optional(),
   })
   .meta({ id: "MaintenanceState" });
@@ -67,9 +68,14 @@ export const AdminStatusResponseSchema = z
   .object({
     at: z.string().datetime(),
     services: z.array(ServiceStatusSchema),
-    crons: z.array(CronRunSchema),
-    outbox: z.object({ unpublished: z.number().int(), oldestUnpublishedAt: z.string().datetime().nullable(), parked: z.number().int(), parkedThreshold: z.number().int() }),
-    emails: z.object({ failedLast24h: z.number().int(), sentLast24h: z.number().int() }),
+    /** A178 — `late` : dernier battement plus vieux que deux intervalles du catalogue (calculé à la lecture). */
+    crons: z.array(CronRunSchema.extend({ late: z.boolean() })),
+    /** A178 — crons du catalogue sans battement dans Redis (jamais passés depuis 7 jours, Redis vidé, ou non enveloppés). */
+    missingCrons: z.array(CronCatalogueEntrySchema),
+    /** § 5.23 — `lagMinutes` : âge du plus ancien non publié ; `lagging` : au-delà de `alerts.outboxLagMinutes` (même règle que l'alerte). */
+    outbox: z.object({ unpublished: z.number().int(), oldestUnpublishedAt: z.string().datetime().nullable(), parked: z.number().int(), parkedThreshold: z.number().int(), lagMinutes: z.number().int(), lagThresholdMinutes: z.number().int(), lagging: z.boolean() }),
+    /** A177 — `sentLast24h` = accepté par le fournisseur (SENT, DELIVERED, BOUNCED, COMPLAINED) ; `failedLast24h` = FAILED. */
+    emails: z.object({ failedLast24h: z.number().int(), sentLast24h: z.number().int(), deliveredLast24h: z.number().int(), bouncedLast24h: z.number().int() }),
     maintenance: MaintenanceStateSchema,
   })
   .meta({ id: "AdminStatusResponse", description: "Service status page (D64 5A) — not a monitoring tool" });

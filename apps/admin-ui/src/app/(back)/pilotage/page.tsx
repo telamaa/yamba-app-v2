@@ -1,11 +1,13 @@
 import PilotageView from "@/components/PilotageView";
+import PageAccess from "@/components/PageAccess";
 
 export default function PilotagePage() {
   return (
-    <>
+    // Décision du 15/09 : un profil sans la permission lit un seul refus, sans consigne ni section.
+    <PageAccess title="Pilotage">
       <h1 className="text-xl font-bold">Pilotage</h1>
       <p className="mt-1 text-[13px] text-slate-500">Courbes et corridors calculés depuis les deals, les trajets et les comptes (rafraîchis toutes les 60 s). Les vues et les recherches viennent de la recherche publique. Chaque courbe s'agrandit : le tableau apparaît dessous, et un clic sur un point liste les éléments de la période. Les alertes de seuil ont leur page.</p>
       <PilotageView />
-    </>
+    </PageAccess>
   );
 }

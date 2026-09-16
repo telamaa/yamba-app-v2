@@ -13,7 +13,7 @@
 import prisma from "../index";
 
 async function main() {
-  for (const field of ["trackingEvents", "deliveryPhotoUrls"] as const) {
+  for (const field of ["trackingEvents", "deliveryPhotoUrls", "refunds"] as const) { // A166 : `refunds` — la part ancienne du cumul se lit en entrée LEGACY
     const before = (await prisma.$runCommandRaw({ count: "Booking", query: { [field]: { $exists: false } } })) as { n: number };
     const res = (await prisma.$runCommandRaw({
       update: "Booking",

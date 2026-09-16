@@ -24,8 +24,8 @@
     "empty": {
       "title": "No earnings yet",
       "text": "Your payouts will show up here after your first validated delivery.",
-      "notCarrier": "Become a carrier to earn money with your luggage allowance.",
-      "cta": "Become a carrier"
+      "notCarrier": "Become a Traveler to earn money with your luggage allowance.",
+      "cta": "Become a Traveler"
     },
     "kind": {
       "DELIVERY": "Transport for {name}",
@@ -56,13 +56,14 @@
     "line": "Shipment {route} · {name}",
     "lineNoName": "Shipment {route}",
     "state": {
-      "AUTHORIZED": "Authorized, not charged · waiting for the carrier",
+      "AUTHORIZED": "Authorized, not charged · waiting for the Traveler",
       "HELD": "Held by Yamba",
       "HELD_UNTIL": "Held until {date}",
       "RELEASED": "Released on {date} · transaction closed",
       "RELEASED_NO_CHARGE": "Never charged · the hold vanished",
       "REFUNDED": "Refunded {amount} on {date}",
-      "PARTIALLY_REFUNDED": "Refunded {amount} on {date} · {retention} retention passed on to the carrier"
+      "PARTIALLY_REFUNDED": "Refunded {amount} on {date} · {retention} retention passed on to the Traveler",
+      "PARTIALLY_REFUNDED_AFTER_COMPLETION": "Refunded {amount} on {date} · {kept} paid for your shipment"
     }
   },
   "unknownName": "a member"
