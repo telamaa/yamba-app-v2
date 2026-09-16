@@ -29,6 +29,7 @@ import {
   type RevealPhoneResponse,
 } from "@packages/api-contracts";
 import { conversationAccess, conversationExists, counterpartIdOf, roleOf } from "../lib/conversation.rules";
+import { nomDeLaContrepartie } from "../lib/counterpart-label"; // ANO-WEB-83 (D63)
 import { detectContactInfo, normalizeBody, sixDigitCandidates } from "../lib/message-guard.rules";
 import { canAcceptMeetup, nextMeetupOf, validateMeetupSlot } from "../lib/meetup.rules";
 import { phoneRevealWindow } from "../lib/phone-reveal.rules";
@@ -222,7 +223,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
       const bookingBy = new Map(bookings.map((b) => [b.id, b]));
       const counterpartIds = rows.map((r) => (r.shipperId === userId ? r.carrierId : r.shipperId));
       const [users, meetups, lastMessages] = await Promise.all([
-        prisma.user.findMany({ where: { id: { in: [...new Set(counterpartIds)] } }, select: { id: true, firstName: true, avatar: { select: { url: true } } } }),
+        prisma.user.findMany({ where: { id: { in: [...new Set(counterpartIds)] } }, select: { id: true, isDeleted: true, firstName: true, avatar: { select: { url: true } } } }),
         prisma.meetup.findMany({ where: { conversationId: { in: rows.map((r) => r.id) }, status: { in: ["PROPOSED", "ACCEPTED"] } } }),
         prisma.message.findMany({ where: { conversationId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "desc" }, take: 200, select: { conversationId: true, body: true, authorRole: true, createdAt: true } }),
       ]);
@@ -252,7 +253,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
           id: r.id,
           bookingId: r.bookingId,
           role,
-          counterpart: { id: counterpart?.id ?? "", firstName: counterpart?.firstName ?? "—", avatarUrl: counterpart?.avatar?.url ?? null },
+          counterpart: { id: counterpart?.id ?? "", firstName: nomDeLaContrepartie(counterpart), avatarUrl: counterpart?.avatar?.url ?? null },
           corridor: { originCity: booking.trip.originCity, destinationCity: booking.trip.destinationCity, departureAt: iso(booking.trip.departureAt) },
           bookingStatus: booking.status,
           lastMessage: last ? { body: last.body.slice(0, 140), authorRole: last.authorRole as MessageDto["authorRole"], createdAt: last.createdAt.toISOString() } : null,
@@ -276,7 +277,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         }),
         prisma.meetup.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "desc" } }),
-        prisma.user.findUnique({ where: { id: counterpartIdOf(role, booking) }, select: { id: true, firstName: true, phoneE164: true, avatar: { select: { url: true } } } }),
+        prisma.user.findUnique({ where: { id: counterpartIdOf(role, booking) }, select: { id: true, isDeleted: true, firstName: true, phoneE164: true, avatar: { select: { url: true } } } }),
         prisma.phoneReveal.findUnique({ where: { conversationId_revealedToId: { conversationId: conversation.id, revealedToId: userId } } }),
       ]);
       const hasMore = rawMessages.length > MESSAGES_PAGE_SIZE;
@@ -291,7 +292,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
           id: conversation.id,
           bookingId: booking.id,
           role,
-          counterpart: { id: counterpart?.id ?? "", firstName: counterpart?.firstName ?? "—", avatarUrl: counterpart?.avatar?.url ?? null },
+          counterpart: { id: counterpart?.id ?? "", firstName: nomDeLaContrepartie(counterpart), avatarUrl: counterpart?.avatar?.url ?? null },
           corridor: { originCity: booking.trip.originCity, destinationCity: booking.trip.destinationCity, departureAt: iso(booking.trip.departureAt) },
           bookingStatus: booking.status,
           lastMessage: null,

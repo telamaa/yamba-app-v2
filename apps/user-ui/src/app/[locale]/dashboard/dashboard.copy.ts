@@ -232,6 +232,11 @@ export function getDashboardCopy(isFr: boolean) {
       codeSent: isFr ? "Code envoyé : regarde ta boîte mail (et les spams)." : "Code sent: check your inbox (and spam).",
       codeLabel: isFr ? "Code reçu par email" : "Code received by email",
       confirmLabel: isFr ? "Tape SUPPRIMER pour confirmer" : "Type SUPPRIMER to confirm",
+      // ANO-WEB-84 (recette 5.25) : le refus arrivait en ANGLAIS (le `message` brut du serveur) — un refus métier
+      // porte un `details.code`, et c'est le front qui le dit dans la langue du membre (A146).
+      exportRateLimited: isFr
+        ? "Un seul export par 24 heures : tu pourras en redemander un demain."
+        : "One export per 24 hours: you can request another one tomorrow.",
       cancel: isFr ? "Annuler" : "Cancel",
       error: isFr ? "Impossible pour le moment, réessaie." : "Not possible right now, try again.",
     },

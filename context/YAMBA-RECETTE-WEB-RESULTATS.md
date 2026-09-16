@@ -3090,6 +3090,105 @@ créés par l'API des deux côtés (révélés) sur `bzv-completed`.
 - **Une session `contexte.request` peut expirer** au fil d'une longue fiche (401) : préférer une preuve par l'écran
   ou un contexte fraîchement connecté.
 
+## Chapitre 5.25 — Données personnelles : export et effacement · **CONFORME** (9 fiches jouées, 5 après correction · 5 anomalies closes dont 1 MAJEURE, + deux purges du jeu d'essai · 9 scénarios en série, 1 min 24)
+
+`web-rgp.spec.ts`. Aminata (écran, export, blocage), Thomas (blocage « versement dû », contrepartie du compte effacé),
+un compte **NEUF créé par l'écran** pour l'avertissement, la suppression réelle et « Membre supprimé » (il réserve sur
+`bzv-perkg` par l'API, Thomas accepte, un message part, le deal est annulé à plus de 48 h — remboursement intégral —
+puis le compte est effacé) ; `gru-completed` (João) et `bzv-disputed` (Chinwe) pour l'effacement du destinataire.
+**La suppression ne touche jamais un compte du jeu d'essai.** Le quota de codes (6 par heure) est levé au démarrage
+par `scripts/recette/otp-debloquer.ts` — sans quoi rejouer le chapitre dans l'heure n'envoie aucun code, en silence.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-RGP-1 | L'écran « Mes données » | **Conforme après correction** → `ANO-WEB-81` ; « Mes données » / « Ce que Yamba garde, ce que tu peux télécharger ou supprimer » ; bascule « Relance par email des messages non lus » / « Un email si un message reste sans lecture 15 minutes, au plus un par heure » ; bascule « Mesure d'audience » / « Pages vues, recherches, étapes de réservation — pour améliorer Yamba, jamais pour la publicité » ; les deux reflètent la préférence **du compte** servie par `/auth/me` ; carte « Télécharger mes données » (« …Une fois par 24 h. ») + « Télécharger » ; carte « Supprimer mon compte » (« Immédiat et irréversible… ») + « Supprimer » |
+| WEB-RGP-2 | Télécharger ses données | **Conforme** — `POST /auth/me/data-export` → 403 `SUDO_REQUIRED`, la porte « Confirme que c'est bien toi » / « Pour ce geste sensible, on t'envoie un code à six chiffres par email. Il ouvre une fenêtre de 15 minutes sur cet appareil. » ; email « Ton code de confirmation Yamba » ; code saisi → le fichier se télécharge et l'écran dit « Ton fichier est téléchargé. (yamba-mes-donnees-2026-09-12.json) » |
+| WEB-RGP-3 | Le contenu du fichier | **Conforme** — `format: "yamba-data-export/1"` ; 20 sections (profil, préférences, adresses, consentements, profil Voyageur, trajets, réservations, avis donnés/reçus, messages, rendez-vous, révélations de numéro, routes, favoris, suivis, notifications, signalements faits, demandes RGPD) ; chaque réservation porte `role` (SHIPPER pour Aminata) et SES montants ; **aucun code de livraison** (ni `deliveryCode`, ni `742891`, ni la forme chiffrée) ; aucun `reportsReceived`, `adminNote`, `disputesLostCount`, `trustScore`, `resolution` ; les avis reçus n'y sont que **révélés** ; l'export d'un VOYAGEUR (Thomas, 13 réservations) ne porte **aucune clé `recipient`**, ni « Clarisse », ni « +242061234567 », ni l'email de l'Expéditrice |
+| WEB-RGP-4 | Un export par 24 heures | **Conforme après correction** → `ANO-WEB-84` ; second téléchargement → 400 `EXPORT_RATE_LIMITED` (`nextAt` servi), **aucun second fichier**, aucun nouveau code envoyé, et l'écran dit « Un seul export par 24 heures : tu pourras en redemander un demain. » (le message anglais du serveur n'apparaît plus). **Bon point** : le refus tombe AVANT la porte — pas de code envoyé pour rien |
+| WEB-RGP-5 | La suppression bloquée par un deal vivant | **Conforme** — Aminata : `ACTIVE_DEAL`, `PENDING_REQUEST`, `RETENTION_HELD`, `ADMIN_ACCOUNT` ; Thomas : + `PAYOUT_PENDING`, `PUBLISHED_TRIP` ; le bandeau « Impossible pour l'instant : termine d'abord ce qui est en cours. » et **seulement** les motifs servis, dans la liste fermée ; ni « M'envoyer le code » ni le bouton de suppression ; **aucun code envoyé** |
+| WEB-RGP-6 | Le texte d'avertissement | **Conforme** — sur le compte neuf (aucun bloqueur) : le texte exact du cahier, mot pour mot, sans bandeau de blocage |
+| WEB-RGP-7 | Supprimer son compte | **Conforme avec constat** — « supprime » → bouton inactif ; « supprimer » → le champ **met en majuscules à la frappe** et le bouton s'active (le cahier attendait un refus) ; le geste → 403 `SUDO_REQUIRED`, la porte, le code, puis 200 ; déconnexion immédiate (retour `/fr`, plus de menu utilisateur, `/auth/me` 401) ; reconnexion refusée (401) ; email « Ton compte Yamba a été supprimé » **sans aucun lien** |
+| WEB-RGP-8 | L'autre partie voit « Membre supprimé » | **Conforme après correction** → `ANO-WEB-83`, `ANO-WEB-85` ; le fil est intact et lisible (le message du compte effacé est là), la contrepartie s'affiche « **Membre supprimé** » (elle disait « Membre » — le prénom anonymisé seul), ni l'ancien prénom ni l'ancienne adresse nulle part ; « Voir le numéro » → 400 `TOO_EARLY` et le refus est **dit à l'écran** (il ne vivait que dans l'attribut `title`) ; aucun chiffre de téléphone ; le deal reste |
+| WEB-RGP-9 | Le tiers destinataire effacé à 30 jours | **Conforme** — `destinataire-eligible.ts <id> 40` + `destinataire.ts` → `{examined: 1, redacted: 1}` ; le récapitulatif ne porte plus ni nom, ni téléphone, ni email (« — », `+00000000000`, `null`) ; le lien de suivi répond « Ce lien de suivi n'est plus valide » ; **le deal en litige n'est pas touché** (Clarisse et son numéro intacts) |
+
+### Anomalies
+
+- **ANO-WEB-81 (MAJEURE, close)** — la bascule « Mesure d'audience » n'était rendue **que si le FRONT portait une clé
+  PostHog** (`analyticsConfigured()`), et son état venait du `localStorage` du navigateur. Or `analyticsOptIn` est une
+  préférence **du compte** qui gouverne aussi la capture **serveur** (D66) : sur un déploiement où seul le serveur
+  mesure, le membre ne pouvait plus se retirer, et sur un autre appareil la bascule mentait. La ligne est toujours
+  rendue, son état vient de `/auth/me`, l'écriture est confirmée (et annulée si le serveur refuse) ; l'initialisation
+  du PostHog navigateur reste conditionnée à la clé.
+- **ANO-WEB-83 (mineure, close)** — la messagerie affichait « Membre » pour un compte effacé (le prénom anonymisé
+  seul, qui se lit comme un prénom ordinaire) : `nomDeLaContrepartie` (message-service) rend « Membre supprimé », le
+  libellé déjà employé par le back-office ; +3 tests message-service = **47**.
+- **ANO-WEB-84 (mineure, close)** — le refus « un export par 24 h » s'affichait en **anglais** (le `message` brut du
+  serveur) ; le front le dit par son `details.code` (A146).
+- **ANO-WEB-85 (mineure, close)** — dans un fil, « Voir le numéro » refusé (trop tôt, contrepartie effacée) ne disait
+  **rien** : le motif ne vivait que dans l'attribut `title` du bouton, et le bandeau n'apparaît qu'en arrivant par
+  « Appeler » (`?focus=phone`). Un refus affiche désormais la même phrase.
+- **ANO-WEB-82 (mineure, close)** — le fichier d'export se téléchargeait sous le nom de repli `yamba-mes-donnees.json`
+  (sans la date) : CORS n'expose que six en-têtes par défaut, et `Content-Disposition` n'en fait pas partie — le
+  navigateur le **cachait** au client. La passerelle l'expose (`exposedHeaders`, avec `x-correlation-id`).
+- **Jeu d'essai** — deux fuites de plus : le **journal des demandes RGPD** (un export réussi bloquait le suivant
+  pendant 24 h au passage d'après) et, avant lui, les avis (5.22) et les signalements (5.24) : `seed-deals.ts` purge
+  désormais `DataRequest` des comptes du seed.
+
+### À trancher (produit)
+
+- **« Tape SUPPRIMER » accepte les minuscules** : le champ met en majuscules à la frappe, donc « supprimer » active le
+  bouton. Le cahier veut un refus. Garder la commodité (et amender le cahier) ou refuser strictement ?
+- **Le quota de codes (6 par heure, 1 min entre deux)** n'est jamais dit à l'écran : quand il est atteint, « M'envoyer
+  le code » ne produit **rien de visible**. Un message (« trop de codes demandés, réessaie dans une heure ») manque.
+- **Le refus de révélation du numéro sur un deal annulé** renvoie `TOO_EARLY` avec une date de départ future : le motif
+  exact serait « ce deal est clos ». À préciser côté message-service.
+- **L'ordre des clés de l'export** : le cahier dit « le fichier commence par `format` » ; il commence par `exportedAt`,
+  puis `format`.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **RGP-1** — Deux bascules, deux sources de vérité auparavant (compte / navigateur) : maintenant une seule. Ajouter
+  la date du dernier consentement (`consents` est déjà dans l'export) sous la bascule d'audience — petit.
+- **RGP-2** — La porte au moment du geste (et non avant le formulaire) est le bon choix ; le fichier part en une
+  requête. Pour un gros compte, servir un export **asynchrone** (email avec lien signé) éviterait un JSON de plusieurs
+  mégaoctets dans la mémoire du navigateur — chantier.
+- **RGP-3** — La liste blanche par rôle est nette (aucun `recipient` côté Voyageur). Les `notifications` (185 lignes
+  ici) gonflent le fichier sans grand intérêt : les borner (90 jours) ou les documenter — petit.
+- **RGP-4** — Le refus AVANT la porte évite un code inutile : très bien. Servir `nextAt` à l'écran (« demain à 16 h »)
+  plutôt que « demain » — petit.
+- **RGP-5** — Les bloqueurs sont une liste fermée servie par l'API et le front n'en invente aucun : exemplaire.
+  Ajouter le **compte** par motif (« 3 deals en cours ») que le service calcule déjà (`counts`) — petit.
+- **RGP-6** — Le texte dit ce qui reste et ce qui part, et nomme Stripe : rien à redire. Le lier à la politique de
+  confidentialité — petit.
+- **RGP-7** — Deux barrières (mot + code) pour un geste irréversible : bien. Le champ qui met en majuscules annule la
+  première : soit on l'assume, soit on cesse de transformer la saisie — petit.
+- **RGP-8** — Le fil survit au compte et l'identité disparaît : conforme au RGPD. Le libellé vient maintenant d'une
+  règle pure et testée ; l'appliquer aussi aux avis publics et aux écrans de deal (mêmes comptes effacés) — moyen.
+- **RGP-9** — L'effacement du tiers est piloté par un réglage (`privacy.recipientRetentionDays`) et respecte les états
+  terminaux : très bien. Révoquer le lien de suivi dans la même passe (`revokedAt`) tracerait la cause côté admin
+  sans la révéler côté public — petit (déjà proposé en 5.23).
+- **Transversal** — Trois anomalies sur cinq sont des **vérités dupliquées** : un consentement lu dans le navigateur
+  plutôt qu'au compte (81), un nom recomposé à l'écran plutôt que nommé par une règle (83), un refus traduit par son
+  statut plutôt que par son code (84). La quatrième est une **couche de transport qui masque une donnée** (82 :
+  CORS). Règle : une préférence a une seule source (le compte), un refus se dit par son `details.code`, et tout
+  en-tête utile au client doit être exposé explicitement — moyen.
+
+### Pièges de poste payés ici
+
+- **Le quota de codes OTP (6 par heure, 1 minute entre deux)** grille au troisième rejeu du chapitre : plus aucun
+  email ne part, **sans message à l'écran**, et la fiche échoue sur « aucun email ». `scripts/recette/otp-debloquer.ts
+  <email>` lève les clés Redis ; le chapitre l'appelle dans son `beforeAll` pour Aminata et Thomas.
+- **La fenêtre sudo est liée au `jti` de la session** : une session mémorisée d'un passage précédent peut encore en
+  porter une ouverte, et la porte ne se présente pas. `navigateurConnecte(..., { parEcran: true })` donne un jti neuf.
+- **Playwright efface le téléchargement à la fin de SA fiche** : lire le contenu du fichier dans la fiche qui le
+  télécharge, jamais dans la suivante (le chemin pointe sur un artefact supprimé).
+- **`GET /trips/:id` est réservé au propriétaire** (déjà payé en 5.24) et **une session `contexte.request` expire** au
+  fil d'une longue fiche : préférer la preuve par l'écran.
+- **`nx serve` a lâché message-service** après une édition (le port 6005 muet, la passerelle en 500 de 2 ms) : relancer
+  en bundle (`node --env-file=../../.env dist/main.js`) et vérifier que le bundle porte bien la correction.
+- **Le journal des demandes RGPD survit au seed** : sans purge, « un export par 24 h » refuse dès la première fiche du
+  passage suivant.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

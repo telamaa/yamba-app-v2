@@ -116,6 +116,19 @@ export default function ConversationThread({
         </button>
       </header>
 
+      {/* ANO-WEB-85 (recette 5.25) : un refus de révélation (400 TOO_EARLY, contrepartie effacée) ne disait RIEN —
+          le motif ne vivait que dans l'attribut `title` du bouton, et le bandeau n'apparaît qu'en arrivant par « Appeler ». */}
+      {reveal.isError && !focusPhone && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100" role="status">
+          <Phone size={13} className="shrink-0" />
+          <span>
+            {phone.opensAt
+              ? t("phone.banner.opensAt", { time: `${dayLabel(phone.opensAt, locale)} ${timeLabel(phone.opensAt, locale)}` })
+              : t("phone.banner.needsMeetup")}
+          </span>
+        </div>
+      )}
+
       {focusPhone && (
         <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
           <Phone size={13} className="shrink-0" />
