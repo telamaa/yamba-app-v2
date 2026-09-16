@@ -56,6 +56,8 @@ export function buildUsersWhere(q: AdminUsersQuery): Record<string, unknown> {
   if (q.role) where.roles = { has: q.role };
   if (q.accountStatus) where.accountStatus = q.accountStatus;
   if (q.carrierStatus) where.carrierStatus = q.carrierStatus;
+  // A194 (recette § 7, ADM-NRG-7 écart 4) — la tuile « Sanctions proposées » menait à la liste entière : même filtre que son compteur.
+  if (q.proposal === "1") where.suspensionProposedAt = { not: null };
   if (q.stripeReady === "1") where.carrierPage = { is: { stripePayoutsEnabled: true } };
   if (q.stripeReady === "0") where.OR = [{ carrierPage: null }, { carrierPage: { is: { stripePayoutsEnabled: false } } }];
   if (q.createdFrom || q.createdTo) where.createdAt = { ...(q.createdFrom ? { gte: new Date(q.createdFrom) } : {}), ...(q.createdTo ? { lt: new Date(q.createdTo) } : {}) };

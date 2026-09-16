@@ -6,7 +6,7 @@
  * livraison, identifiants Stripe complets).
  */
 import prisma from "@packages/libs/prisma";
-import { adminRolesOf, type AdminUsersQuery } from "@packages/api-contracts";
+import { adminRolesOf, sanctionCategoryOf, type AdminUsersQuery } from "@packages/api-contracts";
 import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere, matchedOnFor, textSearchOr } from "../lib/admin-users.query";
 import redis from "@packages/libs/redis";
 import { EXPORT_MAX_ROWS, capExportRows } from "@packages/libs/csv";
@@ -219,6 +219,7 @@ export function makeAdminUsersService() {
           u.accountStatus !== "ACTIVE" && u.suspendedAt
             ? {
                 level: u.accountStatus as AdminUserFile["accountStatus"],
+                category: sanctionCategoryOf(u.suspensionCategory), // A193 — absente avant A193 → OTHER
                 reason: u.suspensionReason ?? "",
                 until: u.suspensionUntil ? u.suspensionUntil.toISOString() : null,
                 at: u.suspendedAt.toISOString(),
@@ -227,7 +228,7 @@ export function makeAdminUsersService() {
             : null,
         suspensionProposal:
           u.suspensionProposedLevel && u.suspensionProposedAt
-            ? { level: u.suspensionProposedLevel, reason: u.suspensionProposedReason ?? "", byAdmin: nameOf(u.suspensionProposedByAdminId), at: u.suspensionProposedAt.toISOString() }
+            ? { level: u.suspensionProposedLevel, category: sanctionCategoryOf(u.suspensionProposedCategory), reason: u.suspensionProposedReason ?? "", byAdmin: nameOf(u.suspensionProposedByAdminId), at: u.suspensionProposedAt.toISOString() }
             : null,
         createdAt: u.createdAt.toISOString(),
         isDeleted: u.isDeleted,

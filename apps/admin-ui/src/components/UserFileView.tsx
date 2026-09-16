@@ -8,9 +8,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, auditDetail, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
+import { ACTION_LABEL, auditDetail, SANCTION_CATEGORY_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
-import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
+import type { AdminMe, AdminUserFile, ErasureBlocker, SanctionCategory } from "@/lib/types";
 
 const MIN_REASON = 20;
 /** Recette § 5.5 — un motif inconnu (`UNKNOWN`) n'est plus affiché « rebond dur ». */
@@ -23,11 +23,13 @@ const SANCTION_REFUS: Record<string, string> = {
   ADMIN_IS_SELF: "Aucune action sur ton propre compte.",
   SUPER_ADMIN_ONLY: "Seul un super administrateur agit sur un compte admin.",
   ADMIN_PERMISSION_DENIED: "Ton profil n'a pas ce droit.",
+  ACCOUNT_STATE_CHANGED: "Un autre administrateur vient d'agir sur ce compte : la fiche est rechargée, relis-la avant de recommencer.", // ANO-ADM-89
 };
 function refusDeSanction(e: unknown): string {
   if (!(e instanceof ApiError)) return "Action impossible.";
   const code = (e.data as { details?: { code?: string } } | undefined)?.details?.code;
-  return (code && SANCTION_REFUS[code]) ?? `${e.status} : ${e.message}`;
+  if (code && SANCTION_REFUS[code]) return SANCTION_REFUS[code];
+  return e.status === 400 ? `Demande refusée : choisis une catégorie et écris un motif interne de ${MIN_REASON} caractères au moins.` : "Action impossible pour le moment. Réessaie.";
 }
 /**
  * Recette § 5.4 — « jusqu'au 20 septembre » se lit INCLUS : `new Date("2026-09-20")` valait minuit UTC, soit une
@@ -83,14 +85,14 @@ export default function UserFileView({ userId }: { userId: string }) {
       )}
       {file.suspension && (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-800">
-          {STATUS_LABEL[file.suspension.level]} depuis le {dateTime(file.suspension.at)} par {file.suspension.byAdmin}{file.suspension.until ? `, jusqu'au ${dateTime(file.suspension.until)}` : ""} — motif : {file.suspension.reason}
+          {STATUS_LABEL[file.suspension.level]} depuis le {dateTime(file.suspension.at)} par {file.suspension.byAdmin}{file.suspension.until ? `, jusqu'au ${dateTime(file.suspension.until)}` : ""} — catégorie envoyée au membre : {SANCTION_CATEGORY_LABEL[file.suspension.category]} · motif interne : {file.suspension.reason}
           {/* ANO-ADM-07 — passé sa date de fin, la sanction ne s'applique plus (lecture) : on le dit, « Lever » nettoie la fiche. */}
           {sanctionEchue && <span className="ml-1 font-semibold"> — sanction échue le {dateTime(file.suspension.until!)} : elle ne s&apos;applique plus. « Lever » nettoie la fiche.</span>}
         </div>
       )}
       {file.suspensionProposal && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
-          Proposition de {file.suspensionProposal.byAdmin} le {dateTime(file.suspensionProposal.at)} : {STATUS_LABEL[file.suspensionProposal.level]} — {file.suspensionProposal.reason}
+          Proposition de {file.suspensionProposal.byAdmin} le {dateTime(file.suspensionProposal.at)} : {STATUS_LABEL[file.suspensionProposal.level]} · {SANCTION_CATEGORY_LABEL[file.suspensionProposal.category]} — {file.suspensionProposal.reason}
         </div>
       )}
 
@@ -167,6 +169,8 @@ export default function UserFileView({ userId }: { userId: string }) {
 function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUserFile; canPropose: boolean; canApply: boolean; onDone: () => void }) {
   const [level, setLevel] = useState<"RESTRICTED" | "SUSPENDED">(file.suspensionProposal?.level === "SUSPENDED" ? "SUSPENDED" : "RESTRICTED");
   const [reason, setReason] = useState(file.suspensionProposal?.reason ?? "");
+  // A193 — aucune catégorie présélectionnée hors proposition : l'admin la choisit, c'est ce que le membre lira.
+  const [category, setCategory] = useState<SanctionCategory | "">(file.suspensionProposal?.category ?? (file.accountStatus !== "ACTIVE" ? file.suspension?.category ?? "" : ""));
   const [until, setUntil] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -175,8 +179,8 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
     setBusy(true);
     setMsg(null);
     try {
-      if (action === "propose") await post(`/admin/users/${file.id}/suspension/propose`, { level, reason: reason.trim() });
-      if (action === "apply") await post(`/admin/users/${file.id}/suspension`, { level, reason: reason.trim(), ...(until ? { until: finDeJournee(until) } : {}) });
+      if (action === "propose") await post(`/admin/users/${file.id}/suspension/propose`, { level, category, reason: reason.trim() });
+      if (action === "apply") await post(`/admin/users/${file.id}/suspension`, { level, category, reason: reason.trim(), ...(until ? { until: finDeJournee(until) } : {}) });
       if (action === "lift") await del(`/admin/users/${file.id}/suspension`, { reason: reason.trim() });
       // Recette § 5.4 — « Fait. » ne disait pas CE qui était fait : le message nomme le geste et son effet.
       setMsg(
@@ -189,28 +193,41 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
       onDone();
     } catch (e) {
       setMsg(refusDeSanction(e));
+      if (e instanceof ApiError && e.status === 409) onDone(); // l'état a changé : la fiche montre la décision gagnante
     } finally {
       setBusy(false);
     }
   }
   if (!canPropose && !canApply) return <Card title="Sanction"><p className="text-[12.5px] text-slate-500">{file.isMe ? "Aucune action sur ton propre compte." : "Ton profil ne propose ni n'exécute de sanction."}</p></Card>;
   const ok = reason.trim().length >= MIN_REASON && !busy;
+  const okSanction = ok && category !== ""; // proposer / appliquer exigent la catégorie ; lever n'en a pas
   return (
     <Card title="Sanction">
       <div className="flex gap-3 text-[12.5px]">
         <label className="flex items-center gap-1"><input type="radio" checked={level === "RESTRICTED"} onChange={() => setLevel("RESTRICTED")} /> Restreint (ni publier ni réserver)</label>
         <label className="flex items-center gap-1"><input type="radio" checked={level === "SUSPENDED"} onChange={() => setLevel("SUSPENDED")} /> Suspendu (connexion refusée)</label>
       </div>
-      <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={3} placeholder={`Motif (${MIN_REASON} caractères au moins), envoyé au membre sans le détail d'un signalement`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+      <label className="mt-2 block text-[12px] text-slate-600">
+        Catégorie envoyée au membre
+        <select value={category} onChange={(e) => setCategory(e.target.value as SanctionCategory | "")} className="ml-2 rounded border border-slate-300 px-2 py-1 text-[12px]">
+          <option value="">— choisir —</option>
+          {(Object.keys(SANCTION_CATEGORY_LABEL) as SanctionCategory[]).map((c) => <option key={c} value={c}>{SANCTION_CATEGORY_LABEL[c]}</option>)}
+        </select>
+      </label>
+      {/* A193 c (recette § 7) — le placeholder disait « envoyé au membre » : faux depuis ANO-ADM-87, et c'est l'erreur qui pousse à écrire ce qu'on ne doit pas envoyer. */}
+      <label className="mt-2 block text-[12px] text-slate-600">
+        Motif interne (jamais envoyé au membre)
+        <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={3} placeholder={`${MIN_REASON} caractères au moins : faits, signalements, deals concernés — reste au journal et sur cette fiche`} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+      </label>
       {canApply && (
         <label className="mt-2 block text-[12px] text-slate-600">Jusqu'au (optionnel) <input type="date" min={demain()} value={until} onChange={(e) => setUntil(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1 text-[12px]" /></label>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        {canPropose && !canApply && <button disabled={!ok} onClick={() => run("propose")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Proposer</button>}
-        {canApply && file.accountStatus === "ACTIVE" && <button disabled={!ok} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Appliquer</button>}
+        {canPropose && !canApply && <button disabled={!okSanction} onClick={() => run("propose")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Proposer</button>}
+        {canApply && file.accountStatus === "ACTIVE" && <button disabled={!okSanction} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Appliquer</button>}
         {canApply && file.accountStatus !== "ACTIVE" && (
           <>
-            <button disabled={!ok} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Modifier la sanction</button>
+            <button disabled={!okSanction} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Modifier la sanction</button>
             <button disabled={!ok} onClick={() => run("lift")} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Lever</button>
           </>
         )}

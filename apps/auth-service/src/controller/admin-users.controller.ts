@@ -16,7 +16,8 @@ import { adminRolesOf, isSuperAdmin } from "../utils/admin-roles";
 import { AdminUsersQuerySchema, EXPORT_REASON_MIN_LENGTH } from "@packages/api-contracts";
 import { CSV_BOM, buildCsv, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { USERS_CSV_COLUMNS } from "../lib/admin-users.query";
-import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
 import redis from "@packages/libs/redis";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
@@ -43,6 +44,14 @@ function parseId(raw: unknown): string {
 function meta(req: AuthenticatedRequest) {
   return { ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
+/**
+ * Recette 02-ADMIN § 7 (engagement du § 5.19, ANO-ADM-89) — proposer, appliquer et lever une sanction lisaient le compte puis
+ * écrivaient sans condition : trois clics simultanés donnaient 500 (P2034) ou trois lignes de journal, trois emails au
+ * membre et trois récapitulatifs au support. L'écriture est désormais conditionnée à l'état LU (verrou optimiste sur
+ * `updatedAt`, champ requis toujours présent) et rejouée sur conflit : un gagnant, les autres lisent 409.
+ */
+const accountChanged = () => new ConflictError("This account was changed by another action. Reload it.", { code: "ACCOUNT_STATE_CHANGED" });
+
 function fmtDate(d: Date | null, locale: string): string | null {
   return d ? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(d) : null;
 }
@@ -130,13 +139,14 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const parsed = ProposeSuspensionRequestSchema.safeParse(req.body);
         if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
         const now = new Date();
-        await prisma.$transaction(async (tx) => {
-          await tx.user.update({
-            where: { id: user.id },
-            data: { suspensionProposedLevel: parsed.data.level, suspensionProposedReason: parsed.data.reason, suspensionProposedByAdminId: req.user.id, suspensionProposedAt: now },
+        await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+          const written = await tx.user.updateMany({
+            where: { id: user.id, updatedAt: user.updatedAt },
+            data: { suspensionProposedLevel: parsed.data.level, suspensionProposedCategory: parsed.data.category, suspensionProposedReason: parsed.data.reason, suspensionProposedByAdminId: req.user.id, suspensionProposedAt: now },
           });
-          await recordAdminAction(tx, { adminUserId: req.user.id, action: "USER_SUSPENSION_PROPOSED", targetType: "USER", targetId: user.id, after: { level: parsed.data.level, reason: parsed.data.reason }, ...meta(req) });
-        });
+          if (written.count !== 1) throw accountChanged();
+          await recordAdminAction(tx, { adminUserId: req.user.id, action: "USER_SUSPENSION_PROPOSED", targetType: "USER", targetId: user.id, after: { level: parsed.data.level, category: parsed.data.category, reason: parsed.data.reason }, ...meta(req) });
+        }));
         res.status(200).json({ ok: true, proposedAt: now.toISOString() });
       } catch (e) {
         next(e);
@@ -148,40 +158,43 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const user = await loadTarget(req);
         const parsed = ApplySuspensionRequestSchema.safeParse(req.body);
         if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-        const { level, reason } = parsed.data;
+        const { level, category, reason } = parsed.data;
         const until = parsed.data.until ? new Date(parsed.data.until) : null;
         if (until && until.getTime() <= Date.now()) throw new ValidationError("The end date must be in the future.", { code: "DATE_IN_PAST" });
         const now = new Date();
-        await prisma.$transaction(async (tx) => {
-          await tx.user.update({
-            where: { id: user.id },
+        await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+          const written = await tx.user.updateMany({
+            where: { id: user.id, updatedAt: user.updatedAt },
             data: {
               accountStatus: level,
               suspensionReason: reason,
+              suspensionCategory: category, // A193
               suspensionUntil: until,
               suspendedAt: now,
               suspendedByAdminId: req.user.id,
               suspensionProposedLevel: null,
               suspensionProposedReason: null,
+              suspensionProposedCategory: null,
               suspensionProposedByAdminId: null,
               suspensionProposedAt: null,
             },
           });
+          if (written.count !== 1) throw accountChanged();
           await recordAdminAction(tx, {
             adminUserId: req.user.id,
             action: level === "SUSPENDED" ? "USER_SUSPENDED" : "USER_RESTRICTED",
             targetType: "USER",
             targetId: user.id,
             before: { accountStatus: user.accountStatus },
-            after: { accountStatus: level, reason, until: until?.toISOString() ?? null },
+            after: { accountStatus: level, category, reason, until: until?.toISOString() ?? null },
             ...meta(req),
           });
-        });
+        }));
         // Effets hors transaction (idempotents) : sessions, emails.
         if (level === "SUSPENDED") await revokeRefreshJti(user.id);
         const locale = resolveLocale(user.preferredLocale);
         const dict = getAdminEmails(locale);
-        const params = { firstName: user.firstName, until: fmtDate(until, locale), supportEmail: SUPPORT_EMAIL }; // ANO-ADM-87 : jamais le motif interne
+        const params = { firstName: user.firstName, category, until: fmtDate(until, locale), supportEmail: SUPPORT_EMAIL }; // ANO-ADM-87 : jamais le motif interne ; A193 : la catégorie fermée
         if (!user.emailSuppressedAt) await sendAuthEmail(user.email, locale, level === "SUSPENDED" ? dict.accountSuspended(params) : dict.accountRestricted(params)).catch(() => undefined); // D35 4A
         await notifySupportOfActiveDeals(user, level);
         res.status(200).json({ ok: true, accountStatus: level, at: now.toISOString() });
@@ -206,13 +219,14 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const parsed = LiftSuspensionRequestSchema.safeParse(req.body);
         if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
         if (user.accountStatus === "ACTIVE") throw new ValidationError("This account is not restricted.", { code: "ACCOUNT_NOT_RESTRICTED" });
-        await prisma.$transaction(async (tx) => {
-          await tx.user.update({
-            where: { id: user.id },
-            data: { accountStatus: "ACTIVE", suspensionReason: null, suspensionUntil: null, suspendedAt: null, suspendedByAdminId: null },
+        await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+          const written = await tx.user.updateMany({
+            where: { id: user.id, updatedAt: user.updatedAt },
+            data: { accountStatus: "ACTIVE", suspensionReason: null, suspensionCategory: null, suspensionUntil: null, suspendedAt: null, suspendedByAdminId: null },
           });
+          if (written.count !== 1) throw accountChanged();
           await recordAdminAction(tx, { adminUserId: req.user.id, action: "USER_REINSTATED", targetType: "USER", targetId: user.id, before: { accountStatus: user.accountStatus }, after: { accountStatus: "ACTIVE", reason: parsed.data.reason }, ...meta(req) });
-        });
+        }));
         const locale = resolveLocale(user.preferredLocale);
         if (!user.emailSuppressedAt) await sendAuthEmail(user.email, locale, getAdminEmails(locale).accountReinstated({ firstName: user.firstName, supportEmail: SUPPORT_EMAIL })).catch(() => undefined); // D35 4A
         res.status(200).json({ ok: true, accountStatus: "ACTIVE" });

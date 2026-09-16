@@ -114,7 +114,7 @@ test.describe("ADM-PRM — la matrice des permissions, profil par profil (cahier
     /* Les conflits d'intérêts s'appliquent au super administrateur : sa propre fiche. */
     await sup.page.goto(`${bo()}/users/${idSuper}`, { waitUntil: "domcontentloaded" });
     await expect(sup.page.getByText("(c'est toi : aucune action possible)", { exact: true })).toBeVisible({ timeout: 60_000 });
-    const soi = await sup.contexte.request.post(`${api()}/admin/users/${idSuper}/suspension`, { data: { level: "RESTRICTED", reason: MOTIF }, failOnStatusCode: false });
+    const soi = await sup.contexte.request.post(`${api()}/admin/users/${idSuper}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF }, failOnStatusCode: false });
     expect(soi.status(), "agir sur son propre compte : 403").toBe(403);
     expect(((await soi.json()) as { message?: string }).message).toBe("You cannot act on your own account.");
     const journal = await lignes(sup, debut, idSuper);
@@ -208,7 +208,7 @@ test.describe("ADM-PRM — la matrice des permissions, profil par profil (cahier
     expect((await sup.contexte.request.get(`${api()}/admin/conversations/by-deal/${jeuEssai.deal("bzv-accepted").id}`)).ok(), "lire la conversation").toBe(true);
     /* 6-7. Les refus. */
     for (const chemin of ["/finances", "/pilotage", "/audit"]) expect(await ouvrir(sup.page, chemin), `${chemin} : 403`).toContain(403);
-    const applique = await sup.contexte.request.post(`${api()}/admin/users/${jeuEssai.membre("thomas")}/suspension`, { data: { level: "RESTRICTED", reason: MOTIF }, failOnStatusCode: false });
+    const applique = await sup.contexte.request.post(`${api()}/admin/users/${jeuEssai.membre("thomas")}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF }, failOnStatusCode: false });
     expect(applique.status(), "le Support PROPOSE, il n'applique jamais : 403").toBe(403);
     const reglages = (await (await sup.contexte.request.get(`${api()}/admin/settings`)).json()) as { version: number };
     expect((await sup.contexte.request.post(`${api()}/admin/settings/reset`, { data: { reason: MOTIF, expectedVersion: reglages.version }, failOnStatusCode: false })).status(), "remise à zéro de TOUS les paramètres par le Support : 403").toBe(403);
@@ -361,11 +361,11 @@ test.describe("ADM-PRM — la matrice des permissions, profil par profil (cahier
     const idSuper = jeuEssai.admin("super").id;
     const debut = await depuis();
     /* 1. Sa propre fiche. */
-    const soi = await med.contexte.request.post(`${api()}/admin/users/${jeuEssai.admin("mediateur").id}/suspension`, { data: { level: "RESTRICTED", reason: MOTIF }, failOnStatusCode: false });
+    const soi = await med.contexte.request.post(`${api()}/admin/users/${jeuEssai.admin("mediateur").id}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF }, failOnStatusCode: false });
     expect(soi.status(), "cas 1").toBe(403);
     expect(((await soi.json()) as { message?: string }).message).toBe("You cannot act on your own account.");
     /* 2. Un Médiateur veut sanctionner un compte admin (le Support). */
-    const surAdmin = await med.contexte.request.post(`${api()}/admin/users/${jeuEssai.admin("support").id}/suspension`, { data: { level: "RESTRICTED", reason: MOTIF }, failOnStatusCode: false });
+    const surAdmin = await med.contexte.request.post(`${api()}/admin/users/${jeuEssai.admin("support").id}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF }, failOnStatusCode: false });
     expect(surAdmin.status(), "cas 2").toBe(403);
     expect(((await surAdmin.json()) as { message?: string }).message).toBe("Only a super administrator can act on an admin account.");
     /* 6. Un super administrateur veut effacer son propre compte. */

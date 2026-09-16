@@ -9,6 +9,11 @@ describe("admin-users.query (C-PR7a, D60 2A)", () => {
     expect(buildUsersOrderBy(q)).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
     expect(q.limit).toBe(50);
   });
+  it("A194 (recette § 7, ADM-NRG-7 écart 4) — proposal=1 : le filtre du compteur « Sanctions proposées » ; toute autre valeur refusée", () => {
+    expect(buildUsersWhere(parse({ proposal: "1" }))).toEqual({ isDeleted: false, suspensionProposedAt: { not: null } });
+    expect(buildUsersWhere(parse({}))).not.toHaveProperty("suspensionProposedAt");
+    expect(AdminUsersQuerySchema.safeParse({ proposal: "0" }).success).toBe(false);
+  });
   it("texte + stripeReady=0 : les deux OR sont combinés par AND ; identifiant ou ticket ne filtrent pas le texte", () => {
     const w = buildUsersWhere(parse({ q: "ami", stripeReady: "0" })) as { AND: unknown[]; OR?: unknown };
     expect(w.OR).toBeUndefined();

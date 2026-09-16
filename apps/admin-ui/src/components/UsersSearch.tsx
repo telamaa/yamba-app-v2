@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { STATUS_LABEL, dateTime } from "@/lib/format";
@@ -9,8 +10,8 @@ import type { AdminMe, AdminUserSummary, AdminUsersResponse } from "@/lib/types"
 import ExportButton from "./ExportButton";
 import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
-type Filters = { q: string; role: string; accountStatus: string; carrierStatus: string; stripeReady: string; createdFrom: string; createdTo: string; sort: "createdAt" | "lastName"; dir: "asc" | "desc" };
-const EMPTY: Filters = { q: "", role: "", accountStatus: "", carrierStatus: "", stripeReady: "", createdFrom: "", createdTo: "", sort: "createdAt", dir: "desc" };
+type Filters = { q: string; role: string; accountStatus: string; carrierStatus: string; stripeReady: string; proposal: string; createdFrom: string; createdTo: string; sort: "createdAt" | "lastName"; dir: "asc" | "desc" };
+const EMPTY: Filters = { q: "", role: "", accountStatus: "", carrierStatus: "", stripeReady: "", proposal: "", createdFrom: "", createdTo: "", sort: "createdAt", dir: "desc" };
 
 function toParams(f: Filters): URLSearchParams {
   const p = new URLSearchParams();
@@ -19,6 +20,7 @@ function toParams(f: Filters): URLSearchParams {
   if (f.accountStatus) p.set("accountStatus", f.accountStatus);
   if (f.carrierStatus) p.set("carrierStatus", f.carrierStatus);
   if (f.stripeReady) p.set("stripeReady", f.stripeReady);
+  if (f.proposal) p.set("proposal", f.proposal);
   if (f.createdFrom) p.set("createdFrom", new Date(f.createdFrom + "T00:00:00Z").toISOString());
   if (f.createdTo) p.set("createdTo", new Date(new Date(f.createdTo + "T00:00:00Z").getTime() + 86_400_000).toISOString());
   p.set("sort", f.sort); p.set("dir", f.dir);
@@ -26,7 +28,16 @@ function toParams(f: Filters): URLSearchParams {
 }
 
 export default function UsersSearch() {
-  const [f, setF] = useState<Filters>(EMPTY);
+  // A194 (recette § 7) — les tuiles de l'accueil posent leur filtre dans l'URL (`?proposal=1`, `?accountStatus=RESTRICTED`) :
+  // la liste part de ces filtres au lieu d'afficher tous les comptes.
+  const search = useSearchParams();
+  const [f, setF] = useState<Filters>(() => ({
+    ...EMPTY,
+    q: search.get("q") ?? "",
+    role: search.get("role") ?? "",
+    accountStatus: search.get("accountStatus") ?? "",
+    proposal: search.get("proposal") === "1" ? "1" : "",
+  }));
   const [items, setItems] = useState<AdminUserSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -54,6 +65,7 @@ export default function UsersSearch() {
         <input value={f.q} onChange={set("q")} placeholder="email, nom, +33…, 64b…, YAM-2041" className="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-[13px]" autoFocus />
         <select value={f.role} onChange={set("role")} className="rounded-lg border border-slate-300 px-2 py-1.5"><option value="">tous rôles</option><option value="SHIPPER">Expéditeur</option><option value="CARRIER">Voyageur</option><option value="ADMIN">Admin</option></select>
         <select value={f.accountStatus} onChange={set("accountStatus")} className="rounded-lg border border-slate-300 px-2 py-1.5"><option value="">tout état</option><option value="ACTIVE">Actif</option><option value="RESTRICTED">Restreint</option><option value="SUSPENDED">Suspendu</option></select>
+        <select value={f.proposal} onChange={set("proposal")} className="rounded-lg border border-slate-300 px-2 py-1.5"><option value="">avec ou sans proposition</option><option value="1">sanction proposée</option></select>
         <select value={f.stripeReady} onChange={set("stripeReady")} className="rounded-lg border border-slate-300 px-2 py-1.5"><option value="">Stripe : tous</option><option value="1">Stripe prêt</option><option value="0">Stripe non prêt</option></select>
         <label className="flex items-center gap-1">inscrit du <input type="date" value={f.createdFrom} onChange={set("createdFrom")} className="rounded border border-slate-300 px-2 py-1" /></label>
         <label className="flex items-center gap-1">au <input type="date" value={f.createdTo} onChange={set("createdTo")} className="rounded border border-slate-300 px-2 py-1" /></label>

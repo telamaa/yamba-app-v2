@@ -6206,3 +6206,49 @@ reçoivent la même session : « Mes sessions » ne montre jamais de session fan
 
 **Ce qui reste à trancher.** Une catégorie de motif de sanction en liste fermée, lue par le membre (exposé des motifs
 spécifique sans texte libre) — proposée, structurante.
+
+# Cahier 02-ADMIN, § 7 : non-régression
+
+**Le besoin.** Les défauts qui coûtent deux fois sont ceux qu'on ne rejoue pas. Le § 7 garde fermées sept portes déjà
+payées (sous-titres qui promettent une fonction livrée, liens d'alerte qui perdent leur filtre, libellé manquant, clé React,
+mur d'alertes sur l'accueil, journal sans filtre, écarts documentaires connus) et solde deux dettes ouvertes depuis le
+§ 5.19 : les gestes simultanés, et ce que le membre sanctionné a le droit de savoir.
+
+**RG-ADM-NRG-01 — Deux administrateurs qui agissent au même instant : un seul gagne, l'autre lit pourquoi (A192).**
+Proposer, appliquer ou lever une sanction, activer la double authentification, vérifier un code, consommer un code de
+secours, régénérer ses codes : le second geste ne produit JAMAIS une erreur technique. Il produit un refus lisible —
+« Un autre administrateur vient d'agir sur ce compte » (409), « code incorrect » (401 / 400), « la double authentification
+est déjà active » (403) — et la fiche est rechargée sur la décision gagnante. Conséquence métier : une seule ligne de
+journal et un seul email par geste réellement effectué. Un membre ne reçoit jamais trois fois la même sanction.
+
+**RG-ADM-NRG-02 — La sanction est expliquée au membre par une catégorie, jamais par le motif interne (A193).** À la
+proposition comme à l'application, l'administrateur choisit une catégorie dans une liste FERMÉE : arnaque suspectée, contenu
+ou objet interdit, comportement abusif envers un membre, litiges ou annulations répétés, usurpation d'identité, autre
+manquement. C'est cette catégorie, dans la langue du membre, qui part dans l'email et que le membre lit sur son compte. Le
+motif libre reste interne (journal + fiche) : il est souvent recopié d'un signalement et peut nommer un signalant ou un
+collègue. Un compte sanctionné avant cette règle n'a pas de catégorie : il se lit « autre manquement », jamais une erreur.
+(Complète RG-ADM-E2E-02 : le membre reçoit désormais un exposé des motifs spécifique, dans l'esprit de l'article 17 du DSA.)
+
+**RG-ADM-NRG-03 — Le motif interne est nommé comme tel.** Le champ du back-office s'appelle « Motif interne (jamais envoyé
+au membre) » et invite à écrire les faits, les signalements et les deals concernés. Le champ « Catégorie envoyée au membre »
+est obligatoire : sans lui, « Proposer » et « Appliquer » restent inactifs.
+
+**RG-ADM-NRG-04 — Une tuile qui compte n objets mène à une liste qui montre ces n objets (A194).** « Sanctions proposées »
+ouvre la liste des comptes qui attendent une décision, « Comptes restreints » et « Comptes suspendus » ouvrent leur état.
+Le filtre de la liste et le compteur de la tuile utilisent le même critère : ils ne peuvent pas diverger.
+
+**RG-ADM-NRG-05 — Un délai affiché renvoie toujours au paramètre qui le gouverne.** Aucun écran ne récite « 72 h » :
+le sous-titre de la file d'arbitrage et le formulaire de décision nomment le paramètre « Délai de réponse au litige » et
+affichent l'échéance calculée, figée à l'ouverture du litige.
+
+**RG-ADM-NRG-06 — Lire ne se journalise pas, chercher ne ment pas.** Consulter le journal n'écrit aucune ligne. La
+recherche libre ne porte que sur les lignes déjà chargées, l'écran le dit, et un filtre serveur que le serveur n'a pas
+retenu est nommé « ignoré » au lieu d'être affiché comme appliqué.
+
+**Tests d'acceptation.** ADM-NRG-1 à 7 (cahier) et ADM-NRG-8, 9 (ajoutées) dans `adm-nrg-non-regression.spec.ts` ; règles
+prouvées par `admin-users-concurrency.controller.spec.ts`, `admin-auth-totp-concurrency.controller.spec.ts`,
+`admin-emails.spec.ts`, `me-projection.spec.ts` et `admin-users.query.spec.ts` (auth-service).
+
+**Ce qui reste à trancher.** La catégorie de sanction est désormais lue par le membre ; reste ouvert : faut-il consigner au
+journal admin un refus d'effacement RGPD (aujourd'hui inscrit au seul registre `DataRequest`), et faut-il un écran pour
+réinitialiser la double authentification d'un autre administrateur (aujourd'hui : retirer l'accès, réinviter).

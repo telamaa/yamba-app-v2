@@ -454,7 +454,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await ouvrirLaRecherche(page, { from: "Paris", to: "Montréal" });
     await expect(carte(page, idYul), "avant : le trajet de Marc est là").toBeVisible({ timeout: 30_000 });
 
-    const suspension = await admin.contexte.request.post(`${apiAdmin}/admin/users/${idMarc}/suspension`, { data: { level: "SUSPENDED", reason: motif } });
+    const suspension = await admin.contexte.request.post(`${apiAdmin}/admin/users/${idMarc}/suspension`, { data: { level: "SUSPENDED", category: "OTHER", reason: motif } });
     expect(suspension.status(), `POST /admin/users/:id/suspension → ${await suspension.text()}`).toBe(200);
     try {
       await page.reload({ waitUntil: "domcontentloaded" });

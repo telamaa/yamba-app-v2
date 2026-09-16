@@ -29,6 +29,8 @@ export const ME_EXCLUDED_FIELDS = {
   totpLastUsedStep: "compteur anti-rejeu interne, sans usage client",
   suspensionProposedLevel: "modération INTERNE, avant décision (D56)",
   suspensionProposedReason: "modération INTERNE : motif rédigé par un admin",
+  suspensionProposedCategory: "modération INTERNE, avant décision (A193)",
+  suspensionReason: "motif LIBRE rédigé par un admin — interne (A191) ; le membre lit `suspensionCategory` (ANO-ADM-90)",
   suspensionProposedByAdminId: "modération INTERNE : identité de l'admin",
   suspensionProposedAt: "modération INTERNE (D56)",
   suspendedByAdminId: "identité de l'admin sanctionnant — jamais au membre",
@@ -41,8 +43,9 @@ export const ME_EXCLUDED_FIELDS = {
  * Ce que le membre reçoit. `avatar` et `carrierPage` sont ajoutés par le contrôleur, qui
  * les projette lui-même (ils portent leurs propres listes blanches).
  *
- * Sont conservés à dessein : `suspendedAt` / `suspensionReason` / `suspensionUntil` — une
- * sanction PRONONCÉE est notifiée au membre, il doit pouvoir la lire ; `totpEnabledAt`,
+ * Sont conservés à dessein : `suspendedAt` / `suspensionCategory` / `suspensionUntil` — une
+ * sanction PRONONCÉE est notifiée au membre, il doit pouvoir la lire (ANO-ADM-90, recette § 7 : c'était `suspensionReason`,
+ * le motif libre interne, que `GET /auth/me` servait à un compte restreint — contraire à A191) ; `totpEnabledAt`,
  * qui dit « la 2FA est active » sans rien livrer d'exploitable ; `emailSuppressedAt`, qui
  * permet d'afficher « nos emails vous reviennent » sans en donner le détail.
  */
@@ -71,7 +74,7 @@ export const ME_USER_SELECT = {
   parcelsSentCount: true,
   adminInvitedAt: true,
   suspendedAt: true,
-  suspensionReason: true,
+  suspensionCategory: true,
   suspensionUntil: true,
   totpEnabledAt: true,
   createdAt: true,
