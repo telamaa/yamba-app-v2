@@ -126,7 +126,7 @@ export default function DecisionForm({ file, canDecide = true, onDecidedAction }
   if (!file.canDecide) {
     return (
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">
-        {`Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (délai de réponse laissé au Voyageur), ou dès sa réponse.`}
+        {`Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (délai de réponse laissé au Voyageur : paramètre « Délai de réponse au litige », figé à l'ouverture du litige), ou dès sa réponse.` /* ANO-ADM-92 (recette § 7, ADM-NRG-1) — le texte ne renvoyait pas au paramètre */}
       </section>
     );
   }

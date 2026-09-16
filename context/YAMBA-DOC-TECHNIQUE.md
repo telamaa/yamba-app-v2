@@ -9706,3 +9706,84 @@ vrais profils, plus les lots décidés au § 5.26 (A190) et une correction de fo
 - Typecheck auth-service, admin-ui, harnais ; `npm run generate:openapi` (seul `apps/auth-service/openapi.json` change).
 - Déploiement : rebâtir auth-service (vérifier `grep -c admin_rotated dist/main.js`) et admin-ui ; aucun changement de
   schéma ; rejouer `seed-deals.ts` sur les environnements de recette pour le fil de YAM-2041.
+
+# Cahier 02-ADMIN, § 7 : non-régression — l'engagement « jamais 500 sous deux clics » tenu, et la sanction enfin expliquée au membre
+
+Branche `chore/recette-admin-7`, empilée sur `chore/recette-admin-6`. Le § 7 rejoue sept défauts déjà payés une fois. Deux
+fiches lui ont été ajoutées, et ce sont elles qui portent le travail : **ADM-NRG-8** solde l'engagement pris au § 5.19 (plus
+aucun geste admin « lu puis écrit » ne rend 500 sous des clics simultanés) et **ADM-NRG-9** livre la catégorie de sanction en
+liste fermée proposée au § 6.
+
+## Ce qui a été corrigé
+
+- **ANO-ADM-89 (majeure) — proposer, appliquer, lever une sanction : trois clics, trois emails, ou 500**
+  (`apps/auth-service/src/controller/admin-users.controller.ts`). Les trois gestes lisaient le compte (`loadTarget`) puis
+  l'écrivaient sans condition : deux administrateurs qui tranchaient au même instant écrivaient chacun leur ligne de journal
+  et envoyaient chacun leur email au membre — ou, quand Mongo détectait le conflit, rendaient un 500 `P2034` brut.
+  Correction : `user.updateMany({ where: { id, updatedAt: <valeur LUE> }, … })` — un verrou optimiste sur un champ REQUIS,
+  toujours présent (le piège Prisma+Mongo des champs absents ne s'y applique pas) — enveloppé dans
+  `withWriteConflictRetry` ; `written.count !== 1` lève 409 `ACCOUNT_STATE_CHANGED`. L'écran (`UserFileView.tsx`) traduit ce
+  code (« Un autre administrateur vient d'agir sur ce compte… ») et **recharge la fiche** pour montrer la décision gagnante.
+- **ANO-ADM-88 (majeure) — le même code TOTP servait trois fois** (`controller/admin-auth.controller.ts`). `totpVerify`,
+  `totpEnable` et la régénération des codes de secours (A190 a) vérifiaient l'anti-rejeu sur une valeur LUE avant la
+  transaction : trois requêtes simultanées portant le même code passaient toutes, ouvraient trois sessions, et l'activation
+  rendait trois jeux de codes de secours dont deux étaient déjà morts à l'affichage. Correction : la garde entre DANS
+  l'écriture — `updateMany({ where: { id, OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { isSet: false } },
+  { totpLastUsedStep: { lt: step } }] } })` pour le pas TOTP (les trois branches sont obligatoires : `null` ET absent ET
+  antérieur), `{ totpEnabledAt: null | isSet: false }` pour l'activation, `updatedAt` pour la consommation d'un code de
+  secours. Un perdant lit le refus d'un code rejoué (401 / 400 `OTP_INCORRECT`), jamais un 500.
+- **ANO-ADM-90 (majeure) — `GET /auth/me` servait le motif interne au membre sanctionné**
+  (`apps/auth-service/src/utils/me-projection.ts`). La liste blanche gardait `suspensionReason` « pour que le membre puisse
+  lire sa sanction » : depuis A191, ce champ est le texte rédigé par l'administrateur, souvent recopié d'un signalement (qui,
+  quoi, parfois le nom du signalant). Correction : `suspensionReason` passe dans `ME_EXCLUDED_FIELDS` (avec son pourquoi) et
+  la projection sert `suspensionCategory` — la liste fermée d'A193, la seule chose que le membre doit lire.
+- **ANO-ADM-91 (cosmétique) — la note du journal mentait** (`AuditTable.tsx`) : « le détail est du JSON, il ne s'indexe
+  pas » était faux depuis ANO-ADM-73 (le détail est rendu lisible et la recherche « contient » le parcourt). Nouveau texte :
+  « … ne porte que sur les lignes déjà chargées, détail compris : pour chercher dans tout le journal, pose un filtre serveur ».
+- **ANO-ADM-92 (mineure) — le formulaire de décision récitait « 72 h »** (`DecisionForm.tsx`) : le délai est un paramètre
+  (`disputes.responseHours`) figé à l'ouverture du litige. Le texte renvoie au paramètre et garde la date calculée.
+
+## Lots décidés au § 7 (A192, A193, A194)
+
+- **A192 — la règle, et son inventaire.** Un geste admin qui lit un document puis l'écrit conditionne son `updateMany` à
+  l'état LU et passe par `withWriteConflictRetry` ; au réessai, la garde répond le refus métier (409 / 403 / 401), jamais
+  500, une seule ligne de journal, un seul email. Après grep, il ne reste AUCUN `$transaction` admin sans rejeu. Hors
+  périmètre admin, listés pour une passe membre : `auth.controller`, `profile.controller`, `google-auth.service`,
+  `conversation.service`, `conversation-retention.service`.
+- **A193 — catégorie de sanction en liste FERMÉE.** `SANCTION_CATEGORIES` / `SanctionCategorySchema` /
+  `sanctionCategoryOf` (`packages/libs/api-contracts/src/admin/admin-users.schema.ts`) : six valeurs, requises pour
+  proposer et pour appliquer, écrites dans `User.suspensionCategory` / `suspensionProposedCategory` et dans le journal
+  (`after.category`). `SANCTION_CATEGORY_LABELS` (FR/EN, `admin-emails.ts`) porte l'exposé des motifs dans la langue du
+  membre ; `AccountStatusParams` n'a toujours pas de champ `reason` (A191). Lecture TOLÉRANTE : un compte sanctionné avant
+  A193 n'a pas de catégorie et se lit `OTHER` (`sanctionCategoryOf`) — aucun back-fill, aucune erreur. L'écran nomme les
+  deux textes : « Catégorie envoyée au membre » (select) et « Motif interne (jamais envoyé au membre) » (le placeholder
+  disait l'inverse, et c'est l'erreur qui poussait à écrire ce qu'il ne faut pas envoyer).
+- **A194 — une tuile qui compte n objets mène à une liste qui montre ces n objets.** Filtre serveur `proposal=1`
+  (`buildUsersWhere` : `suspensionProposedAt: { not: null }`, le MÊME critère que le compteur), `UsersSearch` initialise ses
+  filtres depuis l'URL (`q`, `role`, `accountStatus`, `proposal`) sous un `<Suspense>` (exigence Next 16 pour
+  `useSearchParams`), et les tuiles « Sanctions proposées », « Comptes restreints », « Comptes suspendus » emportent leur
+  filtre.
+- **Lecture d'argent** — `platformHoldsRow` (`DealMoneyView.tsx`) : un solde plateforme négatif après un geste commercial se
+  lit « Avancé par Yamba 0,80 € » au lieu de « Détenu par la plateforme −0,80 € » (proposition du § 6, faite ici).
+
+## Harnais
+
+`apps/e2e/src/admin/adm-nrg-non-regression.spec.ts` — neuf fiches, `mode: "default"` (un rouge ne masque pas les huit
+autres). NRG-8 joue les courses réelles : trois `POST /admin/users/:id/suspension` simultanés depuis deux navigateurs admin,
+trois `DELETE` de levée, trois `POST /auth/admin/totp/verify` du même code (une seule session Redis), trois
+`POST /admin/me/backup-codes` du même code — sur un administrateur JETABLE enrôlé en base, dont l'accès est retiré en
+`finally`. NRG-9 lit l'email du membre dans Mailpit, puis `GET /auth/me` avec la session du membre, puis la fiche admin, et
+efface la catégorie en base pour prouver la lecture tolérante. Pièges payés : le menu latéral porte le même `href="/alerts"`
+que le résumé d'accueil (viser `main`) ; le pas TOTP qui vient de servir à la connexion est brûlé — une fiche qui enchaîne
+deux gestes TOTP doit attendre le pas SUIVANT ; depuis ANO-ADM-74 un identifiant de cible COURT est une valeur légitime (une
+clé de paramètre), seul un caractère interdit fait un filtre « ignoré ».
+
+## Vérifications
+
+- Tests : auth-service **356** (+14 : `admin-users-concurrency.controller.spec.ts` 6, `admin-auth-totp-concurrency.controller.spec.ts` 4,
+  `admin-emails.spec.ts` +1, `me-projection.spec.ts` +1, `admin-users.query.spec.ts` +1, `admin-auth-sessions.controller.spec.ts` +1) ;
+  deal 644, trip 293, notification 122, message 57 inchangés ; harnais **543 scénarios** (534 + 9).
+- Contre-épreuve : les quatre fichiers corrigés remis dans leur état d'origine → **16 rouges sur 356** dans cinq suites
+  (concurrence sanctions, concurrence TOTP, sessions admin, emails, projection `/me`) ; corrections remises : 356/356.
+- Typecheck des huit projets de la CI + harnais ; `npm run generate:openapi` (aucun écart après régénération).
+- Déploiement : rebâtir auth-service et admin-ui ; `prisma db push` non requis (deux champs optionnels ajoutés sans index).

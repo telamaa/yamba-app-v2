@@ -19575,6 +19575,13 @@
               "1"
             ]
           },
+          "proposal": {
+            "description": "1 = a suspension proposal awaits a decision (A194, home tile « Sanctions proposées »)",
+            "type": "string",
+            "enum": [
+              "1"
+            ]
+          },
           "createdFrom": {
             "type": "string",
             "format": "date-time",
@@ -19617,6 +19624,18 @@
           "limit"
         ],
         "additionalProperties": false
+      },
+      "SanctionCategory": {
+        "type": "string",
+        "enum": [
+          "SCAM_SUSPECTED",
+          "PROHIBITED_CONTENT",
+          "ABUSIVE_BEHAVIOUR",
+          "REPEATED_DISPUTES",
+          "IMPERSONATION",
+          "OTHER"
+        ],
+        "description": "Closed list, sent to the member (statement of reasons); the free-text reason stays internal"
       },
       "AdminUserFile": {
         "type": "object",
@@ -19704,6 +19723,9 @@
                   "level": {
                     "$ref": "#/components/schemas/AccountStatus"
                   },
+                  "category": {
+                    "$ref": "#/components/schemas/SanctionCategory"
+                  },
                   "reason": {
                     "type": "string"
                   },
@@ -19730,6 +19752,7 @@
                 },
                 "required": [
                   "level",
+                  "category",
                   "reason",
                   "until",
                   "at",
@@ -19750,6 +19773,9 @@
                   "level": {
                     "type": "string"
                   },
+                  "category": {
+                    "$ref": "#/components/schemas/SanctionCategory"
+                  },
                   "reason": {
                     "type": "string"
                   },
@@ -19764,6 +19790,7 @@
                 },
                 "required": [
                   "level",
+                  "category",
                   "reason",
                   "byAdmin",
                   "at"
@@ -20120,14 +20147,19 @@
               "SUSPENDED"
             ]
           },
+          "category": {
+            "$ref": "#/components/schemas/SanctionCategory"
+          },
           "reason": {
             "type": "string",
             "minLength": 20,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Internal reason — never sent to the member (A191)"
           }
         },
         "required": [
           "level",
+          "category",
           "reason"
         ],
         "additionalProperties": false,
@@ -20143,10 +20175,14 @@
               "SUSPENDED"
             ]
           },
+          "category": {
+            "$ref": "#/components/schemas/SanctionCategory"
+          },
           "reason": {
             "type": "string",
             "minLength": 20,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Internal reason — never sent to the member (A191)"
           },
           "until": {
             "description": "Optional end; absent = until lifted",
@@ -20157,6 +20193,7 @@
         },
         "required": [
           "level",
+          "category",
           "reason"
         ],
         "additionalProperties": false

@@ -6641,3 +6641,192 @@ aucun code corrigé.
   étape 10 : `INVALID_CREDENTIALS` (A-décision du § 5.21), pas `ACCOUNT_DELETED` ; les trois ouvertures du registre peuvent
   n'écrire que deux lignes (A168, lectures identiques à moins de 10 s).
 - E2E-7 étape 2 : « n alertes de seuil · n critique » (le seed porte d'autres seuils franchis).
+
+---
+
+## Cahier 02-ADMIN — § 7 Non-régression · **CONFORME après correction** (7 fiches du cahier + 2 ajoutées · 3 anomalies majeures + 1 mineure + 1 cosmétique closes · 3 décisions (A192, A193, A194) · 2 écarts documentaires levés · 9 scénarios, 3 min 30)
+
+Spec : `apps/e2e/src/admin/adm-nrg-non-regression.spec.ts` (mode `default` : un rouge ne masque pas les huit autres). Le § 7
+du cahier rejoue des défauts déjà payés une fois ; deux fiches lui ont été ajoutées, et ce sont elles qui portent le
+chapitre : **ADM-NRG-8** solde l'engagement pris au § 5.19 (aucun geste admin « lu puis écrit » ne rend 500 sous des clics
+simultanés — dernier périmètre : `admin-users` et `admin-auth`), **ADM-NRG-9** livre la catégorie de sanction en liste
+fermée proposée au § 6 (A191 → A193). Les gestes passent par l'écran quand le cahier décrit un écran (sous-titres, filtres
+d'URL, « Traité », page Paramètres, résumé d'alertes, journal, tuiles) ; les courses se jouent par appels simultanés, seule
+façon d'obtenir une vraie concurrence.
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-NRG-1 | Les sous-titres périmés | **Conforme après correction** — `/home`, `/finances`, `/disputes`, `/pilotage` : aucune mention « arrive avec C-PR… », le sous-titre de `/disputes` nomme le paramètre (« Délai de réponse au litige », 72 h par défaut) ; le formulaire « Trancher » d'un dossier non décidable renvoyait « 72 h » en dur (ANO-ADM-92) : il nomme le paramètre et garde la date calculée |
+| ADM-NRG-2 | Les filtres d'URL de la file d'arbitrage | **Conforme** — `?decidable=1`, `?kind=RETENTION`, `?olderThanDays=7`, `?originCity=Paris`, `?destinationCity=Brazzaville` et les trois combinés : chaque paramètre positionne son `select` ET part dans l'appel serveur (vérifié sur l'URL réellement interrogée) ; les compteurs de la file entière restent affichés sous les filtres ; seuil de retenue abaissé à 1 j → « Aller traiter → » de `/alerts` dépose sur `/disputes?kind=RETENTION`, filtre appliqué |
+| ADM-NRG-3 | Le libellé du signalement traité | **Conforme** — signalement déposé par João, « Traité » par le Médiateur à l'écran ; `/audit` filtré sur la cible REPORT affiche « Signalement traité », jamais `REPORT_REVIEWED` ; le select « Action » propose « Signalement traité » et « Message signalé traité » ; la base garde le code, sur la cible `REPORT` |
+| ADM-NRG-4 | La clé React de la page Paramètres | **Conforme** — aucun avertissement « unique key » en console ; une valeur saisie sur une ligne y reste après l'ouverture de l'« historique » d'une autre ligne du même groupe et cinq ouvertures/fermetures de panneaux d'explication ; « À valider — 1 modification(s) » avec le bon libellé et le bon couple avant → après ; rien n'est enregistré |
+| ADM-NRG-5 | Les alertes ont quitté l'accueil | **Conforme** — deux seuils abaissés → l'accueil n'affiche qu'une ligne « n alertes de seuil · n critiques · la plus grave : … · Voir les alertes → », le tableau « Seuils utilisés » reste sur `/alerts`, la première tuile « À traiter » est à moins de 900 px du haut (pas de mur à dérouler) ; `/alerts` groupe « Critiques · n » / « À surveiller · n », affiche le code de chaque règle et les seuils ; le profil Données personnelles n'a ni l'entrée de menu ni le droit serveur (403) ; deux `SETTING_CHANGED` par seuil |
+| ADM-NRG-6 | Le journal se filtre et se fouille | **Conforme après correction** — six filtres serveur + « Contient (lignes chargées, détail compris) » ; un filtre posé part au serveur et la barre le nomme ; une valeur à caractère interdit est ignorée ET nommée (« Ignoré (format non reconnu) ») ; « Qui » cliqué pose `adminUserId` ; « Tout effacer » ne laisse aucun paramètre ; aucun JSON brut dans la colonne Détail ; **aucune ligne de journal n'est écrite par la lecture**. La note de l'écran affirmait « le détail est du JSON, il ne s'indexe pas » — faux depuis ANO-ADM-73 (ANO-ADM-91) |
+| ADM-NRG-7 | Les cinq écarts documentaires connus | **Constaté, 2 écarts levés** — (1) l'export nominatif marche pour le profil Données personnelles (A143) : 200, le code fait foi ; (2) `PAYOUT_FAILED_48H` garde son code avec un seuil à 1 h, le titre suit le paramètre (« plus de 1 h ») ; (3) un refus d'effacement (409) est au registre `DataRequest` (REFUSED) et **pas** au journal admin — à arbitrer ; (4) **levé (A194)** : la tuile « Sanctions proposées » ouvre `/users?proposal=1`, filtre serveur appliqué ; (5) **partiellement levé (A190 a)** : « Régénérer mes codes de secours » existe dans « Mes sessions » ; réinitialiser la 2FA d'un AUTRE admin reste « retirer / réinviter » |
+| ADM-NRG-8 (ajoutée) | Gestes simultanés : un gagnant, jamais 500 | **Conforme après correction** — trois applications simultanées de la même sanction depuis deux navigateurs admin : `[200, 409, 409]`, code `ACCOUNT_STATE_CHANGED`, **une** ligne `USER_RESTRICTED` et **un** email ; trois levées simultanées : une seule `USER_REINSTATED`, compte rendu à `ACTIVE` sans catégorie ; trois `POST /auth/admin/totp/verify` du même code : un seul 200, **une seule** session Redis ; trois `POST /admin/me/backup-codes` du même code : un seul jeu rendu, une seule ligne `ADMIN_BACKUP_CODES_REGENERATED`. Aucun 500 (ANO-ADM-88, 89) |
+| ADM-NRG-9 (ajoutée) | La sanction expliquée au membre | **Conforme après correction** — proposer et appliquer sans catégorie : 400 ; catégorie hors liste : 400 ; avec `SCAM_SUSPECTED` : l'email du membre porte « Motif : Arnaque suspectée. », jamais le motif interne ni le nom du signalant ; `GET /auth/me` sert `suspensionCategory` et **plus** `suspensionReason` (ANO-ADM-90) ; la fiche admin nomme les deux (« catégorie envoyée au membre : … · motif interne : … ») ; catégorie effacée en base (sanction d'avant A193) → la fiche se lit et affiche « Autre manquement aux règles d'utilisation », jamais une erreur |
+
+**Contre-épreuve.** Les quatre fichiers corrigés (`admin-users.controller.ts`, `admin-auth.controller.ts`,
+`admin-emails.ts`, `me-projection.ts`) remis dans leur état d'origine : **16 rouges sur 356** dans cinq suites
+(`admin-users-concurrency`, `admin-auth-totp-concurrency`, `admin-auth-sessions`, `admin-emails`, `me-projection`) ;
+corrections remises : 356/356. Au navigateur, NRG-6 et NRG-9 ont d'abord été ROUGES contre les textes d'origine (note du
+journal, bandeau de la fiche). Passages : NRG 9/9 vert **deux fois** (3 min 30 et 3 min 55). Voisins rejoués : ADM-ACC (3),
+ADM-JRN (7), ADM-MED (9), ADM-SNC (7) — SNC-1 et SNC-2 d'abord rouges sur le journal (`after.category` ajouté par A193) et
+le bandeau de la fiche : specs réalignées, 7/7.
+
+### Anomalies
+
+- **ANO-ADM-89 (majeure) — une sanction, trois emails, ou 500.** Proposer / appliquer / lever lisaient le compte puis
+  l'écrivaient sans condition : deux administrateurs simultanés écrivaient chacun leur ligne et leur email, ou Mongo rendait
+  un `P2034` nu (500). Écriture conditionnée à l'état lu (`updatedAt`) + `withWriteConflictRetry` ; le perdant lit 409
+  `ACCOUNT_STATE_CHANGED` et l'écran recharge la fiche sur la décision gagnante. Close (A192).
+- **ANO-ADM-88 (majeure) — le même code TOTP servait trois fois.** L'anti-rejeu était vérifié sur une valeur lue avant la
+  transaction : trois requêtes simultanées du même code ouvraient trois sessions ; l'activation rendait trois jeux de codes
+  de secours dont deux morts. Garde dans l'écriture (`totpLastUsedStep` null / absent / antérieur, `totpEnabledAt` absent),
+  rejeu du conflit. Close (A192).
+- **ANO-ADM-90 (majeure) — `/auth/me` servait le motif interne au membre sanctionné.** La liste blanche gardait
+  `suspensionReason` « pour que le membre lise sa sanction » ; depuis A191 ce champ est le texte rédigé par l'administrateur,
+  souvent recopié d'un signalement. Le membre lit désormais `suspensionCategory` (A193). Close.
+- **ANO-ADM-92 (mineure) — le formulaire de décision récitait « 72 h ».** Il nomme le paramètre et garde l'échéance
+  calculée. Close.
+- **ANO-ADM-91 (cosmétique) — la note du journal mentait.** « Le détail est du JSON, il ne s'indexe pas » était faux depuis
+  ANO-ADM-73. Close.
+
+### Décisions (16/09) — inscrites au registre avant le code
+
+- **A192** — écriture conditionnelle + rejeu du conflit, partout : la règle, son application à `admin-users` et
+  `admin-auth`, et l'inventaire (plus aucun `$transaction` admin sans rejeu ; restent listés pour une passe membre :
+  `auth.controller`, `profile.controller`, `google-auth.service`, `conversation.service`, `conversation-retention.service`).
+- **A193** — catégorie de sanction en liste FERMÉE, communiquée au membre dans sa langue ; motif libre interne ; lecture
+  tolérante (`OTHER`) pour les sanctions antérieures, sans back-fill.
+- **A194** — une tuile qui compte n objets mène à une liste qui montre ces n objets : filtre serveur `proposal=1`,
+  `UsersSearch` initialisé depuis l'URL sous `<Suspense>`, tuiles « Comptes restreints » / « Comptes suspendus » filtrées.
+
+### Améliorations faites (au-delà du cahier)
+
+- « Avancé par Yamba 0,80 € » remplace « Détenu par la plateforme −0,80 € » sur la fiche argent (proposition du § 6).
+- Le champ de motif s'appelle « Motif interne (jamais envoyé au membre) » et son invite dit quoi y écrire (faits,
+  signalements, deals) — le placeholder disait l'inverse, et c'est lui qui poussait à écrire ce qu'il ne faut pas envoyer.
+- Un refus de sanction 400 ne s'affiche plus « 400 : Invalid request » mais « choisis une catégorie et écris un motif
+  interne de 20 caractères au moins ».
+- Le harnais mesure la position de la première tuile « À traiter » (preuve chiffrée du « sans dérouler » du cahier).
+
+### Proposé, non fait
+
+- **Journaliser le refus d'effacement RGPD** (écart n° 3) : aujourd'hui seul `DataRequest` en porte la trace. À trancher :
+  le registre suffit-il comme preuve vis-à-vis d'un régulateur ?
+- **Réinitialiser la 2FA d'un autre administrateur** depuis `/admins` (écart n° 5) : aujourd'hui « retirer / réinviter ».
+- **Passe « concurrence » sur les gestes MEMBRE** (A192, hors périmètre admin) : cinq fichiers inventoriés.
+- **Catégorie de sanction sur la fiche publique d'un signalement** : le Support ne voit pas quelle catégorie a été retenue
+  quand il rouvre un dossier déjà tranché (il lit le motif interne, plus long).
+
+### Écarts avec le cahier
+
+- NRG-6 étape 3 : depuis ANO-ADM-74 (§ 5.24), un identifiant de cible COURT est une valeur légitime (clé de paramètre,
+  `maintenance`) : il est appliqué et rend « 0 ligne affichée ». Seul un caractère interdit (espace, `$`) fait un filtre
+  « ignoré ». Le cahier décrit l'état d'avant A187.
+- NRG-7 écarts 4 et 5 : levés (A194) et partiellement levés (A190 a) — le cahier les décrit ouverts.
+- NRG-1 : le cahier annonce cinq écrans ; le cinquième (`/disputes/[id]`) n'a pas de sous-titre mais un texte de
+  formulaire — c'est lui qui est vérifié.
+
+---
+
+## Cahier 02-ADMIN — § 8 Consignation · **RECETTE ADMIN PRONONCÉE CONFORME AVEC RÉSERVES DOCUMENTAIRES** (31 chapitres · 196 scénarios du cahier joués · 92 anomalies closes, aucune ouverte · 12 critères de sortie)
+
+Le § 8 ne se joue pas : il consigne. Il rassemble le tableau de suivi, le bilan des anomalies et les douze critères de
+sortie du cahier, chacun avec sa preuve. Les verdicts détaillés restent dans les sections par chapitre de ce document ; le
+détail d'une fiche (étapes, écarts, améliorations) ne se recopie pas ici.
+
+### 8.1 Tableau de suivi
+
+| Chapitre du cahier | Objet | Scénarios joués | Verdict |
+|---|---|---|---|
+| § 4.1 | Connexion en deux étapes | 7 | **Conforme** |
+| § 4.2 | Sessions et durée de vie | 4 | **Conforme** |
+| § 4.3 | La matrice des permissions | 10 | **Conforme** |
+| § 5.1 | Accueil et compteurs | 3 | **Conforme** |
+| § 5.2 | Alertes de seuil | 4 | **Conforme** |
+| § 5.3 | Utilisateurs : recherche et fiche | 3 | **Conforme** |
+| § 5.4 | Sanctions : proposer, appliquer, lever | 7 | **Conforme** |
+| § 5.5 | Suppression d'adresse email | 4 | **Conforme** |
+| § 5.6 | Exports CSV | 4 | **Conforme** |
+| § 5.7 | Trajets : liste, fiche et masquage | 7 | **Conforme** |
+| § 5.8 | Billets à vérifier | 8 | **Conforme** |
+| § 5.9 | Médiation : la file, le dossier, la décision | 9 | **Conforme** |
+| § 5.10 | Retenue d'annulation tardive | 4 | **Conforme** |
+| § 5.11 | Finances : les files d'exception | 5 | **Conforme** |
+| § 5.12 | Fiche argent d'un deal | 5 | **Conforme** |
+| § 5.13 | Rapprochement avec le fournisseur | 3 | **Conforme** |
+| § 5.14 | Versements : rejeu et renversement | 7 | **Conforme** |
+| § 5.15 | Remboursement manuel en deux gestes | 6 | **Conforme après correction** |
+| § 5.16 | Rapport mensuel et export finances | 5 | **Conforme après correction** |
+| § 5.17 | Pilotage et drilldown | 6 | **Conforme après correction** |
+| § 5.18 | Conversations | 5 | **Conforme après correction** |
+| § 5.19 | Signalements : deux files | 9 | **Conforme après correction** |
+| § 5.20 | Paramètres de la plateforme | 12 | **Conforme après correction** |
+| § 5.21 | Données personnelles et effacement RGPD | 6 | **Conforme après correction** |
+| § 5.22 | État des services | 7 | **Conforme après correction** |
+| § 5.23 | Maintenance | 6 | **Conforme après correction** |
+| § 5.24 | Journal d'audit | 7 | **Conforme après correction** |
+| § 5.25 | Comptes admin | 11 | **Conforme après correction** |
+| § 5.26 | Mes sessions | 5 | **Conforme après correction** |
+| § 6 | Cas de bout en bout | 8 | **Conforme après correction** |
+| § 7 | Non-régression | 9 | **Conforme après correction** |
+| **Total** | **31 chapitres** | **196** | **Conforme (dont 14 après correction)** |
+
+Le harnais joue **211 scénarios admin** (`apps/e2e/src/admin/*.spec.ts`) pour 125 fiches au cahier : l'écart est fait des
+fiches AJOUTÉES en cours de recette (anomalies transformées en non-régression, contre-épreuves, lots décidés). Avec les
+chapitres du cahier 01-WEB, le harnais compte **543 scénarios**.
+
+**Scénario non joué (⏭).** `ADM-RAP-2 — Divergences Stripe réelles` : le poste de recette tourne sur le fournisseur de
+paiement FAKE (un Stripe réel exigerait des comptes Connect vérifiés et des virements réels). Couverture de substitution
+engagée et livrée : `PaymentProvider.inspect` est prouvé par les tests unitaires de `packages/libs/payments` et par
+ADM-RAP-1 / ADM-RAP-3 sur le fournisseur FAKE (écarts détectés, `INTENT_NOT_FOUND`, lecture seule). À rejouer sur
+l'environnement de pré-production le jour où Stripe y est branché.
+
+### 8.2 Anomalies — bilan
+
+| Gravité | Nombre | Ouvertes | Où |
+|---|---|---|---|
+| Bloquantes | **5** | 0 | ANO-ADM-01 (compte bloqué affiché « code invalide », § 4.1), 12 (export CSV, § 5.6), 22 (double remboursement, § 5.9), 33 (versement, § 5.14), 34 (remboursement manuel, § 5.15) |
+| Majeures | **48** | 0 | réparties sur § 4 → § 7 ; les dernières : ANO-ADM-87 (motif interne dans l'email), 88 (rejeu TOTP), 89 (sanctions simultanées), 90 (`/auth/me` servait le motif interne) |
+| Mineures | **38** | 0 | dont ANO-ADM-92 (« 72 h » en dur dans le formulaire de décision) |
+| Cosmétiques | **1** | 0 | ANO-ADM-91 (note du journal fausse depuis ANO-ADM-73) |
+| **Total** | **92** | **0** | ANO-ADM-01 → 92, toutes closes avec test |
+
+Chaque anomalie est décrite dans la section de son chapitre (constat, cause, correction, test). Les décisions
+d'architecture prises pendant la recette sont au registre : **A153 → A194** (42 arbitrages), inscrites AVANT le code.
+
+### 8.3 Critères de sortie
+
+| # | Critère | Seuil | Constat | Verdict |
+|---|---|---|---|---|
+| 1 | Anomalies bloquantes | zéro ouverte | 5 trouvées, 5 closes avec test et contre-épreuve | ✅ |
+| 2 | Anomalies majeures | zéro ouverte sur argent, sanction, effacement, permissions | 48 trouvées, 48 closes ; les quatre domaines sensibles sont couverts par § 5.4, 5.6, 5.9 → 5.16, 5.21, 4.3 | ✅ |
+| 3 | Mineures et cosmétiques | listées et arbitrées | 39, toutes corrigées (aucune reportée) | ✅ |
+| 4 | Documentaires | consignées et transmises | consignées sous « Écarts avec le cahier » à chaque chapitre ; 2 des 5 écarts du § 7 ont été LEVÉS (A194, A190 a) ; le cahier `RECETTE-02-ADMIN.md` reste à mettre à jour sur ces points | ⚠️ à reporter au cahier |
+| 5 | Matrice des permissions | six profils, menu, un geste, un refus 403 serveur | § 4.3 (ADM-PRM-1 → 9) + `adm-prm-garde-serveur.spec.ts` : la matrice est DÉDUITE du contrat `ADMIN_PERMISSIONS` et comparée au cahier ; chaque route admin montée a été appelée sans droit (403) | ✅ |
+| 6 | Journal | chaque geste d'écriture a sa ligne (auteur, cible, avant/après) | vérifié fiche par fiche (`lireLeJournal` filtré) ; § 5.24 a prouvé la liste fermée d'actions et de types de cible ; ANO-ADM-70 (types jamais écrits) close | ✅ |
+| 7 | Refus | aucun refus n'écrit au journal | vérifié à chaque fiche de garde (403 / 400 / 409) ; prouvé une dernière fois au § 7 sur les gestes SIMULTANÉS : le perdant n'écrit rien (ADM-NRG-8) | ✅ |
+| 8 | Données sensibles | ni code de livraison, ni téléphone, ni email hors export nominatif | § 5.12, 5.18, 5.6 : code de livraison absent des écrans, exports et chronologies ; numéro masqué dans les fils ; exports opérationnels sans email ni téléphone (`exports.operational`) ; § 7 ajoute : le motif interne ne part plus au membre (A191, A193) | ✅ |
+| 9 | Circuits à deux temps | deux profils distincts | sanction (Support propose / Médiateur applique, § 5.4 et ADM-E2E-2), masquage (Support propose / Médiateur masque, ADM-E2E-8), remboursement manuel (Finance propose / super administrateur applique, § 5.15 et ADM-E2E-7) | ✅ |
+| 10 | Cas de bout en bout | les huit joués, chacun fini par le journal filtré | § 6 : 8/8, deux passages verts | ✅ |
+| 11 | Non-régression | les sept scénarios rejoués | § 7 : 7/7 + 2 fiches ajoutées, deux passages verts | ✅ |
+| 12 | Scénarios ⏭ | listés avec leur raison et la couverture de substitution | un seul (ADM-RAP-2), raison et substitution ci-dessus | ✅ |
+
+**Verdict global proposé : conforme avec réserves documentaires.** Les onze critères de produit sont tenus ; la seule
+réserve porte sur le critère 4 — le cahier `docs/recette/RECETTE-02-ADMIN.md` décrit encore quelques états d'avant
+correction (écarts n° 4 et 5 du § 7, « identifiant trop court ignoré » du journal, délais « 72 h » en dur). Ces mises à
+jour sont documentaires : elles ne conditionnent aucune livraison, mais elles conditionnent la FIDÉLITÉ du prochain
+passage de recette.
+
+**Reste à trancher par le fondateur (accumulé sur le cahier).** (a) journaliser un refus d'effacement RGPD ; (b) écran de
+réinitialisation de la 2FA d'un autre administrateur ; (c) ce que mesure « Versements en échec depuis plus de 48 h » ;
+(d) « Abandonner » un renversement sans événement ni message au Voyageur ; (e) billets servis par URL ImageKit publiques
+permanentes ; (f) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés).
+
+| Rôle | Nom | Date | Verdict global |
+|---|---|---|---|
+| Testeur | harnais `apps/e2e` (campagne 09 → 16/09/2026) | 16/09/2026 | ☑ conforme avec réserves documentaires |
+| Responsable produit | | | |
+| Développement | | | |

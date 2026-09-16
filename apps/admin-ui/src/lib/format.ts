@@ -1,3 +1,5 @@
+import type { SanctionCategory } from "./types";
+
 export function money(cents: number | null | undefined, currency = "EUR"): string {
   if (cents == null) return "—";
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(cents / 100);
@@ -298,6 +300,15 @@ export const TRANSPORT_MODE_LABEL: Record<string, string> = { PLANE: "Avion", TR
 export const BOOKING_STATUS_LABEL: Record<string, string> = { PENDING: "En attente", ACCEPTED: "Acceptée", DECLINED: "Refusée", EXPIRED: "Expirée", CANCELLED: "Annulée", PICKED_UP: "Prise en charge", DELIVERED: "Livrée", COMPLETED: "Terminée", DISPUTED: "En litige" };
 
 export const STATUS_LABEL: Record<string, string> = { ACTIVE: "Actif", RESTRICTED: "Restreint", SUSPENDED: "Suspendu" };
+/** A193 — catégorie FERMÉE d'une sanction : c'est elle (et elle seule) que le membre lit dans l'email. Miroir de `SANCTION_CATEGORIES`. */
+export const SANCTION_CATEGORY_LABEL: Record<SanctionCategory, string> = {
+  SCAM_SUSPECTED: "Arnaque suspectée",
+  PROHIBITED_CONTENT: "Contenu ou objet interdit",
+  ABUSIVE_BEHAVIOUR: "Comportement abusif envers un membre",
+  REPEATED_DISPUTES: "Litiges ou annulations répétés",
+  IMPERSONATION: "Usurpation d'identité",
+  OTHER: "Autre manquement aux règles d'utilisation",
+};
 
 export const RESOLUTION_LABEL: Record<string, string> = {
   REJECTED: "Rejet : le Voyageur est payé en entier",

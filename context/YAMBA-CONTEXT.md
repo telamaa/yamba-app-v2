@@ -796,6 +796,29 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 16/09 : **CAHIER 02-ADMIN — § 7 NON-REGRESSION + § 8 CONSIGNATION (branche `chore/recette-admin-7`, empilee sur `chore/recette-admin-6`) — FIN DU CAHIER ADMIN** —
+  9 scenarios ADM-NRG (`adm-nrg-non-regression.spec.ts` : sous-titres perimes, filtres d'URL de la file d'arbitrage,
+  libelle « Signalement traite », cle React des parametres, alertes hors accueil, journal filtrable, cinq ecarts
+  documentaires + **NRG-8 gestes simultanes** et **NRG-9 categorie de sanction**). ENGAGEMENT P2034 SOLDE.
+  ANO-ADM-89 CLOSE (majeure) : proposer / appliquer / lever une sanction lisaient puis ecrivaient sans condition → 500
+  P2034 ou deux decisions, deux lignes, deux emails ; verrou optimiste `updatedAt` + `withWriteConflictRetry`, perdant 409
+  ACCOUNT_STATE_CHANGED, fiche rechargee. ANO-ADM-88 CLOSE (majeure) : le meme code TOTP servait trois fois (anti-rejeu lu
+  avant la transaction) → garde dans l'ecriture (`totpLastUsedStep` null / isSet:false / lt, `totpEnabledAt` absent).
+  ANO-ADM-90 CLOSE (majeure) : `GET /auth/me` servait `suspensionReason` (motif INTERNE) au membre sanctionne → le membre
+  lit `suspensionCategory`. ANO-ADM-92 (mineure) : « 72 h » en dur dans le formulaire de decision. ANO-ADM-91
+  (cosmetique) : note du journal fausse depuis ANO-ADM-73. DECISIONS : A192 (ecriture conditionnelle + rejeu du conflit,
+  partout ; inventaire : plus aucun `$transaction` admin sans rejeu ; 5 fichiers MEMBRE listes pour une passe ulterieure),
+  A193 (categorie de sanction en liste FERMEE communiquee au membre, motif libre interne, lecture tolerante `OTHER`),
+  A194 (une tuile qui compte n objets mene a une liste qui montre ces n objets : filtre serveur `proposal=1`,
+  `UsersSearch` initialise depuis l'URL sous `<Suspense>`). CONTRE-EPREUVE : quatre fichiers d'origine remis → **16 rouges
+  sur 356** (5 suites) ; NRG 9/9 vert deux fois ; voisins ADM-ACC 3, ADM-JRN 7, ADM-MED 9, ADM-SNC 7 (SNC-1 et 2 realignees
+  sur `after.category` et le bandeau de la fiche). § 8 : tableau de suivi (31 chapitres, 196 scenarios du cahier, 211 au
+  harnais), 92 anomalies closes (5 bloquantes, 48 majeures, 38 mineures, 1 cosmetique), 12 criteres de sortie — **recette
+  admin conforme AVEC RESERVES DOCUMENTAIRES** (le cahier `RECETTE-02-ADMIN.md` decrit encore des etats d'avant
+  correction). Un seul scenario non joue : ADM-RAP-2 (Stripe reel ; substitution unitaire + FAKE livree). Tests : auth
+  **356**, deal 644, message 57, trip 293, notification 122, harnais **543**. Reste : mise a jour du cahier 02-ADMIN sur
+  les ecarts documentaires ; arbitrages accumules (refus d'effacement au journal, reinitialisation 2FA, passe concurrence
+  MEMBRE).
 - 15/09 : **CAHIER 02-ADMIN — § 6 CAS DE BOUT EN BOUT (branche `chore/recette-admin-6`, empilee sur `chore/recette-admin-5-26`)** —
   8 scenarios ADM-E2E (`adm-e2e-bout-en-bout-1-4.spec.ts` : litige → argent, sanction proposee → appliquee → levee, trois
   signalements, parametre < 30 s ; `adm-e2e-bout-en-bout-5-8.spec.ts` : lecture seule et levee, effacement RGPD, versement

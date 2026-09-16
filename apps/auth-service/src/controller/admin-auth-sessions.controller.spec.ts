@@ -22,7 +22,7 @@ const redisMock = {
   exists: jest.fn(async (k: string) => (store.has(k) ? 1 : 0)),
   scan: jest.fn(async (_c: string, _m: string, pattern: string) => ["0", [...store.keys()].filter((k) => k.startsWith(pattern.replace("*", "")))]),
 };
-const prismaMock = { user: { findUnique: jest.fn(), update: jest.fn(async () => ({})) }, $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)) };
+const prismaMock = { user: { findUnique: jest.fn(), update: jest.fn(async () => ({})), updateMany: jest.fn(async () => ({ count: 1 })) }, $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)) };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => undefined) };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
@@ -176,7 +176,7 @@ describe("A190 (recette 02-ADMIN § 6) — lots du § 5.26", () => {
     const { backupCodes } = res.json.mock.calls[0][0] as { backupCodes: string[] };
     expect(backupCodes.length).toBeGreaterThanOrEqual(8);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
-    const ecrit = (prismaMock.user.update.mock.calls[0] as unknown[])[0] as { data: { totpBackupCodeHashes: string[] } };
+    const ecrit = (prismaMock.user.updateMany.mock.calls[0] as unknown[])[0] as { data: { totpBackupCodeHashes: string[] } };
     expect(ecrit.data.totpBackupCodeHashes).toEqual(backupCodes.map(totp.hashBackupCode));
     expect((auditMock.recordAdminAction.mock.calls[0] as unknown[])[1]).toMatchObject({ action: "ADMIN_BACKUP_CODES_REGENERATED", before: { remaining: 1 }, after: { remaining: backupCodes.length } });
     expect(JSON.stringify(auditMock.recordAdminAction.mock.calls)).not.toContain(backupCodes[0]); // jamais un code en clair au journal
@@ -189,7 +189,7 @@ describe("A190 (recette 02-ADMIN § 6) — lots du § 5.26", () => {
       const { error } = await call(ctrl.regenerateAdminBackupCodes as never, { user: { id: ID }, body: { code } });
       expect(error).toMatchObject({ statusCode: 400, details: { code: "OTP_INCORRECT" } });
     }
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
     expect(auditMock.recordAdminAction).not.toHaveBeenCalled();
   });
 });

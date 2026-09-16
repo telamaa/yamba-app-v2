@@ -128,6 +128,8 @@ export type AdminUserSummary = {
 };
 export type AdminUsersResponse = { items: AdminUserSummary[]; total: number; nextCursor?: string | null };
 export type ReputationFacts = { reputationLevel: string | null; ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number; disputesLostCount: number };
+/** A193 — miroir de `SANCTION_CATEGORIES` (@packages/api-contracts). */
+export type SanctionCategory = "SCAM_SUSPECTED" | "PROHIBITED_CONTENT" | "ABUSIVE_BEHAVIOUR" | "REPEATED_DISPUTES" | "IMPERSONATION" | "OTHER";
 export type AdminUserFile = {
   id: string;
   firstName: string;
@@ -140,8 +142,8 @@ export type AdminUserFile = {
   adminRole: import("./permissions").AdminRole | null;
   adminRoles: import("./permissions").AdminRole[];
   accountStatus: AccountStatus;
-  suspension: { level: AccountStatus; reason: string; until: string | null; at: string; byAdmin: string } | null;
-  suspensionProposal: { level: string; reason: string; byAdmin: string; at: string } | null;
+  suspension: { level: AccountStatus; category: SanctionCategory; reason: string; until: string | null; at: string; byAdmin: string } | null;
+  suspensionProposal: { level: string; category: SanctionCategory; reason: string; byAdmin: string; at: string } | null;
   createdAt: string;
   isDeleted: boolean;
   isMe: boolean;

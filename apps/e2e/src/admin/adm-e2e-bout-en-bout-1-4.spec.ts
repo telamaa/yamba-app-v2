@@ -232,7 +232,7 @@ test.describe("ADM-E2E — cas de bout en bout 1 à 4 (cahier 02-ADMIN § 6)", (
       await attendreLeChargement(support.page);
       const carte = support.page.locator("section").filter({ has: support.page.getByRole("heading", { name: "Sanction", exact: true }) });
       await expect(carte).toBeVisible({ timeout: 60_000 });
-      const propose = await support.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension/propose`, { data: { level: "RESTRICTED", reason: MOTIF_P } });
+      const propose = await support.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension/propose`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF_P } });
       expect(propose.ok(), `proposition : ${propose.status()}`).toBe(true);
       /* 3. Tuile. */
       expect(await tuile(support.page, "Sanctions proposées")).toBe(1);
@@ -244,7 +244,7 @@ test.describe("ADM-E2E — cas de bout en bout 1 à 4 (cahier 02-ADMIN § 6)", (
       await med.page.goto(`${bo()}/users/${marcId}`, { waitUntil: "domcontentloaded" });
       await attendreLeChargement(med.page);
       await expect(med.page.locator("main")).toContainText(/Sami/, { timeout: 60_000 });
-      const applique = await med.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension`, { data: { level: "RESTRICTED", reason: MOTIF_A } });
+      const applique = await med.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: MOTIF_A } });
       expect(applique.ok(), `application : ${applique.status()}`).toBe(true);
       await med.page.reload();
       await attendreLeChargement(med.page);
@@ -258,7 +258,7 @@ test.describe("ADM-E2E — cas de bout en bout 1 à 4 (cahier 02-ADMIN § 6)", (
       const mRestreint = await mailpit.attendreEmail({ pour: COMPTES.marc.email, sujet: "Ton compte Yamba est restreint" }, 60_000);
       expect(mRestreint.texte, "motif générique : jamais le motif interne").not.toContain(MOTIF_A);
       /* 11. Suspension : sessions membre révoquées. */
-      const suspend = await med.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension`, { data: { level: "SUSPENDED", reason: MOTIF_S } });
+      const suspend = await med.contexte.request.post(`${apiAdmin()}/admin/users/${marcId}/suspension`, { data: { level: "SUSPENDED", category: "OTHER", reason: MOTIF_S } });
       expect(suspend.ok(), `suspension : ${suspend.status()}`).toBe(true);
       await expect.poll(async () => (await appel(marc.contexte, "GET", "/auth/me")).statut, { timeout: 30_000 }).toBe(401);
       /* 12. Ses trajets sortent de la recherche, statut resté PUBLISHED. */
@@ -332,8 +332,8 @@ test.describe("ADM-E2E — cas de bout en bout 1 à 4 (cahier 02-ADMIN § 6)", (
       expect(fiche.trust.factors.find((f) => f.key === "reportsOpen" || f.key === "openReports")?.points, "3 × 8 points").toBe(24);
       expect(lireCoteServeur<string>(`import prisma from "./packages/libs/prisma"; (async () => { const u = await prisma.user.findUnique({ where: { id: "${thomasId}" }, select: { accountStatus: true } }); console.log("@@" + JSON.stringify(u?.accountStatus)); process.exit(0); })();`), "rien d'automatique").toBe("ACTIVE");
       /* 9-10. Proposer, appliquer. */
-      expect((await support.contexte.request.post(`${apiAdmin()}/admin/users/${thomasId}/suspension/propose`, { data: { level: "RESTRICTED", reason: "Recette ADM-E2E-3 : trois signalements convergents." } })).ok()).toBe(true);
-      expect((await med.contexte.request.post(`${apiAdmin()}/admin/users/${thomasId}/suspension`, { data: { level: "RESTRICTED", reason: "Recette ADM-E2E-3 : restriction appliquée." } })).ok()).toBe(true);
+      expect((await support.contexte.request.post(`${apiAdmin()}/admin/users/${thomasId}/suspension/propose`, { data: { level: "RESTRICTED", category: "OTHER", reason: "Recette ADM-E2E-3 : trois signalements convergents." } })).ok()).toBe(true);
+      expect((await med.contexte.request.post(`${apiAdmin()}/admin/users/${thomasId}/suspension`, { data: { level: "RESTRICTED", category: "OTHER", reason: "Recette ADM-E2E-3 : restriction appliquée." } })).ok()).toBe(true);
       await mailpit.attendreEmail({ pour: COMPTES.thomas.email, sujet: "Ton compte Yamba est restreint" }, 60_000);
       /* 11. « Traité » ×3, avec la note, par l'écran. */
       const note = `restreint le ${new Date().toLocaleDateString("fr-FR")}`;

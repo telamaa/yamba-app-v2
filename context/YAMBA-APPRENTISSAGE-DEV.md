@@ -957,3 +957,79 @@ exécutions, sans `setTimeout` ni hasard. La contre-épreuve (contrôleur d'orig
 catégorie en liste fermée, choisie à l'application de la sanction, concilie spécificité et confidentialité (proposé en
 A191). Sur la rotation : Redis `SET … NX` est le compare-and-set le plus simple ; au-delà d'un nœud, voir les limites de
 Redlock (M. Kleppmann, « How to do distributed locking »).
+
+## Chapitre 186 — ADM-NRG · L'écriture conditionnelle : lire-puis-écrire est une course, le rejeu ne suffit pas, et la liste fermée qui protège deux personnes à la fois
+
+**Le problème.** Depuis le § 5.19, une dette revenait à chaque chapitre : des gestes admin lisaient un document, décidaient,
+puis l'écrivaient. Entre la lecture et l'écriture, un autre administrateur peut écrire. Selon la chance, on obtenait un
+500 `P2034` (Mongo détecte le conflit) ou — pire, parce que silencieux — deux décisions appliquées : deux lignes de journal,
+deux emails au membre, deux jeux de codes de secours dont un déjà mort.
+
+**(1) Rejouer ne suffit pas : il faut une garde.** `withWriteConflictRetry` existait déjà et relance la transaction sur
+`P2034`. Mis seul, il transforme un 500 en… deux gagnants successifs : le second essai relit (ou pas) et réécrit. Ce qui
+manque, c'est que l'écriture n'ait de sens QUE si l'état n'a pas bougé. En Prisma+Mongo, cela s'écrit avec `updateMany` et
+une condition sur l'état lu (`apps/auth-service/src/controller/admin-users.controller.ts`) :
+
+```ts
+await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+  const written = await tx.user.updateMany({
+    where: { id: user.id, updatedAt: user.updatedAt },   // ← l'état LU, pas seulement l'identifiant
+    data: { accountStatus: level, suspensionCategory: category, /* … */ },
+  });
+  if (written.count !== 1) throw accountChanged();        // 409 ACCOUNT_STATE_CHANGED
+  await recordAdminAction(tx, { /* … */ });
+}));
+```
+
+Pourquoi `updateMany` et pas `update` : `update` cible par clé unique et lève si rien ne correspond ; `updateMany` accepte
+un `where` arbitraire et rend un COMPTE — c'est ce compte qui devient la décision. C'est le *verrou optimiste* classique
+(lire une version, écrire sous condition de cette version), avec `updatedAt` comme numéro de version : Prisma le met à jour
+à chaque écriture, et c'est un champ REQUIS — donc toujours présent, contrairement aux champs optionnels que le piège
+Prisma+Mongo rend infiltrables (`isSet`).
+
+**(2) Quand la version ne suffit pas, la garde est la règle elle-même.** Pour l'anti-rejeu TOTP, conditionner sur
+`updatedAt` serait trop large (n'importe quelle écriture sur le compte ferait échouer la vérification). La bonne garde est
+la règle métier : « ce pas n'a pas encore servi ». Elle doit couvrir les trois états possibles du champ optionnel —
+`null`, ABSENT, et « strictement antérieur » :
+
+```ts
+const unusedStepGuard = (step: number) => ({
+  OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { isSet: false } }, { totpLastUsedStep: { lt: step } }],
+});
+```
+
+Oublier `isSet: false` rend la garde aveugle aux comptes créés avant l'ajout du champ : ils ne correspondent à AUCUN filtre,
+pas même à `not`. C'est le piège Prisma+Mongo payé six fois dans ce projet — ici il se déguise en faille de sécurité.
+
+**(3) Le refus qu'on rend dit au client quoi faire.** Le perdant d'une course sur une sanction lit 409
+`ACCOUNT_STATE_CHANGED` ; l'écran traduit le code en une phrase et **recharge la fiche** : l'opérateur voit la décision qui
+a gagné au lieu de recliquer. Le perdant d'une course sur un code TOTP lit le refus d'un code rejoué (401 / 400
+`OTP_INCORRECT`) : de son point de vue, quelqu'un a déjà utilisé ce code — c'est exactement ce qui s'est passé.
+
+**(4) Prouver une course dans un test unitaire, sans horloge.** Le mock de `$transaction` perd la course une fois, en
+posant l'état de l'autre acteur puis en levant `P2034` ; le vrai `updateMany` mocké compare `where.updatedAt` à l'état
+courant. Aucun `setTimeout`, aucun hasard, et la contre-épreuve (contrôleurs d'origine remis) rend 16 tests rouges :
+
+```ts
+function perdreLaCourse(autre: Record<string, unknown>) {
+  prismaMock.$transaction.mockImplementationOnce(async () => { etat = { ...etat, ...autre, updatedAt: T1 }; throw conflit(); });
+}
+```
+
+**(5) Une liste fermée protège le membre ET les tiers.** Le motif d'une sanction est rédigé pour le back-office : il cite
+des signalements, parfois leurs auteurs. L'envoyer au membre expose des tiers ; ne rien envoyer prive le membre d'un exposé
+des motifs. La sortie est une troisième valeur : une catégorie en liste fermée (`SANCTION_CATEGORIES`), requise au contrat,
+écrite en base et au journal, traduite dans la langue du destinataire, et un motif libre qui ne quitte jamais l'interne.
+Deux détails font la différence entre une règle et une intention : le champ s'appelle « Motif interne (jamais envoyé au
+membre) » à l'écran (le placeholder disait l'inverse), et la lecture est TOLÉRANTE pour les sanctions antérieures —
+`sanctionCategoryOf(raw)` rend `OTHER` plutôt qu'une erreur, ce qui évite un back-fill et un risque d'écran blanc.
+
+**(6) Ce que le membre lit de lui-même est une liste blanche, pas un reste.** `/auth/me` servait `suspensionReason` « pour
+que le membre puisse lire sa sanction » : le champ avait changé de sens (motif interne) sans que la projection soit relue.
+Une liste blanche doit se relire à chaque fois qu'un champ change de SENS, pas seulement quand il change de nom —
+`ME_EXCLUDED_FIELDS` documente désormais le pourquoi de chaque exclusion, ce qui rend cette relecture possible.
+
+**Pour aller plus loin.** Verrou optimiste : « Designing Data-Intensive Applications » (M. Kleppmann), ch. 7 — l'écriture
+conditionnelle (compare-and-set) est la primitive que les bases sans transactions sérialisables offrent toujours. Sur le
+choix entre verrou pessimiste (Redis) et optimiste (condition en base) : préférer l'optimiste quand la base peut porter la
+condition — un second système de vérité, c'est une seconde source de pannes.

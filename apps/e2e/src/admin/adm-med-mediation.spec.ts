@@ -202,7 +202,7 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
     }
     /* Écarts documentaires (le code fait foi) : avant l'échéance, « Trancher » cède la place à la date de décision ; « Jalons
        du voyage » et « Remise » n'apparaissent que s'il y a des jalons ou des photos de remise — le jeu d'essai n'en pose pas. */
-    await expect(page.getByText(/^Décision possible à partir du .+ \(délai de réponse laissé au Voyageur\), ou dès sa réponse\.$/)).toBeVisible();
+    await expect(page.getByText(/^Décision possible à partir du .+ \(délai de réponse laissé au Voyageur : paramètre « Délai de réponse au litige », figé à l'ouverture du litige\), ou dès sa réponse\.$/)).toBeVisible();
     const absents = ["trancher", "jalons du voyage", "remise"].filter((b) => !titres.some((t) => t === b || t.startsWith(`${b} `)));
     test.info().annotations.push({ type: "écart documentaire", description: `blocs du cahier absents sur YAM-2041 non décidable : ${absents.join(", ") || "aucun"} — vus : ${titres.join(" | ")}` });
     const signalement = page.locator("section").filter({ has: page.getByRole("heading", { name: /^Signalement YAM-2041/ }) });
@@ -241,7 +241,7 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
       await expect(support.page.getByText("Ton profil lit ce dossier mais ne tranche pas (médiateur ou super administrateur).", { exact: true })).toBeVisible({ timeout: 60_000 });
       /* 2. YAM-2042, avant l'échéance : date affichée, appel direct 409 portant decidableAt. */
       await med.page.goto(`${bo()}/disputes/${d2042}`, { waitUntil: "domcontentloaded" });
-      await expect(med.page.getByText(/^Décision possible à partir du .+ \(délai de réponse laissé au Voyageur\), ou dès sa réponse\.$/)).toBeVisible({ timeout: 60_000 });
+      await expect(med.page.getByText(/^Décision possible à partir du .+ \(délai de réponse laissé au Voyageur : paramètre « Délai de réponse au litige », figé à l'ouverture du litige\), ou dès sa réponse\.$/)).toBeVisible({ timeout: 60_000 });
       const trop = await med.contexte.request.post(`${api()}/admin/disputes/${d2042}/resolve`, { data: { outcome: "REJECTED", reason: MOTIF }, failOnStatusCode: false });
       expect(trop.status(), "avant l'échéance : 409").toBe(409);
       const corps = (await trop.json()) as { details?: { code?: string; decidableAt?: string } };

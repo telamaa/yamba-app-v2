@@ -69,7 +69,7 @@ test.describe("ADM-JRN — journal d'audit (cahier 02-ADMIN § 5.24)", () => {
     for (const l of ["Du", "Au", "Action", "Type de cible", "Identifiant de cible", "IP"]) await expect(champ(page, l)).toBeVisible();
     const types = await champ(page, "Type de cible").locator("option").evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
     expect(types.sort(), "ANO-ADM-70 : le filtre propose les types écrits, aucun autre").toEqual([...ADMIN_TARGET_TYPES].sort());
-    await expect(filtres(page)).toContainText("La recherche « contient » ne porte que sur les lignes déjà chargées : le détail est du JSON, il ne s'indexe pas.");
+    await expect(filtres(page)).toContainText("La recherche « contient » ne porte que sur les lignes déjà chargées, détail compris : pour chercher dans tout le journal, pose un filtre serveur.");
     await expect(barre(page).getByRole("button", { name: "Tout effacer" })).toHaveCount(0);
 
     // Étape 8 — « contient » : local, la barre dit « sur n chargées », aucun appel serveur.

@@ -2,8 +2,8 @@
  * admin-emails.spec.ts — ANO-ADM-53 (recette 02-ADMIN § 5.20) : les valeurs de paramètres dans l'email aux super
  * administrateurs parlent la langue du destinataire. Avant : « 48 hours → 50 hours », « 3.00 € » dans un email français.
  */
-import { SETTINGS_CATALOG } from "@packages/api-contracts";
-import { formatSettingValue, getAdminEmails } from "./admin-emails";
+import { SANCTION_CATEGORIES, SETTINGS_CATALOG, sanctionCategoryOf } from "@packages/api-contracts";
+import { SANCTION_CATEGORY_LABELS, formatSettingValue, getAdminEmails } from "./admin-emails";
 
 describe("formatSettingValue — une valeur de paramètre, dans la langue du destinataire", () => {
   it("français : unités françaises, virgule décimale, espace avant le pourcentage", () => {
@@ -57,7 +57,7 @@ describe("A189 c — l'admin dont les accès changent est prévenu, sans porte d
 });
 
 describe("ANO-ADM-87 (recette § 6, ADM-E2E-2) — l'email de sanction ne transporte jamais le motif interne", () => {
-  const params = { firstName: "Marc", until: null, supportEmail: "support@yamba.app" };
+  const params = { firstName: "Marc", category: "OTHER" as const, until: null, supportEmail: "support@yamba.app" };
   it("français et anglais : motif générique et adresse de recours, pour la restriction comme pour la suspension", () => {
     for (const locale of ["fr", "en"]) {
       const d = getAdminEmails(locale);
@@ -65,9 +65,22 @@ describe("ANO-ADM-87 (recette § 6, ADM-E2E-2) — l'email de sanction ne transp
         const texte = JSON.stringify(email.content);
         expect(texte).toMatch(locale === "fr" ? /manquement aux règles d'utilisation de Yamba/ : /breach of Yamba's terms of use/);
         expect(texte).toContain("support@yamba.app");
-        expect(texte).not.toMatch(/Motif :|Reason:/);
+        // A193 : la seule « raison » transmise est la catégorie fermée, jamais un texte saisi.
+        expect(texte).toContain(locale === "fr" ? "Motif : Autre manquement aux règles d'utilisation." : "Reason: Other breach of the terms of use.");
       }
     }
+  });
+  it("A193 — la catégorie fermée arrive au membre dans SA langue, pour la restriction comme pour la suspension ; chaque catégorie a son libellé FR et EN", () => {
+    for (const category of SANCTION_CATEGORIES) {
+      expect(SANCTION_CATEGORY_LABELS.fr[category].length).toBeGreaterThan(5);
+      expect(SANCTION_CATEGORY_LABELS.en[category].length).toBeGreaterThan(5);
+    }
+    const fr = JSON.stringify(getAdminEmails("fr").accountSuspended({ ...params, category: "SCAM_SUSPECTED" }).content);
+    const en = JSON.stringify(getAdminEmails("en").accountRestricted({ ...params, category: "SCAM_SUSPECTED" }).content);
+    expect(fr).toContain("Motif : Arnaque suspectée.");
+    expect(en).toContain("Reason: Suspected scam.");
+    expect(sanctionCategoryOf(undefined)).toBe("OTHER"); // compte sanctionné avant A193
+    expect(sanctionCategoryOf("INCONNUE")).toBe("OTHER");
   });
   it("le type refuse un motif : le passer est une erreur de compilation", () => {
     // @ts-expect-error — `reason` n'existe plus dans AccountStatusParams
