@@ -6804,7 +6804,7 @@ d'architecture prises pendant la recette sont au registre : **A153 → A194** (4
 | 1 | Anomalies bloquantes | zéro ouverte | 5 trouvées, 5 closes avec test et contre-épreuve | ✅ |
 | 2 | Anomalies majeures | zéro ouverte sur argent, sanction, effacement, permissions | 48 trouvées, 48 closes ; les quatre domaines sensibles sont couverts par § 5.4, 5.6, 5.9 → 5.16, 5.21, 4.3 | ✅ |
 | 3 | Mineures et cosmétiques | listées et arbitrées | 39, toutes corrigées (aucune reportée) | ✅ |
-| 4 | Documentaires | consignées et transmises | consignées sous « Écarts avec le cahier » à chaque chapitre ; 2 des 5 écarts du § 7 ont été LEVÉS (A194, A190 a) ; le cahier `RECETTE-02-ADMIN.md` reste à mettre à jour sur ces points | ⚠️ à reporter au cahier |
+| 4 | Documentaires | consignées et transmises | consignées sous « Écarts avec le cahier » à chaque chapitre ; **reportées au cahier le 17/09/2026** : les 14 divergences relevées aux § 5.23, 5.24, 5.25, 5.26, § 6 et § 7 sont corrigées dans `RECETTE-02-ADMIN.md`, `ADM-SES-2` est ajouté (A190 a, b), les écarts 4 et 5 du § 7 sont marqués LEVÉ / RÉDUIT, et deux renvois cassés (`RECETTE-01-MEMBRE`, `RECETTE-04-EXPLOITATION`) sont réparés | ✅ |
 | 5 | Matrice des permissions | six profils, menu, un geste, un refus 403 serveur | § 4.3 (ADM-PRM-1 → 9) + `adm-prm-garde-serveur.spec.ts` : la matrice est DÉDUITE du contrat `ADMIN_PERMISSIONS` et comparée au cahier ; chaque route admin montée a été appelée sans droit (403) | ✅ |
 | 6 | Journal | chaque geste d'écriture a sa ligne (auteur, cible, avant/après) | vérifié fiche par fiche (`lireLeJournal` filtré) ; § 5.24 a prouvé la liste fermée d'actions et de types de cible ; ANO-ADM-70 (types jamais écrits) close | ✅ |
 | 7 | Refus | aucun refus n'écrit au journal | vérifié à chaque fiche de garde (403 / 400 / 409) ; prouvé une dernière fois au § 7 sur les gestes SIMULTANÉS : le perdant n'écrit rien (ADM-NRG-8) | ✅ |
@@ -6814,19 +6814,29 @@ d'architecture prises pendant la recette sont au registre : **A153 → A194** (4
 | 11 | Non-régression | les sept scénarios rejoués | § 7 : 7/7 + 2 fiches ajoutées, deux passages verts | ✅ |
 | 12 | Scénarios ⏭ | listés avec leur raison et la couverture de substitution | un seul (ADM-RAP-2), raison et substitution ci-dessus | ✅ |
 
-**Verdict global proposé : conforme avec réserves documentaires.** Les onze critères de produit sont tenus ; la seule
-réserve porte sur le critère 4 — le cahier `docs/recette/RECETTE-02-ADMIN.md` décrit encore quelques états d'avant
-correction (écarts n° 4 et 5 du § 7, « identifiant trop court ignoré » du journal, délais « 72 h » en dur). Ces mises à
-jour sont documentaires : elles ne conditionnent aucune livraison, mais elles conditionnent la FIDÉLITÉ du prochain
-passage de recette.
+**Verdict global : CONFORME (réserve documentaire LEVÉE le 17/09/2026).** Les douze critères sont tenus. La réserve
+portait sur le critère 4 — le cahier décrivait encore des états d'avant correction ; il a été mis à jour le 17/09 à
+partir des sections « Écarts avec le cahier » ci-dessus, qui en sont la source. Ce qui a changé dans le cahier :
+en-tête (référence `dev` au 17/09, le `.md` fait foi, le `.pdf` du 06/09 n'est plus régénéré à chaque passe) ; tuile
+« Sanctions proposées » → `/users?proposal=1` (A194) ; codes de secours régénérables depuis « Mes sessions » (A190 a) aux
+quatre endroits qui disaient le contraire, et **nouveau scénario `ADM-SES-2`** (A190 a, b) ; types de cible du journal
+ramenés à la liste réellement écrite (A183) et auteur nommé comme septième filtre serveur ; « Rapprochement fournisseur »
+au lieu de « Rapprochement Stripe » ; MNT-4 étape 4 (A182), CPT-3 étape 5, CPT-4 étapes 3 et 4 ; E2E-1 étapes 2, 3, 15,
+16, E2E-2 étape 17, E2E-3 étape 11, E2E-6 étapes 4 et 10, E2E-7 étape 2 ; NRG-6 étape 3 (un identifiant COURT est
+légitime depuis ANO-ADM-74) ; NRG-1 (le cinquième écran est un texte de formulaire) ; connexion d'un compte effacé →
+`INVALID_CREDENTIALS` et non `ACCOUNT_DELETED`. Vérifié au passage : les délais « 72 h » / « 48 h » du cahier sont bien
+les valeurs PAR DÉFAUT des paramètres (`alerts.disputeUndecidedHours`, `alerts.payoutFailedHours`) et sont déjà
+présentés comme tels — rien à corriger de ce côté.
 
 **Reste à trancher par le fondateur (accumulé sur le cahier).** (a) journaliser un refus d'effacement RGPD ; (b) écran de
 réinitialisation de la 2FA d'un autre administrateur ; (c) ce que mesure « Versements en échec depuis plus de 48 h » ;
 (d) « Abandonner » un renversement sans événement ni message au Voyageur ; (e) billets servis par URL ImageKit publiques
-permanentes ; (f) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés).
+permanentes ; (f) catégorie de sanction sur un dossier de signalement déjà tranché.
+~~(g) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés)~~ — **FAITE** le 16/09 (A195, PR #332).
 
 | Rôle | Nom | Date | Verdict global |
 |---|---|---|---|
 | Testeur | harnais `apps/e2e` (campagne 09 → 16/09/2026) | 16/09/2026 | ☑ conforme avec réserves documentaires |
+| Testeur | report des écarts au cahier `RECETTE-02-ADMIN.md` | 17/09/2026 | ☑ **conforme, réserve documentaire levée** |
 | Responsable produit | | | |
 | Développement | | | |

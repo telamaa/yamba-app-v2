@@ -1,7 +1,9 @@
 # YAMBA — CAHIER DE RECETTE · PARTIE ADMIN (back-office)
 
 > Application testée : `apps/admin-ui`, servie sur **http://localhost:3001**, adossée au gateway `http://localhost:8080`.
-> Version du code de référence : branche `feat/f3-messaging-admin` (base `dev`), état au 06/09/2026.
+> Version du code de référence : **`dev` au 17/09/2026** — après la campagne de recette (92 anomalies closes) et les
+> arbitrages A187 à A195. Le `.md` FAIT FOI ; le `.pdf` du même nom date du 06/09 et n'est plus régénéré à chaque
+> correction (`python3 scripts/build-doc-pdf.py docs/recette/RECETTE-02-ADMIN.md` pour le remettre à niveau).
 > Document de recette **exécutable par un testeur seul**. Chaque scénario se conclut par un verdict binaire : **conforme** ou **non conforme**.
 
 ---
@@ -28,9 +30,9 @@ Le périmètre exact :
 
 ### 1.2 Ce que ce cahier ne couvre pas
 
-- Les parcours **membres** (publication d'un trajet, réservation, paiement, remise, notation, messagerie côté Expéditeur / Voyageur) : voir **`docs/recette/RECETTE-01-MEMBRE.md`**.
+- Les parcours **membres** (publication d'un trajet, réservation, paiement, remise, notation, messagerie côté Expéditeur / Voyageur) : voir **`docs/recette/RECETTE-01-WEB.md`**.
 - Les **contrats d'API** pris isolément (codes de retour, schémas OpenAPI, en-têtes) : voir **`docs/recette/RECETTE-03-API.md`**.
-- L'**exploitation** au sens infrastructure (déploiement, variables d'environnement, sauvegardes, moniteur externe, Sentry) : voir **`docs/recette/RECETTE-04-EXPLOITATION.md`**.
+- L'**exploitation** au sens infrastructure (déploiement, variables d'environnement, sauvegardes, moniteur externe, Sentry) : voir **`docs/recette/RECETTE-04-CRONS.md`**.
 
 Quand un scénario admin a un effet visible côté membre (une suspension qui bloque une réservation, un masquage qui retire un trajet de la recherche, un paramètre qui change un prix), ce cahier **exige la vérification côté membre** mais ne détaille pas le parcours membre : il renvoie au cahier 01.
 
@@ -56,7 +58,7 @@ Quand un scénario admin a un effet visible côté membre (une suspension qui bl
 |---|---|---|
 | Base MongoDB | `DATABASE_URL` dans le `.env` de la racine | `npx prisma db push` répond sans erreur |
 | Redis | `REDIS_DATABASE_URI` | indispensable aux sessions admin, aux battements de cron, aux compteurs de pilotage |
-| Redpanda (Kafka) | facultatif | son arrêt est **volontairement** utilisé au scénario `ADM-ETA-5` |
+| Redpanda (Kafka) | facultatif | son arrêt est **volontairement** utilisé au scénario `ADM-ETA-3` (bloc outbox : les événements s'empilent, rien ne se perd) |
 | Services | `npm run dev` (tout) ou service par service | gateway `:8080`, auth `:6001`, trip `:6002`, deal `:6003`, notification `:6004`, message `:6005` |
 | Back-office | `npx nx dev admin-ui` | http://localhost:3001 |
 | Front membre | `npx nx dev user-ui` | http://localhost:3000 — nécessaire aux scénarios à effet croisé |
@@ -177,7 +179,11 @@ npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --re
 
 > **Astuce de recette.** Prévois **deux** codes de secours par compte : le scénario du blocage après cinq échecs consomme du temps, celui du code de secours consomme un code.
 >
-> **Il n'existe aucun écran pour régénérer des codes ou réinitialiser la 2FA.** Si l'application d'authentification est perdue, le seul chemin est `grant-admin.ts --revoke` puis une nouvelle attribution de profil (le retrait efface le secret TOTP), ce qui **réenrôle** au prochain accès.
+> **Régénérer SES PROPRES codes de secours existe** depuis « Mes sessions » (A190 a) : il faut un code TOTP valide —
+> jamais un code de secours, on ne renouvelle pas la clé de secours avec elle-même. Voir `ADM-SES-2`.
+> **En revanche, il n'existe aucun écran pour réinitialiser la 2FA d'un AUTRE administrateur.** Si l'application
+> d'authentification est perdue (et qu'il ne reste aucun code de secours), le seul chemin est `grant-admin.ts --revoke`
+> puis une nouvelle attribution de profil (le retrait efface le secret TOTP), ce qui **réenrôle** au prochain accès.
 
 ### 2.6 Deux profils simultanés
 
@@ -395,7 +401,10 @@ Ce chapitre passe en premier : tout le reste du cahier suppose qu'une session ad
 **Résultat attendu :**
 - Étape 3 → session ouverte, arrivée sur `/home`.
 - Étape 4 → refus « Code invalide. » : un code de secours ne sert **qu'une fois**.
-- Étape 5 → quand il reste **deux codes ou moins**, la barre latérale affiche « Il te reste n code(s) de secours ». Au-dessus de deux, aucun avertissement.
+- Étape 5 → quand il reste **deux codes ou moins**, la barre latérale avertit, au pluriel accordé : « Il te reste 2 codes
+  de secours — tu peux les régénérer depuis « Mes sessions ». » (« 1 code » au singulier). À **zéro**, le message dit le
+  recours : « Tu n'as plus de code de secours : régénère-les depuis « Mes sessions » avec un code de ton application
+  d'authentification. » Au-dessus de deux, aucun avertissement.
 
 **Lignes de journal attendues :** deux lignes pour une seule connexion.
 
@@ -871,7 +880,7 @@ Le menu complet, dans l'ordre exact du code, et la permission qui le gouverne :
 | Retenues à arbitrer | **1** | `/disputes` |
 | Billets à vérifier | **1** | `/tickets` |
 | Masquages proposés | **0** | `/trips?hideProposed=1` |
-| Sanctions proposées | **0** | `/users` |
+| Sanctions proposées | **0** | `/users?proposal=1` (A194) |
 | Versements en échec | **1** | `/finances?kind=FAILED` |
 | Transferts renversés | **1** | `/finances?kind=REVERSED` |
 | Remboursements proposés | **0** | `/finances?kind=PROPOSED_REFUNDS` |
@@ -2780,7 +2789,10 @@ La décision et la ligne de journal sont écrites dans **une seule** transaction
 - Étape 4 → le membre apparaît comme « Membre supprimé » ; un second effacement répond **404** « User not found. ».
 - Étape 5 → **une seule transaction** a : mis le prénom à « Membre » et le nom à « supprimé » ; remplacé l'email par `erased+<id>@anonymised.invalid` et le slug par `deleted-<id>` (**jamais `null`** sur un champ unique, sous peine de collision) ; effacé mot de passe, téléphones, genre, date de naissance, secret TOTP et rôles client ; posé `isDeleted` et `deletedAt` ; anonymisé la `CarrierPage` et **déplacé** `stripeAccountId` dans `ErasedAccount` (obligations comptables : le compte Stripe Connect n'est **pas** supprimé) ; supprimé adresses, identités OAuth, avatar, abonnements, alertes route, favoris, notifications et justificatifs de trajet (fichiers ImageKit compris).
 - Étape 6 → réservations, litiges, avis, messages, rendez-vous, révélations de numéro, signalements et journal admin sont **conservés**, l'auteur devenant « Membre supprimé ». Le `ConsentLog` est gardé **sans IP ni user-agent**.
-- Étape 7 → la connexion répond **401** avec le code `ACCOUNT_DELETED`. Toutes ses sessions ont été révoquées.
+- Étape 7 → la connexion répond **401** `INVALID_CREDENTIALS` — **pas** un code qui dirait « ce compte est effacé » :
+  l'adresse effacée est devenue `erased+<id>@anonymised.invalid`, l'ancienne n'est plus connue de personne, et distinguer
+  les deux cas révélerait que le compte a existé (décision du § 5.21). Toutes ses sessions ont été révoquées.
+  (`ACCOUNT_DELETED` existe, mais sur un tout autre chemin : refuser un **profil admin** à un compte effacé.)
 - Étape 8 → ✉ un email de confirmation, **sans lien**, part à l'ancienne adresse. Ensuite, **plus aucun email ne part** vers ce compte : tout résolveur de destinataire doit ignorer `isDeleted`.
 - Étape 9 → une ligne apparaît au registre : type « Effacement », canal « par l'admin ({nom}) », issue « faite ».
 - Étape 10 → **403** « You cannot erase your own account from the back-office. ».
@@ -3015,7 +3027,10 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 **Résultat attendu :**
 - Étape 1 → refus **409** : « L'état a changé entre-temps : la page est rechargée. » (message serveur « The maintenance state changed meanwhile… »).
 - Étape 3 → le badge « **forcée par l'environnement du gateway** » s'affiche à côté du titre « Maintenance ».
-- Étape 4 → **impossible** : l'interrupteur d'environnement l'emporte sur la base. C'est prévu pour le jour où Mongo lui-même est la panne.
+- Étape 4 → **impossible**, et l'écran le dit AVANT le clic (A182) : le formulaire est remplacé par l'explication
+  (« la maintenance est forcée par l'environnement du gateway : la lever passe par l'environnement, pas par cette
+  page »). Le refus **409** reste prouvable par appel direct à l'API. L'interrupteur d'environnement l'emporte sur la
+  base : c'est prévu pour le jour où Mongo lui-même est la panne.
 - Étape 6 → le Support **lit** la page (`status.read` est ouvert à tous les profils) mais voit « Profil Exploitation ou super administrateur pour modifier. » à la place du formulaire.
 
 **Ligne de journal attendue :** seulement pour l'écriture réussie de l'étape 1. L'interrupteur d'environnement, lui, n'écrit **rien** au journal : c'est un geste d'exploitation hors application, à consigner ailleurs.
@@ -3026,7 +3041,7 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 
 ### 5.24 Journal d'audit (`/audit`)
 
-#### ADM-JRN-1 — Le journal et ses six filtres serveur
+#### ADM-JRN-1 — Le journal et ses filtres serveur (six saisissables, l'auteur par clic)
 
 **Gravité : bloquante.**
 **Préconditions :** session **Finance** ou **super administrateur** (`audit.read`). Plusieurs gestes admin déjà joués.
@@ -3045,7 +3060,13 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 11. Cliquer une cellule « Qui », « Action », « Cible », « IP ».
 
 **Résultat attendu :**
-- Étape 2 → six filtres **serveur** : « Du », « Au », « Action », « Type de cible », « Identifiant de cible », « IP ». Le select « Type de cible » propose : `USER`, `BOOKING`, `DISPUTE`, `TRIP`, `SESSION`, `SETTINGS`, `REPORT`, `MAINTENANCE`, `EXPORT`.
+- Étape 2 → six filtres **serveur** saisissables : « Du », « Au », « Action », « Type de cible », « Identifiant de cible »,
+  « IP ». L'**auteur** est un septième filtre serveur, posé par clic sur la pastille de la colonne « Qui » (étape 11) —
+  il n'a pas de select. Le select « Type de cible » propose les types **réellement écrits** (A183), en français :
+  « Membre » (`USER`), « Deal » (`BOOKING`), « Trajet » (`TRIP`), « Conversation » (`CONVERSATION`), « Signalement »
+  (`REPORT`), « Session admin » (`SESSION`), « Paramètres » (`SETTINGS`). ⚠️ `DISPUTE`, `MAINTENANCE` et `EXPORT` **ne
+  doivent plus y figurer** : ils n'ont jamais été écrits (un litige tranché est journalisé sur le `BOOKING`, un
+  changement de maintenance sur `SETTINGS`). Les revoir serait une anomalie.
 - Étape 8 → la recherche « contient » ne porte **que sur les lignes déjà chargées**. L'écran le dit : « La recherche « contient » ne porte que sur les lignes déjà chargées : le détail est du JSON, il ne s'indexe pas. ».
 - Étape 9 → « {n} ligne(s) affichée(s) », complété de « sur {n} chargées » quand la recherche libre est active, puis « Filtres serveur : {liste} ». Le bouton « Tout effacer » n'apparaît que si un filtre est renseigné.
 - Étape 11 → chaque valeur est **cliquable** et pose le filtre correspondant (info-bulles « Filtrer sur cet auteur », « Filtrer sur cette action », « Filtrer sur cette cible », « Filtrer sur cette IP »).
@@ -3068,7 +3089,7 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 2. Relever la colonne « Action » : chercher un **code brut** en majuscules avec des tirets bas.
 3. Vérifier en particulier « Signalement traité » et « Message signalé traité ».
 
-**Résultat attendu :** toutes les actions s'affichent avec un libellé français. Aucune n'apparaît sous sa forme technique. Les 43 libellés attendus incluent notamment : « Connexion admin », « Déconnexion », « 2FA activée », « Code de secours utilisé », « Session révoquée », « Admin invité », « Invitation acceptée », « Profil admin modifié », « Accès admin retiré », « Fiche consultée », « Suspension proposée », « Compte restreint », « Compte suspendu », « Compte rétabli », « Suppression d'adresse levée », « Compte effacé (RGPD) », « Registre RGPD consulté », « Trajet consulté », « Masquage proposé », « Trajet masqué », « Trajet rétabli », « Document ouvert », « Billet vérifié », « Billet rejeté », « Dossier consulté », « Litige tranché », « Retenue arbitrée », « Fiche argent consultée », « Rapprochement Stripe », « Versement rejoué », « Renversement clos », « Export finances », « Remboursement manuel proposé », « Remboursement manuel appliqué », « Chronologie consultée », « Liste d'inscriptions consultée (pilotage) », « Export CSV », « Conversation consultée », « Message signalé traité », « **Signalement traité** », « Paramètre modifié », « Paramètre réinitialisé », « État de maintenance modifié ».
+**Résultat attendu :** toutes les actions s'affichent avec un libellé français. Aucune n'apparaît sous sa forme technique. Les 43 libellés attendus incluent notamment : « Connexion admin », « Déconnexion », « 2FA activée », « Code de secours utilisé », « Session révoquée », « Admin invité », « Invitation acceptée », « Profil admin modifié », « Accès admin retiré », « Fiche consultée », « Suspension proposée », « Compte restreint », « Compte suspendu », « Compte rétabli », « Suppression d'adresse levée », « Compte effacé (RGPD) », « Registre RGPD consulté », « Trajet consulté », « Masquage proposé », « Trajet masqué », « Trajet rétabli », « Document ouvert », « Billet vérifié », « Billet rejeté », « Dossier consulté », « Litige tranché », « Retenue arbitrée », « Fiche argent consultée », « Rapprochement fournisseur » (et non « Rapprochement Stripe » : le libellé ne nomme plus le fournisseur depuis le § 5.13), « Versement rejoué », « Renversement clos », « Export finances », « Remboursement manuel proposé », « Remboursement manuel appliqué », « Chronologie consultée », « Liste d'inscriptions consultée (pilotage) », « Export CSV », « Conversation consultée », « Message signalé traité », « **Signalement traité** », « Paramètre modifié », « Paramètre réinitialisé », « État de maintenance modifié ».
 
 > **Point de non-régression.** Le libellé de `REPORT_REVIEWED` (« Signalement traité ») **manquait** : le journal affichait le code brut. Voir `ADM-NRG-3`.
 
@@ -3199,7 +3220,8 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 - Étape 2 → « Profils posés sur un compte existant, email envoyé. ».
 - Étape 3 → ✉ email « Accès au back-office Yamba accordé », avec un lien vers `/login` (pas de mot de passe à poser : le compte en a déjà un).
 - Étape 4 → le rôle client (`SHIPPER`) est **conservé**.
-- Étape 5 → refus **400** « This account already has an admin profile. ».
+- Étape 5 → refus **400** « This account already has an admin profile. » — c'est aussi, mot pour mot, la réponse du
+  **perdant de deux invitations simultanées** sur la même adresse (garde serveur, pas seulement lecture d'écran).
 
 **Ligne de journal attendue :**
 
@@ -3218,8 +3240,8 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 **Étapes :**
 1. Sur la ligne d'un admin, cocher un profil supplémentaire.
 2. Décocher tous ses profils sauf un, puis tenter de décocher le dernier.
-3. Sur **sa propre** ligne, tenter de changer ses profils, puis de cliquer « Retirer ».
-4. S'il ne reste qu'un super administrateur, tenter de décocher son profil `SUPER_ADMIN`.
+3. Sur **sa propre** ligne, chercher à changer ses profils, puis à cliquer « Retirer ».
+4. S'il ne reste qu'un super administrateur, chercher à décocher son profil `SUPER_ADMIN`.
 5. Sur la ligne d'un autre admin, cliquer « Retirer » et lire la confirmation du navigateur.
 6. Confirmer. Puis vérifier : le compte dans `/users`, ses sessions admin, sa 2FA.
 7. Depuis la session de l'admin retiré (si elle était ouverte), naviguer.
@@ -3227,8 +3249,12 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 **Résultat attendu :**
 - Étape 1 → la liste est **remplacée en entier** par la nouvelle sélection (ce n'est pas une union avec l'ancienne).
 - Étape 2 → au moins un profil reste coché.
-- Étape 3 → **403** dans les deux cas.
-- Étape 4 → **403** « The last super administrator cannot be downgraded / revoked. ».
+- Étape 3 → l'écran **ne le propose plus** : sur sa propre ligne, les cases sont désactivées et « Retirer » absent.
+  Le **403** reste la réponse de l'API, à prouver par appel direct (l'écran ne doit jamais offrir un geste qui échoue).
+- Étape 4 → **403** « The last super administrator cannot be downgraded / revoked. » — mais la garde n'est **pas
+  atteignable par l'écran** (on ne touche pas à sa propre ligne, et viser un AUTRE super administrateur suppose d'être
+  deux) : elle se déclenche sous gestes croisés ou quand l'autre n'est plus en service. Prouvée par test unitaire et par le harnais
+  (`apps/e2e/src/admin/adm-cpt-comptes-admin.spec.ts`, fiche ajoutée hors cahier).
 - Étape 5 → confirmation du navigateur : « Retirer l'accès admin de {prénom} {nom} ? Sa 2FA et ses sessions admin sont supprimées. ».
 - Étape 6 → tous ses profils sont vidés, le rôle ADMIN est retiré, **le secret TOTP et les codes de secours sont effacés**, et ses sessions admin tombent. Le compte membre, lui, subsiste.
 - Étape 7 → renvoi immédiat à `/login` : le middleware refuse un compte sans profil admin.
@@ -3248,7 +3274,9 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 
 **Gravité : majeure.**
 
-**Objet :** vérifier que la **seule** procédure documentée fonctionne, puisqu'il n'existe **aucun écran** pour régénérer des codes de secours ni réinitialiser la 2FA.
+**Objet :** vérifier que la **seule** procédure documentée fonctionne quand la 2FA d'un **autre** administrateur est perdue :
+il n'existe aucun écran pour la réinitialiser. (Régénérer **ses propres** codes de secours, en revanche, existe depuis
+« Mes sessions » — A190 a, scénario `ADM-SES-2` : ce chemin-ci ne sert que si l'admin n'a plus ni application ni code.)
 
 **Étapes :**
 1. Sur `/admins`, « Retirer » le compte concerné, puis le réinviter avec ses profils.
@@ -3283,10 +3311,60 @@ Cette ligne est écrite **dans la transaction d'effacement**.
 
 **Résultat attendu :**
 - Étape 1 → **il n'existe pas** de page « Mon compte » : l'identité de l'admin vit dans la barre latérale.
-- Étape 2 → la barre affiche « Yamba · Admin », le prénom et le nom, le libellé des profils cumulés (« Support + Finance »), l'avertissement « Il te reste {n} code(s) de secours. » quand il en reste deux ou moins, et « Se déconnecter ».
-- Étape 4 → **aucun** de ces gestes n'existe dans le back-office. Le mot de passe d'un compte admin se change par le **parcours membre**, sous la fenêtre de confirmation renforcée, puisque c'est le même compte.
+- Étape 2 → la barre affiche « Yamba · Admin », le prénom et le nom, le libellé des profils cumulés (« Support + Finance »), l'avertissement de codes de secours quand il en reste **deux ou moins** (pluriel accordé, et à zéro le recours — voir
+  `ADM-SEC-4`), et « Se déconnecter ».
+- Étape 4 → le mot de passe et l'email **n'ont aucun écran admin** : ils se changent par le **parcours membre**, sous la
+  fenêtre de confirmation renforcée, puisque c'est le même compte. **Régénérer ses codes de secours, en revanche, existe**
+  depuis cette page (A190 a) — c'est l'objet de `ADM-SES-2`.
 
-**Ligne de journal attendue :** `ADMIN_LOGOUT` sur déconnexion.
+**Précisions issues des corrections de la campagne (à vérifier en passant) :**
+- Chaque ligne nomme l'**appareil** et l'**adresse IP**, et « cette session » est marquée : on révoque la bonne (ANO-ADM-81).
+- Serveur injoignable → « Se déconnecter » et « Révoquer » disent que **la session reste ouverte**, jamais un faux succès (ANO-ADM-82).
+- Une panne de chargement n'affiche **pas** « Aucune session. » : le message distingue l'absence de la panne, et le recours est nommé (ANO-ADM-84).
+
+**Ligne de journal attendue :** `ADMIN_LOGOUT` sur déconnexion — et **rien** quand le geste n'a rien fait : une déconnexion
+rejouée ou la révocation d'une session déjà fermée n'écrit aucune ligne (ANO-ADM-83).
+
+**Verdict :** ☐ conforme ☐ non conforme
+
+---
+
+#### ADM-SES-2 — Régénérer mes codes de secours, fermer mes autres sessions
+
+**Gravité : majeure.**
+
+**Objet :** deux gestes ajoutés après la campagne (A190 a, b). Ils remplacent, pour l'admin qui a **encore** accès à son
+compte, le détour « retirer / réinviter » de `ADM-CPT-5`.
+
+**Préconditions :** être connecté sur **deux** navigateurs (ou deux profils) avec le même compte admin.
+
+**Étapes :**
+1. Sur `/sessions`, compter les lignes : il doit y en avoir deux, dont une marquée « cette session ».
+2. Cliquer « Révoquer toutes mes autres sessions ».
+3. Recharger l'autre navigateur.
+4. Saisir **000000** dans « Code de l'application d'authentification », puis « Régénérer mes codes de secours ».
+5. Attendre le **pas suivant** de l'application d'authentification, saisir le vrai code, puis régénérer.
+6. Cliquer « Je les ai notés », puis chercher à revoir la liste.
+7. Se déconnecter, puis ouvrir une session avec **un des nouveaux codes de secours**.
+
+**Résultat attendu :**
+- Étape 2 → « 1 autre session fermée. Cette session reste ouverte. » ; il ne reste qu'une ligne, et le bouton **disparaît**
+  (plus rien à révoquer).
+- Étape 3 → l'autre navigateur est **coupé** (401, retour à la connexion).
+- Étape 4 → refus **en français** (« Code incorrect : saisis le code à six chiffres… ») et **on reste sur `/sessions`** :
+  la session en cours est valide, un retour à `/login` serait une anomalie.
+- Étape 5 → au moins **huit** codes, montrés **une seule fois**. ⚠️ Un pas TOTP qui vient de servir est **brûlé**
+  (anti-rejeu) : enchaîner deux gestes TOTP demande d'attendre le pas suivant — ce n'est pas une anomalie.
+- Étape 6 → la liste **disparaît** et n'est plus consultable ; l'avertissement « Il te reste {n} code(s) de secours. »
+  a disparu de la barre latérale (le compteur est reparti à huit).
+- Étape 7 → le code ouvre bien une session, et le compte de codes restants **baisse d'une unité**.
+- Un code de secours ne permet **pas** de régénérer les codes de secours : seul un code de l'application est accepté
+  (on ne renouvelle pas la clé de secours avec elle-même).
+- Trop d'essais → **403** « trop de tentatives », jamais **401** : un 401 ferait renouveler le jeton par le client et
+  compterait un second échec.
+
+**Ligne de journal attendue :** `ADMIN_SESSIONS_REVOKED { count }` à l'étape 2 (aucune ligne si rien n'a été fermé) et
+`ADMIN_BACKUP_CODES_REGENERATED` à l'étape 5, avec `before/after: { remaining }` — **jamais** un code en clair.
 
 **Verdict :** ☐ conforme ☐ non conforme
 
@@ -3308,8 +3386,8 @@ Rejouer le jeu d'essai avant chaque cas.
 | # | Acteur | Geste | Résultat attendu | Ligne de journal |
 |---|---|---|---|---|
 | 1 | — | Rejouer le jeu d'essai | 2 litiges, 1 retenue en file | — |
-| 2 | Super administrateur | Abaisser `dispute.responseDelayHours` à 1 h, motif ≥ 20 | Le dossier `YAM-2041` devient décidable | `SETTING_CHANGED` · `SETTINGS · dispute.responseDelayHours` |
-| 3 | Médiateur | Ouvrir `/home` | Tuile « Litiges à trancher » = 2, en ambre | — |
+| 2 | Super administrateur | Abaisser `dispute.responseDelayHours` à son **minimum, 12 h** (1 h est refusé par les bornes du catalogue), motif ≥ 20 | Le dossier `YAM-2041` devient décidable. ⚠️ Depuis A169, le paramètre **ne rend pas décidable un litige déjà ouvert** : un dossier signalé il y a moins de 12 h (YAM-2042) reste non décidable, et la tuile « Litiges à trancher » vaut **1**, pas 2 | `SETTING_CHANGED` · `SETTINGS · dispute.responseDelayHours` |
+| 3 | Médiateur | Ouvrir `/home` | Tuile « Litiges à trancher » en ambre — **1** avec le jeu d'essai neuf (voir l'étape 2) | — |
 | 4 | Médiateur | Cliquer la tuile | Arrivée sur `/disputes`, compteur « 3 affiché(s) · file entière : 2 litige(s) · 1 retenue(s) » | — |
 | 5 | Médiateur | Ouvrir `YAM-2041` | Dossier complet ; bandeau « délai passé, décision possible sans sa version » | `DISPUTE_VIEWED` · `BOOKING · <id>` |
 | 6 | Médiateur | Cliquer « Lire la conversation des deux parties → » | Le fil s'affiche, sans aucun numéro de téléphone | `CONVERSATION_VIEWED` · `CONVERSATION · <id>` |
@@ -3321,8 +3399,8 @@ Rejouer le jeu d'essai avant chaque cas.
 | 12 | Médiateur | Rouvrir `/home` | Tuile « Litiges à trancher » = 1 | — |
 | 13 | Finance | Ouvrir `/finances/report` | Le remboursement apparaît au mois courant ; le revenu reconnu du deal terminé est comptabilisé | — |
 | 14 | Finance | Ouvrir `/deals/<id>`, « Charger la chronologie » | Un événement `booking.dispute_resolved` figure dans la chronologie, publié ou en attente | `DEAL_HISTORY_VIEWED` |
-| 15 | Super administrateur | Remettre `dispute.responseDelayHours` à 72, motif ≥ 20 | Version incrémentée | `SETTING_CHANGED` |
-| 16 | Finance | Ouvrir `/audit`, filtrer sur la cible = l'identifiant du deal | **Toutes** les lignes ci-dessus, dans l'ordre chronologique, avec le bon auteur | — |
+| 15 | Super administrateur | Remettre `dispute.responseDelayHours` à sa valeur par défaut (**72**), motif ≥ 20 | Version incrémentée | `SETTING_CHANGED` |
+| 16 | Finance | Ouvrir `/audit`, filtrer sur la cible = l'identifiant du deal | Les lignes portées par **ce deal**, dans l'ordre chronologique, avec le bon auteur — soit **quatre** ici. ⚠️ `CONVERSATION_VIEWED` vise la CONVERSATION et les `SETTING_CHANGED` la CLÉ de paramètre : ces lignes-là ne remontent pas sous ce filtre, et c'est correct (chaque ligne vise ce qu'elle a touché) | — |
 
 **Contrôle final :** le dossier ne peut plus être tranché (409), aucune invitation à noter n'est partie (un deal clos par médiation ne se note pas), et le fil de discussion est passé en lecture seule pendant le litige.
 
@@ -3353,7 +3431,7 @@ Rejouer le jeu d'essai avant chaque cas.
 | 14 | Médiateur | « Lever », motif ≥ 20 | Badge « Actif », champs de sanction effacés | `USER_REINSTATED` |
 | 15 | Marc (front) | Se reconnecter, publier | Tout refonctionne ; ses trajets sont de nouveau dans la recherche | — |
 | 16 | — | Mailpit | ✉ « Ton compte Yamba est rétabli » | — |
-| 17 | Finance | `/audit`, filtrer sur la cible = identifiant de Marc | Les cinq lignes de gestes plus les consultations | — |
+| 17 | Finance | `/audit`, filtrer sur la cible = identifiant de Marc | **Quatre** lignes de gestes — `USER_SUSPENSION_PROPOSED`, `USER_RESTRICTED`, `USER_SUSPENDED`, `USER_REINSTATED` — plus les consultations (`USER_VIEWED`) | — |
 
 **Verdict :** ☐ conforme ☐ non conforme
 
@@ -3376,7 +3454,7 @@ Rejouer le jeu d'essai avant chaque cas.
 | 8 | Support | Vérifier le statut du compte et ses trajets | `ACTIVE`, trajets visibles : **rien d'automatique** | — |
 | 9 | Support | « Proposer » Restreint, motif ≥ 20 | Bandeau ambre | `USER_SUSPENSION_PROPOSED` |
 | 10 | Médiateur | « Appliquer » | Compte restreint, email au membre | `USER_RESTRICTED` |
-| 11 | Support | Revenir sur `/reports`, note « restreint le {date} », « Traité » ×3 | Les trois cartes passent dans l'onglet « traité » | `REPORT_REVIEWED` ×3 |
+| 11 | Support | Revenir sur `/reports`, note « restreint le {date} », « Traité » ×3 | Les trois cartes passent dans l'onglet « traité ». ⚠️ Dès le **premier** « Traité », la ligne n'est plus « Prioritaire » (le badge compte les signalements OUVERTS : il n'en reste que deux) — ce n'est pas une anomalie | `REPORT_REVIEWED` ×3 |
 | 12 | Support | Onglet « à traiter » | Vide ; la tuile d'accueil revient à 0 | — |
 | 13 | — | Mailpit | ✉ **aucun** email n'est parti aux auteurs des signalements : ils n'apprennent pas la suite | — |
 
@@ -3445,13 +3523,13 @@ Rejouer le jeu d'essai avant chaque cas.
 | 1 | — | Créer un compte membre de test depuis le front, avec adresse, avatar, un favori et une alerte route ; lui faire réserver un colis (deal `ACCEPTED`) | Compte complet, un deal vivant | — |
 | 2 | Données personnelles | Ouvrir `/privacy` | Registre vide ou avec les demandes antérieures | `DATA_REQUESTS_VIEWED` |
 | 3 | Données personnelles | Ouvrir la fiche du membre | Carte « Effacer ce compte (RGPD) » présente | `USER_VIEWED` |
-| 4 | Données personnelles | Motif « Demande reçue par email le {date}, identité vérifiée », `EFFACER`, « Effacer définitivement » | **409** « Refusé pour l'instant : un deal en cours. » | **aucune** ligne `ACCOUNT_ERASED` |
+| 4 | Données personnelles | Motif « Demande reçue par email le {date}, identité vérifiée », `EFFACER`, « Effacer définitivement » | Le bouton est **inactif** : les bloqueurs sont affichés AVANT le clic (A179 b, « un deal en cours »). Le **409** « Refusé pour l'instant : un deal en cours. » se prouve par appel direct à l'API | **aucune** ligne `ACCOUNT_ERASED` |
 | 5 | Données personnelles | Ouvrir `/privacy` | Une ligne « Effacement · par l'admin ({nom}) · **refusée** · deal en cours » | `DATA_REQUESTS_VIEWED` |
 | 6 | Membre + Voyageur (front) | Terminer ou annuler le deal, régler le versement | Plus aucun bloqueur | — |
 | 7 | Données personnelles | Reprendre l'effacement | « Compte effacé : identité et coordonnées supprimées, réservations conservées sans nom, journal écrit, email de confirmation envoyé à l'ancienne adresse. » | `ACCOUNT_ERASED` · `USER · <id>` |
 | 8 | — | Vérifier en base | Prénom « Membre », nom « supprimé », email `erased+<id>@anonymised.invalid`, slug `deleted-<id>` (**jamais null**), `isDeleted` posé ; adresses, avatar, favoris, alertes, notifications supprimés ; `stripeAccountId` **déplacé** dans `ErasedAccount` | — |
 | 9 | — | Ouvrir la réservation du membre | Elle existe toujours, l'auteur devient « Membre supprimé » | — |
-| 10 | Membre (front) | Tenter de se connecter | **401** `ACCOUNT_DELETED` | — |
+| 10 | Membre (front) | Tenter de se connecter | **401** `INVALID_CREDENTIALS` (décision du § 5.21 : un compte effacé ne se distingue pas d'une adresse inconnue — le dire serait révéler qu'il a existé) | — |
 | 11 | — | Mailpit | ✉ **un seul** email de confirmation, **sans lien**, à l'ancienne adresse. Ensuite, **plus rien** ne part vers ce compte | — |
 | 12 | Données personnelles | Ouvrir `/privacy` | Une ligne « Effacement · par l'admin · **faite** » | `DATA_REQUESTS_VIEWED` |
 | 13 | Données personnelles | Tenter d'effacer **son propre** compte | **403** « You cannot erase your own account from the back-office. » | aucune |
@@ -3468,7 +3546,7 @@ Rejouer le jeu d'essai avant chaque cas.
 | # | Acteur | Geste | Résultat attendu | Ligne de journal |
 |---|---|---|---|---|
 | 1 | Exploitation | Abaisser `alerts.payoutFailedHours` à 1 h, motif ≥ 20 | Enregistré | `SETTING_CHANGED` |
-| 2 | Finance | Ouvrir `/home` | Le bandeau annonce « n alertes de seuil · 1 critique » avec un lien vers `/alerts` | — |
+| 2 | Finance | Ouvrir `/home` | Le bandeau annonce « n alertes de seuil · n critique(s) » avec un lien vers `/alerts`. ⚠️ Le jeu d'essai franchit **d'autres** seuils que celui de ce scénario : le compte n'est pas forcément « 1 critique » — lire le bandeau, ne pas exiger un chiffre | — |
 | 3 | Finance | Ouvrir `/alerts` | Carte critique `PAYOUT_FAILED_48H`, badge « 1 concerné », « Aller traiter → » | — |
 | 4 | Finance | Cliquer « Aller traiter → » | Arrivée sur `/finances?kind=FAILED`, onglet présélectionné | — |
 | 5 | Finance | Lire la ligne | Motif « compte Stripe du Voyageur non prêt », détail brut du fournisseur, « 4 tentative(s) », badge « Stripe non prêt » | — |
@@ -3535,7 +3613,9 @@ Ces scénarios vérifient des correctifs déjà livrés. Ils sont **courts** et 
 | `/pilotage` | « Les alertes de seuil arrivent avec C-PR6b » | un sous-titre sans cette mention (les alertes ont leur page `/alerts`) |
 | `/disputes/[id]`, formulaire « Trancher » | « 72 h laissées au Voyageur » en dur | un texte qui renvoie au **paramètre**, l'échéance affichée restant calculée à partir de sa valeur |
 
-**Résultat attendu :** aucun de ces cinq écrans ne mentionne une fonction « à venir » déjà livrée, ni un délai en dur qui contredit un paramètre réglable.
+**Résultat attendu :** aucune de ces cinq entrées ne mentionne une fonction « à venir » déjà livrée, ni un délai en dur
+qui contredit un paramètre réglable. ⚠️ La cinquième n'est **pas** un sous-titre : `/disputes/[id]` n'en a pas — c'est le
+**texte du formulaire « Trancher »** qui est vérifié.
 
 > **À vérifier en priorité :** le sous-titre de `/pilotage` est le dernier de la liste à avoir été corrigé. S'il contient encore « Les alertes de seuil arrivent avec C-PR6b », c'est une **non-conformité cosmétique** à consigner : les alertes sont livrées et ont leur propre entrée de menu.
 
@@ -3653,7 +3733,12 @@ Ces scénarios vérifient des correctifs déjà livrés. Ils sont **courts** et 
 
 **Résultat attendu :**
 - Étape 1 → **six** filtres serveur plus un champ de recherche locale.
-- Étape 3 → les filtres réellement appliqués côté serveur sont **nommés**. Une valeur mal formée (identifiant trop court, date invalide) est **ignorée**, pas rejetée par une erreur.
+- Étape 3 → les filtres réellement appliqués côté serveur sont **nommés**. Une valeur mal formée est **ignorée**, pas
+  rejetée par une erreur : date illisible (« hier »), auteur qui n'est pas un ObjectId, identifiant de cible contenant un
+  espace ou un caractère interdit (`{ $ne: 1 }`, `a b`) ou dépassant 100 caractères. ⚠️ Un identifiant **court** est au
+  contraire une valeur **légitime** depuis ANO-ADM-74 : `maintenance`, une clé de paramètre (`pricing.commissionPct`),
+  l'identifiant d'une session admin (32 caractères). Il est **appliqué** — et rend « 0 ligne affichée » s'il ne
+  correspond à rien, ce qui est la bonne réponse. S'il était ignoré (toutes les lignes rendues), ce serait une anomalie.
 - Étape 4 → la note dit clairement que la recherche libre ne porte que sur les lignes déjà chargées.
 - Étape 5 → chaque valeur cliquable pose son filtre.
 - Étape 7 → le détail est **lisible** (« clé : valeur · clé : valeur »), pas un bloc de JSON brut.
@@ -3664,18 +3749,21 @@ Ces scénarios vérifient des correctifs déjà livrés. Ils sont **courts** et 
 
 ---
 
-### ADM-NRG-7 — Les cinq écarts documentaires connus
+### ADM-NRG-7 — Les écarts documentaires connus (deux levés, trois restants)
 
 **Gravité : documentaire.**
-**Objet :** ces écarts sont **attendus**. Le testeur les constate et les consigne sans les traiter comme des anomalies fonctionnelles.
+**Objet :** ces écarts sont **attendus**. Le testeur les constate et les consigne sans les traiter comme des anomalies
+fonctionnelles. Deux d'entre eux (4 et 5) ont été levés ou réduits depuis la rédaction : leur numéro est conservé parce
+que les résultats de campagne y renvoient, mais **le constat attendu a changé** — c'est désormais l'ancien comportement
+qui serait l'anomalie.
 
 | # | Constat attendu | Verdict attendu |
 |---|---|---|
 | 1 | L'export nominatif fonctionne aussi pour le profil **Données personnelles**, alors que plusieurs documents disent « super administrateur seul » | Le **code** fait foi : conforme, écart documentaire |
 | 2 | Le nom d'une règle d'alerte garde son seuil historique (`PAYOUT_FAILED_48H`) même quand le paramètre vaut 1 h | Conforme, écart assumé |
 | 3 | Un refus d'effacement (409) est inscrit au registre `DataRequest` mais **pas** au journal admin | Conforme en l'état ; **à arbitrer** : le registre suffit-il comme preuve ? |
-| 4 | La tuile « Sanctions proposées » de l'accueil mène à `/users` **sans** filtre : il n'existe pas de filtre serveur « proposition en cours » | Conforme en l'état ; gêne d'usage à signaler |
-| 5 | Il n'existe **aucun** écran pour régénérer des codes de secours ni réinitialiser la 2FA | Conforme en l'état ; procédure « retirer / réinviter » documentée en `ADM-CPT-5` |
+| 4 | ~~La tuile « Sanctions proposées » mène à `/users` **sans** filtre~~ — **LEVÉ (A194)** : filtre serveur `proposal=1`, la tuile ouvre `/users?proposal=1` et l'écran part des filtres de l'URL | La tuile mène à la liste **filtrée**. Un retour à la liste entière serait une anomalie |
+| 5 | **RÉDUIT (A190 a)** : régénérer **ses propres** codes de secours existe (`ADM-SES-2`). Reste sans écran : réinitialiser la 2FA d'un **autre** administrateur | Conforme en l'état ; procédure « retirer / réinviter » documentée en `ADM-CPT-5` |
 
 **Verdict :** ☐ constaté ☐ divergent (préciser)
 
@@ -3789,7 +3877,7 @@ Ces scénarios vérifient des correctifs déjà livrés. Ils sont **courts** et 
 | ADM-MNT-2 | Lecture seule | bloquante | | ☐ | ☐ | | | |
 | ADM-MNT-3 | Lever la maintenance | bloquante | | ☐ | ☐ | | | |
 | ADM-MNT-4 | Verrou et interrupteur d'environnement | majeure | | ☐ | ☐ | | | |
-| ADM-JRN-1 | Six filtres serveur | bloquante | | ☐ | ☐ | | | |
+| ADM-JRN-1 | Filtres serveur du journal | bloquante | | ☐ | ☐ | | | |
 | ADM-JRN-2 | Libellés en français | cosmétique | | ☐ | ☐ | | | |
 | ADM-JRN-3 | Journal complet et fidèle | bloquante | | ☐ | ☐ | | | |
 | ADM-JRN-4 | Ni purgé ni ouvert au Support | bloquante | | ☐ | ☐ | | | |
@@ -3799,6 +3887,7 @@ Ces scénarios vérifient des correctifs déjà livrés. Ils sont **courts** et 
 | ADM-CPT-4 | Modifier et retirer | bloquante | | ☐ | ☐ | | | |
 | ADM-CPT-5 | 2FA perdue | majeure | | ☐ | ☐ | | | |
 | ADM-SES-1 | Mon compte admin | mineure | | ☐ | ☐ | | | |
+| ADM-SES-2 | Codes de secours régénérés, autres sessions fermées | majeure | | ☐ | ☐ | | | |
 | ADM-E2E-1 | Litige de bout en bout | bloquante | | ☐ | ☐ | | | |
 | ADM-E2E-2 | Sanction de bout en bout | bloquante | | ☐ | ☐ | | | |
 | ADM-E2E-3 | Trois signalements | majeure | | ☐ | ☐ | | | |
@@ -3872,4 +3961,4 @@ La recette de la partie admin est **prononcée conforme** quand :
 
 ---
 
-*Fin du cahier de recette — partie admin. Voir `RECETTE-01-MEMBRE.md` pour les parcours Expéditeur et Voyageur, `RECETTE-03-API.md` pour les contrats d'API, `RECETTE-04-EXPLOITATION.md` pour l'infrastructure.*
+*Fin du cahier de recette — partie admin. Voir `RECETTE-01-WEB.md` pour les parcours Expéditeur et Voyageur, `RECETTE-03-API.md` pour les contrats d'API, `RECETTE-04-CRONS.md` pour l'infrastructure.*
