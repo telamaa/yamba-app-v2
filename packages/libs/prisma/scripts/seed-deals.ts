@@ -349,6 +349,11 @@ async function main() {
   const delD = await prisma.dispute.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // B5 — les avis suivent leurs bookings (recette 5.22 : sans cette purge, les avis des passages precedents
+  // restaient reveles sur les profils publics des comptes du seed — 25 avis orphelins au bout d'une matinee).
+  const delR = await prisma.review.deleteMany({
+    where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
@@ -369,7 +374,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();

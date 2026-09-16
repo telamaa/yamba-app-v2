@@ -137,6 +137,7 @@
     "theirs": "Their rating",
     "theirsMissing": "No rating received for this Deal.",
     "back": "Back to the Deal",
-    "unavailable": "This Deal can't be rated right now."
+    "unavailable": "This Deal can't be rated right now.",
+    "unavailableTitle": "Rating unavailable"
   }
 }
