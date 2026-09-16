@@ -2737,6 +2737,124 @@ lit l'instantané). Ordre de jeu : 8, 6, 1, 2, 4, 3, 5, 7, 9.
 - **Deux onglets** : figer `GET /me/bookings*` de l'onglet 2 avec la réponse lue (`page.route`), libérer
   avant le clic de confirmation.
 
+## Chapitre 5.21 — Litige et médiation, vue membre · **CONFORME** (13 fiches jouées, 3 après correction · 4 anomalies dont 3 closes (1 MAJEURE) et 1 ouverte (MAJEURE, API) · 14 scénarios en série dont 1 `test.fail`, 4 min 42)
+
+`web-lit.spec.ts`. `sgn-picked` (Mai, départ J−1) et `los-picked` (Chinwe ↔ Adebayo, départ J−2) pour le transit ;
+`bzv-delivered` (João ↔ Thomas) pour le signalement puis le REMBOURSEMENT TOTAL ; `bzv-disputed` (Chinwe ↔ Thomas,
+YAM-2041) pour le dossier, la version, puis le REMBOURSEMENT PARTIEL ; `los-disputed` (Mai ↔ Adebayo, YAM-2042) pour le
+REJET ; `yul-delivered` (Aminata) pour les deux onglets ; `bzv-completed` (Mai) pour l'accès sans droit. Les trois
+décisions sont prises par la médiatrice dans le back-office (port 3001) ; une décision n'est possible qu'après la
+version du Voyageur (ou 72 h) : les versions manquantes sont données par l'API. ImageKit intercepté.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-LIT-1 | Le lien de signalement pendant le transit | **Conforme** — `sgn-picked` : « Colis non livré ? Tu pourras le signaler à partir du … (48 h après le départ du trajet). », aucun bouton actif, `allowedActions` sans `dispute`, `disputeOpensAt` SERVI ; `los-picked` : « Signaler un colis non livré » actif, `dispute` permis |
+| WEB-LIT-2 | Le motif verrouillé pendant le transit | **Conforme** — le bouton mène à `/report` ; le groupe « Quel est le problème ? » n'offre QUE « Le colis n'a jamais été livré à Ngozi », coché ; l'explication « Ton colis est encore en transit : tu peux uniquement signaler… Adebayo sera informé. » ; la barre latérale « Colis en transit : le signalement « non livré » est ouvert depuis 48 h après le départ du trajet. Adebayo n'a pas encore validé la remise. » |
+| WEB-LIT-3 | L'écran de signalement après une livraison | **Conforme** — « On est là pour t'aider » / « …le paiement de Thomas reste bloqué. » ; badges « Requis », « Recommandé », « Optionnel » ; les six motifs exacts ; « 0 / minimum 50 caractères » ; « Ajoute des photos » (« Jusqu'à 5 photos, max 10 Mo par photo ») ; les quatre solutions dont « Remboursement intégral (61,60 €) » ; « Ce qui va se passer après ton signalement » ; l'engagement et « Pourquoi cet engagement ? » ; « FENÊTRE DE SIGNALEMENT » / « Tu peux signaler jusqu'au … » |
+| WEB-LIT-4 | Les refus de validation | **Conforme** — rien : bouton inactif ; motif + « Ça ne va pas » → « 1x / minimum 50 caractères », inactif ; 50 caractères sans engagement → inactif, « n caractères ✓ » ; photo en cours (ImageKit ralenti 4 s) → « Envoi de la photo… », inactif ; photo en échec (500) → « Échec d'envoi — retire-la et réessaye », inactif, retirée → actif ; refus serveur simulé (400) → « Le serveur a refusé le signalement : vérifie la description (50 caractères minimum) et l'engagement. ». **Constat** : les manques ne sont pas « nommés sur leur bloc » au clic — le clic est impossible (bouton inactif, badges « Requis ») |
+| WEB-LIT-5 | Envoyer le signalement | **Conforme** — motif, récit, deux photos, « Remboursement intégral », engagement ; « Envoyer le signalement ? » / « Le paiement de Thomas sera gelé et notre équipe médiation prendra le relais. Cette action est irréversible. » ; `POST /dispute` 200 ; « Signalement envoyé » / « On prend le relais… », « NUMÉRO DE DOSSIER YAM-xxxx », « Le paiement de Thomas est gelé… », « Retour au suivi de mon envoi » → « Signalement en cours · dossier YAM-xxxx » ; `DISPUTED`, `payoutStatus FROZEN`, portefeuille Thomas « Gelé · signalement en cours » ; fil en lecture seule (« Un litige est en cours… ») ; emails : accusé « Signalement YAM-xxxx enregistré… » (« gelé ») à João, « Un signalement a été ouvert sur ton transport… » à Thomas avec « contenu manquant » seul (ni le récit ni les photos) |
+| WEB-LIT-6 | Ni modifiable ni retirable | **Conforme** — aucun « modifier / retirer » ni « Signaler un problème » sur le suivi ; second signalement par l'API → 409 `TRANSITION_NOT_ALLOWED` ; `/report` → toast « Ce deal ne peut plus être signalé. » + retour au suivi ; le dossier reste le premier |
+| WEB-LIT-7 | Le dossier côté Expéditeur | **Conforme** — « Signalement en cours · dossier YAM-2041 » / « Ouvert le …. Le paiement du Voyageur est gelé le temps de l'examen. » ; « TON DOSSIER » : numéro, motif « Contenu manquant… », récit, « Remboursement partiel… », « Envoyé le … » ; « Une question sur ton dossier ? » + « …en rappelant le numéro YAM-2041 : on te répond sous 48 h ouvrées. » ; « État Gelé » + « Aucun versement ne sera fait à Thomas… confirmé par email. » ; « Nous avons demandé sa version à Thomas (72 h). » ; jamais la version du Voyageur |
+| WEB-LIT-8 | Le dossier côté Voyageur | **Conforme** — « …Ton versement est mis en attente le temps de l'examen. » ; « Un signalement a été ouvert » / « Chinwe a signalé un problème sur ce colis… » ; « Ce n'est pas une décision : … Nous entendons les deux parties. » ; « MOTIF contenu manquant » (la catégorie seule — ni le récit « deux des trois jouets », ni la solution souhaitée) ; les trois étapes ; la carte « Donne ta version ». **Constat** : pas de bouton « Donner ma version », le formulaire est ouvert dans la carte (comme WEB-E2E-2) |
+| WEB-LIT-9 | Donner sa version, une seule fois | **Conforme** — « Explique ce qui s'est passé… Une seule fois, jusqu'au …. Nous décidons après avoir lu les deux versions. » ; « Ta version ne pourra plus être modifiée une fois envoyée. » ; « Colis remis fermé. » → « Au moins 50 caractères. », inactif ; version + photo → `POST /dispute/statement` 201, toast « Ta version est enregistrée. », « Version envoyée » / « Envoyée le …. Nous décidons sous 5 jours ouvrés… », plus de champ après rechargement ; Chinwe : « Thomas a donné sa version. La décision arrive sous 5 jours ouvrés. » sans le contenu |
+| WEB-LIT-10 | La décision rendue, trois issues | **Conforme après correction** → `ANO-WEB-72`, `ANO-WEB-73`, `ANO-WEB-75` ; REJET (YAM-2042) : Mai « Ton signalement n'a pas été retenu : le Voyageur est payé en entier. », « Envoi terminé », aucune carte de notation ; Adebayo « Le signalement n'a pas été retenu : tu es payé en entier. » + « 40,00 € partent vers ton compte, sur ton compte bancaire sous 2 à 7 jours. » ; PARTIEL (YAM-2041, 10,00 €) : Chinwe « …retenu en partie : remboursement partiel. » + « 10,00 € te sont remboursés, sur ta carte sous 5 à 10 jours. », jamais 18,00 € ; Thomas « …une part du prix est remboursée à l'Expéditeur. » + « 18,00 € partent vers ton compte », jamais 10,00 € ; TOTAL (ticket de João, 61,60 €) : João « …remboursement total. » + « 61,60 € te sont remboursés… », Thomas « …remboursé en totalité. » + « Aucun versement ne te revient sur ce deal. », jamais 61,60 € ; partout « Décision rendue », « MOTIF DE LA DÉCISION » + le texte lu par les deux, « Cette décision est définitive dans l'application. », « Désaccord ? Demander une médiation conventionnelle par email. » ; cloche « Décision rendue · YAM-… » aux six (après ANO-WEB-75), emails « Décision rendue sur ton envoi / transport » aux six, chacun son montant (les deux décisions de Thomas visées par leur ticket). **Mais l'API des notifications porte les deux montants** → `ANO-WEB-74` (10 bis en `test.fail`) |
+| WEB-LIT-11 | Un deal clos par médiation ne se note pas | **Conforme** — sur les trois deals, aucun « Noter » ni « Donner mon avis » des deux côtés ; `rating.canRate = false` |
+| WEB-LIT-12 | Confirmer dans un onglet, signaler dans l'autre | **Conforme** — l'onglet 2 a son dossier prêt ; l'onglet 1 confirme ; l'onglet 2 envoie → 409, toast « Ce deal a changé entre-temps — retour au suivi. », retour au suivi « Envoi terminé » ; `COMPLETED`, aucun litige |
+| WEB-LIT-13 | Accès direct au signalement sans droit | **Conforme** — Pauline sur le `/report` de João : `GET /deals/:id` 403, retour au suivi, « Cette réservation n'existe pas ou a été annulée. », aucune donnée du deal ni erreur brute ; Mai sur un deal terminé : toast « Ce deal ne peut plus être signalé. » + retour au suivi « Envoi terminé » |
+
+### Anomalies
+
+- **ANO-WEB-75 (MAJEURE, close)** — quatre événements avaient leur texte dans le catalogue (`copy.*`) mais pas
+  d'entrée dans la table de présentation (`isKnownNotificationType`) : « Décision rendue · YAM-… », « Code de
+  livraison renouvelé », « Remboursement émis », « Paiement autorisé » s'affichaient **« Notification »** sans
+  titre ni ligne. Les quatre entrées sont ajoutées (`booking.dispute_resolved`, `booking.code_regenerated`,
+  `booking.refund_issued`, `booking.payment_authorized`).
+- **ANO-WEB-74 (MAJEURE, OUVERTE — API)** — `GET /me/notifications` sert le payload brut de
+  `booking.dispute_resolved` : `refundCents` ET `carrierPayoutCents` à chaque partie (Mai lit
+  `carrierPayoutCents: 4000`). L'écran n'affiche aucun montant, mais la réponse brute contredit « chaque partie
+  voit uniquement le montant qui la concerne ». Même famille qu'ANO-WEB-62 : projection par rôle du payload
+  des notifications (liste blanche par événement), registre, PR dédiée. Scénario 10 bis en `test.fail`.
+- **ANO-WEB-73 (mineure, close)** — un remboursement total clôt le deal en `CANCELLED` (D55) et le suivi
+  titrait « Demande annulée · Cette demande est close. Si un remboursement s'applique… Annulée le … » au-dessus
+  de la décision — sur un colis livré. `BookingStatusNotice` a un texte de clôture par la médiation (« Clos par
+  la médiation » / « Ton signalement a été tranché : la décision et son motif sont ci-dessous. » / « Clos le … »).
+- **ANO-WEB-72 (mineure, close)** — sur un deal clos par la médiation (rejet, partiel), « TON PAIEMENT » disait
+  « La période de vérification est terminée — les fonds sont en cours de versement à … » (le texte d'ANO-WEB-64) :
+  la note suit `completedBy = ADMIN` (« Clos par la médiation — le sort des fonds est celui de la décision
+  ci-dessus. »).
+
+### À trancher (produit)
+
+- **« Donner ma version »** : le cahier décrit un bouton ; le produit ouvre le formulaire dans la carte (constat
+  déjà fait en WEB-E2E-2). Amender le cahier.
+- **Les manques « nommés sur leur bloc »** (LIT-4) : le produit désactive le bouton et marque les blocs
+  « Requis » ; aucun message n'apparaît au clic puisque le clic est impossible. Amender le cahier, ou rendre le
+  bouton actif avec un message par bloc (moins bien).
+- **Un remboursement total = `CANCELLED`** (D55) : le titre est corrigé (ANO-WEB-73), mais « Mes envois » et
+  Paiements classent le deal comme une annulation ; un statut de clôture par la médiation (`CLOSED_BY_MEDIATION`)
+  ou un `closedBy = ADMIN` lu par les listes serait plus juste — registre.
+- **Codes de réponse** : `POST /dispute` répond 200, `POST /dispute/statement` 201 — aligner (201 pour les deux
+  créations).
+- **Libellés en capitales** (« NUMÉRO DE DOSSIER », « MOTIF DE LA DÉCISION ») : `text-transform` — le cahier écrit en
+  minuscules, le harnais lit en capitales.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **LIT-1** — `disputeOpensAt` servi, le front reflète : exemplaire. Afficher aussi le compte à rebours
+  (« ouvre dans 22 h ») plutôt qu'une date-heure — petit.
+- **LIT-2** — Un seul motif rendu quand le colis est en transit : bien (pas un radio grisé qui invite au clic).
+  Dire pourquoi les autres motifs manquent est fait ; renvoyer vers le fil de messagerie (« demande d'abord des
+  nouvelles à Adebayo ») avant de signaler — petit.
+- **LIT-3** — Quatre blocs, badges, compteur, fenêtre : conforme au pixel. « Remboursement intégral (61,60 €) »
+  montre le total ; « Remboursement partiel » pourrait annoncer sa borne (« jusqu'à 55,00 € ») — petit.
+- **LIT-4** — Le bouton inactif est le bon refus. La photo en échec bloque l'envoi : juste (rien à moitié fait).
+  Un test de composant qui couvre les quatre états (`uploading`, `error`, `pledge`, `min length`) coûte moins
+  qu'une fiche — moyen.
+- **LIT-5** — Le ticket vient du serveur et l'écran le relit : bien. L'email « calme » au Voyageur ne porte que
+  la catégorie : bien. Le fil passe en lecture seule au même instant : bien. Le succès pourrait proposer
+  « Ajouter une preuve plus tard » (photos oubliées) sans rouvrir un signalement — moyen.
+- **LIT-6** — 409 partout, l'écran renvoie au suivi : juste. Le message « Ce deal ne peut plus être signalé. »
+  vaut pour trois causes (déjà signalé, fenêtre close, terminé) : dire laquelle — petit.
+- **LIT-7** — « Nous avons demandé sa version (72 h) » puis « a donné sa version » : la bonne dose
+  d'information. Le compte à rebours des 72 h (échéance servie) serait plus honnête que « 72 h » — petit.
+- **LIT-8** — La catégorie seule, jamais le récit : bien (A68). La solution souhaitée de l'Expéditrice n'est pas
+  servie au Voyageur : bien aussi. Une phrase « ce que tu peux joindre » (photos de prise en charge déjà au
+  dossier) éviterait un doublon — petit.
+- **LIT-9** — Une seule version, immuable, échéance servie : bien. Le 201 sur la version et le 200 sur le
+  signalement (même famille de créations) : aligner — petit.
+- **LIT-10** — Trois issues, chaque partie SON montant à l'écran et dans l'email : bien. L'API des
+  notifications, elle, sert les deux (ANO-WEB-74) : projeter le payload par rôle à la lecture (une liste
+  blanche par événement, comme `analyticsEventsFor`) — moyen, structurel. Quatre événements sans présentation
+  (ANO-WEB-75) : un test qui aligne `copy.*` et `PRESENTATION` en CI — petit.
+- **LIT-11** — Pas de note après une médiation : juste (`canRate = false` servi). Dire pourquoi à l'écran
+  (« Un deal clos par la médiation ne se note pas ») plutôt qu'une absence silencieuse — petit.
+- **LIT-12** — Le 409 est traduit, l'onglet revient au suivi : exactement le cahier. Relire le deal au focus de
+  l'écran de signalement (comme le suivi) éviterait de remplir un dossier pour rien — petit.
+- **LIT-13** — 403 traduit en « n'existe pas ou a été annulée » : bonne étanchéité (pas de 403 vs 404 visible). Le
+  message est celui de l'introuvable pour un étranger : voulu (ne rien révéler) — RAS.
+- **Transversal** — Trois anomalies closes sont des **textes qui ignorent la cause de la clôture** (72 : note du
+  paiement, 73 : titre « Demande annulée ») ou une **table de présentation en retard sur le catalogue** (75) ;
+  l'ouverte est une **projection manquante** (74 : payload brut servi aux deux rôles). Règle : un état a autant
+  de textes que de causes (`completedBy`, `closedBy`, `resolution`), et tout ce qui sort par une API de lecture
+  passe par une liste blanche par rôle — moyen.
+
+### Pièges de poste payés ici
+
+- **Une décision n'est possible qu'après la version du Voyageur (ou 72 h)** : `POST /deals/:id/dispute/statement`
+  par l'API (201) sur les dossiers du seed avant de trancher.
+- **Le back-office doit tourner** (`npx nx dev admin-ui`, port 3001) : la fixture `navigateurAdmin("mediateur")`
+  et `MediationAdmin` (file → dossier → trancher) font le reste.
+- **« Autre problème » est un sous-texte de « … a un autre problème avec le voyageur »** : `exact: true` sur les
+  motifs.
+- **En transit, un seul radio est rendu** : « verrouillé » se prouve par le compte des radios du groupe, pas par
+  `disabled`.
+- **Les libellés sont en capitales à l'écran** (« NUMÉRO DE DOSSIER », « MOTIF DE LA DÉCISION », « MOTIF ») :
+  motifs insensibles à la casse.
+- **Le total de l'Expéditeur ne vit que dans SA vue** (A13) : `dealBrut` avec la session du bon rôle.
+- **Thomas reçoit deux « Décision rendue » sur le même corridor** : viser chaque email par son ticket dans le
+  corps (`emailsPour` + `ouvrir`).
+- **`POST /dispute` 200, `POST /dispute/statement` 201** : ne pas généraliser un code.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

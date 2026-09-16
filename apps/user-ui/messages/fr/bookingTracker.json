@@ -249,7 +249,8 @@
       "stateReleased": "Libéré",
       "note": "Les fonds sont en attente chez Yamba. Ils seront versés à {carrierFirstName} après la période de vérification.",
       "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}.",
-      "noteReleasedAuto": "La période de vérification est terminée — les fonds sont en cours de versement à {carrierFirstName}."
+      "noteReleasedAuto": "La période de vérification est terminée — les fonds sont en cours de versement à {carrierFirstName}.",
+      "noteReleasedMediation": "Clos par la médiation — le sort des fonds est celui de la décision ci-dessus."
     },
     "report": "Quelque chose ne va pas avec ce colis ?",
     "reportShort": "Quelque chose ne va pas ?"
@@ -491,6 +492,11 @@
       "title": "Signalement en cours",
       "message": "Ton signalement est enregistré : le versement au Voyageur est gelé le temps de l'examen. Notre équipe te répond sous 48 h ouvrées.",
       "dateLine": "Ouvert le {date}."
+    },
+    "cancelledByMediation": {
+      "title": "Clos par la médiation",
+      "message": "Ton signalement a été tranché : la décision et son motif sont ci-dessous.",
+      "dateLine": "Clos le {date}."
     }
   },
   "completed": {
