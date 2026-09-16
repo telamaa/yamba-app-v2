@@ -6040,3 +6040,66 @@ l'API, `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) et `destin
 
 Plateforme inchangée (997 + auth 229). `apps/e2e` : **257 scénarios** (248 + WEB-DES ×9). Typecheck harnais vert ;
 aucune clé i18n ni code produit touché.
+
+---
+
+# Chapitre 5.24 du cahier 01-WEB : signaler un trajet, un profil, un message — la règle de visibilité dupliquée, et le 404 traduit à la hache
+
+*(PR `chore/recette-web-5-24`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-quatrième chapitre « fiches » du cahier 01-WEB : `WEB-SIG` (la porte d'identité, la fenêtre de signalement
+d'une annonce, le doublon, soi-même, le profil, la cible invisible, trois signalements, l'avis). Huit fiches jouées et
+conformes (deux après correction), deux anomalies closes (`ANO-WEB-79` MAJEURE, `ANO-WEB-80` mineure) et une purge du
+jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-sig.spec.ts                                            8 scénarios en série, 2 min 54
+apps/auth-service/src/services/report.service.ts (+ .spec)                         ANO-WEB-79 (annonce masquée = introuvable) — auth 230
+apps/user-ui/src/components/shared/ReportDialog.tsx                               ANO-WEB-80 (404 → « introuvable »)
+apps/user-ui/messages/{fr,en}/common.json                                         `report.notFound`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Report des comptes du seed
+```
+
+## ANO-WEB-79 : trois causes d'invisibilité, une seule connue
+
+`resolveTarget` chargeait un trajet par `{ id, isDeleted: false }` : une annonce MASQUÉE par Yamba (`hiddenByAdminAt`,
+C-PR4 — la recherche, la page publique et la réservation la connaissent déjà) restait signalable, `POST /reports`
+répondait 201 et l'accusé partait — l'existence de la cible était révélée par le seul succès. Le service exige
+désormais un champ null OU absent (pitfall Mongo : `null` ne voit pas un champ absent, d'où `OR isSet`) :
+
+```ts
+// apps/auth-service/src/services/report.service.ts
+const trip = await db.trip.findFirst({
+  where: { id: targetRef, isDeleted: false, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }] },
+  select: { id: true, userId: true },
+});
+```
+
+Le test unitaire pose un trajet masqué (404) et un trajet sans le champ (accepté). Le regard d'expert propose une règle
+de visibilité unique, partagée par les trois services qui la réinventent.
+
+## ANO-WEB-80 : traduire par le code, pas par le statut
+
+`ReportDialog` mappait 409 → « déjà signalé », 400 → « ton propre contenu », le reste → « n'a pas pu être envoyé.
+Réessaie. » Un 404 (cible disparue entre l'ouverture et l'envoi, ou masquée) invitait donc à réessayer. La branche
+404 rend `report.notFound` ; la vraie correction (à trancher) est de mapper `details.code` — `OWN_TARGET` est un refus
+de droit, pas une requête mal formée.
+
+## Le harnais
+
+- La porte d'identité se joue en fenêtre privée, puis la connexion DANS la fenêtre (le formulaire visible qui porte
+  `#email`, comme en 5.11) ; on vérifie le 200 du `POST /auth/login`, la porte fermée et l'annonce toujours ouverte.
+- « Le membre signalé n'apprend rien » se prouve sur les cloches NOUVELLES qui parlent de signalement ou de la cible
+  (le cron FAKE écrit d'autres cloches au même compte pendant la fiche) et sur les emails par sujet.
+- La cible invisible est fabriquée par l'API admin (`POST …/admin/trips/:id/hide`, contexte `navigateurAdmin`) et par
+  une manœuvre (`profilePublic: false`), toutes deux défaites dans un `finally`.
+- La file du back-office (« Prioritaire · 3 ouverts ») est lue par `GET /admin/reports?status=OPEN` avec un contexte
+  SUPPORT : trois lignes sur la cible, `openCountOnTarget = 3`, `priority = true`.
+- SIG-8 fabrique un avis révélé par l'API (`POST /deals/:id/rating` des deux côtés) et lit le `mailto:` décodé.
+
+## Tests
+
+Plateforme 997 + auth **230** (+1, ANO-WEB-79). `apps/e2e` : **265 scénarios** (257 + WEB-SIG ×8). Typecheck
+auth-service, user-ui et harnais verts ; miroir i18n vert (`report.notFound` FR / EN).

@@ -3012,6 +3012,84 @@ son destinataire effacé pour la fiche 8).
 - **Le destinataire s'efface en deux temps** : `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) puis
   `destinataire.ts` (la passe) — le lien tombe alors sur le même 404 qu'un jeton altéré.
 
+## Chapitre 5.24 — Signaler un trajet, un profil, un message · **CONFORME** (8 fiches jouées, 2 après correction · 2 anomalies closes dont 1 MAJEURE, + une purge du jeu d'essai · 8 scénarios en série, 2 min 54)
+
+`web-sig.spec.ts`. Cibles : le trajet `bzv-upcoming` de Thomas (SIG-1 à 4), `bzv-perkg` de Thomas (SIG-7), le profil
+`seed-thomas` (SIG-4, 5, 8), le trajet `fih` de Joséphine masqué par le back-office et le profil `seed-josephine` rendu
+privé par manœuvre (SIG-6, remis en l'état dans un `finally`). Le signalement d'un message est joué en 5.15. La file
+du back-office est lue par l'API admin (`GET /admin/reports?status=OPEN`, profil SUPPORT) ; les avis pour SIG-8 sont
+créés par l'API des deux côtés (révélés) sur `bzv-completed`.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-SIG-1 | Un visiteur voit la porte d'identité | **Conforme** — « Signaler cette annonce » en fenêtre privée → « Connecte-toi pour signaler » / « Un signalement est toujours signé : cela protège tout le monde des abus. » ; connexion DANS la fenêtre (Aminata) → `POST /auth/login` 200, la porte se ferme, l'annonce reste ouverte avec son bouton |
+| WEB-SIG-2 | Signaler une annonce | **Conforme** — « Signaler cette annonce » / « Dis-nous ce qui ne va pas. Notre équipe regarde chaque signalement ; la personne concernée ne saura jamais qui l'a signalée. » ; les quatre motifs exacts (« Usurpation d'identité » absente) ; « Précisions (facultatif) » / « Ce que tu as vu, quand… » ; « Arnaque suspectée » + précision → `POST /reports` 201, « Merci, ton signalement est bien reçu. » / « Un email de confirmation t'a été envoyé. Nous ne communiquons pas la suite donnée. » ; l'annonce reste en ligne (fenêtre privée) ; email « Ton signalement a bien été reçu » (« Bonjour Aminata ») |
+| WEB-SIG-3 | Le doublon est refusé | **Conforme** — second signalement → 409, « Tu as déjà signalé cet élément, notre équipe s'en occupe. » ; API 409 `ALREADY_REPORTED` |
+| WEB-SIG-4 | On ne se signale pas soi-même | **Conforme** — Thomas : aucun bouton sur sa propre annonce ni sur son profil ; appels forcés (TRIP, USER) → 400 `OWN_TARGET` (« Tu ne peux pas signaler ton propre contenu. » à l'écran) |
+| WEB-SIG-5 | Signaler un profil | **Conforme** — « Signaler ce profil », « Usurpation d'identité » disponible → 201, accusé ; Thomas : aucune cloche de signalement, aucun email, rien sur son accueil |
+| WEB-SIG-6 | Une cible invisible répond « introuvable » | **Conforme après correction** → `ANO-WEB-79` ; annonce masquée par Yamba : page « Trajet introuvable », aucun bouton, `POST /reports` → 404 `TRIP_NOT_FOUND` (répondait **201** avant) ; profil masqué : « Profil introuvable », aucun bouton, 404 `USER_NOT_FOUND` |
+| WEB-SIG-7 | Trois signalements ne changent rien côté membre | **Conforme** — Aminata, João, Chinwe signalent `bzv-perkg` (« Comportement inapproprié ») : trois accusés, trois emails ; l'annonce reste en ligne (fenêtre privée) ; Thomas : aucune cloche de signalement, aucun email, ni bandeau ni sanction sur son annonce et « Mes trajets » ; back-office : trois lignes OPEN sur la cible, `openCountOnTarget = 3`, `priority = true` (« Prioritaire · 3 ouverts ») ; l'annonce reste publique après la revue prioritaire |
+| WEB-SIG-8 | Signaler un avis | **Conforme** — sur l'avis révélé de Mai (page publique de Thomas) : « Signaler cet avis » = `mailto:support…?subject=Signalement d'un avis (#id)` ; aucune fenêtre, aucune file (choix assumé) |
+
+### Anomalies
+
+- **ANO-WEB-79 (MAJEURE, close)** — une annonce MASQUÉE par Yamba (`hiddenByAdminAt`, C-PR4) se signalait : le service
+  ne vérifiait que `isDeleted`, `POST /reports` répondait 201 et révélait l'existence de la cible (le cahier veut
+  « introuvable », l'existence n'est pas révélée). `report.service.ts` exige `hiddenByAdminAt` null OU absent (pitfall
+  Mongo, `OR isSet`) ; +1 test auth-service = **230**.
+- **ANO-WEB-80 (mineure, close)** — la fenêtre traduisait un 404 par « Le signalement n'a pas pu être envoyé. Réessaie. »
+  — réessayer ne sert à rien quand la cible a disparu. Nouveau texte `report.notFound` : « Cet élément est introuvable :
+  il n'existe plus ou n'est plus visible. » (FR / EN).
+- **Jeu d'essai** — les signalements survivaient au seed : un signalement OUVERT d'Aminata sur `seed-thomas` (passage
+  précédent) rendait « Signaler ce profil » 409 au premier clic. `seed-deals.ts` purge les `Report` des comptes du
+  seed (auteur, ou membre visé) avec les bookings et les avis.
+
+### À trancher (produit)
+
+- **« Tu ne peux pas signaler ton propre contenu » répond 400** (`OWN_TARGET`) : c'est un refus de droit, pas une
+  requête mal formée — 403 serait plus juste ; le front mappe `status === 400` → aligner sur `details.code`.
+- **Une annonce en pause ou annulée reste signalable** (seule la suppression et le masquage la rendent introuvable) ;
+  voulu (elle a été visible) ou à fermer comme le masquage ?
+- **Le doublon ne vaut que pour un signalement OUVERT** : après traitement, le même auteur peut signaler à nouveau la
+  même cible — cohérent avec « notre équipe s'en occupe », à confirmer au registre.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **SIG-1** — La porte reprend le geste après connexion (A63) pour le favori ; ici elle se contente de rester sur la
+  page — rouvrir la fenêtre de signalement après connexion (`onSignedInAction`) éviterait un second clic — petit.
+- **SIG-2** — Les motifs par cible viennent du contrat (`REPORT_REASONS_BY_TARGET`) et l'accusé part dans la langue de
+  l'auteur : bien. Le champ « Précisions » est limité à 500 sans compteur — petit.
+- **SIG-3** — 409 traduit, sans révéler l'état du dossier : juste. Rien à ajouter.
+- **SIG-4** — Le bouton disparaît ET l'API refuse : la double barrière. Le code 400 pour un refus de droit (voir « à
+  trancher ») — petit.
+- **SIG-5** — Le membre signalé n'apprend rien (ni cloche, ni email, ni bandeau) : conforme à SIG-01. Le profil offre
+  cinq motifs dont « Usurpation d'identité » : bien.
+- **SIG-6** — La visibilité d'une cible a trois causes (supprimée, masquée, privée) et le service n'en connaissait
+  qu'une (ANO-WEB-79) : centraliser « est-ce visible ? » dans une règle partagée avec la page publique et la
+  recherche (trip-service la connaît déjà) — moyen.
+- **SIG-7** — Trois signalements = revue prioritaire, jamais une sanction : la règle SIG-03 tient (`priority` calculé
+  à la lecture). Le seuil `REPORT_REVIEW_THRESHOLD` au catalogue des réglages (D62) — petit.
+- **SIG-8** — Un `mailto:` avec la référence de l'avis : sobre et assumé. Ajouter l'auteur et le deal en corps du mail
+  pré-rempli épargnerait une recherche au support — petit.
+- **Transversal** — L'anomalie majeure est une **règle de visibilité dupliquée** (SIG-6) : quand plusieurs services
+  décident « visible ou non », l'un finit par oublier une cause ; une seule fonction, testée, importée partout. La
+  mineure est un **code HTTP traduit à la hache** (404 = « réessaie ») : traduire par `details.code`, jamais par le
+  seul statut — petit.
+
+### Pièges de poste payés ici
+
+- **Les signalements survivaient au seed** (comme les avis en 5.22) : un OPEN du passage précédent fait 409 le premier
+  clic ; le seed purge désormais `Report` (auteur ou cible du seed).
+- **Le cron FAKE écrit au propriétaire pendant la fiche** (versements rejoués) : « aucune notification » se prouve sur
+  les cloches NOUVELLES qui parlent d'un signalement ou de la cible, et « aucun email » sur un sujet, jamais sur le
+  total.
+- **`GET /trips/:id` est réservé au propriétaire** (401 / 403 pour un autre membre) : « l'annonce reste en ligne » se
+  prouve par la page publique en fenêtre privée, pas par cette route.
+- **Le masquage d'une annonce passe par l'API admin** (`adresseDeLApiAdmin()` + contexte `navigateurAdmin("mediateur")`,
+  `POST … /hide` puis `DELETE`), le profil privé par manœuvre (`profilePublic: false`) — les deux dans un `finally`.
+- **Une session `contexte.request` peut expirer** au fil d'une longue fiche (401) : préférer une preuve par l'écran
+  ou un contexte fraîchement connecté.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

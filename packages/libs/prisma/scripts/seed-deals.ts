@@ -354,6 +354,11 @@ async function main() {
   const delR = await prisma.review.deleteMany({
     where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
   });
+  // D68 — les signalements des comptes du seed (auteur, ou membre visé) suivent aussi : un signalement OUVERT du
+  // passage precedent rendait « Signaler ce profil » 409 des le premier clic (recette 5.24).
+  const delS = await prisma.report.deleteMany({
+    where: { OR: [{ reporterUserId: { in: seedIds } }, { targetType: "USER", targetId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
@@ -374,7 +379,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();

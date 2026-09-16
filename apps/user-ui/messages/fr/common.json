@@ -196,7 +196,10 @@
     }
   },
   "report": {
-    "title": { "TRIP": "Signaler cette annonce", "USER": "Signaler ce profil" },
+    "title": {
+      "TRIP": "Signaler cette annonce",
+      "USER": "Signaler ce profil"
+    },
     "intro": "Dis-nous ce qui ne va pas. Notre équipe regarde chaque signalement ; la personne concernée ne saura jamais qui l'a signalée.",
     "reason": "Motif",
     "reasons": {
@@ -218,6 +221,7 @@
     "ownTarget": "Tu ne peux pas signaler ton propre contenu.",
     "failed": "Le signalement n'a pas pu être envoyé. Réessaie.",
     "gateTitle": "Connecte-toi pour signaler",
-    "gateSubtitle": "Un signalement est toujours signé : cela protège tout le monde des abus."
+    "gateSubtitle": "Un signalement est toujours signé : cela protège tout le monde des abus.",
+    "notFound": "Cet élément est introuvable : il n'existe plus ou n'est plus visible."
   }
 }
