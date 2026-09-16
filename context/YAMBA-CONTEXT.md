@@ -796,6 +796,32 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 17/09 : **QUATRE LIVRAISONS — cahier admin a jour (#334), A196 (#335), A197 (#336), arbitrages instruits (#337).**
+  (1) **Cahier 02-ADMIN remis a l'etat du code** : la reserve documentaire du § 8 est LEVEE. Le handoff nommait trois
+  ecarts ; il y en avait QUATORZE — la source exacte etant les sections « Ecarts avec le cahier » de chaque chapitre des
+  resultats, pas le resume. Corriges aussi : deux renvois vers des fichiers INEXISTANTS (`RECETTE-01-MEMBRE`,
+  `RECETTE-04-EXPLOITATION`), deux renvois vers des scenarios absents (`ADM-ETA-5`, `ADM-CPT-8`). Ajoute : `ADM-SES-2`
+  (125 -> 126 scenarios). Tranche : **le `.md` fait foi**, le `.pdf` du 06/09 n'est plus regenere a chaque passe.
+  (2) **A196 — une transition s'ecrit sur l'etat qu'elle a LU** (trip-service). Les huit transitions du trajet lisaient,
+  jugeaient par la machine a etats, puis ecrivaient SANS CONDITION : deux gestes simultanes passaient tous deux la garde.
+  Consequences : un double clic sur « Publier » = deux increments du compteur public ET DEUX vagues de notifications ;
+  surtout, **D72 tombait** (un deal ne entre la garde et l'ecriture laissait le trajet annule avec un deal vivant). La
+  condition porte sur le statut LU ; l'annulation y ajoute `reservedKg` LU — la reservation d'un deal ecrit sur le MEME
+  document Trip (CAP-01), c'etait le temoin qui manquait pour qu'un service voie l'ecriture d'un autre. Pitfall A34 :
+  `reservedKg` ABSENT -> condition OMISE (une garde qui peut se bloquer elle-meme est pire que la course qu'elle corrige).
+  INVENTAIRE : deal-service n'avait RIEN a corriger (toutes ses ecritures passent par booking-write, deja sous rejeu).
+  (3) **A197 — D2 devient executable**. Cause racine de la violation trouvee en A195 : le patron de mock du depot
+  `$transaction: (fn) => fn(prismaMock)` passe LE MEME client dedans, donc dedans et dehors sont INDISCERNABLES et une
+  ecriture sortie de sa transaction ne fait tomber aucune assertion. Deux fiches structurelles (client de transaction
+  DISTINCT + journal des appels avec leur provenance) verrouillent la messagerie et l'ecrivain commun des deals.
+  CONTRE-EPREUVE faite : defaut reintroduit volontairement -> fiche ROUGE sur le bon scenario -> code restaure.
+  (4) **Les sept points a trancher sont INSTRUITS** (§ 8 des resultats) : etat reel verifie dans le code, enjeu, options
+  chiffrees, recommandation. Recommandations : journaliser le refus d'effacement RGPD (oui) · ecran de reinitialisation
+  2FA d'un autre admin (NON — cree le pouvoir que cherche un attaquant) · « versements en echec 48 h » = corriger le
+  LIBELLE, la mesure est bonne · email au Voyageur sur un renversement abandonne (oui, motif generique, sans evenement) ·
+  URL signees pour les justificatifs avant l'ouverture publique (oui) · montrer le motif du signalement sans pre-cocher
+  la categorie (oui) · doublon de signalement : conflit materialise, PAS d'index unique (re-signaler une cible dont le
+  dossier est clos est legitime). ~1,75 jour de « oui » immediats. Tests : trip 305, deal 649, message 74 (1150 + auth 393).
 - 16/09 : **PASSE CONCURRENCE MEMBRE (A195, PR #332 MERGEE, branche `feat/concurrence-membre`)** — suite directe d'A192, qui avait
   solde le perimetre ADMIN et laisse l'inventaire des cinq fichiers MEMBRE. Trois regles etendues : (1) l'ecriture se
   conditionne a l'etat LU (`updateMany`/`deleteMany` qui COMPTENT, jamais `update`/`delete` qui levent P2025 -> 500) —

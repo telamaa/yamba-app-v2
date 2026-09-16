@@ -45,7 +45,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **1127 tests** (trip-service 293, deal-service 644, notification-service 122, message-service 68) + auth-service 393 (also a CI check) — any deviation must be explained. Measured 16/09/2026, after the four recette campaigns, D78 and the member-side concurrency pass (A195, +11 message / +17 auth).
+Test platform baseline: **1150 tests** (trip-service 305, deal-service 649, notification-service 122, message-service 74) + auth-service 393 (also a CI check) — any deviation must be explained. Measured 17/09/2026, after the four recette campaigns, D78 and the three concurrency passes: A195 (member gestures), A196 (trip transitions), A197 (D2 made executable).
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
