@@ -423,6 +423,9 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
 
       const updated = await prisma.meetup.updateMany({ where: { id: meetupId, status: "PROPOSED" }, data: { status: "ACCEPTED", acceptedAt: now } });
       if (updated.count === 0) throw new ValidationError("This meeting was just changed. Reload the conversation.", { code: "MEETUP_CHANGED" });
+      // ANO-WEB-47 (recette 5.15) — un seul rendez-vous confirmé par type : accepter une re-proposition remplace le
+      // précédent confirmé (il est annulé), sinon l'ancre du numéro (D61 3A) et la liste hésiteraient entre deux.
+      await prisma.meetup.updateMany({ where: { conversationId: conversation.id, kind: meetup.kind as never, status: "ACCEPTED", id: { not: meetupId } }, data: { status: "CANCELLED", cancelledAt: now } });
       const fresh = (await prisma.meetup.findUniqueOrThrow({ where: { id: meetupId } })) as unknown as MeetupRow;
       await writeMessage(
         conversation.id,

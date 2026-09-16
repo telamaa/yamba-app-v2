@@ -99,7 +99,8 @@ export class FilMessagerie {
     await expect(this.page.getByText("À confirmer par vous")).toBeVisible({ timeout: 15_000 });
     await this.page.getByRole("button", { name: "Accepter", exact: true }).click();
     await expect(this.page.getByText("Confirmé", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(this.page.getByText("Le rendez-vous est confirmé.")).toBeVisible();
+    // Un fil peut porter plusieurs confirmations (re-proposition acceptée, ANO-WEB-47) : la dernière ligne système.
+    await expect(this.page.getByText("Le rendez-vous est confirmé.").last()).toBeVisible();
   }
 
   /**
