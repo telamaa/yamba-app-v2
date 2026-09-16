@@ -47,6 +47,7 @@ export type YambaTripResultDto = {
   toCityCode?: string;
   toCountry?: string;
   travelDate: string;            // "12 juin 2026" / "June 12, 2026"
+  departureAt?: string;          // ISO 8601 — ANO-WEB-30 (badge « Trajet passé » des favoris)
   departureTime: string;         // "08:00"
   arrivalTime?: string;          // "14:30" — ABSENT quand le trajet n'a pas d'heure d'arrivée
   nextDay?: boolean;
@@ -348,6 +349,7 @@ export function mapTripToYambaResult(
     toCityCode: trip.destinationCityCode || undefined,
     toCountry: trip.destinationCountry || undefined,
     travelDate,
+    departureAt: new Date(trip.departureAt).toISOString(),
     departureTime,
     arrivalTime,
     nextDay: nextDay || undefined,

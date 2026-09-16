@@ -610,6 +610,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.11 DU CAHIER 01-WEB — WEB-FAV, FAVORIS ET VOYAGEURS SUIVIS (branche
+  `chore/recette-web-5-11`, empilee sur #275)** — 12 fiches, 12 jouees CONFORMES (3 apres correction), 12
+  scenarios en serie, 1 min 50 (`apps/e2e/src/chapitres/web-fav.spec.ts`). Porte d'identite du coeur avec
+  geste repris apres connexion DANS la fenetre (prouve par l'API), ajout/retrait optimistes, propre trajet
+  refuse, trajet annule/masque, favori d'un trajet passe, suivi (Suivre → Suivi, abonnes, bascule),
+  email « Thomas N. vient de publier un nouveau trajet » (Mailpit), silence si notification coupee,
+  desabonnement, soi-meme refuse, etats vides. Trois anomalies MINEURES corrigees : ANO-WEB-30 (badge
+  « Trajet passe » jamais rendu — `departureAt` ISO ajoute au contrat `YambaTripResult`, OpenAPI x5
+  regeneres, badge dans `FavoriteTripsList`), ANO-WEB-31 (toast de desabonnement perdu — meme motif
+  qu'ANO-WEB-29, retours au niveau du hook `useUnfollowUser`), ANO-WEB-32 (un trajet MASQUE par Yamba
+  s'ajoutait en favori — `addFavorite` lit `hiddenByAdminAt`, +1 test unitaire : trip-service 261,
+  plateforme 994). A trancher : note « 5.0 » vs « 5,0 », refus « propre trajet » en toast. Regard
+  d'expert : revue systematique des `mutate(x, { onSuccess })` avec `onMutate` qui retire l'element
+  (troisieme occurrence) ; dispatch email sans outbox (comme 5.10). Piege : le coeur est DANS le lien de
+  la carte (selecteur corrige, aussi en 5.9) ; `nx serve trip-service` retombe sur « Recursive task
+  invocation » apres deux modifications rapprochees. Harnais : 131 scenarios. PR **#276** (empilee sur
+  #275). Reste : 5.12 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.10 DU CAHIER 01-WEB — WEB-ALR, ALERTES DE ROUTE (branche `chore/recette-web-5-10`,
   empilee sur #274)** — 9 fiches, 9 jouees CONFORMES (1 apres correction), 9 scenarios en serie, 1 min 45
   (`apps/e2e/src/chapitres/web-alr.spec.ts`). Ecran eprouve sans Google (panneau, periodes, bascules,
