@@ -4436,3 +4436,62 @@ trace, ni identifiant brut (`QUOTE_DIVERGENCE`, `SUDO_REQUIRED`, `P2002`…), ni
 - La longueur de la référence varie selon son origine (Sentry ou `digest` de Next) : la normaliser.
 - Les deux routes de panne (inertes en production) restent livrées : elles donnent à la recette un moyen stable de
   revérifier la page d'erreur. À retirer le jour où une préproduction permet de couper une dépendance pour de vrai.
+
+---
+
+# Le rendu sur téléphone — ce que le chapitre 5.30 fait respecter
+
+*(PR `chore/recette-web-5-30`, 13/09/2026 — cahier 01-WEB chapitre 5.30, WEB-MOB-1 à 10.)*
+
+## Le besoin
+
+La majorité des membres de Yamba envoient et voyagent avec un téléphone à la main. Un écran de 390 px ne doit donc
+rien perdre : ni un bouton, ni un montant, ni une bulle de conversation — et la page ne doit jamais partir de
+travers.
+
+## Les règles
+
+**RG-WEB-289 — La page ne défile jamais horizontalement.** Un contenu large (rangée de réponses rapides, frise,
+tableau) défile **dans son propre cadre** ; le corps de page, lui, reste dans l'écran.
+
+**RG-WEB-290 — Ce qui engage se voit sans chercher** : sur une page de trajet, le prix et « Réserver » vivent dans
+une barre du bas qui survit au défilement ; dans l'assistant, le total reste visible et « Détail » ouvre le
+récapitulatif complet.
+
+**RG-WEB-291 — Une feuille est une fenêtre** : elle s'annonce comme telle, porte un nom, et se ferme — par son
+bouton d'application, par le voile, et par la touche d'échappement.
+
+**RG-WEB-292 — Rien de ce que le membre a écrit ne sort de l'écran** : ses propres bulles sont entièrement visibles,
+les titres passent à la ligne plutôt que d'élargir la colonne.
+
+**RG-WEB-293 — Une porte d'identité se ferme sur téléphone comme sur grand écran** : la croix est visible, dans
+l'écran, et elle ferme.
+
+**RG-WEB-294 — Entre 768 et 1024 px, rien ne disparaît** : la colonne d'actions du Voyageur (gains, couverture,
+bouton principal) reste présente.
+
+**RG-WEB-295 — Saisir un code à six chiffres est un geste de téléphone** : clavier numérique, six cases sur une
+ligne, collage qui remplit tout.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 330 | Accueil et menu en 390 px | panneau qui s'ouvre et se ferme, aucun débordement | oui |
+| 331 | Filtres de recherche | feuille annoncée comme fenêtre, appliquée et fermée (dont Échap) | oui (ANO-WEB-93 close) |
+| 332 | Page d'un trajet | barre du bas collante avec prix et « Réserver » | oui |
+| 333 | Assistant de réservation | total permanent, « Détail » / « Masquer », aucun champ coupé | oui |
+| 334 | Fil de messagerie | aucune bulle hors cadre, réponses rapides dans leur cadre | oui |
+| 335 | Porte d'identité | croix visible et fonctionnelle sur téléphone | oui |
+| 336 | Écran du Voyageur à 800 px | colonne d'actions présente | oui |
+| 337 | Code de livraison | six cases, clavier numérique, collage complet | oui |
+| 338 | Listes du tableau de bord | aucun débordement, montants visibles | oui |
+| 339 | Page destinataire | frise lisible, bloc d'acquisition dans l'écran | oui |
+
+## Ce qui reste à trancher
+
+- Dans la porte d'identité, **trois contrôles portent le même nom accessible** (« Plus tard ») : croix, voile, lien.
+- Le **piège de focus** des feuilles mobiles n'est pas posé (sujet du chapitre 5.31).
+- « Le clavier ne masque pas le bouton de validation » ne se vérifie pas en émulation : à jouer sur un vrai
+  téléphone.
+- La rangée de réponses rapides ne montre pas qu'elle défile (pas de dégradé de bord).

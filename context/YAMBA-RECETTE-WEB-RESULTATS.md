@@ -3570,6 +3570,96 @@ est excellent, et qui explique pourquoi la fiche 3 avait besoin d'une porte déd
   malformée, morceau de code coupé, charge RSC en 500) n'ont produit aucune frontière d'erreur. Ne pas s'acharner :
   demander la porte de panne, et **consigner** que les gardes tiennent.
 
+## Chapitre 5.30 — Responsive mobile · **CONFORME** (10 fiches jouées, 1 après correction · 1 anomalie close · 10 scénarios en série, 1 min 06)
+
+`web-mob.spec.ts`. Tout se joue en **émulation iPhone 14 (390 × 844, tactile)** — sauf `WEB-MOB-7`, à 800 px. Le
+harnais a gagné pour l'occasion une option `{ mobile: true }` sur ses deux fabriques de navigateur : ce n'est pas un
+`viewport` étroit, c'est `isMobile` + `hasTouch` + un agent utilisateur de téléphone, **parce que le produit rend des
+arbres différents** (feuilles du bas, barres collantes, `useIsMobile`). Sans cela, le chapitre aurait éprouvé
+l'arbre desktop dans une fenêtre étroite — et n'aurait rien prouvé.
+
+**La règle générale du cahier** (la page ne défile jamais horizontalement) est portée par deux garde-fous partagés :
+`aucunDebordement()`, qui **nomme l'élément fautif** (sélecteur, bord droit, largeur d'écran) plutôt que de dire
+« ça déborde » ; et `rienNeSortDuCadre()`, qui exempte ce qui défile **dans son propre cadre**
+(`overflow-x: auto|scroll`) — une rangée de réponses rapides a le droit de dépasser, pas de pousser la page.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-MOB-1 | Accueil et en-tête | **Conforme** — aucun débordement, le bouton de recherche tient dans l'écran, le menu s'ouvre en panneau (« Fermer le menu ») et se referme par le voile |
+| WEB-MOB-2 | Recherche et filtres en feuille du bas | **Conforme après correction** → `ANO-WEB-93` ; les cartes portent prix et kilos, la feuille s'ouvre, tient dans l'écran, s'applique par « **Voir 5 trajets** » et se ferme **par Échap** (qui ne faisait rien) |
+| WEB-MOB-3 | Barre de réservation mobile | **Conforme** — prix et « Réserver » dans une barre du bas, **toujours là après défilement**, dans l'écran |
+| WEB-MOB-4 | Assistant en feuille du bas | **Conforme** — « Détail » ouvre le récapitulatif, « Masquer » le referme, aucun champ de l'étape ne sort de l'écran, aucun débordement |
+| WEB-MOB-5 | Bulles de messagerie `[FCH30]` | **Conforme** — **aucune bulle ne sort du cadre** (la régression #175 / WEB-NRG-5 ne réapparaît pas), les réponses rapides défilent dans **leur** cadre et non dans la page, « Voir le numéro » tient dans l'écran |
+| WEB-MOB-6 | Croix de la porte d'identité `[NRG3]` | **Conforme** — la croix est **visible sur téléphone**, en haut à droite, dans l'écran, et ferme réellement la feuille. *Constat : son nom accessible est « Plus tard » — comme le lien du bas ET le voile : trois contrôles pour un seul nom.* |
+| WEB-MOB-7 | L'écran du deal entre 768 et 1024 px | **Conforme** — à 800 px, les gains du Voyageur et le bouton principal sont **présents et dans la fenêtre** : la colonne de droite ne disparaît plus dans la zone intermédiaire |
+| WEB-MOB-8 | Les six cases du code | **Conforme** — six cases `inputmode="numeric"` (clavier chiffres), **toutes sur la même ligne** et dans l'écran, et un collage de `742891` remplit les six d'un coup |
+| WEB-MOB-9 | Listes du tableau de bord | **Conforme** — « Mes envois », « Mes trajets » et « Finances » : aucun débordement de page, rien ne sort à droite (les montants restent visibles) |
+| WEB-MOB-10 | Page destinataire | **Conforme** — lien créé par l'Expéditrice, ouvert **sans session** sur téléphone : frise des jalons lisible, bloc d'acquisition dans l'écran, aucun débordement |
+
+### Anomalies
+
+- **ANO-WEB-93 (mineure, close)** — le panneau **plein écran** des filtres de recherche n'était pas annoncé comme
+  une fenêtre : ni `role="dialog"`, ni `aria-modal`, ni nom accessible, et la touche Échap ne le fermait pas. Un
+  lecteur d'écran continuait donc de parcourir la page **en dessous**, et le clavier n'avait aucune porte de sortie.
+  Les deux autres feuilles de la recherche (`MobileSearchExperience`, `MobileFieldFullScreen`) portent déjà
+  `role="dialog"` : celle-ci l'avait oublié. Trois attributs et un `keydown` — la même famille que les anomalies des
+  chapitres précédents : **une convention qui ne va pas jusqu'au bout**.
+
+### À trancher (produit)
+
+- **Trois contrôles, un seul nom** : dans la porte d'identité, la croix de fermeture, le voile et le lien du bas
+  portent tous le nom accessible « Plus tard ». Nommer la croix « Fermer » (et le voile « Fermer la fenêtre »)
+  lèverait l'ambiguïté pour un lecteur d'écran — petit, à voir avec le chapitre 5.31.
+- **Le piège de focus n'est pas posé** sur les feuilles mobiles : `aria-modal` annonce une fenêtre modale, mais la
+  tabulation peut encore sortir vers la page. À trancher au chapitre 5.31 (accessibilité clavier).
+- **La rangée de réponses rapides déborde volontairement** (défilement horizontal dans son cadre) : c'est conforme à
+  la règle du cahier, mais rien n'indique visuellement qu'elle défile (pas de dégradé de bord). Confort — petit.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **MOB-1** — Le menu mobile se ferme par le voile, qui porte son propre nom accessible : bien. La feuille ne piège
+  pas le focus — même remarque que pour les filtres, à traiter en 5.31 — moyen.
+- **MOB-2** — Le bouton d'application porte le **nombre de résultats** (« Voir 5 trajets ») : excellent (le membre
+  sait ce qu'il obtient avant de fermer). Ajouter un compteur de filtres actifs sur le bouton « Filtres » de la
+  barre — petit.
+- **MOB-3** — La barre collante est une vraie barre du bas, pas un bouton qui suit le défilement : rien à redire.
+  Y afficher le prix **pour le poids saisi** (déjà connu de la recherche) éviterait un aller-retour — moyen.
+- **MOB-4** — Le total permanent + « Détail » est le bon patron pour un tunnel sur téléphone. Le cahier demande
+  aussi que « le clavier ne masque pas le bouton de validation » : non vérifiable en émulation (le clavier virtuel
+  n'existe pas dans Chrome émulé) — **à jouer sur un vrai téléphone** au montage LAN, et consigné comme tel.
+- **MOB-5** — La régression #175 est morte et **le harnais la garde** : c'est le meilleur usage d'une contre-épreuve.
+  La garde est générique (rien ne sort du cadre, sauf ce qui défile dans le sien) : elle protégera aussi les écrans
+  à venir — rien à faire.
+- **MOB-6** — La croix existe et ferme ; c'est son **nom** qui pèche. Voir « à trancher » — petit.
+- **MOB-7** — La zone 768–1024 px est le point aveugle classique des grilles Tailwind (`md:` / `lg:`) : la fiche la
+  vise explicitement, et elle est saine. Ajouter la même vérification pour l'écran de suivi Expéditeur — petit.
+- **MOB-8** — `inputmode="numeric"` et le collage réparti sur six cases sont deux détails que l'on oublie neuf fois
+  sur dix : ils sont là. Ajouter `autocomplete="one-time-code"` ferait proposer le code par le téléphone lui-même —
+  petit, et c'est le geste attendu sur iOS.
+- **MOB-9** — Trois listes, aucun débordement : la mise en page des listes tient. La garde par élément (et pas
+  seulement par page) attrape les cas où un enfant sort sans agrandir le document — rien à faire.
+- **MOB-10** — La page destinataire est lisible sur téléphone, ce qui est sa cible principale (elle arrive par
+  WhatsApp ou SMS). Y vérifier le contraste des jalons sous le soleil est hors portée du harnais — pour mémoire.
+- **Transversal** — Le chapitre n'a trouvé qu'**une** anomalie, et c'est la même famille que partout ailleurs :
+  une convention (annoncer une fenêtre) appliquée à deux feuilles sur trois. Une garde automatique — « tout
+  conteneur `fixed inset-0` qui capte l'écran porte `role="dialog"` » — la rendrait impossible à oublier : moyen,
+  et c'est le meilleur candidat d'outillage de cette campagne.
+
+### Pièges de poste payés ici
+
+- **Un `viewport` étroit ne suffit pas** : sans `isMobile` / `hasTouch`, le produit rend son arbre desktop et le
+  chapitre mesure la mauvaise interface. L'option `{ mobile: true }` du harnais pose les trois (taille, tactile,
+  agent utilisateur).
+- **« Fermer le menu » est le VOILE plein écran**, dont le centre est couvert par la feuille : le clic doit viser le
+  haut (`{ position: { x: 8, y: 8 } }`) — c'est d'ailleurs le geste réel d'un doigt qui tape à côté.
+- **Un élément peut dépasser sans que ce soit un défaut** : s'il vit dans un cadre qui défile horizontalement, la
+  règle du cahier est respectée. Une garde naïve échoue sur les réponses rapides de la messagerie.
+- **Le titre d'une page de résultats s'affiche avant les cartes** : attendre « Brazzaville » ne prouve rien, il faut
+  attendre ce qui n'existe que sur une carte (un prix).
+- **La croix de la porte d'identité s'appelle « Plus tard »** : la chercher par « Fermer » ne la trouve pas. On la
+  reconnaît à sa **position** dans la feuille (et l'on consigne le problème de nom).
+- **`POST /deals/:id/tracking-link` rend un chemin RELATIF** : `new URL(...)` lève « Invalid URL ».
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

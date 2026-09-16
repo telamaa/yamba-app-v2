@@ -6635,3 +6635,89 @@ pas seulement le libellé qui change.
 Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **296 scénarios**
 (291 + WEB-ERR ×5). Typecheck user-ui et harnais verts ; miroir i18n vert (`errors.boundary.copyFailed` FR/EN).
 
+
+---
+
+# Chapitre 5.30 du cahier 01-WEB : le mobile — émuler un téléphone, et prouver qu'une page ne déborde pas
+
+*(PR `chore/recette-web-5-30`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le trentième chapitre « fiches » du cahier 01-WEB : `WEB-MOB` (accueil et menu, filtres en feuille du bas, barre de
+réservation collante, assistant, bulles de messagerie, croix de la porte d'identité, zone 768–1024 px, six cases du
+code, listes du tableau de bord, page destinataire). Dix fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-93`).
+
+```
+apps/e2e/src/chapitres/web-mob.spec.ts                                            10 scénarios, iPhone 14 émulé
+apps/e2e/src/fixtures/yamba.ts                                                    `{ mobile: true }` sur les deux fabriques de navigateur
+apps/user-ui/src/components/search/SearchResultsView.tsx                          ANO-WEB-93 (le panneau des filtres est une fenêtre)
+```
+
+## Émuler un téléphone, ce n'est pas rétrécir une fenêtre
+
+Le produit ne se contente pas de changer de style sous 768 px : il rend des **arbres différents**
+(`useIsMobile`, feuilles du bas, barres collantes, double arbre `BookingStepperDesktop` /
+`BookingStepperMobile`). Un `viewport: { width: 390 }` seul aurait donc éprouvé l'interface desktop dans une fenêtre
+étroite — et validé la mauvaise chose. La fabrique de contexte du harnais pose les trois marqueurs :
+
+```ts
+{ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: "…iPhone…" }
+```
+
+`{ mobile: { width: 800 } }` sert la fiche 7, qui vise la zone intermédiaire où la colonne de droite du Voyageur
+avait disparu — le point aveugle classique d'une grille qui ne déclare ses colonnes qu'à partir de `lg:`.
+
+## Prouver qu'une page ne déborde pas (sans interdire ce qui doit défiler)
+
+La règle du cahier est « la page ne défile jamais horizontalement ; un contenu large défile **dans son propre
+cadre** ». Deux garde-fous, partagés par toutes les fiches :
+
+1. `aucunDebordement()` compare `scrollWidth` et `clientWidth` **et**, en cas d'échec, parcourt le DOM pour nommer
+   l'élément le plus à droite : « `div.flex.gap-2` (bord droit 612 px pour 390 px d'écran) ». Un échec anonyme ne se
+   corrige pas ; un échec nommé se corrige en une minute.
+2. `rienNeSortDuCadre()` cherche les éléments dont le bord droit sort de l'écran, **sauf** ceux qu'un ancêtre fait
+   défiler horizontalement (`overflow-x: auto|scroll` avec `scrollWidth > clientWidth`). Sans cette exemption, la
+   rangée de réponses rapides de la messagerie — qui défile volontairement — ferait échouer la fiche alors qu'elle
+   respecte exactement la règle.
+
+## ANO-WEB-93 : une feuille sur trois n'était pas une fenêtre
+
+Le panneau des filtres de recherche occupe tout l'écran (`fixed inset-0 z-[150]`) mais n'était qu'un `div` : ni
+`role="dialog"`, ni `aria-modal`, ni nom accessible — et Échap ne le fermait pas. Les deux autres feuilles de la
+recherche le faisaient déjà. Conséquences concrètes : un lecteur d'écran continue de parcourir la page **en
+dessous**, et un membre au clavier n'a aucune porte de sortie.
+
+```tsx
+<div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[150] …">
+```
+
+```tsx
+useEffect(() => {
+  if (!mobileFiltersOpen) return;
+  const surEchap = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileFiltersOpen(false); };
+  window.addEventListener("keydown", surEchap);
+  return () => window.removeEventListener("keydown", surEchap);
+}, [mobileFiltersOpen]);
+```
+
+Le piège de focus reste à poser (tabulation qui sort vers la page) : c'est le sujet du chapitre 5.31, et il est
+consigné comme tel.
+
+## Ce que le harnais a appris ici
+
+- **« Fermer le menu » est le voile plein écran** : son centre est couvert par la feuille, le clic doit viser le
+  haut — le geste réel d'un doigt qui tape à côté.
+- **La croix de la porte d'identité s'appelle « Plus tard »** (comme le lien du bas et le voile) : on la reconnaît à
+  sa position, et l'on consigne le problème de nom.
+- **Le titre d'une page de résultats s'affiche avant les cartes** : attendre le nom de la ville ne prouve rien, il
+  faut attendre un prix.
+- **`POST /deals/:id/tracking-link` rend un chemin relatif** : `new URL(...)` lève « Invalid URL ».
+- **Le clavier virtuel n'existe pas en émulation** : « le clavier ne masque pas le bouton » (fiche 4) ne peut être
+  vérifié que sur un vrai téléphone — consigné, pas simulé.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **306 scénarios**
+(296 + WEB-MOB ×10). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.
