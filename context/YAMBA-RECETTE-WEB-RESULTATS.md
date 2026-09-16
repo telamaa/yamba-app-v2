@@ -548,6 +548,60 @@ Proposition    : dériver le fuseau CÔTÉ SERVEUR des coordonnées du lieu (`or
                  correction en vérifiant l'instant en base, pas seulement l'affichage.
 ```
 
+```
+ANO-WEB-24
+Fiche          : WEB-DOC-1 (chapitre 5.8) · Gravité : MINEURE · ÉTAT : OUVERTE (décision produit)
+Attendu        : au dépôt d'un justificatif, un TYPE se choisit — au moins billet, itinéraire,
+                 véhicule, identité, autre (cahier) ; seul le billet entre dans le cycle de
+                 vérification.
+Obtenu         : aucun sélecteur. `TripDocumentsManager` (détail du trajet) et le wizard envoient
+                 TOUJOURS `type: "TICKET_PROOF"` : un itinéraire ou une pièce d'identité devient
+                 un « billet », passe le trajet « En vérification » et atterrit dans la file
+                 « Billets » du back-office. L'API, elle, connaît les cinq types
+                 (`TripDocumentType`) et ne fait passer le billet en vérification que pour
+                 `TICKET_PROOF`.
+Cause          : le formulaire n'a jamais reçu le champ ; le serveur est prêt, l'écran non.
+Proposition    : un sélecteur de type (cinq entrées, FR/EN) dans les deux composants de dépôt,
+                 « Billet » par défaut ; les documents non-billet s'affichent sans statut de
+                 vérification. Petit lot front, PR dédiée après arbitrage.
+État recette   : WEB-DOC-1 est jouée conforme sur le dépôt et le statut ; elle CONSTATE que les
+                 deux documents déposés sont `TICKET_PROOF`.
+```
+
+```
+ANO-WEB-25
+Fiche          : WEB-DOC-2 (chapitre 5.8) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : tenter un sixième document donne un « refus explicite » (au plus 5 par trajet).
+Obtenu         : à cinq documents, la zone de dépôt disparaissait simplement (`canAddMore`
+                 faux) — rien ne disait pourquoi on ne peut plus rien ajouter.
+Cause          : les deux composants de dépôt rendaient la zone sous condition, sans branche
+                 « limite atteinte ».
+Correction     : un message « 5 documents maximum par trajet — supprime un document pour en
+                 ajouter un autre. » (FR/EN) quand la limite est atteinte : `TripDocumentsManager`
+                 (détail) et `DocumentUpload` (wizard, via la prop `limitHint` et la clé
+                 `docLimitReached` du copy). Le serveur refuse le sixième de toute façon
+                 (`DOCUMENT_LIMIT_REACHED`).
+Contre-épreuve : WEB-DOC-2 lit le message à cinq documents, et l'absence de « Ajouter un billet
+                 ou justificatif » ; l'API répond 400 au sixième.
+```
+
+```
+ANO-WEB-26
+Fiche          : WEB-DOC-2 (chapitre 5.8) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : un fichier de plus de 5 Mo est refusé avec un message ; rien n'est envoyé.
+Obtenu         : rien n'était envoyé (le hook `useImageKitUpload` refuse avant tout réseau), mais
+                 le message « Le fichier dépasse 5 Mo. » n'apparaissait JAMAIS : l'utilisateur
+                 choisissait un fichier et… rien. Même chose pour « Format non supporté ».
+Cause          : `handleFiles` appelait `reset()` du hook juste après la boucle d'envoi — et
+                 `reset()` remet l'erreur à `null`. L'erreur de validation était effacée dans le
+                 même tour de boucle que sa pose.
+Correction     : plus de `reset()` après les envois (le hook remet déjà l'erreur à zéro au DÉBUT
+                 de chaque envoi, et `isUploading` à faux dans son `finally`) — dans
+                 `TripDocumentsManager` et `DocumentUpload`.
+Contre-épreuve : WEB-DOC-2 dépose un PDF de 5 Mo + 1 octet : le message est visible et aucune
+                 requête (jeton ImageKit, téléversement, enregistrement) ne part.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -903,6 +957,81 @@ le médiateur pour le masquage administratif.
 - **Le wizard en édition n'a pas besoin de Google** : « Bruxelles » et « Kinshasa » sont rendus
   depuis le trajet, l'étape 1 est valide, « Continuer » ouvre l'étape 2 — c'est ce qui rend les
   fiches 3 à 9 automatisables.
+
+---
+
+
+## Chapitre 5.8 — Justificatifs et billet vérifié · **CONFORME** (6 fiches jouées · 2 anomalies mineures closes, 1 mineure ouverte · 6 scénarios, 1 min 00)
+
+Le front téléverse chaque justificatif **directement chez ImageKit** puis n'envoie au trip-service
+que les URL rendues (`POST /trips/:id/documents`). Comme pour les photos de colis, le harnais
+intercepte l'appel tiers (`intercepterImageKit`) : jeton signé demandé à trip-service, contrôle du
+type et de la taille côté client, enregistrement, statut du billet — toute la chaîne Yamba est
+traversée, sans rien écrire dans la médiathèque. Les gestes d'administration (valider, rejeter)
+passent par l'API du back-office avec le compte **SUPPORT** (permission `tickets.review`). Le jeu
+d'essai est rejoué en tête de fichier : le chapitre consomme le billet en attente de `bzv-upcoming`.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-DOC-1 | Déposer un justificatif | **Conforme** — trajet neuf : « Non soumis » ; deux PDF déposés depuis le détail du trajet (section « Documents ») : `201`, listés avec leur nom, « En vérification » ; `ticketVerificationStatus` `NOT_SUBMITTED → PENDING`. **Constat** : aucun sélecteur de type, les deux documents sont `TICKET_PROOF` → `ANO-WEB-24` (ouverte) |
+| WEB-DOC-2 | Les bornes de dépôt | **Conforme après correction** → `ANO-WEB-26` (le refus > 5 Mo était muet) et `ANO-WEB-25` (la limite de 5 se dit) ; un PDF de 5 Mo + 1 : « Le fichier dépasse 5 Mo. » et **aucune requête** ; à cinq documents : « 5 documents maximum par trajet… », plus de zone de dépôt ; le serveur refuse le sixième (`400 DOCUMENT_LIMIT_REACHED`) et le trop lourd (`400 DOCUMENT_TOO_LARGE`) |
+| WEB-DOC-3 | Les statuts du billet | **Conforme** — `bzv-upcoming` (Thomas) : « En vérification » à l'écran, `PENDING` à l'API, un document `TICKET_PROOF` en attente. Les quatre statuts sont vus : « Non soumis » (DOC-1), « En vérification », « Vérifié » (DOC-4), « Rejeté » (DOC-5) |
+| WEB-DOC-4 | Billet validé par l'équipe | **Conforme** — SUPPORT : `POST /admin/tickets/:documentId/review` `{ decision: "VERIFY" }` → `{ status: VERIFIED, tripTicketStatus: VERIFIED }` ; Thomas recharge : « Vérifié » ; la page publique (visiteur) porte **« Billet vérifié »** et le DTO public `ticketVerified: true` ; email **« Billet vérifié pour ton trajet Paris → Brazzaville »** en français ; un second examen répond `400 TICKET_ALREADY_REVIEWED` |
+| WEB-DOC-5 | Billet rejeté avec motif | **Conforme** — un rejet sans motif est refusé (`400`) ; `REJECT` + `DATES_MISMATCH` → « Rejeté », le trajet reste **PUBLISHED** ; email **« Billet non validé pour ton trajet Bruxelles → Kinshasa »** : « les dates ne correspondent pas au trajet », « Déposer un autre billet », jamais le code interne ; un nouveau dépôt à l'écran repasse « En vérification » (`PENDING`) |
+| WEB-DOC-6 | Le billet ne bloque rien | **Conforme** — trajet sans billet : `publish` → **PUBLISHED**, DTO public `ticketVerified: false` ; Aminata voit « Réserver » (et pas le badge), le clic ouvre `/trips/:id/book` |
+
+### À trancher (produit)
+
+- **Le type de document** (`ANO-WEB-24`) : cinq types côté API, aucun à l'écran. Ajouter le
+  sélecteur (petit lot front) ou assumer « tout justificatif est un billet » et amender le cahier.
+
+### Piège de poste — un `.env` de projet qui envoyait de vrais emails
+
+**`apps/trip-service/.env`** (13/05, gitignoré, un reliquat) portait un **SMTP Gmail réel**
+(`SMTP_HOST=smtp.gmail.com`, un compte personnel) et des clés ImageKit. Nx fusionne l'env racine
+et celui du projet : trip-service — et lui seul — envoyait ses emails (billet vérifié / rejeté,
+« masqué par Yamba », alertes de route) **par Gmail**, à des adresses `@seed.yamba.dev` qui
+n'existent pas, pendant que les autres services parlaient à Mailpit. Et l'échec ou le succès
+était invisible : `emailCarrier` avalait tout (`.catch(() => undefined)`), rien dans les journaux.
+Diagnostic par élimination — la bibliothèque d'email fonctionne en processus isolé (sonde `tsx`),
+le fournisseur est « configuré », l'utilisateur est trouvé, aucune erreur… puis `ps eww` sur le
+processus : `SMTP_HOST=smtp.gmail…`. C'est le piège déjà payé une fois avec ImageKit (CLAUDE.md :
+« un `.env` de projet est un reliquat à supprimer »), payé une seconde fois avec l'email.
+
+- **Remède** : le fichier est déplacé hors du dépôt (`~/.yamba-leftovers/trip-service.env.2026-09-11`,
+  il contient un mot de passe d'application Gmail — à révoquer si le compte n'en a plus l'usage) ;
+  le `catch` de `emailCarrier` journalise désormais l'échec. Après ce déplacement, `nx run-many`
+  DOIT être relancé : le processus parent avait déjà lu l'env du projet et le réinjectait à chaque
+  redémarrage de trip-service (un `kill` du service ne suffit pas).
+- **Conséquence** : pendant 5.7 (WEB-TRJ-21, masquage / levée) et les premiers tours de 5.8,
+  quelques emails sont partis par le compte Gmail vers `marc.carrier@`, `thomas.carrier@` et
+  `josephine.carrier@seed.yamba.dev` — ils rebondissent dans cette boîte Gmail. Aucun email n'est
+  parti vers une personne réelle.
+- **Reste à faire, hors recette** : le contrôle de bon démarrage (§ 2.2 du cahier) devrait lire
+  `SMTP_HOST` vu par CHAQUE service (le `/health` ou le `/api/status` pourraient l'exposer en
+  développement), et `emailCarrier` pourrait remonter à Sentry (`captureServerError`).
+
+### Observations
+
+- **Les justificatifs déposés au wizard (étape 1) et au détail** passent par le même hook
+  `useImageKitUpload` (5 Mo, PDF / JPG / PNG / HEIC) et la même limite de 5 ; les deux composants
+  avaient les deux mêmes défauts (ANO-WEB-25/26), corrigés aux deux endroits.
+- **Le rejet exige un motif fermé** (`ILLEGIBLE`, `DATES_MISMATCH`, `NAME_MISMATCH`,
+  `SUSPICIOUS`) et l'email en donne le libellé humain dans la langue du Voyageur — le code
+  interne ne sort jamais.
+- **Un administrateur ne peut pas examiner son propre billet** (`ADMIN_IS_OWNER`) : non joué
+  (aucun compte du seed n'est à la fois Voyageur et administrateur).
+
+### Pièges de poste payés ici
+
+- **Le `.env` de projet** (ci-dessus). Règle : `ls apps/*/.env` doit être vide ; tout va dans le
+  `.env` racine.
+- **Un `catch` vide sur un email métier** cache un environnement faux pendant des semaines. Un
+  best-effort se journalise, il ne se tait pas.
+- **`setInputFiles` avec un tampon de 5 Mo + 1** suffit pour la borne de taille ; le PDF minimal
+  (en-tête, `xref`, `%%EOF`) passe le filtre `accept` et `application/pdf` du hook.
+- **Le chapitre consomme le seed** (le billet en attente de `bzv-upcoming` est validé en DOC-4) :
+  `test.beforeAll(() => new JeuEssai().rejouer())`, comme les parcours du chapitre 6.
 
 ---
 
