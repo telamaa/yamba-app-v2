@@ -1369,3 +1369,113 @@ fichier se corrige **une fois** ; c'est exactement pourquoi elle vaut le détour
   **P2002** (unicité → une réponse métier, chapitre 188), **P2034** (conflit d'écriture → rejeu).
 - La question à se poser devant tout `update({ where: { id } })` : *sur quelle lecture cette écriture repose-t-elle,
   et cette lecture est-elle dans le `where` ?*
+
+## Chapitre 190 — Un mock qui ment, et comment le prendre en défaut (A197)
+
+Ce chapitre ne parle pas d'une fonctionnalité mais d'un **angle mort de tests** — le genre qui laisse vivre un
+défaut des mois dans un dépôt pourtant bien testé.
+
+### 1. Le fait
+
+Trois gestes de la messagerie violaient une règle non négociable (« aucun changement d'état sans son événement
+dans la MÊME transaction »). message-service comptait 57 tests. Aucun ne l'a vu. Pourquoi ?
+
+```ts
+$transaction: jest.fn(async (fn) => fn(prismaMock))
+```
+
+Ce mock — qu'on trouve dans à peu près tous les dépôts Node qui utilisent Prisma — passe **le même client** à
+l'intérieur de la transaction. Du point de vue du test, `tx.message.create(…)` et `prisma.message.create(…)`
+sont le même appel. On peut donc sortir une écriture de sa transaction sans qu'une seule assertion bouge.
+
+La leçon est plus large que Prisma : **un double qui simplifie une propriété la rend intestable.** Ici la
+propriété simplifiée était l'atomicité, et c'était précisément celle qu'il fallait garantir.
+
+### 2. Rendre la provenance observable
+
+La correction tient en une idée : le client de transaction doit être **distinguable**, et chaque appel doit
+dire d'où il vient.
+
+```ts
+let transactionCourante: number | null = null;
+let transactionsOuvertes = 0;
+
+const tracer = (cible: string, retour: unknown) =>
+  jest.fn(async () => { appels.push({ cible, transaction: transactionCourante }); return retour; });
+
+$transaction: jest.fn(async (fn) => {
+  const precedente = transactionCourante;
+  transactionCourante = ++transactionsOuvertes;     // un identifiant par transaction ouverte
+  try { return await fn(prismaMock); } finally { transactionCourante = precedente; }
+})
+```
+
+`appels` devient une **trace d'exécution** : chaque écriture porte le numéro de la transaction qui la
+contient, ou `null` si elle a lieu dehors. Toutes les assertions intéressantes deviennent alors des questions
+simples sur cette trace :
+
+```ts
+expect(evenements[0].transaction).not.toBeNull();            // l'événement est bien DANS une transaction
+expect(ecriture.transaction).toBe(evenements[0].transaction); // …la MÊME que l'état
+expect(transactionsOuvertes).toBe(1);                         // …et il n'y en a qu'une
+```
+
+La sauvegarde/restauration de `transactionCourante` (`precedente`) n'est pas du zèle : elle rend la trace
+juste si une transaction en contient une autre un jour.
+
+### 3. Écrire une RÈGLE, pas une liste de scénarios
+
+```ts
+const GESTES = [
+  { nom: "poster un message", jouer: () => service.postMessage(…) },
+  { nom: "proposer un rendez-vous", jouer: () => service.proposeMeetup(…) },
+  …
+];
+
+it.each(GESTES)("$nom", async ({ jouer }) => { /* les trois propriétés */ });
+```
+
+Un scénario teste un cas ; une règle teste une **propriété sur un ensemble**. Ajouter un geste demain, c'est
+ajouter une ligne au tableau — et il est couvert sans y penser. C'est ce qui fait la différence entre une
+fiche qui vieillit bien et une fiche qu'on oublie de compléter.
+
+Corollaire : il faut nommer explicitement ce qui n'est **pas** dans l'ensemble, sinon la règle devient fausse
+au premier contre-exemple légitime. Ici, « marquer comme lu » écrit bien en base mais n'est pas un changement
+d'état du domaine : il n'ouvre pas de transaction et n'émet pas d'événement. C'est écrit, testé, assumé.
+
+### 4. Tester le test (le pas que presque personne ne fait)
+
+Une fiche structurelle qui passe du premier coup doit inquiéter : passe-t-elle parce que le code est correct,
+ou parce qu'elle ne mesure rien ? Deux garde-fous ont été posés.
+
+**Une assertion sur l'instrument lui-même** — si le mock cessait de distinguer dedans et dehors, ce test-là
+tomberait, et on saurait que les autres sont devenus creux :
+
+```ts
+it("la fiche elle-même est honnête : le client de transaction se distingue du client de base", …)
+```
+
+**Une contre-épreuve manuelle, avant de livrer** : on réintroduit le défaut (l'événement rendu à une seconde
+transaction), on lance la fiche, **on la voit rouge sur le bon scénario**, on restaure. C'est la version
+pauvre — et parfaitement suffisante — de la *mutation testing*. Une minute de travail, et la certitude que le
+filet existe.
+
+> Règle personnelle à emporter : **tout test de non-régression doit avoir été vu échouer au moins une fois.**
+> Sinon, on n'a pas écrit un test, on a écrit un commentaire exécutable.
+
+### 5. Pourquoi pas un lint ?
+
+L'alternative évidente était une règle d'analyse statique : « interdit d'appeler `outboxEvent.create` en
+dehors d'un `$transaction` ». Elle attrape le cas facile… et rate le vrai défaut, qui n'était pas « l'événement
+est dehors » mais « l'événement est dans une **autre** transaction ». Les deux passages sont syntaxiquement
+identiques ; seule l'exécution les sépare. Quand une propriété porte sur le **déroulement**, c'est à
+l'exécution qu'il faut la vérifier.
+
+### Pour aller plus loin
+
+- *Growing Object-Oriented Software, Guided by Tests* — sur les doubles qui simplifient trop, et le risque de
+  tester le double plutôt que le code.
+- La *mutation testing* (Stryker en JS) automatise l'idée du § 4 : injecter des défauts et vérifier que la
+  suite les attrape. Une contre-épreuve manuelle sur le test qui compte donne 80 % du bénéfice pour 1 % du coût.
+- Relire le patron `$transaction: (fn) => fn(prismaMock)` partout où il traîne : il est commode, il est
+  partout, et il ment sur exactement une propriété — celle qu'on écrit une transaction pour obtenir.

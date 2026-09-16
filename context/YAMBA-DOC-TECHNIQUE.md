@@ -10072,3 +10072,63 @@ déjà écrite, et le cron de cohérence repasse derrière.
 trip-service **293 → 305** (12 scénarios : conditions posées, 409 du perdant, publication jouée deux fois sans double
 notification, D72 sous concurrence, trajet legacy sans `reservedKg`, compteurs relus puis abandonnés).
 `scripts/smoke-services.sh` : les six bundles bootent.
+
+---
+
+# PR — D2 rendue exécutable (A197) · `feat/d2-executable`
+
+## Pourquoi
+
+En A195, trois gestes du fil violaient la règle non négociable « aucun changement d'état sans événement
+outbox dans la MÊME transaction » : ils écrivaient l'état, puis l'événement dans une **seconde** transaction.
+Si la seconde échoue, l'état est commité et personne n'est prévenu — un rendez-vous accepté dont l'autre
+partie n'entendra jamais parler.
+
+La vraie question n'est pas « comment ont-ils échappé à la revue », mais **pourquoi aucun test ne l'a vu**,
+alors que message-service en comptait 57. La réponse est dans le patron de mock du dépôt :
+
+```ts
+$transaction: jest.fn(async (fn) => fn(prismaMock))   // le MÊME client à l'intérieur
+```
+
+Dedans et dehors deviennent indiscernables. Une écriture sortie de la transaction ne fait tomber aucune
+assertion. Les fiches vérifiaient **quels** événements partent — jamais **où** ils sont écrits.
+
+## Ce qui est livré
+
+Deux fiches structurelles, avec un client de transaction **distinct** et un journal des appels portant leur
+provenance (`transaction: null` = hors transaction) :
+
+**`d2-une-transaction-par-geste.spec.ts`** (message-service). Pour chaque geste du tableau `GESTES` — poster,
+proposer, accepter, révéler — trois propriétés :
+1. aucun `outboxEvent.create` hors transaction ;
+2. toute écriture d'état est dans **la même** transaction que l'événement ;
+3. une **seule** transaction est ouverte.
+
+Elle est écrite comme une règle, pas comme un scénario : un geste ajouté demain au tableau est couvert sans
+qu'on y pense. Deux fiches de contrôle l'accompagnent : le marqueur de lecture n'est pas un changement d'état
+de domaine (aucune transaction, aucun événement — et c'est voulu), et une fiche qui vérifie que **le mock
+lui-même distingue bien dedans et dehors**, sans quoi toutes les autres assertions seraient creuses.
+
+**`d2-booking-write.spec.ts`** (deal-service) verrouille `applyBookingTransition`, passage obligé de toute
+transition d'un deal : statut, reprise des kilos (CAP-02), écritures annexes (`within`, par exemple le dossier
+de litige) et événements dans une transaction unique ; aucun événement quand la transition est refusée ;
+condition sur le statut de départ ; rejeu du conflit portant sur la transaction **entière**.
+
+## La contre-épreuve
+
+Un test structurel qui passe ne prouve rien tant qu'on n'a pas vu ce qui le fait tomber. Le défaut d'avant
+A195 a donc été **réintroduit volontairement** (l'événement du rendez-vous proposé rendu à une seconde
+transaction), la fiche est passée au rouge sur le scénario « proposer un rendez-vous », puis le code correct a
+été restauré. Un test qui ne mord pas est pire qu'aucun test : il rassure.
+
+## Portée
+
+Volontairement limitée aux deux écrivains qui portent les invariants — la messagerie et l'argent. Les
+écritures de deal-service hors écrivain commun ont été inventoriées une à une : compteur d'essais de code de
+livraison, statuts de versement venus du fournisseur, rédaction RGPD d'un destinataire. Ce sont des faits
+d'exécution, déjà écrits sous condition, sans événement de domaine attendu.
+
+## Tests
+
+message-service **68 → 74**, deal-service **644 → 649**.
