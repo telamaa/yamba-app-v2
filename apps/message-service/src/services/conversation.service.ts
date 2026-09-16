@@ -10,9 +10,18 @@
  *  - un tiers n'accède à rien (403 explicite, jamais un 404 : le deal existe) ;
  *  - le code de livraison ne voyage jamais (D43 / D61 4A) : un message qui le contient est refusé ;
  *  - aucun changement d'état sans événement outbox dans la MÊME transaction (D2).
+ *
+ * A195 (passe concurrence MEMBRE, suite de A192) — chaque geste qui écrit tient en UNE transaction,
+ * rejouée sur conflit d'écriture. La CONVERSATION est le document partagé de tous ces gestes (son
+ * `lastMessageAt` bouge à chaque message) : deux gestes simultanés sur le même fil se disputent donc
+ * ce document, MongoDB rejette le perdant (P2034) et le rejeu repart d'une lecture fraîche. Sans lui,
+ * deux transactions qui créent chacune leur propre document ne se voient pas : on obtenait deux
+ * rendez-vous PROPOSED du même type, et personne ne s'en apercevait.
  */
 import bcrypt from "bcryptjs";
+import type { Prisma } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import {
   MessagingDomainEventSchema,
@@ -122,10 +131,35 @@ function toMessageDto(m: {
   };
 }
 
+/**
+ * A195 — « ce document existe déjà » (Prisma P2002). Deux requêtes simultanées ont lu la MÊME absence
+ * puis créé le même document unique : la base tranche, la perdante n'a pas à devenir un 500. Partout
+ * ici, la bonne réponse est de relire ce que l'autre vient d'écrire (le geste est idempotent).
+ */
+const estCollisionUnique = (e: unknown): boolean =>
+  typeof e === "object" && e !== null && (e as { code?: string }).code === "P2002";
+
 /** Enveloppe d'événement (D2) : validée au contrat AVANT écriture, comme le deal-service. */
 function envelopeFor(conversationId: string, now: Date) {
   return { aggregateType: "conversation" as const, aggregateId: conversationId, occurredAt: now.toISOString(), correlationId: null, schemaVersion: 1 as const };
 }
+
+/** Les champs du fil dont tous les gestes ont besoin (une seule définition : une seule vérité). */
+const CONVERSATION_SELECT = { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } as const;
+
+/** Le client Prisma À L'INTÉRIEUR d'une transaction : même API, mais il n'en ouvre pas une seconde. */
+type TxClient = Prisma.TransactionClient;
+
+type MessageToWrite = {
+  kind: "TEXT" | "SYSTEM" | "MEETUP";
+  authorId: string | null;
+  authorRole: string;
+  body: string;
+  photoUrls?: string[];
+  systemKey?: string | null;
+  systemData?: Record<string, unknown> | null;
+  flaggedContact?: boolean;
+};
 
 export function makeConversationService(clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
   /** Charge le deal, la conversation (créée à la demande) et le rôle de l'appelant. */
@@ -133,7 +167,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     let bookingId = by.bookingId ?? null;
     let conversation = null as null | { id: string; bookingId: string; shipperLastReadAt: Date | null; carrierLastReadAt: Date | null };
     if (by.conversationId) {
-      conversation = await prisma.conversation.findUnique({ where: { id: by.conversationId }, select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } });
+      conversation = await prisma.conversation.findUnique({ where: { id: by.conversationId }, select: CONVERSATION_SELECT });
       if (!conversation) throw new NotFoundError("Conversation not found.", { code: "CONVERSATION_NOT_FOUND" });
       bookingId = conversation.bookingId;
     }
@@ -147,12 +181,20 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     if (!conversationExists(booking)) throw new ForbiddenError("This deal has no conversation yet.", { code: "CONVERSATION_NOT_OPEN" });
 
     if (!conversation) {
-      conversation =
-        (await prisma.conversation.findUnique({ where: { bookingId }, select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } })) ??
-        (await prisma.conversation.create({
-          data: { bookingId, shipperId: booking.shipperId, carrierId: booking.carrierId, lastMessageAt: null, lastMessageAuthorRole: null, shipperRemindedAt: null, carrierRemindedAt: null },
-          select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true },
-        }));
+      conversation = await prisma.conversation.findUnique({ where: { bookingId }, select: CONVERSATION_SELECT });
+      if (!conversation) {
+        try {
+          conversation = await prisma.conversation.create({
+            data: { bookingId, shipperId: booking.shipperId, carrierId: booking.carrierId, lastMessageAt: null, lastMessageAuthorRole: null, shipperRemindedAt: null, carrierRemindedAt: null },
+            select: CONVERSATION_SELECT,
+          });
+        } catch (e) {
+          // A195 — l'Expéditeur et le Voyageur ouvrent le fil à la même seconde : `bookingId` est UNIQUE,
+          // l'un des deux crée, l'autre relit. Le fil est le même, personne ne voit une erreur.
+          if (!estCollisionUnique(e)) throw e;
+          conversation = await prisma.conversation.findUniqueOrThrow({ where: { bookingId }, select: CONVERSATION_SELECT });
+        }
+      }
     }
     return { booking, conversation, role, access: conversationAccess(booking, clock(), (await settings.get())["messaging.writeDaysAfterEnd"]) };
   }
@@ -161,14 +203,19 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
    * Écrit un message + son événement dans UNE transaction (D2). L'événement est construit
    * APRÈS la création (il porte l'identifiant réel du message) puis validé au contrat avant
    * écriture : un payload invalide est un bug de writer, jamais un poison pour le relais (A24).
+   *
+   * A195 — deux entrées : `writeMessageIn(tx, …)` REJOINT la transaction du geste appelant (un
+   * rendez-vous et son message d'annonce doivent tomber ou passer ensemble), `writeMessage(…)`
+   * ouvre la sienne pour un message simple.
    */
-  async function writeMessage(
+  async function writeMessageIn(
+    tx: TxClient,
     conversationId: string,
-    data: { kind: "TEXT" | "SYSTEM" | "MEETUP"; authorId: string | null; authorRole: string; body: string; photoUrls?: string[]; systemKey?: string | null; systemData?: Record<string, unknown> | null; flaggedContact?: boolean },
+    data: MessageToWrite,
     buildEvent: ((messageId: string) => MessagingDomainEvent) | null,
     now: Date
   ): Promise<{ id: string }> {
-    return prisma.$transaction(async (tx) => {
+    {
       const message = await tx.message.create({
         data: {
           conversationId,
@@ -193,7 +240,17 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
         });
       }
       return message;
-    });
+    }
+  }
+
+  /** Message simple (aucun autre changement d'état) : sa propre transaction, rejouée sur conflit. */
+  async function writeMessage(
+    conversationId: string,
+    data: MessageToWrite,
+    buildEvent: ((messageId: string) => MessagingDomainEvent) | null,
+    now: Date
+  ): Promise<{ id: string }> {
+    return withWriteConflictRetry(() => prisma.$transaction((tx) => writeMessageIn(tx as TxClient, conversationId, data, buildEvent, now)));
   }
 
   function eventBase(booking: BookingRow, conversationId: string, actorRole: "SHIPPER" | "CARRIER" | "SYSTEM", actorId: string | null) {
@@ -334,11 +391,20 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
       return { reportId: report.id, createdAt: report.createdAt.toISOString() };
     },
 
-    /** Marque le fil comme lu jusqu'à maintenant. */
+    /**
+     * Marque le fil comme lu jusqu'à maintenant. A195 — le marqueur n'AVANCE que : deux clients du même
+     * membre (onglet et téléphone) qui marquent lu à une seconde d'écart écrivaient sans condition, et le
+     * plus lent ramenait le marqueur en arrière — des messages déjà lus redevenaient non lus. Pitfall Mongo :
+     * un marqueur ABSENT n'est vu par aucun filtre → OR explicite sur `null` / `isSet: false`.
+     */
     async markRead(userId: string, conversationId: string): Promise<{ readAt: string }> {
       const now = clock();
       const { conversation, role } = await loadContext(userId, { conversationId });
-      await prisma.conversation.update({ where: { id: conversation.id }, data: role === "SHIPPER" ? { shipperLastReadAt: now } : { carrierLastReadAt: now } });
+      const champ = role === "SHIPPER" ? "shipperLastReadAt" : "carrierLastReadAt";
+      await prisma.conversation.updateMany({
+        where: { id: conversation.id, OR: [{ [champ]: null }, { [champ]: { isSet: false } }, { [champ]: { lt: now } }] } as never,
+        data: { [champ]: now },
+      });
       return { readAt: now.toISOString() };
     },
 
@@ -383,31 +449,41 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
       const check = validateMeetupSlot(slot, now);
       if (!check.ok) throw new ValidationError("Invalid meeting slot.", { code: "INVALID_MEETUP_SLOT", reason: check.reason });
 
-      // Une seule proposition ouverte par type : la nouvelle remplace la precedente.
-      await prisma.meetup.updateMany({ where: { conversationId: conversation.id, kind: input.kind as never, status: "PROPOSED" }, data: { status: "CANCELLED", cancelledAt: now } });
-      const meetup = await prisma.meetup.create({
-        data: {
-          conversationId: conversation.id,
-          bookingId: booking.id,
-          kind: input.kind as never,
-          proposedByRole: role,
-          proposedById: userId,
-          placeLabel: input.placeLabel,
-          placeDetails: input.placeDetails ?? null,
-          startAt: slot.startAt,
-          endAt: slot.endAt,
-        },
-      });
-      await writeMessage(
-        conversation.id,
-        { kind: "MEETUP", authorId: userId, authorRole: role, body: input.placeLabel, systemKey: "meetup.proposed", systemData: { meetupId: meetup.id, kind: input.kind, placeLabel: input.placeLabel, startAt: slot.startAt.toISOString(), endAt: slot.endAt.toISOString() } },
-        () =>
-          ({
-            ...envelopeFor(conversation.id, now),
-            eventType: "conversation.meetup_proposed",
-            payload: { ...eventBase(booking, conversation.id, role, userId), meetupId: meetup.id, kind: input.kind, placeLabel: input.placeLabel, startAt: slot.startAt.toISOString() },
-          }) as MessagingDomainEvent,
-        now
+      // A195 — UNE transaction : annuler la proposition ouverte, créer la nouvelle, écrire le message et
+      // l'événement (D2). Les trois écritures tombent ou passent ensemble, et comme le message touche la
+      // CONVERSATION, deux propositions simultanées se disputent ce document : la perdante est rejouée et
+      // annule alors la proposition de la gagnante — une contre-proposition, jamais deux propositions ouvertes.
+      const meetup = await withWriteConflictRetry(() =>
+        prisma.$transaction(async (tx) => {
+          // Une seule proposition ouverte par type : la nouvelle remplace la precedente.
+          await tx.meetup.updateMany({ where: { conversationId: conversation.id, kind: input.kind as never, status: "PROPOSED" }, data: { status: "CANCELLED", cancelledAt: now } });
+          const cree = await tx.meetup.create({
+            data: {
+              conversationId: conversation.id,
+              bookingId: booking.id,
+              kind: input.kind as never,
+              proposedByRole: role,
+              proposedById: userId,
+              placeLabel: input.placeLabel,
+              placeDetails: input.placeDetails ?? null,
+              startAt: slot.startAt,
+              endAt: slot.endAt,
+            },
+          });
+          await writeMessageIn(
+            tx as TxClient,
+            conversation.id,
+            { kind: "MEETUP", authorId: userId, authorRole: role, body: input.placeLabel, systemKey: "meetup.proposed", systemData: { meetupId: cree.id, kind: input.kind, placeLabel: input.placeLabel, startAt: slot.startAt.toISOString(), endAt: slot.endAt.toISOString() } },
+            () =>
+              ({
+                ...envelopeFor(conversation.id, now),
+                eventType: "conversation.meetup_proposed",
+                payload: { ...eventBase(booking, conversation.id, role, userId), meetupId: cree.id, kind: input.kind, placeLabel: input.placeLabel, startAt: slot.startAt.toISOString() },
+              }) as MessagingDomainEvent,
+            now
+          );
+          return cree;
+        })
       );
       return toMeetupDto(meetup as unknown as MeetupRow);
     },
@@ -422,22 +498,30 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
       const check = canAcceptMeetup(meetup as unknown as MeetupRow, role);
       if (!check.ok) throw new ValidationError("This meeting cannot be accepted.", { code: "MEETUP_NOT_ACCEPTABLE", reason: check.reason });
 
-      const updated = await prisma.meetup.updateMany({ where: { id: meetupId, status: "PROPOSED" }, data: { status: "ACCEPTED", acceptedAt: now } });
-      if (updated.count === 0) throw new ValidationError("This meeting was just changed. Reload the conversation.", { code: "MEETUP_CHANGED" });
-      // ANO-WEB-47 (recette 5.15) — un seul rendez-vous confirmé par type : accepter une re-proposition remplace le
-      // précédent confirmé (il est annulé), sinon l'ancre du numéro (D61 3A) et la liste hésiteraient entre deux.
-      await prisma.meetup.updateMany({ where: { conversationId: conversation.id, kind: meetup.kind as never, status: "ACCEPTED", id: { not: meetupId } }, data: { status: "CANCELLED", cancelledAt: now } });
-      const fresh = (await prisma.meetup.findUniqueOrThrow({ where: { id: meetupId } })) as unknown as MeetupRow;
-      await writeMessage(
-        conversation.id,
-        { kind: "MEETUP", authorId: userId, authorRole: role, body: fresh.placeLabel, systemKey: "meetup.accepted", systemData: { meetupId: fresh.id, kind: fresh.kind, placeLabel: fresh.placeLabel, startAt: fresh.startAt.toISOString() } },
-        () =>
-          ({
-            ...envelopeFor(conversation.id, now),
-            eventType: "conversation.meetup_accepted",
-            payload: { ...eventBase(booking, conversation.id, role, userId), meetupId: fresh.id, kind: fresh.kind as "PICKUP" | "DELIVERY", placeLabel: fresh.placeLabel, startAt: fresh.startAt.toISOString() },
-          }) as MessagingDomainEvent,
-        now
+      // A195 — la garde `status: "PROPOSED"` tenait déjà le double clic, mais le changement d'état était
+      // commité AVANT son message et son événement (D2 : jamais deux transactions). Tout tient ici.
+      const fresh = await withWriteConflictRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const updated = await tx.meetup.updateMany({ where: { id: meetupId, status: "PROPOSED" }, data: { status: "ACCEPTED", acceptedAt: now } });
+          if (updated.count === 0) throw new ValidationError("This meeting was just changed. Reload the conversation.", { code: "MEETUP_CHANGED" });
+          // ANO-WEB-47 (recette 5.15) — un seul rendez-vous confirmé par type : accepter une re-proposition remplace le
+          // précédent confirmé (il est annulé), sinon l'ancre du numéro (D61 3A) et la liste hésiteraient entre deux.
+          await tx.meetup.updateMany({ where: { conversationId: conversation.id, kind: meetup.kind as never, status: "ACCEPTED", id: { not: meetupId } }, data: { status: "CANCELLED", cancelledAt: now } });
+          const relu = (await tx.meetup.findUniqueOrThrow({ where: { id: meetupId } })) as unknown as MeetupRow;
+          await writeMessageIn(
+            tx as TxClient,
+            conversation.id,
+            { kind: "MEETUP", authorId: userId, authorRole: role, body: relu.placeLabel, systemKey: "meetup.accepted", systemData: { meetupId: relu.id, kind: relu.kind, placeLabel: relu.placeLabel, startAt: relu.startAt.toISOString() } },
+            () =>
+              ({
+                ...envelopeFor(conversation.id, now),
+                eventType: "conversation.meetup_accepted",
+                payload: { ...eventBase(booking, conversation.id, role, userId), meetupId: relu.id, kind: relu.kind as "PICKUP" | "DELIVERY", placeLabel: relu.placeLabel, startAt: relu.startAt.toISOString() },
+              }) as MessagingDomainEvent,
+            now
+          );
+          return relu;
+        })
       );
       return toMeetupDto(fresh);
     },
@@ -459,18 +543,33 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
       const existing = await prisma.phoneReveal.findUnique({ where: { conversationId_revealedToId: { conversationId: conversation.id, revealedToId: userId } } });
       if (existing) return { phoneE164: counterpart.phoneE164, firstName: counterpart.firstName, revealedAt: existing.revealedAt.toISOString() };
 
-      await prisma.phoneReveal.create({ data: { conversationId: conversation.id, bookingId: booking.id, revealedToId: userId, revealedUserId: counterpartId, revealedAt: now } });
-      await writeMessage(
-        conversation.id,
-        { kind: "SYSTEM", authorId: null, authorRole: "SYSTEM", body: "phone.revealed", systemKey: "phone.revealed", systemData: { role } },
-        () =>
-          ({
-            ...envelopeFor(conversation.id, now),
-            eventType: "conversation.phone_revealed",
-            payload: { ...eventBase(booking, conversation.id, role, userId), revealedUserId: counterpartId },
-          }) as MessagingDomainEvent,
-        now
-      );
+      // A195 — la trace de révélation, le message système et l'événement dans UNE transaction (D2) : un numéro
+      // révélé sans trace serait exactement ce que la trace doit empêcher. Double clic : la paire
+      // (conversation, destinataire) est UNIQUE, la seconde création est refusée par la base → on relit la trace
+      // de la première et on rend le même numéro (le geste est idempotent, pas une erreur).
+      try {
+        await withWriteConflictRetry(() =>
+          prisma.$transaction(async (tx) => {
+            await tx.phoneReveal.create({ data: { conversationId: conversation.id, bookingId: booking.id, revealedToId: userId, revealedUserId: counterpartId, revealedAt: now } });
+            await writeMessageIn(
+              tx as TxClient,
+              conversation.id,
+              { kind: "SYSTEM", authorId: null, authorRole: "SYSTEM", body: "phone.revealed", systemKey: "phone.revealed", systemData: { role } },
+              () =>
+                ({
+                  ...envelopeFor(conversation.id, now),
+                  eventType: "conversation.phone_revealed",
+                  payload: { ...eventBase(booking, conversation.id, role, userId), revealedUserId: counterpartId },
+                }) as MessagingDomainEvent,
+              now
+            );
+          })
+        );
+      } catch (e) {
+        if (!estCollisionUnique(e)) throw e;
+        const deja = await prisma.phoneReveal.findUniqueOrThrow({ where: { conversationId_revealedToId: { conversationId: conversation.id, revealedToId: userId } } });
+        return { phoneE164: counterpart.phoneE164, firstName: counterpart.firstName, revealedAt: deja.revealedAt.toISOString() };
+      }
       return { phoneE164: counterpart.phoneE164, firstName: counterpart.firstName, revealedAt: now.toISOString() };
     },
   };

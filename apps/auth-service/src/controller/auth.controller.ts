@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { AuthError, ConflictError, RateLimitError, ValidationError } from "@packages/error-handler";
 import { isSupportedLocale, resolveLocale } from "@packages/api-contracts";
 
@@ -76,6 +77,22 @@ function getClientIp(req: Request): string | undefined {
     return xForwardedFor.split(",")[0]?.trim();
   }
   return req.ip;
+}
+
+/**
+ * A195 — « ce document existe déjà » (Prisma P2002), et sur QUEL champ. Une lecture d'unicité ne réserve
+ * rien : entre le « c'est libre » et l'écriture, une autre requête a pu prendre la place. Le seul juge de
+ * l'unicité est l'index de la base ; sa collision doit donc porter la même réponse métier que la lecture,
+ * pas un 500. Le champ visé arrive dans `meta.target` — nom d'index Mongo compris, d'où la comparaison souple.
+ */
+function collisionSur(e: unknown, champ: "email" | "slug"): boolean {
+  if (typeof e !== "object" || e === null || (e as { code?: string }).code !== "P2002") return false;
+  const cible = (e as { meta?: { target?: unknown } }).meta?.target;
+  const texte = (Array.isArray(cible) ? cible.join(",") : String(cible ?? "")).toLowerCase();
+  // Cible absente (le pilote ne la donne pas toujours) : on l'attribue à l'email, seule collision plausible
+  // sur ce chemin — un slug tiré au hasard ne se répète pas deux fois de suite.
+  if (!texte) return champ === "email";
+  return texte.includes(champ);
 }
 
 function getClientLocale(req: Request): string | undefined {
@@ -295,34 +312,58 @@ export const verifyRegistrationOtp = async (
     }
 
     // ✨ NEW — Génération du slug public AVANT la transaction.
-    // La vérif d'unicité est hors transaction pour ne pas allonger le lock,
-    // et le slug est immuable une fois généré (pas de race condition possible).
-    const publicSlug = await generateUniquePublicSlug(
-      pending.firstName,
-      pending.lastName
-    );
+    // La vérif d'unicité est hors transaction pour ne pas allonger le lock.
+    // A195 — « pas de race condition possible » était faux : la lecture d'unicité ne réserve rien, et deux
+    // tirages simultanés peuvent sortir le même slug. C'est un accident de tirage, pas une réponse au membre :
+    // on retire une fois (le slug porte un discriminant aléatoire, deux collisions de suite sont invraisemblables).
+    const creerLeCompte = async () => {
+      const publicSlug = await generateUniquePublicSlug(pending.firstName, pending.lastName);
+      await withWriteConflictRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              firstName: pending.firstName,
+              lastName: pending.lastName,
+              email: pending.email,
+              emailNormalized: pending.emailNormalized,
+              passwordHash: pending.passwordHash,
+              publicSlug, // ✨ NEW — Slug public unique pour /u/[slug]
+              preferredLocale: resolveLocale(registrationLocale), // D44
+            },
+          });
 
-    await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          firstName: pending.firstName,
-          lastName: pending.lastName,
-          email: pending.email,
-          emailNormalized: pending.emailNormalized,
-          passwordHash: pending.passwordHash,
-          publicSlug, // ✨ NEW — Slug public unique pour /u/[slug]
-          preferredLocale: resolveLocale(registrationLocale), // D44
-        },
-      });
+          await recordRegistrationConsents(tx, user.id, {
+            termsVersion: pending.termsVersion,
+            privacyVersion: pending.privacyVersion,
+            ipAddress: pending.consentIp,
+            userAgent: pending.consentUserAgent,
+            locale: pending.consentLocale,
+          });
+        })
+      );
+    };
 
-      await recordRegistrationConsents(tx, user.id, {
-        termsVersion: pending.termsVersion,
-        privacyVersion: pending.privacyVersion,
-        ipAddress: pending.consentIp,
-        userAgent: pending.consentUserAgent,
-        locale: pending.consentLocale,
-      });
-    });
+    // A195 — la vérification d'existence ci-dessus ne PROTÈGE de rien sous concurrence : deux validations du
+    // même code (double clic, ou le navigateur qui rejoue la requête) lisent toutes deux « libre », créent
+    // toutes deux le compte, et la seconde prenait un 500 sur l'index unique. La base est le seul juge de
+    // l'unicité : sa collision porte exactement la même réponse métier que la lecture — EMAIL_ALREADY_USED.
+    try {
+      try {
+        await creerLeCompte();
+      } catch (error) {
+        if (!collisionSur(error, "slug")) throw error;
+        await creerLeCompte(); // second tirage de slug
+      }
+    } catch (error) {
+      if (!collisionSur(error, "email")) throw error;
+      return next(
+        new ConflictError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
+    }
 
     sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, registrationLocale, {
       loginUrl: process.env.USER_APP_URL
@@ -816,10 +857,26 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     const passwordHash = await bcrypt.hash(String(newPassword), 10);
 
-    await prisma.user.update({
-      where: { emailNormalized: emailKey },
-      data: { passwordHash },
-    });
+    // A195 — le refus « même mot de passe qu'avant » porte sur l'empreinte LUE : si le mot de passe change
+    // entre la lecture et l'écriture (l'autre demande de réinitialisation du même membre, ou un changement
+    // depuis le compte), l'écriture sans condition écrasait ce changement en silence. Conditionnée à
+    // l'empreinte lue, elle ne peut plus écraser que ce qu'elle a vraiment vérifié. Pitfall Mongo : un
+    // compte SANS mot de passe (connexion Google, D47) a un champ null ou ABSENT → les deux sont visés.
+    const ancienne = user.passwordHash;
+    const ecrit = await withWriteConflictRetry(() =>
+      prisma.user.updateMany({
+        where: ancienne === null ? { id: user.id, OR: [{ passwordHash: null }, { passwordHash: { isSet: false } }] } : { id: user.id, passwordHash: ancienne },
+        data: { passwordHash },
+      })
+    );
+    if (ecrit.count !== 1) {
+      return next(
+        new ConflictError("This password was just changed. Please start the reset again.", {
+          type: "password",
+          code: "PASSWORD_STATE_CHANGED",
+        })
+      );
+    }
 
     const resetLocale = localeFromHeaders(req.headers);
     await sendPasswordChangedEmail(user.firstName, emailKey, resetLocale, {

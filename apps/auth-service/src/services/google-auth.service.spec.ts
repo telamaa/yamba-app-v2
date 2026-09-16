@@ -13,7 +13,7 @@ const USER = { id: "u1", email: "Awa.Diop@gmail.com", firstName: "Awa", lastName
 function deps(overrides: Partial<GoogleAuthDeps> = {}): GoogleAuthDeps & { calls: Record<string, jest.Mock> } {
   const calls = {
     identityFind: jest.fn().mockResolvedValue(null),
-    identityUpdate: jest.fn().mockResolvedValue({}),
+    identityUpdate: jest.fn().mockResolvedValue({ count: 1 }),
     identityCreate: jest.fn().mockResolvedValue({}),
     userFind: jest.fn().mockResolvedValue(null),
     userCreate: jest.fn().mockResolvedValue({ ...USER, id: "new" }),
@@ -24,7 +24,7 @@ function deps(overrides: Partial<GoogleAuthDeps> = {}): GoogleAuthDeps & { calls
     calls,
     verify: async () => PROFILE,
     prisma: {
-      authIdentity: { findUnique: calls.identityFind, update: calls.identityUpdate, create: calls.identityCreate },
+      authIdentity: { findUnique: calls.identityFind, updateMany: calls.identityUpdate, create: calls.identityCreate },
       user: { findUnique: calls.userFind },
       $transaction: async (fn) => fn(tx),
     },
@@ -103,5 +103,55 @@ describe("googleSignIn (D47)", () => {
     expect(d.calls.recordConsents).toHaveBeenCalledWith(expect.anything(), "new", {
       termsVersion: "2026-04-26", privacyVersion: "2026-04-26", ipAddress: "10.0.0.1", userAgent: "Safari", locale: "en",
     });
+  });
+});
+
+/**
+ * A195 — deux connexions Google à la même seconde (passe concurrence MEMBRE, suite d'A192)
+ * =========================================================================================
+ * Ce service lit trois fois « est-ce que ça existe ? » puis écrit. Une lecture d'unicité ne RÉSERVE rien :
+ * entre le « non » et l'écriture, l'autre onglet est passé. Les deux collisions possibles portent chacune
+ * une réponse ÉVIDENTE — l'identité que l'autre vient d'écrire est exactement celle qu'on voulait, le compte
+ * qu'il vient de créer est celui du même membre —, donc un 500 n'a jamais été la bonne réponse.
+ */
+describe("A195 — connexions Google simultanées", () => {
+  const collision = () => Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+
+  it("rattachement joué deux fois : la collision est une non-nouvelle, le membre est connecté", async () => {
+    const d = deps();
+    d.calls.userFind.mockImplementation(async (args: { where: { emailNormalized?: string } }) =>
+      args.where.emailNormalized === "awa.diop@gmail.com" ? USER : null
+    );
+    d.calls.identityCreate.mockRejectedValue(collision()); // l'autre onglet a rattaché en premier
+
+    const r = await googleSignIn(d, { idToken: "x" });
+
+    expect(r).toMatchObject({ status: "LOGGED_IN", user: USER, linked: true, created: false });
+  });
+
+  it("deux créations de compte : la perdante se rattache au compte de la gagnante, jamais un 500", async () => {
+    const d = deps();
+    let compteCree = false;
+    d.calls.userFind.mockImplementation(async (args: { where: { emailNormalized?: string } }) =>
+      args.where.emailNormalized && compteCree ? USER : null // « libre » à la lecture, pris à la relecture
+    );
+    d.calls.userCreate.mockImplementation(async () => {
+      compteCree = true;
+      throw collision();
+    });
+
+    const r = await googleSignIn(d, { idToken: "x", consent: { termsVersion: "2026-01", privacyVersion: "2026-01" } });
+
+    expect(r).toMatchObject({ status: "LOGGED_IN", user: USER, linked: true, created: false });
+    expect(d.calls.recordConsents).not.toHaveBeenCalled(); // les consentements de la gagnante suffisent
+  });
+
+  it("collision sur autre chose que l'email (aucun compte à relire) : l'erreur remonte, on n'invente rien", async () => {
+    const d = deps();
+    d.calls.userCreate.mockRejectedValue(collision()); // et userFind rend toujours null
+
+    await expect(
+      googleSignIn(d, { idToken: "x", consent: { termsVersion: "2026-01", privacyVersion: "2026-01" } })
+    ).rejects.toMatchObject({ code: "P2002" });
   });
 });

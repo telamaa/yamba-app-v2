@@ -70,7 +70,7 @@ export type GoogleAuthDeps = {
   prisma: {
     authIdentity: {
       findUnique: (args: Prisma.AuthIdentityFindUniqueArgs) => Promise<{ userId: string } | null>;
-      update: (args: Prisma.AuthIdentityUpdateArgs) => Promise<unknown>;
+      updateMany: (args: Prisma.AuthIdentityUpdateManyArgs) => Promise<{ count: number }>;
       create: (args: Prisma.AuthIdentityCreateArgs) => Promise<unknown>;
     };
     user: {
@@ -107,8 +107,10 @@ export async function googleSignIn(deps: GoogleAuthDeps, input: GoogleSignInInpu
   if (identity) {
     const user = await deps.prisma.user.findUnique({ where: { id: identity.userId } });
     if (user) {
-      await deps.prisma.authIdentity.update({
-        where: { provider_providerSub: { provider: "GOOGLE", providerSub: profile.sub } },
+      // A195 — `updateMany` et non `update` : l'identité peut avoir été détachée entre la lecture et
+      // l'écriture (effacement RGPD). La date de dernier usage n'est pas une raison de refuser la connexion.
+      await deps.prisma.authIdentity.updateMany({
+        where: { provider: "GOOGLE", providerSub: profile.sub },
         data: { lastUsedAt: new Date(), email: profile.email },
       });
       return { status: "LOGGED_IN", user, created: false, linked: false };
@@ -118,9 +120,7 @@ export async function googleSignIn(deps: GoogleAuthDeps, input: GoogleSignInInpu
   // 3. Compte existant avec le même email vérifié → rattachement
   const existing = await deps.prisma.user.findUnique({ where: { emailNormalized: emailKey } });
   if (existing) {
-    await deps.prisma.authIdentity.create({
-      data: { userId: existing.id, provider: "GOOGLE", providerSub: profile.sub, email: profile.email },
-    });
+    await lierIdentite(deps, existing.id, profile);
     return { status: "LOGGED_IN", user: existing, created: false, linked: true };
   }
 
@@ -136,30 +136,62 @@ export async function googleSignIn(deps: GoogleAuthDeps, input: GoogleSignInInpu
   const preferredLocale = resolveLocale(input.locale);
   const consent = input.consent;
 
-  const user = await deps.prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: {
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        email: profile.email,
-        emailNormalized: emailKey,
-        passwordHash: null,
-        publicSlug,
-        preferredLocale,
-        identities: {
-          create: { provider: "GOOGLE", providerSub: profile.sub, email: profile.email },
+  const creerLeCompte = () =>
+    deps.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          email: profile.email,
+          emailNormalized: emailKey,
+          passwordHash: null,
+          publicSlug,
+          preferredLocale,
+          identities: {
+            create: { provider: "GOOGLE", providerSub: profile.sub, email: profile.email },
+          },
         },
-      },
+      });
+      await deps.recordConsents(tx, created.id, {
+        termsVersion: consent.termsVersion,
+        privacyVersion: consent.privacyVersion,
+        ipAddress: input.ip,
+        userAgent: input.userAgent,
+        locale: preferredLocale,
+      });
+      return created;
     });
-    await deps.recordConsents(tx, created.id, {
-      termsVersion: consent.termsVersion,
-      privacyVersion: consent.privacyVersion,
-      ipAddress: input.ip,
-      userAgent: input.userAgent,
-      locale: preferredLocale,
-    });
-    return created;
-  });
 
-  return { status: "LOGGED_IN", user, created: true, linked: false };
+  // A195 — deux onglets terminent le formulaire de consentement en même temps : les deux ont lu « aucun
+  // compte avec cet email » et créent chacun le leur. `emailNormalized` est UNIQUE : la base tranche, et la
+  // perdante n'a pas à rendre un 500 — le compte que l'autre vient de créer est le sien, elle s'y rattache.
+  try {
+    const user = await creerLeCompte();
+    return { status: "LOGGED_IN", user, created: true, linked: false };
+  } catch (e) {
+    if (!estCollisionUnique(e)) throw e;
+    const gagnant = await deps.prisma.user.findUnique({ where: { emailNormalized: emailKey } });
+    if (!gagnant) throw e; // collision sur autre chose que l'email : ce n'est pas le cas traité, elle remonte
+    await lierIdentite(deps, gagnant.id, profile);
+    return { status: "LOGGED_IN", user: gagnant, created: false, linked: true };
+  }
 }
+
+/**
+ * A195 — rattacher l'identité Google à un compte. Deux connexions simultanées lisent toutes deux « aucune
+ * identité » : la paire (fournisseur, `sub`) est UNIQUE, l'une crée, l'autre reçoit P2002. Le rattachement
+ * est IDEMPOTENT — l'identité que l'autre vient d'écrire est exactement celle qu'on voulait —, donc la
+ * collision est une non-nouvelle : on la laisse passer et on connecte.
+ */
+async function lierIdentite(deps: GoogleAuthDeps, userId: string, profile: GoogleProfile): Promise<void> {
+  try {
+    await deps.prisma.authIdentity.create({
+      data: { userId, provider: "GOOGLE", providerSub: profile.sub, email: profile.email },
+    });
+  } catch (e) {
+    if (!estCollisionUnique(e)) throw e;
+  }
+}
+
+const estCollisionUnique = (e: unknown): boolean =>
+  typeof e === "object" && e !== null && (e as { code?: string }).code === "P2002";
