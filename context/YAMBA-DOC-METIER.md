@@ -3031,3 +3031,103 @@ testé unitairement ; recette de bout en bout avec le chapitre 5.12.)*
 | 101 | Retour de Stripe | « Voyageur actif » + email | ⏭ manuel (Express hébergé) |
 | 102 | Accepter sans onboarding | refus, rien débité | ⏭ (5.12 ; D31 unit-testé) |
 | 103 | Voir mes virements sur Stripe | tableau de bord (nouvel onglet) / « Finalise d'abord » | ⏭ manuel |
+
+
+---
+
+# Publier un trajet et son cycle de vie — ce que le chapitre 5.7 fait respecter
+
+*(PR `chore/recette-web-5-7` (#272), 11/09/2026 — cahier 01-WEB chapitre 5.7, WEB-TRJ-1 à 21.)*
+
+## Le besoin
+
+Un Voyageur décrit son trajet en trois étapes (trajet, conditions, vérification), le garde en
+brouillon aussi longtemps qu'il veut, le publie quand il est complet, puis le pilote : masquer,
+remettre en ligne, annuler, restaurer, archiver, dupliquer. Ce qu'il peut faire dépend de l'état
+du trajet et de ce qu'il porte ; c'est le serveur qui le dit, l'écran ne fait que le refléter.
+
+## Les règles
+
+**RG-WEB-81 — Trois étapes, un brouillon à tout moment.** « Trajet », « Conditions »,
+« Vérification » ; « Brouillon » est disponible dès l'ouverture. Les justificatifs se déposent
+dès l'étape 1.
+
+**RG-WEB-82 — Le prix au kilo est pré-rempli et borné, la suggestion ne bloque jamais.** Curseur
+de 5 à 20 €/kg ; une ancre de marché (basse / médiane / haute) et un verdict (« Prix juste »,
+« Sous le marché », « Au-dessus ») ; tout prix reste enregistrable.
+
+**RG-WEB-83 — Le gain net suit la capacité et le prix.** Curseur de 2 à 30 kg ; « Si tes N kg
+partent — N × prix — net, versé à J+4 après livraison » ; plancher de 8 € par envoi ; tolérance de
+poids ≤ 10 % au pickup.
+
+**RG-WEB-84 — Huit familles, toutes acceptées par défaut.** Chaque famille est acceptée,
+surchargée (en %) ou refusée ; le résumé replié nomme exactement les écarts.
+
+**RG-WEB-85 — Un forfait bagage exige la capacité correspondante et un montant positif.** Soute
+23 kg, cabine 12 kg : sous le seuil la ligne est grisée (« Monte ta capacité à … ») ; au-dessus,
+un équivalent au kilo est affiché ; un forfait à 0 € est refusé par le serveur. L'incohérence
+forfait / capacité est refusée **brouillon compris** (RG-WEB-88).
+
+**RG-WEB-86 — Les lieux dépendent du mode de transport, et il en faut un de chaque pour publier.**
+Avion : aéroport et ville ; train : gare et ville. Modes « Exact », « Rayon n km », « Ville
+entière ». Sans lieu de remise ou de livraison, la publication est refusée avec son code.
+
+**RG-WEB-87 — Il n'y a pas de réservation instantanée.** Chaque demande passe par l'accord du
+Voyageur, sous 24 h.
+
+**RG-WEB-88 — Le brouillon accepte l'incomplet, sauf l'incohérence bagage.** Un brouillon avec
+le seul itinéraire est enregistré ; un forfait soute avec 5 kg de capacité est refusé même en
+brouillon.
+
+**RG-WEB-89 — Chaque garde de publication a un code, et le trajet reste en brouillon.** Date
+manquante, date passée, prix ou capacité manquants, lieu de remise ou de livraison manquant :
+refus avec `details.code`, statut inchangé.
+
+**RG-WEB-90 — Masquer et remettre en ligne sont réversibles et visibles.** Masqué = hors
+recherche, badge « Masqué » / « Hidden » ; remis en ligne = réapparaît, « En ligne » / « Online ».
+Jamais les libellés d'une version antérieure.
+
+**RG-WEB-91 — L'écran n'offre que ce que le serveur permet.** `allowedActions` fait foi : un
+brouillon ne se masque ni ne s'annule ; un trajet réservé ne se modifie pas (`TRIP_NOT_EDITABLE`
+si l'on force) ; un archivé ne se restaure pas.
+
+**RG-WEB-92 — Annuler un trajet qui porte un deal vivant est refusé (D72).** À l'écran comme par
+l'API : `409 TRIP_HAS_ACTIVE_DEALS`, le nombre de deals est nommé, le trajet reste en ligne. Un
+trajet libre s'annule, se restaure en brouillon si son départ n'est pas passé, s'archive
+irréversiblement ; dupliquer est toujours permis et crée un nouveau brouillon.
+
+**RG-WEB-93 — Le Voyageur ne réserve pas son propre trajet.** Sur sa page publique : « C'est
+votre trajet », modifier / gérer, aucun « Réserver ».
+
+**RG-WEB-94 — « Masqué par Yamba » s'impose au Voyageur.** Bandeau sur le détail ; page publique
+introuvable pour les autres ; hors recherche ; le Voyageur ne lève pas le masquage.
+
+**RG-WEB-95 — Modifier un trajet rouvre TOUTES ses valeurs, quel que soit le canal qui l'a
+créé.** Les dates et heures sont dérivées de l'instant enregistré quand les chaînes saisies
+manquent (ANO-WEB-22).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 104 | Ouvrir « Créer un trajet » | trois étapes, « Brouillon », trois modes | oui |
+| 105 | Étape 1 : mode, itinéraire, dates | heures locales à chaque lieu | ⏭ Google ; ANO-WEB-23 ouverte |
+| 106 | Prix au kilo | pré-rempli, 5–20, ancre et verdict | oui (« Ton prix = ton net » à trancher) |
+| 107 | Capacité et gain | 2–30, 23 × 11,50 = 264,50, J+4, 8 €, ≤ 10 % | oui |
+| 108 | Huit familles | résumé exact ; les huit dépliées | oui |
+| 109 | Forfaits bagage | grisés sous 23 / 12 kg ; ≈ €/kg ; 0 refusé | oui |
+| 110 | Lieux | rendus ; cartes par mode ; Exact / Rayon / Ville entière | oui |
+| 111 | Réservation instantanée | absente ; « ton accord sous 24 h » | oui |
+| 112 | Vérification | « Prix & capacité », « Aperçu public » | oui |
+| 113 | Publier | PUBLISHED, « En ligne », trouvable | oui |
+| 114 | Brouillon incomplet / incohérence bagage | 201 DRAFT / refus brouillon compris | oui |
+| 115 | Gardes a → f | code par garde, reste DRAFT | oui |
+| 116 | Masquer / remettre en ligne | PAUSED hors recherche, PUBLISHED de retour, badges FR/EN | oui |
+| 117 | Actions permises | selon l'état ; `edit` absent si réservé | oui |
+| 118 | Trajet réservé | `TRIP_NOT_EDITABLE` | oui |
+| 119 | Annuler avec deal vivant | 409, message, reste en ligne (écran + API) | oui |
+| 120 | Annuler un trajet libre | CANCELLED, hors recherche | oui |
+| 121 | Restaurer puis archiver | DRAFT ; ARCHIVED irréversible | oui |
+| 122 | Dupliquer | nouveau brouillon, original inchangé | oui |
+| 123 | Sa propre page publique | « C'est votre trajet », pas de « Réserver » | oui |
+| 124 | Masqué par Yamba | bandeau ; introuvable ; hors recherche | oui (email non vérifié) |

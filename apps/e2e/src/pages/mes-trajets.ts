@@ -52,11 +52,24 @@ export class MesTrajets {
    * Tente d'annuler le trajet par le menu de sa ligne. Rend le toast obtenu : le refus D72
    * (« Ce trajet porte encore n deals en cours … ») ou « Trajet annulé ».
    */
-  async tenterDAnnulerLeTrajet(corridor: string): Promise<{ statut: number; toast: string }> {
-    const ligne = this.page.locator(`a[aria-label="${corridor}"]`).first().locator("xpath=..");
+  async tenterDAnnulerLeTrajet(corridor: string, tripId?: string): Promise<{ statut: number; toast: string }> {
+    // Plusieurs trajets peuvent porter le même corridor (Thomas en a trois Paris → Brazzaville) :
+    // l'identifiant, quand il est donné, vise la bonne ligne par le `href` du lien.
+    const lien = tripId
+      ? this.page.locator(`a[aria-label="${corridor}"][href$="/dashboard/trips/${tripId}"]`)
+      : this.page.locator(`a[aria-label="${corridor}"]`);
+    const ligne = lien.first().locator("xpath=..");
     await expect(ligne).toBeVisible({ timeout: 30_000 });
-    await ligne.locator("button").last().click();
-    await this.page.getByRole("button", { name: "Annuler", exact: true }).click();
+    // Le menu « … » peut se refermer si la liste se re-rend juste après le clic (rafraîchissement
+    // TanStack Query après les mutations des fiches précédentes) : on réessaie jusqu'à le voir.
+    const entreeAnnuler = this.page.getByRole("button", { name: "Annuler", exact: true });
+    await expect.poll(async () => {
+      if (await entreeAnnuler.isVisible()) return true;
+      await ligne.locator("button").last().click();
+      await this.page.waitForTimeout(400);
+      return entreeAnnuler.isVisible();
+    }, { timeout: 20_000 }).toBe(true);
+    await entreeAnnuler.click();
     await expect(this.page.getByRole("heading", { name: "Annuler ce trajet ?" })).toBeVisible({ timeout: 15_000 });
     // Le front annule par `DELETE /trips/:id` (alias de `POST /trips/:id/cancel`, Lot 2).
     const reponse = this.page.waitForResponse(

@@ -497,6 +497,57 @@ Contre-épreuve : WEB-PRO-9 lit « Cette page est masquée… » sur la page du 
                  visiteur reçoit toujours « Profil introuvable ».
 ```
 
+```
+ANO-WEB-22
+Fiche          : WEB-TRJ-3 à 9 (chapitre 5.7) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Modifier » un trajet rouvre l'assistant avec TOUTES ses valeurs, dates et heures
+                 comprises, et « Continuer » mène à l'étape « Conditions ».
+Obtenu         : sur un trajet créé par l'API (comme ceux du seed), l'édition s'ouvrait avec
+                 « 4 champs à compléter », « Date requise » ×2, « Heure requise » ×2 — alors que
+                 `departureAt` et `arrivalAt` sont bien en base. « Continuer » restait bloqué à
+                 l'étape 1 ; enregistrer aurait réécrit les dates à vide.
+Cause          : `create-trip.reverse-mapper.ts` ne lisait que `departureDateLocal` /
+                 `departureTimeLocal` (et leurs jumeaux d'arrivée), des chaînes que SEUL le wizard
+                 écrit à la création. Le mapper inverse ne savait relire que ce que son propre
+                 mapper avait écrit : tout trajet venu d'un autre canal (API, seed, futur client
+                 mobile) perdait ses dates à l'édition.
+Correction     : repli sur l'instant absolu — `localDateTimeParts(departureAt, originTimezone)`
+                 dérive la date et l'heure avec `Intl.DateTimeFormat(...).formatToParts` dans le
+                 fuseau du lieu quand il est connu, sinon dans celui du navigateur (le fuseau que le
+                 mapper d'écriture utilise). Les chaînes locales gardent la priorité quand elles
+                 existent ; un fuseau inconnu du moteur retombe sur le navigateur, jamais d'erreur.
+Contre-épreuve : WEB-TRJ-3 à 9 ouvre un brouillon créé par l'API : aucun « Date requise » /
+                 « Heure requise », aucun « champs à compléter », et l'étape 2 s'ouvre.
+```
+
+```
+ANO-WEB-23
+Fiche          : WEB-TRJ-2 (chapitre 5.7) · Gravité : MINEURE · ÉTAT : OUVERTE (lecture du code,
+                 la fiche est ⏭ Google Places)
+Attendu        : « les heures sont locales à chaque lieu : 14:00 signifie 14 h à Bruxelles,
+                 06:00 signifie 6 h à Kinshasa » (cahier).
+Obtenu         : le wizard n'envoie aucun fuseau (`originTimezone` / `destinationTimezone` absents
+                 de `create-trip.mapper.ts`) et calcule `departureAt` / `arrivalAt` avec
+                 `Date.setHours` — c'est-à-dire dans le fuseau du NAVIGATEUR du Voyageur. Les heures
+                 saisies sont conservées telles quelles (`departureTimeLocal`) et c'est elles que
+                 les écrans affichent : à l'écran tout semble juste. L'instant absolu, lui, est
+                 faux dès que le lieu n'est pas dans le fuseau du navigateur (arrivée à Kinshasa
+                 saisie depuis Paris en été : une heure d'écart), et le serveur retombe sur
+                 `Europe/Paris` pour `departureHourLocal` (`computeDenormalizedFields`). Ce sont
+                 les crons (expiration au départ, complétion automatique) et la garde « départ
+                 passé » qui lisent l'instant absolu.
+Impact         : faible aujourd'hui (Voyageurs francophones, écarts d'une à deux heures) ; réel
+                 pour un Voyageur qui publie depuis un autre continent.
+Proposition    : dériver le fuseau CÔTÉ SERVEUR des coordonnées du lieu (`originLat/Lng` viennent
+                 déjà de Google Places ; une table hors-ligne type `tz-lookup`, aucun appel réseau),
+                 puis calculer `departureAt` = date + heure saisies DANS ce fuseau, et remplir
+                 `originTimezone` / `destinationTimezone` — les mappers d'affichage et
+                 `computeDenormalizedFields` les consomment déjà. Candidat au registre (D-next),
+                 PR dédiée hors recette : décision produit.
+État recette   : WEB-TRJ-2 est ⏭ (Google) avec cette lecture dans son motif ; à rejouer après
+                 correction en vérifiant l'instant en base, pas seulement l'affichage.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -772,6 +823,88 @@ factice. Clé Stripe du poste : `sk_test_`, Connect Express **réel** en mode te
   directement au wizard : c'est l'appel à l'action de cette section qui ouvre `/carrier/onboarding`.
 - **Le champ téléphone du wizard** n'a pas de libellé associé accessible : le viser par
   `input[type="tel"]`.
+
+
+## Chapitre 5.7 — Publier un trajet et son cycle de vie · **CONFORME** (21 fiches : 20 jouées, 1 ⏭ · 1 anomalie mineure close, 1 mineure ouverte · 14 scénarios, 1 min 36)
+
+Le cœur du chapitre — la machine à états (`getAllowedActions`, gardes d'édition / annulation /
+publication, D72) — est déjà prouvé par un test unitaire de 500 lignes
+(`trip-state-machine.spec.ts`). La recette l'**exerce** contre le système : de vrais trajets créés
+par l'API, les gestes tentés, `allowedActions` et les statuts lus, la visibilité vérifiée par la
+recherche publique. Les valeurs du wizard (prix, gain, familles, forfaits, lieux) sont éprouvées à
+l'écran en ouvrant l'assistant **en édition** (`/trips/create?edit=<id>`) sur un brouillon créé par
+l'API : l'étape 1 (Google Places) est contournée, l'étape 2 et la « Vérification » sont réelles.
+Compte : Joséphine (trajet libre) ; Thomas pour `bzv-upcoming` (réservé) et `bzv-perkg` ; Marc et
+le médiateur pour le masquage administratif.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-TRJ-1 | Ouvrir « Créer un trajet » | **Conforme** — « Votre trajet », trois étapes « Trajet », « Conditions », « Vérification », bouton « Brouillon » d'emblée, modes « Avion », « Train », « Voiture », accordéon « Référence & justificatif » dès l'étape 1 |
+| WEB-TRJ-2 | Étape 1 : mode, itinéraire et dates | **⏭** — l'itinéraire passe par l'autocomplétion Google Places (hors périmètre, comme 5.2 et 5.6). Les modes sont vus en TRJ-1, les dates par l'édition (TRJ-3…9). Lecture du code sur « heures locales à chaque lieu » → `ANO-WEB-23` (ouverte) |
+| WEB-TRJ-3 | Le prix au kilo et sa suggestion | **Conforme** — prix rendu tel qu'enregistré (11,50), jamais 0 ; curseur `min=5` `max=20` ; « Les trajets similaires partent à 12,60 €/kg en médiane (fourchette 11,34–14,49). », verdict « ✓ Prix juste », infobulle « Pourquoi ce prix ? ». **Écart** : « Ton prix = ton net » n'est pas affiché — la carte de gain dit « net, versé à J+4 après livraison » (la phrase existe dans `create-trip.copy.ts`, `netGainSub`, la refonte de l'étape 2 ne la rend plus) |
+| WEB-TRJ-4 | La capacité et le gain net | **Conforme** — curseur `min=2` `max=30` ; « Si tes 23 kg partent — 264,50 € — net, versé à J+4 après livraison » (23 × 11,50) ; plancher « aucun envoi ne te rapporte moins de 8 € » ; « écart de poids ≤ 10 % » dans l'infobulle « Ta capacité ». La valeur pré-remplie à la création (12 kg) n'est pas vue en édition |
+| WEB-TRJ-5 | Les huit familles de colis | **Conforme** — résumé replié « Alimentaire sec & scellé : refusé · Électronique & appareils : +20 % » ; dépliée, les huit familles du cahier, du « Documents & papiers » à « Accessoires & divers » |
+| WEB-TRJ-6 | Les forfaits bagage et leur garde | **Conforme** — capacité 5 kg : lignes grisées « Monte ta capacité à 23 kg pour proposer ce forfait » et « … 12 kg … », « Aucun forfait proposé » ; 23 kg + 230 € : « ≈ 10,00 €/kg », « 1 forfait proposé », plus de ligne grisée ; un forfait à 0 € est refusé par le serveur (entier strictement positif). Le « mémorisé mais masqué » du curseur (étape 6) n'est pas joué |
+| WEB-TRJ-7 | Les lieux de remise et de livraison | **Conforme** — les deux lieux du brouillon sont rendus dans leurs champs, carte « À l'aéroport » enfoncée, modes « Exact » (le cahier écrit « Lieu exact »), « Rayon 5 km », « Rayon 10 km » ; activer « Dans la ville » révèle « Rayon 20 km » et « Ville entière », « 2 lieux ». **Les cartes dépendent du mode** : en avion, aéroport + ville ; en train, « À la gare » (vérifié sur un brouillon TRAIN) — le cahier attend les trois à la fois |
+| WEB-TRJ-8 | « Réservation instantanée » n'existe plus | **Conforme** — aucune bascule, aucun vestige du libellé ; « Chaque demande passe par ton accord — tu réponds sous 24 h. » dans « Options & message » |
+| WEB-TRJ-9 | La vérification et l'aperçu public | **Conforme** — carte « Prix & capacité » (11,50 €/kg, 23 kg dispo, « Tu gagnes 264,50 € », familles refusée / surchargée), « Aperçu public — Tel que vu par les expéditeurs ». Les justificatifs se déposent à l'étape 1 et l'étape 3 ne les LISTE que s'il y en a (formulation du cahier) |
+| WEB-TRJ-10 | Publier le trajet | **Conforme** — `POST /trips/:id/publish` → **PUBLISHED**, badge « En ligne » dans « Mes trajets », trouvable par `GET /trips/search?from=Bruxelles&to=Kinshasa`. La carte de recherche (« jamais 0,00 € ») relève du chapitre 5.9 |
+| WEB-TRJ-11 | Le brouillon accepte l'incomplet, sauf l'incohérence bagage | **Conforme** — brouillon minimal (mode + villes) : `201`, **DRAFT** ; forfait soute avec 5 kg de capacité : refusé (`400`) brouillon compris — c'est le schéma Zod (`checkBagCapacity`) qui le tient, avant tout contrôleur |
+| WEB-TRJ-12 | Les gardes de publication (a → f) | **Conforme** — a `PUBLISH_DEPARTURE_REQUIRED` · b date passée `TRIP_TRANSITION_NOT_ALLOWED` (garde de la machine) · c et d `PRICING_INCOMPLETE` · e `PUBLISH_PICKUP_REQUIRED` · f `PUBLISH_DELIVERY_REQUIRED` ; le trajet reste **DRAFT** à chaque refus |
+| WEB-TRJ-13 | Masquer et remettre en ligne | **Conforme** — pause → **PAUSED**, absent de la recherche, badge « Masqué » ; resume → **PUBLISHED**, réapparaît, « En ligne » ; en anglais « Online » puis « Hidden » ; jamais « Actif » / « En pause » / « Active » / « Paused » |
+| WEB-TRJ-14 | Le menu n'offre que le permis | **Conforme** — lu dans `allowedActions` (le front ne décide jamais) : brouillon → `edit`, `publish`, `duplicate`, sans `cancel` ni `archive` ; en ligne libre → `edit`, `pause`, `cancel` ; `bzv-upcoming` (réservé) → **`edit` absent** ; archivé → sans `restore`. « Terminé » n'a pas de trajet dans le seed |
+| WEB-TRJ-15 | Un trajet réservé est intouchable | **Conforme** — `PUT /trips/:id` sur `bzv-upcoming` : `400` `TRIP_NOT_EDITABLE`, « Cannot edit a trip with active bookings. Cancel the trip instead. » |
+| WEB-TRJ-16 | Annuler un trajet qui porte un deal est refusé | **Conforme** — **à l'écran** : « Mes trajets » → menu « … » → « Annuler » → « Annuler ce trajet ? » → `409`, toast « Ce trajet porte encore N deals en cours … remboursé … » ; **par l'API** : `409` `TRIP_HAS_ACTIVE_DEALS`, `activeDeals > 0` ; le trajet reste **PUBLISHED** (D72) |
+| WEB-TRJ-17 | Annuler un trajet libre | **Conforme** — `POST /trips/:id/cancel` → **CANCELLED**, absent de la recherche |
+| WEB-TRJ-18 | Restaurer puis archiver | **Conforme** — `restore` (départ futur) → **DRAFT** ; republié, annulé, `archive` → **ARCHIVED** ; `restore` sur un archivé refusé, `allowedActions` sans `restore` |
+| WEB-TRJ-19 | Dupliquer | **Conforme** — `duplicate` est permis dans tous les états ; la duplication est un `createTrip` depuis les conditions : le jumeau est un nouveau brouillon (`201`), l'original inchangé |
+| WEB-TRJ-20 | Le Voyageur sur sa propre page publique | **Conforme** — « C'est votre trajet », aucun bouton « Réserver », « Modifier » / « Gérer » présents |
+| WEB-TRJ-21 | « Masqué par Yamba » vu du Voyageur | **Conforme** — le médiateur masque `yul` (`POST /admin/trips/:id/hide`, motif) : Marc voit le bandeau « masqué par Yamba » sur le détail ; le visiteur reçoit « introuvable » sur la page publique ; absent de Paris → Montréal ; masquage levé par la fiche (`DELETE …/hide`). L'email Mailpit n'est pas vérifié |
+
+### À trancher (produit)
+
+- **« Ton prix = ton net »** (TRJ-3) : le cahier attend la phrase (« la commission est payée par
+  l'Expéditeur ») ; l'écran ne dit plus que « net, versé à J+4 après livraison ». Rétablir la
+  phrase complète sous la carte de gain (`netGainSub` existe déjà) ou amender le cahier.
+- **« Lieu exact »** (TRJ-7) : le mode s'appelle « Exact » à l'écran. Formulation.
+- **Les cartes de lieu par mode de transport** (TRJ-7) : le cahier attend « À l'aéroport »,
+  « À la gare » et « Dans la ville » ensemble ; le produit ne propose que les cartes du mode
+  (aéroport en avion, gare en train, ville toujours). Cohérent ; amender le cahier.
+- **Les justificatifs** (TRJ-9) : déposés à l'étape 1 (« Référence & justificatif »), seulement
+  listés à l'étape 3. Amender le cahier.
+- **Les heures locales à chaque lieu** (TRJ-2, `ANO-WEB-23`) : fuseau du navigateur aujourd'hui ;
+  fuseau du lieu dérivé côté serveur proposé. Décision produit, PR dédiée.
+
+### Observations
+
+- **Un trajet créé hors wizard perdait ses dates à l'édition** (`ANO-WEB-22`, close) : le
+  correctif touche le front (`create-trip.reverse-mapper.ts`), pas l'API. Les trajets du seed
+  sont dans ce cas — « Modifier » sur l'un d'eux s'ouvrait avec quatre champs vides.
+- **Le résumé « Familles de colis » replié** dit exactement ce qui a été changé (« Alimentaire sec
+  & scellé : refusé · Électronique & appareils : +20 % ») — l'étape 2 reste lisible sans déplier.
+- **Les deals d'un trajet sont dépliés par défaut** dans « Mes trajets » (« 8 colis », « 5 colis »
+  `[expanded]`) : le menu « … » d'une ligne réservée est en bas d'une longue liste.
+
+### Pièges de poste payés ici
+
+- **`innerText` rend le texte transformé par le CSS** : « Aperçu public » est en capitales
+  (`uppercase`) → « APERÇU PUBLIC ». Toute comparaison sur `innerText` est insensible à la casse ;
+  `getByText` cherche le DOM et n'a pas ce problème.
+- **L'infobulle de l'étape 2 se referme sur tout défilement** (`scroll` capturé) — et le clic de
+  Playwright fait défiler l'élément juste avant de cliquer. `scrollIntoViewIfNeeded()` d'abord,
+  puis clic avec reprise (`expect.poll` sur `aria-expanded`), et lecture par `aria-controls`.
+- **Le menu « … » d'une ligne peut se refermer** si la liste se re-rend juste après le clic
+  (rafraîchissement TanStack Query après les mutations des fiches précédentes) : la page-objet
+  réessaie jusqu'à voir l'entrée « Annuler ».
+- **Thomas a trois trajets Paris → Brazzaville** : la ligne se vise par l'`href` du lien
+  (`/dashboard/trips/<id>`), jamais par le corridor seul.
+- **`getByDisplayValue` n'existe pas en Playwright** (c'est Testing Library) : `getByRole("textbox",
+  { name })` + `toHaveValue`.
+- **Le wizard en édition n'a pas besoin de Google** : « Bruxelles » et « Kinshasa » sont rendus
+  depuis le trajet, l'étape 1 est valide, « Continuer » ouvre l'étape 2 — c'est ce qui rend les
+  fiches 3 à 9 automatisables.
+
+---
 
 ---
 
