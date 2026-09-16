@@ -169,6 +169,7 @@
   },
   "toasts": {
     "cancelBlocked": "Ce trajet porte encore {count, plural, =1 {un deal en cours} other {# deals en cours}} : annule-les d'abord depuis « Mes trajets » (chaque deal y est listé sous son trajet). Chaque Expéditeur sera remboursé intégralement.",
+    "cancelBlockedCta": "Voir ses deals",
     "activated": "Trajet activé",
     "activationFailed": "Erreur lors de l''activation",
     "resumed": "Trajet remis en ligne",

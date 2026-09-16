@@ -463,7 +463,12 @@ export default function MyTripsList() {
         onError: (err: unknown) => {
           const details = (err as { response?: { data?: { details?: { code?: string; activeDeals?: number } } } })?.response?.data?.details;
           if (details?.code === "TRIP_HAS_ACTIVE_DEALS") {
-            toast.error(t("toasts.cancelBlocked", { count: details.activeDeals ?? 1 }), toastOpts);
+            // Recette 01-WEB chapitre 7 (regard d'expert, WEB-NRG-9) : le refus disait où aller sans y mener.
+            const tripId = modal.trip.id;
+            toast.error(t("toasts.cancelBlocked", { count: details.activeDeals ?? 1 }), {
+              ...toastOpts,
+              action: { label: t("toasts.cancelBlockedCta"), onClick: () => router.push(`/dashboard/trips/${tripId}`) },
+            });
             return;
           }
           ko();
@@ -475,7 +480,7 @@ export default function MyTripsList() {
         onError: ko,
       });
     }
-  }, [modal, t, deleteTrip, cancelTrip, revertToDraft]);
+  }, [modal, t, deleteTrip, cancelTrip, revertToDraft, router]);
 
   const isConfirming =
     deleteTrip.isPending || cancelTrip.isPending || revertToDraft.isPending;

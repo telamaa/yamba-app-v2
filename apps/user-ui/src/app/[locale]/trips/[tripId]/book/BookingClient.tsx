@@ -74,13 +74,24 @@ export default function BookingClient({ tripId }: Props) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center dark:bg-slate-950">
         <p className="text-sm font-semibold text-slate-900 dark:text-white">{tErrors("TRIP_NOT_BOOKABLE")}</p>
-        <button
-          type="button"
-          onClick={handleClose}
-          className="rounded-full bg-[#FF9900] px-4 py-2 text-sm font-bold text-slate-950"
-        >
-          {t("back")}
-        </button>
+        {/* Recette 01-WEB chapitre 7 (regard d'expert, WEB-NRG-4) : le refus ne proposait aucune suite. La recherche
+            reprend les critères que la barre garde en session. */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/search")}
+            className="rounded-full bg-[#FF9900] px-4 py-2 text-sm font-bold text-slate-950"
+          >
+            {t("findAnother")}
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            {t("back")}
+          </button>
+        </div>
       </div>
     );
   }

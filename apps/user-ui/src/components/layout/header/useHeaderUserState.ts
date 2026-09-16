@@ -56,7 +56,7 @@ export default function useHeaderUserState(): HeaderUserState {
         // `isSuperCarrier` n'est pas (encore) renvoyé par /auth/me ; on retombe sur active.
         // Quand le champ sera exposé : carrierState = cp.isSuperCarrier ? "verified" : "active";
         carrierState = "active";
-      } else if (cp.onboardingStep !== "PROFILE" || cp.stripeAccountId) {
+      } else if (cp.onboardingStep !== "PROFILE") {
         carrierState = "pending";
         hasPendingAction = true;
       }

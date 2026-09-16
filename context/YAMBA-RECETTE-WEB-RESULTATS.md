@@ -3986,10 +3986,9 @@ les onze autres.
 
 ### À trancher (produit)
 
-- **Une origine refusée répond 500** (« Not allowed by CORS ») : c'est un refus, pas une panne — un 403 serait juste
-  et ne réveillerait pas l'alerte Sentry des 5xx. Petit.
-- **`BecomeYamber` teste encore `stripeAccountId`** pour afficher « Configuration incomplète » : même champ jamais
-  servi, donc toujours « Non configuré » pour un onboarding Stripe entamé. Petit, de la même famille qu'ANO-WEB-104.
+- ~~**Une origine refusée répond 500**~~ → **fait au GO** : 403 `ORIGIN_NOT_ALLOWED` (P1).
+- ~~**`BecomeYamber` teste encore `stripeAccountId`**~~ → **fait au GO** (P2), avec le bandeau figé en français trouvé en
+  chemin, et le champ retiré du type `useUser` (P3).
 - **Le plafond des VISITEURS (100 / 15 min) à mesurer sur un build de production.** La mesure du poste dit ≈ 16 pages
   par quart d'heure — mais elle est **pessimiste** : chaque `page.goto` recharge tout, et `next dev` monte deux fois
   chaque effet (StrictMode). Répartition relevée : `GET /api/maintenance` **1,99 par page** (un seul composant, le
@@ -3997,6 +3996,41 @@ les onze autres.
   `/messages/conversations` 0,88, `/me/notifications` 0,84, `/trips/my` 0,42, `/trips/:id/public` 0,35. Un visiteur qui
   compare des trajets depuis un bureau ou un réseau mobile partagé (même IP) reste le vrai risque : rejouer la
   mesure sur `next build && next start` en navigation par liens avant de trancher le plafond. Moyen.
+
+### Améliorations faites au GO du 13/09 (les « petits » du regard d'expert, produit ET test)
+
+**Produit**
+
+| # | Amélioration | Où |
+|---|---|---|
+| P1 | **Une origine refusée répond 403 `ORIGIN_NOT_ALLOWED`**, plus 500 « Not allowed by CORS ». Le refus reste FRANC : un middleware placé avant `cors()` coupe la requête — se contenter de ne pas poser `Access-Control-Allow-Origin` laisserait un POST d'un site tiers atteindre les services (le navigateur bloque la LECTURE de la réponse, pas l'envoi). Liste des origines extraite dans une fonction pure. | `apps/api-gateway/src/libs/origins.ts`, `main.ts` |
+| P2 | **`BecomeYamber`** : « Configuration incomplète » dépendait de `stripeAccountId`, jamais servi → dérivé de `onboardingStep`. Et **trouvé en chemin** : `const isFr = true` figeait tout le bandeau en français, y compris en anglais → `useLocale()`. | `BecomeYamber.tsx` |
+| P3 | **Le champ menteur retiré du type** : `CarrierPage.stripeAccountId?` n'existe pas dans `/auth/me`. Sans lui, TypeScript refuse toute nouvelle lecture — la famille d'ANO-WEB-104 ne peut plus revenir par ce champ. Le dernier usage (état de l'en-tête) suit l'étape d'onboarding. | `hooks/useUser.ts`, `useHeaderUserState.ts` |
+| P4 | **« Ce trajet n'accepte plus de demandes. »** propose une suite : « Chercher un autre trajet » (la barre garde les critères en session). | `BookingClient.tsx`, `trip-detail.json` |
+| P5 | **Le refus d'annulation d'un trajet mène aux deals** : action « Voir ses deals » dans le toast → la page du trajet. | `MyTripsList.tsx`, `myTrips.json` |
+
+**Tests**
+
+| # | Amélioration | Preuve |
+|---|---|---|
+| T1 | NRG-1 compare les cartes affichées à **celles que sert l'API** (identifiants), desktop et téléphone — « au moins une carte » passait sur une recherche à moitié vide | ensembles égaux |
+| T2 | NRG-2 relit aussi la recherche et la page d'un trajet **sur téléphone** (autres arbres de composants) | aucun zéro |
+| T3 | NRG-3 joue les quatre portes **sur téléphone ET sur grand écran** (« sur mobile comme sur desktop ») | 8 croix |
+| T4 | NRG-4 vérifie que le refus propose « Chercher un autre trajet » | contre-épreuve de P4 |
+| T5 | NRG-7 **purge son compte jetable** (manœuvre consignée, par l'adresse exacte) | aucun compte `neuf-*` laissé par la fiche |
+| T6 | NRG-9 clique « Voir ses deals » et trouve les deals du trajet | contre-épreuve de P5 |
+| T7 | NRG-10 mesure en deux temps : **3 min par rechargement** (pessimiste) puis **2 min par liens** de la barre latérale (réaliste) | par rechargement 6,0 appels par page ; **par liens 0,8** — un membre actif ≈ 72 appels / 15 min, **7 %** de son plafond |
+| T8 | NRG-11 exige **403 `ORIGIN_NOT_ALLOWED`** et vérifie qu'un **POST** d'une origine étrangère est refusé avant les services | contre-épreuve de P1 |
+| T9 | MOB-5 (chapitre 5.30) allégée : son saut silencieux `if (count)` sur « Voir le numéro » est retiré, NRG-5 jouant le fil en entier | web-mob vert |
+
+**Non fait, et pourquoi.** « Relire l'origine de production » (NRG-11) : elle n'existe pas encore. « Le rôle en minuscule »
+(≈ 35 messages, « le voyageur ») : c'est le point **à trancher** du chapitre 5.32 — pas de réécriture sans décision.
+
+**Ce que la mesure « par liens » change.** Le « visiteur plafonné en ≈ 16 pages » de la première mesure ne vaut que
+pour un visiteur qui ouvre CHAQUE page par un lien externe ou un nouvel onglet (rechargement complet). En navigation
+par liens, une page coûte 0,8 appel : le plafond de 100 couvre alors une centaine de pages par quart d'heure. Le point
+« à trancher » se réduit au cas des visiteurs derrière une même adresse IP (bureau, réseau mobile partagé) qui
+arrivent par des liens partagés — à suivre, pas à corriger en aveugle.
 
 ### Regard d'expert — optimisations et améliorations (produit ET test, une ligne par fiche)
 

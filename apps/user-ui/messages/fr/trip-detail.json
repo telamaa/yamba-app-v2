@@ -1,5 +1,6 @@
 {
   "back": "Retour aux résultats",
+  "findAnother": "Chercher un autre trajet",
   "trippedBy": "Trajet proposé par {firstName} {lastInitial}.",
   "travelReference": "Réf.",
   "detourPossible": "Détour possible",
