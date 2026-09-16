@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, DIVERGENCE_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, TIMELINE_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, DIVERGENCE_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, dateTime, money } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
@@ -79,7 +79,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           {file.payout.failureKind && <Row k="Motif" v={`${PAYOUT_FAILURE_LABEL[file.payout.failureKind] ?? file.payout.failureKind}${file.payout.failureDetail ? ` — ${file.payout.failureDetail}` : ""}`} />}
           {file.payout.status === "FAILED" && <Row k="Tentatives" v={`${file.payout.attempts}${file.payout.nextRetryAt ? ` · prochaine ${dateTime(file.payout.nextRetryAt)}` : ""}`} />}
           {file.payout.reversal && <Row k="Renversement clos" v={`${file.payout.reversal.resolution === "RESENT" ? "re-versé" : "abandonné"} par ${file.payout.reversal.byAdmin} le ${dateTime(file.payout.reversal.at)} — ${file.payout.reversal.reason}`} />}
-          {file.retention && <Row k="Retenue" v={`${money(file.retention.cents, cur)} · ${file.retention.disposition ?? "—"}${file.retention.decidedAt ? ` (arbitrée le ${dateTime(file.retention.decidedAt)})` : ""}`} />}
+          {file.retention && <Row k="Retenue" v={`${money(file.retention.cents, cur)} · ${file.retention.disposition ? RETENTION_DISPOSITION_LABEL[file.retention.disposition] ?? file.retention.disposition : "—"}${file.retention.decidedAt ? ` (arbitrée le ${dateTime(file.retention.decidedAt)})` : ""}`} />}
           <div className="mt-2 flex flex-wrap gap-2">
             {file.allowedActions.retryPayout && can(me?.adminRoles, "payouts.retry") && <button disabled={busy} onClick={retry} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Relancer le versement</button>}
           </div>

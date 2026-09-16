@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
-import { CATEGORY_LABEL, OUTCOME_LABEL, PARCEL_CATEGORY_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
+import { CATEGORY_LABEL, OUTCOME_LABEL, PARCEL_CATEGORY_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, RETENTION_DISPOSITION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
 import DecisionForm from "./DecisionForm";
 import { can } from "@/lib/permissions";
 import type { AdminMe } from "@/lib/types";
@@ -73,7 +73,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
           <Row k="Capturé" v={dateTime(file.money.capturedAt)} />
           <Row k="Versement" v={file.money.payoutStatus ? PAYOUT_STATUS_LABEL[file.money.payoutStatus] ?? file.money.payoutStatus : "—"} />
           {file.money.refundAmountCents != null && <Row k="Remboursé" v={`${money(file.money.refundAmountCents, cur)} · ${dateTime(file.money.refundedAt)}`} />}
-          {file.money.retentionCents != null && <Row k="Retenue" v={`${money(file.money.retentionCents, cur)} · ${file.money.retentionDisposition ?? ""}`} />}
+          {file.money.retentionCents != null && <Row k="Retenue" v={`${money(file.money.retentionCents, cur)} · ${file.money.retentionDisposition ? RETENTION_DISPOSITION_LABEL[file.money.retentionDisposition] ?? file.money.retentionDisposition : "—"}`} />}
         </Card>
 
         <PartyCard title="Expéditeur" p={file.shipper} unit="envois" />

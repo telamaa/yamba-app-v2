@@ -5244,3 +5244,51 @@ de délai compris.
 - **Coordonnées du destinataire au dossier** (téléphone, adresse) pour un litige « non livré » : utiles au médiateur, mais
   données personnelles d'un tiers.
 - **Montrer qui perd le litige** dans le récapitulatif avant validation.
+
+
+---
+
+# Back-office — arbitrer une retenue d'annulation tardive : l'argent bouge, le deal reste clos (cahier 02-ADMIN § 5.10)
+
+*(PR `chore/recette-admin-5-10`, 14/09/2026 — ADM-RET-1 à 4.)*
+
+## Le besoin
+
+Quand un envoi est annulé après le départ sans prise en charge, une partie du prix (la retenue) est gardée le temps de
+savoir qui a raison : le Voyageur qui s'est déplacé, ou l'Expéditeur qui n'a pas pu remettre son colis. Le Médiateur
+décide, une fois, avec un motif ; chacun lit ce qui le concerne, et seulement cela.
+
+## Les règles
+
+**RG-ADM-RET-01 — Deux issues, aucun montant saisi** : compensation au Voyageur = la part nette de la retenue
+(retenue × net / total), la commission restant à Yamba ; ou restitution de la retenue ENTIÈRE à l'Expéditeur. Le serveur
+calcule ; l'écran affiche le montant, la part de Yamba et le total remboursé avant validation.
+
+**RG-ADM-RET-02 — Le deal reste annulé** : seul l'argent et la disposition de la retenue changent ; la ligne quitte les
+files « À arbitrer » et « Retenues à arbitrer ».
+
+**RG-ADM-RET-03 — Une seule décision** : Médiateur ou super administrateur, motif d'au moins 50 caractères ; un second
+arbitrage, deux validations simultanées ou un deal sans retenue sont refusés sans argent émis.
+
+**RG-ADM-RET-04 — Chacun son montant** : l'Expéditeur ne lit jamais la somme versée au Voyageur, le Voyageur jamais la
+somme remboursée ; les emails ne donnent aucune justification autre que le motif du Médiateur.
+
+**RG-ADM-RET-05 — La décision est journalisée** (`RETENTION_ARBITRATED`, avant / après) et publiée dans la même
+transaction que l'écriture.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| RET-1 | Compensation sur une retenue de 14,56 € (payé 29,12 €, net 26,00 €) | 13,00 € au Voyageur, 1,56 € à Yamba, deal annulé, files vidées, journal | oui |
+| RET-2 | Restitution | 14,56 € remboursés (29,12 € au total), rien au Voyageur | oui |
+| RET-3 | Support, motif court, issue inconnue, deal sans retenue, deux validations simultanées, second arbitrage | refus, un seul remboursement | oui |
+| RET-4 | Emails et portefeuilles après compensation | chaque partie son montant, aucune justification inventée | oui (ANO-ADM-25, 26 closes) |
+
+## Ce qui reste à trancher
+
+- Le **portefeuille de l'Expéditeur** montre « partiellement remboursé » pendant l'arbitrage, sans dire qu'une décision
+  est attendue sur la retenue.
+- **Clé d'idempotence** chez le fournisseur pour la restitution (reprise après panne entre le remboursement et
+  l'enregistrement).
+- Afficher dans le dossier, près des deux issues, le motif d'annulation saisi par l'Expéditeur.

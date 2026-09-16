@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, post } from "@/lib/api";
-import { PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, money } from "@/lib/format";
+import { BOOKING_STATUS_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, RETENTION_DISPOSITION_LABEL, money } from "@/lib/format";
 import type { AdminDisputeFile, AdminResolutionResponse, DisputeResolutionOutcome, RetentionArbitrationOutcome } from "@/lib/types";
 
 const MIN_REASON = 50;
@@ -107,9 +107,15 @@ export default function DecisionForm({ file, canDecide = true, onDecidedAction }
       <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-4">
         <h2 className="text-[13px] font-bold text-emerald-900">Décision enregistrée</h2>
         <p className="mt-1 text-[13px] text-emerald-900">
-          {RESOLUTION_LABEL[done.outcome] ?? done.outcome} · deal {done.finalStatus} · remboursé {money(done.refundCents, cur)} · versé {money(done.carrierPayoutCents, cur)}
+          {RESOLUTION_LABEL[done.outcome] ?? done.outcome} · statut final : {BOOKING_STATUS_LABEL[done.finalStatus] ?? done.finalStatus} · remboursé {money(done.refundCents, cur)} · versé {money(done.carrierPayoutCents, cur)}
           {done.payoutStatus ? ` (versement ${PAYOUT_STATUS_LABEL[done.payoutStatus] ?? done.payoutStatus})` : ""}
         </p>
+        {done.kind === "RETENTION" && (
+          <p className="mt-1 text-[12px] text-emerald-800">
+            {/* § 5.10 — un arbitrage de retenue ne rouvre pas le deal : il reste annulé, seul l'argent bouge. */}
+            Le deal reste annulé ; la retenue est désormais {RETENTION_DISPOSITION_LABEL[done.outcome === "COMPENSATE_CARRIER" ? "CARRIER" : "SHIPPER"]}.
+          </p>
+        )}
         <p className="mt-1 text-[12px] text-emerald-800">Les deux parties sont prévenues (écran, notification, email).</p>
         <button onClick={() => router.push("/disputes")} className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">Retour à la file</button>
       </section>
@@ -138,8 +144,9 @@ export default function DecisionForm({ file, canDecide = true, onDecidedAction }
         { value: "FULL_REFUND", hint: `Expéditeur : ${money(total, cur)} (commission comprise) · Voyageur : 0` },
       ]
     : [
-        { value: "COMPENSATE_CARRIER", hint: `Voyageur : ${money(file.proposedAmounts.compensateCarrierCents, cur)} (prorata de sa part nette)` },
-        { value: "RESTITUTE_SHIPPER", hint: `Expéditeur : ${money(file.proposedAmounts.restituteShipperCents, cur)} remboursés` },
+        // § 5.10 — l'indice dit aussi ce que garde Yamba et le total remboursé : les deux questions que pose le Médiateur.
+        { value: "COMPENSATE_CARRIER", hint: `Voyageur : ${money(file.proposedAmounts.compensateCarrierCents, cur)} (prorata de sa part nette) · Yamba garde ${money((file.money.retentionCents ?? 0) - (file.proposedAmounts.compensateCarrierCents ?? 0), cur)} (sa commission)` },
+        { value: "RESTITUTE_SHIPPER", hint: `Expéditeur : ${money(file.proposedAmounts.restituteShipperCents, cur)} remboursés · remboursé en tout : ${money((file.money.refundAmountCents ?? 0) + (file.proposedAmounts.restituteShipperCents ?? 0), cur)} · Voyageur : 0` },
       ];
 
   return (

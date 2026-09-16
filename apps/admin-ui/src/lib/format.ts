@@ -145,6 +145,13 @@ export const RESOLUTION_LABEL: Record<string, string> = {
   RESTITUTE_SHIPPER: "Restitution de la retenue à l'Expéditeur",
 };
 
+/** § 5.10 — la disposition d'une retenue d'annulation tardive, lisible (le code reste au survol et dans l'API). */
+export const RETENTION_DISPOSITION_LABEL: Record<string, string> = {
+  HELD_FOR_MEDIATION: "en attente d'arbitrage",
+  CARRIER: "compensation versée au Voyageur",
+  SHIPPER: "restituée à l'Expéditeur",
+};
+
 export function hoursUntil(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 3_600_000);
 }

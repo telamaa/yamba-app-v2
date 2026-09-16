@@ -8100,3 +8100,78 @@ le service charge `Booking.disputedAt` des litiges ouverts et passe le paramètr
   remboursement, MED-8 404), puis 9/9 verts deux fois.
 - Typecheck deal, notification, auth, trip, message, admin-ui, harnais verts ; contrats OpenAPI inchangés (le code d'erreur
   n'est pas exposé en énumération).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.10 : la retenue d'annulation tardive — ce qu'un email affirme doit être vrai
+
+*(PR `chore/recette-admin-5-10`, empilée sur #310, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre scénarios (ADM-RET-1 et 2 du cahier, 3 et 4 ajoutés), une anomalie close, trois améliorations d'écran.
+
+```
+apps/e2e/src/admin/adm-ret-retenue.spec.ts                  NOUVEAU — 6 preuves par arbitrage, jeu d'essai rejoué avant chaque fiche
+apps/notification-service/src/emails/settlement-emails.ts   ANO-ADM-25 — part Yamba, plus de justification inventée ; ANO-ADM-26 — jamais le montant de l'autre partie
+apps/notification-service/src/emails/booking-emails.spec.ts +1 test
+apps/admin-ui/src/lib/format.ts                             RETENTION_DISPOSITION_LABEL
+apps/admin-ui/src/components/DecisionForm.tsx               indices (part Yamba, total remboursé), panneau en français
+apps/admin-ui/src/components/DisputeFileView.tsx            disposition lisible
+apps/admin-ui/src/components/DealMoneyView.tsx              disposition lisible
+apps/e2e/src/admin/adm-med-mediation.spec.ts, apps/e2e/src/parcours/web-e2e-2.spec.ts   « statut final : Terminée »
+```
+
+## Le verrou A159 couvrait déjà la retenue
+
+`makeDealMediationService` expose `resolveRetention` à travers `withDecisionLock(requireLock(), dealId, …)` (ligne 430) :
+la fiche ADM-RET-3, jouée contre le code non corrigé, envoie deux restitutions simultanées et compte les remboursements
+**émis chez le fournisseur** (rapprochement, en différence) : 200 + 409 `DECISION_IN_PROGRESS`, un seul remboursement.
+Aucune correction : un soupçon hérité d'un chapitre voisin se mesure avant de se corriger.
+
+## Le calcul, du serveur à l'écran
+
+```ts
+// booking-lifecycle.ts — la compensation est la part NETTE de la retenue (ANN-01, A80)
+Math.round((retentionCents * transportCents) / totalShipperCents)   // 1456 × 2600 / 2912 = 1300
+```
+
+`admin-dispute.service.ts` sert ce montant dans `proposedAmounts.compensateCarrierCents` ; `DecisionForm` n'en calcule
+aucun autre : l'indice et le récapitulatif lisent la même valeur, la part de Yamba est la différence
+`retentionCents − compensateCarrierCents`. La fiche vérifie les trois : formule, API, écran.
+
+## ANO-ADM-25 : un modèle d'email ne justifie pas une décision à la place du décideur
+
+La branche `COMPENSATE_CARRIER` de `disputeResolvedShipper` portait une phrase figée : « personne n'a pu attester de la
+prise en charge, et il s'était déplacé ». Le Médiateur écrit son motif (≥ 50 caractères), déjà repris dans l'email ; la
+phrase ajoutait un fait qu'il n'avait pas établi — contredit par le jeu d'essai (« Le Voyageur ne s'est pas présenté ») —
+et un montant faux (« la retenue est versée au Voyageur » : 13,00 € sur 14,56 €). Le modèle dit maintenant ce qui est
+vrai par construction :
+
+```ts
+"La retenue d'annulation ne t'est pas restituée : le Voyageur en reçoit une part en compensation, le reste correspond à la commission Yamba."
+```
+
+## ANO-ADM-26 : « chacun son montant », une règle que seul un parcours de bout en bout gardait
+
+La première rédaction de la correction nommait « 13,00 € sont versés au Voyageur ». Rejouer WEB-E2E-2 (le parcours du
+litige, qui lit aussi le gabarit `disputeResolvedShipper`) a échoué à l'étape 18 : **l'email de l'Expéditeur ne contient
+jamais le montant du Voyageur, et inversement** (A13 étendu aux décisions). Le parcours a révélé que la correction
+d'ANO-ADM-23 (§ 5.9) avait déjà franchi cette règle (« Le Voyageur reçoit 40,00 € »). Les deux phrases disent désormais
+le fait sans le montant ; les tests unitaires portent la règle (`not.toMatch(/20,00/)`, `/13,00/`, `/14,56/`) pour
+qu'elle ne dépende plus d'un parcours de 19 étapes. Leçon : un gabarit partagé se corrige contre la liste de ses
+lecteurs (`grep -rn disputeResolvedShipper`, puis les specs e2e qui lisent son sujet).
+
+## Lire l'outbox : l'enveloppe, puis le contenu
+
+`applyBookingTransition` écrit dans `OutboxEvent.payload` l'**enveloppe** validée par `BookingDomainEventSchema`
+(`eventId`, `occurredAt`, `schemaVersion`, `aggregateId`…) ; le contenu métier est sous `payload.payload`. Une assertion
+`toMatchObject` sur le premier niveau échoue en listant 28 champs « reçus en plus » : c'est le signe qu'on lit une couche
+trop haut.
+
+## Tests
+
+- notification-service **121** (+1 test, ANO-ADM-25 ; ANO-ADM-23 renforcé pour ANO-ADM-26) ; autres services inchangés.
+- `apps/e2e` : **406 scénarios** (402 + 4), 4/4 verts deux fois sur le code final ; WEB-E2E-2, ADM-MED-4 et ADM-MED-9 rejoués verts.
+- Typecheck admin-ui, notification-service, harnais verts ; contrats OpenAPI inchangés.

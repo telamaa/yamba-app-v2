@@ -5086,6 +5086,66 @@ est rejoué après chaque décision. **Chaque fiche a d'abord été jouée contr
 
 ---
 
+## Cahier 02-ADMIN — § 5.10 Retenue d'annulation tardive · **CONFORME** (2 fiches + 2 ajoutées · 2 anomalies closes dont 1 régression du § 5.9 · 3 améliorations · 2 écarts documentaires · 4 scénarios, 2 min)
+
+`apps/e2e/src/admin/adm-ret-retenue.spec.ts`. Une retenue « à arbitrer » (`HELD_FOR_MEDIATION`) se verse au Voyageur au
+prorata de sa part nette, ou se restitue en entier à l'Expéditeur ; le deal reste CANCELLED. Chaque arbitrage est vérifié
+à six endroits : écran (indice, récapitulatif, panneau de décision, dossier relu), API, base (disposition, montants,
+outbox), fournisseur (remboursement ou transfert RÉELLEMENT émis, par le rapprochement, en différence), journal, et ce que
+lisent les deux parties (emails, portefeuilles). Jouée d'abord contre le code non corrigé, puis 4/4 verts deux fois.
+
+Terrain mesuré : `bzv-held` (Aminata → Thomas, Paris → Brazzaville) payé 29,12 € (net 26,00 €, commission 3,12 €), annulé
+à J−4, remboursé 14,56 €, retenue 14,56 € → compensation round(1456 × 2600 / 2912) = **13,00 €**, Yamba **1,56 €**.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-RET-1 | Compensation au Voyageur | **Conforme** — file filtrée « retenues » → dossier « Retenue à arbitrer » ; bloc Argent « Remboursé 14,56 € », « Retenue 14,56 € · en attente d'arbitrage » (était le code) ; indice « Voyageur : 13,00 € (prorata de sa part nette) · Yamba garde 1,56 € (sa commission) », prorata = `proposedAmounts` = formule ; récapitulatif 0,00 / 13,00 / 1,56 ; 200 `COMPENSATE_CARRIER`, versement **SENT** ; panneau « statut final : Annulée … Le deal reste annulé » ; dossier relu « Ce dossier est déjà tranché. » ; base : CANCELLED, disposition `CARRIER`, motif, `payoutAmountCents` 1300, remboursement inchangé, **un** `booking.dispute_resolved` (acteur ADMIN, kind RETENTION) ; fournisseur : aucun remboursement, transfert 13,00 € ; fiche argent « 14,56 € · compensation versée au Voyageur » ; hors des files « À arbitrer » et « Retenues à arbitrer » ; journal `RETENTION_ARBITRATED BOOKING · id`, avant `{HELD_FOR_MEDIATION, 1456}`, après `{COMPENSATE_CARRIER, 0, 1300}` |
+| ADM-RET-2 | Restitution à l'Expéditeur | **Conforme** — indice « Expéditeur : 14,56 € remboursés · remboursé en tout : 29,12 € · Voyageur : 0 » ; récapitulatif 14,56 / 0,00 / 0,00 ; 200 `RESTITUTE_SHIPPER` ; base : disposition `SHIPPER`, remboursé 29,12 €, `refundId` gardé, aucun versement ; fournisseur : **un** remboursement de 14,56 € de plus ; portefeuille d'Aminata : `PARTIALLY_REFUNDED` (14,56 / retenue 14,56) → `REFUNDED` 29,12 € ; journal après `{RESTITUTE_SHIPPER, 1456, 0}` ; dossier « 14,56 € · restituée à l'Expéditeur » |
+| ADM-RET-3 | Les gardes (ajoutée) | **Conforme d'emblée** — Support : « Ton profil lit ce dossier mais ne tranche pas » et 403 ; motif < 50, issue inconnue, issue de litige (`FULL_REFUND`) → 400 ; deal sans retenue → 409 `TRANSITION_NOT_ALLOWED` ; **deux restitutions simultanées → 200 + 409 `DECISION_IN_PROGRESS`, UN seul remboursement émis** (le verrou A159 couvrait déjà la retenue) ; second arbitrage → refusé, rien émis, aucun versement ; une seule ligne de journal |
+| ADM-RET-4 | Ce que lisent les parties (ajoutée) | **Conforme après correction** → `ANO-ADM-25`, `ANO-ADM-26` ; ✉ Aminata « La retenue d'annulation ne t'est pas restituée : le Voyageur en reçoit une part en compensation, le reste correspond à la commission Yamba. », le motif du Médiateur, aucune promesse de remboursement, **jamais « 13,00 € »** ; ✉ Thomas « Une compensation de 13,00 € … », **jamais « 14,56 € »** ; portefeuille de Thomas `LATE_CANCELLATION` **SENT 13,00 €** ; portefeuille d'Aminata inchangé `PARTIALLY_REFUNDED`, retenue 14,56 € |
+
+### Anomalie
+
+- **ANO-ADM-25 (mineure, close)** — **l'email d'une compensation inventait sa justification et taisait la part de Yamba.**
+  L'Expéditeur lisait « La retenue d'annulation est versée au Voyageur : personne n'a pu attester de la prise en charge, et
+  il s'était déplacé. » — un fait que le Médiateur n'a pas écrit (le jeu d'essai dit même l'inverse : « Le Voyageur ne
+  s'est pas présenté »), et un fait faux : seuls 13,00 € sur 14,56 € vont au Voyageur. Correction
+  (`apps/notification-service/src/emails/settlement-emails.ts`, FR et EN) : la part de Yamba nommée, SANS le montant du
+  Voyageur (règle « chacun son montant », ci-dessous) ; le motif du Médiateur, déjà présent, est la seule justification.
+  Côté Voyageur, « La retenue te revient » devient « Une compensation de 13,00 € te revient ». Test `booking-emails.spec.ts`.
+- **ANO-ADM-26 (majeure, close — régression introduite par ANO-ADM-23 au § 5.9, PR #310)** — **l'Expéditeur lisait
+  le montant versé au Voyageur.** Trouvée en rejouant WEB-E2E-2 (étape 18 « Décision rendue, chacun son montant » :
+  « jamais 40,00 € dans l'email de João ») après une modification voisine : la correction d'ANO-ADM-23 avait remplacé
+  « le reste est versé au Voyageur » par « Le Voyageur reçoit 40,00 € ». Le parcours WEB-E2E-2 n'avait pas été rejoué au
+  § 5.9. Correction : « Le reste du prix de transport est versé au Voyageur. » (FR/EN), sans montant ; « Le Voyageur ne
+  reçoit rien sur ce deal. » garde le cas au-delà du net. Tests unitaires : l'email Expéditeur ne contient jamais le
+  montant du Voyageur, l'email Voyageur jamais le montant remboursé ; WEB-E2E-2, ADM-MED-4 et ADM-MED-9 rejoués verts.
+
+### Écarts documentaires
+
+- Les issues s'appellent `COMPENSATE_CARRIER` / `RESTITUTE_SHIPPER` dans l'API et le journal (le cahier :
+  `CARRIER_COMPENSATION` / `SHIPPER_RESTITUTION`).
+- Indices et panneau de décision enrichis (part de Yamba, total remboursé, « statut final : Annulée ») : le cahier cite
+  l'ancien texte.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **RET-1** — *Fait* : disposition en français (`RETENTION_DISPOSITION_LABEL`, dossier et fiche argent) ; indice qui dit
+  la part de Yamba ; panneau « le deal reste annulé ». *Proposé* : afficher dans le dossier que la retenue vient d'une
+  annulation « Le Voyageur ne s'est pas présenté » (motif saisi par l'Expéditeur) à côté des deux issues : c'est
+  l'argument décisif de l'arbitrage — petit. *Test* : le transfert est lu chez le fournisseur, pas seulement en base.
+- **RET-2** — *Fait* : indice « remboursé en tout ». *Proposé* : la restitution émet le remboursement AVANT la transaction,
+  sans clé d'idempotence chez le fournisseur — même réserve qu'au § 5.9 (reprise après panne) — moyen, à trancher.
+- **RET-3** — *Constat* : le verrou A159 tient déjà pour la retenue ; aucune correction. *Test* : la concurrence est
+  prouvée par la somme des remboursements émis, pas par le code HTTP.
+- **RET-4** — *Fait* : ANO-ADM-25 et ANO-ADM-26 (et ses assertions « jamais le montant de l'autre » dans la fiche).
+  *Test* : une correction de gabarit d'email se prouve contre TOUS les parcours qui lisent ce gabarit — le rejeu de
+  WEB-E2E-2 a trouvé la régression que les fiches admin ne voyaient pas. *Proposé* : le portefeuille de l'Expéditeur montre « partiellement remboursé » pendant
+  l'arbitrage, sans dire qu'une décision est attendue sur la retenue — ajouter un état « retenue en cours d'arbitrage »
+  (contrat du portefeuille + écran membre + i18n) — moyen, à trancher avec l'écran membre.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation
