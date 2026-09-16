@@ -7306,3 +7306,72 @@ tous les projets. Plus de recalculs, mais plus jamais un vert fantôme.
 - `apps/e2e` : **356 scénarios** (339 + 17), les 17 verts sur la pile réelle (deal-service en FAKE) ; les 16 hors
   SEC-8 rejoués une seconde fois, verts, après la correction de la sonde de session.
 - Typecheck des six projets vert.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.2 : les alertes de seuil — piloter une alerte par son seuil
+
+*(PR `chore/recette-admin-5-2`, empilée sur #302, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre fiches (ADM-ALR-1 à 4), conformes, aucun code produit modifié.
+
+```
+apps/e2e/src/admin/adm-alr-alertes.spec.ts    4 scénarios en série — seuils posés puis rétablis (finally)
+```
+
+## Une alerte sans état se teste par son seuil
+
+`GET /admin/alerts` (deal-service) recalcule neuf règles pures (`ops-alerts.rules.ts`) sur un instantané de la base
+(`collectOpsSnapshot`), avec des seuils lus dans `PlatformSettings` à travers un cache de 30 s. Rien n'est stocké : pour
+faire apparaître ou disparaître une alerte, on **change son seuil**. Trois outils dans la spec :
+
+```ts
+poserSeuils(ctx, { "alerts.payoutFailedHours": 336 }, motif);   // PATCH /admin/settings, seules les clés qui changent
+alertesQuand(ctx, (a) => a.length === 0, "…");                  // expect.poll sur /admin/alerts : absorbe le cache de 30 s
+retablir(ctx, cles, motif);                                     // dans le finally : défauts lus dans la réponse GET
+```
+
+## Mesurer le jeu d'essai AVANT d'écrire la fiche
+
+Une sonde en base (litiges, retenues, renversements, versements en échec, outbox, emails, demandes, dernier trajet) a
+montré, avant la première ligne de spec :
+
+- le versement en échec de `bzv-completed-blocked` est **terminé à J−3** : la requête compte les deals dont
+  `completedAt` (ou `closedAt`) dépasse le seuil — il franchit donc déjà les 48 h par défaut. Le cahier le croit « en
+  échec depuis 24 h » et suppose l'état vide ; `YAMBA-DOC-METIER` (ALR01) attend bien l'alerte au seed. **Le code et la
+  doc métier font foi** : l'état vide d'ALR-1 et l'« apparition » d'ALR-2 se jouent en relevant d'abord le seuil à 336 h ;
+- les deux litiges sont créés **au moment du seed** et un litige n'est décidable qu'à `createdAt + 72 h` (ou à la réponse
+  du Voyageur) : `DISPUTE_UNDECIDED_72H` est infranchissable juste après le seed, même seuil à 1 h ;
+- le renversement a `updatedAt` = l'heure du seed : `REVERSAL_OPEN_48H` ne franchit 1 h qu'une heure après le seed ;
+- aucune ligne d'outbox non publiée, aucun email en échec, un trajet publié le jour même.
+
+ALR-4 abaisse donc toutes les clés au minimum de leurs bornes et **constate** les règles franchies
+(`PAYOUT_FAILED_48H`, `RETENTION_HELD_7D`, `ACCEPTANCE_RATE_LOW_7D` avec taux minimum 100 % sur 90 jours) ; pour les
+autres, elle ouvre l'URL de destination du cahier et vérifie le filtre présélectionné (le point de non-régression de
+`QueueTable`, qui lit `kind` et `decidable` dans l'URL).
+
+## ALR-2 : la valeur en vigueur, prouvée par un écart volontaire
+
+Le tableau « Seuils utilisés » doit montrer les seuils **en vigueur**, pas les constantes du code. Une valeur par défaut
+ne permet pas de distinguer les deux : ALR-1 lit le tableau **pendant que** `payoutFailedHours` vaut 336 et exige
+« 336 » (la constante `ALERT_THRESHOLDS.payoutFailedHours` vaut 48).
+
+## ALR-3 : forcer le cron sans le simuler
+
+Le cron horaire (`ops-alerts.cron.ts`, minute 5) appelle `opsAlertsService.notifyNewAlerts(redis)`. La fiche appelle
+**la même méthode avec le vrai Redis**, par un script `tsx` (`lireCoteServeur`), après trois précautions :
+
+1. s'écarter de la fenêtre du cron réel (minutes 3 à 7) pour ne pas se disputer la clé ;
+2. purger les verrous `yamba:alerts:sent:*:<jour UTC>` du jour — manœuvre consignée dans la sortie ;
+3. compter les emails de `support@yamba.app` avant, pour prouver « un » puis « aucun second ».
+
+« Le lendemain » ne s'attend pas : la fiche instancie `makeOpsAlertsService(() => demain)` avec un **magasin en mémoire**
+qui contient déjà la clé d'aujourd'hui, et coupe l'envoi réel (`EMAIL_PROVIDER=fake` avant le premier envoi : le
+fournisseur est créé paresseusement par `getEmailProvider`). La règle repart ; Mailpit n'a rien reçu de plus.
+
+## Tests
+
+`apps/e2e` : **360 scénarios** (356 + 4), les 4 verts deux fois de suite. Plateforme inchangée (auth 235).

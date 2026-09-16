@@ -4788,3 +4788,55 @@ dernière modification.
   en pose une (versement en échec) — à aligner.
 - Le profil Données personnelles voit la fiche entière (TrustScore, historique de sanctions) : il se confie comme un
   super administrateur.
+
+
+---
+
+# Back-office — des alertes qui disent quand agir, et qui se taisent quand tout va bien (cahier 02-ADMIN § 5.2)
+
+*(PR `chore/recette-admin-5-2`, 13/09/2026 — ADM-ALR-1 à 4. Les règles de fond sont RG-ALR-01 à 04, plus haut ; ce
+chapitre en éprouve l'écran.)*
+
+## Le besoin
+
+L'équipe d'exploitation ne surveille pas neuf files à la main : la plateforme lui dit ce qui dépasse un délai
+raisonnable (un Voyageur pas payé, un litige oublié, un relais d'événements arrêté), où aller agir, et prévient le support
+une fois par jour. Les délais sont réglables sans développeur.
+
+## Les règles
+
+**RG-ADM-ALR-01 — La page Alertes montre l'état du moment**, recalculé à chaque lecture : critiques d'abord, puis « à
+surveiller », chaque alerte avec son nombre d'éléments, son détail et un lien vers l'écran où agir ; sinon un message
+« Aucune alerte ». La consulter n'est pas journalisé.
+
+**RG-ADM-ALR-02 — Les seuils affichés sont ceux en vigueur**, pas les valeurs d'origine ; les changer dans Paramètres
+change l'alerte en 30 secondes au plus, et chaque changement est journalisé (avant, après, motif, version).
+
+**RG-ADM-ALR-03 — L'identifiant d'une règle garde son seuil d'origine** (`PAYOUT_FAILED_48H` avec un seuil à 1 h) : c'est
+un nom, pas une valeur.
+
+**RG-ADM-ALR-04 — Le support reçoit un email par règle et par jour**, à la première apparition, en français, avec un lien
+vers chaque file ; une règle toujours active repart le lendemain.
+
+**RG-ADM-ALR-05 — Chaque lien mène à la file déjà filtrée** : versements en échec, transferts renversés, litiges
+décidables, retenues ; les règles techniques et de liquidité mènent au pilotage.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| ALR-1 | Aucune alerte en cours | message vert, tableau des seuils en vigueur (un seuil modifié s'y lit), pied daté, rien au journal | oui |
+| ALR-2 | Seuil du versement en échec abaissé à 1 h, puis remis | carte critique « 1 concerné », lien vers les versements en échec, deux lignes de journal | oui |
+| ALR-3 | Passage du cron avec une alerte active, puis un second | un email au support, puis aucun ; le lendemain l'alerte repart | oui (lendemain simulé) |
+| ALR-4 | Chaque lien d'alerte | la bonne file, filtre présélectionné | oui pour 3 règles franchissables ; destinations des autres vérifiées par leur adresse |
+
+## Ce qui reste à trancher
+
+- **Ce que mesure « Versements en échec depuis plus de 48 h »** : le serveur compte les deals **terminés** depuis plus
+  de 48 h dont le versement est toujours en échec — pas les versements **en échec** depuis 48 h. Le résultat métier est
+  défendable (un Voyageur non payé 48 h après la fin du deal), mais le libellé et le détail (« rejoué(s) sans succès
+  depuis plus de 48 h ») annoncent autre chose : un versement tenté pour la première fois il y a une heure s'y affiche
+  déjà. Choisir la mesure, puis aligner le libellé (ou la requête).
+- Le cahier (§ 5.2) est à corriger : le versement du jeu d'essai franchit déjà le seuil par défaut.
+- Six règles ne sont pas observables juste après le seed (litige, renversement, événement parqué, relais en retard,
+  emails en échec, absence de publication) : un jeu d'essai « vieilli » pour les alertes rendrait l'écran démontrable.
