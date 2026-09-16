@@ -65,7 +65,8 @@ export class MesEnvois {
     if (!r.ok()) throw new Error(`Annulation refusée : ${r.status()} ${await r.text()}`);
     const corps = (await r.json()) as { status?: string; refundAmountCents?: number };
     expect(corps.status).toBe("CANCELLED");
-    const toast = this.page.getByText(/^Envoi annulé\. Remboursement de .+ en cours\.$/);
+    // PENDING (rien n'a été débité) : « Envoi annulé. » ; ACCEPTED : « … Remboursement de {montant} en cours. » (5.20).
+    const toast = this.page.getByText(/^Envoi annulé\.( Remboursement de .+ en cours\.)?$/).last();
     await expect(toast).toBeVisible({ timeout: 15_000 });
     return { refundAmountCents: corps.refundAmountCents ?? 0, toast: normaliserEspaces(await toast.innerText()) };
   }

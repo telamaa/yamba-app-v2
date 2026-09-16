@@ -2632,6 +2632,111 @@ rôle) : 1, 11, 2 puis 4, 5, 3 puis 6, 7, 8, 9, 10.
 - **Les deals sont repliés par trajet** (« n colis ») : un deal terminé vit sous un trajet de l'historique,
   `MesTrajets.ligneDuDeal()` déplie chaque trajet jusqu'à voir la ligne.
 
+## Chapitre 5.20 — Les annulations · **CONFORME** (9 fiches jouées, 2 après correction, 1 avec réserve · 4 anomalies dont 2 closes et 2 ouvertes (1 MAJEURE : aucune annulation Voyageur) · 9 scénarios en série dont 1 `test.fail`, 3 min 18)
+
+`web-ann.spec.ts`. `bzv-pending` (Aminata ↔ Thomas), `bzv-accepted` (Pauline ↔ Thomas, départ J+10),
+`yul-accepted` (Marie-Claire ↔ Marc, trajet `yul` ramené à +24 h), un deal CRÉÉ PAR L'API sur `bzv-perkg`
+(Aminata ↔ Thomas, accepté par l'API, trajet ramené à −24 h), `bzv-picked` / `bzv-delivered`, `gru-pending`
+(João ↔ Inês). Les manœuvres de date déplacent le trajet ET l'instantané `booking.trip.departureAt` (le barème
+lit l'instantané). Ordre de jeu : 8, 6, 1, 2, 4, 3, 5, 7, 9.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-ANN-1 | Annuler une demande en attente | **Conforme après correction** → `ANO-WEB-71` ; « Annuler cet envoi ? » / « Ta demande Paris → Brazzaville auprès de Thomas sera annulée définitivement. » / « Tu seras remboursée de 28,00 € » (= `cancellationPreview.refundCents` du serveur, retenue 0) / « Remboursement intégral : le paiement n'a pas encore été débité… » / « Garder l'envoi » + « Confirmer l'annulation » ; toast « Envoi annulé. », ligne « Annulée », kilos rendus (20 → 23) ; Aminata : email « Ta demande Paris → Brazzaville est annulée » ; Thomas : cloche « Aminata a annulé · … ta capacité est libérée », **aucun email** |
+| WEB-ANN-2 | Annuler un deal accepté à plus de 48 h | **Conforme** — total intégral 39,20 € annoncé et remboursé ; toast « Envoi annulé. Remboursement de 39,20 € en cours. » ; kilos rendus ; Pauline : « …est annulée » puis « Remboursement émis pour ton envoi Paris → Brazzaville » (montant exact, « 5 à 10 jours ouvrés ») ; Thomas : « Le deal Paris → Brazzaville a été annulé » (kilos / capacité) ; Paiements : « Remboursé 39,20 € le … » |
+| WEB-ANN-3 | Annuler à moins de 48 h | **Conforme** — total 47,04 € (net 42,00 €) : fenêtre « Tu seras remboursée de 23,52 € » + « Une retenue de 50 % (23,52 €) s'applique car le départ est dans moins de 48 h : elle est reversée au Voyageur… » ; remboursé 23,52 €, Paiements « Remboursé 23,52 € le … · retenue 23,52 € reversée au Voyageur » ; Marc : cloche « 21,00 € de compensation partis vers ton compte », portefeuille « Compensation · annulation tardive de Marie-Claire » « + 21,00 € », `payoutAmountCents` = arrondi(retenue × net ÷ total) au centime ; l'exemple du cahier par la même formule : 16,10 € / 14,38 € |
+| WEB-ANN-4 | Le montant annoncé vient du serveur | **Conforme** — `cancellationPreview` est servi DANS `GET /me/bookings` ; ouvrir la fenêtre ne déclenche **aucun appel** (0 requête `/deals`, `/bookings`) et affiche le montant de la réponse déjà lue ; « Garder l'envoi » n'envoie rien |
+| WEB-ANN-5 | Annuler après le départ, sans prise en charge | **Conforme avec réserve** → `ANO-WEB-69` ; deal créé et accepté par l'API (38,64 €), trajet parti ; remboursé 19,32 €, `retentionDisposition = HELD_FOR_MEDIATION`, `payoutStatus` null (**aucun versement automatique**) ; Thomas : portefeuille « Compensation · annulation tardive de Aminata » / « Retenue conservée · on te contacte », écran du deal « Annulation après le départ : la retenue de l'Expéditeur est conservée par Yamba… », Mes trajets « Annulée après le départ · retenue conservée, on te contacte » ; **mais la fenêtre et Paiements disent « reversée au Voyageur »** |
+| WEB-ANN-6 | Le Voyageur annule un deal accepté | **NON CONFORME** → `ANO-WEB-68` MAJEURE ouverte ; aucune action d'annulation à l'écran du deal ni dans « Mes trajets » ; `POST /deals/:id/cancel` par le Voyageur → 403 `SHIPPER_ONLY` (la machine connaît pourtant `cancel` par le CARRIER, effets ANN-02) ; scénario en `test.fail` |
+| WEB-ANN-7 | Aucun bouton d'annulation après la prise en charge | **Conforme** — `PICKED_UP` et `DELIVERED` : ligne de « Mes envois » sans « Annuler », suivi sans annulation, écran Voyageur sans annulation, API 409 `TRANSITION_NOT_ALLOWED`, statuts inchangés |
+| WEB-ANN-8 | L'annulation ne se duplique pas sur le suivi | **Conforme après correction** → `ANO-WEB-70` ; le suivi d'un deal accepté n'a aucune action d'annulation ; « Voir le Deal dans mon dashboard → » est un lien vers `/dashboard/shipments`, où la ligne porte « Annuler » |
+| WEB-ANN-9 | L'annulation échouée recharge la liste (deux onglets) | **Conforme** — l'onglet 2 garde sa liste (route figée), l'onglet 1 annule ; l'onglet 2 ouvre la fenêtre, confirme → 409 `TRANSITION_NOT_ALLOWED`, toast « L'annulation n'a pas abouti — la liste vient d'être actualisée. », ligne « Annulée », fenêtre fermée ; un seul `refundAmountCents`, kilos rendus une seule fois |
+
+### Anomalies
+
+- **ANO-WEB-68 (MAJEURE, OUVERTE — serveur + front)** — l'annulation par le Voyageur (ANN-02 : remboursement
+  intégral, kilos rendus, compteur d'annulations) n'existe nulle part : le service répond 403 `SHIPPER_ONLY`
+  (`deal-lifecycle.service.ts`, « Only the shipper can cancel this deal ») alors que la machine déclare la
+  transition `ACCEPTED --cancel(CARRIER)--> CANCELLED` avec `PENALIZE_CARRIER`, et aucun écran ne la
+  propose — le refus D72 renvoie pourtant le Voyageur vers « Mes trajets » pour « annuler ses deals ».
+  Chantier dédié : branche CARRIER du service (remboursement intégral par le fournisseur, kilos, `closedBy`
+  CARRIER, événement + emails « annulée » / « Remboursement émis » à l'Expéditeur, compteur du profil
+  public), écran (bouton + confirmation sur le deal accepté et sur la ligne de « Mes trajets »), tests de
+  service et de machine, registre (D-next).
+- **ANO-WEB-69 (mineure, OUVERTE — contrat)** — après le départ, la retenue est CONSERVÉE à arbitrer, mais
+  la fenêtre dit « elle est reversée au Voyageur, qui avait réservé sa capacité pour toi » et Paiements
+  « retenue 19,32 € reversée au Voyageur ». `cancellationPreview` et la ligne de paiement ne portent pas la
+  destination de la retenue : ajouter `retentionDisposition` aux deux (contrat, OpenAPI), deux textes
+  (`retentionNoteHeld`, `PARTIALLY_REFUNDED_HELD`). PR dédiée.
+- **ANO-WEB-70 (mineure, close)** — « Voir le Deal dans mon dashboard → » était un `<button>` dont le seul
+  effet était `console.info` (suivi Expéditeur ET écran Voyageur du deal accepté) : liens vers
+  `/dashboard/shipments` et `/dashboard/trips`.
+- **ANO-WEB-71 (mineure, close)** — annuler une demande EN ATTENTE affichait « Envoi annulé. Remboursement de
+  28,00 € en cours. » alors que rien n'a été débité (l'empreinte est levée, Paiements dit « Jamais débité ») :
+  le remboursement ne se dit qu'après un débit (`item.status !== "PENDING"`).
+
+### À trancher (produit)
+
+- **Le barème lit le départ figé dans le deal** (`booking.trip.departureAt`, instantané), pas le trajet : si
+  le Voyageur repousse son vol après l'acceptation, la fenêtre des 48 h de l'Expéditeur reste calculée sur
+  l'ancienne date. Voulu (le deal est un contrat) ou à recalculer ?
+- **Les objets des emails** : « Le deal Paris → Brazzaville a été annulé » (cahier : « Deal annulé, tes kilos
+  sont restitués ») ; amender le cahier.
+- **« Annuler » est un bouton** sur la ligne, pas un « lien discret » ; la forme est sobre, amender le cahier.
+- **ANN-02 dans son ensemble** (ANO-WEB-68) : quel compteur (annulations « tardives » ? toute annulation
+  après acceptation ?), quel texte à l'Expéditeur, quelle sanction — le registre doit le dire avant le code.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **ANN-1** — Le serveur sert l'aperçu avec la liste : bien (aucun appel à l'ouverture). L'email « Ta
+  demande … est annulée » à une Expéditrice qui vient de cliquer est un accusé sans information neuve : le
+  garder, mais le rendre utile (« rien n'a été débité, l'empreinte disparaît sous 7 jours ») — petit.
+- **ANN-2** — Deux emails à quelques secondes (« annulée » puis « Remboursement émis ») : un seul email qui
+  porte le remboursement, ou le second seulement quand le remboursement part réellement (webhook Stripe)
+  — moyen. « 5 à 10 jours ouvrés » est écrit dans l'email et nulle part à l'écran : l'écrire dans le toast
+  ou sur la ligne Paiements — petit.
+- **ANN-3** — L'arithmétique est au centime et la compensation part par l'exécuteur unique : très bien. La
+  fenêtre pourrait dire le montant que le Voyageur recevra (« dont 21,00 € pour Marc ») : le net est connu
+  du serveur — petit.
+- **ANN-4** — `cancellationPreview` n'est calculé que quand `cancel` est permis et vit dans la liste : juste
+  et économe. Le figer avec un horodatage (« calculé à 10 h 42 ») éviterait la fenêtre ouverte dix minutes
+  qui bascule de 100 % à 50 % à l'insu de l'Expéditrice ; le 409 la rattrape, mais après le clic — moyen.
+- **ANN-5** — La retenue « à arbitrer » est un vrai état de la machine (A81) : bien. Le texte de la fenêtre
+  et de Paiements ne le connaissent pas (ANO-WEB-69) ; plus largement, une retenue conservée mérite un
+  délai promis (« sous 5 jours ouvrés ») des deux côtés — petit, une fois le contrat porteur.
+- **ANN-6** — La transition existe, le service la refuse, l'écran l'ignore : trois couches en désaccord
+  (ANO-WEB-68). Un test de machine « toute transition déclarée a une route et un écran » (inventaire des
+  `action × actor` contre les `allowedActions` servis) l'aurait dit — moyen, structurel.
+- **ANN-7** — Refus d'état 409 des deux côtés maintenant que le Voyageur n'a pas de transition (403 en
+  5.18 sur PICKED_UP) : cohérent. Servir `allowedActions` aussi au Voyageur pour la liste « Mes trajets »
+  (aujourd'hui elle ne propose rien, faute d'actions) — moyen.
+- **ANN-8** — Un lien mort depuis la maquette (ANO-WEB-70), dans deux fichiers jumeaux : un composant
+  « retour au tableau de bord » partagé, et une règle de revue « aucun `onClick` qui n'écrit que dans la
+  console » (`grep console.info` en CI) — petit.
+- **ANN-9** — Le 409 est traduit, la liste rechargée, la fenêtre fermée : exactement le cahier. Rejouer la
+  liste au retour du focus est déjà là (TanStack) ; ajouter `refetchOnWindowFocus` court sur l'aperçu suffit
+  pour que la fenêtre de l'onglet 2 s'ouvre déjà à jour — petit.
+- **Transversal** — Deux anomalies closes sont des **restes de maquette** (un bouton console, un toast qui
+  suppose un débit) ; les deux ouvertes sont des **désaccords entre couches** (machine ≠ service ≠ écran,
+  état serveur ≠ texte). Règle : chaque texte qui affirme un fait d'argent (« remboursé », « reversée »)
+  lit la donnée qui le porte ; chaque transition déclarée est routée ou retirée — moyen.
+
+### Pièges de poste payés ici
+
+- **`GET /trips/:id` n'est servi qu'au propriétaire** (403 `NOT_TRIP_OWNER`) : les kilos restants se lisent
+  avec la session du Voyageur, pas de l'Expéditrice.
+- **Le barème lit l'instantané du deal** : déplacer `trip.departureAt` ne suffit pas, il faut aussi
+  `booking.trip.departureAt` (composite : `update: { trip: { update: { departureAt } } }`) — WEB-E2E-3
+  contournait en déplaçant le trajet AVANT de réserver.
+- **Créer un deal par l'API en deux appels** : `POST /deals/payment-intents` avec `expectedTotalCents: 1`
+  répond 409 `QUOTE_DIVERGENCE` avec `actualTotalCents` ; le second appel porte le vrai total, puis
+  `POST /deals` (FAKE : `clientSecret` null) et `POST /deals/:id/accept` par le Voyageur — trente secondes
+  au lieu de l'assistant.
+- **Le toast « Envoi annulé. »** est aussi préfixe de « Envoi annulé. Remboursement de … » : le motif du
+  page object accepte les deux (`.last()`).
+- **Deux onglets** : figer `GET /me/bookings*` de l'onglet 2 avec la réponse lue (`page.route`), libérer
+  avant le clic de confirmation.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
