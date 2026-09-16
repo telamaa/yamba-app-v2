@@ -610,6 +610,44 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.26 DU CAHIER 01-WEB — WEB-PRF, PREFERENCES, LANGUE ET RELANCES (branche
+  `chore/recette-web-5-26`, empilee sur #290)** — 6 fiches jouees CONFORMES (3 apres correction), 6 scenarios en
+  serie, 1 min 24 (`apps/e2e/src/chapitres/web-prf.spec.ts` ; Aminata pour la langue, les emails et l'ecran
+  « Parametres », Thomas le Voyageur francophone qui accepte, Pauline + bzv-accepted pour la relance des messages
+  non lus, une adresse libre pour l'inscription en anglais). TROIS ANOMALIES CLOSES : ANO-WEB-87 MAJEURE (`authApi`,
+  le SECOND client axios des flux SANS compte — activation, mot de passe oublie, renvoi — ne posait pas l'en-tete
+  `x-locale` : ces emails partaient toujours en francais ET le compte naissait `preferredLocale: "fr"` meme pour une
+  inscription en anglais, donc tous ses emails suivants aussi ; meme interception que `apiClient`, D44),
+  ANO-WEB-86 (l'ecran « Parametres » etait un reste de MAQUETTE : « Changer » sans gestionnaire sur la langue et le
+  theme, et deux bascules a `useState` local — elles bougeaient, rien n'etait enregistre, l'etat repartait a zero au
+  rechargement, un membre pouvait croire avoir coupe ses emails ; chaque ligne porte desormais le vrai reglage LA OU
+  IL A UN EFFET : langue → le COMPTE (PATCH /auth/me/locale, selecteur de l'en-tete reutilise), theme → le
+  NAVIGATEUR (next-themes, trois choix Automatique/Clair/Sombre), « Notifications email » → `messagingReminderEmails`
+  (D61, la seule preference email qui existe) avec un libelle qui dit aussi ce qu'elle NE couvre pas (les emails d'un
+  Deal en cours sont contractuels), « Notifications push » → ligne en LECTURE, rien n'est branche ; `ToggleRow` est
+  desormais CONTROLEE (`checked` + `onChangeAction`, `role="switch"`, `aria-checked`) et `SettingRow` n'affiche son
+  bouton que si un gestionnaire existe — une bascule decorative n'est plus exprimable), ANO-WEB-88 (une adresse qui
+  ne correspond a AUCUNE route — `/es`, reecrit `/fr/es` par le middleware next-intl — ne declenche jamais
+  `notFound()` : Next servait son 404 INTERNE « This page could not be found. », en anglais, sans en-tete ni lien de
+  retour, alors que `[locale]/not-found.tsx` existait depuis 5.3 ; route attrape-tout `[locale]/[...rest]`).
+  Prouve : langue enregistree sur le compte et tenue apres reconnexion dans un contexte neuf ; email TOUJOURS dans la
+  langue du DESTINATAIRE (Thomas « Nouvelle demande de transport Paris → Brazzaville », Aminata « Your request
+  Paris → Brazzaville was accepted » — le geste vient pourtant de l'autre partie) ; inscription en /en → « Your Yamba
+  activation code » ; relance coupee → AUCUN email et notification in-app presente ; ecran « Parametres » (les quatre
+  entrees, bascule servie par le SERVEUR, PATCH dans les deux sens, classe `dark` de <html>, etat conserve apres
+  rechargement, aucun controle sur le push) ; /es et /en/es → 404 avec la page introuvable de Yamba dans la langue de
+  l'URL. A trancher : le CAHIER decrit l'ancien ecran (§ 5.26 amende), preferences email par FAMILLE d'evenement +
+  push = candidats au registre (liste fermee des familles coupables, les emails d'un Deal en cours ne le sont pas),
+  le theme ne suit pas le compte. Regard d'expert : la bascule de langue n'ecrit `if (user)` (cliquer trop tot navigue
+  sans rien enregistrer), UN SEUL client HTTP au lieu de deux, `List-Unsubscribe` dans l'email de relance, dire la
+  portee des reglages a l'ecran, fiche transversale « aucune page decorative / aucune adresse inconnue servie par un
+  404 d'outil ». PIEGES : les PREFERENCES survivent au seed (Aminata arrivait avec sa relance deja coupee — le
+  chapitre pose son etat de depart dans son beforeAll et le remet dans son afterAll) ; trois `npx tsx` de suite
+  depassent 60 s (`spawnSync npx ETIMEDOUT`) → un seul processus ; Atlas a coupe en cours de session (replique sans
+  primaire) et `GET /api/status` reste « down » 10 s (son cache) ; le front Next finit par ne plus hydrater apres une
+  longue serie (relancer `nx dev user-ui`) ; Docker Desktop relance les 17 conteneurs etrangers a chaque demarrage
+  (deux Elasticsearch = 4 Gio, charge 6-7). Plateforme inchangee (1000 + auth 230), harnais : 280 scenarios.
+  PR a ouvrir (empilee sur #290). Reste : 5.27 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.25 DU CAHIER 01-WEB — WEB-RGP, DONNEES PERSONNELLES : EXPORT ET EFFACEMENT (branche
   `chore/recette-web-5-25`, empilee sur #289)** — 9 fiches jouees CONFORMES (5 apres correction), 9 scenarios en
   serie, 1 min 24 (`apps/e2e/src/chapitres/web-rgp.spec.ts` ; Aminata et Thomas pour l'ecran, l'export et les

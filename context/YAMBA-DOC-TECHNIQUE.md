@@ -6190,3 +6190,131 @@ maintenant par son `details.code` (A146). Et dans un fil, « Voir le numéro » 
 
 Plateforme **1000** (message 47, +3) + auth 230. `apps/e2e` : **274 scénarios** (265 + WEB-RGP ×9). Typecheck
 user-ui, message-service, api-gateway et harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.26 du cahier 01-WEB : préférences et langue — trois conventions qui n'allaient pas jusqu'au bout
+
+*(PR `chore/recette-web-5-26`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-sixième chapitre « fiches » du cahier 01-WEB : `WEB-PRF` (la bascule de langue qui écrit le compte, la langue
+d'un email qui est celle de son destinataire, les emails sans compte qui suivent la langue de l'écran, la relance des
+messages non lus qu'on peut couper, l'écran « Paramètres », une langue non prise en charge). Six fiches jouées et
+conformes (trois après correction), trois anomalies closes (`ANO-WEB-87` MAJEURE, `86`, `88`).
+
+```
+apps/e2e/src/chapitres/web-prf.spec.ts                                            6 scénarios en série, 1 min 24
+apps/user-ui/src/services/auth.api.ts                                             ANO-WEB-87 (`x-locale` sur le client des flux sans compte)
+apps/user-ui/src/components/dashboard/sections/SettingsSection.tsx                 ANO-WEB-86 (l'écran « Paramètres » porte les vrais réglages)
+apps/user-ui/src/components/dashboard/DashboardUI.tsx                             `ToggleRow` contrôlée + `role="switch"` ; `SettingRow` sans bouton décoratif
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts                         libellés des trois thèmes, vérité des deux lignes de notifications
+apps/user-ui/src/app/[locale]/[...rest]/page.tsx                                  ANO-WEB-88 (route attrape-tout → `[locale]/not-found.tsx`)
+docs/recette/RECETTE-01-WEB.md                                                    § 5.26 amendé (l'écran attendu n'est plus celui de la maquette)
+```
+
+## ANO-WEB-87 : un second client HTTP qui avait oublié une convention du premier
+
+D44 dit que la langue d'un email est celle de son **destinataire**, et que les flux **sans compte** (il n'y a pas
+encore de `User.preferredLocale` à lire) suivent la langue de la requête — portée par l'en-tête `x-locale` que le
+front pose sur chaque appel. `apiClient` (axios, `withCredentials`, refresh automatique) le faisait. Mais les écrans
+d'inscription, de mot de passe oublié et de renvoi de code n'utilisent pas `apiClient` : ils passent par `authApi`, un
+second client axios créé pour ne pas déclencher la mécanique de refresh sur des routes publiques. Ce client, lui, ne
+posait pas l'en-tête.
+
+Deux conséquences, dont la seconde est durable :
+
+1. l'email de code d'activation partait **toujours en français**, même pour une inscription menée entièrement en
+   anglais ;
+2. le compte naissait avec `preferredLocale: "fr"` — donc **tous** ses emails suivants aussi, jusqu'à ce que le membre
+   trouve la bascule de langue.
+
+```ts
+// apps/user-ui/src/services/auth.api.ts
+authApi.interceptors.request.use((config) => {
+  const locale = getCurrentLocale();
+  if (locale) config.headers.set("x-locale", locale);
+  return config;
+});
+```
+
+La correction est de trois lignes ; la leçon ne l'est pas. Deux clients HTTP, c'est deux endroits où une convention
+doit être répétée — et une convention répétée est une convention qui se perd. `authApi` n'existe que pour éviter le
+refresh : un simple `requireAuth: false` sur `apiClient` (l'option existe déjà) rendrait le second client inutile.
+Consigné comme axe dans le rapport de recette.
+
+## ANO-WEB-86 : un composant de maquette pris pour un composant de produit
+
+L'écran « Paramètres » affichait quatre lignes. Deux portaient un bouton « Changer » — `SettingRow` accepte un
+`onAction` **optionnel**, et personne ne le passait : le bouton était donc dessiné, cliquable, et sans effet. Les deux
+autres étaient des `ToggleRow`, dont l'état vivait dans un `useState` **local au composant** :
+
+```tsx
+// avant — la bascule bougeait, et rien n'était enregistré
+export function ToggleRow({ label, description, defaultOn = false }) {
+  const [on, setOn] = useState(defaultOn);
+  …
+}
+```
+
+Un membre pouvait donc « couper ses notifications email », voir la bascule basculer, et recevoir ses emails comme
+avant — l'état repartant à `defaultOn` au rechargement suivant. C'est exactement la classe d'anomalie d'`ANO-WEB-81`
+(la bascule d'audience lue dans le navigateur), en pire : ici, il n'y avait aucune écriture du tout.
+
+La correction pose une règle simple : **chaque réglage vit là où il a un effet**, et un contrôle qui n'écrit nulle
+part n'existe pas.
+
+| Ligne | Où vit le réglage | Pourquoi |
+|---|---|---|
+| Langue | le **compte** (`PATCH /auth/me/locale`) | c'est elle qui décide la langue des emails (D44) — le sélecteur de l'en-tête est réutilisé tel quel |
+| Thème | le **navigateur** (next-themes) | préférence d'affichage, aucun effet serveur ; trois choix, dont l'« Automatique » que le libellé annonçait déjà |
+| Notifications email | le **compte** (`messagingReminderEmails`, D61) | la seule préférence email qui existe ; le libellé dit aussi ce qu'elle ne couvre pas — les emails d'un Deal en cours sont contractuels |
+| Notifications push | nulle part | rien n'est branché : la ligne informe, sans contrôle |
+
+Et les deux composants partagés sont durcis pour que le défaut ne puisse pas revenir : `ToggleRow` est **contrôlée**
+(`checked` + `onChangeAction`, avec `role="switch"` et `aria-checked` — elle n'était pas annonçable à un lecteur
+d'écran), et `SettingRow` n'affiche son bouton que si un gestionnaire **et** un libellé existent ; sans eux, la ligne
+est en lecture. Un « Changer » sans effet n'est plus exprimable.
+
+## ANO-WEB-88 : une page d'erreur écrite mais jamais atteinte
+
+`/es` n'est pas une langue prise en charge. Le middleware next-intl (`localePrefix: "always"`) réécrit l'adresse sous
+une langue connue — `/fr/es` — ce qui est le bon comportement. Mais `/fr/es` ne correspond à **aucune route** : aucun
+`page.tsx` n'est rendu, donc personne n'appelle `notFound()`, et Next sert son 404 **interne** :
+« This page could not be found. » — en anglais quelle que soit la langue de l'URL, sans en-tête, sans pied de page et
+sans un lien pour revenir au site.
+
+La page introuvable du produit existait pourtant déjà (`[locale]/not-found.tsx`, soignée au chapitre 5.3 : elle
+propose de chercher un trajet, d'en publier un, ou de rentrer à l'accueil). Elle n'était simplement jamais atteinte
+pour ce cas. La façon documentée par next-intl de lui rendre la main est une route attrape-tout :
+
+```tsx
+// apps/user-ui/src/app/[locale]/[...rest]/page.tsx
+import { notFound } from "next/navigation";
+export default function PageInconnue() {
+  notFound();
+}
+```
+
+Les routes réelles, plus spécifiques, gagnent toujours contre un segment `[...rest]` : elle n'attrape que ce qui
+n'existe pas. `/es` répond maintenant 404 avec la page du produit en français, `/en/es` la même traduite.
+
+## Ce que le harnais a appris ici
+
+- **Les préférences d'un compte survivent au seed** (`seed-deals.ts` recrée trajets et deals, pas les réglages) :
+  Aminata arrivait avec sa relance déjà coupée par un passage précédent. Un chapitre qui éprouve des réglages **pose
+  son état de départ** et le remet ensuite (`beforeAll` / `afterAll`). Ici, c'est même un outil : Aminata arrive avec
+  la relance **coupée**, donc l'écran doit l'afficher coupée — ce qui prouve d'un coup que la bascule lit le serveur,
+  et que le profil est chargé avant que la fiche ne touche aux contrôles.
+- **Un seul processus pour toutes les préconditions** : trois `npx tsx --env-file=.env -e …` de suite dépassaient les
+  60 s sur un poste qui recompile le front en même temps (`spawnSync npx ETIMEDOUT`).
+- La bascule de langue de l'en-tête écrit le compte **en best-effort et seulement si le profil est chargé**
+  (`if (user)`) : cliquer trop tôt navigue sans rien enregistrer. Le harnais attend donc un signal de chargement ; le
+  rapport en fait un axe (rejouer l'écriture après le chargement).
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **280 scénarios**
+(274 + WEB-PRF ×6). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (les libellés de l'écran vivent dans
+`dashboard.copy.ts`), miroir i18n donc inchangé.

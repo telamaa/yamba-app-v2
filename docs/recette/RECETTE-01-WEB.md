@@ -4660,8 +4660,13 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 **Étapes**
 1. Tableau de bord › « Paramètres ».
 
-**Résultat attendu** — Les entrées « Langue », « Thème » (« Automatique »), « Notifications email » (« Demandes, messages, paiements ») et « Notifications push » (« Alertes en temps réel »).
-**Note de recette** — Vérifier que les bascules affichées produisent réellement un effet. Une bascule décorative, sans conséquence, est une anomalie **mineure** à consigner explicitement (le membre croit avoir réglé quelque chose).
+**Résultat attendu** — Les entrées « Langue », « Thème » (trois choix : « Automatique », « Clair », « Sombre »), « Notifications email » et « Notifications push ».
+- « Langue » **écrit la préférence du compte** (`PATCH /auth/me/locale`), comme le sélecteur de l'en-tête.
+- « Thème » change réellement le thème de l'écran ; c'est une préférence d'**affichage**, donc elle vit dans le navigateur (un autre appareil repart sur « Automatique »).
+- « Notifications email » gouverne la **relance des messages non lus** (la seule préférence email qui existe, D61) et le dit : les emails d'un Deal en cours (demande, paiement, livraison) ne se coupent pas. L'état est celui du **compte** et survit au rechargement.
+- « Notifications push » est une ligne en **lecture** : rien n'est branché, donc aucun contrôle n'est proposé (« Indisponible pour l'instant : les alertes arrivent dans la cloche et par email »).
+
+**Note de recette** — Vérifier que les bascules affichées produisent réellement un effet. Une bascule décorative, sans conséquence, est une anomalie **mineure** à consigner explicitement (le membre croit avoir réglé quelque chose). *Amendé le 12/09/2026 (recette 5.26, `ANO-WEB-86`) : l'écran promettait « Demandes, messages, paiements » et « Alertes en temps réel » avec deux bascules sans effet ; le libellé attendu est désormais celui des réglages qui existent. Des préférences email par famille d'événement et le push restent des candidats au registre.*
 **Verdict** ⬜   **Note** :
 
 ---
