@@ -6349,3 +6349,37 @@ Deux d'entre elles ne se rattrapent pas après coup, et ce sont celles qui ont m
 | CNC11 | Deux envois d'avatar simultanés | Un avatar en place ; le perdant lit « le profil a changé, rechargez » et **l'image du gagnant n'est pas supprimée** chez l'hébergeur |
 | CNC12 | Réinitialisation du mot de passe alors qu'il vient d'être changé ailleurs | Refus `PASSWORD_STATE_CHANGED`, **aucun écrasement**, aucun email « mot de passe modifié » |
 | CNC13 | « Marquer comme lu » depuis deux appareils, à une seconde d'écart | Le marqueur reste sur la lecture **la plus récente** |
+
+---
+
+# Transitions du trajet sous concurrence (A196)
+
+## Le besoin
+
+Le cycle de vie d'un trajet (brouillon → publié → en pause → annulé → archivé) est décrit par une machine à états qui
+fait foi. Elle jugeait correctement — mais sur l'état lu au début de la requête, et écrivait ensuite sans vérifier que
+cet état tenait encore. Deux gestes lancés à la même seconde par le même Voyageur (deux onglets, un double clic, un
+téléphone et un ordinateur) passaient donc tous les deux.
+
+## Les règles
+
+- **RG-CNC-14** — Une transition ne s'applique que si le trajet est **encore** dans l'état sur lequel la règle a été
+  jugée. Sinon : refus `TRIP_STATE_CHANGED`, l'écran recharge le trajet et les actions réellement possibles.
+- **RG-CNC-15** — Publier n'a lieu **qu'une fois** : un second clic ne republie pas, ne recompte pas le trajet dans les
+  statistiques publiques du Voyageur, et surtout **n'envoie pas une seconde vague de notifications** aux membres
+  abonnés au corridor.
+- **RG-CNC-16** — Un trajet ne peut pas être annulé si un deal naît **pendant** la demande d'annulation (RG-D72 tient
+  sous concurrence) : le Voyageur reçoit le refus « annule d'abord tes deals » avec leur nombre, pas une confirmation.
+- **RG-CNC-17** — Les compteurs publics d'un Voyageur ne comptent chaque transition qu'une fois. S'ils ne peuvent pas
+  être mis à jour (plusieurs transitions à la même seconde), **la transition n'échoue pas pour autant** : elle est déjà
+  écrite, et le compteur est rattrapé par la tâche de cohérence.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| CNC14 | Mettre en pause dans un onglet, annuler dans l'autre | Un seul geste s'applique ; l'autre lit « ce trajet a changé, rechargez » |
+| CNC15 | Double clic sur « Publier » | Un trajet publié, **un** incrément du compteur, **une** vague de notifications |
+| CNC16 | Un Expéditeur réserve pendant que le Voyageur annule | L'annulation est refusée avec le nombre de deals actifs ; le deal existe bel et bien |
+| CNC17 | Publier deux trajets à la même seconde | Le compteur public affiche **+2**, pas +1 |
+| CNC18 | Annuler un trajet d'avant la reprise de capacité (`reservedKg` absent) | L'annulation fonctionne — jamais un refus permanent dû au champ absent |

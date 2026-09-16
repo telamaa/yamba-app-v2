@@ -1245,3 +1245,127 @@ Deux pièges rencontrés en écrivant ces fiches, à connaître :
   prédicat ; c'est toute la différence avec un `SERIALIZABLE` PostgreSQL.
 - Les codes d'erreur Prisma : P2002 (contrainte unique), P2025 (document introuvable à l'écriture), P2034
   (conflit d'écriture / interblocage). Les connaître par cœur change la façon d'écrire un `catch`.
+
+## Chapitre 189 — Une garde n'est une garde que si elle est DANS l'écriture (A196)
+
+Le chapitre 188 montrait comment rendre un conflit visible entre deux transactions. Celui-ci porte sur une erreur plus
+banale, et bien plus répandue : **écrire une décision prise sur une lecture, sans rappeler cette lecture dans
+l'écriture**. Le code fautif est toujours joli à lire — c'est ce qui le rend dangereux.
+
+```ts
+const trip = await prisma.trip.findUnique({ where: { id } });        // 1. lire
+const check = canPerform(trip, "cancel", ctx);                       // 2. juger
+if (!check.allowed) return next(/* refus */);
+await prisma.trip.update({ where: { id }, data: { status: "CANCELLED" } });  // 3. écrire… quoi qu'il arrive
+```
+
+Entre (1) et (3) il y a des lectures de base, un appel à un autre service, un calcul. Des dizaines de millisecondes. Le
+`where: { id }` dit « le trajet numéro X », pas « le trajet numéro X **tel que je l'ai lu** ». La machine à états a
+donc tout jugé — sur un passé.
+
+### 1. La forme correcte tient en une ligne
+
+```ts
+const ecrit = await prisma.trip.updateMany({ where: { id, status: trip.status, isDeleted: false }, data });
+if (ecrit.count !== 1) return next(trajetChange());   // 409, pas 500
+```
+
+`where` porte maintenant **l'hypothèse** sur laquelle la décision a été prise. Si elle n'est plus vraie, rien n'est
+écrit et `count` vaut 0 — une information, pas une exception. C'est le *compare-and-set* que tout le monde connaît en
+programmation concurrente, appliqué à une ligne de base de données ; les Anglo-Saxons parlent de *optimistic
+concurrency control*. « Optimiste » parce qu'on ne verrouille rien : on parie que personne n'a touché, et on vérifie
+au moment d'écrire.
+
+Le choix `updateMany` plutôt qu'`update` n'est pas cosmétique : `update` **lève** quand le `where` ne matche pas
+(P2025, qui remonte en 500), `updateMany` **compte**. On veut compter.
+
+### 2. Choisir la condition : celle dont la décision dépend
+
+Trois conditions étaient possibles pour une transition de trajet.
+
+| Condition | Ce qu'elle attrape | Ce qu'elle coûte |
+|---|---|---|
+| `updatedAt` | toute écriture, même sans rapport | des refus faux (un compteur touché ailleurs suffit) |
+| `status` | exactement ce que la machine a jugé | rien |
+| `status` + `reservedKg` | en plus, un deal né entre-temps | rien, **sauf** sur un trajet legacy (voir plus bas) |
+
+Le bon critère n'est pas « quelle condition est la plus stricte », c'est **de quoi la décision dépend-elle**. Une
+transition dépend du statut : la condition, c'est le statut. Pour l'annulation, la règle D72 dit « pas d'annulation si
+un deal est vivant » : cette décision dépend AUSSI de l'existence d'un deal, donc la condition doit inclure un témoin
+de cette existence.
+
+### 3. Le témoin : réutiliser le document que l'autre écrit déjà
+
+Comment une annulation dans trip-service peut-elle « voir » un deal créé dans deal-service, une autre base de code, une
+autre requête HTTP ? Réponse : parce que la création d'un deal écrit, elle aussi, sur le **document Trip** — elle
+réserve la capacité par un `updateMany` conditionnel (CAP-01) :
+
+```ts
+{ id: trip.id, status: "PUBLISHED", reservedKg: { lte: trip.capacityKg - kg } }   // deal-service
+```
+
+Ce champ `reservedKg` est donc le témoin cherché. L'annulation le relit et le met dans sa propre condition : si un deal
+est né entre-temps, `reservedKg` a bougé, la condition ne matche plus, la course est perdue — et le refus redevient
+celui de la règle métier, avec son décompte :
+
+```ts
+if (ecrit !== 1) {
+  const vivants = await countActiveBookings(trip.id);
+  if (vivants > 0) return next(new AppError("…", 409, true, { code: "TRIP_HAS_ACTIVE_DEALS", activeDeals: vivants }));
+  return next(trajetChange());
+}
+```
+
+Deux services qui ne se parlent pas se coordonnent ainsi par **un champ partagé**, sans verrou distribué, sans file de
+messages, sans transaction croisée. C'est le pattern que la littérature appelle *optimistic offline lock* — la
+coordination par l'état plutôt que par le protocole.
+
+### 4. Le piège du champ absent, encore
+
+`reservedKg` est un scalaire **requis avec valeur par défaut**. Sur MongoDB, un document écrit avant l'ajout du champ
+ne l'a tout simplement pas — et **aucun filtre Prisma ne matche un champ absent** sur un scalaire requis (`isSet` est
+réservé aux champs optionnels, et `not` ne le rattrape pas). Mettre `reservedKg: 0` dans la condition rendrait
+l'annulation **impossible pour toujours** sur ces trajets-là.
+
+```ts
+if (options.surReservation && typeof trip.reservedKg === "number") where.reservedKg = trip.reservedKg;
+```
+
+La règle générale : **une garde qui peut se bloquer elle-même est pire que la course qu'elle corrige.** On dégrade
+proprement (condition omise = comportement d'avant, pas de régression), et le vrai remède reste le back-fill des
+données.
+
+### 5. Quand renoncer est la bonne réponse
+
+Les compteurs publics du Voyageur sont lus puis réécrits en valeur absolue (bornée à zéro — un `{ increment }` sur un
+champ absent rendrait `null`, pitfall connu du dépôt). Deux transitions simultanées en perdent un. La correction est la
+même — condition sur les valeurs lues — mais avec une nuance de jugement :
+
+```ts
+for (let essai = 0; essai < 3; essai++) {
+  /* relire, recalculer, écrire sous condition */
+  if (ecrit.count === 1) return;
+}
+// trois échecs : on renonce au compteur. La transition, elle, est DÉJÀ écrite.
+```
+
+Faire échouer une annulation de trajet parce qu'un compteur d'affichage résiste serait absurde : l'important est déjà
+écrit, et une tâche de cohérence repasse. **Toutes les données n'ont pas la même valeur** ; savoir laquelle peut
+attendre fait partie du métier.
+
+### 6. Vérifier que le reste du dépôt est sain, et le dire
+
+Avant d'écrire une ligne, l'inventaire : quels fichiers ouvrent une transaction sans rejeu, quels writers écrivent sans
+condition. Résultat pour deal-service : **rien**. Toutes ses écritures passent par un écrivain commun
+(`booking-write.ts`) déjà protégé. C'est un résultat, pas une non-livraison : il se consigne au registre, sinon
+quelqu'un refera la recherche dans six mois. Une architecture où toutes les écritures d'un domaine passent par un seul
+fichier se corrige **une fois** ; c'est exactement pourquoi elle vaut le détour d'indirection qu'on lui reproche parfois.
+
+### Pour aller plus loin
+
+- Martin Fowler, *Patterns of Enterprise Application Architecture* — « Optimistic Offline Lock » : le pattern exact, y
+  compris la question « sur quel champ porter la comparaison ».
+- Les codes Prisma à connaître par cœur : **P2025** (`update`/`delete` sans cible → 500 si on ne le rattrape pas),
+  **P2002** (unicité → une réponse métier, chapitre 188), **P2034** (conflit d'écriture → rejeu).
+- La question à se poser devant tout `update({ where: { id } })` : *sur quelle lecture cette écriture repose-t-elle,
+  et cette lecture est-elle dans le `where` ?*

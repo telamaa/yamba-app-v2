@@ -37,6 +37,43 @@ import { publicTripWhere } from "../lib/public-visibility.rules";
 import { changedTicketFacts, tripTicketStatusFromDocuments } from "../lib/ticket-status.rules";
 import { computeComparablePriceCents, comparableParamsFromSettings, DEFAULT_COMPARABLE_PARAMS, type ComparableParams } from "../lib/comparable-price";
 import { platformSettings } from "@packages/libs/settings/default";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
+
+// ─────────────────────────────────────────────
+// A196 — une transition s'écrit sur l'état qu'elle a LU
+// ─────────────────────────────────────────────
+/**
+ * La machine à états est la source de vérité des transitions (« un miroir exécutable de la spec »).
+ * Mais `canPerform(trip, …)` juge l'état **lu**, et l'écriture qui suivait ne le rappelait pas :
+ * `prisma.trip.update({ where: { id } })` écrit quel que soit l'état devenu. Deux gestes simultanés
+ * (le Voyageur qui met en pause dans un onglet et annule dans l'autre, un double clic sur « Publier »)
+ * passaient tous deux la garde, et le dernier écrivait — une transition jouée depuis un état qui
+ * n'existait plus. Les compteurs publics suivaient deux fois.
+ *
+ * La condition porte donc sur le statut LU (et sur `isDeleted: false` : un brouillon supprimé entre-temps
+ * ne se réveille pas). Quand la réservation du trajet est connue, elle est ajoutée : une réservation née
+ * entre la garde et l'écriture fait échouer la condition — c'est ce qui tient D72 (on n'annule pas un
+ * trajet dont un deal vient de naître). Le champ `reservedKg` peut être ABSENT sur un trajet d'avant
+ * B2-PR1 (pitfall A34) : dans ce cas on ne l'ajoute pas au filtre, faute de quoi la transition serait
+ * refusée pour toujours (le remède est `backfill-reserved-kg.ts`, pas un filtre qui ne matche jamais).
+ */
+async function ecrireTransition(
+  trip: { id: string; status: string; reservedKg?: number | null },
+  data: Record<string, unknown>,
+  options: { surReservation?: boolean } = {}
+): Promise<number> {
+  const where: Record<string, unknown> = { id: trip.id, status: trip.status, isDeleted: false };
+  if (options.surReservation && typeof trip.reservedKg === "number") where.reservedKg = trip.reservedKg;
+  const ecrit = await withWriteConflictRetry(() => prisma.trip.updateMany({ where: where as never, data: data as never }));
+  return ecrit.count;
+}
+
+/** Le refus quand la course est perdue : le front recharge le trajet et ses `allowedActions`. */
+const trajetChange = () =>
+  new AppError("This trip changed while you were acting on it. Reload it.", 409, true, {
+    type: "trip",
+    code: "TRIP_STATE_CHANGED",
+  });
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -120,21 +157,31 @@ async function applyCarrierStatDeltas(
   const deltas = getCarrierStatDeltas(from, to);
   if (!deltas) return;
 
-  const carrierPage = await prisma.carrierPage.findUnique({
-    where: { userId },
-    select: { id: true, totalTripsPublished: true, totalTripsCancelled: true },
-  });
-  if (!carrierPage) return;
+  // A196 — lire les compteurs puis écrire une valeur absolue, c'est perdre l'un des deux gestes quand
+  // deux transitions tombent ensemble (publier deux trajets à la même seconde). L'écriture est donc
+  // conditionnée aux valeurs LUES, et relue tant qu'un autre est passé devant — trois tours au plus,
+  // après quoi on renonce : un compteur public d'affichage ne vaut pas de faire échouer la transition,
+  // qui, elle, est déjà écrite. Le cron de cohérence des statistiques repasse derrière.
+  for (let essai = 0; essai < 3; essai++) {
+    const carrierPage = await prisma.carrierPage.findUnique({
+      where: { userId },
+      select: { id: true, totalTripsPublished: true, totalTripsCancelled: true },
+    });
+    if (!carrierPage) return;
 
-  // ANO-CRON-01 — on écrit une VALEUR bornée à zéro, pas un delta : un compteur public ne
-  // descend jamais sous zéro, et un `{ increment }` sur un champ absent rendrait `null`.
-  const valeurs = clampedCarrierStats(carrierPage, deltas);
-  if (!valeurs) return;
+    // ANO-CRON-01 — on écrit une VALEUR bornée à zéro, pas un delta : un compteur public ne
+    // descend jamais sous zéro, et un `{ increment }` sur un champ absent rendrait `null`.
+    const valeurs = clampedCarrierStats(carrierPage, deltas);
+    if (!valeurs) return;
 
-  await prisma.carrierPage.update({
-    where: { id: carrierPage.id },
-    data: valeurs,
-  });
+    const ecrit = await withWriteConflictRetry(() =>
+      prisma.carrierPage.updateMany({
+        where: { id: carrierPage.id, totalTripsPublished: carrierPage.totalTripsPublished, totalTripsCancelled: carrierPage.totalTripsCancelled },
+        data: valeurs,
+      })
+    );
+    if (ecrit.count === 1) return;
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -666,10 +713,16 @@ async function performCancel(
     return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
   }
 
-  await prisma.trip.update({
-    where: { id },
-    data: { status: "CANCELLED", cancelledAt: new Date() },
-  });
+  const ecrit = await ecrireTransition(trip, { status: "CANCELLED", cancelledAt: new Date() }, { surReservation: true });
+  if (ecrit !== 1) {
+    // A196 — course perdue. Si c'est un deal qui vient de naître, le refus reste celui de D72 (avec son
+    // décompte) ; sinon le trajet a changé d'état. Dans les deux cas, une réponse métier, jamais un 500.
+    const vivants = await countActiveBookings(trip.id);
+    if (vivants > 0) {
+      return next(new AppError("This trip still has active deals.", 409, true, { type: "trip", code: "TRIP_HAS_ACTIVE_DEALS", activeDeals: vivants }));
+    }
+    return next(trajetChange());
+  }
 
   // ⭐ Deltas sur la transition (corrige le chemin PAUSED → cancel)
   await applyCarrierStatDeltas(userId, trip.status as TripStatus, "CANCELLED");
@@ -697,10 +750,7 @@ async function performSoftDelete(
   // ⭐ Soft delete — le statut reste DRAFT, le trip sort de toutes
   // les listes via le filtre isDeleted. Plus de hard delete : les
   // documents et références (messages, liens) restent cohérents.
-  await prisma.trip.update({
-    where: { id },
-    data: { isDeleted: true, deletedAt: new Date() },
-  });
+  if ((await ecrireTransition(trip, { isDeleted: true, deletedAt: new Date() })) !== 1) return next(trajetChange());
 
   return res.status(200).json({ success: true, message: "Draft deleted." });
 }
@@ -769,10 +819,7 @@ export const archiveTrip = async (
     const check = canPerform(trip, "archive", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
-    await prisma.trip.update({
-      where: { id },
-      data: { status: "ARCHIVED", archivedAt: new Date() },
-    });
+    if ((await ecrireTransition(trip, { status: "ARCHIVED", archivedAt: new Date() })) !== 1) return next(trajetChange());
 
     // COMPLETED/CANCELLED → ARCHIVED : hors pool public, aucun delta.
 
@@ -805,10 +852,7 @@ export const restoreTrip = async (
     const check = canPerform(trip, "restore", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
-    await prisma.trip.update({
-      where: { id },
-      data: { status: "DRAFT", cancelledAt: null },
-    });
+    if ((await ecrireTransition(trip, { status: "DRAFT", cancelledAt: null })) !== 1) return next(trajetChange());
 
     return res.status(200).json({ success: true, message: "Trip restored as draft." });
   } catch (error) {
@@ -1001,18 +1045,19 @@ export const publishTrip = async (
       comparableParamsFromSettings(await platformSettings().get())
     );
 
-    const publishedTrip = await prisma.trip.update({
-      where: { id },
-      data: {
-        status: "PUBLISHED",
-        publishedAt: new Date(),
-        currentStep: 3,
-        carrierRatingSnapshot,
-        minPriceCents: denormalized.minPriceCents,
-        comparablePriceCents: denormalized.comparablePriceCents,
-        departureHourLocal: denormalized.departureHourLocal,
-      },
+    const publie = await ecrireTransition(trip, {
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      currentStep: 3,
+      carrierRatingSnapshot,
+      minPriceCents: denormalized.minPriceCents,
+      comparablePriceCents: denormalized.comparablePriceCents,
+      departureHourLocal: denormalized.departureHourLocal,
     });
+    // A196 — un double clic sur « Publier » publiait deux fois : deux incréments du compteur public et
+    // DEUX vagues de notifications aux membres abonnés au corridor. Seul le gagnant continue.
+    if (publie !== 1) return next(trajetChange());
+    const publishedTrip = await prisma.trip.findUniqueOrThrow({ where: { id } });
 
     // ⭐ Lot 2 — Deltas sur la transition
     await applyCarrierStatDeltas(userId, trip.status as TripStatus, "PUBLISHED");
@@ -1049,10 +1094,7 @@ export const unpublishTrip = async (
     const check = canPerform(trip, "unpublish", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
-    await prisma.trip.update({
-      where: { id },
-      data: { status: "DRAFT", publishedAt: null, currentStep: 1 },
-    });
+    if ((await ecrireTransition(trip, { status: "DRAFT", publishedAt: null, currentStep: 1 })) !== 1) return next(trajetChange());
 
     // ⭐ Deltas : décrémente aussi depuis PAUSED (corrige le bug stats)
     await applyCarrierStatDeltas(userId, trip.status as TripStatus, "DRAFT");
@@ -1085,10 +1127,7 @@ export const pauseTrip = async (
     const check = canPerform(trip, "pause", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
-    await prisma.trip.update({
-      where: { id },
-      data: { status: "PAUSED" },
-    });
+    if ((await ecrireTransition(trip, { status: "PAUSED" })) !== 1) return next(trajetChange());
 
     // PUBLISHED → PAUSED : reste dans le pool public, aucun delta.
 
@@ -1121,10 +1160,7 @@ export const resumeTrip = async (
     const check = canPerform(trip, "resume", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
-    await prisma.trip.update({
-      where: { id },
-      data: { status: "PUBLISHED" },
-    });
+    if ((await ecrireTransition(trip, { status: "PUBLISHED" })) !== 1) return next(trajetChange());
 
     // PAUSED → PUBLISHED : reste dans le pool public, aucun delta.
 
