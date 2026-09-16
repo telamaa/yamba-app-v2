@@ -5620,3 +5620,47 @@ incohérents » et aucun geste d'argent ne doit être fait avant rapprochement.
   reconnue nulle part aujourd'hui.
 - **Historique des versements** : re-verser écrase la date et le montant du transfert renversé (même défaut que les
   remboursements avant A166).
+
+# Back-office — le pilotage : une lecture fidèle du rapport, et des corridors qui disent la vérité de la fenêtre (cahier 02-ADMIN § 5.17)
+
+*(PR `chore/recette-admin-5-17`, 15/09/2026 — ADM-PIL-1 à 6.)*
+
+## Le besoin
+
+La direction et les opérations suivent l'activité et l'argent semaine par semaine, et cherchent où recruter des Voyageurs.
+Le pilotage n'est pas une comptabilité : c'est une lecture rapide. Elle ne doit jamais contredire le rapport mensuel, ni
+montrer une demande qui date d'il y a six mois comme si elle était d'hier.
+
+## Les règles
+
+**RG-ADM-PIL-01 — Mêmes chiffres que le rapport** : pour chaque mois et chaque mesure d'argent (encaissé, remboursé, versé,
+revenu reconnu, retenues nées), le pilotage donne le montant du rapport mensuel, au centime ; la règle est écrite une seule
+fois et partagée (A167).
+
+**RG-ADM-PIL-02 — Un point se justifie par ses éléments** : le drilldown d'un point liste les faits de la période et leur
+somme vaut le point ; pour « Remboursé », une ligne par remboursement (un deal remboursé deux fois apparaît deux fois).
+
+**RG-ADM-PIL-03 — Semaines du lundi, en UTC ; périodes écrites en jours** (« du 7 sept. 2026 au 13 sept. 2026 (UTC) »).
+
+**RG-ADM-PIL-04 — Lecture sensible journalisée** : seul le drilldown des inscriptions (une liste de personnes) écrit une
+ligne de journal ; les courbes et les autres drilldowns n'en écrivent pas. Liste bornée à 200.
+
+**RG-ADM-PIL-05 — Corridors de la fenêtre** : un corridor n'est listé que s'il a eu, dans la fenêtre choisie, un trajet
+publié, une demande, une vue ou une recherche ; « demande sans offre » = des recherches sans résultat et aucun trajet. Une
+vue compte une fois par visiteur et par jour, sans rien garder de son adresse.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| PIL-1 | Courbes d'activité | huit courbes, totaux = serveur, bascules semaine / mois, lundi UTC, cache signalé, aucun journal, Support refusé | oui |
+| PIL-2 | Courbes de finances | cinq courbes = rapport mensuel, mois par mois | oui |
+| PIL-3 | Drilldown | liste de la période avec liens, pied en jours UTC ; journal seulement pour les inscriptions | oui |
+| PIL-4 | Corridors | demande sans offre en ambre après trois recherches ; deux vues le même jour = +1 | oui (coupure Redis non jouable sur le poste) |
+| PIL-5 | Deux remboursements à deux mois d'écart, une annulation avant capture | pilotage = rapport chaque mois ; Σ drilldown = point | oui (août 0 € au pilotage avant correction) |
+| PIL-6 | Corridor cherché hors fenêtre | absent de la fenêtre de 7 jours | oui |
+
+## Ce qui reste à trancher
+
+- **Historique des versements** (même question qu'au § 5.16).
+- **Période en cours** signalée comme incomplète dans les courbes.

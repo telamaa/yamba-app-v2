@@ -3,6 +3,14 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.17 LIVRÉ
+>
+> PR #317 (§ 5.16) : CI 17/17. Branche `chore/recette-admin-5-17` empilée sur #317 : 6 scénarios ADM-PIL, contre-épreuve
+> rouge sur PIL-3 / 5 / 6, ANO-ADM-40 (majeure), 41 closes, **A167** (règle des remboursements dans `@packages/api-contracts`).
+> Chiffres : auth **252**, deal **635**, harnais **443** ; dernière anomalie ANO-ADM-41 ; dernier chapitre d'apprentissage
+> **175**. Pièges : jouer une contre-épreuve fiche par fiche (`-g "ADM-PIL-N "`), le mode série masque les fiches suivantes ;
+> un compteur dédupliqué par visiteur et par jour se teste avec un contexte HTTP neuf (`userAgent` propre). Suite : § 5.18.
+>
 > ## ▶ 14/09/2026 (nuit) — § 5.16 LIVRÉ
 >
 > PR #316 (§ 5.15) : CI 17/17, non-régression 72/72. Branche `chore/recette-admin-5-16` empilée sur #316 : 5 scénarios

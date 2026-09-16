@@ -289,8 +289,13 @@ const DAY_MS = 86_400_000;
 /** « du 1 oct. 2025 au 30 sept. 2026 (mois UTC) » — la borne de fin servie est EXCLUE (1er du mois suivant, minuit UTC) :
  *  on affiche le dernier jour inclus, en UTC, jamais « au 01 oct. 2026, 02:00 » (heure locale d'une borne exclue). */
 export function reportPeriodLabel(fromIso: string, toExclusiveIso: string): string {
+  return `Du ${utcPeriodLabel(fromIso, toExclusiveIso)} (mois UTC)`;
+}
+
+/** « 14 sept. 2026 au 20 sept. 2026 » — une période [début, fin EXCLUE) en jours UTC, dernier jour inclus (§ 5.16, § 5.17). */
+export function utcPeriodLabel(fromIso: string, toExclusiveIso: string): string {
   const f = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-  return `Du ${f.format(new Date(fromIso))} au ${f.format(new Date(new Date(toExclusiveIso).getTime() - DAY_MS))} (mois UTC)`;
+  return `${f.format(new Date(fromIso))} au ${f.format(new Date(new Date(toExclusiveIso).getTime() - DAY_MS))}`;
 }
 
 /** Période d'export saisie en jours inclus (AAAA-MM-JJ) : null si acceptable, sinon la raison en français (au plus 366 jours). */
