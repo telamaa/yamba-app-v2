@@ -5986,3 +5986,57 @@ un compte du seed, avant les bookings, et le journalise (« n avis »).
 
 Plateforme inchangée (997 + auth 229). `apps/e2e` : **248 scénarios** (237 + WEB-NOT ×11). Typecheck user-ui et
 harnais verts ; miroir i18n vert (`done.unavailableTitle` FR / EN).
+
+---
+
+# Chapitre 5.23 du cahier 01-WEB : la page destinataire — un chapitre sans anomalie, et comment prouver une absence
+
+*(PR `chore/recette-web-5-23`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-troisième chapitre « fiches » du cahier 01-WEB : `WEB-DES` (le lien de suivi, ses canaux, la page publique,
+ce qu'elle ne montre jamais, sa progression, l'absence côté Voyageur et avant l'acceptation, le lien invalide, le
+vrai numéro côté Voyageur). Neuf fiches jouées, neuf conformes, aucune anomalie — le contrat fermé de D69 tient.
+
+```
+apps/e2e/src/chapitres/web-des.spec.ts                                            9 scénarios en série, 2 min 24
+```
+
+## Prouver une absence
+
+La moitié du chapitre affirme que quelque chose n'existe pas. Trois techniques :
+
+- **Les valeurs, pas les symboles.** Le code source d'une page next-intl embarque tout le catalogue de messages :
+  « € » y figure dans des textes génériques. Le harnais cherche les VALEURS du deal (le code `742891`, le numéro
+  E.164 et local, le nom, le montant formaté), à l'écran ET dans `page.content()`.
+- **La liste fermée.** `GET /track/:token` sert exactement huit clés (`CLES_PUBLIQUES_DU_SUIVI`) ; le test compare les
+  clés triées, pas la présence de quelques-unes.
+- **Le 404 uniforme.** Un jeton altéré et un jeton dont le destinataire a été effacé reçoivent le même corps de
+  réponse ; l'écran, le même texte ; le bloc d'acquisition reste.
+
+## Un canal qu'on ne peut pas cliquer
+
+WhatsApp ouvre une fenêtre (`window.open`, capturé par `addInitScript`) ; le SMS assigne `window.location.href =
+"sms:…"`, un schéma externe que le navigateur du poste ne journalise pas et que le harnais ne doit pas déclencher
+(il ouvrirait Messages). La preuve passe par la donnée : le lien est (re)demandé par la page et sa réponse porte
+`recipientPhoneE164`, le numéro que les DEUX canaux utilisent — comparé à celui de la réservation.
+
+```ts
+// apps/e2e/src/chapitres/web-des.spec.ts
+const reponse = page.waitForResponse((r) => r.url().includes("/tracking-link") && r.request().method() === "POST");
+await carte.getByRole("button", { name: "WhatsApp" }).click();
+const lienServi = (await (await reponse).json()) as { path: string; recipientPhoneE164: string | null };
+```
+
+## Un jeton, une fois
+
+« Le même lien est produit au second clic » se prouve à deux niveaux : dans la page, le second clic n'émet aucun
+`POST /tracking-link` (la carte garde le lien en mémoire) ; après rechargement, un nouveau POST rend le même jeton
+(le service réutilise le lien vivant du deal). L'effacement du destinataire (fiche 8) enchaîne la confirmation par
+l'API, `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) et `destinataire.ts` (la passe de rétention).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **257 scénarios** (248 + WEB-DES ×9). Typecheck harnais vert ;
+aucune clé i18n ni code produit touché.

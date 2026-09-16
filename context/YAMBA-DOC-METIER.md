@@ -4051,3 +4051,51 @@ met la ligne de faits à jour, et se signale par email au support avec sa réfé
 | 276 | J+5, J+7, puis | relance, dernier rappel, silence ; jamais au rôle qui a noté | oui |
 | 277 | 14 jours, avis unique | révélé, fenêtre fermée, public | oui |
 | 278 | Page publique, sans session | auteur, note nommée, pouces, faits, signalement | oui (ANO-WEB-78 close) |
+
+---
+
+# La page destinataire — ce que le chapitre 5.23 fait respecter
+
+*(PR `chore/recette-web-5-23`, 12/09/2026 — cahier 01-WEB chapitre 5.23, WEB-DES-1 à 9.)*
+
+## Le besoin
+
+Le destinataire n'a pas de compte : l'Expéditeur lui partage un lien (créé une fois, par WhatsApp, SMS ou copie) qui
+dit où en est le colis — et rien d'autre : ni adresse, ni numéro, ni code, ni photo, ni montant, ni indexation. La page
+suit les jalons publics du Voyageur, ne s'ouvre qu'après l'acceptation, n'appartient qu'à l'Expéditeur, et devient
+« plus valide » sans distinguer ses causes. Le Voyageur, lui, voit le vrai numéro du destinataire.
+
+## Les règles
+
+**RG-WEB-238 — Le lien de suivi est créé une fois par deal, par l'Expéditeur seul, après l'acceptation** ; un second
+clic ne le régénère pas ; le Voyageur n'a ni carte ni droit ; une demande en attente n'en a pas.
+
+**RG-WEB-239 — Les canaux de partage visent le numéro saisi à la réservation** (WhatsApp, SMS) avec le message
+pré-rempli « Bonjour {destinataire} ! Ton colis arrive avec {Voyageur}. Suis-le ici : {lien} ».
+
+**RG-WEB-240 — La page publique dit le prénom, l'expéditeur, le Voyageur (prénom, initiale), le corridor, les dates,
+le jalon courant et son aide, la mention de confidentialité, et invite à rejoindre Yamba.**
+
+**RG-WEB-241 — La page publique ne révèle rien d'autre**, ni à l'écran, ni dans son code source, ni par son API (liste
+fermée de clés) ; elle n'est pas indexée.
+
+**RG-WEB-242 — La page suit les jalons publics** (acceptation, prise en charge, en route, arrivée, remise) ; l'aéroport
+reste privé.
+
+**RG-WEB-243 — Un lien invalide (jeton altéré, destinataire effacé) donne le même message et le même 404** ; le bloc
+d'acquisition reste.
+
+**RG-WEB-244 — Le Voyageur voit le vrai numéro du destinataire**, cliquable (appel, WhatsApp).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 279 | Copier deux fois, recharger | un POST, même lien, même jeton | oui |
+| 280 | WhatsApp, SMS | numéro de la réservation, message pré-rempli | oui |
+| 281 | Fenêtre privée | la page complète | oui |
+| 282 | Écran, source, API, robots | rien de révélé, 8 clés, noindex | oui |
+| 283 | Jalons confirmés par le Voyageur | la frise et ses aides, rien de révélé | oui |
+| 284 | Voyageur / demande en attente | aucune carte, 403 / 409 | oui |
+| 285 | Jeton altéré / destinataire effacé | même message, même 404 | oui |
+| 286 | Écran de transit du Voyageur | le vrai numéro, appel, WhatsApp | oui |

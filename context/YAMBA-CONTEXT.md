@@ -610,6 +610,25 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.23 DU CAHIER 01-WEB — WEB-DES, LA PAGE DESTINATAIRE (branche `chore/recette-web-5-23`,
+  empilee sur #287)** — 9 fiches jouees CONFORMES, AUCUNE ANOMALIE, 9 scenarios en serie, 2 min 24
+  (`apps/e2e/src/chapitres/web-des.spec.ts` ; bzv-picked Aminata ↔ Thomas, destinataire Clarisse +242061234567,
+  code 742891 ; bzv-pending pour « pas de lien avant l'acceptation » ; page publique lue sans session,
+  presse-papiers et window.open observes, `sms:` jamais clique — numero prouve par `recipientPhoneE164` de la
+  reponse partagee par les deux canaux ; effacement du destinataire par `destinataire-eligible.ts` +
+  `destinataire.ts`). Prouve : lien cree une fois (un seul POST pour deux clics, meme jeton apres
+  rechargement), message et « Copie ! » ; WhatsApp wa.me/242061234567 avec le message ; page publique complete
+  (titre, sous-titre avec initiale, dates, frise de cinq jalons, confidentialite + lien, acquisition) ; rien de
+  revele (ecran, code source — valeurs du deal, jamais « € » qui vit dans le catalogue —, `noindex`, 8 cles
+  fermees de GET /track/:token) ; progression en deux navigateurs (aeroport prive, decollage, atterrissage, remise) ;
+  aucune carte cote Voyageur (403) ni avant l'acceptation (409) ; lien invalide = jeton altere OU destinataire
+  efface → meme message, meme 404 ; vrai numero cote Voyageur (bouton nomme par le numero). A trancher : « Colis
+  pris en charge » = acceptation sur la page publique, bouton d'appel nomme par le numero, SMS par assignation de
+  location plutot qu'un lien. Regard d'expert : revocation du lien par l'Expeditrice, SMS en href, fermer
+  ANO-WEB-53 (arrivalAt), test de contrat sur la liste fermee, polling doux de la page, mention « le lien
+  apparaitra a l'acceptation », revoquer le lien a l'effacement, « Appeler {numero} ». PIEGES : source next-intl =
+  tout le catalogue, `sms:` non observable, bouton nomme par le numero, page sans session, effacement en deux
+  temps. Harnais : 257 scenarios. Reste : 5.24 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.22 DU CAHIER 01-WEB — WEB-NOT, LA NOTATION CROISEE (branche `chore/recette-web-5-22`,
   empilee sur #286)** — 11 fiches jouees CONFORMES (3 apres correction), 11 scenarios en serie, 3 min 18
   (`apps/e2e/src/chapitres/web-not.spec.ts` ; bzv-completed Mai ↔ Thomas pour le double-aveugle et la page

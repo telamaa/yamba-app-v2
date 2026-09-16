@@ -2947,6 +2947,71 @@ dans un contexte neuf, sans session (fenêtre privée).
   `notation.ts relances|reveal` ; `FORCE_COLOR=0` comme en 5.19.
 - **Le contexte de notation d'un étranger est un 403** : l'écran rend « indisponible », pas l'introuvable du suivi.
 
+## Chapitre 5.23 — La page destinataire · **CONFORME** (9 fiches jouées · aucune anomalie · 9 scénarios en série, 2 min 24)
+
+`web-des.spec.ts`. `bzv-picked` (Aminata ↔ Thomas, destinataire Clarisse Mabiala, +242 06 123 45 67, code `742891`)
+pour tout le chapitre ; `bzv-pending` pour « pas de lien avant l'acceptation ». La page publique se lit dans un contexte
+sans session (`navigateurVisiteur`) ; le presse-papiers et `window.open` (WhatsApp) sont observés en mémoire de page ;
+le schéma `sms:` n'est pas cliqué (il ouvrirait Messages du poste) — le numéro qu'il vise est prouvé par la réponse de
+l'API que les deux canaux partagent. Ordre de jeu : 7, 6, 9, 1, 2, 3, 4, 5, 8 (le deal est livré en fiche 5, clos puis
+son destinataire effacé pour la fiche 8).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-DES-1 | Créer et partager le lien | **Conforme** — carte « Partage le suivi à Clarisse » / « Un lien sans compte : Clarisse voit où en est le colis, sans ton adresse ni le code. » ; « Copier le message » → un seul `POST /tracking-link`, le presse-papiers porte « Bonjour Clarisse ! Ton colis arrive avec Thomas. Suis-le ici : …/track/… », bouton « Copié ! » ; second clic : le même message, **aucun nouvel appel** ; après rechargement, le POST rend **le même jeton** (créé une fois par deal) |
+| WEB-DES-2 | Le partage par WhatsApp et SMS | **Conforme** — WhatsApp : `window.open("https://wa.me/242061234567?text=…")`, le numéro saisi à la réservation, le message pré-rempli ; SMS : bouton actif, cible `sms:+242061234567` (le numéro servi par l'API, `recipientPhoneE164`, est celui de la réservation — le schéma externe n'est pas cliqué) |
+| WEB-DES-3 | La page vue par le destinataire (fenêtre privée) | **Conforme** — « Ton colis arrive, Clarisse » / « Aminata t'envoie un colis avec Thomas N., Voyageur Yamba, de Paris à Brazzaville. » ; « Départ », « Arrivée prévue », « Où en est le colis » ; la frise : « Colis pris en charge », « Colis récupéré par Thomas », « En route », « Arrivé à Brazzaville », « Colis remis » ; la mention « Aminata a confié ton prénom et ton numéro à Yamba pour cette livraison, et à personne d'autre. Ils sont effacés après la remise. » + « Politique de confidentialité » ; « Toi aussi, envoie ou transporte avec Yamba » avec « Envoyer un colis » et « Devenir Voyageur » ; aucun compte connecté |
+| WEB-DES-4 | Ce que la page ne montre jamais | **Conforme** — écran : aucun code, numéro, montant, photo, mot de l'adresse ; code source : ni `742891`, ni `+242061234567` / `061234567`, ni « Mabiala », ni le montant ; `<meta name="robots">` avec `noindex` ; `GET /track/:token` sert exactement les 8 clés fermées du contrat (arrivalAt, carrier, corridor, departureAt, milestone, recipientFirstName, shipperFirstName, steps) |
+| WEB-DES-5 | La page suit la progression (deux navigateurs) | **Conforme** — « Colis récupéré par Thomas » / « Le colis voyage avec Thomas. » ; l'aéroport ne bouge rien (jalon non public) ; décollage → « En route » / « Thomas est en route vers Brazzaville. » ; atterrissage → « Arrivé à Brazzaville » / « Thomas est arrivé. Il te contacte pour convenir de la remise : prépare le code que Aminata t'a donné. » ; remise contre `742891` → « Colis remis » / « Le colis t'a été remis. Bonne réception ! », cinq jalons atteints ; rien de révélé à aucune étape |
+| WEB-DES-6 | Le Voyageur ne crée pas le lien | **Conforme** — aucune carte de partage sur le suivi ni sur l'écran de remise du Voyageur ; `POST /tracking-link` par le Voyageur → 403 |
+| WEB-DES-7 | Pas de lien avant l'acceptation | **Conforme** — aucune carte sur le suivi d'une demande en attente ; l'API refuse aussi (409) |
+| WEB-DES-8 | Un lien invalide | **Conforme** — jeton altéré : « Ce lien de suivi n'est plus valide » / « Le colis a été remis il y a un moment, ou le lien a été retiré. Rapproche-toi de la personne qui te l'a envoyé. », le bloc « Toi aussi » reste, ni prénom ni ville ; destinataire effacé (deal clos, `destinataire-eligible.ts` + `destinataire.ts`) : **le même message**, et l'API répond le même 404 (corps identique) — les deux causes ne se distinguent pas |
+| WEB-DES-9 | Le vrai numéro du destinataire côté Voyageur | **Conforme** — carte « Clarisse Mabiala · Destinataire », le bouton d'appel nommé « +242061234567 » (le numéro saisi à la réservation, celui de l'API), « WhatsApp » ; aucun numéro factice |
+
+### À trancher (produit)
+
+- **« Colis pris en charge »** est, sur la page publique, le jalon de l'ACCEPTATION ; la prise en charge physique
+  s'appelle « Colis récupéré par {Voyageur} ». Le cahier (5.23 comme WEB-E2E-6) emploie « pris en charge » pour les
+  deux ; amender le cahier, ou renommer le premier jalon (« Deal accepté »).
+- **Le bouton d'appel porte le numéro comme nom** (pas « Appeler ») : lisible, mais un lecteur d'écran annonce un
+  numéro sans verbe ; « Appeler +242… » serait plus clair (même remarque en 5.16).
+- **Le SMS assigne `window.location.href`** (schéma externe) là que WhatsApp ouvre une fenêtre : un `<a href="sms:…">`
+  serait observable, accessible et cohérent avec 5.17 (SenderCodeCard).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **DES-1** — Un jeton par deal, créé une fois, jamais régénéré : bien (D69). Offrir « Retirer le lien » à l'Expéditrice
+  (révocation, `revokedAt` existe) pour un message envoyé au mauvais numéro — petit.
+- **DES-2** — Le numéro des deux canaux vient de la réponse serveur (`recipientPhoneE164`) : bien. Le SMS en lien
+  `href` plutôt qu'en assignation (observable, accessible) — petit.
+- **DES-3** — La page publique est complète et sobre ; « Arrivée prévue » vaut « — » tant que l'instantané ne porte pas
+  `arrivalAt` (ANO-WEB-53, ouverte) : la fermer rendrait la page entière — moyen, PR dédiée déjà proposée.
+- **DES-4** — Liste fermée de clés côté API, `noindex`, aucune image : exemplaire. Ajouter un test de contrat qui
+  échoue si une clé s'ajoute à `PublicTrackingResponse` sans décision (D69) — petit.
+- **DES-5** — Les jalons publics sont un sous-ensemble des jalons du Voyageur (l'aéroport reste privé) : bon choix.
+  Un rafraîchissement automatique de la page (polling doux, 60 s) éviterait « recharge à chaque étape » — petit.
+- **DES-6** — Le Voyageur n'a ni carte ni droit (403) : juste. Rien à ajouter.
+- **DES-7** — Rien à suivre avant l'acceptation : l'API refuse (409), la carte n'existe pas — juste. Dire à l'Expéditrice
+  « le lien de suivi apparaîtra à l'acceptation » sur la demande en attente — petit.
+- **DES-8** — 404 uniforme (jeton altéré = destinataire effacé) et le bloc d'acquisition qui reste : très bien. Le
+  cron d'effacement (`recipient-redaction`) pourrait aussi révoquer le lien (`revokedAt`) pour tracer la cause côté
+  admin sans la révéler côté public — petit.
+- **DES-9** — Le numéro réel, cliquable, au bon endroit : bien. Nommer le bouton « Appeler {numéro} » — petit.
+- **Transversal** — Aucune anomalie : ce chapitre est le plus étanche de la campagne (contrat fermé, 404 uniforme,
+  aucune fuite dans la source). La seule dette est de nommage (jalons, bouton d'appel) et d'observabilité (SMS).
+
+### Pièges de poste payés ici
+
+- **Le code source d'une page next-intl porte tout le catalogue** : chercher les VALEURS du deal (code, numéro, nom,
+  montant formaté), jamais un symbole (« € » y figure dans des textes génériques).
+- **Le schéma `sms:` n'est ni journalisé ni cliquable** dans le harnais : prouver le numéro par la réponse de l'API
+  (`recipientPhoneE164`) que les deux canaux partagent, et `window.open` pour WhatsApp.
+- **Le bouton d'appel s'appelle par son numéro** (`getByRole("button", { name: "+242061234567" })`).
+- **La page publique se lit sans session** (`navigateurVisiteur`) et le jalon courant est la 2e ligne de la section
+  « Où en est le colis » (page object).
+- **Le destinataire s'efface en deux temps** : `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) puis
+  `destinataire.ts` (la passe) — le lien tombe alors sur le même 404 qu'un jeton altéré.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
