@@ -796,6 +796,14 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 16/09 : **TOUTE LA CAMPAGNE DE RECETTE EST DANS `dev`** — les 59 PR empilees (#270 -> #329, cahiers 01-WEB et 02-ADMIN,
+  200 commits) plus #271 (D78 securite de la connexion) mergees ; **zero PR ouverte**. La pile etait strictement lineaire
+  (`dev` en etait un ancetre) : aucun conflit sur les 59. Les dix dernieres (#320 -> #329) n'avaient jamais eu de CI — le
+  workflow ne se declenche que sur les PR qui ciblent `dev`, et un simple retarget n'emet pas d'evenement : il faut
+  fermer/rouvrir la PR. Retargetees puis relancees : **17/17 chacune**, et la CI de `dev` est verte sur les deux merges.
+  Seule #271, hors pile, a demande une resolution : 4 fichiers, tous des ajouts en fin de fichier (CLAUDE.md et les trois
+  docs cumulatifs), plus le chapitre d'apprentissage D78 renumerote **131 -> 187** (131 etait pris par WEB-TRJ). Reference
+  des tests remise a la MESURE dans CLAUDE.md : trip 293, deal 644, notification 122, message 57, auth **376** (+20 D78).
 - 16/09 : **CAHIER 02-ADMIN — § 7 NON-REGRESSION + § 8 CONSIGNATION (branche `chore/recette-admin-7`, empilee sur `chore/recette-admin-6`) — FIN DU CAHIER ADMIN** —
   9 scenarios ADM-NRG (`adm-nrg-non-regression.spec.ts` : sous-titres perimes, filtres d'URL de la file d'arbitrage,
   libelle « Signalement traite », cle React des parametres, alertes hors accueil, journal filtrable, cinq ecarts
