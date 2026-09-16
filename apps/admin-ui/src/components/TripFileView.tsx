@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, BOOKING_STATUS_LABEL, TICKET_REASON_LABEL, TICKET_STATUS_LABEL, TRANSPORT_MODE_LABEL, TRIP_STATUS_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, BOOKING_STATUS_LABEL, DOCUMENT_TYPE_LABEL, TICKET_REASON_LABEL, TICKET_STATUS_LABEL, TRANSPORT_MODE_LABEL, TRIP_STATUS_LABEL, dateTime, money } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, AdminTripFile } from "@/lib/types";
 
@@ -53,8 +53,8 @@ export default function TripFileView({ tripId }: { tripId: string }) {
         <Card title={`Documents (${file.documents.length})`}>
           {file.documents.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucun document.</p> : file.documents.map((d) => (
             <div key={d.id} className="flex justify-between gap-2 text-[12.5px]">
-              <span>{d.type} · {d.originalName ?? d.id.slice(-6)}</span>
-              <span className="text-right">{d.status}{d.rejectionReason ? ` · ${TICKET_REASON_LABEL[d.rejectionReason] ?? d.rejectionReason}` : ""}{d.reviewedAt ? ` · ${dateTime(d.reviewedAt)}` : ""}</span>
+              <span><span title={d.type}>{DOCUMENT_TYPE_LABEL[d.type] ?? d.type}</span> · {d.originalName ?? d.id.slice(-6)}</span>
+              <span className="text-right"><span title={d.status}>{TICKET_STATUS_LABEL[d.status] ?? d.status}</span>{d.rejectionReason ? ` · ${TICKET_REASON_LABEL[d.rejectionReason] ?? d.rejectionReason}` : ""}{d.reviewedAt ? ` · ${dateTime(d.reviewedAt)}` : ""}</span>
             </div>
           ))}
         </Card>

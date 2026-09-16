@@ -4,6 +4,7 @@
  */
 import type { AdminTripsQuery, TicketQueueQuery, TicketRejectionReason } from "@packages/api-contracts";
 import { containsText } from "@packages/libs/prisma/text-search";
+import { REVIEWABLE_TRIP_STATUSES } from "./ticket-status.rules";
 
 /** Filtre Prisma « pas masqué par Yamba » — matche aussi les trajets SANS le champ (pitfall Mongo). */
 export function notHiddenFilter(): { OR: Array<{ hiddenByAdminAt: null } | { hiddenByAdminAt: { isSet: false } }> } {
@@ -93,11 +94,26 @@ export function buildTicketsWhere(q: TicketQueueQuery, now: Date): Record<string
   if (q.submittedTo) created.lt = new Date(q.submittedTo);
   if (q.olderThanDays != null) created.lt = new Date(Math.min(created.lt?.getTime() ?? Infinity, now.getTime() - q.olderThanDays * 86_400_000));
   if (Object.keys(created).length) where.createdAt = created;
-  const trip: Record<string, unknown> = {};
+  // Recette § 5.8 (ANO-ADM-20) — la file ET son export ne proposent que des billets DÉCIDABLES : trajet vivant (brouillon,
+  // publié, en pause), non supprimé, pas encore parti (ou sans date). Avant, l'export sortait les billets des trajets
+  // partis que la file venait d'écarter, et un trajet annulé restait « à vérifier ».
+  const trip: Record<string, unknown> = {
+    isDeleted: false,
+    status: { in: [...REVIEWABLE_TRIP_STATUSES] },
+    OR: [{ departureAt: { gte: now } }, { departureAt: null }, { departureAt: { isSet: false } }],
+  };
   if (q.originCity) trip.originCity = containsText(q.originCity);
   if (q.destinationCity) trip.destinationCity = containsText(q.destinationCity);
-  if (Object.keys(trip).length) where.trip = { is: trip };
+  where.trip = { is: trip };
   return where;
+}
+
+/**
+ * Les billets EN ATTENTE dont le trajet est parti ou supprimé : la lecture de la file les passe en EXPIRED (8A). Borne
+ * basse `gt: epoch` : dans un filtre de relation Prisma + Mongo, `lt` matche aussi une date nulle (piège payé au § 5.4).
+ */
+export function departedTicketsWhere(now: Date): Record<string, unknown> {
+  return { type: "TICKET_PROOF", status: "PENDING", trip: { is: { OR: [{ isDeleted: true }, { departureAt: { gt: new Date(0), lt: now } }] } } };
 }
 /** Exports opérationnels : identifiants seulement, jamais un email ni un téléphone (D60 2A). */
 export const TRIPS_CSV_COLUMNS = ["id", "status", "originCity", "originCountryCode", "destinationCity", "destinationCountryCode", "departureAt", "publishedAt", "cancelledAt", "carrierId", "transportMode", "capacityKg", "reservedKg", "pricePerKgCents", "ticketVerificationStatus", "hiddenByAdminAt", "createdAt"] as const;

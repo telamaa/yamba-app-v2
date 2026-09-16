@@ -4906,6 +4906,92 @@ les deux fois.
 
 ---
 
+## Cahier 02-ADMIN — § 5.8 Billets à vérifier · **CONFORME** (4 fiches + 4 ajoutées · 3 anomalies closes dont 2 majeures sur le badge public · 4 écarts documentaires · 8 scénarios, 3 min 10)
+
+`apps/e2e/src/admin/adm-bil-billets.spec.ts`. Le billet est un **signal de confiance** : en le validant, l'équipe atteste
+des **faits** (dates, villes, nom). Les quatre fiches ajoutées éprouvent ce que le cahier ne regarde pas : le conflit
+d'intérêts, la cohérence du badge quand un trajet a plusieurs billets, le badge quand les faits changent, deux
+administrateurs sur le même billet. **Chaque fiche a été jouée AVANT correction** (une par une) : BIL-2, 3, 4 conformes
+d'emblée ; BIL-1, 5, 6, 7, 8 en échec, chacun sur le défaut qu'il visait. Après correction : 8/8 verts deux fois. Les
+trajets créés (Joséphine, super administrateur) sont supprimés en fin de fiche, manœuvres consignées.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-BIL-1 | La file et ses filtres | **Conforme après correction** → `ANO-ADM-20` ; sous-titre exact ; **1** carte = l'API : Paris → Brazzaville, départ à **J+10**, Thomas Nkounkou, « déposé le … » ; aucune mention « trajets partis » ; filtres : origine « paris » → 1, « Lyon » → « Rien à vérifier. », « ( » → « Rien à vérifier. » (A157), destination « Brazza » → 1 ; âge : le billet du seed est déposé à l'heure du seed → 0 pour 1/3/7 j, et un billet **vieilli de 2 jours** (manœuvre) → « + de 1 j » oui, « + de 3 j » non, et il passe **devant** (plus anciens d'abord) ; aucune ligne de journal. Contre-épreuves : un billet sur un trajet reculé à J−1 → **absent de l'export** (était présent), la lecture le sort avec « 1 billet(s) de trajets partis sortis de la file. », **une seule fois** ; un billet sur un trajet **annulé** → hors de la file |
+| ADM-BIL-2 | Ouvrir un billet est journalisé | **Conforme** — « Ouvrir le billet (billet-bzv-upcoming.jpeg) » → un nouvel onglet sur l'URL exacte du document ; journal : **une** ligne `DOCUMENT_VIEWED TRIP · <id>` `{ documentId }` par clic ; document inexistant → 404, aucune ligne |
+| ADM-BIL-3 | Valider un billet | **Conforme** — Support : « Valider » → « Billet vérifié, Voyageur prévenu. », la carte sort ; fiche : trajet `VERIFIED`, ligne « Billet · … vérifié · date » (**en français**, était `TICKET_PROOF · … VERIFIED`) ; page publique (visiteur) : « Billet vérifié » ; rejeu → **400** « This ticket was already reviewed. » `TICKET_ALREADY_REVIEWED` ; ✉ **un** « Billet vérifié pour ton trajet Paris → Brazzaville » ; journal `TICKET_VERIFIED TRIP · id` `{ documentId, reason: null }`, rien pour le refus |
+| ADM-BIL-4 | Rejeter avec un motif fermé | **Conforme** — Médiateur : « Rejeter : motif… » + **quatre** motifs exacts, aucun champ libre ; « Rejeter » **inactif** sans motif ; « Les dates ne correspondent pas au trajet » → « Billet rejeté (motif : Les dates ne correspondent pas au trajet), Voyageur prévenu. » ; document `REJECTED` `DATES_MISMATCH`, trajet `REJECTED` ; ✉ « Billet non validé pour ton trajet Paris → Brazzaville » avec le motif en clair ; journal `TICKET_REJECTED` `{ documentId, reason: "DATES_MISMATCH" }` ; Thomas redépose → trajet `PENDING`, **le nouveau billet** revient seul dans la file |
+| ADM-BIL-5 *(ajoutée)* | Son propre billet | **Conforme après amélioration** — le super administrateur, connecté comme membre, publie un trajet et dépose un billet ; `POST review` → **403** `ADMIN_IS_OWNER` ; l'écran n'affiche **plus** « Valider » / « Rejeter » sur sa carte (les affichait) et dit « C'est ton propre trajet : un autre administrateur vérifie ce billet. » ; un Médiateur valide (200) ; le refus n'écrit rien |
+| ADM-BIL-6 *(ajoutée)* | Le badge = la synthèse des billets | **Conforme après correction** → `ANO-ADM-19` ; A vérifié → VERIFIED ; B déposé → reste VERIFIED ; **B rejeté → VERIFIED** (était **REJECTED**, badge perdu alors que A reste vérifié) ; C déposé puis **A supprimé** → **PENDING** et DTO public `ticketVerified: false` (le badge survivait tant qu'un autre billet existait) |
+| ADM-BIL-7 *(ajoutée)* | Changer les faits vérifiés | **Conforme après correction** → `ANO-ADM-21` / **A158** ; billet vérifié ; prix modifié → reste VERIFIED ; **date de départ** déplacée de 16 jours → trajet **PENDING**, billet **PENDING** (restait **VERIFIED**), billet de retour dans la file ; revalidé puis **destination** changée → PENDING |
+| ADM-BIL-8 *(ajoutée)* | Deux administrateurs, un billet | **Conforme après amélioration** — deux écrans ouverts ; le Support valide, le Médiateur rejette depuis un écran périmé → « Ce billet vient d'être traité par un autre administrateur : la file est rechargée. » (était « 400 : This ticket was already reviewed. ») et la carte disparaît ; deux décisions **simultanées** → **200 + 400**, une seule ligne de journal |
+
+### Anomalies
+
+- **ANO-ADM-19 (majeure, close)** — **le badge public ne reflétait pas les billets du trajet.** Chaque geste écrivait
+  `Trip.ticketVerificationStatus` sans regarder les autres billets : rejeter un second billet effaçait le badge d'un trajet
+  dont le premier restait vérifié ; supprimer le billet vérifié laissait le badge tant qu'un autre billet existait (le
+  statut ne revenait à « non soumis » que sans aucun billet). Correction : le statut se **déduit** des billets
+  (`apps/trip-service/src/lib/ticket-status.rules.ts`, `tripTicketStatusFromDocuments`), recalculé dans la transaction de
+  décision (`admin-trips.controller.ts`) et au dépôt / à la suppression (`trip.controller.ts`, `syncTripTicketStatus`).
+- **ANO-ADM-20 (mineure, close)** — **la file et son export ne proposaient pas les mêmes billets, ni seulement des billets
+  décidables.** L'export sortait les billets des trajets partis que la file venait d'écarter ; un trajet **annulé** restait
+  « à vérifier » ; la file lisait les 200 premiers billets en attente AVANT d'écarter les partis (200 billets partis
+  masquaient un billet à venir) ; décider un billet d'un trajet parti ou annulé était accepté. Correction :
+  `buildTicketsWhere` ne retient que les trajets vivants, non supprimés, à venir ou sans date ; `departedTicketsWhere`
+  (borne basse contre la date nulle) cherche à part les billets à expirer ; la décision répond 400 `TICKET_TRIP_DEPARTED` /
+  `TICKET_TRIP_CLOSED`. Le cas « annulé » est établi par lecture du code (le filtre de statut n'existait pas) ; la
+  contre-épreuve prouve la correction.
+- **ANO-ADM-21 (majeure, close, A158)** — **changer la date ou les villes gardait le badge.** La vérification atteste des
+  faits ; un Voyageur pouvait faire vérifier un billet puis déplacer son trajet, le badge restait. Correction :
+  `changedTicketFacts` dans `updateTrip` ; un fait réellement changé repasse les billets vérifiés en attente.
+
+### Améliorations faites
+
+- **File** (`apps/admin-ui/src/components/TicketsQueue.tsx`) : sa propre carte sans boutons de décision, avec la raison ;
+  refus lus par leur code et suivis d'un rechargement quand la file est périmée (déjà traité, supprimé, trajet parti ou
+  annulé) ; message de rejet qui nomme le motif ; boutons inactifs pendant la requête (double clic) ; le message vit hors
+  du « Chargement… » (un refus au premier appel n'était jamais affiché) ; mode de transport en français ; type de fichier
+  (« PDF », « image JPEG ») à côté du bouton d'ouverture.
+- **Fiche trajet** (`TripFileView.tsx`, `format.ts`) : type et statut des documents en français (`DOCUMENT_TYPE_LABEL`,
+  `TICKET_STATUS_LABEL`), code au survol.
+- **Serveur** : conflit d'intérêts vérifié avant « déjà traité » (un refus ne masque plus l'autre) ; décision sous
+  `withWriteConflictRetry` ; `tripTicketStatus` de la réponse = la synthèse réelle.
+- **Harnais** : contre-épreuve d'âge avec un billet vieilli, ordre « plus anciens d'abord » prouvé ; ligne de document
+  vérifiée au lieu d'un texte trouvé n'importe où dans la page.
+
+### Écarts documentaires
+
+- **Âge du billet du jeu d'essai** : déposé à l'heure du seed ; les filtres « + de 1/3/7 j » le retirent tous (le cahier
+  ne le précise pas).
+- **Message de rejet** : « Billet rejeté (motif : …), Voyageur prévenu. » au lieu de « Billet rejeté, Voyageur prévenu. ».
+- **Export des billets** : 403 pour le Support (`exports.operational`) — la fiche ne le demande pas, mais le bouton
+  n'apparaît pas à ce profil.
+- **Fiche trajet** : « Billet · … vérifié » au lieu des codes `TICKET_PROOF` / `VERIFIED`.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **BIL-1** — *Fait* : file = décidables, export aligné, contre-épreuves partis / annulé / âge. *Proposé* : afficher le
+  nombre de billets et l'âge du plus ancien en tête de file (délai de traitement) — petit.
+- **BIL-2** — *Constat* : l'URL servie est une URL ImageKit **publique et permanente** : qui la copie (onglet, historique,
+  capture) voit le billet sans passer par le journal. *À trancher* : fichiers privés ImageKit et URL signées de quelques
+  minutes (change le téléversement et la lecture côté membre). *Test* : l'onglet n'est vérifié que sur son URL ; lire
+  l'image rendue n'apporte rien tant que le seed pointe une image de démonstration.
+- **BIL-3** — *Fait* : statuts lisibles sur la fiche. *Proposé* : afficher dans la file ce qui est à comparer (date de
+  départ + nom complet du compte côte à côte, déjà partiellement là) — petit.
+- **BIL-4** — *Fait* : motif nommé dans le message. *Proposé* : quand un billet rejeté pour « dates » est suivi d'une
+  correction des dates, rouvrir aussi (aujourd'hui seul un redépôt le fait) — moyen, décision métier.
+- **BIL-5** — *Fait* : carte sans boutons + raison. *Test* : la fiche fabrique un administrateur Voyageur ; un compte de ce
+  type dans `seed-admins.ts` rendrait aussi jouables les cas 3-5 d'ADM-PRM-8 — moyen.
+- **BIL-6** — *Fait* : synthèse déduite. *Proposé* : empêcher le Voyageur de supprimer un billet vérifié sans
+  avertissement « tu perdras le badge » (front membre) — petit.
+- **BIL-7** — *Fait* : faits changés → vérification rouverte. *Proposé* : prévenir le Voyageur (écran et email) que la
+  modification retire le badge jusqu'à nouvelle vérification — petit ; le journaliser côté membre — à trancher.
+- **BIL-8** — *Fait* : refus lisible + rechargement, retry. *Test* : la course simultanée est prouvée par l'API ; la course
+  « écran périmé » par deux navigateurs réels.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

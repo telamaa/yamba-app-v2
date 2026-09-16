@@ -20,7 +20,8 @@ import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTic
 import { CSV_BOM, EXPORT_MAX_ROWS, buildCsv, capExportRows, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { getTripAdminEmails } from "../emails/admin-trip-emails";
 import { makeCarrierMailer } from "../lib/carrier-mailer";
-import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, fileExtensionOf, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "../lib/admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, departedTicketsWhere, fileExtensionOf, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, notHiddenFilter, ticketReviewOutcome } from "../lib/admin-trips.rules";
+import { ticketNotReviewableReason, tripTicketStatusFromDocuments } from "../lib/ticket-status.rules";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const USER_APP_URL = (process.env.USER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -283,30 +284,30 @@ export const listTickets = async (req: AuthenticatedRequest, res: Response, next
     // C-PR7a (D60 2A) — filtres : villes, période de dépôt, « plus vieux que N jours »
     const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
     if (!parsedQ.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
+    // 8A — les billets des trajets partis (ou supprimés) sortent de la file (EXPIRED), en un seul updateMany. Recette § 5.8
+    // (ANO-ADM-20) : ils sont cherchés À PART, et la file ne lit que des billets décidables — avant, les 200 premiers
+    // billets en attente pouvaient être tous « partis » et masquer un billet à venir.
+    const expired = await prisma.tripDocument.findMany({ where: departedTicketsWhere(now) as never, select: { id: true } });
+    if (expired.length) await prisma.tripDocument.updateMany({ where: { id: { in: expired.map((d) => d.id) }, status: "PENDING" }, data: { status: "EXPIRED", expiredAt: now } });
     const pending = await prisma.tripDocument.findMany({
       where: buildTicketsWhere(parsedQ.data, now) as never,
       orderBy: { createdAt: "asc" },
       take: 200,
-      include: { trip: { select: { id: true, originCity: true, destinationCity: true, departureAt: true, transportMode: true, isDeleted: true, user: { select: { id: true, firstName: true, lastName: true } } } } },
+      include: { trip: { select: { id: true, originCity: true, destinationCity: true, departureAt: true, transportMode: true, user: { select: { id: true, firstName: true, lastName: true } } } } },
     });
-    // 8A — les billets des trajets partis sortent de la file (EXPIRED), en un seul updateMany.
-    const expiredIds = pending.filter((d) => d.trip.isDeleted || isTicketExpired(d.trip, now)).map((d) => d.id);
-    if (expiredIds.length) await prisma.tripDocument.updateMany({ where: { id: { in: expiredIds } }, data: { status: "EXPIRED", expiredAt: now } });
-    const items: TicketQueueItem[] = pending
-      .filter((d) => !expiredIds.includes(d.id))
-      .map((d) => ({
-        documentId: d.id,
-        tripId: d.trip.id,
-        originCity: d.trip.originCity ?? "—",
-        destinationCity: d.trip.destinationCity ?? "—",
-        departureAt: iso(d.trip.departureAt),
-        transportMode: d.trip.transportMode ? String(d.trip.transportMode) : null,
-        carrier: { id: d.trip.user.id, firstName: d.trip.user.firstName, lastName: d.trip.user.lastName },
-        originalName: d.originalName,
-        mimeType: d.mimeType,
-        submittedAt: d.createdAt.toISOString(),
-      }));
-    res.status(200).json({ items, expiredNow: expiredIds.length });
+    const items: TicketQueueItem[] = pending.map((d) => ({
+      documentId: d.id,
+      tripId: d.trip.id,
+      originCity: d.trip.originCity ?? "—",
+      destinationCity: d.trip.destinationCity ?? "—",
+      departureAt: iso(d.trip.departureAt),
+      transportMode: d.trip.transportMode ? String(d.trip.transportMode) : null,
+      carrier: { id: d.trip.user.id, firstName: d.trip.user.firstName, lastName: d.trip.user.lastName },
+      originalName: d.originalName,
+      mimeType: d.mimeType,
+      submittedAt: d.createdAt.toISOString(),
+    }));
+    res.status(200).json({ items, expiredNow: expired.length });
   } catch (e) {
     next(e);
   }
@@ -353,13 +354,20 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
     const documentId = parseId(req.params.documentId, "document id");
     const parsed = ReviewTicketRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    const d = await prisma.tripDocument.findUnique({ where: { id: documentId }, include: { trip: { select: { id: true, userId: true, originCity: true, destinationCity: true } } } });
+    const d = await prisma.tripDocument.findUnique({ where: { id: documentId }, include: { trip: { select: { id: true, userId: true, originCity: true, destinationCity: true, status: true, isDeleted: true, departureAt: true } } } });
     if (!d || d.type !== "TICKET_PROOF") throw new NotFoundError("Ticket not found.", { code: "TICKET_NOT_FOUND" });
-    if (d.status !== "PENDING") throw new ValidationError("This ticket was already reviewed.", { code: "TICKET_ALREADY_REVIEWED" });
+    // Recette § 5.8 — le conflit d'intérêts d'abord : son propre billet est refusé en 403, qu'il soit traité ou non
+    // (avant, un billet déjà traité répondait 400 à son propriétaire, un refus qui en masquait un autre — cf. ANO-ADM-02).
     if (d.trip.userId === req.user.id) throw new ForbiddenError("You cannot review your own ticket.", { code: "ADMIN_IS_OWNER" });
-    const outcome = ticketReviewOutcome(parsed.data.decision, parsed.data.reason ?? null);
+    if (d.status !== "PENDING") throw new ValidationError("This ticket was already reviewed.", { code: "TICKET_ALREADY_REVIEWED" });
+    // Recette § 5.8 — un billet ne se décide que sur un trajet à venir et vivant (la file n'en montre pas d'autre).
     const now = new Date();
-    await prisma.$transaction(async (tx) => {
+    const closed = ticketNotReviewableReason({ status: String(d.trip.status), isDeleted: d.trip.isDeleted, departureAt: d.trip.departureAt }, now);
+    if (closed === "TICKET_TRIP_DEPARTED") throw new ValidationError("This trip has already left: its ticket has nothing left to prove.", { code: closed });
+    if (closed) throw new ValidationError("This trip is no longer open: its ticket cannot be reviewed.", { code: closed });
+    const outcome = ticketReviewOutcome(parsed.data.decision, parsed.data.reason ?? null);
+    // Deux administrateurs sur le même billet (fiche ADM-BIL-8) : écriture conditionnelle + rejeu sur conflit (P2034).
+    const tripTicketStatus = await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
       const updated = await tx.tripDocument.updateMany({
         where: { id: d.id, status: "PENDING" },
         data: outcome.documentStatus === "VERIFIED"
@@ -367,7 +375,10 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
           : { status: "REJECTED", rejectedAt: now, reviewedByAdminId: req.user.id, rejectionReason: outcome.rejectionReason },
       });
       if (updated.count === 0) throw new ValidationError("This ticket was already reviewed.", { code: "TICKET_ALREADY_REVIEWED" });
-      await tx.trip.update({ where: { id: d.trip.id }, data: { ticketVerificationStatus: outcome.tripTicketStatus } });
+      // ANO-ADM-19 — le trajet porte la SYNTHÈSE de ses billets : un second billet rejeté n'efface pas un billet vérifié.
+      const billets = await tx.tripDocument.findMany({ where: { tripId: d.trip.id, type: "TICKET_PROOF" }, select: { type: true, status: true } });
+      const synthese = tripTicketStatusFromDocuments(billets.map((b) => ({ type: String(b.type), status: String(b.status) })));
+      await tx.trip.update({ where: { id: d.trip.id }, data: { ticketVerificationStatus: synthese } });
       await recordAdminAction(tx, {
         adminUserId: req.user.id,
         action: outcome.documentStatus === "VERIFIED" ? "TICKET_VERIFIED" : "TICKET_REJECTED",
@@ -376,7 +387,8 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
         after: { documentId: d.id, reason: outcome.rejectionReason },
         ...meta(req),
       });
-    });
+      return synthese;
+    }));
     await emailCarrier(d.trip.userId, (locale, u) => {
       const base = { firstName: u.firstName, route: route(d.trip), tripUrl: `${USER_APP_URL}/${locale}/trips/${d.trip.id}`, supportEmail: SUPPORT_EMAIL };
       const dict = getTripAdminEmails(locale);
@@ -384,7 +396,7 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
         ? dict.ticketVerified(base)
         : dict.ticketRejected({ ...base, reasonLabel: TICKET_REJECTION_LABELS[locale === "en" ? "en" : "fr"][outcome.rejectionReason!] });
     });
-    res.status(200).json({ ok: true, status: outcome.documentStatus, tripTicketStatus: outcome.tripTicketStatus });
+    res.status(200).json({ ok: true, status: outcome.documentStatus, tripTicketStatus });
   } catch (e) {
     next(e);
   }

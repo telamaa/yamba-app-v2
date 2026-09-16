@@ -7906,3 +7906,94 @@ proposition, invisible pendant le masquage, ressurgissait au rétablissement. Un
   auth-service 248 (inchangé, sa suite `admin-users.query.spec.ts` passe sur la fonction partagée).
 - `apps/e2e` : **385 scénarios** (378 + 7), les 7 verts deux fois de suite.
 - Typecheck trip, auth (tsc), admin-ui, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.8 : les billets à vérifier — un badge qui se déduit au lieu de s'écrire
+
+*(PR `chore/recette-admin-5-8`, empilée sur #308, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Huit fiches (ADM-BIL-1 à 4 du cahier, 5 à 8 ajoutées), trois anomalies closes (`ANO-ADM-19`, `20`, `21`), une décision
+(A158), et des améliorations d'écran.
+
+```
+apps/trip-service/src/lib/ticket-status.rules.ts        NOUVEAU — synthèse du statut, faits vérifiés, trajet décidable
+apps/trip-service/src/lib/ticket-status.rules.spec.ts   NOUVEAU — 8 tests
+apps/trip-service/src/lib/admin-trips.rules.ts          buildTicketsWhere (décidables), departedTicketsWhere (+ 2 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   file, décision (ordre des gardes, synthèse, retry)
+apps/trip-service/src/controllers/trip.controller.ts    syncTripTicketStatus au dépôt / à la suppression, faits changés
+apps/admin-ui/src/components/TicketsQueue.tsx           refus par code, sa propre carte, occupé, mode et type de fichier
+apps/admin-ui/src/components/TripFileView.tsx, lib/format.ts   documents en français
+apps/e2e/src/admin/adm-bil-billets.spec.ts              8 scénarios en série
+```
+
+## Un champ dérivé ne s'écrit pas, il se recalcule
+
+`Trip.ticketVerificationStatus` est **dénormalisé** : la recherche publique filtre dessus (`verifiedTicket`) et le DTO
+public en tire `ticketVerified`. Tant qu'il était **écrit** par chaque geste (« la décision vaut VERIFIED », « le dépôt
+vaut PENDING si le trajet était NOT_SUBMITTED ou REJECTED », « la suppression vaut NOT_SUBMITTED s'il ne reste aucun
+billet »), il divergeait dès qu'un trajet avait plusieurs billets. La règle devient une fonction pure de ses sources :
+
+```ts
+export function tripTicketStatusFromDocuments(documents: ReadonlyArray<{ type: string; status: string }>): TripTicketStatus {
+  const billets = documents.filter((d) => d.type === "TICKET_PROOF");
+  if (billets.some((d) => d.status === "VERIFIED")) return "VERIFIED";
+  if (billets.some((d) => d.status === "PENDING" || d.status === "EXPIRED")) return "PENDING";
+  if (billets.some((d) => d.status === "REJECTED")) return "REJECTED";
+  return "NOT_SUBMITTED";
+}
+```
+
+Côté admin, elle est appelée **dans la transaction** de décision, après l'`updateMany` conditionnel : la synthèse lit
+l'état que la transaction vient d'écrire. Côté membre, `syncTripTicketStatus` écrit par `updateMany` conditionnel
+(`NOT: { ticketVerificationStatus: synthese }`) : aucune écriture quand rien ne change.
+
+## Les faits vérifiés (A158)
+
+```ts
+const factsChanged = changedTicketFacts({ departureAt: trip.departureAt, originCity: trip.originCity, destinationCity: trip.destinationCity }, updateData);
+if (factsChanged.length > 0) {
+  const reopened = await prisma.tripDocument.updateMany({ where: { tripId: id, type: "TICKET_PROOF", status: "VERIFIED" }, data: { status: "PENDING", verifiedAt: null, reviewedByAdminId: null } });
+  if (reopened.count > 0) await syncTripTicketStatus(id);
+}
+```
+
+`changedTicketFacts` compare des **valeurs** : un champ absent du patch est inchangé, une date se compare par instant
+(chaîne ISO ou `Date`), une ville sans casse ni espaces. Renvoyer le même payload que l'écran d'édition ne rouvre donc rien.
+
+## La file ne lit que des billets décidables
+
+Avant, `listTickets` lisait les 200 premiers billets `PENDING`, puis écartait ceux des trajets partis en mémoire. Deux
+défauts : l'export (même `where`) sortait ces billets partis ; et 200 billets partis masquaient un billet à venir. Les
+deux requêtes sont désormais séparées :
+
+```ts
+const expired = await prisma.tripDocument.findMany({ where: departedTicketsWhere(now), select: { id: true } });  // à expirer
+const pending = await prisma.tripDocument.findMany({ where: buildTicketsWhere(q, now), orderBy: { createdAt: "asc" }, take: 200 });
+```
+
+`buildTicketsWhere` porte le filtre de relation `trip.is = { isDeleted: false, status ∈ {DRAFT, PUBLISHED, PAUSED},
+OR: [departureAt ≥ now, departureAt null, departureAt absent] }` ; `departedTicketsWhere` borne `departureAt` par
+`gt: new Date(0)` : dans un filtre de relation Prisma + Mongo, `lt` matche une date nulle (piège payé au § 5.4).
+
+## L'ordre des gardes
+
+La décision vérifie maintenant : billet introuvable (404) → **son propre billet (403)** → déjà traité (400) → trajet parti
+ou fermé (400). Un propriétaire qui rejouait sur un billet déjà traité recevait 400 : un refus qui en masquait un autre,
+comme ANO-ADM-02.
+
+## Écran : un refus dit la suite
+
+`TicketsQueue` associe chaque `details.code` à un texte ET à un rechargement (`reload`) : « déjà traité », « billet
+supprimé », « trajet parti / annulé » rechargent la file, puisqu'elle est périmée ; « c'est ton propre trajet » ne recharge
+rien. Le message est rendu hors du bloc « Chargement… » : un refus au tout premier appel n'était jamais visible.
+
+## Tests
+
+- trip-service **292** (+10 : `ticket-status.rules.spec.ts` ×8, `admin-trips.rules.spec.ts` ×2) ; autres services inchangés.
+- `apps/e2e` : **393 scénarios** (385 + 8) ; chaque fiche jouée seule AVANT correction (BIL-1, 5, 6, 7, 8 en échec sur
+  leur défaut), puis 8/8 verts deux fois.
+- Typecheck trip-service, admin-ui, harnais verts ; contrats OpenAPI inchangés.
