@@ -4810,3 +4810,101 @@ propre billet.
 Plateforme inchangée (993 + auth 229 ; `admin-trips.controller.spec` 6/6). `apps/e2e` : **94
 scénarios** (`playwright --list` ; 88 + WEB-DOC ×6). Typecheck user-ui, trip-service et harnais
 verts.
+
+
+---
+
+# Chapitre 5.9 du cahier 01-WEB : recherche, filtres, tri, état vide — la page qui tombait pour un avatar, et l'index unique qui n'était pas épars
+
+*(PR `chore/recette-web-5-9` (#274), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le neuvième chapitre « fiches » du cahier 01-WEB : `WEB-RCH` (l'écran `/search`, les cartes et
+leurs prix, le poids du colis, les tris, les familles, les filtres de confiance, les états vide
+et d'erreur, la page publique, le compteur de vues, un trajet disparu, un compte suspendu).
+Quinze fiches, quinze jouées et conformes — trois après correction d'une anomalie **bloquante**
+(`ANO-WEB-27`) — et une seconde anomalie bloquante trouvée en posant la contre-épreuve
+(`ANO-WEB-28`, ouverte, `test.fail`). Le rapport porte, pour la première fois, une section
+« regard d'expert » par fiche (consigne du 11/09).
+
+```
+apps/e2e/src/chapitres/web-rch.spec.ts   NOUVEAU — 16 scénarios (15 fiches + ANO-WEB-27 ; ANO-WEB-28 en test.fail), 2 min 06
+apps/user-ui/next.config.js              ANO-WEB-27 — images.remotePatterns : ik.imagekit.io, lh3.googleusercontent.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.9, ANO-WEB-27/28, à trancher, regard d'expert, pièges
+```
+
+## Viser une recherche sans piloter Google
+
+La barre de recherche interroge Google Places pour les villes. Le chapitre 5.1 l'avait pilotée
+(frappe touche par touche, origine `localhost` pour le référent) ; ici il y a douze recherches
+différentes, et chaque frappe Google est lente et fragile. L'observation qui change tout : ce que
+`/search` lit en arrivant, c'est le **brouillon persistant** de la barre —
+`usePersistedFormState("trip-search")`, en `sessionStorage`, clé `yamba:form:trip-search`,
+enveloppe `{ version: 2, data: { from, to, dateValue } }`, les dates sérialisées avec un
+marqueur (`{ __yamba_date__: iso }`, rétablies en `Date` par un `reviver`). Le harnais pose ce
+brouillon par `page.addInitScript` **avant** la navigation :
+
+```ts
+await page.addInitScript(({ cle, valeur }) => { window.sessionStorage.setItem(cle, valeur); },
+  { cle: "yamba:form:trip-search", valeur: JSON.stringify({ version: 2, data }) });
+await page.goto("/fr/search");
+```
+
+et l'écran cherche exactement ce qu'il aurait cherché après une saisie. Douze recherches en
+deux minutes, sans une requête Google. Même principe pour le poids (`localStorage`,
+`yamba.search.weightKg`).
+
+Seconde règle : **rien n'est codé en dur**. L'ordre des cartes est comparé à l'ordre que rend
+`GET /trips/search?sort=…`, les comptes des puces à `GET /trips/search/facets`, le prix pour
+3 kg au `totalForWeight` de l'API (38,64) — la carte n'en montre que l'arrondi (« ≈ 39 € »).
+
+## ANO-WEB-27 : un composant qui jette tue la page
+
+Trois fiches échouaient sur trois symptômes différents (onglet introuvable, zéro carte après
+« Tout effacer », zéro carte après « Réessayer »). Le point commun n'était pas dans les
+sélecteurs mais dans la **console** : « Invalid src prop (https://ik.imagekit.io/…) on
+`next/image`, hostname "ik.imagekit.io" is not configured under images ». `next/image` refuse
+tout hôte distant absent de `images.remotePatterns` — et il refuse en **jetant**, donc la page
+entière bascule sur l'error boundary (`app/[locale]/error.tsx`, « Cette page n'a pas pu
+s'afficher »). Il suffisait qu'un Voyageur listé ait un avatar ; le seed n'en a aucun, le poste
+en avait un.
+
+Correctif : la section `images` de `next.config.js` (ImageKit + `lh3.googleusercontent.com`,
+l'hôte des avatars Google, `payload.picture`). La config n'est pas rechargée à chaud : redémarrer
+le front. Contre-épreuve durable : un scénario pose un avatar ImageKit **en base** sur Thomas
+(référence seule, aucun téléversement — `jeuEssai.manoeuvre`), ouvre la recherche et la page
+publique, exige l'absence de la page d'incident et d'erreur `next/image`, et retire l'avatar dans
+un `finally`.
+
+## ANO-WEB-28 : trouvée en posant la contre-épreuve
+
+La manœuvre `image.create({ userId })` a répondu `P2002 … Image_carrierPageId_key`. Le modèle
+`Image` sert deux relations 1-1 (`userId? @unique` pour l'avatar d'un membre, `carrierPageId?
+@unique` pour celui d'une page Voyageur) : sur MongoDB, Prisma crée pour `@unique` un index
+unique **non épars** (`listIndexes` : `unique: true`, aucun `sparse`), donc deux documents à
+`carrierPageId: null` — deux avatars de membres — sont interdits. Vérifié par l'API réelle :
+`POST /auth/me/avatar` pour Joséphine, pendant qu'un autre compte a un avatar → **500**. Un seul
+membre de la plateforme peut avoir un avatar ; c'est le piège « nullable unique fields collide on
+null » de CLAUDE.md, jamais payé ici parce que 5.5 n'avait pas joué le téléversement réel.
+
+Prisma ne sait pas déclarer un index épars ou partiel sur Mongo. La voie propre est de scinder
+`Image` en deux modèles 1-1 dont la clé est **requise** (`UserAvatar`, `CarrierAvatar`) — une
+migration d'un document, deux écrivains et les lecteurs à ajuster : candidat au registre, PR
+dédiée. La fiche est en `test.fail` (elle attend 200) ; la contre-épreuve d'ANO-WEB-27 contourne
+le piège en posant `carrierPageId` sur l'image de test.
+
+## Le harnais : ce qui a coûté
+
+- **Deux arbres** : chaque carte, chaque panneau de filtres existe deux fois (mobile masqué par
+  CSS, desktop). `first()` tombe sur la copie `hidden` → `.filter({ visible: true })` partout.
+- **Le tri par défaut** : cliquer « Départ le plus tôt » en premier ne déclenche rien.
+- **Lire `pageerror` avant de corriger des sélecteurs** quand plusieurs fiches tombent sur une
+  même page : un `test.only` de dix lignes qui imprime la console a donné la cause en quinze
+  secondes.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **110 scénarios** (`playwright --list` ;
+94 + WEB-RCH ×16, dont 1 `test.fail`). Typecheck harnais vert ; `next.config.js` est du
+JavaScript (aucun typecheck), le front redémarré le sert.
