@@ -4706,3 +4706,85 @@ journalisés.
 - La cible de `ADMIN_LOGIN` (`SESSION` sans identifiant) : le filtre par cible du journal ne retrouve pas les
   connexions d'un admin.
 - Aucun écran pour régénérer ses codes de secours.
+
+
+---
+
+# Back-office — une session qu'on coupe vraiment, un profil qui voit ce qu'il doit faire, un accueil qui dit vrai (cahier 02-ADMIN § 4.2, § 4.3, § 5.1)
+
+*(PR `chore/recette-admin-4-2`, 13/09/2026 — ADM-SEC-7 à 10, ADM-PRM-0 à 9, ADM-ACC-1 à 3.)*
+
+## Le besoin
+
+Un administrateur qui voit une session inconnue dans « Mes sessions » la révoque : il attend que l'intrus perde la main
+**immédiatement**, pas dans un quart d'heure. Chaque profil du back-office (Médiateur, Support, Exploitation, Finance,
+Données personnelles) doit voir les écrans de son métier, pouvoir y agir, et se voir refuser le reste **par le
+serveur** — un bouton caché ne protège rien. L'accueil annonce ce qui attend une action ; ses chiffres doivent être
+ceux de la plateforme.
+
+## Les règles
+
+**RG-ADM-SEC-07 — La session membre et la session admin sont séparées** : être connecté au site n'ouvre aucune route
+du back-office ; se connecter au back-office ne déconnecte pas du site.
+
+**RG-ADM-SEC-08 — 45 minutes sans activité ferment la session admin**, sans ligne de journal (une expiration n'est pas
+une déconnexion volontaire).
+
+**RG-ADM-SEC-09 — Une session admin ne vit jamais plus de 12 heures**, même renouvelée sans interruption.
+
+**RG-ADM-SEC-10 — Révoquer une session coupe l'accès dans la seconde** (`ADMIN_SESSION_REVOKED`), et chaque révocation
+est journalisée (`ADMIN_SESSION_REVOKED`, cible la session). Si le cache des sessions est indisponible, le back-office
+**refuse** l'accès plutôt que de risquer d'accepter une session révoquée.
+
+**RG-ADM-PRM-01 — Le menu d'un profil est exactement ce que ses permissions ouvrent**, et l'écran applique la même
+matrice que le serveur.
+
+**RG-ADM-PRM-02 — Toute route admin refuse (403, permission nommée) un profil qui n'a pas la permission**, quel que
+soit ce qu'affiche l'écran. Un refus n'écrit rien au journal.
+
+**RG-ADM-PRM-03 — Un refus se dit refus** : une demande qu'un profil n'a pas le droit de faire est refusée même quand
+elle n'aurait rien changé (remise à zéro de paramètres déjà par défaut).
+
+**RG-ADM-PRM-04 — Le profil Données personnelles lit les membres** (recherche et fiche, lecture journalisée) : l'export
+nominatif et l'effacement se font depuis ces écrans. Il ne propose ni n'applique aucune sanction, et ne lit ni litige,
+ni argent, ni conversation (A153).
+
+**RG-ADM-PRM-05 — Cumuler deux profils donne l'union de leurs droits, jamais un droit de plus** (Support + Finance ne
+tranche pas un litige).
+
+**RG-ADM-PRM-06 — Conflits d'intérêts** : personne n'agit sur son propre compte ; seul un super administrateur agit sur
+un compte admin ; personne ne retire son propre accès ni ne change son propre profil.
+
+**RG-ADM-ACC-01 — L'accueil affiche, pour chaque tuile, le chiffre servi par le serveur**, et seulement les tuiles que
+le profil a le droit de lire (les autres compteurs ne sont pas calculés pour lui). Un profil sans lecture des
+compteurs voit le refus à la place des tuiles.
+
+**RG-ADM-ACC-02 — Les alertes de seuil tiennent en une ligne sur l'accueil** (nombre, critiques, la plus grave, lien
+vers la page Alertes) ; un seuil modifié dans Paramètres s'y reflète en 30 secondes au plus, et le bandeau nomme la
+dernière modification.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| ADM-7 | Connecté au site, ouvrir le back-office | `/login`, 401 sur les routes admin ; après connexion admin, les deux sessions coexistent | oui |
+| ADM-8 | 46 minutes sans activité | la session a expiré, retour à `/login`, aucune ligne | oui (attente réelle) |
+| ADM-9 | Session vieillie à 11 h 59 puis 12 h 01 | renouvelée pour moins d'une minute, puis refusée | oui (substituts + manœuvre) |
+| ADM-10 | Révoquer la session d'un autre navigateur | refus **immédiat** de ce navigateur, une ligne par révocation | oui (ANO-ADM-04 close) |
+| ADM-11 | Chaque profil : menu, un geste, des refus | menu = contrat, geste réussi et journalisé, 403 serveur | oui (six profils + cumul) |
+| ADM-12 | Médiateur remet par défaut une clé métier | 403, la valeur reste | oui (ANO-ADM-02 close) |
+| ADM-13 | Profil Données personnelles ouvre une fiche membre | fiche lisible, export et effacement atteignables, sanction refusée | oui (ANO-ADM-03 close) |
+| ADM-14 | Chaque route admin × chaque compte | 403 si et seulement si la permission manque | oui |
+| ADM-15 | Accueil du super administrateur, puis de trois profils | chiffres = serveur = jeu d'essai ; tuiles filtrées | oui |
+| ADM-16 | Relever un seuil d'alerte | le résumé passe au vert, bandeau de modification, une ligne `SETTING_CHANGED` | oui |
+
+## Ce qui reste à trancher
+
+- Le cahier est à mettre à jour sur trois points : le menu du profil Données personnelles (« Utilisateurs » s'ajoute),
+  la décision d'un litige ouvert depuis moins de 72 h (l'écran affiche l'échéance de réponse du Voyageur, pas le
+  formulaire), et le message « dernier super administrateur » que l'API ne peut pas produire (la garde « soi-même »
+  répond avant).
+- L'accueil sert des tuiles que le cahier ne liste pas, et le cahier suppose « aucune alerte » sur un jeu d'essai qui
+  en pose une (versement en échec) — à aligner.
+- Le profil Données personnelles voit la fiche entière (TrustScore, historique de sanctions) : il se confie comme un
+  super administrateur.

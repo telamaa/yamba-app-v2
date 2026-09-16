@@ -17,6 +17,9 @@ describe("adminRoleAllows (D56)", () => {
   });
   it("SUPPORT lit et propose, n'exécute pas", () => {
     expect(adminRoleAllows("SUPPORT", "users.read")).toBe(true);
+    // A153 (ANO-ADM-03) — PRIVACY lit la fiche : ses deux gestes (export nominatif, effacement) y vivent.
+    expect(adminRoleAllows("PRIVACY", "users.read")).toBe(true);
+    expect(adminRoleAllows("PRIVACY", "users.suspension.propose")).toBe(false);
     expect(adminRoleAllows("SUPPORT", "users.suspension.propose")).toBe(true);
     expect(adminRoleAllows("SUPPORT", "users.suspension.apply")).toBe(false);
     expect(adminRoleAllows("SUPPORT", "disputes.decide")).toBe(false);

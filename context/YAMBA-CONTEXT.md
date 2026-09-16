@@ -621,6 +621,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   TRANCHER : cible de ADMIN_LOGIN, regeneration des codes de secours. Deja ecrit pour § 4.3 : ADM-PRM-9 genere la
   matrice routes × 7 comptes depuis les routeurs et ADMIN_PERMISSIONS — CONFORME (aucune garde absente). Harnais : 339
   scenarios. PR a ouvrir. Reste : § 4.2, § 4.3 (PRM-1 a 8), § 5 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 4.2 SESSIONS, § 4.3 PERMISSIONS, § 5.1 ACCUEIL (branche `chore/recette-admin-4-2`,
+  empilee sur #301)** — 17 scenarios verts sur la pile reelle : ADM-SEC-7 a 10 (SEC-8 = 46 min d'attente reelle, SEC-9 =
+  substituts + session vieillie a 11 h 59 dans Redis), ADM-PRM-0 a 9 (PRM-0 = miroir front de la matrice identique au
+  contrat ; PRM-9 = chaque route admin des quatre routeurs × les sept comptes), ADM-ACC-1 a 3 (ecran = API = cahier,
+  tuiles polluees comptees en base). TROIS ANOMALIES CLOSES : ANO-ADM-04 (MAJEURE — revoquer une session admin ne
+  coupait que le renouvellement, le jeton d'acces restait accepte 15 min → le jeton porte le `jti`, `isAdminAuthenticated`
+  verifie `admin_jti:<id>:<jti>` a chaque requete, echec FERME si Redis est muet), ANO-ADM-02 (un Mediateur recevait
+  400 « Nothing to reset » au lieu de 403 sur une remise a zero de cles deja par defaut), ANO-ADM-03 (PRIVACY ne pouvait
+  pas ouvrir la fiche ou vivent export et effacement → A153, `users.read` ouvert a PRIVACY). Aussi : seed-deals pose la
+  relance du versement en echec a +23 h (le cron FAKE vidait la file), `nx.json` sharedGlobals += `packages/**`, schema
+  Prisma, tsconfig.base (cache de test perime). Pieges harnais : `isVisible({ timeout })` n'attend pas → `waitFor` ; la sonde de
+  session admin acceptait un cookie a quelques secondes de son expiration → renouvellement a < 5 min.
+  auth-service 235, harnais 356. A mettre a jour dans le cahier : menu PRIVACY, formulaire « Trancher » avant 72 h,
+  message « dernier super administrateur » inatteignable, tuiles non listees, « aucune alerte » sur jeu d'essai neuf.
+  Reste : § 5.2 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
