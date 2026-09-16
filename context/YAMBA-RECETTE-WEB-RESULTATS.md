@@ -1112,6 +1112,40 @@ Correction     : clé `pickedUp.code.copyFailed` (FR / EN) : « Copie impossible
 Contre-épreuve : WEB-COD-3, second navigateur sans presse-papiers : le message, jamais « régénération ».
 ```
 
+```
+ANO-WEB-60
+Fiche          : WEB-REM-1 (chapitre 5.18) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Depuis le suivi de transit, clique « Valider la livraison » » — sur tout deal pris en charge ; les
+                 jalons (aéroport, décollage, atterrissage) portent le badge « Optionnel » et l'API livre depuis
+                 PICKED_UP quel que soit l'avancement.
+Obtenu         : la carte-projecteur ne proposait « Valider la livraison » qu'APRÈS le troisième jalon (`getNextEvent`
+                 → DELIVER) : trois jalons « optionnels » de fait obligatoires pour atteindre l'écran du code par
+                 l'interface (seule l'URL `/deliver` tapée à la main y menait). Un Voyageur qui ne coche rien en
+                 vol arrivait devant le destinataire sans chemin vers la remise.
+Correction     : `TrackingSpotlight`, variante « jalon optionnel » : sous le bouton du jalon, « {destinataire} est
+                 déjà devant toi ? Tu peux passer directement à la remise : Valider la livraison » (clé
+                 `spotlight.deliverEarly`, FR / EN) — le chemin direct est toujours ouvert.
+Contre-épreuve : WEB-REM-1 : `sgn-picked` (aéroport confirmé, « Ton vol décolle ? » proposé) → « Valider la
+                 livraison » → `/deliver`.
+```
+
+```
+ANO-WEB-61
+Fiche          : WEB-REM-2 (chapitre 5.18) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : après un code faux, « {n} tentatives restantes » puis « Dernière tentative » ; reprendre la saisie
+                 ramène « Tentative 2 sur 3 » ; chaque échec secoue et vide les cases.
+Obtenu         : (1) `otp.attemptsLeft` existait au catalogue et n'était JAMAIS rendu (même famille qu'ANO-WEB-51/55) ;
+                 (2) l'erreur remplaçait la ligne « Tentative n sur 3 » et restait affichée pendant la ressaisie —
+                 « Tentative 2 sur 3 » ne revenait jamais ; (3) l'effet « secousse + cases vidées » était déclenché
+                 par le TEXTE de l'erreur, identique d'un essai à l'autre : au deuxième code faux, rien ne bougeait
+                 et les six chiffres faux restaient dans les cases.
+Correction     : `DeliverOtpInput` — le compteur est rendu sous l'erreur et à côté de « Tentative n sur 3 » ; l'erreur
+                 s'efface dès le premier chiffre ressaisi (`erreurMasquee`) ; l'effet est rearmé par le compteur
+                 d'essais (`[errorMessage, attemptsUsed]`), pas par le texte.
+Contre-épreuve : WEB-REM-2 : « 2 tentatives restantes », « Tentative 2 sur 3 » à la ressaisie, « Dernière
+                 tentative », « Tentative 3 sur 3 ».
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -2395,6 +2429,75 @@ presse-papiers est observé en mémoire de page, `window.open` est capturé (Wha
 - **Ne jamais cliquer `sms:` / `mailto:`** sur le Chrome du poste : Messages et Mail s'ouvrent.
 - **Les crons écrivent aux comptes du seed** (versement à Thomas pendant l'attente) : l'absence d'email
   se prouve sur le SUJET.
+
+## Chapitre 5.18 — La remise du colis · **CONFORME** (7 fiches jouées, 2 après correction · 2 anomalies closes dont 1 MAJEURE · 7 scénarios en série, 55 s)
+
+`web-rem.spec.ts`. `sgn-picked` (Mai ↔ Linh, destinataire Đức, code `742891`, un jalon confirmé) pour la
+remise ; `bzv-picked` (Aminata ↔ Thomas) pour l'absence d'annulation. ImageKit intercepté (aucun envoi
+réel) ; le verrou de 15 minutes n'est jamais attendu : c'est la régénération côté Expéditrice qui le lève
+(règle serveur, D43).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-REM-1 | L'écran « Livraison à Đức » | **Conforme après correction** → `ANO-WEB-60` ; depuis le suivi de transit (« Ton vol décolle ? » proposé), « Valider la livraison » → `/deliver` ; « Livraison à Đức » / « Hô Chi Minh-Ville · à valider avec le code » ; l'encart exact (« …le code de livraison que Mai lui a communiqué… ») ; « CODE DE LIVRAISON REÇU PAR ĐỨC », six cases « Chiffre 1 » à « Chiffre 6 » en 3 · 3, bouton inactif tant que vide ; l'aide « Đức ne se souvient plus du code ? » et ses trois puces ; « Tentative 1 sur 3 ». **Constat** : l'encart et l'aide accordent le destinataire au féminin (« Si elle… », « qu'elle… ») quel que soit le prénom |
+| WEB-REM-2 | Un code faux et le compteur d'essais | **Conforme après correction** → `ANO-WEB-61` ; `000000` → 409 `DELIVERY_CODE_INVALID`, « Ce code n'est pas le bon. Vérifie avec Đức et réessaye. », « 2 tentatives restantes » ; ressaisie → « Tentative 2 sur 3 » ; `111111` → « Dernière tentative » ; « Tentative 3 sur 3 ». Côté Mai : `GET /me/notifications` identique avant / après — un essai raté n'est pas un événement |
+| WEB-REM-3 | Le verrou de 15 minutes | **Conforme** — troisième faux → 409 `DELIVERY_LOCKED`, « Trop de tentatives. Saisie bloquée pendant 15 min pour des raisons de sécurité. », « Réessaye dans 14:5x », cases inertes ; **après rechargement, le verrou est toujours là** (le compteur vit sur le serveur) ; le BON code `742891` par l'API → 409 `DELIVERY_LOCKED` avec `lockedUntil`, le deal reste `PICKED_UP` |
+| WEB-REM-4 | Une régénération lève le verrou (deux navigateurs) | **Conforme** — Mai régénère (carte compacte de la phase voyage) ; Linh recharge : plus de verrou, « Tentative 1 sur 3 », cases actives ; l'ancien code est refusé (« 2 tentatives restantes ») |
+| WEB-REM-5 | La photo de remise est facultative | **Conforme** (ImageKit intercepté, le cahier dit ⏭) — « Une photo de la remise ? », badge « Optionnel », le texte « …cette photo parle pour toi. », « Jusqu'à 2 photos. Elles sont visibles par l'Expéditeur dans son suivi et par Yamba en cas de litige. » ; deux photos envoyées à la sélection (avant toute saisie), plus d'« Ajouter », une troisième sélection ignorée, aucun « Échec d'envoi » |
+| WEB-REM-6 | Le bon code vaut livraison | **Conforme** — nouveau code + une photo → 200, « Livraison validée ! » / « Bravo, tu as remis le colis à Đức. Mai vient d'être prévenue. » ; « Ton versement arrive » / « 28 € partiront vers ton compte après la période de vérification de l'Expéditeur, le mercredi 16 septembre au plus tard, puis arriveront sur ton compte bancaire sous 2 à 7 jours. » ; « Voir le récap du Deal », « Retour à l'accueil », **aucun « Noter »** ; `DELIVERED` ; Mai : cloche « Colis remis · vérifie avant le … », email « Ton colis Paris → Hô Chi Minh-Ville a été livré » avec « 3 jours », sans le code ; Linh : cloche « Livraison validée » / « versement après la vérification de Mai », **aucun email** |
+| WEB-REM-7 | Aucune annulation après la prise en charge | **Conforme** — « Mes envois » : la ligne du deal pris en charge n'a pas d'« Annuler » (les envois en attente / acceptés le gardent) ; suivi : aucun « Annuler », « Signaler un colis non livré » seul ; Voyageur : aucun ; API : 409 `TRANSITION_NOT_ALLOWED` (Expéditrice), 403 (Voyageur), statut inchangé |
+
+### À trancher (produit)
+
+- **Le destinataire est toujours « elle »** (« Si elle ne le retrouve pas », « Vérifie qu'elle a bien Mai »,
+  « (Đức absente, refus, etc.) ») : le cahier a la même forme. Neutraliser (« Si le destinataire ne le
+  retrouve pas ») ou porter un genre à la réservation.
+- **L'email de remise** a pour objet « Ton colis … a été livré » ; « 3 jours pour confirmer ou signaler » est
+  dans le corps. Le cahier nomme l'email par cette phrase — amender le cahier, ou porter l'action dans l'objet.
+- **La photo de remise part à la sélection** (l'inverse de la prise en charge, 5.16) : aligner les deux écrans.
+- **Refus d'annulation** : 409 pour l'Expéditrice, 403 pour le Voyageur — deux codes pour le même « non ».
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **REM-1** — Six cases avec `autocomplete="one-time-code"` sur la première et collage géré : bien.
+  Grouper les cases (`role="group"`, `aria-describedby` vers l'erreur) pour qu'un lecteur d'écran lise
+  « Ce code n'est pas le bon » au bon moment — petit.
+- **REM-2** — Le serveur compte (A38) et le client ne fait que refléter : juste. Journaliser les essais
+  ratés dans l'historique admin du deal (horodatage, jamais le code saisi) donnerait une preuve en
+  médiation « il a tenté trois codes avant de signaler » — moyen.
+- **REM-3** — `MAX_DELIVERY_ATTEMPTS = 3` et `DELIVERY_LOCK_MINUTES = 15` sont des constantes : les
+  porter au catalogue des réglages (`delivery.maxAttempts`, `delivery.lockMinutes`, D62) et les servir
+  dans le DTO Voyageur pour que l'écran n'écrive plus « 15 » — moyen (même famille que COD-6).
+- **REM-4** — Régénérer lève le verrou et remet les essais à zéro : voulu (D43), mais invisible pour
+  l'Expéditrice. Le dire dans la boîte de confirmation (« …et débloque la saisie du Voyageur ») — petit.
+- **REM-5** — Photos envoyées à la sélection ici, à la confirmation en 5.16 : un seul composant de
+  photos pour les deux écrans (upload à la sélection, retrait = suppression ImageKit) — moyen.
+- **REM-6** — La date du versement est calculée dans le client à partir de `payoutDelayDays` du DTO :
+  correct, mais `payoutDueAt` existe côté serveur — le servir et l'afficher tel quel évite deux
+  horloges — petit. L'objet de l'email devrait porter l'action attendue (« 3 jours pour confirmer »)
+  — petit.
+- **REM-7** — Le refus d'annulation répond 409 à l'une et 403 à l'autre ; les deux sont parties au deal,
+  un seul `details.code` (`TRANSITION_NOT_ALLOWED`, 409) suffirait et ne révèle rien — petit.
+- **Transversal** — Les deux anomalies sont des **impasses d'état** : une étape « optionnelle » qui
+  verrouillait le chemin principal (REM-1), une erreur qui ne se libérait jamais et un effet déclenché
+  par un texte identique (REM-2). Règle : tout état qui masque l'action principale doit avoir une
+  sortie explicite ; un test unitaire de `DeliverOtpInput` (deux erreurs identiques → deux secousses,
+  ressaisie → l'erreur s'efface) l'aurait dit — moyen.
+
+### Pièges de poste payés ici
+
+- **La liste des notifications est `GET /me/notifications`**, pas `/notifications` — et la fiche COD-2
+  gardait ce chemin derrière un `if (ok)` qui rendait la preuve silencieuse. Ne jamais garder une preuve
+  derrière une condition : corrigé dans les deux chapitres.
+- **Le suivi Expéditrice change de forme avec un jalon confirmé** : carte compacte, code en texte
+  « 742 891 », bouton « Régénérer » — le page object lit les deux formes.
+- **Après une régénération, la carte relit le serveur** (`invalidateQueries`) : attendre que le code
+  affiché CHANGE (`expect.poll`), pas seulement le toast.
+- **« le mercredi 16 septembre »** : la date du versement porte le jour de la semaine, pas l'année.
+- **« Mes envois » porte « Annuler » sur les autres lignes** : viser la ligne par son lien.
+- **L'`input[type=file]` caché survit au plafond** : prouver « deux au plus » par une troisième sélection
+  ignorée, pas par l'absence de l'input.
+- **Le statut du deal n'est pas à la racine de la réponse** : lire le texte brut (`"status":"PICKED_UP"`).
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
