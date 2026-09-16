@@ -7,6 +7,7 @@
  */
 import type { MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
 import type { PaymentInspection } from "@packages/payments";
+import { csvCell } from "@packages/libs/csv";
 
 /* ── Rejeux espacés (A111) ─────────────────────────────────── */
 
@@ -333,13 +334,11 @@ export const FINANCE_CSV_COLUMNS = [
   "disputeTicket", "paymentIntentId", "chargeId",
 ] as const;
 
-/** Une cellule CSV : guillemets doublés, virgule / retour à la ligne / guillemet ⇒ encadrée. Un préfixe de formule est neutralisé (injection tableur). */
-export function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  let s = v instanceof Date ? v.toISOString() : String(v);
-  if (/^[=+\-@]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+/**
+ * Une cellule CSV — ANO-ADM-14 (recette 02-ADMIN § 5.6) : cette file avait sa propre copie, qui ne neutralisait ni la
+ * tabulation ni le retour chariot. Une seule implémentation : `@packages/libs/csv`.
+ */
+export { csvCell };
 
 /** Un deal entre dans l'export si l'un de ses faits d'argent tombe dans la période. */
 export function csvRowInRange(r: FinanceCsvRow, from: Date, to: Date): boolean {

@@ -5001,3 +5001,53 @@ lit « déjà levée ».
   vivante), couper les notifications non demandées.
 - **Rebonds temporaires répétés** : aucun seuil ne les transforme en suppression.
 - **Afficher les derniers emails en échec** sur la fiche, pour savoir quoi corriger avant de lever.
+
+
+---
+
+# Back-office — ce qui sort du back-office, et sous quelles conditions (cahier 02-ADMIN § 5.6)
+
+*(PR `chore/recette-admin-5-6`, 14/09/2026 — ADM-EXP-1 à 4.)*
+
+## Le besoin
+
+L'équipe a besoin de tableaux : suivre les trajets, la file des billets, les dossiers à arbitrer, et, rarement, une
+liste nominative de membres (demande d'une autorité, audit RGPD). Un fichier téléchargé échappe à tout contrôle : ce
+qui en sort doit être le strict nécessaire, tracé, et sans piège pour qui l'ouvre.
+
+## Les règles
+
+**RG-ADM-CSV-01 — Deux familles d'exports.** Opérationnels (trajets, billets, dossiers) : Finance ou Médiateur (et super
+administrateur), sans motif. Nominatif (membres) : Données personnelles ou super administrateur, avec un motif de
+20 caractères au moins. Le Support n'exporte rien.
+
+**RG-ADM-CSV-02 — Un export opérationnel ne contient que des identifiants, des états, des dates, des montants et des
+villes** — jamais un champ saisi librement par un membre (A156), jamais une adresse email ni un numéro de téléphone.
+
+**RG-ADM-CSV-03 — Le fichier est exactement la liste affichée** : les filtres de l'écran s'appliquent au fichier.
+
+**RG-ADM-CSV-04 — Chaque export est journalisé** : domaine, nominatif ou non, filtres, nombre de lignes, troncature, et
+le motif pour un export nominatif.
+
+**RG-ADM-CSV-05 — 5 000 lignes au plus par fichier, et le dépassement est dit** : à l'écran et au journal.
+
+**RG-ADM-CSV-06 — Un fichier ouvert dans un tableur n'exécute rien** : une cellule qui commence comme une formule est
+neutralisée ; les accents s'affichent (BOM UTF-8).
+
+**RG-ADM-CSV-07 — Un export aboutit ou dit pourquoi**, en français, même après une longue inactivité.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| EXP-1 | Export nominatif des Voyageurs, motif court puis valide | refus, puis fichier = liste filtrée, formule neutralisée, journalisé avec le motif | oui (ANO-ADM-13 close) |
+| EXP-2 | Trois exports opérationnels | aucune adresse ni téléphone, même dans un nom de fichier déposé | oui (ANO-ADM-12 close) |
+| EXP-3 | Profil Support | aucun bouton, refus serveur, rien au journal | oui |
+| EXP-4 | Export refusé par le serveur | message en français, aucun fichier, aucun onglet | oui |
+
+## Ce qui reste à trancher
+
+- **Le motif d'un export nominatif voyage dans l'adresse** : il apparaît dans les journaux techniques du gateway et du
+  service. Passer l'export en envoi de formulaire le garderait au seul journal d'audit.
+- **L'export Finances n'a pas de plafond de lignes** (§ 5.16).
+- **Noms de fichiers en UTC** : un export fait après minuit à Paris porte la date de la veille.
