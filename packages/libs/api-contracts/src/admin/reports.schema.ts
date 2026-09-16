@@ -48,6 +48,8 @@ export const AdminReportItemSchema = z
     targetId: z.string(),
     /** Ce que le support lit : corridor d'un trajet, prénom + nom d'un membre. */
     targetLabel: z.string(),
+    /** ANO-ADM-47 — la cible n'existe plus (trajet purgé, document effacé) : le signalement reste dans la file et se clôt. */
+    targetMissing: z.boolean(),
     /** Propriétaire d'un trajet signalé (null pour un membre : la cible est le membre). */
     targetOwner: z.object({ id: z.string(), firstName: z.string() }).nullable(),
     status: ReportStatusSchema,

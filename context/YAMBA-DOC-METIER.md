@@ -5707,3 +5707,62 @@ le dossier de médiation seulement s'il existe.
 ## Ce qui reste à trancher
 
 - **Démasquer à la demande** un message signalé (preuve d'une sortie de plateforme), comme geste journalisé distinct.
+
+# Back-office — signalements : rien d'automatique, rien de perdu, une décision une fois (cahier 02-ADMIN § 5.19)
+
+*(PR `chore/recette-admin-5-19`, 15/09/2026 — ADM-SIG-1 à 9.)*
+
+## Le besoin
+
+Un membre signale un trajet, un profil ou un message. Le Support et le Médiateur doivent voir chaque signalement, dans
+l'ordre, avec ce qui aide à juger (motif, précisions, nombre de signalements sur la même cible, niveau de risque),
+décider une fois (« Traité » ou « Sans suite »), et laisser une trace. Le signalement ne doit jamais devenir une arme :
+il ne sanctionne rien seul et n'expose pas son auteur.
+
+## Les règles
+
+**RG-ADM-SIG-01 — Deux files, deux services** : trajets et membres d'un côté, messages de l'autre ; un signalement de
+message n'est pas traitable par la route des trajets et membres (404).
+
+**RG-ADM-SIG-02 — Un signalement ouvert par auteur et par cible** : un second est refusé (409).
+
+**RG-ADM-SIG-03 — Priorité, jamais sanction** : trois signalements ouverts sur la même cible (ou une cible « À risque »)
+rendent la carte prioritaire ; le compte reste actif, ses trajets visibles, aucun email ne part. Sanctionner ou masquer
+est un geste humain, depuis la fiche de la cible.
+
+**RG-ADM-SIG-04 — Rien de perdu** : un signalement ouvert reste dans sa file tant qu'une personne ne l'a pas clos, même si
+sa cible a disparu (« Trajet introuvable », « Membre introuvable ») ; il se clôt alors comme les autres.
+
+**RG-ADM-SIG-05 — Une décision, une fois** : un double clic n'envoie qu'une décision ; si deux administrateurs décident en
+même temps, un seul gagne, les autres lisent « Ce signalement vient d'être traité par un autre administrateur : la file
+est rechargée. » — jamais une erreur technique ; une seule ligne de journal (`REPORT_REVIEWED` ou
+`MESSAGE_REPORT_REVIEWED`, avec la note facultative).
+
+**RG-ADM-SIG-06 — Ce que le niveau de risque affiche** : seulement « À surveiller » et « À risque » ; « Standard » et
+« Compte neuf » ne sont pas des signaux.
+
+**RG-ADM-SIG-07 — Qui décide** : Médiateur, Support, super administrateur ; les autres profils n'ont ni menu ni accès,
+et lisent un refus en français.
+
+**RG-ADM-SIG-08 — L'auteur protégé** : la cible n'apprend ni qui l'a signalée ni la suite ; l'auteur reçoit un accusé à la
+création, rien à la décision.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| SIG-1 | Trois membres signalent le même profil, un en double | 409 au doublon ; carte complète, « Prioritaire · 3 ouverts », lien vers la fiche ; auteur jamais révélé | oui |
+| SIG-2 | « Traité » avec note, « Sans suite » sans note | messages, onglets, 409 au rappel, deux lignes de journal, aucun email | oui |
+| SIG-3 | Signalement de message | citation, liens, décision, 409, 404 sur l'autre route | oui |
+| SIG-4 | Trois signalements ouverts | aucune sanction, aucun masquage, aucun email | oui |
+| SIG-5 | Finance, Exploitation, Données personnelles | pas de menu, 403, refus en français | oui (message anglais avant correction) |
+| SIG-6 | Trajet signalé puis purgé | reste dans la file, « Trajet introuvable », se clôt | oui (disparu avant correction) |
+| SIG-7 | Double clic ; deux admins | une requête ; refus clair et file rechargée | oui (deux requêtes avant correction) |
+| SIG-8 | Trois décisions simultanées, chaque file | 200, 409, 409 ; une ligne | oui (500 avant correction) |
+| SIG-9 | Cible créée le jour même | pas de badge « Compte neuf » | oui (affiché avant correction) |
+
+## Ce qui reste à trancher
+
+- **Un seul libellé** pour le motif `SCAM` : « Arnaque suspectée » (front membre) ou « Tentative d'arnaque » (back-office).
+- **La décision visible dans les onglets « traité » / « sans suite »** : qui, quand, avec quelle note (aujourd'hui au
+  journal seulement).

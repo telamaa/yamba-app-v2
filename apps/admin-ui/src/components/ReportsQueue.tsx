@@ -6,11 +6,13 @@
  * Les plus anciens d'abord ; « prioritaire » dès 3 signalements ouverts sur la même cible
  * (SIG-03 : aucune sanction automatique — masquer le trajet ou sanctionner le compte se fait
  * depuis la fiche cible, puis on revient « Traité »). Chaque décision est journalisée avec sa note.
+ * Recette § 5.19 : un double clic ne part qu'une fois, un refus se dit en français et recharge une file périmée,
+ * une cible disparue (ANO-ADM-47) reste traitable sans lien mort, seuls « À surveiller » / « À risque » sont affichés.
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ApiError, apiFetch, patch } from "@/lib/api";
-import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, TRUST_LEVEL_LABEL, dateTime } from "@/lib/format";
+import { apiFetch, patch } from "@/lib/api";
+import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, TRUST_LEVEL_LABEL, dateTime, isAlertTrustLevel, reportRefusalMessage } from "@/lib/format";
 import type { AdminReportItem, AdminReportsResponse, MessageReportStatus } from "@/lib/types";
 
 export default function ReportsQueue() {
@@ -18,19 +20,28 @@ export default function ReportsQueue() {
   const [data, setData] = useState<AdminReportsResponse | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
-    apiFetch<AdminReportsResponse>(`/admin/reports?status=${status}`).then(setData).catch((e) => setMsg(e.message));
+    apiFetch<AdminReportsResponse>(`/admin/reports?status=${status}`).then((d) => { setData(d); setFailed(false); })
+      .catch((e) => { setMsg(reportRefusalMessage(e).text); setFailed(true); }); // recette § 5.19 : un 403 se dit en français, jamais « 403 : … »
   }, [status]);
   useEffect(load, [load]);
 
   async function review(item: AdminReportItem, decision: "REVIEWED" | "DISMISSED") {
+    if (busy) return; // un double clic ne part pas deux fois
+    setBusy(item.id);
     try {
       await patch(`/admin/reports/${item.id}`, { decision, ...(notes[item.id]?.trim() ? { note: notes[item.id].trim() } : {}) });
       setMsg(decision === "REVIEWED" ? "Signalement traité (journalisé)." : "Signalement classé sans suite (journalisé).");
       load();
     } catch (e) {
-      setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Décision impossible.");
+      const r = reportRefusalMessage(e as { status?: number; data?: unknown });
+      setMsg(r.text);
+      if (r.reload) load();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -48,7 +59,7 @@ export default function ReportsQueue() {
       </div>
       {msg && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[12.5px] text-slate-700">{msg}</p>}
       {!data ? (
-        <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>
+        !failed && <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>
       ) : data.items.length === 0 ? (
         <p className="mt-4 text-[13px] text-slate-500">Aucun signalement {REPORT_STATUS_LABEL[status]}.</p>
       ) : (
@@ -62,13 +73,17 @@ export default function ReportsQueue() {
                 </span>
                 <span>
                   {REPORT_TARGET_LABEL[item.targetType]}
-                  {item.targetTrustLevel && item.targetTrustLevel !== "STANDARD" && <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${item.targetTrustLevel === "HIGH_RISK" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>{TRUST_LEVEL_LABEL[item.targetTrustLevel]}</span>}
+                  {isAlertTrustLevel(item.targetTrustLevel) && <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${item.targetTrustLevel === "HIGH_RISK" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>{TRUST_LEVEL_LABEL[item.targetTrustLevel]}</span>}
                 </span>
               </div>
               <p className="mt-2 text-[13.5px] font-medium text-slate-900">
-                <Link href={targetHref(item)} className="text-[#185FA5] hover:underline">
-                  {item.targetLabel} →
-                </Link>
+                {item.targetMissing ? (
+                  <span className="text-slate-500" title="Trajet purgé ou compte effacé : le signalement se clôt ici.">{item.targetLabel}</span>
+                ) : (
+                  <Link href={targetHref(item)} className="text-[#185FA5] hover:underline">
+                    {item.targetLabel} →
+                  </Link>
+                )}
                 {item.targetOwner && (
                   <span className="ml-2 text-[12.5px] font-normal text-slate-500">
                     publié par{" "}
@@ -87,10 +102,10 @@ export default function ReportsQueue() {
                     placeholder="Note pour le journal (facultatif)"
                     className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-[12.5px]"
                   />
-                  <button onClick={() => review(item, "REVIEWED")} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                  <button onClick={() => review(item, "REVIEWED")} disabled={busy !== null} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">
                     Traité
                   </button>
-                  <button onClick={() => review(item, "DISMISSED")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px]">
+                  <button onClick={() => review(item, "DISMISSED")} disabled={busy !== null} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] disabled:opacity-50">
                     Sans suite
                   </button>
                 </div>
