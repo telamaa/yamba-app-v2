@@ -169,6 +169,10 @@ export default function TripsClient() {
         </button>
       </div>
 
+      {/* ANO-WEB-66 : le bandeau des versements bloqués n'était rendu que sur la page VIDE — un Voyageur
+          qui a des trajets (le cas normal) ne voyait jamais « {montant} en attente : finalise ton compte Stripe ». */}
+      <PayoutBlockedBanner />
+
       {/* À traiter (inbox dérivée, trans-trajets) */}
       {actions.length > 0 && (
         <section>

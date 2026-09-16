@@ -248,7 +248,8 @@
       "stateBlocked": "Bloqué jusqu'à J+4",
       "stateReleased": "Libéré",
       "note": "Les fonds sont en attente chez Yamba. Ils seront versés à {carrierFirstName} après la période de vérification.",
-      "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}."
+      "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}.",
+      "noteReleasedAuto": "La période de vérification est terminée — les fonds sont en cours de versement à {carrierFirstName}."
     },
     "report": "Quelque chose ne va pas avec ce colis ?",
     "reportShort": "Quelque chose ne va pas ?"

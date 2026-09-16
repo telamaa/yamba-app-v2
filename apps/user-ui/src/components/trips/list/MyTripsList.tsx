@@ -11,6 +11,7 @@ import useUser from "@/hooks/useUser";
 import { useMyDeals } from "@/hooks/useMyDeals";
 import TripActionRow from "@/components/dashboard/trips/TripActionRow";
 import TripDealRow from "@/components/dashboard/trips/TripDealRow";
+import PayoutBlockedBanner from "@/components/dashboard/trips/PayoutBlockedBanner";
 import { deriveCarrierActions, type CarrierDealItem } from "@/components/dashboard/trips/trips.types";
 import {
   countPending,
@@ -615,6 +616,10 @@ export default function MyTripsList() {
           onDismiss={() => setBannerDismissed(true)}
         />
       )}
+
+      {/* ANO-WEB-66 : « {montant} en attente : finalise ton compte Stripe » — le bandeau (A75) n'était posé
+          que sur l'ancien TripsClient, jamais sur cette liste : un Voyageur au versement bloqué ne le voyait pas. */}
+      <PayoutBlockedBanner />
 
       {/* À traiter — inbox dérivée, trans-trajets (A44) */}
       {actions.length > 0 && (

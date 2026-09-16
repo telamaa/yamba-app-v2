@@ -2499,6 +2499,139 @@ réel) ; le verrou de 15 minutes n'est jamais attendu : c'est la régénération
   ignorée, pas par l'absence de l'input.
 - **Le statut du deal n'est pas à la racine de la réponse** : lire le texte brut (`"status":"PICKED_UP"`).
 
+## Chapitre 5.19 — Confirmation, complétion et versement · **CONFORME** (11 fiches jouées, 4 après correction · 6 anomalies dont 4 closes (1 MAJEURE) et 2 ouvertes (1 MAJEURE, API) · 13 scénarios en série dont 2 `test.fail`, 2 min 54)
+
+`web-cnf.spec.ts`. `bzv-delivered` (João ↔ Thomas, destinataire Clarisse) pour la lecture et la confirmation
+anticipée ; `yul-delivered` (Aminata ↔ Marc) pour le rappel, l'après-J+4 et la complétion automatique ;
+`bzv-completed-blocked` (Aminata ↔ Thomas, versement en échec « compte Stripe incomplet ») et `bzv-reversed`
+(Pauline ↔ Thomas). Les deux passes du cron `payout-bookings` sont FORCÉES (`scripts/recette/payout.ts
+reminder` / `due`) sur le fournisseur FAKE, après une manœuvre de date (`scripts/recette/livraison-ancienne.ts
+<id> <jours>` recule `deliveredAt` ET `payoutDueAt`). L'ordre de jeu diffère du cahier (un seul deal livré par
+rôle) : 1, 11, 2 puis 4, 5, 3 puis 6, 7, 8, 9, 10.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-CNF-1 | Le suivi d'un colis livré | **Conforme** — « Ton colis a été livré à Clarisse » / « Confirmé hier à 9h07 par Thomas avec le code à 6 chiffres » ; « Période de vérification » / « Tu as 3 jours pour t'assurer… » ; « VERSEMENT AUTOMATIQUE DANS 2 jours · 23h », carte slate (aucune classe rouge) ; « Tout s'est bien passé ? » avec un bouton **secondaire** (`border-emerald-300 bg-white`, jamais le mango ni un fond plein) et le conseil ; « RÉCAP DE LA LIVRAISON » / « COLIS LIVRÉ » / « REMIS À CLARISSE MABIALA » / « Code de livraison saisi par Thomas et validé » / « PHOTOS DE TRAÇABILITÉ » ; « Comment ça marche » et ses trois cas ; « Quelque chose ne va pas avec ce colis ? » / « Signaler un problème » — le geste par défaut est bien de ne rien faire |
+| WEB-CNF-2 | La confirmation anticipée est définitive | **Conforme** — l'avertissement « Cette action est définitive… » lisible AVANT le clic ; « Confirmer définitivement ? » / « Thomas sera payé immédiatement… » / « Oui, tout est OK » / « Annuler » ; `POST /confirm` → 200 `COMPLETED`, `payoutStatus: SENT` (FAKE), net 55,00 € ; toast « Merci ! Thomas va recevoir son paiement. » ; « Envoi terminé » / « Tu as confirmé la livraison le … » / « Transaction close » ; la carte de signalement et le bouton ont disparu, « Cette transaction est close… » ; João : email « Transaction terminée pour ton envoi Paris → Brazzaville » ; Thomas : cloche « 55,00 € partis vers ton compte » et email « 55,00 € en route vers ton compte pour Paris → Brazzaville » (« sous 2 à 7 jours ») |
+| WEB-CNF-3 | La complétion automatique à J+4 (cron) | **Conforme** (passe `due` forcée) — `COMPLETED` par `SYSTEM` ; « Envoi terminé » / « Période de vérification terminée le 8 septembre à 04:37, sans signalement de ta part. » / « Transaction close » / « Le paiement de Marc est libéré » ; note du paiement « La période de vérification est terminée — les fonds sont en cours de versement à Marc. » (ANO-WEB-64) ; Marc : « Deal terminé », « 18,00 € partis vers ton compte » ; emails « Transaction terminée » (Aminata, « …terminée sans signalement de ta part ») et « 18,00 € en route vers ton compte » (Marc) |
+| WEB-CNF-4 | Le rappel de la veille (cron) | **Conforme** (passe `reminder` forcée deux fois : 1 puis 0) — cloche « Dernier jour pour vérifier ton colis » / « Paris → Montréal · sans action, le paiement de Marc part le … », UNE seule pour ce deal ; email « Dernier jour pour vérifier ton colis Paris → Montréal » (« Si tout va bien, tu n'as rien à faire »), un seul ; le deal reste `DELIVERED` |
+| WEB-CNF-5 | Après J+4, ni confirmation ni signalement | **Conforme avec réserve** → `ANO-WEB-63` ; « Signaler un problème » et sa carte absents, compte à rebours « 0h », `allowedActions` sans `dispute` ; signalement forcé → 409 `TRANSITION_NOT_ALLOWED` « The verification period has ended » ; **mais « Confirmer la livraison » reste proposé** (`allowedActions = ["confirmEarly"]`, scénario 5 bis en `test.fail`) |
+| WEB-CNF-6 | L'Expéditrice ne voit jamais un échec de versement | **Conforme après correction** (écrans) → `ANO-WEB-64`, `ANO-WEB-65` ; suivi : « Envoi terminé » / « Transaction close » / « Le paiement de Thomas est libéré », aucun « échec », « en attente », « Stripe », « compte de paiement » (la description du colis du seed, qui dit elle-même « compte Stripe incomplet », est retirée avant la chasse) ; Paiements : « Envoi Paris → Brazzaville · Thomas » / « Libéré le 9 sept. · transaction close », la page ne parle jamais de Stripe. **Mais l'API brute sert `"payoutStatus":"FAILED"` à l'Expéditrice** → `ANO-WEB-62` (scénario 6 bis en `test.fail`) |
+| WEB-CNF-7 | Le versement en attente vu du Voyageur | **Conforme après correction** → `ANO-WEB-66` ; deal : « Deal terminé » / « Transaction close », carte ambre « 26,00 € en attente : finalise ton compte Stripe » + le texte exact + bouton « Finaliser mon compte Stripe » ; Mes trajets : bandeau `role=status` « 26,00 € en attente : finalise ton compte Stripe » / « Finaliser mon compte » (total = `blockedCents` du serveur), ligne « Terminé · 26,00 € en attente : finalise ton compte Stripe » ; Portefeuille : carte « En attente 54,00 € Compte Stripe, signalement ou envoi en cours », ligne « Transport pour Aminata · Paris → Brazzaville » / « En attente : finalise ton compte Stripe » / « + 26,00 € » ; aucune chaîne technique (`NOT_READY`, `payouts_enabled`, `capabilit`, `account_`) sur les trois écrans |
+| WEB-CNF-8 | Le versement renversé | **Conforme** — « 30,00 € : versement sous examen » / « Le transfert a été renversé par notre prestataire de paiement. Rien n'est perdu : nous te contactons pour le régulariser. » ; aucun « renvoyer / réessayer / relancer », aucun CTA Stripe ; Portefeuille : « Transport pour Pauline · Paris → Brazzaville » / « Sous examen · transfert renversé, on te contacte » |
+| WEB-CNF-9 | Le portefeuille du Voyageur | **Conforme** — « Finances » / « Tes paiements, gains et versements — tout vient de tes deals, rien n'est estimé. » ; « À venir 0,00 € Livraisons en vérification », « Envoyés 90,00 € + 90,00 € ce mois », « En attente 54,00 € Compte Stripe, signalement ou envoi en cours » = `GET /me/wallet` ; six lignes, chacune à son état exact (SENT « Parti le … · 2 à 7 jours » ×2, BLOCKED, FROZEN « Gelé · signalement en cours », HELD « Retenue conservée · on te contacte », REVERSED), libellés « Transport pour {prénom} » et « Compensation · annulation tardive de Aminata » (montant « — ») ; « Voir mes virements sur Stripe » + « Dates d'arrivée, RIB et historique… » ; aucune donnée de maquette (89,30, Aminata T., Josué, IBAN) |
+| WEB-CNF-10 | Les paiements de l'Expéditrice | **Conforme après correction** → `ANO-WEB-67` ; « Bloqué chez Yamba {n} Libéré à la fin de chaque transaction », « Dépensé », « Remboursé » = serveur ; six lignes : AUTHORIZED « Autorisé, pas débité · en attente du Voyageur », HELD « Bloqué chez Yamba », RELEASED « Libéré le … · transaction close » ×2, PARTIALLY_REFUNDED « Remboursé 14,56 € le … · retenue 14,56 € reversée au Voyageur », REFUNDED « Remboursé 33,60 € le … » ; `heldCents` = Σ des lignes HELD (rien n'est recalculé à l'écran) |
+| WEB-CNF-11 | Aucune fausse carte bancaire | **Conforme** — « TON PAIEMENT » : « Débité 61,60 € », « État Bloqué jusqu'à J+4 », la note ; jamais « Visa », « Mastercard », « •• », « 4242 », « Sur ton relevé », « CB » (le mapper laisse `cardBrand` / `cardLast4` / `statementDescriptor` vides tant que Stripe ne les sert pas) |
+
+### Anomalies
+
+- **ANO-WEB-62 (MAJEURE, OUVERTE — API)** — la vue Expéditeur de `GET /deals/:id` porte `payoutStatus` /
+  `payoutSentAt` (`FAILED` sur `bzv-completed-blocked`), et `ConfirmDealResponse` rend `payoutStatus` à
+  l'Expéditeur qui confirme. Les écrans n'en montrent rien (fiche 6 conforme), mais le cahier qualifie de
+  bloquante « toute fuite de l'état du versement du Voyageur vers l'Expéditeur », et une réponse brute est
+  une fuite. Le contrat le dit voulu (« both roles read it », A68) : à trancher au registre — proposition :
+  retirer les deux champs de la vue Expéditeur et de la réponse de confirmation (le front Expéditeur ne les
+  lit pas), OpenAPI régénéré, PR dédiée (D-next).
+- **ANO-WEB-63 (mineure, OUVERTE — machine)** — après `payoutDueAt`, la machine retire `dispute` mais laisse
+  `confirmEarly` : « Confirmer la livraison » reste proposé (avec « Tu n'as pas besoin d'attendre 3 jours »
+  alors que les trois jours sont passés) tant que le cron n'est pas passé (≤ 5 min). Le cahier n'attend ni
+  confirmation ni signalement. Proposition : garde `beforePayoutDue` sur `confirmEarly` (la transition
+  appartient alors au SYSTÈME), test de machine, registre.
+- **ANO-WEB-64 (mineure, close)** — sur un deal clos PAR LE SYSTÈME, le bloc « TON PAIEMENT » disait « Tu as
+  confirmé la livraison — les fonds sont en cours de versement » : la note suit `completedBy`
+  (`noteReleasedAuto` FR / EN : « La période de vérification est terminée — … »).
+- **ANO-WEB-65 (mineure, close)** — « Comment s'est passé ton Deal avec Thomas ? Tu as jusqu'au . » :
+  `RatingStatusCard` formatait une échéance absente ; sans date, la phrase sans date (`promptTextNoDate`), et
+  le seed pose `ratingWindowEndsAt` sur les deals `-blocked` / `-reversed` comme sur les autres.
+- **ANO-WEB-66 (MAJEURE, close)** — le bandeau « {montant} en attente : finalise ton compte Stripe » (A75)
+  n'était rendu que par l'ancien `TripsClient` (et seulement sur sa page VIDE) ; la page réelle
+  `/dashboard/trips` (`MyTripsList`) ne le posait jamais : un Voyageur au versement bloqué ne le voyait pas.
+  Posé en tête de la liste (et sur la page pleine de `TripsClient`).
+- **ANO-WEB-67 (mineure, close)** — Paiements : « Remboursé 33,60 € le » sans date pour un envoi annulé
+  sans `refundedAt` (seed `bzv-cancelled`) ; `wallet.service` replie sur `updatedAt` (REFUNDED et
+  PARTIALLY_REFUNDED), +1 test deal-service = **577**.
+
+### À trancher (produit)
+
+- **`payoutStatus` servi aux deux rôles** (A68) contre « aucune fuite vers l'Expéditeur » (cahier) — voir
+  ANO-WEB-62.
+- **Confirmer après J+4** — voir ANO-WEB-63 ; si la confirmation reste permise, amender le cahier et changer
+  le texte de la carte (« Tu n'as pas besoin d'attendre 3 jours ») après l'échéance.
+- **Deux horloges** : le compte à rebours et « J+n » sont calculés dans le navigateur à partir de
+  `deliveredAt` + 4 jours, alors que `payoutDueAt` est servi ; une manœuvre qui ne bouge que `payoutDueAt`
+  fait mentir l'écran (d'où `livraison-ancienne.ts` qui recule les deux). Servir et afficher `payoutDueAt`.
+- **L'objet des emails de complétion** porte le corridor (« Transaction terminée pour ton envoi Paris →
+  Brazzaville ») ; le cahier les nomme par leur titre. Amender le cahier.
+- **« Versement parti » côté Expéditeur** : le catalogue front a une entrée `booking_payout_sent.SHIPPER`
+  (« Versement parti ») que le consommateur ne sert jamais (CARRIER seul, D52) — clé morte à retirer, ou
+  décision de prévenir l'Expéditeur (ce serait une fuite de plus).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **CNF-1** — Le bouton secondaire et la lecture d'abord : juste. Le compte à rebours recalcule chaque
+  minute côté client à partir de `deliveredAt` ; afficher `payoutDueAt` servi (« versement le mardi 16
+  septembre à 9h ») dit la même chose sans dérive d'horloge et sans arithmétique locale — petit.
+- **CNF-2** — La réponse de confirmation rend `payoutStatus` à l'Expéditeur (SENT / FAILED) ; l'écran ne
+  s'en sert pas — la retirer ferme ANO-WEB-62 pour cette route sans rien perdre — petit. Le toast et l'écran
+  « Transaction close » arrivent dans le même rendu : bien.
+- **CNF-3** — La complétion automatique et la confirmation manuelle partagent les effets (transfert, notif,
+  invitation à noter) : une seule fonction de règlement, deux acteurs — bonne architecture. Journaliser
+  « cron passé à {heure}, {n} deals » dans l'historique admin du deal donnerait la preuve « le système a
+  clos » sans lire les logs — moyen.
+- **CNF-4** — Le rappel est idempotent par `verificationReminderSentAt` avec un `where` d'exclusion (OR
+  isSet) : le bon motif Mongo. Le libellé « Dernier jour » à 24 h est vrai à 23 h 59 comme à 0 h 01 :
+  planifier l'envoi à `payoutDueAt − 24 h` exactement (file datée) plutôt qu'au premier tick sous l'horizon
+  — moyen.
+- **CNF-5** — `allowedActions` est la seule source de vérité de l'écran : bien. La garde `beforePayoutDue`
+  manque sur `confirmEarly` (ANO-WEB-63) ; sa jumelle existe pour `dispute`, la symétrie coûte trois lignes
+  et un test de machine — petit.
+- **CNF-6** — Les écrans sont étanches, l'API ne l'est pas (ANO-WEB-62). La bonne coupe : le mapper
+  Expéditeur ne connaît pas `payoutStatus` (liste blanche stricte, règle « jamais spread + delete ») — petit,
+  mais contrat + OpenAPI + registre.
+- **CNF-7** — Le bandeau vivait dans un composant orphelin (ANO-WEB-66) : un test de rendu de `MyTripsList`
+  avec un deal `payoutBlocker` l'aurait dit. Plus largement, `TripsClient` (preview + section du tableau de
+  bord) et `MyTripsList` (page réelle) sont deux listes de trajets : en garder une — chantier.
+- **CNF-8** — « Sous examen » sans bouton : juste (A87). Dire au Voyageur le délai attendu (« nous te
+  contactons sous 48 h ouvrées ») et un lien « Nous écrire » avec le numéro de deal — petit.
+- **CNF-9** — Les cartes viennent du serveur et chaque ligne porte un état fermé (7 états) : très bien. La
+  ligne HELD (« Retenue conservée · on te contacte ») affiche « — » comme montant : afficher le montant
+  retenu en attente serait plus honnête — petit. Le lien Stripe passe par la porte sudo : bien.
+- **CNF-10** — Même qualité côté Expéditeur ; ANO-WEB-67 tenait à une donnée absente, le repli est en place.
+  Les cartes « Dépensé » / « Remboursé » n'ont pas de sous-titre : « Total des envois clos » / « Retours
+  après annulation » alignerait les trois — petit.
+- **CNF-11** — Le bloc n'invente rien : `cardBrand` / `cardLast4` / `statementDescriptor` sont absents du
+  mapper « en attendant Stripe » (A37). Quand Stripe les servira, les faire passer par le DTO Expéditeur
+  (jamais côté Voyageur) et ajouter le test « jamais 4242 avec FAKE » au serveur — petit.
+- **Transversal** — Quatre anomalies sur six sont des **textes qui ne suivent pas la donnée** : une note qui
+  suppose l'acteur (64), une date absente formatée (65, 67), un bandeau posé au mauvais endroit (66). Règle :
+  chaque texte qui cite une donnée a un repli explicite quand elle manque, et chaque composant « transversal »
+  (bandeau) est posé par la page, pas par une liste parmi d'autres. Un test de rendu par état (`completedBy`,
+  `windowEndsAt: null`, `payoutBlocker`) coûte moins qu'une fiche de recette — moyen.
+
+### Pièges de poste payés ici
+
+- **Le deal-service FAKE rejoue les versements en échec** : le cron des 5 minutes fait PARTIR le versement
+  « bloqué » du seed (transfert fictif toujours accepté) — `scripts/recette/versement-bloque.ts` refige
+  `FAILED` / `CARRIER_ACCOUNT_NOT_READY` et repousse `payoutNextRetryAt` d'un jour, juste après le seed
+  puis avant les fiches 6 / 7. Symétriquement, une échéance passée est complétée par le vrai cron dans les
+  cinq minutes : la fiche 5 se joue tout de suite après la manœuvre, la fiche 3 accepte que le cron l'ait
+  devancée.
+- **Playwright pose `FORCE_COLOR`** : `console.log("x →", 0)` d'un script de recette imprime
+  `[33m0[39m` et « 0 » se lit « 33 ». `FORCE_COLOR=0` + retrait des séquences ANSI dans
+  `scriptDeRecette()`.
+- **`tsx --env-file=.env` laisse gagner l'environnement du processus** : `STRIPE_SECRET_KEY=""` force le
+  FAKE dans `payout.ts` même avec la clé réelle dans le `.env` (le même mécanisme que le bundle).
+- **Les notifications survivent au seed** (les comptes ne sont pas recréés) : « une seule notification » se
+  compte sur le lien du deal (`a[href*="<id>"]`), pas sur le texte.
+- **L'espace avant « € » est FINE INSÉCABLE (U+202F)** dans les cloches et les objets d'email : un motif
+  ` ?€` ne matche pas ; `[\s  ]?€`.
+- **Les pages de suivi n'ont pas de `<main>`** : lire `body`, et retirer la description du colis du seed
+  (« compte Stripe incomplet ») avant une chasse aux mots interdits.
+- **`/dashboard/trips` rend `MyTripsList`, pas `TripsClient`** (qui ne sert que la prévisualisation et la
+  section du tableau de bord) : corriger l'un sans l'autre ne change rien à l'écran.
+- **Les deals sont repliés par trajet** (« n colis ») : un deal terminé vit sous un trajet de l'historique,
+  `MesTrajets.ligneDuDeal()` déplie chaque trajet jusqu'à voir la ligne.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
