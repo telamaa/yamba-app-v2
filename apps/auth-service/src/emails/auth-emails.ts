@@ -29,8 +29,10 @@ export type PasswordChangedParams = {
   supportEmail: string;
 };
 export type AccountCreatedParams = { firstName?: string; loginUrl?: string; supportEmail: string };
+/** D78 - email de nouvelle connexion (nouvel appareil/session). */
+export type NewSignInParams = { firstName?: string; whenText: string; device: string; ip: string | null; location: string | null; manageUrl?: string; supportEmail: string };
 export type SecurityAlertParams = {
-  scope: "register" | "forgot" | "sudo" | "email_change"; // sudo : D63 1A · email_change : D65 4A — même texte « compte » que forgot
+  scope: "register" | "forgot" | "sudo" | "email_change" | "login"; // sudo : D63 1A · email_change : D65 4A · login : D78
   attemptCount: number;
   /** Durée du verrou déclenché, en secondes (barème A50). */
   lockSeconds: number;
@@ -46,6 +48,8 @@ export type AuthEmailDictionary = {
   passwordChanged(p: PasswordChangedParams): AuthEmail;
   accountCreated(p: AccountCreatedParams): AuthEmail;
   securityAlert(p: SecurityAlertParams): AuthEmail;
+  /** D78 - nouvelle connexion (nouvel appareil). */
+  newSignIn(p: NewSignInParams): AuthEmail;
   carrierOnboardingComplete(p: OnboardingCompleteParams): AuthEmail;
   carrierOnboardingReminder(p: OnboardingReminderParams): AuthEmail;
   /** C-PR8b (D63 1A) — code sudo pour un geste sensible (export, effacement) */
@@ -66,6 +70,7 @@ export const AUTH_EMAIL_KEYS = [
   "passwordChanged",
   "accountCreated",
   "securityAlert",
+  "newSignIn",
   "carrierOnboardingComplete",
   "carrierOnboardingReminder",
   "sudoCode",
@@ -223,6 +228,7 @@ const fr: AuthEmailDictionary = {
   }),
   securityAlert: ({ scope, attemptCount, lockSeconds, supportEmail }) => {
     const isRegister = scope === "register";
+    const isLogin = scope === "login";
     const lock = formatLockDurationLocalized(lockSeconds, "fr");
     return {
       subject: isRegister
@@ -233,10 +239,16 @@ const fr: AuthEmailDictionary = {
         title: "Activité suspecte détectée",
         greeting: "Bonjour,",
         paragraphs: [
-          `Nous avons détecté ${attemptCount} saisies incorrectes du code de vérification lors de ${isRegister ? "ton inscription" : "la réinitialisation de ton mot de passe"} sur Yamba.`,
-          `Par mesure de sécurité, la saisie est bloquée pendant ${lock}.`,
+          isLogin
+            ? `Nous avons détecté ${attemptCount} tentatives de connexion incorrectes sur ton compte Yamba.`
+            : `Nous avons détecté ${attemptCount} saisies incorrectes du code de vérification lors de ${isRegister ? "ton inscription" : "la réinitialisation de ton mot de passe"} sur Yamba.`,
+          isLogin
+            ? `Par mesure de sécurité, les connexions à ce compte sont momentanément bloquées pendant ${lock}.`
+            : `Par mesure de sécurité, la saisie est bloquée pendant ${lock}.`,
           "Si ce n'était pas toi : quelqu'un a peut-être tenté d'accéder à ton compte. Vérifie la sécurité de ta boîte e-mail, choisis un mot de passe unique et contacte-nous en cas de doute.",
-          "Si c'était bien toi : aucune action n'est requise. Tu pourras demander un nouveau code à la fin du blocage.",
+          isLogin
+            ? "Si c'était bien toi : aucune action n'est requise. Tu pourras réessayer à la fin du blocage."
+            : "Si c'était bien toi : aucune action n'est requise. Tu pourras demander un nouveau code à la fin du blocage.",
         ],
         reason: "Cet email t'est envoyé automatiquement pour protéger ton compte Yamba.",
         help: { label: `Une question ? ${supportEmail}`, url: `mailto:${supportEmail}` },
@@ -315,6 +327,24 @@ const fr: AuthEmailDictionary = {
       ],
       reason: "Cet email confirme la réception d'un signalement envoyé depuis ton compte Yamba.",
       help: { label: `Une question ? ${supportEmail}`, url: `mailto:${supportEmail}` },
+    },
+  }),
+  newSignIn: ({ firstName, whenText, device, ip, location, manageUrl, supportEmail }) => ({
+    subject: "Nouvelle connexion à ton compte Yamba",
+    content: {
+      preheader: "Une nouvelle connexion vient d'avoir lieu sur ton compte.",
+      title: "Nouvelle connexion",
+      greeting: greet(firstName, true),
+      paragraphs: [
+        "Une connexion à ton compte Yamba vient d'avoir lieu depuis un appareil que nous ne reconnaissions pas :",
+        `Quand : ${whenText}`,
+        `Appareil : ${device}`,
+        ...(ip ? [`Adresse IP : ${ip}`] : []),
+        ...(location ? [`Localisation approximative : ${location}`] : []),
+      ],
+      notice: { tone: "warning", text: "Si ce n'était pas toi, sécurise ton compte tout de suite : change ton mot de passe et déconnecte les appareils que tu ne reconnais pas." },
+      ...(manageUrl ? { cta: { label: "Voir mes appareils connectés", url: manageUrl } } : {}),
+      reason: `Tu reçois cet email pour t'avertir d'une connexion à ton compte Yamba. Un doute ? ${supportEmail}`,
     },
   }),
 };
@@ -451,6 +481,7 @@ const en: AuthEmailDictionary = {
   }),
   securityAlert: ({ scope, attemptCount, lockSeconds, supportEmail }) => {
     const isRegister = scope === "register";
+    const isLogin = scope === "login";
     const lock = formatLockDurationLocalized(lockSeconds, "en");
     return {
       subject: isRegister
@@ -461,10 +492,16 @@ const en: AuthEmailDictionary = {
         title: "Suspicious activity detected",
         greeting: "Hi,",
         paragraphs: [
-          `We detected ${attemptCount} incorrect verification code entries during ${isRegister ? "your sign-up" : "your password reset"} on Yamba.`,
-          `For your security, code entry is blocked for ${lock}.`,
+          isLogin
+            ? `We detected ${attemptCount} incorrect sign-in attempts on your Yamba account.`
+            : `We detected ${attemptCount} incorrect verification code entries during ${isRegister ? "your sign-up" : "your password reset"} on Yamba.`,
+          isLogin
+            ? `For your security, sign-ins to this account are temporarily blocked for ${lock}.`
+            : `For your security, code entry is blocked for ${lock}.`,
           "If this wasn't you: someone may have tried to access your account. Check the security of your mailbox, choose a unique password, and contact us if in doubt.",
-          "If it was you: no action is needed. You can request a new code once the block ends.",
+          isLogin
+            ? "If it was you: no action is needed. You can try again once the block ends."
+            : "If it was you: no action is needed. You can request a new code once the block ends.",
         ],
         reason: "This email is sent automatically to protect your Yamba account.",
         help: { label: `Questions? ${supportEmail}`, url: `mailto:${supportEmail}` },
@@ -543,6 +580,24 @@ const en: AuthEmailDictionary = {
       ],
       reason: "This email confirms a report sent from your Yamba account.",
       help: { label: `A question? ${supportEmail}`, url: `mailto:${supportEmail}` },
+    },
+  }),
+  newSignIn: ({ firstName, whenText, device, ip, location, manageUrl, supportEmail }) => ({
+    subject: "New sign-in to your Yamba account",
+    content: {
+      preheader: "A new sign-in just happened on your account.",
+      title: "New sign-in",
+      greeting: greet(firstName, false),
+      paragraphs: [
+        "A sign-in to your Yamba account just happened from a device we didn't recognise:",
+        `When: ${whenText}`,
+        `Device: ${device}`,
+        ...(ip ? [`IP address: ${ip}`] : []),
+        ...(location ? [`Approximate location: ${location}`] : []),
+      ],
+      notice: { tone: "warning", text: "If this wasn't you, secure your account right away: change your password and sign out any devices you don't recognise." },
+      ...(manageUrl ? { cta: { label: "See my connected devices", url: manageUrl } } : {}),
+      reason: `You're receiving this email to alert you to a sign-in to your Yamba account. In doubt? ${supportEmail}`,
     },
   }),
 };

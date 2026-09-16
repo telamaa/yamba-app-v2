@@ -2614,6 +2614,39 @@ page, la reconnexion ne la quitte pas, et le membre refait son geste.
 **RG-WEB-29 — La suppression est bloquée avant toute porte.** Un deal en cours ou une demande en
 attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoyé.
 
+# Sécurité de la connexion — throttling et alerte (D78)
+
+*(PR `feat/login-security`, 11/09/2026 — suite d'ANO-WEB-19.)*
+
+## Le besoin
+
+Protéger un compte contre l'essai en masse de mots de passe, et prévenir le titulaire quand une
+connexion inhabituelle a lieu — sans imposer de friction (pas de code à chaque connexion).
+
+## Les règles
+
+**RG-SEC-01 — La connexion ralentit après des échecs répétés.** Par compte : 5 échecs → 1 min de
+blocage, 10 → 15 min, 15 et au-delà → 1 h. Le compteur repart à zéro dès une connexion réussie.
+
+**RG-SEC-02 — Le blocage ne révèle jamais l'existence d'un compte.** Même refus, même 429, pour une
+adresse connue ou non ; le blocage vaut pour l'adresse tapée, quelle qu'elle soit.
+
+**RG-SEC-03 — Le titulaire est alerté d'un acharnement.** À partir du 10e échec, un email
+« tentatives de connexion » part vers le compte visé (jamais vers une adresse inconnue), une seule
+fois par salve.
+
+**RG-SEC-04 — Une nouvelle connexion est notifiée.** Depuis un appareil non déjà vu, un email dit
+quand, quel appareil, quelle IP, quelle localisation approximative, et « si ce n'était pas toi,
+sécurise ton compte ». Réglable : nouvel appareil (défaut), chaque connexion, ou aucun.
+
+**RG-SEC-05 — La localisation ne fuit pas par défaut.** Aucune géolocalisation tierce sans décision
+explicite de l'exploitant (RGPD) ; sinon, l'email montre l'IP seule.
+
+**RG-SEC-06 — Deux façons de se déconnecter à distance, au choix.** « Déconnecter les autres
+appareils » ferme toutes les sessions sauf celle-ci ; « Déconnecter tous les appareils » les ferme
+TOUTES, celle-ci comprise (on est alors renvoyé à l'accueil, à reconnecter). Aucune ne demande de
+sudo : sécuriser son compte ne doit pas être bloqué.
+
 ## Tests d'acceptation
 
 | # | Situation | Attendu | Vérifié |
@@ -6252,3 +6285,10 @@ prouvées par `admin-users-concurrency.controller.spec.ts`, `admin-auth-totp-con
 **Ce qui reste à trancher.** La catégorie de sanction est désormais lue par le membre ; reste ouvert : faut-il consigner au
 journal admin un refus d'effacement RGPD (aujourd'hui inscrit au seul registre `DataRequest`), et faut-il un écran pour
 réinitialiser la double authentification d'un autre administrateur (aujourd'hui : retirer l'accès, réinviter).
+
+| S1 | 5 / 10 / 15 échecs | blocage 1 min / 15 min / 1 h | oui (unitaire) |
+| S2 | Adresse inconnue vs connue | même 429, même corps | oui |
+| S3 | 10e échec sur un compte réel | email « tentatives de connexion », une fois | oui (règle) |
+| S4 | Connexion depuis un nouvel appareil | email quand/appareil/IP/localisation + « pas toi ? » | oui (règle) |
+| S5 | Géoloc par défaut | aucune (IP seule) ; ipapi seulement si activé | oui (unitaire) |
+| S6 | « Autres » vs « tous » les appareils | autres = courante gardée ; tous = courante coupée + retour accueil | oui |

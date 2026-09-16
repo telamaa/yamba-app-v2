@@ -131,6 +131,28 @@ export const revokeMyOtherSessions = async (req: AuthenticatedRequest, res: Resp
   }
 };
 
+/**
+ * D78 — « déconnecter TOUS les appareils » (la session courante comprise) : une déconnexion
+ * globale, l'action de sécurité qu'on fait quand on a un doute. On révoque les autres sessions,
+ * puis la courante, on ferme la fenêtre sudo et on efface les cookies : l'appareil qui a cliqué
+ * se retrouve déconnecté lui aussi.
+ */
+export const revokeMyAllSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    const currentJti = currentMemberJti(req);
+    const others = await revokeOtherSessions(req.user.id, currentJti);
+    if (currentJti) {
+      await revokeRefreshJti(req.user.id, currentJti);
+      await closeSudoWindow(store, req.user.id, currentJti);
+    }
+    clearAuthCookies(res);
+    return res.status(200).json({ ok: true, revoked: others + (currentJti ? 1 : 0) });
+  } catch (e) {
+    return next(e);
+  }
+};
+
 /* ── Mot de passe (D65 3A) ─────────────────────────────────────────────── */
 export const changeMyPassword = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {

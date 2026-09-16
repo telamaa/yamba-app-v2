@@ -1,5 +1,5 @@
 /** session-device.spec.ts — D65 2A : un libellé grossier, jamais une empreinte. */
-import { describeUserAgent, UNKNOWN_DEVICE, shortUserAgent } from "./session-device";
+import { describeUserAgent, UNKNOWN_DEVICE, shortUserAgent, isDeviceKnown } from "./session-device";
 
 describe("describeUserAgent", () => {
   it("reconnaît navigateur et système courants", () => {
@@ -15,5 +15,19 @@ describe("describeUserAgent", () => {
     expect(describeUserAgent("YambaMobile/1.0 (Android)")).toBe("Application Yamba · Android");
     expect(shortUserAgent("x".repeat(500))?.length).toBe(200);
     expect(shortUserAgent(null)).toBeNull();
+  });
+});
+
+describe("isDeviceKnown (D78)", () => {
+  it("connu si le libellé figure parmi les sessions actives", () => {
+    expect(isDeviceKnown(["Chrome · macOS", "Safari · iOS"], "Safari · iOS")).toBe(true);
+  });
+  it("nouveau si absent de la liste", () => {
+    expect(isDeviceKnown(["Chrome · macOS"], "Firefox · Windows")).toBe(false);
+  });
+  it("un appareil inconnu / vide n'est jamais « connu » (on prévient plutôt que taire)", () => {
+    expect(isDeviceKnown([UNKNOWN_DEVICE, "Chrome · macOS"], UNKNOWN_DEVICE)).toBe(false);
+    expect(isDeviceKnown(["Chrome · macOS"], "")).toBe(false);
+    expect(isDeviceKnown(["Chrome · macOS"], null)).toBe(false);
   });
 });

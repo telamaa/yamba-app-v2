@@ -24,6 +24,7 @@ export const fetchSudoStatus = async (): Promise<SudoStatus> => (await apiClient
 export const fetchMySessions = async (): Promise<MemberSession[]> => (await apiClient.get<{ items: MemberSession[] }>("/auth/me/sessions", { requireAuth: true })).data.items;
 export const revokeSession = async (jti: string): Promise<{ current: boolean }> => (await apiClient.delete<{ ok: true; current: boolean }>(`/auth/me/sessions/${jti}`, { requireAuth: true })).data;
 export const revokeOtherSessions = async (): Promise<number> => (await apiClient.delete<{ ok: true; revoked: number }>("/auth/me/sessions", { requireAuth: true })).data.revoked;
+export const revokeAllSessions = async (): Promise<number> => (await apiClient.delete<{ ok: true; revoked: number }>("/auth/me/sessions/all", { requireAuth: true })).data.revoked; // D78 — déconnexion partout (session courante comprise)
 
 export const changePassword = async (newPassword: string): Promise<{ revokedSessions: number; hadPassword: boolean }> => (await apiClient.post<{ ok: true; revokedSessions: number; hadPassword: boolean }>("/auth/me/password", { newPassword }, { requireAuth: true })).data;
 export const requestEmailChange = async (newEmail: string): Promise<{ pendingEmail: string; expiresInMinutes: number }> => (await apiClient.post<{ ok: true; pendingEmail: string; expiresInMinutes: number }>("/auth/me/email/request", { newEmail }, { requireAuth: true })).data;

@@ -17,3 +17,15 @@ export function describeUserAgent(ua: string | null | undefined): string {
 
 /** Tronque un user-agent pour Redis (jamais 8 Ko par session). */
 export const shortUserAgent = (ua: string | null | undefined): string | null => (ua ? ua.slice(0, 200) : null);
+
+/**
+ * L'appareil qui se connecte est-il DÉJÀ connu ? (D78, email de nouvelle connexion)
+ * `knownDevices` = les libellés d'appareil des AUTRES sessions actives du membre. Un appareil
+ * « inconnu » (user-agent non reconnu) n'est jamais considéré comme connu : on préfère prévenir
+ * une fois de trop que taire une vraie connexion suspecte.
+ */
+export function isDeviceKnown(knownDevices: ReadonlyArray<string | null | undefined>, device: string | null | undefined): boolean {
+  const d = (device ?? "").trim();
+  if (!d || d === UNKNOWN_DEVICE) return false;
+  return knownDevices.some((k) => (k ?? "").trim() === d);
+}
