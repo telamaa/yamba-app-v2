@@ -3,6 +3,25 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.25 LIVRÉ
+>
+> Branche `chore/recette-admin-5-25` empilée sur #325 : 11 scénarios ADM-CPT (`adm-cpt-comptes-admin.spec.ts`) ; ANO-ADM-75,
+> 76, 77, 78, 79 (majeures), 80 (mineure) closes ; décisions A185 (invitation : un lien vivant par compte, réclamé, lien de
+> mot de passe pour un compte sans mot de passe), A186 (un super administrateur EN SERVICE — mot de passe et 2FA — garde
+> `PlatformSettings { key: "admin-accounts" }` écrite dans la transaction + rejeu P2034), A187 (lots du § 5.24 : auteurs du
+> journal, avant → après, export du journal filtré). Chiffres : auth **319**, deal **644**, message **57**, trip **293**,
+> notification **122**, harnais **517** ; dernière anomalie ANO-ADM-80 ; dernier arbitrage A187 ; dernier chapitre
+> d'apprentissage **183**. Pas de changement de schéma (le document de garde naît à la première écriture). POSTE :
+> auth-service rebâti et relancé en bundle `nohup` ; gateway, deal (FAKE), message, trip, notification inchangés. Pièges :
+> **un troisième super administrateur en service existe sur le poste** (compte du propriétaire, `adminRole` SUPER_ADMIN et
+> `adminRoles` vide) — une fiche qui suppose « deux super administrateurs » doit le mesurer (CPT-8) ; les administrateurs
+> jetables des fiches CPT (`cpt-*@recette.yamba.dev`) restent en base, accès retiré — viser une option ou une ligne par
+> IDENTIFIANT, jamais par nom ; une case à cocher contrôlée dont l'état revient du serveur se clique (`click()`), jamais
+> `check()` ; une borne `from` du journal se pose après `debutDuScenario()` quand le geste précédent est très rapide. Si
+> CPT-8 est interrompue : vérifier `super@recette.yamba.dev` en `SUPER_ADMIN` (`restaurerLeSuperAdministrateur`).
+> **ENGAGEMENT § 7** réduit : P2034 sur **admin-users** et **admin-auth** (admin-admins traité ici, A186). Suite : § 5.26
+> (mes sessions).
+>
 > ## ▶ 15/09/2026 — § 5.24 LIVRÉ
 >
 > Branche `chore/recette-admin-5-24` empilée sur #324 : 7 scénarios ADM-JRN + ADM-ETA-10 + ADM-MNT-7, 8 ; ANO-ADM-68,

@@ -768,3 +768,70 @@ Six enseignements. (1) **`toISOString().slice(0, 16)` n'est pas une heure locale
 ## Chapitre 182 — ADM-JRN · Un filtre qui ment : recherche locale contre requête serveur, la date sans fuseau, et le catalogue que le compilateur garde
 
 **Le problème.** Le journal d'audit est la preuve de tout le back-office ; la recette § 5.24 a trouvé sept façons dont son écran pouvait mentir sans jamais lever d'erreur. (1) **Filtrer n'est pas chercher.** `AuditTable.tsx` avait deux mécanismes : des filtres serveur (`GET /admin/audit?action=…`, Mongo interroge toute la collection) et une recherche « contient » en mémoire, sur les 50 lignes de la page. Le bouton « Filtrer sur cet auteur » appelait `setContains(a.admin)` : un filtre en apparence, une recherche locale en réalité — les lignes du même auteur sur les pages suivantes n'apparaissaient jamais. La leçon générale : quand une interface propose les deux, chaque geste doit savoir lequel il déclenche, et l'écran doit l'afficher (« Filtres serveur : auteur »). Correction : l'API sert `adminUserId` dans chaque ligne, le clic pose `filters.adminUserId`, une pastille « Auteur : Nadia M. ✕ » le montre. (2) **Une date sans heure n'a pas de fuseau… jusqu'à ce qu'on la parse.** `<input type="date">` rend la chaîne `"2026-09-15"`. En JavaScript, `new Date("2026-09-15")` (forme date seule) est interprétée en **UTC**, mais `new Date("2026-09-15T00:00:00")` (date-heure sans `Z`) en **heure locale** — une asymétrie de la norme ECMAScript qui surprend tout le monde. Le serveur recevait la date seule : à Paris en été, « du 15 au 15 » couvrait 02:00 le 15 → 01:59 le 16. Remède côté écran, là où le fuseau de l'opérateur est connu : `localBound(day, end)` fabrique `new Date(\`${day}T00:00:00.000\`)` puis envoie `toISOString()` (un instant absolu). Le serveur n'a rien à deviner. ADM-JRN-6 vérifie l'URL envoyée contre `new Date(a, m - 1, j)` calculé par le harnais, dont le contexte est en `Europe/Paris`. (3) **Une liste construite sur les données chargées se vide quand on filtre.** Le select « Action » faisait `[...new Set(items.map((a) => a.action))]` : dès qu'on filtrait sur « Paramètre modifié », les lignes chargées n'avaient plus que cette action, et le select ne proposait plus qu'elle. Une liste de choix doit venir d'un catalogue, pas du résultat du choix précédent. (4) **Laisser le compilateur garder un catalogue.** `AdminActionInput.targetType` était typé `"USER" | "BOOKING" | … | (string & {})`. Le motif `string & {}` sert à garder l'autocomplétion tout en acceptant n'importe quelle chaîne — autrement dit à ne rien vérifier. Résultat mesuré en base (`groupBy`) : le filtre proposait `DISPUTE`, `MAINTENANCE`, `EXPORT` (jamais écrits) et oubliait `CONVERSATION`. Remède (A183) : `export const ADMIN_TARGET_TYPES = [...] as const; type AdminTargetType = (typeof ADMIN_TARGET_TYPES)[number];` et le type fermé. Le compilateur a aussitôt signalé deux écrivains qui élargissaient la valeur : un littéral objet `const viewed = { action: "DATA_REQUESTS_VIEWED", … }` voit sa propriété inférée `string` (élargissement des littéraux dans un objet mutable) — `as const` sur la valeur la garde littérale ; une fonction `audit(admin, action: string, …)` — typer le paramètre `AdminActionType`. Comme admin-ui n'importe pas `@packages/*`, ses libellés restent un miroir ; le harnais importe les deux fichiers et les compare (`ADMIN_ACTIONS.filter((a) => !ACTION_LABEL[a])` doit être vide). (5) **Une validation silencieuse est un mensonge différé.** `buildAuditWhere` ignorait « une valeur mal formée, jamais une erreur » — bonne intention, mais `targetId` exigeait un ObjectId alors que les paramètres se journalisent sous leur clé (`pricing.commissionPct`) : le champ restait rempli à l'écran, le serveur l'ignorait, toutes les lignes `SETTINGS` revenaient. Deux corrections : un jeu de caractères sûr et borné (`/^[A-Za-z0-9._:-]{1,100}$/`, ni espace ni opérateur), et l'écran qui compare ce qu'il a demandé à `appliedFilters` et affiche « Ignoré (format non reconnu) : identifiant de cible ». Ignorer peut rester la règle, à condition de le dire. (6) **Une panne n'est pas un résultat vide.** `catch` qui ne fait que `setLoading(false)` laisse `items = []` : l'état vide « Aucune action journalisée. » s'affiche sur une erreur 502. Toujours trois états distincts — chargement, erreur, vide — et un « Réessayer ». Même famille : les réponses dans le désordre. Avec un filtre tapé vite, la requête A (lente) peut revenir après B ; `const mine = ++seq.current; … if (mine !== seq.current) return;` (un compteur dans `useRef`, qui survit aux rendus sans en provoquer) ignore les réponses dépassées — l'équivalent maison d'un `AbortController`. (7) **Rediriger vers la connexion est une affirmation.** `AdminShell` faisait `.catch(() => router.replace("/login"))` : toute erreur de `/admin/me` voulait dire « tu n'es pas connecté ». Avec auth-service arrêté (502), l'admin atterrissait sur un formulaire qui ne pouvait pas répondre, alors que ses cookies étaient valides. Seul un 401 affirme l'absence de session (A184 a) ; le reste est une indisponibilité. Et un préfixe de chaîne n'est pas un préfixe de chemin : `path.startsWith("/api/maintenance")` accepte `/api/maintenanceX` ; `p === prefix || p.startsWith(prefix + "/")` compare des segments (A184 c). Côté harnais, un piège de Next : l'annonceur de route (`#__next-route-announcer__`) porte lui aussi `role="alert"` et fait échouer `getByRole("alert")` en mode strict ; `page.locator('[role="alert"]:not(#__next-route-announcer__)')` vise le produit. *Pour aller plus loin* : la section « Date Time String Format » de la spécification ECMAScript (date seule = UTC, date-heure = locale) et `Temporal.PlainDate` qui supprime l'ambiguïté ; `satisfies` (TypeScript 4.9+) pour vérifier un objet contre un type sans l'élargir ; TanStack Query, dont les clés de requête règlent nativement les réponses dans le désordre ; les en-têtes `Link` / curseurs opaques pour paginer un journal sans `skip`.
+
+## Chapitre 183 — ADM-CPT · La porte du back-office : vérifier n'est pas réclamer, et l'isolation par instantané laisse passer le write skew
+
+**Le problème.** L'écran « Comptes admin » ouvre et ferme le back-office. La recette a trouvé des défauts qui ne se voient
+qu'à plusieurs : trois clics sur le même lien d'invitation posaient trois mots de passe, trois invitations simultanées
+rendaient `[201, 500, 500]`, deux super administrateurs pouvaient se rétrograder l'un l'autre et fermer la porte à clé, un
+vieux lien d'invitation revivait. Et un défaut qui se voit seul : réinviter un compte sans mot de passe lui envoyait
+« accès accordé » vers un formulaire de connexion où il n'avait rien à saisir.
+
+**(1) Vérifier puis écrire n'est pas atomique — le « TOCTOU ».** `acceptAdminInvite` faisait `redis.get(clé)` → écrire le mot
+de passe → `redis.del(clé)`. Trois requêtes lisent la clé avant que la première ne l'efface : trois écritures. Le remède est
+de **réclamer** au lieu de vérifier : `DEL` rend le nombre de clés supprimées, et Redis exécute les commandes une par une,
+donc une seule requête lit `1`. Extrait (`apps/auth-service/src/controller/admin-admins.controller.ts`) :
+`const ttl = await redis.ttl(key); if ((await redis.del(key)) !== 1) throw invalid();`. On valide le mot de passe AVANT de
+réclamer (un mot de passe refusé ne doit pas brûler le lien) et, si la transaction échoue ensuite, on rend le lien pour le
+temps qui lui restait (`redis.set(key, id, "EX", ttl)`). `GETDEL` (Redis 6.2) ferait la même chose en une commande ; `DEL`
+marche partout.
+
+**(2) Une contrainte d'unicité est un verrou gratuit — encore faut-il traduire son refus.** Trois invitations d'une adresse
+inconnue : les trois `findUnique` ne trouvent rien, les trois `create` partent, l'index unique `emailNormalized` en laisse
+passer un et lève `P2002` pour les autres — que le gestionnaire d'erreurs transformait en 500. Le perdant a simplement
+perdu la course : on rattrape `P2002` et on répond le refus qu'il aurait eu une seconde plus tard
+(`ADMIN_ALREADY_GRANTED`). Règle : chaque garde de base de données doit avoir une traduction métier.
+
+**(3) L'isolation par instantané laisse passer le « write skew ».** MongoDB exécute une transaction sur un instantané et
+détecte les conflits **sur les documents écrits**. Deux transactions : A rétrograde B, B rétrograde A. Chacune compte « les
+autres super administrateurs » sur son instantané (1, donc permis) et écrit un document DIFFÉRENT. Aucun conflit, deux
+commits, zéro super administrateur. C'est l'anomalie classique des bases en snapshot isolation (le médecin de garde de la
+littérature : deux médecins se retirent en même temps en voyant l'autre de garde). Remèdes possibles : sérialiser
+(indisponible), verrouiller (Redis : hors transaction, ne protège pas le script), ou **matérialiser le conflit** : faire
+écrire aux deux transactions le MÊME document. A186 : `tx.platformSettings.update({ where: { key: "admin-accounts" }, data:
+{ version: { increment: 1 } } })` avant le comptage. La seconde transaction rencontre une écriture concurrente → `P2034`
+(« write conflict ») → `withWriteConflictRetry` la rejoue → le nouvel instantané voit la rétrogradation de l'autre → 403
+`LAST_SUPER_ADMIN`. Deux détails comptent : le document de garde doit exister AVANT (un `upsert` concurrent de création
+lèverait `P2002`, pas `P2034`), et le comptage se fait DANS la transaction (compter avant, c'est reproduire le TOCTOU).
+
+**(4) Un invariant se définit sur ce qui fonctionne.** « Il reste un super administrateur » comptait aussi une invitation en
+attente ou un compte sans 2FA : un filet qui ne rouvre pas la porte. `inServiceSuperAdminsWhere` exige `passwordHash: { not:
+null }` et `totpEnabledAt: { not: null }` — et, piège Prisma + Mongo déjà payé, `{ not: null }` exclut aussi un champ ABSENT,
+ce qui est ici le sens voulu. Corollaire mesuré en recette : sur le poste, un troisième super administrateur en service
+existait (le compte du propriétaire) ; la course ne pouvait donc pas fermer la porte et ADM-CPT-8 le constate avant de
+choisir son attendu. Un test de bout en bout qui dépend de l'état du poste doit **mesurer** cet état, pas le supposer ; la
+preuve déterministe de la course est le test unitaire qui simule le conflit (`prismaMock.$transaction.mockRejectedValueOnce(conflit())`).
+
+**(5) Un jeton qu'on ne peut pas retirer revit.** Le jeton `admin_invite:<jeton> → id` restait 48 h après un retrait ; il
+était inoffensif tant que le compte n'avait plus de profil (`acceptAdminInvite` vérifie les profils)… et redevenait valide à
+la réinvitation. Le remède est un **index inverse** `admin_invite_user:<id> → jeton` : on sait retrouver (et tuer) le lien
+vivant d'un compte. C'est aussi pourquoi on n'a pas pris un JWT signé : sans état, il ne se révoque pas.
+
+**(6) Écran : ne pas proposer l'impossible, traduire le reste.** La ligne de l'administrateur connecté affiche des cases
+désactivées et « ton accès » au lieu de « Retirer » (le serveur refuse de toute façon — le front reflète, il ne décide pas).
+Les refus passent par `adminAccountRefusalMessage(err)` (`apps/admin-ui/src/lib/format.ts`), qui lit `details.code` et dit
+s'il faut recharger la liste. Côté harnais, une case à cocher **contrôlée** dont l'état revient du serveur fait échouer
+`locator.check()` (« Clicking the checkbox did not change its state » : l'état change APRÈS la réponse) ; `click()` puis une
+assertion `toBeChecked()` qui patiente est la bonne forme.
+
+**(7) Le journal : « avant → après » et un export qui est une donnée personnelle.** `auditChange(before, after)` compare les
+clés de `before` à `after` en `JSON.stringify` et traduit les valeurs connues (profils, statut) ; les clés dont le nom évoque
+un secret (`/secret|hash|token|password|backup|totp/i`) ne sont jamais lues — défense en profondeur, le journal n'en contient
+pas. L'export réutilise `@packages/libs/csv` (`csvCell` préfixe d'une apostrophe une cellule qui commence par `=`, `+`, `-`,
+`@`) et chaîne deux gardes Express : `requireAdminPermission("audit.read"), requireAdminPermission("exports.personal")` — une
+intersection de permissions s'écrit en série de middlewares.
+
+*Pour aller plus loin* : Berenson et al., « A Critique of ANSI SQL Isolation Levels » (1995), qui décrit le write skew ;
+Kleppmann, *Designing Data-Intensive Applications*, chapitre 7 (« Materializing conflicts ») ; la documentation MongoDB
+« Transactions and Write Conflicts » ; le patron « claim check » et `SET key value NX` pour réclamer une ressource dans
+Redis ; OWASP « CSV Injection ».

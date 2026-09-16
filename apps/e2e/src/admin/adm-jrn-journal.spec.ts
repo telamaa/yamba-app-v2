@@ -195,7 +195,8 @@ test.describe("ADM-JRN — journal d'audit (cahier 02-ADMIN § 5.24)", () => {
       expect(lu.corps!.items.length, `au moins une ligne ${action} en base`).toBeGreaterThan(0);
       const details = await page.locator("table tbody td:nth-child(5)").allInnerTexts();
       expect(details.filter((d) => /[{}[\]"]/.test(d)), `ANO-ADM-73 : détail JSON brut (${action})`).toEqual([]);
-      if (action === "SETTING_CHANGED") expect(details[0]).toMatch(/ · /);
+      // A187 b (§ 5.25) : un paramètre se lit « clé : avant → après », le reste du détail sous la ligne de changement.
+      if (action === "SETTING_CHANGED") expect(details[0]).toMatch(/ : .+ → .+\n.*reason : /);
     }
     // Étape 4 — une ligne par clé : cliquer la cible d'un paramètre filtre sur SA clé (ANO-ADM-74 : la clé était ignorée).
     await prochaineLecture(page, () => champ(page, "Action").selectOption("SETTING_CHANGED"));

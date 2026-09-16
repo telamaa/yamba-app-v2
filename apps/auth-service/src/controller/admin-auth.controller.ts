@@ -49,7 +49,9 @@ import {
   storeAdminSession,
   totpFailuresExceeded,
 } from "../utils/admin-session";
-import { appliedAuditFilters, buildAuditWhere } from "../lib/admin-audit.query"; // A149
+import { AUDIT_CSV_COLUMNS, appliedAuditFilterValues, appliedAuditFilters, auditAuthors, auditCsvRow, auditQueryFrom, buildAuditWhere } from "../lib/admin-audit.query"; // A149, A187
+import { CSV_BOM, EXPORT_MAX_ROWS, buildCsv, capExportRows, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
+import { EXPORT_REASON_MIN_LENGTH } from "@packages/api-contracts";
 import {
   ADMIN_PREAUTH_COOKIE,
   ADMIN_REFRESH_COOKIE,
@@ -359,6 +361,45 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
       nextCursor: rows.length > AUDIT_PAGE ? page[page.length - 1].id : null,
       appliedFilters: appliedAuditFilters({ from: q.from, to: q.to, adminUserId: q.adminUserId, action: q.action, targetType: q.targetType, targetId: q.targetId, ip: q.ip }),
     });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A187 lot a (recette § 5.25) — les auteurs du journal, pour le champ « Auteur » : lecture `audit.read` (la liste des comptes
+ * admin est réservée à `admins.manage`, et un admin retiré reste l'auteur de ses lignes).
+ */
+export const listAdminAuditAuthors = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const groups = await prisma.adminAction.groupBy({ by: ["adminUserId"] });
+    const ids = groups.map((g) => g.adminUserId);
+    const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true, adminRole: true, adminRoles: true } }) : [];
+    return res.status(200).json({ items: auditAuthors(ids, users) });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A187 lot c — export CSV du journal FILTRÉ. Il contient des IP et des navigateurs d'administrateurs : donnée personnelle →
+ * `audit.read` ET `exports.personal` (le super administrateur, en pratique), motif ≥ 20 caractères, ligne `EXPORTED` avec
+ * les filtres retenus, le nombre de lignes et la troncature (plafond `EXPORT_MAX_ROWS`, dit dans `X-Truncated`).
+ */
+export const exportAdminAudit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const reason = typeof req.query.reason === "string" ? req.query.reason.trim() : "";
+    if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`, { code: "REASON_TOO_SHORT" });
+    const q = auditQueryFrom(req.query as Record<string, unknown>);
+    const found = await prisma.adminAction.findMany({ where: buildAuditWhere(q), orderBy: { createdAt: "desc" }, take: EXPORT_MAX_ROWS + 1 });
+    const { rows, truncated } = capExportRows(found);
+    const ids = [...new Set(rows.map((r) => r.adminUserId))];
+    const admins = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true } }) : [];
+    const names = new Map(admins.map((a) => [a.id, `${a.firstName} ${a.lastName}`.trim()]));
+    const now = new Date();
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "USER", after: { domain: "audit", personal: true, reason, filters: appliedAuditFilterValues(q), rows: rows.length, truncated }, ...clientMeta(req) });
+    res.set(csvResponseHeaders(csvFilename("journal-admin", now), rows.length, truncated));
+    return res.status(200).send(CSV_BOM + buildCsv(AUDIT_CSV_COLUMNS, rows.map((r) => auditCsvRow(r, names.get(r.adminUserId)))));
   } catch (e) {
     return next(e);
   }

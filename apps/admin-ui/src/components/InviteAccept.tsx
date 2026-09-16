@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, post } from "@/lib/api";
+import { adminAccountRefusalMessage } from "@/lib/format";
 
 export default function InviteAccept() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function InviteAccept() {
       await post("/auth/admin/invite/accept", { token, password }, { auth: false });
       router.replace("/login");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Impossible de définir le mot de passe.");
+      setError(err instanceof ApiError ? adminAccountRefusalMessage(err).text : "Impossible de définir le mot de passe."); // § 5.25 — en français, par code
     } finally {
       setBusy(false);
     }

@@ -796,6 +796,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.25 COMPTES ADMIN (branche `chore/recette-admin-5-25`, empilee sur #325)** — 11
+  scenarios ADM-CPT (1 a 5 du cahier + CPT-6 compte sans mot de passe / ancien lien, CPT-7 clics simultanes, CPT-8
+  retrogradations croisees, CPT-9 refus francais, CPT-10 et 11 pour les lots du § 5.24). CONTRE-EPREUVE : CPT-2, 3, 4, 6, 7,
+  8, 9, 10, 11 ROUGES (CPT-1 et 5 ne touchent aucun code corrige). ANO-ADM-75 CLOSE (majeure) : compte sans mot de passe
+  reinvite → « acces accorde » vers un /login impossible. ANO-ADM-76 CLOSE (majeure) : ancien lien d'invitation revivant a
+  la reinvitation. ANO-ADM-77 CLOSE (majeure) : lien a usage multiple sous clics simultanes. ANO-ADM-78 CLOSE (majeure) :
+  deux retrogradations croisees → zero super administrateur (write skew). ANO-ADM-79 CLOSE (majeure) : invitations
+  simultanees `[201, 500, 500]`. ANO-ADM-80 (mineure) : ecran en anglais, propre ligne modifiable, OpenAPI 409 au lieu de
+  403. ARBITRAGES : A185 (un lien vivant par compte, reclame, lien de mot de passe pour un compte sans mot de passe), A186
+  (un super administrateur EN SERVICE, garde `PlatformSettings admin-accounts` + rejeu — ENGAGEMENT § 7 tenu pour
+  admin-admins, restent admin-users et admin-auth), A187 (auteurs du journal, avant → apres, export du journal filtre
+  `audit.read` ET `exports.personal`). POSTE : un troisieme super administrateur en service existe (compte du proprietaire)
+  — CPT-8 le mesure. Tests : auth 319, deal 644, message 57, trip 293, notification 122, harnais 517. Reste : § 5.26 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.24 JOURNAL D'AUDIT (branche `chore/recette-admin-5-24`, empilee sur #324)** — 7
   scenarios ADM-JRN (1 a 4 du cahier + JRN-5 panne, JRN-6 journees locales, JRN-7 pagination filtree) + ADM-ETA-10,
   ADM-MNT-7, 8 (lots du § 5.23) ; JRN 14/14 sur deux passages, voisins ETA, MNT, USR, TRJ 34/35 au premier passage (seule

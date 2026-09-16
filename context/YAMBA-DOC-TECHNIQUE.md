@@ -9490,3 +9490,80 @@ anomalies majeures et trois mineures closes (`ANO-ADM-68` à `74`), deux décisi
   régénérés.
 - Déploiement : `prisma generate` + `prisma db push` (index), rebâtir auth-service, deal-service (types seulement) et
   api-gateway.
+
+# Cahier 02-ADMIN, § 5.25 : comptes admin — la porte du back-office sous gestes simultanés
+
+Onze scénarios ADM-CPT (1 à 5 du cahier ; 6 à 9 ajoutés ; 10 et 11 pour les lots décidés au § 5.24), cinq anomalies
+majeures et une mineure closes (`ANO-ADM-75` à `80`), trois décisions inscrites au registre avant le code (A185, A186,
+A187). Branche `chore/recette-admin-5-25`, empilée sur `chore/recette-admin-5-24`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Règles pures (`apps/auth-service/src/utils/admin-accounts.rules.ts`)** — `inviteMode(existing)` rend `NEW`,
+  `GRANT_ACCESS` (compte avec mot de passe), `PASSWORD_LINK` (compte sans mot de passe) ou `REFUSED`
+  (`ADMIN_ALREADY_GRANTED`, `ACCOUNT_DELETED`) ; `removesSuperAdmin(before, after)` ; `inServiceSuperAdminsWhere(cible)` ;
+  les clés Redis `inviteKey` / `inviteUserKey` ; `isUniqueViolation`. Le contrôleur ne décide plus rien lui-même.
+- **Compte sans mot de passe réinvité (ANO-ADM-75)** — la branche « compte existant » envoyait toujours
+  `adminAccessGranted` (lien vers `/login`). Un invité retiré avant d'avoir accepté n'a pas de `passwordHash` : il ne
+  pouvait plus jamais entrer. `PASSWORD_LINK` émet un jeton et `adminInvite` ; la réponse porte `passwordRequired`
+  (`InviteAdminResponseSchema`, `packages/libs/api-contracts/src/auth/member-auth.schema.ts`).
+- **Un lien vivant par compte (ANO-ADM-76, A185 a)** — `issueInviteToken(userId)` lit `admin_invite_user:<id>`, efface
+  l'ancien `admin_invite:<jeton>`, pose le nouveau (48 h) ; `dropInviteToken(userId)` est appelé par `revokeAdmin`. Avant :
+  le jeton de la première invitation, inoffensif tant que le compte n'avait pas de profil, redevenait valide à la
+  réinvitation.
+- **Lien à usage unique sous clics simultanés (ANO-ADM-77, A185 b)** — `acceptAdminInvite` valide le mot de passe, puis
+  RÉCLAME le jeton (`redis.del(key) !== 1` → 400 `INVITATION_INVALID`) avant la transaction ; en cas d'échec de la
+  transaction, le jeton est reposé pour son TTL restant. Avant : `get` → écriture → `del`, trois clics = trois mots de passe
+  et trois lignes `ADMIN_INVITE_ACCEPTED`.
+- **Dernier super administrateur sous gestes croisés (ANO-ADM-78, A186)** — `updateAdminRole` et `revokeAdmin` comptaient
+  `superAdminCount()` HORS transaction : deux super administrateurs qui se rétrogradent au même instant voyaient chacun
+  « 2 », les deux passaient. Désormais, dans une transaction rejouée (`withWriteConflictRetry`) : relire la cible, puis, si
+  le geste retire `SUPER_ADMIN`, `assertAnotherSuperAdminInService(tx, cible)` écrit le document de garde
+  `PlatformSettings { key: "admin-accounts" }` (`version` + 1) et compte `inServiceSuperAdminsWhere(cible)` (non supprimé,
+  mot de passe, 2FA). L'écriture commune transforme le « write skew » en conflit d'écriture (`P2034`) ; la transaction
+  rejouée recompte et répond 403 `LAST_SUPER_ADMIN`. `ensureGuardDocument()` crée la garde hors transaction (une création
+  concurrente lève `P2002`, ignorée). `superAdminCount` (`utils/admin-roles.ts`) est supprimé : il comptait une invitation
+  en attente comme un filet. La garde `ADMIN_IS_SELF` passe avant toute lecture.
+- **Invitations simultanées (ANO-ADM-79, A185 d)** — adresse inconnue : `P2002` (unicité `emailNormalized`) → 400
+  `ADMIN_ALREADY_GRANTED` au lieu de 500 ; compte existant : la transaction relit le compte (`inviteMode(fresh)`) et
+  l'écriture concurrente du même document est rejouée → le perdant lit le profil posé → 400, ni ligne ni email. Un compte
+  `isDeleted` n'est jamais promu (400 `ACCOUNT_DELETED`).
+- **Écran en français (ANO-ADM-80, mineure)** — `AdminsManager.tsx` affichait `403 : You cannot change your own profile.`,
+  `InviteAccept.tsx` le message anglais du serveur. `adminAccountRefusalMessage(err)` (`apps/admin-ui/src/lib/format.ts`) lit
+  `details.code` et dit s'il faut recharger la liste ; la ligne de l'administrateur connecté affiche « (toi) », des cases
+  désactivées et « ton accès » à la place de « Retirer » ; le message porte `data-testid="admins-message"` et `role="status"`.
+  OpenAPI : les 403 `ADMIN_IS_SELF` / `LAST_SUPER_ADMIN` étaient documentés en 409 sur `DELETE`, absents sur `PATCH`.
+
+## Lots décidés au § 5.24 (A187)
+
+- **a. Auteur choisi dans une liste** — `GET /admin/audit/authors` (`audit.read`, `listAdminAuditAuthors`) : `groupBy`
+  des `adminUserId` du journal, noms lus en base, `auditAuthors(ids, users)` (pur, `apps/auth-service/src/lib/admin-audit.query.ts`)
+  trie par nom et marque `active: false` un admin retiré. `AuditTable.tsx` : select « Auteur » (option « (accès retiré) »),
+  la pastille reste. Pas `/admin/admins` : réservé à `admins.manage`, et il oublie les admins retirés.
+- **b. « avant → après »** — `auditChange(before, after)` et `auditChangeKeys(before)` (`format.ts`) : champ par champ,
+  profils et statut traduits, forme `{ key, value }` des paramètres, clés sensibles jamais lues ; la cellule « Détail »
+  affiche la ligne de changement (`data-testid="audit-change"`) puis le reste de `after` sans répéter les champs dits.
+  `auditDetail(after, omit)` gagne un second paramètre.
+- **c. Export du journal filtré** — `GET /admin/audit/export` (`exportAdminAudit`) : `auditQueryFrom(req.query)` →
+  `buildAuditWhere` → `take: EXPORT_MAX_ROWS + 1` → `capExportRows` → `auditCsvRow` (JSON fidèle de `before` / `after`) →
+  `buildCsv(AUDIT_CSV_COLUMNS, …)` ; ligne `EXPORTED` `{ domain: "audit", personal: true, reason, filters:
+  appliedAuditFilterValues(q), rows, truncated }`. Route gardée par `requireAdminPermission("audit.read")` PUIS
+  `requireAdminPermission("exports.personal")`. À l'écran, `ExportButton` (`personal`) reçoit `query(filters)` : il ne
+  s'affiche que pour qui a `exports.personal`, et la page n'est lisible qu'avec `audit.read`.
+
+## Harnais
+
+`apps/e2e/src/admin/adm-cpt-comptes-admin.spec.ts`. Les administrateurs « jetables » sont posés en base par
+`creerAdminEnrole` (mot de passe du seed, secret TOTP connu, manœuvre consignée) et connectés par l'API
+(`connecterParApi` : `/auth/admin/login` puis `/auth/admin/totp/verify`) ; chaque fiche retire ce qu'elle a ouvert.
+ADM-CPT-8 mesure d'abord les AUTRES super administrateurs en service : sur le poste, le compte du propriétaire en est un,
+la course ne peut donc pas fermer la porte et l'attendu devient « les deux passent, la garde est écrite deux fois » ; sans
+lui, « un 200, un 403 `LAST_SUPER_ADMIN` ». `restaurerLeSuperAdministrateur()` remet le super administrateur du seed en
+`finally`. ADM-JRN-3 est réalignée : un paramètre se lit « clé : avant → après », puis le motif.
+
+## Vérifications
+
+- Tests : auth-service (+23 : `admin-accounts.rules.spec.ts` 8, `admin-admins.controller.spec.ts` 12,
+  `admin-audit.query.spec.ts` 3) ; harnais **517 scénarios** (506 + CPT 11).
+- Typecheck auth-service, admin-ui, harnais ; cinq `openapi.json` régénérés.
+- Déploiement : rebâtir auth-service ; aucun changement de schéma (le document de garde est créé à la première écriture).

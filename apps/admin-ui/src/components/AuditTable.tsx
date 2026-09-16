@@ -20,11 +20,15 @@
  *    un filtre saisi mais ignoré est signalé ;
  *  - cliquer une cible sans identifiant vide le champ (un identifiant partiel restait collé) ;
  *  - une réponse plus ancienne n'écrase plus une réponse plus récente (filtres tapés vite).
+ *
+ * Recette 02-ADMIN § 5.25, lots décidés au § 5.24 (A187) : champ « Auteur » (liste des auteurs du journal, admins retirés
+ * compris) ; « avant → après » en français ; export CSV du journal filtré (super administrateur, motif, journalisé).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { ACTION_LABEL, AUDIT_FILTER_LABEL, TARGET_TYPE_LABEL, auditDetail, dateTime } from "@/lib/format";
-import type { AuditItem, AuditResponse } from "@/lib/types";
+import ExportButton from "./ExportButton";
+import { ACTION_LABEL, AUDIT_FILTER_LABEL, TARGET_TYPE_LABEL, auditChange, auditChangeKeys, auditDetail, dateTime } from "@/lib/format";
+import type { AdminMe, AuditItem, AuditResponse } from "@/lib/types";
 import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const EMPTY = { from: "", to: "", adminUserId: "", action: "", targetType: "", targetId: "", ip: "" };
@@ -50,6 +54,12 @@ export default function AuditTable() {
   const [applied, setApplied] = useState<string[]>([]);
   const [contains, setContains] = useState("");
   const seq = useRef(0);
+  const [authors, setAuthors] = useState<Array<{ id: string; name: string; active: boolean }>>([]);
+  const [me, setMe] = useState<AdminMe | null>(null);
+  useEffect(() => {
+    apiFetch<{ items: Array<{ id: string; name: string; active: boolean }> }>("/admin/audit/authors").then((r) => setAuthors(r.items)).catch(() => undefined);
+    apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
+  }, []);
 
   const query = useCallback((f: Filters) => {
     const p = new URLSearchParams();
@@ -115,6 +125,13 @@ export default function AuditTable() {
         <div className="grid gap-2 md:grid-cols-4">
           <label className="text-[11px] uppercase tracking-wider text-slate-500">Du<input type="date" value={filters.from} onChange={(e) => set({ from: e.target.value })} className={`mt-0.5 block w-full ${cell}`} /></label>
           <label className="text-[11px] uppercase tracking-wider text-slate-500">Au<input type="date" value={filters.to} onChange={(e) => set({ to: e.target.value })} className={`mt-0.5 block w-full ${cell}`} /></label>
+          <label className="text-[11px] uppercase tracking-wider text-slate-500">Auteur
+            <select value={filters.adminUserId} onChange={(e) => { set({ adminUserId: e.target.value }); setAuthorName(authors.find((x) => x.id === e.target.value)?.name ?? ""); }} className={`mt-0.5 block w-full ${cell}`}>
+              <option value="">tous</option>
+              {filters.adminUserId && !authors.some((x) => x.id === filters.adminUserId) && <option value={filters.adminUserId}>{authorName || filters.adminUserId}</option>}
+              {authors.map((x) => <option key={x.id} value={x.id}>{x.name}{x.active ? "" : " (accès retiré)"}</option>)}
+            </select>
+          </label>
           <label className="text-[11px] uppercase tracking-wider text-slate-500">Action
             <select value={filters.action} onChange={(e) => set({ action: e.target.value })} className={`mt-0.5 block w-full ${cell}`}>
               <option value="">toutes</option>
@@ -129,7 +146,7 @@ export default function AuditTable() {
           </label>
           <label className="text-[11px] uppercase tracking-wider text-slate-500">Identifiant de cible<input value={filters.targetId} onChange={(e) => set({ targetId: e.target.value })} placeholder="identifiant ou clé" className={`mt-0.5 block w-full font-mono ${cell}`} /></label>
           <label className="text-[11px] uppercase tracking-wider text-slate-500">IP<input value={filters.ip} onChange={(e) => set({ ip: e.target.value })} placeholder="10.0.0.1" className={`mt-0.5 block w-full font-mono ${cell}`} /></label>
-          <label className="text-[11px] uppercase tracking-wider text-slate-500 md:col-span-2">Contient (lignes chargées, détail compris)<input value={contains} onChange={(e) => setContains(e.target.value)} placeholder="mot, identifiant, motif…" className={`mt-0.5 block w-full ${cell}`} /></label>
+          <label className="text-[11px] uppercase tracking-wider text-slate-500">Contient (lignes chargées, détail compris)<input value={contains} onChange={(e) => setContains(e.target.value)} placeholder="mot, identifiant, motif…" className={`mt-0.5 block w-full ${cell}`} /></label>
         </div>
         {filters.adminUserId && (
           <div className="pt-2">
@@ -144,6 +161,7 @@ export default function AuditTable() {
           {applied.length > 0 && <span>Filtres serveur : {applied.map((k) => AUDIT_FILTER_LABEL[k] ?? k).join(", ")}</span>}
           {!loading && ignored.length > 0 && <span className="font-medium text-amber-700">Ignoré (format non reconnu) : {ignored.join(", ")}</span>}
           <span className="text-slate-400">La recherche « contient » ne porte que sur les lignes déjà chargées : le détail est du JSON, il ne s&apos;indexe pas.</span>
+          <span className="ml-auto"><ExportButton me={me} path="/admin/audit/export" params={query(filters)} personal label="Exporter le journal filtré" /></span>
         </div>
       </div>
 
@@ -181,7 +199,10 @@ export default function AuditTable() {
                     {TARGET_TYPE_LABEL[a.targetType] ?? a.targetType}{a.targetId ? <span className="font-mono text-[11px]"> · {a.targetId}</span> : ""}
                   </button>
                 </td>
-                <td className="px-3 py-2 text-[11.5px] text-slate-600">{auditDetail(a.after)}</td>
+                <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                  {auditChange(a.before, a.after) && <div data-testid="audit-change" className="font-medium text-slate-800">{auditChange(a.before, a.after)}</div>}
+                  {auditDetail(a.after, auditChange(a.before, a.after) ? auditChangeKeys(a.before) : [])}
+                </td>
                 <td className="px-3 py-2 font-mono text-[11px] text-slate-500">
                   {a.ip ? <button type="button" onClick={() => set({ ip: a.ip as string })} className="underline-offset-2 hover:underline" title="Filtrer sur cette IP">{a.ip}</button> : ""}
                 </td>
