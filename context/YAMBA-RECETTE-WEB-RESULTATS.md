@@ -4588,6 +4588,98 @@ après. Joué deux fois de suite après les corrections, vert et identique les d
 
 ---
 
+## Cahier 02-ADMIN — § 5.4 Sanctions : proposer, appliquer, lever · **CONFORME** (5 fiches + 2 fiches d'anomalie · 3 anomalies closes · 5 améliorations faites · 2 écarts documentaires · 7 scénarios, 3 min 30)
+
+`apps/e2e/src/admin/adm-snc-sanctions.spec.ts`. Une sanction agit **par lecture** (D56 2A) : chaque fiche prouve
+l'**écran** (carte Sanction, bandeaux, badge), le **serveur** (journal, base, emails Mailpit) et l'**effet côté membre**
+(appels réels avec la session du membre : création refusée, connexion refusée, recherche). Le code a été lu **avant**
+de jouer : deux fiches d'anomalie s'ajoutent au cahier. `afterAll` remet Pauline et Thomas actifs, sans proposition,
+quoi qu'il arrive. Joué deux fois de suite après corrections, vert les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-SNC-1 | Proposer (Support) | **Conforme** — fiche de Pauline, carte « Sanction », « Restreint (ni publier ni réserver) » ; « trop court » et 19 caractères → « Proposer » **inactif**, 20 → actif, saisie coupée à **2000** ; aucun « Appliquer » ; « Proposer » → « Proposition enregistrée (Restreint) : un Médiateur décide. » (était « Fait. », amélioration) ; rechargée : bandeau « Proposition de Sami S. le 14 sept. 2026, 00:03 : Restreint — Trois signalements convergents… », badge « Actif » ; tuile « Sanctions proposées » +1 (API **et** écran) ; côté Pauline : ni `POST /trips` ni `POST /deals/payment-intents` ne répondent `ACCOUNT_RESTRICTED`, base `ACTIVE` ; journal `USER_SUSPENSION_PROPOSED USER · Pauline`, avant —, après `{ level: "RESTRICTED", reason }` |
+| ADM-SNC-2 | Appliquer (Médiateur) | **Conforme** — bandeau ambre lu ; motif pré-rempli par la proposition (constat) ; date passée → **400**, affiché « La date de fin doit être dans le futur. » (lu par `DATE_IN_PAST`, amélioration), rien écrit ; le champ date porte `min` = demain (amélioration) ; date à 7 jours → « Sanction appliquée : Restreint jusqu'au 20/09/2026. Le membre est prévenu par email. » ; rechargée : plus d'ambre, bandeau rouge « Restreint depuis le 14 sept. 2026, 00:04 par Nadia M., jusqu'au 20 sept. 2026, **23:59** — motif : … », badge « Restreint » ; base : proposition effacée, fin = **23:59:59** du jour choisi (amélioration, était minuit UTC) ; côté Pauline : `POST /trips`, `/trips/:id/publish`, `/deals`, `/deals/payment-intents` → **403 `ACCOUNT_RESTRICTED`**, son deal en cours et `/auth/me` restent 200 ; ✉ « Ton compte Yamba est restreint » avec « jusqu'au » et `support@yamba.app` ; tuiles : proposées −1, restreints +1 ; journal `USER_RESTRICTED`, avant `{ ACTIVE }`, après `{ RESTRICTED, reason, until }` (le 400 n'écrit rien) ; proposition d'**escalade** (Suspendu) sur ce compte restreint → tuile +1 (amélioration) |
+| ANO-ADM-07 | Une sanction datée cesse à sa date | **Conforme après correction** → `ANO-ADM-07` ; manœuvre consignée (fin posée à maintenant − 1 min) ; côté Pauline : `POST /trips` et `/deals/payment-intents` ne répondent plus `ACCOUNT_RESTRICTED` (avant correction : **403**) ; tuile « Comptes restreints » −1 ; fiche : « — sanction échue le … : elle ne s'applique plus. « Lever » nettoie la fiche. » et badge « Actif (sanction échue) » ; levée de nettoyage 200 |
+| ADM-SNC-3 | Suspendre un compte avec des deals | **Conforme** — Thomas, « Deals en cours » **5** ; « Suspendu (connexion refusée) », sans date → « Sanction appliquée : Suspendu, sans date de fin… », badge « Suspendu » ; la session ouverte avant → `GET /auth/me` **401 `ACCOUNT_SUSPENDED`** ; nouvelle connexion → **401 `ACCOUNT_SUSPENDED`** ; clés `refresh_jti:<Thomas>:*` : **0** ; recherche publique : plus aucun de ses trajets, statuts `PUBLISHED` inchangés en base ; ✉ « Ton compte Yamba est suspendu » et ✉ support « [Yamba ops] SUSPENDED : Thomas Nkounkou a 5 deal(s) en cours » avec **5** lignes (id — statut — trajet — ticket YAM) ; journal `USER_SUSPENDED`, après `{ SUSPENDED, reason, until: null }` |
+| ANO-ADM-08 | Le trajet d'un suspendu, par son lien | **Conforme après correction** → `ANO-ADM-08` ; `GET /trips/:id/public` → **404** (avant : **200**) ; `POST /deals/payment-intents` d'Aminata sur ce trajet → **409 `TRIP_NOT_BOOKABLE`** (avant : la garde passait, refus seulement sur `QUOTE_DIVERGENCE` du montant volontairement faux) |
+| ADM-SNC-4 | Lever | **Conforme** — « Lever » sans motif : inactif ; motif → « Sanction levée. Le membre est prévenu par email. » ; rechargée : badge « Actif », bandeau rouge disparu, base `suspensionReason` / `Until` / `suspendedAt` / `suspendedByAdminId` à `null`, plus de bouton « Lever » ; `DELETE` à nouveau → **400** « This account is not restricted. » ; connexion de Thomas **200**, ses trajets reviennent dans la recherche **et** leur page publique répond 200 ; ✉ « Ton compte Yamba est rétabli » ; journal `USER_REINSTATED`, avant `{ SUSPENDED }`, après `{ ACTIVE, reason }` (le 400 n'écrit rien) |
+| ADM-SNC-5 | Support, appel direct | **Conforme** — `fetch("/api/admin/users/<id>/suspension")` depuis la page du back-office, cookie du Support → **403** ; état du compte strictement identique en base ; journal du Support : aucune ligne |
+
+### Anomalies
+
+- **ANO-ADM-07 (majeure, close)** — **une sanction datée ne se levait jamais.** « Jusqu'au (optionnel) » était
+  enregistré (`User.suspensionUntil`), affiché dans la fiche et annoncé au membre (« jusqu'au 20 septembre 2026 »),
+  mais **aucun lecteur ne le lisait** — ni garde, ni filtre, ni cron (recherche de toutes les lectures de
+  `suspensionUntil` : l'export CSV et la fiche seulement). Mesuré : une minute après la date de fin, `POST /trips`
+  répondait encore **403 `ACCOUNT_RESTRICTED`**. Correction par lecture, fidèle à D56 : règle pure
+  `packages/middleware/account-status.ts` (`effectiveAccountStatus`, `notSuspendedOwnerFilter`,
+  `activeSanctionFilter`) lue par `isAuthenticated`, `requireActiveAccount`, la connexion (`auth.controller.ts`), la
+  recherche (`trip-search.controller.ts`), les tuiles (`admin-kpis.controller.ts`) et la fiche admin
+  (`UserFileView.tsx`). Aucun email « rétabli » ne part à l'échéance (voir « à trancher »).
+- **ANO-ADM-08 (majeure, close)** — **le trajet d'un Voyageur suspendu restait ouvert et réservable par son lien.** La
+  suspension le retirait de la recherche, pas de `GET /trips/:id/public` (**200**) ni de la réservation : un Expéditeur
+  qui avait gardé le lien (favori, partage, alerte) pouvait faire autoriser son paiement pour un Voyageur qui ne pouvait
+  même plus se connecter pour accepter. Correction : `publicTripWhere` (trip-service) porte le même filtre que la
+  recherche ; `checkTripBookable` (deal-service) refuse `TRIP_NOT_BOOKABLE`, même message qu'un trajet fermé (l'état du
+  compte n'est pas révélé).
+- **ANO-ADM-09 (mineure, close, trouvée à la lecture)** — la **connexion Google** et le **renouvellement** de session ne
+  vérifiaient pas la suspension : un compte suspendu passant par Google obtenait une session aussitôt refusée par chaque
+  appel. Même refus `ACCOUNT_SUSPENDED` que la connexion par mot de passe, sans session posée (`auth.controller.ts`).
+  Non jouée au navigateur (Google n'est pas configuré sur le poste, comme aux chapitres web) : prouvée par la règle pure.
+
+**Piège payé en corrigeant** : dans un filtre de **relation**, Prisma + Mongo compare dans un pipeline où `null` est
+inférieur à toute date — `suspensionUntil: { lte: now }` matchait une suspension **sans** date de fin, et les trajets
+de Thomas revenaient dans la recherche au premier rejeu (3 trajets comptés en base avec ce filtre, 0 avec l'ancien). Mesuré sur les quatre cas (null, absent, fin à
+venir, fin passée), la borne `gt: new Date(0)` règle le cas null.
+
+### Améliorations d'expert faites pendant le chapitre
+
+- **Messages de résultat** : « Fait. » → le geste et son effet (« Proposition enregistrée (Restreint) : un Médiateur
+  décide. », « Sanction appliquée : Restreint jusqu'au 20/09/2026. Le membre est prévenu par email. », « Sanction
+  levée… ») — `UserFileView.tsx`, prouvé par SNC-1/2/3/4.
+- **Refus lus par leur code** (`DATE_IN_PAST`, `ACCOUNT_NOT_RESTRICTED`, `ADMIN_IS_SELF`, `SUPER_ADMIN_ONLY`,
+  `ADMIN_PERMISSION_DENIED`) en français, le message anglais en repli — `UserFileView.tsx`, prouvé par SNC-2.
+- **« Jusqu'au » inclus** : fin posée à 23:59:59 du jour choisi, heure de l'écran (était minuit UTC, soit 2 h du matin
+  le jour même à Paris) ; champ date avec `min` = demain — `UserFileView.tsx`, prouvé par SNC-2 (base).
+- **Tuile « Sanctions proposées »** : compte aussi une proposition d'escalade sur un compte déjà restreint (elle
+  comptait pour zéro) — `admin-kpis.controller.ts`, prouvé par SNC-2.
+- **Statut effectif à l'écran** : badge « Actif (sanction échue) » et mention d'échéance — `UserFileView.tsx`, prouvé par
+  la fiche ANO-ADM-07.
+
+### Écarts documentaires
+
+- Le cahier attend « Fait. » et « 400 The end date must be in the future. » : l'écran dit désormais le geste et le refus
+  en français (améliorations ci-dessus).
+- **Le motif envoyé au membre n'est pas générique** : l'email reprend le texte libre du Médiateur (le placeholder le dit :
+  « envoyé au membre sans le détail d'un signalement »). Le cahier parle d'un « motif générique » : c'est une consigne à
+  l'opérateur, pas une garantie du produit (voir « à trancher »).
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **SNC-1** — *Produit* : un Support peut re-proposer et **écraser** une proposition existante sans le voir (la carte ne
+  rappelle pas la proposition en cours à son auteur) — petit, proposé. *Test* : bornes 19/20/2000 ajoutées au cahier —
+  fait.
+- **SNC-2** — *Produit* : le motif libre part tel quel au membre — un choix de motifs types (« comportement signalé »,
+  « fraude suspectée »…) + une note interne séparée protégerait les signalants — **moyen, décision métier, à trancher**.
+  *Test* : la fin de journée est vérifiée en base, pas seulement à l'écran — fait.
+- **ANO-ADM-07** — *Produit* : corrigée par lecture ; il manque l'email « ton compte est rétabli » **à l'échéance** et la
+  ligne de journal correspondante (le journal exige un `adminUserId`) — **moyen, décision d'architecture (acteur SYSTEM
+  au journal), à trancher**. *Test* : la manœuvre sur la date remplace sept jours d'attente — rien à faire.
+- **SNC-3** — *Produit* : suspendre un Voyageur avec 5 deals en cours ne demande **aucune confirmation** et révoque ses
+  sessions sur-le-champ ; une confirmation « 5 deals en cours seront à arbitrer » — petit, proposé. L'email ops liste
+  les deals par identifiant : un lien vers `/deals/<id>` les rendrait cliquables — petit, proposé. *Test* : la session
+  ouverte **avant** la suspension est la vraie preuve (pas une nouvelle connexion) — fait.
+- **ANO-ADM-08** — *Produit* : corrigée ; un Voyageur **restreint** garde ses trajets publiés réservables (il ne peut
+  « ni publier ni réserver » lui-même) : est-ce voulu ? — **à trancher**. *Test* : montant volontairement faux pour
+  distinguer « garde du trajet » et « devis » — rien à faire.
+- **SNC-4** — *Produit* : lever une sanction ne retire pas une proposition d'escalade restée en attente — petit, proposé.
+  *Test* : la page publique vérifiée après levée ferme la boucle d'ANO-ADM-08 — fait.
+- **SNC-5** — *Produit* : conforme. *Test* : l'appel part de la page du back-office (même cookie, même proxy), pas d'un
+  contexte API détaché — rien à faire.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

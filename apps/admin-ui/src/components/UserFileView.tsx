@@ -14,6 +14,27 @@ import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
 
 const MIN_REASON = 20;
 
+/** Recette 02-ADMIN § 5.4 — un refus se lit par son code (A146), pas par son statut ; le message anglais reste un repli. */
+const SANCTION_REFUS: Record<string, string> = {
+  DATE_IN_PAST: "La date de fin doit être dans le futur.",
+  ACCOUNT_NOT_RESTRICTED: "Ce compte n'a pas de sanction à lever.",
+  ADMIN_IS_SELF: "Aucune action sur ton propre compte.",
+  SUPER_ADMIN_ONLY: "Seul un super administrateur agit sur un compte admin.",
+  ADMIN_PERMISSION_DENIED: "Ton profil n'a pas ce droit.",
+};
+function refusDeSanction(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Action impossible.";
+  const code = (e.data as { details?: { code?: string } } | undefined)?.details?.code;
+  return (code && SANCTION_REFUS[code]) ?? `${e.status} : ${e.message}`;
+}
+/**
+ * Recette § 5.4 — « jusqu'au 20 septembre » se lit INCLUS : `new Date("2026-09-20")` valait minuit UTC, soit une
+ * sanction levée à 2 h du matin le 20 à Paris. La fin est posée à 23:59:59 du jour choisi, heure de l'écran.
+ */
+const finDeJournee = (jour: string) => new Date(`${jour}T23:59:59`).toISOString();
+/** Le lendemain, au format du champ date : une sanction datée finit au plus tôt demain. */
+const demain = () => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+
 export default function UserFileView({ userId }: { userId: string }) {
   const [file, setFile] = useState<AdminUserFile | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
@@ -31,6 +52,7 @@ export default function UserFileView({ userId }: { userId: string }) {
   if (!file) return <p className="text-[13px] text-slate-500">Chargement…</p>;
 
   const isAdminTarget = file.adminRoles.length > 0 || !!file.adminRole;
+  const sanctionEchue = !!file.suspension?.until && new Date(file.suspension.until).getTime() <= Date.now(); // ANO-ADM-07
   const canPropose = can(me?.adminRoles, "users.suspension.propose") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
   const canApply = can(me?.adminRoles, "users.suspension.apply") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
   const canErase = can(me?.adminRoles, "users.erase") && !file.isMe && !file.isDeleted; // C-PR8b (D63 6A)
@@ -41,7 +63,7 @@ export default function UserFileView({ userId }: { userId: string }) {
       <div className="mt-2 flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-bold">{file.firstName} {file.lastName}</h1>
         <span className="text-[13px] text-slate-500">{file.email}{file.phoneE164 ? ` · ${file.phoneE164}` : ""} · {file.preferredLocale}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${file.accountStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : file.accountStatus === "RESTRICTED" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>{STATUS_LABEL[file.accountStatus]}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${file.accountStatus === "ACTIVE" || sanctionEchue ? "bg-emerald-50 text-emerald-700" : file.accountStatus === "RESTRICTED" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>{sanctionEchue ? "Actif (sanction échue)" : STATUS_LABEL[file.accountStatus]}</span>
         {isAdminTarget && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">{rolesLabel(file.adminRoles.length ? file.adminRoles : file.adminRole ? [file.adminRole] : [])}</span>}
         {file.isMe && <span className="text-[11px] text-slate-500">(c'est toi : aucune action possible)</span>}
       </div>
@@ -55,6 +77,8 @@ export default function UserFileView({ userId }: { userId: string }) {
       {file.suspension && (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-800">
           {STATUS_LABEL[file.suspension.level]} depuis le {dateTime(file.suspension.at)} par {file.suspension.byAdmin}{file.suspension.until ? `, jusqu'au ${dateTime(file.suspension.until)}` : ""} — motif : {file.suspension.reason}
+          {/* ANO-ADM-07 — passé sa date de fin, la sanction ne s'applique plus (lecture) : on le dit, « Lever » nettoie la fiche. */}
+          {sanctionEchue && <span className="ml-1 font-semibold"> — sanction échue le {dateTime(file.suspension.until!)} : elle ne s&apos;applique plus. « Lever » nettoie la fiche.</span>}
         </div>
       )}
       {file.suspensionProposal && (
@@ -145,12 +169,19 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
     setMsg(null);
     try {
       if (action === "propose") await post(`/admin/users/${file.id}/suspension/propose`, { level, reason: reason.trim() });
-      if (action === "apply") await post(`/admin/users/${file.id}/suspension`, { level, reason: reason.trim(), ...(until ? { until: new Date(until).toISOString() } : {}) });
+      if (action === "apply") await post(`/admin/users/${file.id}/suspension`, { level, reason: reason.trim(), ...(until ? { until: finDeJournee(until) } : {}) });
       if (action === "lift") await del(`/admin/users/${file.id}/suspension`, { reason: reason.trim() });
-      setMsg("Fait.");
+      // Recette § 5.4 — « Fait. » ne disait pas CE qui était fait : le message nomme le geste et son effet.
+      setMsg(
+        action === "propose"
+          ? `Proposition enregistrée (${STATUS_LABEL[level]}) : un Médiateur décide.`
+          : action === "apply"
+            ? `Sanction appliquée : ${STATUS_LABEL[level]}${until ? ` jusqu'au ${new Date(until).toLocaleDateString("fr-FR")}` : ", sans date de fin"}. Le membre est prévenu par email.`
+            : "Sanction levée. Le membre est prévenu par email."
+      );
       onDone();
     } catch (e) {
-      setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Action impossible.");
+      setMsg(refusDeSanction(e));
     } finally {
       setBusy(false);
     }
@@ -165,7 +196,7 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
       </div>
       <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={3} placeholder={`Motif (${MIN_REASON} caractères au moins), envoyé au membre sans le détail d'un signalement`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
       {canApply && (
-        <label className="mt-2 block text-[12px] text-slate-600">Jusqu'au (optionnel) <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1 text-[12px]" /></label>
+        <label className="mt-2 block text-[12px] text-slate-600">Jusqu'au (optionnel) <input type="date" min={demain()} value={until} onChange={(e) => setUntil(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1 text-[12px]" /></label>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {canPropose && !canApply && <button disabled={!ok} onClick={() => run("propose")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Proposer</button>}

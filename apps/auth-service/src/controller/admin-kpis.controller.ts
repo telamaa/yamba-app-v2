@@ -9,6 +9,7 @@
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
+import { activeSanctionFilter } from "@packages/middleware/account-status"; // ANO-ADM-07 — une sanction échue ne compte plus
 import { adminRolesAllow, type AdminHomeKpis, type AdminRole } from "@packages/api-contracts";
 
 const ACTIVE_DEAL = ["ACCEPTED", "PICKED_UP", "DELIVERED", "DISPUTED"];
@@ -29,9 +30,9 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
         opt(can("tickets.review"), () => prisma.tripDocument.count({ where: { type: "TICKET_PROOF", status: "PENDING", trip: { is: { departureAt: { gte: now }, isDeleted: false } } } })),
         opt(can("trips.read"), () => prisma.trip.count({ where: { hiddenByAdminAt: { not: null }, isDeleted: false } })),
         opt(can("trips.read"), () => prisma.trip.count({ where: { hideProposedAt: { not: null }, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }], isDeleted: false } })),
-        opt(can("users.read"), () => prisma.user.count({ where: { suspensionProposedAt: { not: null }, accountStatus: "ACTIVE", isDeleted: false } })),
-        opt(can("users.read"), () => prisma.user.count({ where: { accountStatus: "RESTRICTED", isDeleted: false } })),
-        opt(can("users.read"), () => prisma.user.count({ where: { accountStatus: "SUSPENDED", isDeleted: false } })),
+        opt(can("users.read"), () => prisma.user.count({ where: { suspensionProposedAt: { not: null }, isDeleted: false } }) /* recette § 5.4 — une proposition sur un compte déjà restreint (escalade vers la suspension) comptait pour zéro */),
+        opt(can("users.read"), () => prisma.user.count({ where: { ...activeSanctionFilter("RESTRICTED", now), isDeleted: false } as never })),
+        opt(can("users.read"), () => prisma.user.count({ where: { ...activeSanctionFilter("SUSPENDED", now), isDeleted: false } as never })),
         opt(can("trips.read"), () => prisma.trip.count({ where: { status: "PUBLISHED", isDeleted: false, departureAt: { gte: now } } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: { in: ACTIVE_DEAL as never }, isDeleted: false } })),
         // C-PR5 (D58) — les files d'argent sont celles du profil FINANCE (finances.read)

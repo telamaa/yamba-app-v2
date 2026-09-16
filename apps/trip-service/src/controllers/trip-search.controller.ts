@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { resolveViewerLocale, type SupportedLocale } from "@packages/api-contracts";
 import { notHiddenFilter } from "../lib/admin-trips.rules";
+import { notSuspendedOwnerFilter } from "@packages/middleware/account-status";
 import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
 import { Prisma } from "@prisma/client";
@@ -81,7 +82,8 @@ function buildBaseWhere(
     // C-PR3 (D56 2A) — les trajets d'un compte SUSPENDU disparaissent de la recherche
     // sans écriture croisée (le trip-service ne touche pas au Trip d'un autre domaine).
     // `not` matche aussi les documents sans le champ (comptes antérieurs à C-PR3).
-    user: { is: { accountStatus: { not: "SUSPENDED" } } },
+    // ANO-ADM-07 — une suspension dont la date de fin est passée ne cache plus rien.
+    user: { is: notSuspendedOwnerFilter() },
     // C-PR4 (D57 3A) — « masqué par Yamba » : absent OU null (pitfall Mongo).
     ...notHiddenFilter(),
   };
