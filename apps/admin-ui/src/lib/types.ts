@@ -213,7 +213,7 @@ export type FinanceQueueItem = {
   payoutFailureKind: "ACCOUNT_NOT_READY" | "PROVIDER_ERROR" | "REVERSED" | null; payoutFailureDetail: string | null;
   lastAttemptAt: string | null; nextRetryAt: string | null; disputeTicket: string | null; since: string;
 };
-export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; generatedAt: string };
+export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; counts: Record<FinanceQueueKind, number>; truncated: boolean; generatedAt: string }; // recette § 5.11 — compte de chaque file, troncature
 export type MoneyTimelineEvent = { at: string; kind: string; amountCents: number | null; detail: string | null };
 export type AdminDealMoneyFile = {
   id: string; status: string; disputeTicket: string | null;

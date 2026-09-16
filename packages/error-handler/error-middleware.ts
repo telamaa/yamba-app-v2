@@ -1,4 +1,4 @@
-import { AppError } from "./index";
+import { AppError, NotFoundError } from "./index";
 import { captureServerError } from "./sentry";
 import { Request, Response, NextFunction } from "express";
 
@@ -94,4 +94,13 @@ export const errorMiddleware = (
     status: "error",
     error: "Something went wrong, please try again!",
   });
+};
+
+/**
+ * ANO-ADM-27 (recette 02-ADMIN § 5.11) — une route inconnue répondait la page HTML par défaut d'Express
+ * (« Cannot GET /admin/finances »), qui nomme le framework et casse tout client qui lit du JSON. Monté APRÈS les
+ * routes et AVANT `errorMiddleware` : la réponse prend la forme de toutes les erreurs de la plateforme.
+ */
+export const notFoundHandler = (req: Request, _res: Response, next: NextFunction) => {
+  next(new NotFoundError("Route not found.", { code: "ROUTE_NOT_FOUND" }));
 };

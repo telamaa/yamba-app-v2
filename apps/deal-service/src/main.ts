@@ -31,7 +31,7 @@ import cookieParser = require("cookie-parser");
 import { randomUUID } from "crypto";
 import pino from "pino";
 import { pinoHttp } from "pino-http";
-import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
@@ -125,6 +125,7 @@ app.get("/docs", (req, res) => {
 // Routes métier (lecture seule en PR3) — avant l'error-middleware.
 app.use(dealRouter);
 
+app.use(notFoundHandler); // ANO-ADM-27 — route inconnue : 404 JSON ROUTE_NOT_FOUND, jamais la page HTML d'Express
 app.use(errorMiddleware);
 
 const port = process.env.PORT || 6003;

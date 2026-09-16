@@ -8175,3 +8175,84 @@ trop haut.
 - notification-service **121** (+1 test, ANO-ADM-25 ; ANO-ADM-23 renforcé pour ANO-ADM-26) ; autres services inchangés.
 - `apps/e2e` : **406 scénarios** (402 + 4), 4/4 verts deux fois sur le code final ; WEB-E2E-2, ADM-MED-4 et ADM-MED-9 rejoués verts.
 - Typecheck admin-ui, notification-service, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.11 : les files d'exception de /finances — un filtre, un compte, une erreur qui reste JSON
+
+*(PR `chore/recette-admin-5-11`, empilée sur #311, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-FIN-1 à 5), deux anomalies closes (ANO-ADM-27, 28), décision A161.
+
+```
+apps/e2e/src/admin/adm-fin-files.spec.ts                         5 scénarios en série
+packages/error-handler/error-middleware.ts                       notFoundHandler (ANO-ADM-27)
+apps/{auth,trip,deal,message,notification}-service/src/main.ts   app.use(notFoundHandler) avant errorMiddleware
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts   financeQueueWhere, FINANCE_QUEUE_PAGE, counts, truncated
+apps/deal-service/src/services/admin-finance.service.ts          file = filtre partagé + comptes des quatre files
+apps/deal-service/src/controllers/admin-finance.controller.ts    INVALID_QUEUE_KIND
+apps/auth-service/src/controller/admin-kpis.controller.ts         tuiles = filtre partagé
+apps/admin-ui/src/components/FinanceQueues.tsx                   compteurs, adresse, libellés, refus, Relancer
+apps/admin-ui/src/components/AlertsView.tsx                      lien d'alerte selon la permission (ANO-ADM-28)
+apps/*/openapi.json                                              régénérés (FinanceQueueResponse)
+```
+
+## ANO-ADM-27 : la page HTML d'Express
+
+Express termine toute requête qu'aucune route n'a prise par son gestionnaire par défaut, qui écrit une page HTML
+`Cannot GET <chemin>`. Un middleware d'erreur (`(err, req, res, next)`) ne l'intercepte pas : il n'y a pas d'erreur, il
+n'y a juste personne. La correction est un middleware ORDINAIRE, placé après toutes les routes, qui fabrique l'erreur :
+
+```ts
+export const notFoundHandler = (req: Request, _res: Response, next: NextFunction) => {
+  next(new NotFoundError("Route not found.", { code: "ROUTE_NOT_FOUND" }));
+};
+// main.ts de chaque service
+app.use(notFoundHandler);
+app.use(errorMiddleware);
+```
+
+L'ordre est tout : placé avant un routeur, il répondrait 404 à des routes existantes. Le script de revue du chapitre
+vérifie qu'aucun `app.use` / `app.get` ne suit `notFoundHandler` dans les cinq `main.ts`. La passerelle n'a pas eu besoin
+d'être touchée : son proxy de repli transmet à auth-service, qui répond désormais en JSON.
+
+## Un filtre partagé entre deux services
+
+Les tuiles de l'accueil (auth-service) et la file (deal-service) comptaient les mêmes choses avec deux filtres écrits
+séparément. `financeQueueWhere(kind)` vit dans `api-contracts`, que les deux services importent déjà : c'est un objet
+Prisma en JSON (`isSet`, `in`, `gt`), sans dépendance à Prisma. La file sert en plus le compte des quatre files
+(`prisma.booking.count` en parallèle de la page) et `truncated` (`counts[kind] > items.length`) :
+
+```ts
+const [rows, ...sizes] = await Promise.all([
+  prisma.booking.findMany({ where: financeQueueWhere(kind), take: FINANCE_QUEUE_PAGE, … }),
+  ...FinanceQueueKindSchema.options.map((k) => prisma.booking.count({ where: financeQueueWhere(k) })),
+]);
+```
+
+Le test unitaire reconnaît chaque appel `count` à son filtre sérialisé, ce qui prouve que les QUATRE comptes utilisent
+bien la fonction partagée.
+
+## admin-ui : un nom accessible stable, une adresse qui suit l'onglet
+
+Le compteur est un `<span data-count>` dans le bouton ; `aria-label={label}` garde le nom accessible « Versements en
+échec » intact, et les fiches qui cliquent le bouton par son nom exact (ADM-ALR-2, ALR-4) n'ont pas bougé. L'onglet
+s'écrit dans l'adresse par `router.replace(`${pathname}?kind=${k}`, { scroll: false })` — `replace` et non `push` :
+changer d'onglet ne remplit pas l'historique. Piège de test payé : `router.replace` est asynchrone ; recharger
+immédiatement après le clic recharge l'ANCIENNE adresse. La fiche attend `toHaveURL(…?kind=HELD)` avant `reload()`.
+
+## ANO-ADM-28 : un lien vers un 403
+
+`AlertsView` associe chaque destination à sa permission (`/finances` → `finances.read`, `/disputes` → `disputes.read`,
+`/pilotage` → `pilotage.read`) et lit `/admin/me` ; la carte n'est un `<Link>` que si `can(adminRoles, permission)`.
+Tant que `/admin/me` n'a pas répondu, la carte reste un lien (état d'avant, jamais pire).
+
+## Tests
+
+- auth-service **249** (+1, `notFoundHandler`), deal-service **587** (+1, comptes et troncature). Un passage parallèle de
+  deal-service a expiré deux fois sous charge ; vert en isolé (même constat qu'au § 5.5).
+- `apps/e2e` : **411 scénarios** (406 + 5), 5/5 verts deux fois ; ADM-ALR et ADM-ACC rejouées (7/7).
+- Typecheck des cinq services, d'admin-ui et du harnais verts ; OpenAPI régénérés.

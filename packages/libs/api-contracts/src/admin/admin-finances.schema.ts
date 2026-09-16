@@ -32,13 +32,40 @@ export const FinanceQueueItemSchema = z
     lastAttemptAt: z.string().datetime().nullable(),
     nextRetryAt: z.string().datetime().nullable(),
     disputeTicket: z.string().nullable(),
-    since: z.string().datetime().describe("Depuis quand l'exception existe (fin du deal ou dernière écriture)"),
+    since: z.string().datetime().describe("Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"),
   })
   .meta({ id: "FinanceQueueItem" });
 export type FinanceQueueItem = z.infer<typeof FinanceQueueItemSchema>;
+/** Nombre de lignes servies au plus par file ; au-delà, `truncated` le dit (recette § 5.11). */
+export const FINANCE_QUEUE_PAGE = 200;
 export const FinanceQueueResponseSchema = z
-  .object({ kind: FinanceQueueKindSchema, items: z.array(FinanceQueueItemSchema), generatedAt: z.string().datetime() })
+  .object({
+    kind: FinanceQueueKindSchema,
+    items: z.array(FinanceQueueItemSchema),
+    counts: z.object({ FAILED: z.number().int(), REVERSED: z.number().int(), HELD: z.number().int(), PROPOSED_REFUNDS: z.number().int() }).describe("Taille réelle de CHAQUE file, avec les mêmes filtres que les tuiles de l'accueil (recette § 5.11)"),
+    truncated: z.boolean().describe(`Vrai quand la file compte plus de lignes que les ${FINANCE_QUEUE_PAGE} servies`),
+    generatedAt: z.string().datetime(),
+  })
   .meta({ id: "FinanceQueueResponse" });
+
+/**
+ * Le filtre Prisma de chaque file d'argent — UNE définition, lue par la file (deal-service) ET par les tuiles de
+ * l'accueil (auth-service). Avant la recette § 5.11, les deux services écrivaient chacun le leur : la tuile « Versements
+ * en échec » comptait tout `payoutStatus: FAILED`, la file seulement les deals terminés ou annulés.
+ */
+export function financeQueueWhere(kind: FinanceQueueKind): Record<string, unknown> {
+  const base = { isDeleted: false };
+  switch (kind) {
+    case "FAILED":
+      return { ...base, status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED" };
+    case "REVERSED":
+      return { ...base, payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
+    case "HELD":
+      return { ...base, status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" };
+    case "PROPOSED_REFUNDS":
+      return { ...base, manualRefundProposedCents: { gt: 0 } };
+  }
+}
 export type FinanceQueueResponse = z.infer<typeof FinanceQueueResponseSchema>;
 
 export const MoneyTimelineKindSchema = z
