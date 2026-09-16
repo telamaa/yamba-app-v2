@@ -796,7 +796,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
-- 16/09 : **PASSE CONCURRENCE MEMBRE (A195, PR #332, branche `feat/concurrence-membre`)** — suite directe d'A192, qui avait
+- 16/09 : **PASSE CONCURRENCE MEMBRE (A195, PR #332 MERGEE, branche `feat/concurrence-membre`)** — suite directe d'A192, qui avait
   solde le perimetre ADMIN et laisse l'inventaire des cinq fichiers MEMBRE. Trois regles etendues : (1) l'ecriture se
   conditionne a l'etat LU (`updateMany`/`deleteMany` qui COMPTENT, jamais `update`/`delete` qui levent P2025 -> 500) —
   profil, avatar pose, avatar supprime, reinitialisation du mot de passe (garde sur l'empreinte LUE, pas sur `updatedAt` :
