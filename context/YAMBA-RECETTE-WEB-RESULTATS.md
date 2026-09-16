@@ -3408,6 +3408,87 @@ le front suffit à rejouer 1 à 5.
   moyenne montait à 10 avec les dix-sept conteneurs Docker étrangers relancés par Docker Desktop. Le back-office
   (3001) a été arrêté pour ce chapitre — il n'y sert pas.
 
+## Chapitre 5.28 — Le mode maintenance vu du membre · **CONFORME** (4 fiches jouées, 1 après correction · 1 anomalie close · 4 scénarios en série, 1 min 42)
+
+`web-mnt.spec.ts`. L'état vit dans UN document `PlatformSettings` (clé `maintenance`, D64 1A) écrit par un **OPS**
+(Olivier Exploitation) avec un motif d'au moins 20 caractères ; la passerelle le relit **toutes les 10 s** et refuse
+alors toute ÉCRITURE (`503 MAINTENANCE`) sauf `/api/auth/*` et `/api/admin/*` ; les deux fronts lisent
+`GET /api/maintenance` (sondage 60 s) pour leurs bandeaux. **L'annonce est posée par l'écran du back-office**
+(« État des services », `npx nx dev admin-ui` requis) — c'est le geste du cahier — et les bascules suivantes par
+l'API d'administration, plus rapides. Le `beforeAll` et l'`afterAll` remettent le document **à plat directement en
+base** : une fiche qui échoue au mauvais moment laisserait la plateforme en lecture seule pour tous les chapitres
+suivants.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-MNT-1 | Le bandeau d'annonce | **Conforme** — l'OPS annonce une maintenance dans 1 h **depuis l'écran** (PUT `/admin/maintenance` 200, relu : `enabled: false`, `scheduledAt` posée) ; côté membre, bandeau **ambre** (`rgb(251, 191, 36)`) « Maintenance prévue le {date} : la plateforme passera en lecture seule pendant l'intervention. » ; **rien n'est bloqué** — un message part (2xx) |
+| WEB-MNT-2 | La lecture seule | **Conforme après correction** → `ANO-WEB-91` ; bandeau **rouge** (`rgb(220, 38, 38)`) au texte exact du cahier ; **lectures intactes** (recherche Paris → Brazzaville avec résultats, page d'un trajet, fil de messagerie, « Mes envois ») ; **écritures refusées** : intention de paiement `503`, message `503`, publication de trajet `503`, chacune avec `MAINTENANCE` ; **le refus est dit à l'écran** (« La plateforme est en maintenance : réessaie dans quelques minutes. » — il ne l'était nulle part) ; **connexion et rafraîchissement intacts** (une connexion par l'écran aboutit pendant la maintenance) |
+| WEB-MNT-3 | La levée | **Conforme** — la passerelle applique la levée en **moins de 15 s** (mesuré), l'écriture reprend immédiatement (message 2xx), et le bandeau a disparu au rechargement |
+| WEB-MNT-4 | La maintenance pendant une réservation | **Conforme** — assistant mené jusqu'à l'étape 4 (autorisation demandée AVANT la bascule), puis lecture seule : « Payer » → `503`, refus **dit à l'écran**, on reste sur l'assistant, **aucune réservation créée, rien d'autorisé** ; après la levée, le même bouton crée la demande et l'écran passe sur `/bookings/<id>` |
+
+### Anomalies
+
+- **ANO-WEB-91 (mineure, close)** — la passerelle refuse proprement les écritures (`503 MAINTENANCE` +
+  `Retry-After`), mais **le membre ne l'apprenait pas** : chaque écran affichait son erreur générique (mesuré dans un
+  fil : « Le message n'a pas pu être envoyé. »), et la phrase prévue pour ce cas — `maintenance.writeRefused`,
+  présente dans les deux dictionnaires depuis D64 — n'était rendue **nulle part**. Corrigé comme la session expirée
+  (A89) : `api-client` émet un signal global `yamba:maintenance-refused` sur un 503 dont le code vaut `MAINTENANCE`
+  (à la racine **ou** dans `details`), et le bandeau de maintenance l'écoute — il dit la raison et **relit son état
+  sans attendre son sondage de 60 s**. Effet secondaire heureux : un membre déjà sur la page voit le bandeau rouge
+  dans la seconde où sa première écriture est refusée, au lieu d'attendre une minute.
+
+### À trancher (produit)
+
+- **La passerelle ne suit pas la convention maison pour son code de refus** : elle rend `{ code: "MAINTENANCE" }` à
+  la racine, alors que tout le reste de la plateforme passe par `details.code` (A146) — c'est pour cela qu'aucun
+  écran ne le reconnaissait. Le correctif accepte les deux formes ; aligner la passerelle serait plus propre.
+- **Le bandeau arrive avec un retard pouvant aller jusqu'à 60 s** pour un membre déjà sur une page (sondage du
+  front). Acceptable, et désormais rattrapé par le premier refus d'écriture ; un événement serveur (SSE) le rendrait
+  immédiat, au prix d'une connexion permanente.
+- **Rien n'empêche d'activer la lecture seule pendant qu'un membre est à l'étape de paiement** (c'est le sujet de
+  MNT-4, et le comportement est correct : rien n'est autorisé). Le back-office pourrait afficher le nombre de
+  réservations en cours d'autorisation avant de basculer — confort d'exploitation.
+- **Le message personnalisé de l'admin s'ajoute à la phrase du bandeau mais pas au refus d'écriture** : le toast dit
+  la phrase générique. À unifier si l'on veut expliquer la cause (« mise à jour de la base, retour à 23 h 30 »).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **MNT-1** — L'annonce et la lecture seule sont **le même document** avec deux champs : c'est simple et lisible, et
+  le back-office le dit en clair (« le bandeau est affiché, rien n'est bloqué »). Il manque une date de FIN prévue :
+  le membre lit « prévue le … » sans savoir combien de temps — petit.
+- **MNT-2** — La liste des exemptions (`/api/auth/`, `/api/admin/`, `/api/maintenance`) est une constante pure,
+  testée côté auth-service : exactement au bon endroit. Ajouter `GET` explicitement dans le nom de la règle
+  (`MAINTENANCE_WRITE_METHODS`) évite de croire qu'un `GET` vers `/api/deals` pourrait être bloqué — cosmétique.
+- **MNT-3** — Dix secondes de sondage côté passerelle, soixante côté front : les deux chiffres sont dans le code et
+  dans la documentation, et la fiche mesure le premier. Exposer l'instant du dernier rafraîchissement dans
+  `GET /api/maintenance` aiderait l'exploitation à savoir quand la bascule sera effective — petit.
+- **MNT-4** — Le cas le plus délicat du chapitre est le mieux traité : l'autorisation n'est demandée qu'au montage
+  de l'étape 4, et la création du deal est un second appel — la maintenance tombe donc entre les deux sans laisser
+  d'argent en suspens. Le harnais garde la preuve qu'aucune réservation n'est créée.
+- **Transversal** — L'anomalie est la même famille que celles de 5.26 et 5.27 : **une convention qui ne va pas
+  jusqu'au bout** (un code de refus qui n'emprunte pas le chemin que tous les écrans lisent). Le remède retenu — un
+  signal global écouté par la surface concernée — est le deuxième de ce genre après la session expirée (A89) : cela
+  commence à faire un patron, à documenter comme tel.
+
+### Pièges de poste payés ici
+
+- **Une fixture de navigateur vit le temps d'UNE fiche** : ouvrir le navigateur d'administration dans un `beforeAll`
+  donne « Target page, context or browser has been closed » à la fiche suivante. Chaque fiche ouvre le sien (la
+  session est mémorisée, donc c'est peu coûteux), et le filet de sécurité passe par la base, pas par une session.
+- **L'éditeur de maintenance du back-office se remonte à chaque sondage (30 s)** : remplir ses champs trop tôt, c'est
+  remplir un formulaire qui sera remplacé — l'annonce partait alors **sans date**, et le PUT répondait quand même
+  200. On attend la phrase qui ne s'affiche qu'avec les données, puis on **vérifie que la saisie a tenu**
+  (`inputValue`) avant de cliquer.
+- **`input[type="text"]` ne matche pas un `<input>` sans attribut `type`** : les champs « Message FR / EN » du
+  back-office s'écrivent sans type, et un sélecteur trop littéral les manque.
+- **La passerelle garde son état 10 s** : charger l'écran du membre juste après l'écriture, c'est le charger dans la
+  fenêtre de cache et conclure « pas de bandeau ». Chaque fiche attend d'abord que `GET /api/maintenance` ait
+  basculé.
+- **Le fil de `bzv-accepted` appartient à Pauline** (et à Thomas) : c'est son navigateur qui doit tenter l'écriture
+  refusée, pas celui d'Aminata — sinon il n'y a même pas de zone de saisie à l'écran.
+- **Les résultats de recherche arrivent après le titre** : lire le corps de la page juste après la navigation ne
+  montre que l'en-tête (« Tous les trajets disponibles »). On attend le contenu (`expect.poll`).
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

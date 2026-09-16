@@ -610,6 +610,38 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 5.28 DU CAHIER 01-WEB — WEB-MNT, LE MODE MAINTENANCE VU DU MEMBRE (branche
+  `chore/recette-web-5-28`, empilee sur #292)** — 4 fiches jouees CONFORMES (1 apres correction), 4 scenarios en
+  serie, 1 min 42 (`apps/e2e/src/chapitres/web-mnt.spec.ts` ; l'annonce est posee PAR L'ECRAN du back-office
+  « Etat des services » avec le profil OPS, les bascules suivantes par l'API d'administration). TROIS HORLOGES a
+  connaitre : la passerelle relit le document `maintenance` toutes les 10 s, le front membre sonde
+  `GET /api/maintenance` toutes les 60 s, l'editeur du back-office se remonte toutes les 30 s. FILET : le
+  `beforeAll` et l'`afterAll` remettent le document a plat DIRECTEMENT EN BASE — une maintenance oubliee
+  condamnerait tous les chapitres suivants. ANO-WEB-91 close (mineure) : la passerelle refusait bien les ecritures
+  (503 `MAINTENANCE` + `Retry-After`, D64 2A) mais LE MEMBRE NE L'APPRENAIT PAS — chaque ecran affichait son erreur
+  generique (mesure dans un fil : « Le message n'a pas pu etre envoye. ») et la phrase prevue,
+  `maintenance.writeRefused`, n'etait rendue NULLE PART (cle morte dans les deux dictionnaires depuis D64) ; cause
+  racine : la passerelle pose son code A LA RACINE de la reponse alors que toute la plateforme lit `details.code`
+  (A146). Corrige comme la session expiree (A89) : `api-client` emet `yamba:maintenance-refused` (code a la racine
+  OU dans `details`), le bandeau de maintenance l'ecoute, DIT la raison et relit son etat sans attendre son sondage
+  — effet secondaire heureux, le bandeau rouge arrive dans la seconde au lieu d'une minute. Prouve : bandeau AMBRE
+  date sur une annonce (et rien n'est bloque, un message part) ; bandeau ROUGE au texte exact ; toutes les LECTURES
+  passent (recherche avec resultats, page d'un trajet, fil, « Mes envois ») ; reserver / ecrire / publier repondent
+  503 et le refus est DIT ; connexion et rafraichissement intacts (routes d'authentification exemptees) ; levee
+  appliquee par la passerelle en MOINS DE 15 s avec reprise immediate des ecritures ; et « Payer » sous maintenance
+  a l'etape 4 d'une reservation ne cree RIEN (aucune autorisation, aucun deal), puis aboutit normalement apres la
+  levee. A TRANCHER : aligner le code de refus de la passerelle sur `details.code` ; le retard de 60 s du bandeau
+  pour un membre deja sur sa page (desormais rattrape par le premier refus) ; le message personnalise de l'admin qui
+  ne suit pas jusqu'au refus d'ecriture ; une annonce sans date de FIN. Regard d'expert : deux occurrences font un
+  patron (signal global + surface qui l'ecoute) a documenter ; exposer l'instant du dernier rafraichissement dans
+  `GET /api/maintenance` ; afficher au back-office le nombre de reservations en cours d'autorisation avant de
+  basculer. PIEGES : **une fixture de navigateur vit le temps d'UNE fiche** (le navigateur d'administration ouvert
+  dans un `beforeAll` donne « browser has been closed » a la fiche suivante) ; **un formulaire qui se remonte
+  periodiquement se remplit puis s'oublie** (l'annonce partait SANS DATE et le PUT repondait 200 — verifier
+  `inputValue` avant de cliquer) ; `input[type="text"]` ne matche pas un `<input>` sans attribut `type` ; attendre
+  que la passerelle ait bascule avant d'observer l'ecran du membre ; le fil de `bzv-accepted` appartient a PAULINE ;
+  les resultats de recherche arrivent apres le titre. Plateforme inchangee (1000 + auth 230), harnais : 291
+  scenarios. PR a ouvrir (empilee sur #292). Reste : 5.29 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.27 DU CAHIER 01-WEB — WEB-ANA, LE CONSENTEMENT A LA MESURE D'AUDIENCE (branche
   `chore/recette-web-5-27`, empilee sur #291)** — 6 fiches jouees CONFORMES (2 apres correction) + 1
   CONTRE-EPREUVE, 7 scenarios en DEUX passes, 1 min 36 + 19 s (`apps/e2e/src/chapitres/web-ana.spec.ts`).
