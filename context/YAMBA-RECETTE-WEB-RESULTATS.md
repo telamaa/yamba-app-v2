@@ -5897,6 +5897,87 @@ verts ; ADM-ACC-3 et ADM-MED (9) verts après alignement du harnais (voir « Har
 
 ---
 
+## Cahier 02-ADMIN — § 5.21 Données personnelles et effacement RGPD · **CONFORME après correction** (4 fiches + 2 ajoutées · 4 anomalies closes dont 2 majeures · 6 arbitrages délégués du 15/09 livrés (A172 → A175) · 3 écarts · 6 scénarios ADM-RGP + 2 ADM-PAR, 5 min)
+
+Spec : `apps/e2e/src/admin/adm-rgp-donnees-personnelles.spec.ts`. L'effacement est le seul geste du back-office qu'on ne
+défait pas ; le chapitre se juge à quatre promesses : **le registre est une preuve** (chaque demande, faite ou refusée ;
+chaque consultation, une ligne), **refusé tant qu'un deal vit** (liste fermée, lue en français), **une transaction**
+(uniques remplacés jamais `null`, traces gardées, `ACCOUNT_ERASED`, puis sessions mortes et un email sans lien), **le
+tiers destinataire s'oublie** après `privacy.recipientRetentionDays`. Les comptes effacés sont créés par l'écran
+d'inscription pour chaque fiche (un compte du seed effacé ne se rejoue pas), garnis par manœuvre consignée (adresse,
+favori, notification, copie d'une réservation terminée).
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-RGP-1 | Registre journalisé à la lecture | **Conforme après correction** — ANO-ADM-57 : une ouverture écrivait DEUX `DATA_REQUESTS_VIEWED` |
+| ADM-RGP-2 | Effacement refusé, bloqueurs | **Conforme** — 409 `ERASURE_BLOCKED`, cinq bloqueurs pour Thomas traduits, refus au registre (`REFUSED`, motif, admin), aucune ligne `ACCOUNT_ERASED` |
+| ADM-RGP-3 | Effacer un compte à la demande | **Conforme après correction** — base conforme champ par champ ; ANO-ADM-59 : le message de succès disparaissait avec la carte |
+| ADM-RGP-4 | Le tiers destinataire est oublié | **Conforme** (joué, pas ⏭) — passage du service du cron `recipient-redaction` par le harnais ; 30 j : rien ; 7 j + fin reculée à J-10 : destinataire effacé, jamais deux fois |
+| ADM-RGP-5 (ajoutée) | Trois effacements simultanés + admin en retard | **Conforme après correction** — ANO-ADM-58 `[200, 500, 500]` ; ANO-ADM-60 « 404 : User not found. » |
+| ADM-RGP-6 (ajoutée) | Profil sans permission (Support) | **Conforme** — un seul refus (A170), 403 sur les deux routes, pas de carte, rien au journal |
+| ADM-PAR-13 (ajoutée, A172) | Conditions d'annulation acceptées = appliquées | **Conforme** — réservation par l'écran : `cancellationTerms` {48, 50} posé par le writer ; barème passé à 12 h / 30 % → snapshot intact, aperçu servi 50 % / J-48 h |
+| ADM-PAR-14 (ajoutée, A173 · A174) | Reset de l'Exploitation, portée avant bornes | **Conforme** — `changed: [alerts.outboxLagMinutes]`, `skipped: [pricing.commissionPct]` ; clé métier à 99 → 403 sans bornes |
+
+**Contre-épreuve** (corrections de `privacy.service.ts`, `privacy.controller.ts`, `UserFileView.tsx` mises de côté,
+auth-service rebâti) : **RGP-1, RGP-3, RGP-5 rouges** (deux lignes ; message de succès introuvable après rechargement ;
+`[200, 500, 500]`). RGP-2, 4, 6 ne touchent aucun code corrigé. Après correction : **RGP 6/6 verts deux fois**, ADM-PAR
+14/14, voisins ADM-USR, ADM-ACC, WEB-E2E-3 (annulation tardive, A172) verts. Les lots A172 → A175 sont prouvés par
+leurs tests unitaires et ADM-PAR-13/14 (pas de contre-épreuve navigateur rejouée pour eux).
+
+### Anomalies
+
+- **ANO-ADM-57 (majeure) — une consultation du registre écrivait deux lignes.** `listDataRequests` appelait
+  `recordAdminAction` à chaque lecture ; l'écran lit deux fois au montage. Première page → `recordAdminRead` (A168,
+  coalescence 10 s) ; « Charger la suite » (curseur) reste écrit à chaque fois. Close.
+- **ANO-ADM-58 (majeure) — trois effacements simultanés : `[200, 500, 500]`.** P2034 sur la transaction perdante ; au
+  réessai éventuel, `throw new Error("ACCOUNT_NOT_FOUND")` finissait aussi en 500. `withWriteConflictRetry` autour de la
+  transaction + `AccountNotFoundError` → 404 `USER_NOT_FOUND` (admin ET membre). Après : `[200, 404, 404]`, un
+  `ErasedAccount`, une `DataRequest` faite, une ligne `ACCOUNT_ERASED`, un seul email. Close.
+- **ANO-ADM-59 (mineure) — le message de succès disparaissait.** Il vivait dans la carte ; le rechargement de la fiche
+  (compte effacé) démonte la carte. Le message remonte dans la fiche (`role="status"`). Close.
+- **ANO-ADM-60 (mineure) — refus « 404 : User not found. »** pour l'admin arrivé en retard, sans rechargement. Refus en
+  français (404 / 403 / 400 / autre), fiche rechargée sur 404 (la carte disparaît avec le compte). Close.
+
+### Arbitrages délégués (15/09) — livrés dans cette PR
+
+- **A172** — conditions d'annulation figées à la création (`Booking.cancellationTerms`), lecture snapshot sinon courants.
+- **A173** — « Tout réinitialiser » sans liste : portée de l'acteur seulement, `skipped` nomme le reste.
+- **A174** — portée vérifiée AVANT les bornes (403 sans bornes).
+- **A175** — `seed-settings.ts` : version monotone (`version + 1`, valeurs vides = défauts) ; preuve :
+  « Valeurs remises aux défauts (version 27 → 28) ». ADM-PAR-7 et 8 suppriment désormais le document par manœuvre
+  consignée (la panne simulée), les autres fiches comptent à partir de la version laissée par le script.
+- **Invariant plafond ≥ prime** gardé (commentaire + test direct de `settingsCoherenceIssues`).
+- **Recopie décideur/date sur `Report`** rejetée (A171, alternative écartée).
+
+### Écarts
+
+- **RGP-3 étape 7** : le cahier attend `401 ACCOUNT_DELETED` à la connexion avec les anciens identifiants ; l'email est
+  anonymisé, la connexion répond `401 INVALID_CREDENTIALS` (ne rien révéler est meilleur). `ACCOUNT_DELETED` est ce que
+  lit une **session ouverte avant** l'effacement (prouvé).
+- **RGP-4 étape 2** : le cahier abaisse `privacy.recipientRetentionDays` à 0 ; la borne est 7 (400). La fiche abaisse à
+  7 et recule la fin du deal à J-10. Le deal `bzv-completed` du seed n'a pas de lien de suivi : « le lien meurt » est
+  prouvé par la règle (`isTrackingVisible`, tests unitaires), pas par ce deal.
+- **RGP-2** : un refus n'écrit pas au journal admin, seul le registre en garde trace — décision (arbitrage délégué) : le
+  registre SUFFIT comme preuve (il porte l'admin, le motif, l'IP, les bloqueurs) ; pas de ligne supplémentaire.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **RGP-1** — *Fait* : ANO-ADM-57. *Test* : compte après `networkidle` + 4 s (toutes les lectures de l'écran). *Proposé* :
+  filtrer le registre par membre / type (aujourd'hui 50 lignes par page, sans recherche).
+- **RGP-2** — *Test* : bloqueurs lus dans la réponse et confrontés au texte affiché (liste fermée des six libellés).
+  *Proposé* : afficher les bloqueurs AVANT le clic (`GET /auth/me/erasure/blockers` existe côté membre, pas côté admin).
+- **RGP-3** — *Fait* : ANO-ADM-59. *Test* : le writer réel (inscription par l'écran), la base relue champ par champ, la
+  session d'avant sondée. *Proposé* : les bloqueurs sont calculés HORS transaction — une réservation créée entre le
+  calcul et la transaction passerait (fenêtre de quelques ms) ; A-next candidat : recompter dans la transaction.
+- **RGP-4** — *Test* : le service du cron appelé par le harnais (même code que 03:40), second passage « jamais deux
+  fois ». *Proposé* : un déclenchement admin journalisé des crons de conservation (le cahier le suppose).
+- **RGP-5** — *Fait* : ANO-ADM-58, 60. *Test* : l'admin en retard a la fiche ouverte PENDANT la salve.
+- **RGP-6** — *Test* : le refus cherché dans `main` (l'annonceur de route de Next porte aussi `role="alert"`).
+- **PAR-13** — *Fait* : A172. *Test* : la réservation passe par l'écran — un seed qui poserait le snapshot ne prouverait
+  rien du writer. **PAR-14** — *Fait* : A173, A174.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

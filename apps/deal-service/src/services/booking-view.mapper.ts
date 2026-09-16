@@ -14,6 +14,7 @@ import {
 import {
   computeCancellationRefundCents,
   DEFAULT_CANCELLATION_PARAMS,
+  cancellationParamsForBooking,
   cancellationParamsFromSettings,
   type CancellationParams,
 } from "./booking-lifecycle";
@@ -50,6 +51,8 @@ export function viewParamsFromSettings(v: PlatformSettingsValues): ViewParams {
 
 export type BookingRecord = {
   id: string;
+  /** A172 — conditions d'annulation figées à la création (absentes sur les réservations antérieures). */
+  cancellationTerms?: CancellationParams | null;
   tripId: string;
   shipperId: string;
   carrierId: string;
@@ -324,6 +327,7 @@ const toCancellationPreview = (
   params: CancellationParams = DEFAULT_CANCELLATION_PARAMS
 ): ShipperBookingView["cancellationPreview"] => {
   if (!allowed.includes("cancel")) return null;
+  params = cancellationParamsForBooking(b, params); // A172 — l'aperçu annonce les conditions de CETTE réservation
   const total = b.pricing.totalShipperCents;
   const refundCents =
     b.status === "ACCEPTED"

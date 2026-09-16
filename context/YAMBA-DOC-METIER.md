@@ -5859,3 +5859,48 @@ membre (profil, annonce, message), back-office, documentation.
   métier diffère ; l'écran, lui, ne propose que les clés du profil. Aligner l'API (ne remettre que les clés permises) ?
 - **La règle « plafond ≥ prime » est inatteignable** avec les bornes du catalogue (prime ≤ 50 €, plafond ≥ 100 €) : la
   garder comme filet ou la retirer de la documentation.
+
+
+# Cahier 02-ADMIN, § 5.21 : données personnelles et effacement RGPD
+
+**Le besoin.** Un membre peut demander l'effacement de son compte (par l'application ou par email au support). Yamba doit
+prouver qu'il a répondu dans le mois, effacer vraiment l'identité, et garder ce que la loi et les autres membres exigent
+(réservations, litiges, avis, obligations comptables). Le destinataire d'un colis, qui n'a pas de compte, doit être
+oublié après la fin du deal.
+
+**RG-ADM-RGP-01 — Une consultation du registre, une trace** : ouvrir le registre des demandes écrit une ligne au journal
+admin (`DATA_REQUESTS_VIEWED`), jamais deux pour une même ouverture ; charger la page suivante est une nouvelle
+consultation.
+
+**RG-ADM-RGP-02 — Refusé tant qu'un deal vit** : liste fermée de bloqueurs (deal en cours, demande en attente, versement
+dû ou en échec, retenue en médiation, trajet publié ou en pause, profil admin). Le refus est inscrit au registre avec ses
+motifs, l'admin et le motif saisi ; il n'écrit pas au journal admin — le registre est la preuve.
+
+**RG-ADM-RGP-03 — Un effacement, une fois** : plusieurs administrateurs qui effacent le même compte au même instant → un
+seul effacement (une trace au registre, une ligne au journal, un email) ; les autres lisent « Ce compte n'existe plus ou
+vient d'être effacé par un autre administrateur. », jamais une erreur technique.
+
+**RG-ADM-RGP-04 — L'issue se lit** : après l'effacement, la fiche dit ce qui a été fait, même si la carte d'effacement a
+disparu avec le compte.
+
+**RG-ADM-RGP-05 — Après l'effacement** : les anciens identifiants ne connectent plus (refus sans dire pourquoi) ; une
+session ouverte avant est coupée (« compte supprimé ») ; un email de confirmation sans lien part à l'ancienne adresse.
+
+**RG-ANN-07 — Conditions acceptées = conditions appliquées (A172)** : le délai de remboursement intégral et le taux de
+retenue en vigueur au moment où l'Expéditeur réserve sont figés dans sa réservation, comme le prix. Un changement du
+barème ne s'applique qu'aux réservations créées ensuite. *Mention juridique* : l'information précontractuelle donnée à
+la réservation engage Yamba ; appliquer un barème modifié après coup serait une modification unilatérale du contrat. Les
+réservations antérieures à cette règle suivent le barème courant jusqu'à leur fin.
+
+**RG-ADM-PAR-10 — Chacun remet sa portée (A173)** : « Tout réinitialiser » par l'Exploitation ne remet que les paramètres
+d'exploitation ; les paramètres métier qui s'écartent sont laissés et nommés.
+
+**RG-ADM-PAR-11 — Un refus ne renseigne sur rien d'autre (A174)** : un profil qui n'a pas le droit de modifier un
+paramètre reçoit un refus sans les bornes de ce paramètre.
+
+**Tests d'acceptation.** ADM-RGP-1 à 6 (`adm-rgp-donnees-personnelles.spec.ts`), ADM-PAR-13 (réserver, changer le barème,
+l'aperçu garde les conditions de la réservation), ADM-PAR-14 (reset de l'Exploitation, refus sans bornes).
+
+**Points ouverts proposés.** Recompter les bloqueurs dans la transaction d'effacement (fenêtre de quelques
+millisecondes) ; montrer les bloqueurs à l'admin avant le clic ; filtre du registre par membre ; déclenchement journalisé
+des crons de conservation.

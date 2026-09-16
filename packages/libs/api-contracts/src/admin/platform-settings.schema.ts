@@ -170,6 +170,8 @@ export const PlatformSettingsValuesSchema = z
 export function settingsCoherenceIssues(v: PlatformSettingsValues): string[] {
   const issues: string[] = [];
   if (!(v["pricing.sizeCoefS"] <= v["pricing.sizeCoefM"] && v["pricing.sizeCoefM"] <= v["pricing.sizeCoefL"])) issues.push("Les coefficients de taille doivent respecter S ≤ M ≤ L.");
+  // Invariant défensif (arbitrage du 15/09) : avec les bornes actuelles (prime ≤ plafond minimal) il ne peut pas se déclencher,
+  // mais les bornes du catalogue évolueront — la règle reste, testée directement sur cette fonction pure.
   if (v["protection.extendedCapCents"] < v["protection.extendedPremiumCents"]) issues.push("Le plafond de la Garantie étendue doit être supérieur à sa prime.");
   if (v["reputation.carrier.topMinDeals"] < v["reputation.carrier.confirmedMinDeals"]) issues.push("Voyageur : le niveau top exige au moins autant de deals que le niveau confirmé.");
   if (v["reputation.shipper.topMinDeals"] < v["reputation.shipper.confirmedMinDeals"]) issues.push("Expéditeur : le niveau top exige au moins autant de deals que le niveau confirmé.");
@@ -295,7 +297,12 @@ export const ResetSettingsRequestSchema = z
 export type ResetSettingsRequest = z.infer<typeof ResetSettingsRequestSchema>;
 
 export const SettingsWriteResponseSchema = z
-  .object({ version: z.number().int(), changed: z.array(z.object({ key: z.string(), before: z.number(), after: z.number() })) })
+  .object({
+    version: z.number().int(),
+    changed: z.array(z.object({ key: z.string(), before: z.number(), after: z.number() })),
+    /** A173 — reset global : clés hors portée de l'acteur qui s'écartent du défaut, laissées telles quelles. */
+    skipped: z.array(z.string()).optional(),
+  })
   .meta({ id: "SettingsWriteResponse" });
 export type SettingsWriteResponse = z.infer<typeof SettingsWriteResponseSchema>;
 

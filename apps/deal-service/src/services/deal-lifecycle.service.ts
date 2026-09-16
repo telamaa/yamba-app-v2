@@ -59,7 +59,7 @@ import {
   type BookingForWrite,
 } from "./booking-write";
 import { recomputeBookingParties } from "./reputation.service";
-import { cancellationParamsFromSettings } from "./booking-lifecycle";
+import { cancellationParamsForBooking, cancellationParamsFromSettings } from "./booking-lifecycle";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
 
@@ -277,7 +277,7 @@ export function makeDealLifecycleService(
           totalShipperCents: booking.pricing.totalShipperCents,
           departureAt: booking.trip.departureAt,
           now,
-          params: cancellationParamsFromSettings(await settings.get()), // D62
+          params: cancellationParamsForBooking(booking, cancellationParamsFromSettings(await settings.get())), // D62 · A172 : figées à la création
         });
         if (!booking.paymentIntentId) {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");

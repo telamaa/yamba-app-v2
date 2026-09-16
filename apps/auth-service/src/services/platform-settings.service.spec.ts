@@ -1,5 +1,5 @@
 /** platform-settings.service.spec.ts — écriture des paramètres (C-PR8a, D62 5A) : bornes, portée, cohérence, verrou, journal, email. */
-import { SETTINGS_DEFAULTS } from "@packages/api-contracts";
+import { SETTINGS_DEFAULTS, settingsCoherenceIssues } from "@packages/api-contracts";
 import { makePlatformSettingsService, type SettingsWriterDb } from "./platform-settings.service";
 
 type Row = { key: string; values: Record<string, number>; version: number; updatedAt: Date; updatedByAdminId: string | null };
@@ -77,6 +77,24 @@ describe("platform-settings.service — update", () => {
     expect(db.actions).toHaveLength(0);
     await expect(svc.update(OPS, { changes: { "alerts.outboxLagMinutes": 30 }, reason, expectedVersion: 0 })).resolves.toMatchObject({ version: 1 });
   });
+  it("A174 — la portée avant les bornes : OPS sur une clé métier HORS bornes reçoit 403 sans min/max ; une clé inconnue reste 400", async () => {
+    const db = fakeDb();
+    const svc = makePlatformSettingsService({ db });
+    const refus = await svc.update(OPS, { changes: { "pricing.commissionPct": 99 }, reason, expectedVersion: 0 }).catch((e) => e);
+    expect(refus).toMatchObject({ statusCode: 403, details: { code: "ADMIN_ROLE_CHANGE_DENIED" } });
+    expect(refus.details).toEqual({ code: "ADMIN_ROLE_CHANGE_DENIED" });
+    expect(refus.message).not.toMatch(/between/);
+    await expect(svc.update(OPS, { changes: { "pricing.nope": 1 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { code: "SETTING_OUT_OF_BOUNDS" } });
+    // Dans sa portée, les bornes parlent : OPS hors bornes sur une clé d'exploitation → 400 avec la clé.
+    await expect(svc.update(OPS, { changes: { "alerts.outboxLagMinutes": 100000 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { errors: { "alerts.outboxLagMinutes": expect.stringContaining("between") } } });
+    expect(db.actions).toHaveLength(0);
+  });
+  it("invariant défensif plafond ≥ prime (arbitrage du 15/09) : exercé directement sur la règle pure", () => {
+    expect(settingsCoherenceIssues({ ...SETTINGS_DEFAULTS })).toEqual([]);
+    const issues = settingsCoherenceIssues({ ...SETTINGS_DEFAULTS, "protection.extendedPremiumCents": 5000, "protection.extendedCapCents": 4999 });
+    expect(issues).toEqual(["Le plafond de la Garantie étendue doit être supérieur à sa prime."]);
+    expect(settingsCoherenceIssues({ ...SETTINGS_DEFAULTS, "protection.extendedPremiumCents": 5000, "protection.extendedCapCents": 5000 })).toEqual([]);
+  });
   it("cohérence : S ≤ M ≤ L et intervalle ≥ délai sont refusés en 400, rien n'est écrit", async () => {
     const db = fakeDb();
     const svc = makePlatformSettingsService({ db });
@@ -138,6 +156,18 @@ describe("platform-settings.service — reset et read", () => {
     const svc = makePlatformSettingsService({ db });
     await expect(svc.reset(OPS, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
     await expect(svc.reset(OPS, { keys: ["alerts.outboxLagMinutes"], reason, expectedVersion: 2 })).resolves.toMatchObject({ version: 3 });
+  });
+  it("A173 — « Tout réinitialiser » par OPS : ses clés d'exploitation seulement, les clés métier ignorées et nommées, jamais 403 global", async () => {
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS, "pricing.commissionPct": 14, "alerts.outboxLagMinutes": 30 }, version: 2, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const svc = makePlatformSettingsService({ db });
+    const r = await svc.reset(OPS, { reason, expectedVersion: 2 });
+    expect(r).toEqual({ version: 3, changed: [{ key: "alerts.outboxLagMinutes", before: 30, after: 15 }], skipped: ["pricing.commissionPct"] });
+    expect(db.actions.map((a) => `${a.action} ${a.targetId}`)).toEqual(["SETTINGS_RESET alerts.outboxLagMinutes"]);
+    expect((db.row()!.values as Record<string, number>)["pricing.commissionPct"]).toBe(14);
+    // Plus rien dans sa portée : 400 « rien à remettre », la clé métier restante toujours nommée.
+    await expect(svc.reset(OPS, { reason, expectedVersion: 3 })).rejects.toMatchObject({ statusCode: 400, details: { code: "NOTHING_TO_RESET", skipped: ["pricing.commissionPct"] } });
+    // SUPER_ADMIN inchangé : tout ce qui s'écarte.
+    await expect(svc.reset(SUPER, { reason, expectedVersion: 3 })).resolves.toEqual({ version: 4, changed: [{ key: "pricing.commissionPct", before: 14, after: 12 }] });
   });
   it("ANO-ADM-02 — rien à remettre : un profil sans aucun droit d'écriture est REFUSÉ (403), un profil qui peut écrire reçoit 400", async () => {
     const MEDIATOR = { id: "med1", roles: ["MEDIATOR"] as const };

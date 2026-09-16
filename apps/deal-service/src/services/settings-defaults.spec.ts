@@ -2,7 +2,7 @@
 import { SETTINGS_DEFAULTS, REPUTATION_PARAMS, alertThresholdsFromSettings, pricingParamsFromSettings, reputationParamsFromSettings } from "@packages/api-contracts";
 import { PRICING_PARAMS } from "@packages/pricing";
 import { ALERT_THRESHOLDS, evaluateAlerts, type OpsSnapshot } from "./ops-alerts.rules";
-import { DEFAULT_CANCELLATION_PARAMS, cancellationParamsFromSettings, computeCancellationRefundCents } from "./booking-lifecycle";
+import { DEFAULT_CANCELLATION_PARAMS, cancellationParamsForBooking, cancellationParamsFromSettings, computeCancellationRefundCents } from "./booking-lifecycle";
 import { DEFAULT_VIEW_PARAMS, viewParamsFromSettings } from "./booking-view.mapper";
 import { computeReputationLevel } from "./reputation.service";
 
@@ -23,6 +23,13 @@ describe("D62 — la constante n'est plus lue : changer le paramètre change le 
     expect(computeCancellationRefundCents({ totalShipperCents: 3000, departureAt, now })).toBe(1500);
     expect(computeCancellationRefundCents({ totalShipperCents: 3000, departureAt, now, params: { fullRefundUntilHours: 24, lateRetentionPct: 30 } })).toBe(3000);
     expect(computeCancellationRefundCents({ totalShipperCents: 3000, departureAt, now: new Date("2026-09-10T00:00:00Z"), params: { fullRefundUntilHours: 24, lateRetentionPct: 30 } })).toBe(2100);
+  });
+  it("A172 — cancellationParamsForBooking : le snapshot l'emporte, l'absent (ou incomplet) retombe sur les paramètres courants", () => {
+    const courants = { fullRefundUntilHours: 48, lateRetentionPct: 50 };
+    expect(cancellationParamsForBooking({ cancellationTerms: { fullRefundUntilHours: 24, lateRetentionPct: 30 } }, courants)).toEqual({ fullRefundUntilHours: 24, lateRetentionPct: 30 });
+    expect(cancellationParamsForBooking({}, courants)).toBe(courants);
+    expect(cancellationParamsForBooking({ cancellationTerms: null }, courants)).toBe(courants);
+    expect(cancellationParamsForBooking({ cancellationTerms: { fullRefundUntilHours: Number.NaN, lateRetentionPct: 30 } }, courants)).toBe(courants);
   });
   it("réputation : un Voyageur à 5 deals est TOP si le seuil passe à 5", () => {
     const f = { ratingsAvg: 4.9, ratingsCount: 4, completedDealsCount: 5, lateCancellationsCount: 0 };

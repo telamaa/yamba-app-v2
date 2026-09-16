@@ -3,6 +3,19 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.21 LIVRÉ
+>
+> Branche `chore/recette-admin-5-21` empilée sur #321 : 6 scénarios ADM-RGP + ADM-PAR-13, 14 ; ANO-ADM-57, 58
+> (majeures), 59, 60 closes ; arbitrages délégués A172 (conditions d'annulation figées — **`npx prisma generate` +
+> `npx prisma db push` + rebâtir deal-service**), A173, A174, A175 (seed-settings ne supprime plus le document : version
+> + 1). Chiffres : auth **270**, deal **641**, message **57**, trip **293**, harnais **479** ; dernière anomalie
+> ANO-ADM-60 ; dernier arbitrage A175 ; dernier chapitre d'apprentissage **179**. POSTE : auth et deal (FAKE,
+> `STRIPE_SECRET_KEY=`) rebâtis et relancés en bundles `nohup`. Pièges : `disputeTicket: null` dans un `where` rate les
+> réservations du seed (champ absent) — ne pas filtrer dessus pour choisir une réservation ; un contrôleur qui construit
+> son service au chargement se teste avec `require` après les mocks ; les fiches ADM-PAR comptent les versions à partir
+> de `base` (sortie du script). **ENGAGEMENT § 7** inchangé (P2034 sur admin-admins / admin-users / admin-auth). Suite :
+> § 5.22 (état des services).
+>
 > ## ▶ 15/09/2026 — § 5.20 LIVRÉ
 >
 > Branche `chore/recette-admin-5-20` empilée sur #320 : 12 scénarios ADM-PAR (+ ADM-SIG-10, 11, SIG-5 renforcée),
