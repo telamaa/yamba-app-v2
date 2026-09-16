@@ -828,6 +828,21 @@ Correction     : `StepParcel.handleAddPhotos` filtre sur `PHOTO_MAX_SIZE_BYTES` 
 Contre-épreuve : WEB-RSV-9 : le message, deux photos toujours, aucune requête ImageKit.
 ```
 
+```
+ANO-WEB-40
+Fiche          : WEB-TRU-1 (chapitre 5.13) — observation consignée au chapitre 5.12 · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : après un refus de plafond (compte neuf, D71), la carte de paiement dit le refus et
+                 rien n'invite à payer ; « Payer » n'est actif que lorsqu'une autorisation existe.
+Obtenu         : le bouton « Payer {montant} » restait actif à côté de l'encadré de refus (et avant
+                 le retour de l'intention : un clic muet, piège 18 du handoff). Sans danger — le
+                 serveur refuse aussi la demande — mais l'écran se contredisait.
+Correction     : `BookingWizard` et `BookingMobile` grisent le bouton principal à l'étape 4 tant que
+                 `checkout.intent` est absent (`ctaDisabled = isSubmitting || (step === 4 && !intent)`) :
+                 en attente de l'autorisation, et après un refus (l'encadré et « Réessayer » restent
+                 les seules issues).
+Contre-épreuve : WEB-TRU-1 et WEB-TRU-2 : « Payer » `disabled` à côté de l'encadré, « Réessayer » visible.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1679,6 +1694,82 @@ calcul du cahier — et il est exact partout.
 - **Une photo trop lourde entrait dans la grille** (ANO-WEB-39) : le « supprimer toutes les
   photos » de la fiche 10 doit boucler tant qu'il en reste.
 
+## Chapitre 5.13 — Les plafonds du compte neuf · **CONFORME** (5 fiches jouées, 1 après correction · 1 anomalie mineure close · 5 scénarios en série, 2 min 00)
+
+`web-tru.spec.ts`. Le parcours WEB-E2E-4 couvrait déjà le cœur (450 €, 12 kg, cinq puis six) ; le
+chapitre le découpe fiche par fiche et ajoute ce que le parcours ne prouvait pas : la valeur et le
+poids **corrigés qui passent**, le compte ancien (Aminata) qui réserve 12 kg à 450 € sans refus, le
+**levier du back-office** (`[TRU7]` : un OPS touche le plafond mensuel, l'effet est mesuré en
+secondes, la valeur est remise), le suivi d'envoi parmi les écrans fouillés, et les **réponses brutes
+de l'API** au membre. Le compte neuf est créé par l'écran d'inscription en fiche 1
+(`neuf-20260911124709@recette.yamba.dev` à cette exécution) et sert aux fiches suivantes ;
+deal-service sur le fournisseur FAKE.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-TRU-1 | Le plafond de valeur déclarée | **Conforme après correction** → `ANO-WEB-40` ; 450 € : refus **à l'intention de paiement** (`POST /deals/payment-intents` 409, avant tout argent), message exact du cahier dans la carte de paiement, « Réessayer » ; « Payer » **grisé** à côté de l'encadré ; `GET /me/bookings` = 0, Finances « Aucun paiement pour l'instant », aucun email ; 250 € : la demande passe, suivi `/bookings/<id>`, « Reçu : paiement autorisé… » dans Mailpit |
+| WEB-TRU-2 | Le plafond de poids | **Conforme** — 12 kg (`fih`) : même message, même moment (l'intention), « Payer » grisé, toujours 1 demande ; 8 kg : passe (2 demandes) |
+| WEB-TRU-3 | Le plafond d'envois par mois, puis le levier | **Conforme** — trois demandes de plus (`gru`, `yul`, `bzv-upcoming`) → 5 dans le mois ; la sixième (`bzv-perkg`) refusée **dès l'autorisation**, même message, toujours 5. Levier `[TRU7]` : l'OPS (Olivier) écrit `trust.newAccount.maxShipmentsPerMonth` 5 → 6 par `PATCH /admin/settings` (motif ≥ 20, verrou de version) ; « Réessayer » toutes les 5 s : l'intention passe, la sixième est créée **≈ 6 s après l'écriture** (journal `SETTING_CHANGED` 12:48:24,3 → demande 12:48:29,9 ; contrainte « < 30 s » tenue) ; remise à 5 à 12:48:30,6, relue à 5 ; deux emails « Paramètres de la plateforme modifiés » chez le super administrateur |
+| WEB-TRU-4 | Un compte ancien n'a aucun plafond | **Conforme** — Aminata (90 jours) : 12 kg, 450 €, taille M sur `bzv-perkg` → aucun refus, suivi « En attente du Voyageur » ; le DTO de l'Expéditrice porte `weightKg: 12` et `declaredValueCents: 45000` |
+| WEB-TRU-5 | Le score interne n'est jamais visible | **Conforme** — cinq écrans du compte neuf (tableau de bord, profil, Mes envois, le suivi d'un envoi, la page publique) : aucun « score », « niveau de risque », « compte à risque », « trust », aucun « n points » ; le message de plafond n'est pas là sans tentative ; **trois réponses d'API** (`/auth/me`, `/me/bookings`, `/deals/:id`) sans `trustScore` / `riskLevel` / `caps` / `capsReason` ; export par la porte sudo : `yamba-data-export/1`, six réservations, aucune trace du score |
+
+### À trancher (produit)
+
+- **Le message de plafond est générique** (« valeur déclarée, poids et nombre par mois ») alors que
+  l'API dit lequel (`details.cap`, `limit`, `value`) et que le catalogue des paramètres écrit « le
+  membre lit le plafond dans le message ». Le cahier attend le message générique ; un message ciblé
+  (« pour l'instant, 300 € déclarés au plus par colis ») éviterait trois essais à l'aveugle. Trancher
+  entre le cahier et le catalogue ; s'il faut cibler, c'est une clé i18n par `cap` — petit.
+- **Le compteur mensuel compte les demandes créées**, y compris refusées par le Voyageur, expirées ou
+  annulées : cinq demandes déclinées bloquent un compte neuf jusqu'au mois suivant. Compter les
+  demandes **vivantes ou abouties** (ou exclure les déclinées) est un choix à graver (D71) — moyen.
+- **Le levier a été joué en relevant le plafond** (5 → 6) et non en l'abaissant comme la note du
+  cahier le suggère : le compte avait déjà cinq demandes, et c'est le sens qui prouve un effet
+  (une demande qui passe). L'abaissement se rejoue tel quel au cahier 02-ADMIN (`[TRU7]`).
+- **Le compte de travail** : le cahier nomme `recette+neuf@seed.yamba.dev` ; le harnais crée
+  `neuf-<horodatage>@recette.yamba.dev` à chaque exécution (piège 22). Amender le cahier.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **TRU-1** — Le refus tombe à l'étape 4, après trois étapes de saisie : servir les plafonds du
+  membre (pas le score — les plafonds ne sont pas le score) dans `/auth/me` (`limits: { maxDeclaredValueCents,
+  maxWeightKg, shipmentsLeftThisMonth }`) permettrait de borner la valeur à l'étape 1 et de le dire
+  avant. **Décision de registre** (D71 dit « jamais servi au membre » pour le score ; les plafonds
+  sont une autre donnée) — moyen.
+- **TRU-2** — Même levier : le champ poids pourrait s'arrêter à 10 kg pour un compte neuf, avec
+  l'indice « 10 kg au plus pour l'instant ». Et « Réessayer » après un refus de plafond redemande la
+  même intention (même refus) : le bouton devrait ramener à l'étape 1 — petit.
+- **TRU-3** — Le lecteur de paramètres (cache 30 s) a répondu en 6 s : bon. Le score est recalculé à
+  chaque intention (`loadTrustSignals` : quatre `count` Mongo) ; un cache par membre de 60 s côté
+  deal-service épargnerait trois requêtes par tentative — petit. La page admin des paramètres
+  pourrait afficher « effet sous 30 s » à côté du bouton — petit.
+- **TRU-4** — Aminata n'est « ancienne » que par `createdAt` (90 j) : un compte de 31 jours sans
+  aucun envoi terminé n'est plus plafonné non plus (`isNew` = âge seul dès que `completedDeals` < 3
+  est vrai des deux côtés). Vérifier que c'est voulu (CNF-06 dit « moins de 30 jours ET moins de 3
+  envois ») — c'est le cas, mais un compte dormant de 31 jours a les mêmes droits qu'un compte prouvé
+  ; un seuil « au moins 1 envoi terminé OU 30 jours » serait plus sûr — moyen, registre.
+- **TRU-5** — La preuve par liste de mots interdits est fragile par nature ; la vraie garde est la
+  whitelist des DTO. Ajouter un test de contrat deal-service qui affirme que le DTO Expéditeur ne
+  contient AUCUNE clé de `TrustAssessment` (`score`, `level`, `factors`, `caps`, `capsReason`) — petit,
+  et il tient pour toujours.
+- **Transversal** — Les six demandes du compte neuf restent en base (piège 22) et comptent dans les
+  files du back-office (« demandes en attente » de Thomas ×2, Joséphine, Inès, Marc) : le seed les
+  efface au prochain rejeu, mais une exécution isolée du chapitre laisse ces traces — documenté.
+
+### Pièges de poste payés ici
+
+- **Le levier du back-office se prouve dans le sens qui crée quelque chose** : relever le plafond et
+  voir une demande passer ; l'abaisser sur un compte déjà plein ne change rien d'observable.
+- **Mesurer l'effet par le bouton du produit** (« Réessayer » toutes les 5 s, `waitForResponse` sur
+  l'intention) plutôt que d'attendre 31 s : la mesure est réelle (6 s), et le scénario dure moins.
+- **Toujours remettre le paramètre dans un `finally`** avec un nouveau `expectedVersion` (le verrou
+  optimiste a bougé) — et relire la valeur après.
+- **Le journal du chapitre 5.12** disait « Payer » actif à côté du refus : la contre-épreuve d'ANO-WEB-40
+  est une assertion `toBeDisabled()` sur le bouton **visible** (`filter({ visible: true })` — la
+  feuille mobile est aussi dans le DOM sur écran large).
+- **`--reporter=list` remplace le rapport HTML** : les annotations (`test.info().annotations`) ne sont
+  plus écrites nulle part ; la preuve horaire du levier a été relue dans `AdminAction` et `Booking`.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
@@ -1875,7 +1966,8 @@ majeures corrigées en chemin (ANO-WEB-08 à 11).
   brouillon à l'ouverture). Chapitre 5.12.
 - **Après un refus de plafond, la carte de paiement montre encore un bouton « Payer »** à côté
   de l'encadré de refus. Il ne mène nulle part de dangereux (le serveur refuse aussi le deal),
-  mais il contredit l'encadré. Mineure, chapitre 5.13.
+  mais il contredit l'encadré. Mineure, chapitre 5.13 → **`ANO-WEB-40`, close** (le bouton est
+  grisé tant qu'aucune autorisation n'existe — ce qui règle aussi l'observation suivante).
 - **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien**, sans message :
   le bouton est actif dès l'affichage de l'étape 4, l'intention arrive une seconde plus tard.
   Le harnais attend le texte du mode test (qui porte le montant de l'intention) ; un humain
