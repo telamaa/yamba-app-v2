@@ -9,7 +9,7 @@
  */
 import prisma from "@packages/libs/prisma";
 import { AppError, NotFoundError, ValidationError } from "@packages/error-handler";
-import { recordAdminAction, recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
+import { recordAdminAction, recordAdminRead, type AdminActionType, type ReadCoalescer } from "@packages/admin-audit";
 import { PaymentIntentNotFoundError, type PaymentProvider } from "@packages/payments";
 import type {
   AdminDealMoneyFile,
@@ -165,8 +165,8 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
     return b as unknown as MoneyRecord;
   }
 
-  function audit(admin: AdminActor, action: string, targetId: string, after?: unknown) {
-    return { adminUserId: admin.id, action, targetType: "BOOKING", targetId, after: after ?? null, ip: admin.ip, userAgent: admin.userAgent };
+  function audit(admin: AdminActor, action: AdminActionType, targetId: string, after?: unknown) {
+    return { adminUserId: admin.id, action, targetType: "BOOKING" as const, targetId, after: after ?? null, ip: admin.ip, userAgent: admin.userAgent };
   }
 
   return {

@@ -81,6 +81,46 @@ export const ACTION_LABEL: Record<string, string> = {
   REPORT_REVIEWED: "Signalement traité", // D68
 };
 
+/**
+ * A183 (recette 02-ADMIN § 5.24) — les types de cible réellement écrits (miroir de `ADMIN_TARGET_TYPES`,
+ * packages/libs/admin-audit), en français. Le harnais ADM-JRN-2 compare les deux listes.
+ */
+export const TARGET_TYPE_LABEL: Record<string, string> = {
+  USER: "Membre",
+  BOOKING: "Deal",
+  TRIP: "Trajet",
+  CONVERSATION: "Conversation",
+  REPORT: "Signalement",
+  SESSION: "Session admin",
+  SETTINGS: "Paramètres",
+};
+
+/** Les filtres serveur renvoyés par `/admin/audit` (`appliedFilters`), dits en français. */
+export const AUDIT_FILTER_LABEL: Record<string, string> = { createdAt: "période", adminUserId: "auteur", action: "action", targetType: "type de cible", targetId: "identifiant de cible", ip: "IP" };
+
+function auditValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "oui" : "non";
+  if (Array.isArray(v)) return v.length ? v.map(auditValue).join(", ") : "aucun";
+  if (typeof v === "object") {
+    const entries = Object.entries(v as Record<string, unknown>);
+    return entries.length ? entries.map(([k, x]) => `${k} ${auditValue(x)}`).join(", ") : "aucun";
+  }
+  return String(v);
+}
+
+/**
+ * ANO-ADM-73 (recette 02-ADMIN § 5.24) — le détail lisible d'une ligne de journal : les clés du `after` séparées par « · ».
+ * Un tableau ou un objet imbriqué s'affichait en JSON brut (`divergences : ["CAPTURE_RECORDED_NOT_LIVE"]`, `filters : {}`),
+ * et les cartes « Actions admin sur ce compte / ce trajet » affichaient tout le `after` en JSON. Une seule règle, partout.
+ */
+export function auditDetail(after: unknown): string {
+  if (!after || typeof after !== "object") return "";
+  return Object.entries(after as Record<string, unknown>)
+    .map(([k, v]) => `${k} : ${auditValue(v)}`)
+    .join(" · ");
+}
+
 /* F-PR3 (D61 7A) — messages signalés */
 export const REPORT_REASON_LABEL: Record<string, string> = {
   OFF_PLATFORM: "Veut sortir de Yamba",

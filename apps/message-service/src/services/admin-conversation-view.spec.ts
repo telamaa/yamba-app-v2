@@ -79,7 +79,7 @@ describe("A168 — une ouverture, une ligne", () => {
   });
 
   it("recordAdminRead : Redis en panne → la ligne est écrite (un doublon plutôt qu'une lecture perdue) ; sans coalesceur → toujours écrite", async () => {
-    const input = { adminUserId: "a", action: "USER_VIEWED", targetType: "USER", targetId: "u" };
+    const input = { adminUserId: "a", action: "USER_VIEWED" as const, targetType: "USER" as const, targetId: "u" };
     const enPanne = { set: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")) };
     await expect(recordAdminRead(prismaMock, enPanne, input)).resolves.toBe(true);
     await expect(recordAdminRead(prismaMock, undefined, input)).resolves.toBe(true);

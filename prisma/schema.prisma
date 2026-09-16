@@ -1124,7 +1124,7 @@ model AdminAction {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
   adminUserId String  @db.ObjectId
   action      String // ADMIN_LOGIN | ADMIN_TOTP_ENABLED | DISPUTE_VIEWED | … (ADMIN_ACTIONS)
-  targetType  String // USER | BOOKING | DISPUTE | SESSION
+  targetType  String // ADMIN_TARGET_TYPES (A183) : USER | BOOKING | TRIP | CONVERSATION | REPORT | SESSION | SETTINGS
   targetId    String?
   before      Json?
   after       Json?
@@ -1136,6 +1136,7 @@ model AdminAction {
   @@index([targetType, targetId])
   @@index([adminUserId, createdAt])
   @@index([action, createdAt]) // A149 — filtre « Action » du journal
+  @@index([ip, createdAt]) // recette § 5.24 — le filtre « IP » parcourait toute la collection
 }
 
 // ─────────────────────────────────────────────

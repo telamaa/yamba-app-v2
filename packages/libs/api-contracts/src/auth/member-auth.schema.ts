@@ -158,7 +158,7 @@ export const AdminTotpEnableResponseSchema = z.object({ ok: z.literal(true), bac
 export const AdminTotpVerifyResponseSchema = z.object({ ok: z.literal(true), usedBackupCode: z.boolean(), remainingBackupCodes: z.number().int() }).meta({ id: "AdminTotpVerifyResponse", description: "admin_access_token / admin_refresh_token cookies set" });
 export const OkResponseSchema = z.object({ ok: z.literal(true) }).meta({ id: "OkResponse" });
 export const AdminMeResponseSchema = z.object({ id: ObjectIdSchema, email: z.string(), firstName: z.string(), lastName: z.string(), adminRole: z.string().nullable(), adminRoles: z.array(z.string()), remainingBackupCodes: z.number().int() }).meta({ id: "AdminMeResponse" });
-export const AdminAuditItemSchema = z.object({ id: ObjectIdSchema, at: iso, admin: z.string(), action: z.string(), targetType: z.string(), targetId: z.string().nullable(), before: z.unknown().nullable(), after: z.unknown().nullable(), ip: z.string().nullable() }).meta({ id: "AdminAuditItem" });
+export const AdminAuditItemSchema = z.object({ id: ObjectIdSchema, at: iso, admin: z.string(), adminUserId: ObjectIdSchema.meta({ description: "ANO-ADM-68 — author id, so the screen filters on the server" }), action: z.string(), targetType: z.string(), targetId: z.string().nullable(), before: z.unknown().nullable(), after: z.unknown().nullable(), ip: z.string().nullable() }).meta({ id: "AdminAuditItem" });
 export const AdminAuditResponseSchema = z
   .object({ items: z.array(AdminAuditItemSchema), nextCursor: ObjectIdSchema.nullable(), appliedFilters: z.array(z.string()).optional().meta({ description: "A149 — filtres réellement appliqués (une valeur mal formée est ignorée)" }) })
   .meta({ id: "AdminAuditResponse" });

@@ -24,7 +24,15 @@ describe("buildAuditWhere (A149)", () => {
     });
   });
   it("une valeur mal formée est IGNORÉE, jamais une erreur : le journal reste lisible", () => {
-    expect(buildAuditWhere({ adminUserId: "pas-un-id", action: "select * from", targetType: "user", targetId: "42", ip: "  ", from: "hier" })).toEqual({});
+    expect(buildAuditWhere({ adminUserId: "pas-un-id", action: "select * from", targetType: "user", targetId: "{ $ne: 1 }", ip: "  ", from: "hier" })).toEqual({});
+    expect(buildAuditWhere({ targetId: "a b" })).toEqual({});
+    expect(buildAuditWhere({ targetId: "x".repeat(101) })).toEqual({});
+  });
+  it("ANO-ADM-74 — l'identifiant de cible accepte une clé de paramètre, `maintenance` et l'identifiant d'une session admin", () => {
+    expect(buildAuditWhere({ targetId: "pricing.commissionPct" })).toEqual({ targetId: "pricing.commissionPct" });
+    expect(buildAuditWhere({ targetId: " maintenance " })).toEqual({ targetId: "maintenance" });
+    expect(buildAuditWhere({ targetId: "7f543d7e65fc5841f2fbe4e6bb7fb4a5" })).toEqual({ targetId: "7f543d7e65fc5841f2fbe4e6bb7fb4a5" });
+    expect(appliedAuditFilters({ targetType: "SETTINGS", targetId: "alerts.outboxLagMinutes" })).toEqual(["targetType", "targetId"]);
   });
   it("appliedAuditFilters nomme les filtres retenus, pour que l'écran n'en affiche pas un ignoré", () => {
     expect(appliedAuditFilters({ adminUserId: OID, action: "nope" })).toEqual(["adminUserId"]);

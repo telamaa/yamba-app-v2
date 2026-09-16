@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, BOOKING_STATUS_LABEL, DOCUMENT_TYPE_LABEL, TICKET_REASON_LABEL, TICKET_STATUS_LABEL, TRANSPORT_MODE_LABEL, TRIP_STATUS_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, auditDetail, BOOKING_STATUS_LABEL, DOCUMENT_TYPE_LABEL, TICKET_REASON_LABEL, TICKET_STATUS_LABEL, TRANSPORT_MODE_LABEL, TRIP_STATUS_LABEL, dateTime, money } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, AdminTripFile } from "@/lib/types";
 
@@ -77,7 +77,7 @@ export default function TripFileView({ tripId }: { tripId: string }) {
       </Card>
       <Card title="Actions admin sur ce trajet" className="mt-5">
         {file.adminActions.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
-          <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{a.after ? <span className="ml-1 font-mono text-[11px] text-slate-500">{JSON.stringify(a.after)}</span> : null}</li>)}</ul>
+          <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{auditDetail(a.after) ? <span className="ml-1 text-[11.5px] text-slate-500">— {auditDetail(a.after)}</span> : null /* ANO-ADM-73 */}</li>)}</ul>
         )}
       </Card>
     </div>
