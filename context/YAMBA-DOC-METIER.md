@@ -5397,3 +5397,52 @@ annulation avant acceptation).
 - Une file « Argent sans destination » dans Finances (et une alerte) à partir du bilan : une file de plus, mais le seul
   moyen de voir ces deals sans ouvrir chaque fiche.
 - Lister chaque remboursement d'un deal (aujourd'hui le cumul et la date du dernier seulement).
+
+
+---
+
+# Back-office — rapprocher l'argent avec le fournisseur sans rien toucher (cahier 02-ADMIN § 5.13)
+
+*(PR `chore/recette-admin-5-13`, 14/09/2026 — ADM-RAP-1 à 3.)*
+
+## Le besoin
+
+Quand un membre dit « j'ai été remboursé deux fois » ou « je n'ai rien reçu », Finance doit savoir ce que le fournisseur
+de paiement a réellement fait, et le comparer à ce que Yamba a enregistré — sans qu'un clic corrige quoi que ce soit à sa
+place, et sans confondre « le fournisseur ne connaît pas ce paiement » avec « le fournisseur ne répond pas ».
+
+## Les règles
+
+**RG-ADM-RAP-01 — Le rapprochement est une lecture** : il ne modifie ni la base, ni l'état du paiement chez le
+fournisseur. Toute correction est un geste humain journalisé, ailleurs.
+
+**RG-ADM-RAP-02 — Chaque écart est nommé, chiffré et expliqué** : ce qui diverge, le montant en base et chez le
+fournisseur, la conséquence pour le membre et ce qu'il ne faut PAS faire (ne pas rembourser à nouveau, ne pas re-verser).
+
+**RG-ADM-RAP-03 — « Introuvable » et « injoignable » sont deux réponses différentes** : un paiement inconnu du
+fournisseur est une divergence ; un fournisseur qui ne répond pas n'est pas une divergence — rien n'est comparé, l'écran
+invite à réessayer.
+
+**RG-ADM-RAP-04 — Chaque rapprochement est journalisé**, réussi ou non, avec le fournisseur et les écarts (codes
+seulement, jamais de données de carte).
+
+**RG-ADM-RAP-05 — Finance et Médiateur rapprochent ; le Support ne voit ni la carte ni l'argent** (403 serveur).
+
+**RG-ADM-RAP-06 — Un deal sans paiement n'a rien à rapprocher** (400, aucun bouton, rien au journal).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| RAP-1 | Rapprocher un deal du jeu d'essai, deux fois | « Paiement introuvable » les deux fois, base et fiche inchangées, deux lignes de journal | oui (ANO-ADM-31 close) |
+| RAP-1b | Deal sans paiement | « Aucun paiement à rapprocher. », 400 à l'appel direct | oui |
+| RAP-2 | Base décalée après un vrai versement et un vrai remboursement | chaque écart nommé avec ses deux montants et le geste | oui (4 écarts en local ; Stripe réel ⏭) |
+| RAP-3 | Support, Médiateur, identifiants faux | 403 / rapprochement / 404 et 400 | oui |
+| RAP-4 | Fournisseur injoignable | « ne répond pas, rien comparé », tentative journalisée | oui (tests unitaires, ANO-ADM-32 close) |
+
+## Ce qui reste à trancher
+
+- Un rapprochement **automatique** quotidien des deals de la veille, qui alimente une file « Divergences » et une alerte :
+  aujourd'hui, un écart n'existe que si quelqu'un clique.
+- Sur « paiement introuvable », vérifier quand même le transfert enregistré (un versement sans paiement connu est l'écart
+  le plus grave).

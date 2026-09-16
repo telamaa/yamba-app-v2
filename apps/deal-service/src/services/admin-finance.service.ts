@@ -8,9 +8,9 @@
  * Chaque geste est journalisé dans la MÊME transaction que son écriture.
  */
 import prisma from "@packages/libs/prisma";
-import { NotFoundError, ValidationError } from "@packages/error-handler";
+import { AppError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import type { PaymentProvider } from "@packages/payments";
+import { PaymentIntentNotFoundError, type PaymentProvider } from "@packages/payments";
 import type {
   AdminDealMoneyFile,
   FinanceQueueItem,
@@ -330,7 +330,14 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           insp
         );
       } catch (err) {
-        divergences = [{ code: "INTENT_NOT_FOUND", message: `The provider could not return this payment: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300), dbCents: null, liveCents: null }];
+        // ANO-ADM-32 — « introuvable » est une réponse du fournisseur ; une panne n'en est pas une. Avant, toute erreur
+        // (réseau, clé révoquée, limite de débit) s'affichait « Paiement introuvable chez le fournisseur » : l'admin
+        // cherchait un paiement perdu là où Stripe était simplement injoignable.
+        if (!(err instanceof PaymentIntentNotFoundError) && (err as { name?: string } | null)?.name !== "PaymentIntentNotFoundError") {
+          await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: [], providerError: "PROVIDER_UNAVAILABLE" }));
+          throw new AppError("The payment provider could not be reached: nothing was compared, try again later.", 503, true, { code: "PROVIDER_UNAVAILABLE" });
+        }
+        divergences = [{ code: "INTENT_NOT_FOUND", message: "The payment provider does not know this payment intent.", dbCents: null, liveCents: null }];
       }
       await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: divergences.map((d) => d.code) }));
       return { provider: provider.name, checkedAt: now.toISOString(), live, divergences };

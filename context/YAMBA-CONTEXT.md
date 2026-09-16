@@ -784,6 +784,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   (« Deal introuvable. »). PIEGE DE PILE : un `nx run-many --target=serve --all` (lance le 13/09 22:33) a repris le port
   6003 avec le fournisseur STRIPE pendant le redemarrage du bundle FAKE → PAYMENT_STATE_CONFLICT au rejeu de RET-2 ;
   verifier `lsof -iTCP:6003` + `ps` apres chaque relance. Tests : deal 595, harnais 416. Reste : § 5.13 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.13 RAPPROCHEMENT AVEC LE FOURNISSEUR (branche `chore/recette-admin-5-13`, empilee sur
+  #313)** — 3 scenarios CONFORMES (RAP-1, RAP-2 partielle Stripe reel, + RAP-3 gardes), joues contre le code non corrige
+  (RAP-1 rouge), puis verts deux fois (`adm-rap-rapprochement.spec.ts`) ; ARG, FIN, RET (adaptee), MED rejouees (27/27).
+  Terrain SONDE : 26 deals rapproches par l'API. ANO-ADM-31 CLOSE (majeure) : `FakePaymentProvider.inspect` passait par
+  `retrieve` → adoptait les intents seedes (AUTHORIZED 0 EUR) → fausses divergences CAPTURE_RECORDED_NOT_LIVE /
+  TRANSFER_MISSING et une lecture qui ecrit. ANO-ADM-32 CLOSE (majeure) : toute erreur fournisseur lue « paiement
+  introuvable », `transfers.retrieve` avalait toute erreur → `PaymentIntentNotFoundError` + `isStripeResourceMissing`,
+  panne = 503 PROVIDER_UNAVAILABLE journalise. A163. RAP-2 prouve en local REFUND_NOT_RECORDED (le code bloquant du
+  cahier), REFUND_RECORDED_NOT_LIVE, TRANSFER_AMOUNT_MISMATCH, TRANSFER_MARKED_REVERSED_BUT_LIVE_OK (geste d'argent reel
+  sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
+  refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
+  fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

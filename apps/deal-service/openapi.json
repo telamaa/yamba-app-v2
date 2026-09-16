@@ -2714,7 +2714,7 @@
           "admin"
         ],
         "summary": "Reconcile with the payment provider (D58 4A, A112) — read-only, journaled",
-        "description": "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database (REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal. Journal DEAL_RECONCILED.",
+        "description": "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database (REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal — nor the provider: an intent the provider does not know stays unknown (INTENT_NOT_FOUND). Journal DEAL_RECONCILED. 503 details.code = PROVIDER_UNAVAILABLE when the provider cannot be reached (network, key, rate limit): nothing was compared, the attempt is journaled (ANO-ADM-32).",
         "operationId": "adminReconcileDeal",
         "security": [
           {
@@ -2789,6 +2789,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Payment provider unreachable — details.code = PROVIDER_UNAVAILABLE (nothing compared, attempt journaled)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

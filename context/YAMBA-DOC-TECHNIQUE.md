@@ -8360,3 +8360,89 @@ lève jamais rien. La fiche remet donc le défaut d'origine en base (manœuvre c
 - deal-service **595** (+8) : `moneyBalance` (6), `AUTHORIZATION_RELEASED` (1), `redactContacts` (1).
 - `apps/e2e` : **416 scénarios** (411 + 5), 5/5 verts deux fois ; ADM-RET et ADM-FIN rejouées.
 - Typecheck deal-service, admin-ui et harnais verts ; les cinq `openapi.json` régénérés (nouveau schéma `MoneyBalance`).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.13 : le rapprochement avec le fournisseur — une lecture qui ne crée rien, une panne qui ne ment pas
+
+*(PR `chore/recette-admin-5-13`, empilée sur #313, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Trois fiches (ADM-RAP-1 à 3), deux anomalies closes (`ANO-ADM-31`, `ANO-ADM-32`), décision **A163**.
+
+```
+packages/libs/payments/src/index.ts                     PaymentIntentNotFoundError, isStripeResourceMissing ; Fake.inspect sans adoption ;
+                                                        Stripe.inspect : seule l'absence vaut « introuvable »
+apps/deal-service/src/services/admin-finance.service.ts reconcileDeal : introuvable → INTENT_NOT_FOUND ; panne → 503 PROVIDER_UNAVAILABLE journalisé
+apps/deal-service/src/openapi/build-openapi.ts          503 documenté (+ les cinq openapi.json régénérés)
+apps/admin-ui/src/components/DealMoneyView.tsx          carte : fournisseur nommé, refus par code, aide par divergence, statuts FR
+apps/admin-ui/src/lib/format.ts                         DIVERGENCE_HELP, INTENT_STATUS_LABEL, REFUND_STATUS_LABEL, PROVIDER_LABEL
+apps/e2e/src/admin/adm-rap-rapprochement.spec.ts        NOUVEAU — 3 scénarios
+apps/e2e/src/admin/adm-ret-retenue.spec.ts              RET-1 : transfert lu en base quand l'intent seedé est inconnu du Fake
+```
+
+## ANO-ADM-31 : une lecture qui écrit
+
+Le Fake est en mémoire. Pour que les gestes du développeur (accepter, annuler) marchent sur les deals du jeu d'essai,
+`retrieve` **adopte** tout id `pi_fake_seed_…` inconnu : il le matérialise AUTHORIZED à 0 €. `inspect` passait par
+`retrieve` : le premier rapprochement créait donc un paiement « autorisé, rien encaissé », puis le comparait à une base
+qui dit « capturé » — `CAPTURE_RECORDED_NOT_LIVE`, `TRANSFER_MISSING`. Deux défauts en un : une divergence inventée, et
+une lecture qui modifie l'état du fournisseur.
+
+```ts
+async inspect(input) {
+  const known = this.intents.get(input.intentId);          // pas d'adoptSeeded ici
+  if (!known) throw new PaymentIntentNotFoundError(input.intentId);
+  …
+}
+```
+
+Conséquence assumée (A163) : un intent seedé qu'aucun geste d'argent n'a touché dans ce processus est illisible par le
+rapprochement — exactement comme un intent inconnu de Stripe. ADM-RET-1 (compensation sans remboursement) lit donc le
+transfert en base ; ADM-RAP-2 prouve la lecture du transfert chez le fournisseur après un vrai geste.
+
+## ANO-ADM-32 : « introuvable » est une réponse, « injoignable » n'en est pas une
+
+```ts
+export function isStripeResourceMissing(err: unknown): boolean {
+  const e = err as { code?: unknown; statusCode?: unknown; type?: unknown } | null;
+  return !!e && (e.code === "resource_missing" || (e.statusCode === 404 && e.type === "StripeInvalidRequestError"));
+}
+```
+
+`StripePaymentProvider.inspect` ne traduit en `PaymentIntentNotFoundError` que cette erreur-là, et la lecture du transfert
+ne met `null` (→ `TRANSFER_MISSING`) que sur une absence. Le service :
+
+```ts
+} catch (err) {
+  if (!(err instanceof PaymentIntentNotFoundError) && err?.name !== "PaymentIntentNotFoundError") {
+    await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: [], providerError: "PROVIDER_UNAVAILABLE" }));
+    throw new AppError("The payment provider could not be reached: nothing was compared, try again later.", 503, true, { code: "PROVIDER_UNAVAILABLE" });
+  }
+  divergences = [{ code: "INTENT_NOT_FOUND", message: "The payment provider does not know this payment intent.", dbCents: null, liveCents: null }];
+}
+```
+
+Le double test (`instanceof` ET `name`) protège d'un bundle qui chargerait deux copies de la bibliothèque. La tentative est
+journalisée : un administrateur a bien demandé à lire l'argent chez le fournisseur.
+
+## La fiche : prouver « rien n'est modifié » sans se mentir
+
+- **Base** : le document Mongo du deal relu avant / après, comparé en entier.
+- **Fiche argent** : identique, **sauf** `adminActions` (le journal du deal, qui gagne des lignes par construction) — et
+  la fiche vérifie que les lignes ajoutées ne sont QUE `DEAL_MONEY_VIEWED` et `DEAL_RECONCILED`.
+- **Fournisseur** : deux rapprochements successifs répondent la même chose.
+- **Divergences réelles en local** : un geste d'argent réel (relance du versement, remboursement manuel de 1 €) fait
+  connaître l'intent au Fake ; la base est ensuite décalée champ par champ (manœuvres consignées), chaque écart est exigé
+  avec ses deux montants. Le Fake **cumule** ses remboursements d'un rejeu à l'autre : la fiche part de ce qu'il montre
+  (`L`) et pose la base à `L`, `L−100`, `L+400`.
+- **Rejouabilité** : la mémoire du Fake survit au rejeu du jeu d'essai ; RAP-1 choisit le premier deal dont l'intent est
+  encore inconnu (le sonder ne change rien : c'est le sujet même de la fiche).
+
+## Tests
+
+- deal-service **598** (+3) : Fake sans adoption, `isStripeResourceMissing`, 503 journalisé.
+- `apps/e2e` : **419 scénarios** (416 + 3), 3/3 verts deux fois ; ADM-ARG, FIN, RET (adaptée), MED rejouées (27/27).
+- Typecheck deal-service, admin-ui, harnais verts ; les cinq `openapi.json` régénérés (503 du rapprochement).

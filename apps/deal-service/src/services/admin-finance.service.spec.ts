@@ -121,6 +121,16 @@ describe("reconcileDeal (A112) — lecture seule", () => {
     const r = await makeService().reconcileDeal(ADMIN, ID);
     expect(r.live).toBeNull();
     expect(r.divergences[0].code).toBe("INTENT_NOT_FOUND");
+    expect(r.divergences[0].message).toBe("The payment provider does not know this payment intent.");
+  });
+  it("ANO-ADM-32 : une PANNE du fournisseur n'est pas « paiement introuvable » → 503 PROVIDER_UNAVAILABLE, tentative journalisée, base intacte", async () => {
+    const provider = new FakePaymentProvider();
+    jest.spyOn(provider, "inspect").mockRejectedValue(Object.assign(new Error("connect ECONNRESET"), { type: "StripeConnectionError" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: "pi_live" }));
+    recordAdminAction.mockClear();
+    await expect(makeService(provider).reconcileDeal(ADMIN, ID)).rejects.toMatchObject({ statusCode: 503, details: { code: "PROVIDER_UNAVAILABLE" } });
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "DEAL_RECONCILED", after: { provider: "FAKE", divergences: [], providerError: "PROVIDER_UNAVAILABLE" } }));
+    expect(prismaMock.booking.updateMany).not.toHaveBeenCalled();
   });
 });
 

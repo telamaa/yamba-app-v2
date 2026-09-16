@@ -67,7 +67,7 @@ export const ACTION_LABEL: Record<string, string> = {
   TICKET_VERIFIED: "Billet vérifié",
   TICKET_REJECTED: "Billet rejeté",
   DEAL_MONEY_VIEWED: "Fiche argent consultée",
-  DEAL_RECONCILED: "Rapprochement Stripe",
+  DEAL_RECONCILED: "Rapprochement fournisseur", // § 5.13 : en local le fournisseur est Fake, pas Stripe
   PAYOUT_RETRIED: "Versement rejoué",
   PAYOUT_REVERSAL_RESOLVED: "Renversement clos",
   FINANCE_EXPORTED: "Export finances",
@@ -117,6 +117,29 @@ export const DIVERGENCE_LABEL: Record<string, string> = {
   TRANSFER_MARKED_REVERSED_BUT_LIVE_OK: "Marqué renversé en base, pas de renversement chez Stripe",
   INTENT_NOT_FOUND: "Paiement introuvable chez le fournisseur",
 };
+/**
+ * Recette § 5.13 — ce que veut dire chaque divergence et QUI agit. L'écran affichait sous le libellé le message
+ * anglais du serveur ; l'administrateur y lit maintenant la conséquence et le geste, jamais une correction automatique.
+ */
+export const DIVERGENCE_HELP: Record<string, string> = {
+  CAPTURE_NOT_RECORDED: "L'Expéditeur a été débité mais la base l'ignore : ne rien relancer, signaler au développement avec l'identifiant du deal.",
+  CAPTURE_RECORDED_NOT_LIVE: "La base croit l'argent encaissé : aucun versement ni remboursement ne doit partir avant vérification dans le tableau de bord du fournisseur.",
+  REFUND_NOT_RECORDED: "De l'argent est reparti sans trace en base (souvent un remboursement fait à la main dans le tableau de bord) : ne pas rembourser à nouveau.",
+  REFUND_RECORDED_NOT_LIVE: "La base annonce un remboursement que le fournisseur ne montre pas : l'Expéditeur n'a peut-être rien reçu. Vérifier avant de lui répondre.",
+  TRANSFER_MISSING: "Le versement est noté envoyé mais le transfert n'existe pas chez le fournisseur : le Voyageur n'a probablement rien reçu.",
+  TRANSFER_AMOUNT_MISMATCH: "Le montant versé diffère du montant enregistré : comparer au prix figé avant tout geste.",
+  TRANSFER_REVERSED_NOT_MARKED: "Le fournisseur a repris l'argent du Voyageur mais la base dit « envoyé » : le deal doit passer par la file « Transferts renversés ».",
+  TRANSFER_MARKED_REVERSED_BUT_LIVE_OK: "La base croit le transfert renversé alors qu'il est intact : ne pas re-verser, l'argent est déjà chez le Voyageur.",
+  INTENT_NOT_FOUND: "Le fournisseur ne connaît pas ce paiement (en local : deal du jeu d'essai, attendu). En production, signaler au développement.",
+};
+/** Statut d'un paiement chez le fournisseur (PaymentAuthorizationStatus). */
+export const INTENT_STATUS_LABEL: Record<string, string> = {
+  REQUIRES_PAYMENT_METHOD: "en attente de carte", PROCESSING: "en cours", AUTHORIZED: "empreinte posée", CAPTURED: "encaissé", CANCELED: "annulé", UNKNOWN: "état inconnu",
+};
+/** Statut d'un remboursement chez le fournisseur (Stripe `refund.status`). */
+export const REFUND_STATUS_LABEL: Record<string, string> = { succeeded: "réussi", pending: "en cours", failed: "échoué", canceled: "annulé", requires_action: "action requise" };
+/** Nom du fournisseur tel qu'on le dit à un administrateur. */
+export const PROVIDER_LABEL: Record<string, string> = { STRIPE: "Stripe", FAKE: "le fournisseur de test (Fake)" };
 
 export const TICKET_REASON_LABEL: Record<string, string> = {
   ILLEGIBLE: "Document illisible",
@@ -186,7 +209,9 @@ export function timelineDetailLabel(detail: string | null): string | null {
   if (!detail) return null;
   return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
 }
-const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert" };
+const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert", providerError: "échec" };
+/** § 5.13 — valeurs codées du journal qui ont un libellé. */
+const AFTER_VALUE_LABEL: Record<string, string> = { PROVIDER_UNAVAILABLE: "fournisseur injoignable, rien comparé" };
 /** Le « after » d'une action admin en une ligne lisible (montants en euros, codes traduits) ; une clé inconnue garde son nom. */
 export function adminAfterSummary(after: unknown, currency = "EUR"): string | null {
   if (!after || typeof after !== "object") return null;
@@ -194,7 +219,7 @@ export function adminAfterSummary(after: unknown, currency = "EUR"): string | nu
   for (const [k, v] of Object.entries(after as Record<string, unknown>)) {
     if (v === null || v === undefined || (Array.isArray(v) && v.length === 0)) continue;
     const label = AFTER_KEY_LABEL[k] ?? k;
-    const value = /Cents$/.test(k) && typeof v === "number" ? money(v, currency) : k === "outcome" && typeof v === "string" ? (RESOLUTION_LABEL[v] ?? v) : k === "payoutStatus" && typeof v === "string" ? (PAYOUT_STATUS_LABEL[v] ?? v) : Array.isArray(v) ? v.map((x) => DIVERGENCE_LABEL[String(x)] ?? String(x)).join(", ") : String(v);
+    const value = /Cents$/.test(k) && typeof v === "number" ? money(v, currency) : k === "outcome" && typeof v === "string" ? (RESOLUTION_LABEL[v] ?? v) : k === "payoutStatus" && typeof v === "string" ? (PAYOUT_STATUS_LABEL[v] ?? v) : Array.isArray(v) ? v.map((x) => DIVERGENCE_LABEL[String(x)] ?? String(x)).join(", ") : (AFTER_VALUE_LABEL[String(v)] ?? String(v));
     parts.push(`${label} : ${value}`);
   }
   return parts.length ? parts.join(" · ") : null;
