@@ -843,6 +843,71 @@ Correction     : `BookingWizard` et `BookingMobile` grisent le bouton principal 
 Contre-épreuve : WEB-TRU-1 et WEB-TRU-2 : « Payer » `disabled` à côté de l'encadré, « Réessayer » visible.
 ```
 
+```
+ANO-WEB-41
+Fiche          : WEB-DEA-1 (chapitre 5.14) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : l'accueil et « Mes trajets » datent chaque ligne (« Paris → Brazzaville · sam. 26 sept. »),
+                 rangent un trajet parti dans l'historique et trient par date de départ.
+Obtenu         : « jeu. 1 janv. » sur TOUTES les lignes « À traiter », « trajet du 1 janv. » sur les
+                 remises, un trajet parti depuis six jours rangé dans « à venir » : `TripListItem` ne
+                 lisait que `departureDateLocal` / `departureTimeLocal`, des chaînes que SEUL le wizard
+                 de création écrit — absentes des trajets créés par l'API, le seed ou un futur client
+                 mobile (même famille qu'ANO-WEB-22, côté tableau de bord). Le repli était l'époque
+                 Unix (`new Date(0)`), et `isTripPastDeparture(null)` répondait « pas parti ».
+Correction     : `apps/user-ui/src/components/trips/list/trip-local-dates.ts` (pure) dérive les quatre
+                 chaînes locales de `departureAt` / `arrivalAt` dans le fuseau du lieu (`originTimezone`,
+                 `destinationTimezone`, repli navigateur) quand le wizard ne les a pas écrites ; appliquée
+                 UNE fois, dans les hooks de lecture `useMyTrips` et `useTrip` — tous les consommateurs
+                 (accueil, « Mes trajets », fiche du trajet, badge de navigation, tri, groupes) en héritent.
+Contre-épreuve : WEB-DEA-1 : « Demande de Aminata · Paris → Brazzaville · sam. 26 sept. », aucun « 1 janv. »,
+                 le trajet du 5 sept. dans « Historique ».
+```
+
+```
+ANO-WEB-42
+Fiche          : WEB-DEA-2 (chapitre 5.14) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : le bloc « MODALITÉS DE REMISE ET LIVRAISON » écrit chaque lieu une fois, et porte la
+                 mention « Téléphone du destinataire communiqué à la prise en charge ».
+Obtenu         : « Terminal départ · Paris / Terminal départ · Paris » (le détail répété sous le nom) et
+                 la mention absente : `toLocation` (deal.adapter) posait `name = details || city` ET
+                 `detail = details` ; la ligne de repli de la livraison (la mention) ne s'affichant que
+                 sans `detail`, elle n'apparaissait jamais.
+Correction     : `detail` n'est gardé que s'il diffère de `name` (deal.adapter.ts) : un lieu, une ligne ;
+                 la mention de la livraison revient. Même famille sur « Mon Deal accepté » : « LIVRAISON À
+                 Hall d'arrivée · Brazzaville · Brazzaville » (la ville ajoutée à un lieu qui la porte déjà) —
+                 `DealAcceptedRecap` n'ajoute la ville que si le lieu ne la contient pas.
+Contre-épreuve : WEB-DEA-2 : « Terminal départ · Paris » une seule fois, la mention présente ; WEB-DEA-9 :
+                 jamais « Brazzaville · Brazzaville ».
+```
+
+```
+ANO-WEB-43
+Fiche          : WEB-DEA-2 (chapitre 5.14) · Gravité : MINEURE · ÉTAT : OUVERTE
+Attendu        : le bloc « DE LA PART DE » dit « {n} envois » et « Membre depuis {mois} {année} ».
+Obtenu         : « AD Aminata D. Voir profil » seul. Les libellés (`shipperCard.shipmentCount`,
+                 `memberSince`) et le composant existent ; le DTO Voyageur (`toCounterpart`, deal-service)
+                 ne porte ni le compteur ni la date d'inscription — l'adapter le documente en tête.
+Proposition    : `memberSince` = `User.createdAt` (gratuit), `shipmentCount` = deals terminés de
+                 l'Expéditeur (un `count`, ou le compteur dénormalisé du TrustScore D71) dans le DTO
+                 Voyageur ; contrat OpenAPI à régénérer. PR dédiée.
+```
+
+```
+ANO-WEB-44
+Fiche          : WEB-DEA-9 (chapitre 5.14) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Le code reste secret. … Aminata le révèle à Clarisse quand tu confirmes le pickup. » et
+                 « Tu rencontres Clarisse, elle te donne le code à 6 chiffres ».
+Obtenu         : « Aminata le révèle à Hall … », « Tu rencontres Hall » : l'écran « Mon Deal accepté »
+                 (desktop ET mobile) prenait pour prénom du destinataire le PREMIER MOT du lieu de
+                 livraison (`deliveryLocation.name.split(" ")[0]` — un « TODO Phase backend » vieux de
+                 la maquette). L'API sert pourtant le prénom dès la création (`recipientForCarrier` ne
+                 retient que le téléphone avant le pickup) ; l'adapter ne l'exposait qu'après le pickup.
+Correction     : `DealDetail.recipientFirstName` (toujours servi) posé par l'adapter ; les deux vues
+                 acceptées et la vue « close » le lisent ; `recipient` (avec téléphone) attend toujours
+                 le pickup.
+Contre-épreuve : WEB-DEA-9 : la phrase du cahier mot pour mot avec « Clarisse » ; jamais « révèle à Hall ».
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1769,6 +1834,95 @@ deal-service sur le fournisseur FAKE.
   feuille mobile est aussi dans le DOM sur écran large).
 - **`--reporter=list` remplace le rapport HTML** : les annotations (`test.info().annotations`) ne sont
   plus écrites nulle part ; la preuve horaire du levier a été relue dans `AdminAction` et `Booking`.
+
+## Chapitre 5.14 — La demande côté Voyageur : accepter, refuser, expirer · **CONFORME** (9 fiches jouées, 3 après correction · 3 anomalies closes dont 2 MAJEURES, 1 mineure ouverte · 9 scénarios en série, 2 min 20)
+
+`web-dea.spec.ts`. Le pendant de l'assistant de réservation : où la demande apparaît chez Thomas, l'écran
+« Nouvelle demande de Deal » bloc par bloc, la Charte, l'acceptation (capture, notification, email, fil),
+le refus sans pénalité, l'expiration (avant et après le cron), deux décisions concurrentes, les états
+fermés, « Mon Deal accepté » en détail. Les demandes vivantes sont créées par l'assistant (Aminata sur
+`bzv-perkg`, 2,5 kg S 150 € avec photos : 32,20 € payés, 28,75 € nets — les chiffres du chapitre 5.12) ;
+le refus se joue sur `bzv-pending`, l'expiration sur `gru-pending` (manœuvre consignée + passe forcée
+`scripts/recette/expire.ts`), les états fermés sur les trois deals clos du seed. deal-service en FAKE.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-DEA-1 | Où la demande apparaît | **Conforme après correction** → `ANO-WEB-41` (MAJEURE : « jeu. 1 janv. » sur toutes les lignes, trajet parti rangé « à venir ») ; accueil : « À traiter · 7 », « Demande de Aminata · Paris → Brazzaville · sam. 26 sept. », « Vêtements · 2,5 kg · tu gagnes 28,75 € · reçue cette heure-ci », « Expire dans 23 h », « Répondre » ; « Mes trajets » : la même bande, le trajet « 26 sept. 2026 · Avion · En ligne · 1 demande », la section dépliée « Aminata D · Vêtements · 2,5 kg · Demande en attente de ta réponse · expire dans 23 h · Demande · + 28,75 € » ; fiche du trajet : « Demandes et colis · 1 demande » ; cloche : « Nouvelle demande de Aminata » / « Paris → Brazzaville · 2,5 kg · réponds sous 24 h » ; aucun onglet « Demandes ». **Écart** : pas de carte « {n} demandes en attente » / « À répondre » / « Voir les demandes » (copie présente dans `dashboardHome.json`, jamais rendue) — une ligne par demande à la place |
+| WEB-DEA-2 | L'écran « Nouvelle demande de Deal » | **Conforme après correction** → `ANO-WEB-42` (lieu écrit deux fois, mention du téléphone jamais affichée) ; « Reçue il y a 0min · Paris → Brazzaville · sam. 26 sept. », puce « Expire dans 23h 59min » **ambre**, **rouge et `role="alert"` à +90 min** (manœuvre `deal-eligible.ts`, remise à +23 h) ; « DE LA PART DE Aminata D. Voir profil » ; « DÉTAILS DU COLIS » (CATÉGORIE Vêtements, POIDS DÉCLARÉ 2,5 kg, VALEUR DÉCLARÉE 150 €, description) ; « PHOTOS DÉCLARÉES PAR Aminata », visionneuse (Fermer / Suivant / Précédent) ; « MODALITÉS DE REMISE ET LIVRAISON », « Téléphone du destinataire communiqué à la prise en charge » ; « Garantie Yamba incluse », jamais « assurance » ; « Avant d'accepter… » et ses quatre puces ; « TU GAGNES 28,75 € » ; **jamais 32,20, jamais « commission »**, ni à l'écran ni dans le DTO (`totalShipperCents` absent). **Écarts** : ni « {n} envois » ni « Membre depuis » (→ `ANO-WEB-43` ouverte), pas de ligne « État : demande reçue… », pas d'intitulé « COUVERTURE DU COLIS », note du gain « Versé 4 jours après livraison validée par code confidentiel » (le cahier écrit « Versement à J+4 … sur ton compte Stripe ») |
+| WEB-DEA-3 | La Charte est obligatoire | **Conforme** — sans la case : « Tu dois accepter la Charte pour confirmer ce Deal », on reste sur la demande, « Coche la Charte pour confirmer » ; les six engagements et la phrase de responsabilité ; cochée : « ✓ Charte acceptée », bouton actif |
+| WEB-DEA-4 | Accepter | **Conforme** — « Mon Deal accepté », « Tu es engagé sur ce Deal » / « Aminata est prévenue · à toi de fixer le rendez-vous pour le pickup », cinq jalons, « Contacte Aminata pour fixer le rendez-vous », « Envoyer un message », « Appeler », « TON PAIEMENT · Net pour toi · Versé à J+4 · Ton compte de paiement » ; Aminata : notification « Thomas a accepté ta demande », email « Ta demande … est acceptée » avec 32,20, Finances « Bloqué chez Yamba » ; le fil s'ouvre des deux côtés (même `conversationId`) |
+| WEB-DEA-5 | Refuser | **Conforme** — « Refuser cette demande ? » / « Aminata sera notifiée et pourra contacter un autre Voyageur. Ton taux d'acceptation reste intact. », « RAISON (OPTIONNEL) », **exactement cinq** radios, aucun champ libre, « Cette action est définitive », « Refuser le Deal » ; toast « Demande refusée. Aminata a été notifiée. », « Tu as refusé cette demande » ; Aminata : « Demande non acceptée » + phrase, email « n'a pas pu être acceptée » avec « Raison indiquée : Le colis est trop lourd pour la capacité restante. » ; kilos rendus (+3), profil public de Thomas identique (aucune pénalité). **Constat** : la raison est REFORMULÉE pour l'Expéditrice (le Voyageur a choisi « Poids ou volume trop important ») |
+| WEB-DEA-6 | Expirée | **Conforme** — `expiresAt` −25 h : « Cette demande a expiré » / « Expirée », plus aucun bouton ; `POST /deals/:id/accept` → **409 `TRANSITION_NOT_ALLOWED`** avant le cron ; passe forcée : `status: EXPIRED`, João : « Demande expirée » + phrase, email « Ta demande … a expiré » |
+| WEB-DEA-7 | Deux onglets | **Conforme** — onglet 1 accepte ; onglet 2 (figé sur sa lecture) refuse → **409**, toast « Ce deal a changé entre-temps. La page vient d'être actualisée. », relu sur « Tu es engagé sur ce Deal » ; DTO `ACCEPTED`, un seul débit « Bloqué chez Yamba » |
+| WEB-DEA-8 | États fermés | **Conforme** — « Tu as refusé cette demande » / « Cette demande a expiré » / « Cette demande a été annulée » + « Il n'y a plus d'action à faire ici. », seul « Retour » |
+| WEB-DEA-9 | « Mon Deal accepté » en détail | **Conforme après correction** → `ANO-WEB-44` (MAJEURE : « Aminata le révèle à **Hall** ») ; « DÉTAILS DU DEAL » (EXPÉDITEUR, CONTENU DÉCLARÉ, PICKUP — CHOISI PAR Aminata, LIVRAISON À) ; « Le code reste secret. Tu ne vois pas le code de livraison. Aminata le révèle à Clarisse quand tu confirmes le pickup. » ; « Le versement part après la période de vérification … sous 2 à 7 jours. » ; « Le jour J : la prise en charge » + « Confirmer la prise en charge » ; aucune suite de six chiffres à l'écran, aucun `deliveryCode` dans le DTO |
+
+### À trancher (produit)
+
+- **L'accueil** : une ligne par demande (« Demande de Aminata … Répondre ») plutôt qu'une carte par trajet
+  (« {n} demandes en attente » / « Voir les demandes »). La ligne est plus actionnable ; la copie morte
+  de `dashboardHome.json` (`liveTrip.demands*`) est à retirer ou à brancher. Amender le cahier.
+- **Le bloc « DE LA PART DE »** sans « {n} envois » ni « Membre depuis » : ANO-WEB-43 (DTO à enrichir).
+- **La note du gain** : « Versé 4 jours après livraison validée par code confidentiel » vs « Versement à
+  J+4 après livraison validée · sur ton compte Stripe » (les deux existent en JSON) ; et l'intitulé
+  « COUVERTURE DU COLIS », la ligne « État : demande reçue… » — trois textes du cahier non rendus.
+- **La raison du refus reformulée** dans l'email (« Le colis est trop lourd pour la capacité restante »)
+  : plus utile pour l'Expéditrice que le libellé du choix, mais le cahier dit « avec la raison ». Garder,
+  amender le cahier.
+- **« Reçue il y a 0min »** à la première minute : « à l'instant » — petit.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **DEA-1** — La ligne « Pickup avec Pauline · RDV · · checklist + photos » a un RDV vide (aucun rendez-vous
+  fixé) : masquer le segment ou écrire « rendez-vous à fixer » — petit. Le badge de navigation compte
+  les demandes ; un badge sur « Notifications » pour les seules non lues — petit.
+- **DEA-2** — Le compte à rebours est calculé sur `expiresAt` côté client : un poste à l'heure fausse
+  ment ; servir aussi `secondsLeft` — petit. La visionneuse : l'image interceptée ne se charge pas et
+  l'icône de repli reste sans message ; une vignette cassée devrait le dire — petit.
+- **DEA-3** — La Charte se coche sans avoir été déroulée ; exiger le défilement (comme proposé en RSV-14)
+  ou horodater l'acceptation dans le deal — vérifier que `charterAccepted` est bien persisté avec
+  `acceptedAt` — moyen.
+- **DEA-4** — La capture du paiement est synchrone à l'acceptation : un échec de capture après l'écriture
+  ACCEPTED ? Vérifier l'ordre (capture puis transaction, comme les remboursements manuels) — moyen,
+  revue de code deal-lifecycle.
+- **DEA-5** — « Ton taux d'acceptation reste intact » : ce taux n'existe nulle part à l'écran (ni profil
+  public, ni réputation) — soit le calculer et l'afficher, soit reformuler (« sans pénalité ») — petit.
+- **DEA-6** — Le cron passe toutes les 5 minutes ; entre-temps l'Expéditrice voit encore « En attente du
+  Voyageur » alors que le Voyageur voit « Expirée » : servir `isExpired` dans le DTO Expéditeur pour
+  afficher « expirée » dès la date, sans attendre le cron (l'argent, lui, attend la passe) — moyen.
+- **DEA-7** — Le verrou tient ; le message « la page vient d'être actualisée » arrive AVANT le rendu
+  actualisé (invalidation asynchrone) : afficher le toast à la fin du refetch — petit.
+- **DEA-8** — Un deal fermé sans lien vers l'historique ni vers le trajet : ajouter « Voir mes trajets »
+  — petit.
+- **DEA-9** — Un « TODO Phase backend » vieux de la maquette a survécu jusqu'à la recette (ANO-WEB-44) :
+  bannir les `split(" ")[0]` sur des libellés — un `grep "TODO Phase"` dans le front pour lister les
+  autres survivants — petit, et le plus rentable.
+- **Transversal** — Deux MAJEURES sur des données que l'API sert déjà (`departureAt`, `recipient.firstName`)
+  mais que le front ne lisait pas : une règle de revue « toute dérivation d'un libellé (split, premier
+  mot, date locale) est suspecte » vaut plus qu'un test — et un test de composant des vues acceptées
+  avec un deal fixture aurait pris DEA-9.
+
+### Pièges de poste payés ici
+
+- **Toute la ligne « À traiter » est un lien** : « Répondre » n'est pas un bouton, c'est le libellé de
+  l'action ; viser `a[href="/fr/carrier/deals/<id>"]` et filtrer sur le texte.
+- **`innerText` respecte `text-transform`** : « RAISON (OPTIONNEL) », « PICKUP — CHOISI PAR AMINATA »
+  arrivent en capitales ; comparer sans casse.
+- **Le titre et sa méta sont deux nœuds adjacents** (« Demande de Aminata· Paris → … » sans espace) :
+  ` ?·` dans le motif.
+- **Une puce se vise par son libellé et son parent** (`getByText("Expire dans").locator("xpath=..")`),
+  pas par un `div` filtré sur le texte (les ancêtres correspondent aussi).
+- **Deux onglets « sans recharger »** : TanStack relit le deal au retour du focus ; figer la réponse
+  (`page.route` qui rejoue la première lecture) jusqu'au clic de confirmation, puis `unroute`.
+- **Un script de recette qui importe un service** (`expire.ts`) a une sortie qui ne se lit pas de
+  façon fiable depuis `execFileSync` ; la preuve est l'état relu par l'API (`status: EXPIRED`).
+- **Un deal fermé n'a pas de titre** : attendre « Il n'y a plus d'action à faire ici. » plutôt qu'un
+  `heading`.
+- **Les vignettes photo sont des boutons** ; l'image interceptée (ImageKit) ne se charge pas, l'icône de
+  repli reste : cliquer le bouton, pas l'`img`.
+- **`nx typecheck user-ui` / `admin-ui`** : la cible inférée par `@nx/js/typescript` a disparu sur le
+  poste en cours de session (les services l'ont encore) ; la CI lance `tsc -p apps/user-ui` directement —
+  `npx tsc --noEmit -p apps/user-ui/tsconfig.json` est l'équivalent.
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
