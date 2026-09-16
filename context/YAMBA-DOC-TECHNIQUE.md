@@ -9932,7 +9932,9 @@ proposition annule proprement la première — une contre-proposition, ce qui es
 
 ## Tests
 
-message-service **57 → 68**, auth-service **376 → 393** (total plateforme **1116 → 1144**). Quatre nouvelles
+message-service **57 → 68**, auth-service **376 → 393**. Totaux mesurés après la passe : trip 293, deal 644,
+notification 122, message 68 — soit **1116 → 1127** dans la base annoncée par `CLAUDE.md` (qui exclut auth) — et
+auth 393, soit **1492 → 1520** toutes suites confondues. Quatre nouvelles
 fiches : `conversation-concurrency.service.spec.ts`, `conversation-retention-concurrency.spec.ts`,
 `profile-concurrency.controller.spec.ts`, `auth-concurrency.controller.spec.ts`, plus trois scénarios ajoutés
 à `google-auth.service.spec.ts`. Aucune horloge, aucun hasard : les courses se jouent en faisant échouer la
