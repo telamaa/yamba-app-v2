@@ -53,6 +53,13 @@ describe("platform-settings.service — update", () => {
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0].recipients.map((u: { id: string }) => u.id)).toEqual(["sa1", "sa2"]);
   });
+  it("ANO-ADM-11 — les destinataires excluent les comptes effacés ET les adresses en suppression (D35 4A)", async () => {
+    const db = fakeDb();
+    const spy = jest.spyOn(db.user, "findMany");
+    const svc = makePlatformSettingsService({ db, notify: jest.fn().mockResolvedValue(undefined) });
+    await svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 0 });
+    expect((spy.mock.calls[0][0] as { where: unknown }).where).toMatchObject({ AND: [{ isDeleted: false, OR: [{ emailSuppressedAt: null }, { emailSuppressedAt: { isSet: false } }] }] });
+  });
   it("refuse hors bornes (400 avec la clé), une clé inconnue, un motif trop court, et « rien à changer »", async () => {
     const svc = makePlatformSettingsService({ db: fakeDb() });
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 25 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, details: { errors: { "pricing.commissionPct": expect.stringContaining("between 5 and 20") } } });

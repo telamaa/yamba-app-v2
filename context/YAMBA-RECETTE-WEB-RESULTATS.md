@@ -4680,6 +4680,83 @@ venir, fin passée), la borne `gt: new Date(0)` règle le cas null.
 
 ---
 
+## Cahier 02-ADMIN — § 5.5 Suppression d'adresse email · **CONFORME** (1 fiche du cahier + 3 fiches de preuve · 2 anomalies closes · 1 défaut de concurrence corrigé · 6 améliorations faites · 2 écarts documentaires · 4 scénarios, 3 min 30)
+
+`apps/e2e/src/admin/adm-eml-suppression.spec.ts`. La liste de suppression (D35 4A) ne se juge pas au bandeau : elle se
+juge à **ce qui ne part plus**, puis à **ce qui repart**. Trois partis pris : la suppression naît du **vrai chemin**
+(webhook Svix signé avec le secret du poste, via la passerelle — pas « le champ posé à la main » que le cahier autorise) ;
+« aucun email » se prouve par deux envois réels **attendus puis absents** (email d'administration d'un billet, accusé de
+signalement) ; « les emails repartent » par le même accusé, **reçu** après la levée. Thomas (Voyageur du billet en
+attente du jeu d'essai) porte la fiche ; adresses rétablies en `finally`, jeu d'essai rejoué en fin de chapitre. Joué
+deux fois de suite, vert les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-EML-0 | La suppression naît du webhook (fiche ajoutée) | **Conforme** — signature fausse → **401** `BAD_SIGNATURE`, rien ne change ; rebond **temporaire** → 200, `suppressed: false`, adresse conservée ; rebond **dur** → 200, `suppressed: true`, `emailSuppressedAt` posé, motif `HARD_BOUNCE` ; rejeu → sans effet, date d'origine gardée |
+| ADM-EML-1 | Lever une suppression d'adresse | **Conforme après correction** → `ANO-ADM-10` ; Thomas en suppression (webhook) : le Support **valide son billet** → aucun « Billet vérifié pour ton trajet Paris → Brazzaville » ; Thomas **signale** un trajet → aucun « Ton signalement a bien été reçu » ; levée sans motif → 400 `REASON_REQUIRED` (A155) ; fiche : bandeau ambre « Adresse sur la liste de suppression depuis le 14 sept. 2026, 00:55 (rebond dur) : aucun email ne lui est envoyé. » ; « Lever (adresse corrigée) » → motif (bouton inactif sous 20 caractères) → « Confirmer la levée » → 200, « Suppression levée : les emails repartent vers thomas.carrier@seed.yamba.dev. », bandeau disparu, `emailSuppressedAt` null ; rechargement : pas de bandeau ; nouveau signalement → l'accusé **arrive** ; rappel direct → **400** « This address is not suppressed. » (`EMAIL_NOT_SUPPRESSED`) ; journal : **une** ligne `EMAIL_SUPPRESSION_LIFTED USER · id`, avant `{ emailSuppressedAt, reason: "HARD_BOUNCE" }`, après `{ emailSuppressedAt: null, liftReason }` |
+| ADM-EML-2 | Plainte, concurrence, droits (fiche ajoutée) | **Conforme après correction** (500 de concurrence) — plainte → bandeau « (plainte) » et, à la levée, « Ce membre a signalé un email comme indésirable : ne lève que s'il te l'a demandé. » ; Finance : pas de bouton, **403** ; Médiateur et Support lèvent **en même temps** → 200 + **400**, **une** ligne de journal ; l'écran resté ouvert affiche « Cette adresse n'est plus sur la liste de suppression (déjà levée, peut-être depuis un autre onglet). La fiche est rechargée. » ; compte **admin** en suppression : le Support n'a pas de bouton, 403 `SUPER_ADMIN_ONLY`, le super administrateur lève ; motif inconnu (manœuvre consignée) → « (motif non renseigné) » |
+| ADM-EML-3 | Les emails aux super administrateurs (fiche ajoutée) | **Conforme après correction** → `ANO-ADM-11` ; contre-épreuve : adresse joignable → « Paramètres de la plateforme modifiés » **reçu** ; adresse du super administrateur supprimée (webhook) → le même geste de l'Exploitation → **rien** reçu ; paramètre rétabli |
+
+### Anomalies
+
+- **ANO-ADM-10 (majeure, close)** — **les emails d'administration des trajets ignoraient la liste de suppression.**
+  `emailCarrier` (`apps/trip-service/src/controllers/admin-trips.controller.ts` : billet vérifié / non validé, trajet
+  masqué / de nouveau visible) lisait le Voyageur sans `isDeleted` ni `emailSuppressedAt` : un compte dont l'adresse
+  avait rebondi dur — ou un compte effacé — recevait quand même l'email, ce que D35 4A interdit à « chaque résolveur ».
+  Établie par lecture du code, prouvée corrigée par ADM-EML-1 (aucun « Billet vérifié » vers l'adresse supprimée).
+  Correction : `apps/trip-service/src/lib/carrier-mailer.ts` (`makeCarrierMailer`, dépendances injectées, dit
+  `UNREACHABLE` et le journalise), branché dans le contrôleur ; 5 tests.
+- **ANO-ADM-11 (mineure, close)** — **les emails aux super administrateurs ignoraient la liste de suppression**
+  (changement de paramètres : `platform-settings.service.ts` ; maintenance : `admin-status.controller.ts`) : seuls les
+  comptes effacés étaient exclus. Correction : `AND: [reachableRecipientWhere()]` ; test sur la requête des destinataires.
+- **Défaut de concurrence (corrigé avec A155)** — deux levées simultanées : **500** « Something went wrong » pour la
+  seconde (MongoDB rejette sa transaction, `P2034`, mesuré dans le journal d'auth-service). Correction : écriture
+  conditionnelle + `withWriteConflictRetry` → 400 `EMAIL_NOT_SUPPRESSED`, une seule ligne de journal.
+
+### Améliorations faites
+
+- **Motif obligatoire à la levée** (A155) — `UnsuppressEmailRequestSchema` (≥ 20), `after.liftReason` au journal, contrat
+  OpenAPI régénéré ; service injectable `apps/auth-service/src/services/email-suppression.service.ts` (5 tests).
+- **Règle unique du destinataire joignable** — `packages/libs/email/src/recipient.ts` (`canReceiveEmail`,
+  `reachableRecipientWhere`, `suppressionReasonLabel`), exportée par `@packages/email` (4 tests, notification-service).
+- **Réessai sur conflit d'écriture partagé** — `packages/libs/prisma/write-conflict-retry.ts` (deal-service garde un
+  ré-export ; ses 4 tests passent inchangés).
+- **Écran de levée** (`UserFileView.tsx`) — formulaire motif + « Confirmer la levée », avertissement pour une plainte,
+  refus lus par leur code, message de réussite qui nomme l'adresse, message du refus concurrent conservé au niveau de la
+  fiche (le bandeau disparaît au rechargement), bouton caché sur un compte admin pour qui n'est pas super administrateur
+  (il suit la garde serveur), motif inconnu affiché « motif non renseigné » au lieu de « rebond dur ».
+- **Harnais** — webhook Svix signé par le secret du poste (`signer`, `webhook`), contre-épreuve systématique « reçu
+  quand joignable » avant « non reçu quand supprimé » (ADM-EML-3 était d'abord vert sans rien prouver : aucun autre super
+  administrateur ne reçoit l'email sur ce poste).
+
+### Écarts documentaires
+
+- **Le cahier appelle la levée sans corps** : elle exige désormais un motif (A155), et l'étape 3 passe par « Confirmer la
+  levée ». La ligne de journal gagne `after.liftReason`.
+- **« Ou poser le champ à la main »** : le webhook signé est jouable sur le poste (`RESEND_WEBHOOK_SECRET` posé) — le
+  cahier devrait le proposer en premier.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **EML-0** — *Produit* : conforme ; un rebond **temporaire** répété (dix fois en une semaine) n'aboutit jamais à une
+  suppression : proposé — compter les rebonds temporaires par adresse et supprimer au-delà d'un seuil (paramètre).
+  *Test* : **fait** — le chemin réel (signature, passerelle, service) est éprouvé, pas une écriture en base.
+- **EML-1** — *Produit* : **fait** — motif, message nommé, erreurs lues. Proposé : afficher sur la fiche les **derniers
+  emails en échec** (`EmailDelivery` : sujet, date, type de rebond) pour que le Support sache QUOI corriger avant de
+  lever — moyen. *Test* : **fait** — « aucun email » par deux envois réels attendus puis absents, « repartent » par un
+  envoi reçu.
+- **EML-2** — *Produit* : **fait** — avertissement plainte, concurrence sans 500, bouton aligné sur la garde serveur.
+  *Test* : **fait** — deux administrateurs réels en parallèle ; l'écran resté ouvert rejoue le refus.
+- **EML-3** — *Produit* : **fait** — ANO-ADM-11. *Test* : **fait** — la contre-épreuve « reçu avant suppression » ; sans
+  elle, la fiche passait sur un poste où l'email ne partait vers personne.
+- **Transversal** — *À trancher* : les emails **demandés par le membre lui-même** (code de connexion, réinitialisation
+  du mot de passe) et les notifications de sécurité (« mot de passe changé ») ignorent la suppression
+  (`apps/auth-service/src/utils/auth.helper.ts`). Les couper bloquerait un membre dont l'adresse a rebondi une fois ; les
+  laisser nuit à la réputation d'envoi. Proposition : envoyer les codes demandés (la demande prouve une adresse vivante),
+  couper les notifications non demandées.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

@@ -13,6 +13,8 @@ import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
 
 const MIN_REASON = 20;
+/** Recette § 5.5 — un motif inconnu (`UNKNOWN`) n'est plus affiché « rebond dur ». */
+const SUPPRESSION_REASON_LABEL: Record<string, string> = { HARD_BOUNCE: "rebond dur", COMPLAINT: "plainte" };
 
 /** Recette 02-ADMIN § 5.4 — un refus se lit par son code (A146), pas par son statut ; le message anglais reste un repli. */
 const SANCTION_REFUS: Record<string, string> = {
@@ -39,6 +41,7 @@ export default function UserFileView({ userId }: { userId: string }) {
   const [file, setFile] = useState<AdminUserFile | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null); // recette § 5.5 — le geste réussi se nomme
 
   const load = useCallback(() => {
     apiFetch<AdminUserFile>(`/admin/users/${userId}`).then(setFile).catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
@@ -68,10 +71,12 @@ export default function UserFileView({ userId }: { userId: string }) {
         {file.isMe && <span className="text-[11px] text-slate-500">(c'est toi : aucune action possible)</span>}
       </div>
 
+      {flash && !file.emailSuppression && <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">{flash}</p>}
       {file.emailSuppression && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
-          <span>Adresse sur la liste de suppression depuis le {dateTime(file.emailSuppression.at)} ({file.emailSuppression.reason === "COMPLAINT" ? "plainte" : "rebond dur"}) : aucun email ne lui est envoyé.</span>
-          {can(me?.adminRoles, "users.email.unsuppress") && !file.isMe && <UnsuppressButton userId={file.id} onDone={load} />}
+          <span>Adresse sur la liste de suppression depuis le {dateTime(file.emailSuppression.at)} ({SUPPRESSION_REASON_LABEL[file.emailSuppression.reason] ?? "motif non renseigné"}) : aucun email ne lui est envoyé.</span>
+          {/* Recette § 5.5 — le bouton suit la garde serveur : jamais sur soi, et un compte admin n'est levé que par un super administrateur. */}
+          {can(me?.adminRoles, "users.email.unsuppress") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles)) && <UnsuppressButton userId={file.id} email={file.email} complaint={file.emailSuppression.reason === "COMPLAINT"} onDone={load} onLifted={setFlash} />}
         </div>
       )}
       {file.suspension && (
@@ -300,19 +305,60 @@ function EraseCard({ file, onDone }: { file: AdminUserFile; onDone: () => void }
   );
 }
 
-/** D35 4A — lever la suppression après correction de l'adresse (journalisé). */
-function UnsuppressButton({ userId, onDone }: { userId: string; onDone: () => void }) {
+/** D35 4A — lever la suppression après correction de l'adresse (journalisé).
+ *  A155 (recette § 5.5) : un motif ≥ 20 caractères, un avertissement pour une plainte, le refus lu par son code, et un
+ *  message qui dit ce qui vient de changer — l'ancien bouton levait d'un clic et avalait toute erreur. */
+const SUPPRESSION_REFUS: Record<string, string> = {
+  EMAIL_NOT_SUPPRESSED: "Cette adresse n'est plus sur la liste de suppression (déjà levée, peut-être depuis un autre onglet). La fiche est rechargée.",
+  REASON_REQUIRED: `Le motif doit faire au moins ${MIN_REASON} caractères.`,
+  ADMIN_IS_SELF: "Aucune action sur ton propre compte.",
+  SUPER_ADMIN_ONLY: "Seul un super administrateur agit sur un compte admin.",
+  ADMIN_PERMISSION_DENIED: "Ton profil n'a pas ce droit.",
+};
+function UnsuppressButton({ userId, email, complaint, onDone, onLifted }: { userId: string; email: string; complaint: boolean; onDone: () => void; onLifted: (message: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="rounded-lg border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-medium">
+        Lever (adresse corrigée)
+      </button>
+    );
+  }
+  async function run() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await del(`/admin/users/${userId}/email-suppression`, { reason: reason.trim() });
+      setOpen(false);
+      setReason("");
+      onLifted(`Suppression levée : les emails repartent vers ${email}.`);
+      onDone();
+    } catch (e) {
+      const code = e instanceof ApiError ? (e.data as { details?: { code?: string } } | undefined)?.details?.code : undefined;
+      const texte = (code && SUPPRESSION_REFUS[code]) ?? (e instanceof ApiError ? `${e.status} : ${e.message}` : "Levée impossible.");
+      // Déjà levée ailleurs : le bandeau va disparaître au rechargement — le message vit donc au niveau de la fiche.
+      if (code === "EMAIL_NOT_SUPPRESSED") { onLifted(texte); onDone(); } else setMsg(texte);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const ok = reason.trim().length >= MIN_REASON;
   return (
-    <button
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try { await del(`/admin/users/${userId}/email-suppression`); onDone(); } finally { setBusy(false); }
-      }}
-      className="rounded-lg border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-medium disabled:opacity-50"
-    >
-      Lever (adresse corrigée)
-    </button>
+    <div className="w-full rounded-lg border border-amber-300 bg-white p-2 text-[12.5px] text-slate-800">
+      {complaint && <p className="mb-1 font-medium text-amber-900">Ce membre a signalé un email comme indésirable : ne lève que s'il te l'a demandé.</p>}
+      <label className="block">
+        Motif (journalisé, {MIN_REASON} caractères minimum)
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5" placeholder="Adresse corrigée, demande du membre…" />
+      </label>
+      <p className="mt-1 text-[11px] text-slate-500">Les emails repartiront vers {email}.</p>
+      <div className="mt-2 flex gap-2">
+        <button disabled={busy || !ok} onClick={run} className="rounded-lg bg-slate-900 px-2.5 py-1 text-[12px] font-semibold text-white disabled:opacity-40">Confirmer la levée</button>
+        <button onClick={() => { setOpen(false); setMsg(null); }} className="rounded-lg border border-slate-300 px-2.5 py-1 text-[12px]">Annuler</button>
+      </div>
+      {msg && <p className="mt-1 text-[12px] text-red-700">{msg}</p>}
+    </div>
   );
 }

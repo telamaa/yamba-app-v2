@@ -14470,6 +14470,21 @@
         ],
         "additionalProperties": false
       },
+      "UnsuppressEmailRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000,
+            "description": "Why the address can receive emails again (corrected, member request…) — journaled"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
       "InviteAdminRequest": {
         "type": "object",
         "properties": {

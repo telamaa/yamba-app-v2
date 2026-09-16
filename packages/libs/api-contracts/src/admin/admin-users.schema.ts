@@ -233,6 +233,14 @@ export const LiftSuspensionRequestSchema = z
   .meta({ id: "LiftSuspensionRequest" });
 export type LiftSuspensionRequest = z.infer<typeof LiftSuspensionRequestSchema>;
 
+/** A155 (recette 02-ADMIN § 5.5) — lever une suppression d'adresse porte un motif, comme lever une sanction : une plainte levée
+ *  sans raison écrite rouvre l'envoi vers quelqu'un qui a dit « spam ». Réponse : l'état de la fiche après levée. */
+export const EMAIL_UNSUPPRESS_MIN_REASON_LENGTH = 20;
+export const UnsuppressEmailRequestSchema = z
+  .object({ reason: z.string().trim().min(EMAIL_UNSUPPRESS_MIN_REASON_LENGTH).max(2000).meta({ description: "Why the address can receive emails again (corrected, member request…) — journaled" }) })
+  .meta({ id: "UnsuppressEmailRequest" });
+export type UnsuppressEmailRequest = z.infer<typeof UnsuppressEmailRequestSchema>;
+
 export const InviteAdminRequestSchema = z
   .object({
     email: z.string().trim().toLowerCase().email(),

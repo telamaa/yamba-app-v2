@@ -15,9 +15,10 @@ import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-
 import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, TicketQueueQuerySchema, resolveLocale, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
+import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, TicketQueueQuerySchema, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
 import { CSV_BOM, buildCsv, csvFilename } from "@packages/libs/csv";
 import { getTripAdminEmails } from "../emails/admin-trip-emails";
+import { makeCarrierMailer } from "../lib/carrier-mailer";
 import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
@@ -40,17 +41,13 @@ function meta(req: AuthenticatedRequest) {
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 const route = (t: { originCity: string | null; destinationCity: string | null }) => `${t.originCity ?? "?"} → ${t.destinationCity ?? "?"}`;
 
-async function emailCarrier(userId: string, build: (locale: string, u: { firstName: string; email: string }) => { subject: string; content: import("@packages/email").EmailContent }) {
-  if (!isEmailConfigured()) return;
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, email: true, preferredLocale: true } });
-  if (!u) return;
-  const locale = resolveLocale(u.preferredLocale);
-  const mail = build(locale, u);
-  // Best effort, mais JAMAIS muet : un email métier qui ne part pas se lit dans les journaux (recette 5.8).
-  await sendTransactionalEmail({ to: u.email, locale, subject: mail.subject, content: mail.content }).catch((err: unknown) => {
-    console.error(`[admin-trips] email « ${mail.subject} » non envoyé à ${u.email} :`, err instanceof Error ? err.message : err);
-  });
-}
+/** ANO-ADM-10 — la règle D35 (compte effacé, adresse en suppression) s'applique aussi aux emails d'administration. */
+const emailCarrier = makeCarrierMailer({
+  isConfigured: isEmailConfigured,
+  findUser: (userId) => prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, email: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true } }),
+  send: (mail) => sendTransactionalEmail(mail),
+  log: (message) => console.error(message),
+});
 
 async function adminNames(ids: Array<string | null | undefined>) {
   const clean = [...new Set(ids.filter((x): x is string => !!x))];

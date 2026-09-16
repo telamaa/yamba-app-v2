@@ -4949,3 +4949,55 @@ refus (date passée, levée d'un compte actif, profil sans droit) n'écrit rien.
   faut-il aussi suspendre les nouvelles demandes sur ses trajets ?
 - Confirmation avant de suspendre un compte qui a des deals en cours ; lien cliquable vers chaque deal dans l'email ops ;
   la levée devrait-elle retirer une proposition d'escalade en attente ?
+
+
+---
+
+# Back-office — une adresse qui rebondit ne reçoit plus rien, jusqu'à ce qu'on sache pourquoi (cahier 02-ADMIN § 5.5)
+
+*(PR `chore/recette-admin-5-5`, 14/09/2026 — ADM-EML-0 à 3.)*
+
+## Le besoin
+
+Écrire à une adresse qui n'existe plus, ou à quelqu'un qui a signalé nos emails comme indésirables, abîme la réputation
+d'envoi de Yamba : tous les autres membres finissent en « spam ». Le fournisseur nous prévient ; la plateforme doit
+cesser d'écrire à ce compte, **partout**, et le support doit pouvoir rouvrir l'envoi quand l'adresse est corrigée —
+en disant pourquoi.
+
+## Les règles
+
+**RG-ADM-EML-01 — Seuls un rebond définitif ou une plainte suppriment une adresse**, appris par un message signé du
+fournisseur ; un rebond temporaire ne supprime rien ; un message non signé est refusé.
+
+**RG-ADM-EML-02 — Une adresse supprimée ne reçoit plus AUCUN email de la plateforme** : notifications de deal,
+relances, alertes, emails d'administration (billet, masquage), emails internes aux administrateurs. Un compte effacé
+non plus. *(Les codes de connexion demandés par le membre lui-même : à trancher.)*
+
+**RG-ADM-EML-03 — La fiche membre le dit** : depuis quand, et pourquoi (rebond définitif, plainte, ou motif non
+renseigné).
+
+**RG-ADM-EML-04 — Lever une suppression exige un motif** (20 caractères minimum), journalisé avec la date et le motif
+d'origine. Pour une plainte, l'écran rappelle de ne lever qu'à la demande du membre.
+
+**RG-ADM-EML-05 — Lever est réservé** au Support, au Médiateur, au profil Données personnelles et au super
+administrateur ; jamais sur son propre compte ; sur un compte administrateur, super administrateur seul.
+
+**RG-ADM-EML-06 — Deux levées simultanées font une seule levée** : une ligne de journal, et le second administrateur
+lit « déjà levée ».
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| EML-0 | Message du fournisseur : faux, rebond temporaire, rebond définitif, répété | refusé ; sans effet ; adresse supprimée ; sans effet (date d'origine gardée) | oui |
+| EML-1 | Adresse supprimée : billet validé, signalement ; puis levée motivée ; puis signalement | aucun email ; bandeau disparu, une ligne de journal ; l'accusé arrive | oui (ANO-ADM-10 close) |
+| EML-2 | Plainte ; Finance ; deux levées simultanées ; compte admin ; motif inconnu | avertissement ; refus ; une levée, une ligne ; super administrateur seul ; « motif non renseigné » | oui |
+| EML-3 | Adresse d'un super administrateur supprimée, paramètre modifié | l'email arrive avant la suppression, plus après | oui (ANO-ADM-11 close) |
+
+## Ce qui reste à trancher
+
+- **Codes et notifications de sécurité** (code de connexion, réinitialisation, « mot de passe changé ») : aujourd'hui
+  envoyés même à une adresse supprimée. Proposition : envoyer ce que le membre **demande** (la demande prouve une adresse
+  vivante), couper les notifications non demandées.
+- **Rebonds temporaires répétés** : aucun seuil ne les transforme en suppression.
+- **Afficher les derniers emails en échec** sur la fiche, pour savoir quoi corriger avant de lever.

@@ -671,6 +671,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   escalades, badge « Actif (sanction echue) ». A TRANCHER : motif libre envoye au membre (motifs types ?), aucun email ni
   journal a l'echeance (acteur SYSTEM au journal), trajets d'un Voyageur restreint reservables. Tests : auth 242, trip
   262, deal 578, harnais 370. Poste : auth, trip, deal en bundles detaches (nohup). Reste : § 5.5 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.5 SUPPRESSION D'ADRESSE EMAIL (branche `chore/recette-admin-5-5`, empilee sur #305)** —
+  ADM-EML-1 + 3 fiches de preuve (EML-0 webhook signe, EML-2 plainte/concurrence/droits, EML-3 emails super admin),
+  CONFORMES, jouees deux fois vertes (`apps/e2e/src/admin/adm-eml-suppression.spec.ts`). La suppression nait du VRAI
+  webhook Svix signe (secret du poste, via la passerelle) ; « aucun email » prouve par deux envois reels attendus puis
+  absents, « repartent » par un envoi recu. DEUX ANOMALIES CLOSES : ANO-ADM-10 (MAJEURE) `emailCarrier` de trip-service
+  (billet, masquage) ignorait `emailSuppressedAt` ET `isDeleted` → `lib/carrier-mailer.ts` ; ANO-ADM-11 (mineure) emails
+  aux super admins (parametres, maintenance) → filtre joignable. + 500 sur deux levees simultanees (P2034). A155 : levee
+  MOTIVEE (>= 20, `after.liftReason`), ecriture conditionnelle + `withWriteConflictRetry` (remonte dans
+  `packages/libs/prisma`, re-export deal-service) ; regle partagee `canReceiveEmail` / `reachableRecipientWhere` dans
+  `@packages/email` (fragment a combiner sous AND). AMELIORATIONS FAITES : formulaire de levee, avertissement plainte,
+  refus par code, message qui survit au rechargement, bouton aligne sur SUPER_ADMIN_ONLY, « motif non renseigne »,
+  contre-epreuve systematique dans le harnais. OpenAPI regenere. A TRANCHER : codes de connexion / notifications de
+  securite envoyes a une adresse supprimee ; seuil de rebonds temporaires ; derniers emails en echec sur la fiche.
+  Tests : auth 248, trip 267, notification 119, deal 578, harnais 374. Reste : § 5.6 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
