@@ -658,6 +658,26 @@ Proposition    : Prisma ne sait pas déclarer un index épars ou partiel sur Mon
                  Voyageur de Thomas) sur l'image de test.
 ```
 
+```
+ANO-WEB-29
+Fiche          : WEB-ALR-7 (chapitre 5.10) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : après « Supprimer » puis « Confirmer », le toast « Alerte supprimée ».
+Obtenu         : la carte disparaissait, le compteur passait à « 1 alerte active », et AUCUN
+                 toast — deux exécutions sur deux. Le geste réussissait sans retour.
+Cause          : la suppression est OPTIMISTE (`useDeleteSavedRoute.onMutate` retire la carte de
+                 la liste avant la réponse) : le composant `SavedRouteCard` est démonté pendant
+                 que la requête court. Or les callbacks passés à `mutate(id, { onSuccess })`
+                 sont portés par l'observateur du composant, que TanStack Query détache au
+                 démontage — ils ne sont jamais appelés. Les callbacks déclarés dans les options
+                 du hook (`useMutation({ onSuccess })`), eux, sont portés par la mutation et
+                 survivent. « Prolonger » et « Email activé » ne démontent pas la carte : leurs
+                 toasts passaient.
+Correction     : `useDeleteSavedRoute({ onSuccess, onError })` accepte les retours et les
+                 appelle depuis les options du hook ; la carte lui passe ses deux toasts et
+                 appelle `deleteSavedRoute(id)` sans callbacks.
+Contre-épreuve : WEB-ALR-7 exige le toast « Alerte supprimée » (avant : « non vu » deux fois).
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1224,6 +1244,92 @@ petit / moyen / chantier.)*
 - **`innerText` et les espaces fines** : « ≈ 38,64 € » porte une espace insécable fine ;
   comparer avec `\s*`.
 - **La 404 et la page publique n'ont pas de `<main>`** : lire `body`.
+
+---
+
+
+## Chapitre 5.10 — Alertes de route · **CONFORME** (9 fiches jouées, 1 après correction · 1 anomalie mineure close · 9 scénarios en série, 1 min 45)
+
+Les villes du formulaire passent par l'autocomplétion Google (hors périmètre du harnais). L'écran
+est éprouvé pour tout ce qui n'en dépend pas — état vide, panneau, périodes, bascules, refus,
+cartes, prolonger, supprimer, compteur, bannière — et les alertes sont **créées par l'API**
+(`POST /saved-routes`, le contrat même du formulaire). Les publications qui déclenchent les
+emails viennent de Joséphine, par l'API du trip-service ; les emails sont lus dans Mailpit
+(trip-service sur l'env racine depuis le piège de 5.8). Les fiches s'enchaînent en série : chacune
+part de l'état laissé par la précédente, et la première remet Aminata à zéro alerte.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-ALR-1 | « Mes alertes route » vide | **Conforme** — « Mes alertes route », « Sois prévenu·e dès qu'un trajet correspondant à tes critères est publié. », « Aucune alerte pour l'instant », « Crée ta première alerte et reçois un email dès qu'un trajet correspond à tes critères. », « Créer ma première alerte » |
+| WEB-ALR-2 | Créer une alerte | **Conforme** — panneau « Nouvelle alerte » / « Reçois un email dès qu'un trajet correspond » ; périodes « 3 mois ★ », « 6 mois », « Sans limite », « Personnalisé » (→ « À partir du », « Jusqu'au ») ; bascules « Recevoir un email » et « Inclure les trajets proches » actives, avec leurs aides ; alerte Bruxelles → Kinshasa créée par l'API (3 mois, email, proches) : carte avec **« Email activé »** et **« Villes proches incluses »**, « 1 alerte active », « Nouvelle alerte ». Le toast « Alerte créée ! » n'est pas observé (création par l'API) |
+| WEB-ALR-3 | Les refus de création | **Conforme** — sans ville, « Créer l'alerte » est **désactivé** (le message « Sélectionne les deux villes » du cahier existe dans le code mais n'est pas atteignable : formulation) ; aucune requête ; départ = arrivée → `400 ROUTE_ALERT_INVALID` (« Origin and destination must be different. ») ; même corridor actif → `400 ROUTE_ALERT_DUPLICATE` ; toujours une seule alerte |
+| WEB-ALR-4 | L'alerte se déclenche à la publication | **Conforme** — Joséphine (qui porte la MÊME alerte) publie Bruxelles → Kinshasa (J+20) : email **« Nouveau trajet Bruxelles → Kinshasa »** à Aminata, en français, « Un nouveau trajet correspond à votre alerte », lien vers le trajet ; **rien** pour Joséphine (jamais le Voyageur lui-même). **Constat** : l'email vouvoie |
+| WEB-ALR-5 | L'anti-spam de 24 heures | **Conforme** — un second Bruxelles → Kinshasa dans la foulée : **aucun** email pour Aminata (boîte vidée, 10 s d'attente) |
+| WEB-ALR-6 | Les trajets proches | **Conforme** — Paris → Brazzaville **sans** « proches » : Orly → Brazzaville (≈ 15 km, coordonnées sur l'alerte et le trajet) ne déclenche rien ; option activée (alerte jamais notifiée) : un autre Orly → Brazzaville → email « Nouveau trajet Orly → Brazzaville », « Un trajet proche de votre alerte a été publié » ; Lille → Brazzaville (≈ 204 km) sur une alerte NEUVE (Pauline, pour ne pas confondre avec l'anti-spam) : rien. Villes : Paris 48.8566/2.3522 · Orly 48.7262/2.3652 · Lille 50.6292/3.0573 · Brazzaville −4.2634/15.2429 |
+| WEB-ALR-7 | Prolonger et supprimer | **Conforme après correction** → `ANO-WEB-29` ; « Prolonger » n'apparaît que sur une alerte **« Expire bientôt »** (< 7 jours) — échéance rapprochée par l'API (« jusqu'au » J+3) : « Alerte prolongée de 6 mois », échéance ≈ J+6 mois, badge disparu ; « Supprimer » → « Confirmer » (3 s pour se raviser) → **« Alerte supprimée »**, « 1 alerte active » |
+| WEB-ALR-8 | Le plafond de 20 alertes | **Conforme** — 20 alertes actives, la 21ᵉ → `400 ROUTE_ALERT_LIMIT`, message « maximum of 20 active route alerts » ; « 20 alertes actives » à l'écran ; tout est supprimé ensuite |
+| WEB-ALR-9 | La bannière en fin de liste | **Conforme** — Paris → Brazzaville, en bas des résultats : « Reste informé·e des futurs trajets », « Crée une alerte pour être prévenu·e dès qu'un nouveau trajet correspondant est publié. », « Créer une alerte » |
+
+### À trancher (produit)
+
+- **« Prolonger » seulement sous 7 jours** (ALR-7) : le cahier l'attend sur toute carte. Choix
+  raisonnable (une alerte à 5 mois n'a rien à prolonger) ; amender le cahier ou proposer le bouton
+  partout avec un libellé « Prolonger jusqu'au … ».
+- **« Sélectionne les deux villes »** (ALR-3) : le bouton désactivé remplace le message. Garder
+  le bouton désactivé et retirer la branche morte du code, ou activer le bouton et afficher le
+  message (plus explicite pour un lecteur d'écran).
+- **L'email d'alerte vouvoie** (« Un nouveau trajet correspond à votre alerte ») : le gabarit
+  `trip-published.ejs` prédate la décision du 03/09 (tutoiement). Un passage sur les trois
+  gabarits de `trip-notifications` — petit.
+- **Le message du plafond est en anglais** (« You can have a maximum of 20 … ») : c'est le
+  message API (anglais par contrat) ; l'écran devrait le traduire à partir du code
+  `ROUTE_ALERT_LIMIT` — vérifier ce que la modale affiche (non joué : création par l'API).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **ALR-1** — L'état vide est bon. Proposer directement un corridor à partir de la dernière
+  recherche (le brouillon `sessionStorage` existe) : « Créer une alerte Paris → Brazzaville » —
+  petit.
+- **ALR-2** — Le formulaire dépend de Google pour les villes : le même `CityAutocomplete` que la
+  recherche, avec les mêmes limites (référent `localhost`). Un repli « ville + pays » saisis à la
+  main quand Google est absent rendrait la fonction disponible partout et testable — moyen. La
+  période « 3 mois ★ » est recommandée : dire pourquoi (infobulle) — petit.
+- **ALR-3** — La règle « même ville » est dupliquée (écran + `validateSavedRoutePayload`) sans
+  code d'erreur distinct côté serveur (`ROUTE_ALERT_INVALID` + message anglais) : un code par
+  cause (`SAME_CITY`, `MISSING_CITY`, `DATE_RANGE_INVALID`) et une traduction par code — petit.
+- **ALR-4** — Le dispatch est déclenché `setImmediate` après la réponse, sans outbox : si le
+  processus tombe entre les deux, l'alerte n'est jamais notifiée et rien ne le sait. Passer par
+  l'outbox du trip-service (D-outbox : « aucun changement d'état sans événement dans la même
+  transaction ») et un consommateur notification-service — **moyen**, mais c'est la règle
+  d'architecture du projet. Journaliser le résultat (n candidats, n envoyés) — petit.
+- **ALR-5** — L'anti-spam est par ALERTE (`lastNotifiedAt`) : deux alertes proches (Paris →
+  Brazzaville et Orly → Brazzaville) du même membre reçoivent deux emails pour le même trajet.
+  Un regroupement par membre et par jour (« 3 nouveaux trajets correspondent à tes alertes ») —
+  moyen. Et l'email raté n'est pas rejoué : `lastNotifiedAt` est posé avant confirmation d'envoi ?
+  (à vérifier : l'ordre `sendTripPublishedEmail(...).catch` puis `update lastNotifiedAt`).
+- **ALR-6** — L'appariement à trois niveaux est solide (placeId, ville + pays, haversine).
+  Point faible : sans coordonnées sur le TRAJET (le wizard n'en envoie pas toujours, cf. 5.7
+  ANO-WEB-23), le niveau 3 est inerte — le serveur devrait géocoder à la création (même chantier
+  que le fuseau). Le rayon de 50 km est une constante : un réglage `alerts.nearbyRadiusKm`
+  (catalogue D62) — petit.
+- **ALR-7** — « Confirmer » se rétracte après 3 s sans le dire : un compte à rebours visible ou
+  une vraie boîte de confirmation — petit. Après « Prolonger », dire la nouvelle date — petit.
+- **ALR-8** — Le plafond de 20 est une constante : réglage de plateforme `alerts.maxActive`
+  (D62) — petit ; et l'écran ne montre pas « 18/20 » — un compteur avant le refus — petit.
+- **ALR-9** — La bannière n'apparaît qu'en fin de liste (`!hasMore`) : sur une liste de 40
+  trajets elle est invisible avant trois « Charger plus ». La montrer aussi en tête quand la
+  recherche porte une date sans résultat exact — petit.
+- **Harnais** — Les fiches en série partagent l'état (par construction : ALR-7 consomme ce
+  qu'ALR-2 et 6 ont créé) ; une fiche qui échoue arrête les suivantes. C'est voulu (le cahier
+  est une histoire), mais chaque fiche nettoie ce qu'elle crée (Pauline, le plafond).
+
+### Pièges de poste payés ici
+
+- **Un bouton nommé avec son ornement** : « 3 mois ★ » — viser par préfixe (`/^3 mois/`).
+- **Les fiches en série et un tour partiel** : rejouer une fiche isolée après un échec la fait
+  partir d'un état déjà modifié (une alerte de moins) — rejouer le fichier entier.
+- **Un toast peut ne jamais exister** (ANO-WEB-29) : quand un retour visuel manque, regarder si
+  le composant qui devait l'émettre existe encore au moment de la réponse.
 
 ---
 

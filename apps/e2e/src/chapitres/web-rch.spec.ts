@@ -14,6 +14,7 @@
 import { test, expect, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi, adresseDeLApiAdmin } from "../fixtures/adresses";
 import { JeuEssai } from "../fixtures/jeu-essai";
+import { carteDuTrajet, ouvrirLaRecherche, type CritereRecherche } from "../pages/recherche";
 
 type Page = Navigateur["page"];
 type Contexte = Navigateur["contexte"];
@@ -21,34 +22,8 @@ const api = () => adresseDeLApi();
 
 /* ══ Aides ═══════════════════════════════════════════════════════════════════════════════════ */
 
-type Critere = { from?: string; to?: string; date?: Date };
-
-/** Pose le brouillon de la barre (ce que `/search` lit en arrivant), avant la navigation. */
-async function poserLaRecherche(page: Page, critere: Critere): Promise<void> {
-  const data = {
-    from: critere.from ?? "",
-    to: critere.to ?? "",
-    dateValue: critere.date ? { mode: "exact", date: { __yamba_date__: critere.date.toISOString() } } : null,
-  };
-  await page.addInitScript(
-    ({ cle, valeur }) => {
-      try { window.sessionStorage.setItem(cle, valeur); } catch { /* stockage indisponible */ }
-    },
-    { cle: "yamba:form:trip-search", valeur: JSON.stringify({ version: 2, data }) }
-  );
-}
-
-async function ouvrirLaRecherche(page: Page, critere: Critere = {}): Promise<void> {
-  await poserLaRecherche(page, critere);
-  await page.goto("/fr/search", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 60_000 });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
-}
-
-/** La carte d'un trajet dans la liste (le lien qui enveloppe la carte). */
-// Chaque carte existe DEUX fois dans le DOM (arbre mobile masqué par CSS + arbre desktop) : on vise
-// la copie visible, sinon `first()` tombe sur la copie mobile, « hidden ».
-const carte = (page: Page, id: string) => page.locator(`a[href="/fr/trips/${id}"]`).filter({ visible: true }).first();
+type Critere = CritereRecherche;
+const carte = carteDuTrajet;
 
 /** Les identifiants des cartes, dans l'ordre de l'écran. */
 async function ordreDesCartes(page: Page): Promise<string[]> {
