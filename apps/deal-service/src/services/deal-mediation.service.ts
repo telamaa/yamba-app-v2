@@ -33,6 +33,7 @@ import type { PayoutExecutor } from "./deal-lifecycle.service";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
 import { refundIdempotencyKey } from "../lib/refund-idempotency";
+import { withRefund } from "../lib/booking-refunds"; // A166
 
 export type RequestingUser = { id: string };
 export type AdminActor = { id: string; ip?: string | null; userAgent?: string | null };
@@ -215,7 +216,7 @@ export function makeDealMediationService(
                 payoutStatus: money.carrierPayoutCents > 0 ? "PENDING" : null,
                 payoutAmountCents: money.carrierPayoutCents,
                 payoutFailureReason: null,
-                ...(money.refundCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + money.refundCents, refundId } : {}),
+                ...(money.refundCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + money.refundCents, refundId, refunds: withRefund(booking, { refundId, amountCents: money.refundCents, refundedAt: now, kind: "DISPUTE" }) } : {}),
                 // D54 4B — aucune fenêtre de notation après un litige.
                 ratingWindowEndsAt: null,
               }
@@ -229,6 +230,7 @@ export function makeDealMediationService(
                 refundedAt: now,
                 refundAmountCents: previousRefund + money.refundCents,
                 refundId,
+                ...(money.refundCents > 0 ? { refunds: withRefund(booking, { refundId, amountCents: money.refundCents, refundedAt: now, kind: "DISPUTE" }) } : {}), // A166
               },
         releaseKg: finalStatus === "CANCELLED",
         events: [
@@ -359,7 +361,7 @@ export function makeDealMediationService(
           retentionDecidedAt: now,
           retentionDecidedByAdminId: admin.id,
           ...(compensateCents > 0 ? { payoutStatus: "PENDING", payoutAmountCents: compensateCents, payoutFailureReason: null } : {}),
-          ...(restituteCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + restituteCents, refundId: restituteRefundId } : {}),
+          ...(restituteCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + restituteCents, refundId: restituteRefundId, refunds: withRefund(booking, { refundId: restituteRefundId, amountCents: restituteCents, refundedAt: now, kind: "RETENTION_RESTITUTION" }) } : {}), // A166
         },
         releaseKg: false,
         events: [

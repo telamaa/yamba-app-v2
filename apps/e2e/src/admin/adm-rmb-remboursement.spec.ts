@@ -62,8 +62,6 @@ const poserEnBase = (id: string, data: Record<string, unknown>, pourquoi: string
   process.stdout.write(`   ↳ manœuvre base : ${JSON.stringify(data)} sur ${id} (${pourquoi})\n`);
 };
 const carte = (page: Page) => page.locator("main section").filter({ has: page.locator("h2", { hasText: /^Remboursement manuel \(geste commercial\)$/ }) });
-const ligne = (page: Page, titre: string, cle: string) =>
-  page.locator("main section").filter({ has: page.locator("h2", { hasText: new RegExp(`^${titre}$`) }) }).locator("div.flex").filter({ has: page.locator("span", { hasText: new RegExp(`^${cle}$`) }) }).locator("span").last();
 
 test.describe("ADM-REM — remboursement manuel en deux gestes (cahier 02-ADMIN § 5.15)", () => {
   test.describe.configure({ mode: "serial" });
@@ -165,8 +163,9 @@ test.describe("ADM-REM — remboursement manuel en deux gestes (cahier 02-ADMIN 
     expect(apres.payout, "le versement du Voyageur n'est pas touché").toEqual(avant.payout);
     await page.reload({ waitUntil: "domcontentloaded" });
     await attendreLeChargement(page);
-    await expect(ligne(page, "Paiement de l'Expéditeur", "Remboursement")).toHaveText(corps.refundId!, { timeout: 60_000 });
-    await expect(ligne(page, "Paiement de l'Expéditeur", "Remboursé")).toHaveText(new RegExp(`^${echapper(euros(500))} le `));
+    // A166 (§ 5.16) — la carte liste chaque remboursement : montant, date, nature, identifiant sur une même ligne.
+    const rembourse = page.locator("main section").filter({ has: page.locator("h2", { hasText: /^Paiement de l'Expéditeur$/ }) }).locator("div.flex").filter({ has: page.locator("span", { hasText: /^Remboursé$/ }) });
+    await expect(rembourse).toContainText(new RegExp(`${echapper(euros(500))} le .+ · geste commercial · ${echapper(corps.refundId!)}`), { timeout: 60_000 });
     /* Un seul remboursement chez le fournisseur, un seul événement. */
     const chez = await remboursementsChezLeFournisseur(sup.contexte, deal.id);
     expect(chez.length - chezFournisseurAvant, "un seul remboursement émis chez le fournisseur").toBe(1);

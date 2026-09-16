@@ -50,6 +50,7 @@ import {
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
 import { refundIdempotencyKey } from "../lib/refund-idempotency";
+import { refundEntries, withRefund } from "../lib/booking-refunds";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -62,6 +63,7 @@ const MONEY_SELECT = {
   capturedAt: true,
   refundedAt: true,
   refundId: true,
+  refunds: true, // A166
   paymentProvider: true,
   completedAt: true,
   completedBy: true,
@@ -112,6 +114,7 @@ type MoneyRecord = {
   refundedAt?: Date | null;
   refundAmountCents?: number | null;
   refundId?: string | null;
+  refunds?: Array<{ refundId?: string | null; amountCents: number; refundedAt: Date; kind: string }> | null; // A166
   payoutStatus?: string | null;
   payoutAmountCents?: number | null;
   payoutSentAt?: Date | null;
@@ -257,6 +260,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           refundedAt: iso(b.refundedAt),
           refundAmountCents: b.refundAmountCents ?? null,
           refundId: b.refundId ?? null,
+          refunds: refundEntries(b).map((r) => ({ refundId: r.refundId, amountCents: r.amountCents, refundedAt: r.refundedAt.toISOString(), kind: r.kind })), // A166
         },
         payout: {
           status: b.payoutStatus ?? null,
@@ -464,10 +468,12 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
         orderBy: { requestedAt: "asc" },
       })) as unknown as FinanceCsvRow[];
       const kept = rows.filter((r) => csvRowInRange(r, from, to));
-      const filename = `yamba-finances-${from.toISOString().slice(0, 10)}-${to.toISOString().slice(0, 10)}.csv`;
+      // Recette § 5.16 — `to` est EXCLU (lendemain du dernier jour choisi) : le nom porte le dernier jour inclus, celui
+      // que l'écran a fait saisir (« du 1er au 14 septembre » → …-2026-09-01-2026-09-14.csv, plus …-09-15).
+      const filename = `yamba-finances-${from.toISOString().slice(0, 10)}-${new Date(to.getTime() - 1).toISOString().slice(0, 10)}.csv`;
       // L'export porte des identifiants (personnes, paiements) : chaque export est journalisé.
       await recordAdminAction(prisma, audit(admin, "FINANCE_EXPORTED", null as unknown as string, { from: from.toISOString(), to: to.toISOString(), rows: kept.length, filename }));
-      return { csv: buildFinanceCsv(kept), rows: kept.length, filename };
+      return { csv: buildFinanceCsv(kept, { from, to }), rows: kept.length, filename };
     },
 
     /* ── C-PR5b — remboursement manuel : proposer (3A-c) ─────── */
@@ -530,6 +536,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           refundAmountCents: total,
           refundedAt: now,
           refundId,
+          refunds: withRefund(raw, { refundId, amountCents: input.amountCents, refundedAt: now, kind: "MANUAL" }), // A166
           manualRefundCents: input.amountCents,
           manualRefundReason: input.reason,
           manualRefundByAdminId: admin.id,

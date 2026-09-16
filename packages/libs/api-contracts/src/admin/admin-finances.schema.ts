@@ -92,9 +92,9 @@ export const MoneyBalanceSchema = z
     pending: z.array(z.object({ kind: MoneyPendingKindSchema, cents: z.number().int() })),
     settled: z.boolean().describe("plus rien n'est en attente"),
     anomaly: z
-      .enum(["UNALLOCATED_FUNDS", "OVERSPENT"])
+      .enum(["UNALLOCATED_FUNDS", "OVERSPENT", "REFUND_RECORDS_MISMATCH"])
       .nullable()
-      .describe("deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"),
+      .describe("deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT) ; à tout moment, la liste des remboursements enregistre plus que le cumul (REFUND_RECORDS_MISMATCH, recette § 5.16)"),
   })
   .meta({ id: "MoneyBalance" });
 export type MoneyBalance = z.infer<typeof MoneyBalanceSchema>;
@@ -124,6 +124,16 @@ export const AdminDealMoneyFileSchema = z
       refundedAt: z.string().datetime().nullable(),
       refundAmountCents: z.number().int().nullable(),
       refundId: z.string().nullable(),
+      refunds: z
+        .array(
+          z.object({
+            refundId: z.string().nullable(),
+            amountCents: z.number().int(),
+            refundedAt: z.string().datetime(),
+            kind: z.enum(["CANCELLATION", "PICKUP_REFUSED", "DISPUTE", "RETENTION_RESTITUTION", "MANUAL", "LEGACY"]),
+          }),
+        )
+        .describe("Recette § 5.16 (A166) — chaque remboursement réel, à sa date ; LEGACY = part du cumul antérieure à la liste. Vide sur un deal jamais capturé."),
     }),
     payout: z.object({
       status: z.string().nullable(),

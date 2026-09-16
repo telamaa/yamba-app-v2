@@ -755,6 +755,16 @@ type BookingTrackingEvent {
   confirmedAt DateTime
 }
 
+// A166 (recette 02-ADMIN § 5.16, ANO-ADM-37) — un remboursement RÉELLEMENT émis chez le fournisseur.
+// Le cumul (`refundAmountCents`) et le dernier état (`refundedAt`, `refundId`) restent sur Booking ;
+// la liste garde chaque remboursement à sa date, pour le rapport mensuel et l'export.
+type BookingRefund {
+  refundId    String?
+  amountCents Int
+  refundedAt  DateTime
+  kind        String // CANCELLATION | PICKUP_REFUSED | DISPUTE | RETENTION_RESTITUTION | MANUAL
+}
+
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -809,6 +819,7 @@ model Booking {
   refundedAt        DateTime?
   refundAmountCents Int?
   refundId          String? // C-PR5 (D58) — dernier remboursement fournisseur (rapprochement exact)
+  refunds           BookingRefund[] // A166 — chaque remboursement émis, à sa date ; écrite en entier, créée [] (jamais absente)
   transferId        String?
 
   // ─── Versement Voyageur (B4, D49) ───

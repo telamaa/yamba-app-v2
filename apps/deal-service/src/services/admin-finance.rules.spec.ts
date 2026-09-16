@@ -239,6 +239,70 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
   });
 });
 
+describe("Recette § 5.16 (ANO-ADM-37, A166) — chaque remboursement à sa date", () => {
+  const { buildFinanceReport, buildFinanceCsv, csvRowInRange, buildMoneyTimeline, moneyBalance } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
+  const P = { totalShipperCents: 3920, transportCents: 2800, commissionCents: 1120, premiumCents: 0, currencyCode: "EUR" };
+  const d = (s: string) => new Date(s);
+  const MARS = d("2026-03-01T00:00:00Z"); const AVRIL = d("2026-04-01T00:00:00Z"); const MAI = d("2026-05-01T00:00:00Z");
+  /** Annulé tardivement en mars (remboursé 19,60 €), puis un geste manuel de 5 € en avril. */
+  const deal = {
+    id: "a", status: "CANCELLED", pricing: P, shipperId: "s", carrierId: "c",
+    trip: { originCity: "Paris", destinationCity: "Brazzaville", departureAt: d("2026-03-12T00:00:00Z") },
+    capturedAt: d("2026-03-02T10:00:00Z"), closedAt: d("2026-03-10T10:00:00Z"), retentionCents: 1960,
+    refundAmountCents: 2460, refundedAt: d("2026-04-03T10:00:00Z"), refundId: "re_2",
+    refunds: [
+      { refundId: "re_1", amountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z"), kind: "CANCELLATION" },
+      { refundId: "re_2", amountCents: 500, refundedAt: d("2026-04-03T10:00:00Z"), kind: "MANUAL" },
+    ],
+  };
+
+  it("rapport : le remboursement de mars RESTE en mars après le geste d'avril ; avril ne compte que le geste", () => {
+    const r = buildFinanceReport([deal], MARS, MAI);
+    expect(r.map((m) => [m.month, m.refundedCents, m.refundCount])).toEqual([["2026-04", 500, 1], ["2026-03", 1960, 1]]);
+    // Avant A166 : mars 0 × 0, avril 2 460 € × 1 — le mois clos changeait.
+  });
+
+  it("rapport : une annulation AVANT capture (cumul posé, rien débité) n'est pas un remboursement", () => {
+    const pending = { id: "p", status: "CANCELLED", pricing: P, capturedAt: null, closedAt: d("2026-03-05T00:00:00Z"), refundedAt: d("2026-03-05T00:00:00Z"), refundAmountCents: 3920, refunds: [] };
+    const r = buildFinanceReport([pending], MARS, MAI);
+    expect(r).toEqual([expect.objectContaining({ month: "2026-03", refundedCents: 0, refundCount: 0, cancelledCount: 1 })]);
+  });
+
+  it("rapport : un document antérieur (sans liste) compte encore, daté de son dernier remboursement", () => {
+    const legacy = { ...deal, refunds: undefined, refundAmountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z") };
+    expect(buildFinanceReport([legacy], MARS, MAI).find((m) => m.month === "2026-03")).toMatchObject({ refundedCents: 1960, refundCount: 1 });
+  });
+
+  it("CSV : un deal dont seul le PREMIER remboursement tombe dans la période est exporté, avec le rendu de la période", () => {
+    expect(csvRowInRange({ ...deal, capturedAt: d("2026-02-20T00:00:00Z"), closedAt: d("2026-02-25T00:00:00Z") }, MARS, AVRIL)).toBe(true);
+    const [head, line] = buildFinanceCsv([deal], { from: MARS, to: AVRIL }).split("\r\n");
+    expect(head.endsWith(",chargeId,refundCount,refundedInPeriodCents")).toBe(true);
+    expect(line.endsWith(",2,1960")).toBe(true);
+    const [, avril] = buildFinanceCsv([deal], { from: AVRIL, to: MAI }).split("\r\n");
+    expect(avril.endsWith(",2,500")).toBe(true);
+  });
+
+  it("chronologie : une ligne par remboursement, avec sa nature ; aucune pour une empreinte libérée", () => {
+    const t = buildMoneyTimeline({ ...deal, requestedAt: d("2026-03-01T00:00:00Z") });
+    expect(t.filter((e) => e.kind === "REFUNDED").map((e) => [e.amountCents, e.detail])).toEqual([[1960, "CANCELLATION"], [500, "MANUAL"]]);
+    const pending = buildMoneyTimeline({ requestedAt: MARS, status: "CANCELLED", capturedAt: null, closedAt: d("2026-03-05T00:00:00Z"), refundedAt: d("2026-03-05T00:00:00Z"), refundAmountCents: 3920, pricing: P });
+    expect(pending.map((e) => e.kind)).toEqual(["AUTHORIZED", "CANCELLED", "AUTHORIZATION_RELEASED"]);
+  });
+
+  it("bilan : Σ liste > cumul → REFUND_RECORDS_MISMATCH, en priorité et même sur un deal en cours", () => {
+    const at = d("2026-03-02T10:00:00Z");
+    const list = [{ refundId: "re_1", amountCents: 1960, refundedAt: d("2026-03-10T10:00:00Z"), kind: "CANCELLATION" }];
+    expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: null, refunds: list, pricing: P }).anomaly).toBe("REFUND_RECORDS_MISMATCH");
+    expect(moneyBalance({ status: "ACCEPTED", capturedAt: at, refundAmountCents: 1000, refunds: [...list], pricing: P }).anomaly).toBe("REFUND_RECORDS_MISMATCH");
+    expect(moneyBalance({ status: "CANCELLED", capturedAt: at, refundAmountCents: 1960, retentionCents: 1960, retentionDisposition: "CARRIER", refunds: list, pricing: P }).anomaly).not.toBe("REFUND_RECORDS_MISMATCH");
+  });
+
+  it("bilan : une annulation avant capture ne rend rien et ne lève aucune anomalie", () => {
+    const b = moneyBalance({ status: "CANCELLED", capturedAt: null, refundAmountCents: 3920, refundedAt: d("2026-03-05T00:00:00Z"), pricing: P });
+    expect(b).toMatchObject({ capturedCents: 0, refundedCents: 0, platformHoldsCents: 0, anomaly: null });
+  });
+});
+
 describe("Recette § 5.14 (A164) — jamais deux fois", () => {
   it("payoutNeedsTransferLookup : seulement après une tentative (ou un transfert connu)", () => {
     expect(payoutNeedsTransferLookup({ payoutAttempts: 0, transferId: null })).toBe(false);

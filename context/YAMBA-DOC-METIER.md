@@ -5565,3 +5565,58 @@ fiche rechargée quand l'état a changé, en disant si de l'argent a pu partir.
   actuel).
 - **Nature du remboursement dans l'événement** : aujourd'hui déduite de l'acteur `ADMIN` ; un champ explicite si d'autres
   gestes admin remboursent un jour.
+
+# Back-office — le rapport mensuel et l'export finances : chaque fait à sa date, un mois clos ne bouge plus (cahier 02-ADMIN § 5.16)
+
+*(PR `chore/recette-admin-5-16`, 14/09/2026 — ADM-RPT-1 à 5.)*
+
+## Le besoin
+
+Finance et la direction lisent chaque mois ce qui est entré, sorti et gagné, et le comptable rapproche avec le relevé du
+fournisseur de paiement. Un rapport qui change quand on le relit le mois suivant ne se rapproche pas ; un « remboursé » qui
+compte de l'argent jamais débité ment sur la trésorerie.
+
+## Les règles
+
+**RG-ADM-RPT-01 — Chaque fait à sa date** : encaissement à la capture, remboursement à la date de CHAQUE remboursement,
+versement à son envoi, revenu à la fin du deal, retenue à l'annulation ; mois en UTC, par devise.
+
+**RG-ADM-RPT-02 — Un mois clos ne change pas** : un nouveau geste sur un deal (remboursement manuel, décision de litige)
+compte dans le mois où il a lieu et ne déplace aucun fait déjà compté. Un export relu plus tard rend les mêmes lignes et les
+mêmes montants pour la période.
+
+**RG-ADM-RPT-03 — Ce qui n'a pas été débité n'est pas remboursé** : l'annulation d'une demande jamais acceptée libère
+l'empreinte ; elle compte comme annulation, jamais comme remboursement, et la fiche argent n'y voit aucune anomalie.
+
+**RG-ADM-RPT-04 — Revenu reconnu = commission + prime des deals terminés du mois**, rien d'autre ; dû aux Voyageurs, gelé,
+renversé, retenues à arbitrer et remboursements proposés sont des passifs affichés à part, jamais un revenu.
+
+**RG-ADM-RPT-05 — Export par deal, journalisé** : Finance et super administrateur seulement ; au plus 366 jours ; une ligne
+par deal ayant un fait d'argent dans la période, avec ce qui a été remboursé dans la période ; fichier nommé du premier au
+dernier jour inclus ; nombre de lignes affiché ; chaque export au journal (période, lignes, fichier). Une période invalide
+est refusée à l'écran avant tout appel, en français.
+
+**RG-ADM-RPT-06 — Chaque deal garde la liste de ses remboursements** (nature, montant, date, identifiant du fournisseur),
+visible sur la fiche argent (A166).
+
+**RG-ADM-RPT-07 — La liste et le cumul se contrôlent** : la liste des remboursements n'enregistre jamais plus que le total
+remboursé du deal, ni aucun remboursement sur un deal jamais débité ; sinon la fiche argent affiche « Remboursements
+incohérents » et aucun geste d'argent ne doit être fait avant rapprochement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| RPT-1 | Ouvrir le rapport | cinq passifs = serveur, colonnes, période choisie, pied en UTC, aucun journal | oui |
+| RPT-2 | Exporter | période trop longue ou inversée refusée à l'écran et au serveur ; fichier nommé, colonnes, nombre de lignes, journal ; Médiateur sans export (403) | oui |
+| RPT-3 | Revenu du mois ; litige remboursé en totalité | revenu = calcul indépendant ; la décision ne crée ni ne retire de revenu, compte en remboursé | oui |
+| RPT-4 | Remboursement le mois dernier, puis un geste aujourd'hui | le mois dernier inchangé ; l'export du mois dernier le garde | oui (mois dernier vidé avant correction) |
+| RPT-5 | Annuler une demande en attente | rapport inchangé, fiche argent sans remboursement ni anomalie | oui (28 € « remboursés » avant correction) |
+
+## Ce qui reste à trancher
+
+- **Mois UTC ou mois de Paris** pour la clôture comptable.
+- **Geste commercial** : charge ou diminution du revenu reconnu ; **part gardée par Yamba sur une annulation tardive** :
+  reconnue nulle part aujourd'hui.
+- **Historique des versements** : re-verser écrase la date et le montant du transfert renversé (même défaut que les
+  remboursements avant A166).

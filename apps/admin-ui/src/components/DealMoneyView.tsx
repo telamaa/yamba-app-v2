@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, manualRefundRefusal, money, parseEurosToCents, payoutReasonLabel, payoutRefusalMessage, REFUND_PROPOSAL_STALE_LABEL, timelineDetailLabel } from "@/lib/format";
+import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, manualRefundRefusal, money, parseEurosToCents, payoutReasonLabel, payoutRefusalMessage, REFUND_KIND_LABEL, REFUND_PROPOSAL_STALE_LABEL, timelineDetailLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
@@ -103,8 +103,16 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           <Row k="Intent" v={<Mono v={file.payment.intentId} />} />
           <Row k="Charge" v={<Mono v={file.payment.chargeId} />} />
           <Row k="Capturé" v={dateTime(file.payment.capturedAt)} />
-          <Row k="Remboursé" v={file.payment.refundAmountCents != null ? `${money(file.payment.refundAmountCents, cur)} le ${dateTime(file.payment.refundedAt)}` : "—"} />
-          {file.payment.refundId && <Row k="Remboursement" v={<Mono v={file.payment.refundId} />} />}
+          {/* A166 (recette § 5.16) — chaque remboursement réel à sa date ; le cumul ne suffit pas (le premier identifiant
+              disparaissait, et une empreinte libérée avant capture s'affichait « Remboursé »). */}
+          {(file.payment.refunds ?? []).length === 0 ? (
+            <Row k="Remboursé" v={file.payment.capturedAt ? "—" : "rien (jamais débité)"} />
+          ) : (
+            (file.payment.refunds ?? []).map((r, i) => (
+              <Row key={`${r.refundedAt}-${i}`} k={i === 0 ? "Remboursé" : ""} v={<span>{money(r.amountCents, cur)} le {dateTime(r.refundedAt)} · {REFUND_KIND_LABEL[r.kind] ?? r.kind}{r.refundId ? <> · <Mono v={r.refundId} /></> : null}</span>} />
+            ))
+          )}
+          {(file.payment.refunds ?? []).length > 1 && <Row k="Cumul" v={money(file.payment.refundAmountCents ?? 0, cur)} />}
         </Card>
         <Card title="Versement au Voyageur">
           <Row k="État" v={file.payout.status ? (PAYOUT_STATUS_LABEL[file.payout.status] ?? file.payout.status) : "aucun versement prévu"} />

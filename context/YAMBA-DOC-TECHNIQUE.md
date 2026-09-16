@@ -8711,3 +8711,162 @@ suffisant — un champ explicite est proposé si un autre geste admin devait l'�
 - `apps/e2e` : **432 scénarios** (426 + 6) ; WEB-CNF-10 ajusté.
 - Typecheck des huit projets de la CI vert ; les cinq `openapi.json` régénérés (schémas partagés `FinanceQueueItem`,
   `AdminDealMoneyFile`, `WalletPaymentItem`) ; miroir i18n FR/EN parfait.
+
+# Cahier 02-ADMIN, § 5.16 : rapport mensuel et export — un deal garde la liste de ses remboursements
+
+*(PR `chore/recette-admin-5-16`, empilée sur #316, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-RPT-1, 2, 3 du cahier ; RPT-4, 5 ajoutées), trois anomalies closes (`ANO-ADM-37`, `ANO-ADM-38`
+majeures, `ANO-ADM-39` mineure), une décision (`A166`), sept améliorations.
+
+```
+prisma/schema.prisma                                               A166 — type BookingRefund, Booking.refunds
+apps/deal-service/src/lib/booking-refunds.ts (+ spec)              withRefund (écrire), refundEntries / refundedTotalCents (lire)
+apps/deal-service/src/services/booking-write.ts                    sélection : refunds, capturedAt, refundedAt, refundId
+apps/deal-service/src/services/deal-lifecycle.service.ts           annulation capturée → CANCELLATION (pas l'empreinte libérée)
+apps/deal-service/src/services/deal-transport.service.ts           refus au pickup → PICKUP_REFUSED
+apps/deal-service/src/services/deal-mediation.service.ts           décision → DISPUTE ; restitution → RETENTION_RESTITUTION
+apps/deal-service/src/services/admin-finance.service.ts            geste → MANUAL ; fiche argent payment.refunds ; nom de fichier
+apps/deal-service/src/services/admin-finance.rules.ts              rapport, CSV (+ 2 colonnes), chronologie, bilan lisent la liste
+apps/deal-service/src/services/booking-request.ts                  refunds: [] à la naissance
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts     AdminDealMoneyFile.payment.refunds
+packages/libs/prisma/scripts/repair-absent-lists.ts, seed-deals.ts refunds (et deliveryPhotoUrls oubliée par le seed)
+apps/admin-ui/src/components/FinanceReportView.tsx                 ANO-ADM-39 — downloadFile, période vérifiée, pied en UTC
+apps/admin-ui/src/components/DealMoneyView.tsx, lib/format.ts      liste des remboursements, libellés de nature
+apps/e2e/src/admin/adm-rpt-rapport.spec.ts                         5 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+La pile tournait encore sur le serveur de la branche précédente (sans A166) : la contre-épreuve s'est jouée avant d'écrire
+le code, sans worktree. Deux fiches ajoutées, deux rouges :
+
+- **RPT-4** : 10 € remboursés le 15 août, 5 € remboursés aujourd'hui → août passe de `10,00 € ×1` à `0,00 € ×0`.
+- **RPT-5** : une demande en attente annulée → « Remboursé » du mois `+28,00 € ×1`, fiche argent `anomaly: OVERSPENT`.
+
+## ANO-ADM-37 : un cumul n'est pas un historique
+
+```ts
+// avant — buildFinanceReport
+if (inRange(r.refundedAt, from, to) && (r.refundAmountCents ?? 0) > 0) {
+  const m = get(r.refundedAt!, cur);
+  m.refundedCents += r.refundAmountCents ?? 0;   // le cumul, daté du DERNIER remboursement
+  m.refundCount += 1;
+}
+```
+
+Chaque chemin de remboursement écrit `refundedAt: now, refundAmountCents: previous + montant, refundId`. Le passé est
+écrasé. Tant qu'un deal ne recevait qu'un remboursement, c'était invisible ; le remboursement manuel (répétable, § 5.15) et
+la médiation après une annulation l'ont rendu courant.
+
+### Le modèle
+
+```prisma
+type BookingRefund {
+  refundId    String?
+  amountCents Int
+  refundedAt  DateTime
+  kind        String // CANCELLATION | PICKUP_REFUSED | DISPUTE | RETENTION_RESTITUTION | MANUAL
+}
+model Booking { … refunds BookingRefund[] … }
+```
+
+Les champs du dernier état restent : les écrans, le portefeuille, le rapprochement (§ 5.13) et les bornes du remboursement
+manuel les lisent déjà et n'ont pas besoin de l'historique.
+
+### Écrire
+
+```ts
+export function withRefund(before: RefundHistorySource, entry) {
+  return [...refundEntries(before).map(…), entry];
+}
+// deal-transport.service.ts
+refunds: withRefund(booking, { refundId, amountCents: total, refundedAt: now, kind: "PICKUP_REFUSED" }),
+```
+
+- La liste est **lue puis réécrite en entier** dans la même transaction que le cumul. Pas de `{ push }` : son comportement
+  sur un document où la liste est ABSENTE n'a pas été mesuré, et Prisma+Mongo a déjà trahi deux fois sur un champ absent
+  (`{ increment }` → null, filtres de liste) — une réécriture complète ne dépend pas de l'état du document. La garde
+  conditionnelle de chaque transition (statut, cumul, `retentionDisposition`) empêche deux écritures concurrentes.
+- `withRefund` part de `refundEntries(before)`, pas de `before.refunds` : sur un document antérieur (cumul sans liste), le
+  remboursement ancien est **matérialisé en entrée `LEGACY` à sa date** au moment précis où `refundedAt` va être écrasé.
+  Sans cela, la part ancienne aurait été datée du nouveau remboursement — ANO-ADM-37 reproduite sur toutes les données
+  existantes. RPT-4 joue exactement ce cas.
+- L'annulation d'une demande en attente n'ajoute rien (`wasAccepted` faux) : libérer une empreinte n'est pas rembourser.
+- Création : `booking-request.ts` et le seed posent `refunds: []` ; `repair-absent-lists.ts` le pose sur l'existant
+  (3 documents en local).
+
+### Lire
+
+```ts
+export function refundEntries(b) {
+  if (!b.capturedAt) return [];                                       // ANO-ADM-38
+  const listed = (b.refunds ?? []).map(…);
+  const unexplained = (b.refundAmountCents ?? 0) - Σ listed;
+  if (unexplained > 0) listed.push({ …, amountCents: unexplained, refundedAt: b.refundedAt ?? b.capturedAt, kind: "LEGACY" });
+  return listed.sort(par date);
+}
+```
+
+- **Rapport** : une entrée = un remboursement dans SON mois. La requête ne change pas : `refundedAt >= from` reste un
+  sur-ensemble (le dernier remboursement est postérieur à tous les autres).
+- **Export CSV** : un deal entre dans la période si l'un de ses remboursements y tombe ; `refundCount` et
+  `refundedInPeriodCents` ajoutés en fin de ligne (les 29 colonnes du cahier gardent leur ordre ; `refundAmountCents` reste
+  le cumul, `refundId` le dernier).
+- **Chronologie** (§ 5.12) : une ligne `REFUNDED` par remboursement, `detail` = la nature.
+- **Bilan** (§ 5.12) : `refundedCents = refundedTotalCents(b)` — plus d'`OVERSPENT` sur une empreinte libérée.
+- **Fiche argent** : `payment.refunds` servi (contrat `AdminDealMoneyFile`), affiché ligne par ligne avec nature et
+  identifiant.
+
+### L'invariant Σ liste = cumul
+
+```ts
+export function refundListExcessCents(b) {
+  const listed = Σ (b.refunds ?? []).amountCents;
+  if (!b.capturedAt) return listed;                       // aucun remboursement ne peut exister sans débit
+  return Math.max(0, listed - (b.refundAmountCents ?? 0)); // moins que le cumul = part LEGACY, normal ; plus = défaut
+}
+// moneyBalance — après les autres anomalies, prioritaire et à tout moment
+if (refundListExcessCents(b) > 0) anomaly = "REFUND_RECORDS_MISMATCH";
+```
+
+Deux sources pour un même fait finissent par diverger si rien ne les compare : le bilan de la fiche argent le dit
+(« Remboursements incohérents… »), ADM-ARG-3 l'exige sur chaque deal du jeu d'essai et le contre-éprouve en remettant le
+cumul de `bzv-held` à zéro. Asymétrie voulue : une liste plus courte que le cumul est l'état normal d'un document antérieur.
+
+## ANO-ADM-39 : l'export oublié
+
+Le § 5.6 avait remplacé `window.open` par `downloadFile` (`apps/admin-ui/src/lib/api.ts`) sur les exports utilisateurs,
+trajets, billets, arbitrage. `FinanceReportView.tsx` ouvrait encore un onglet. Désormais :
+
+```ts
+const periodProblem = exportPeriodProblem(from, to);                 // jours inclus, 366 au plus, fin ≥ début
+const out = await downloadFile(`/admin/finances/export?from=…&to=…`);
+setExportMsg({ ok: true, text: `${out.rows} lignes exportées (${out.filename}). L'export est inscrit au journal.` });
+// refus : financeExportRefusal(e) — PERIOD_TOO_LONG, INVALID_PERIOD, 403
+```
+
+Le serveur nomme le fichier avec le **dernier jour inclus** (`to` est exclu : `new Date(to.getTime() - 1)`), et le pied du
+rapport passe par `reportPeriodLabel` (UTC, borne de fin moins un jour) au lieu de `dateTime` en heure locale.
+
+## Ce que la non-régression a appris au harnais
+
+- **Jeu d'essai et réputation** : `seed-deals.ts` remettait à zéro annulations et litiges perdus, pas `completedDealsCount`
+  ni les notes. Un deal terminé par une fiche précédente laissait un compteur rémanent ; WEB-PIC-6 échouait selon l'ordre
+  des fichiers. Étape « 4bis » du seed : mêmes `count` que `carrierFacts` / `shipperFacts`, seuils `REPUTATION_PARAMS`
+  importés du contrat en relatif, notes à 0 (le seed ne crée aucun avis).
+- **`Finances.ouvrir`** (`apps/e2e/src/pages/finances.ts`) attend la disparition de « Chargement de tes finances… ».
+- **Fiches qui lisaient l'ancien modèle** : ADM-ARG-3 (manœuvre « jamais remboursé » qui efface aussi la liste) et
+  ADM-REM-2 (la carte liste les remboursements au lieu d'une ligne « Remboursement »).
+
+## Tests
+
+- deal-service **635** (+20) : invariant Σ liste = cumul (3 : cohérent, incohérent, anomalie de bilan) ; `booking-refunds.spec.ts` (9 : écriture sur liste absente, matérialisation LEGACY à sa
+  date, lecture, empreinte libérée, cumul sans date), règles (6 : rapport deux mois, annulation avant capture, document
+  antérieur, CSV par période, chronologie, bilan), annulation capturée / en attente (1), geste manuel qui s'ajoute (1) ;
+  spec du refus au pickup ajustée. Les écrivains de la médiation n'ont pas de test unitaire (aucun n'existait) : RPT-3 lit
+  la liste en base après une décision réelle.
+- `apps/e2e` : **437 scénarios** (432 + 5) ; ADM-ARG-3 porte l'invariant et sa contre-épreuve.
+- Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminDealMoneyFile`, `MoneyBalance`).

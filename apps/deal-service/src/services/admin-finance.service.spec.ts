@@ -219,7 +219,7 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     ]);
     const out = await makeService().exportCsv(ADMIN, new Date("2026-09-01T00:00:00Z"), new Date("2026-10-01T00:00:00Z"));
     expect(out.rows).toBe(1);
-    expect(out.filename).toBe("yamba-finances-2026-09-01-2026-10-01.csv");
+    expect(out.filename).toBe("yamba-finances-2026-09-01-2026-09-30.csv"); // § 5.16 — le dernier jour INCLUS
     expect(out.csv.split("\r\n")[1]).toContain(`${ID},COMPLETED,Paris,Brazzaville`);
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "FINANCE_EXPORTED", after: expect.objectContaining({ rows: 1 }) }));
     await expect(makeService().exportCsv(ADMIN, new Date("2025-01-01T00:00:00Z"), new Date("2026-09-01T00:00:00Z"))).rejects.toBeInstanceOf(ValidationError);
@@ -255,6 +255,17 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     expect(stored.payload).toMatchObject({ actor: "ADMIN", amountCents: 500, refundedAt: NOW.toISOString() });
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "REFUND_MANUAL_APPLIED", after: expect.objectContaining({ totalRefundedCents: 500 }) }));
     expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("A166 : le geste manuel s'AJOUTE à la liste existante (le remboursement d'annulation garde sa date et son identifiant)", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    const first = { refundId: "re_1", amountCents: 1000, refundedAt: new Date("2026-03-10T00:00:00Z"), kind: "CANCELLATION" };
+    prismaMock.booking.findUnique.mockResolvedValue(record({ status: "CANCELLED", paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: 1000, refunds: [first], parcel: { category: "BOOKS", categoryFamily: null } }));
+    prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    const r = await makeService(provider).applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(prismaMock.booking.updateMany.mock.calls[0][0].data.refunds).toEqual([first, { refundId: r.refundId, amountCents: 500, refundedAt: NOW, kind: "MANUAL" }]);
   });
   it("ANO-ADM-34 : deux « Rembourser maintenant » simultanés → UN remboursement chez le fournisseur, l'autre 409 DECISION_IN_PROGRESS sans rien émettre", async () => {
     const provider = new FakePaymentProvider();

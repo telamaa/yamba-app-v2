@@ -215,6 +215,8 @@ describe("B — refusePickup (A40)", () => {
       refundedAt: NOW,
       refundAmountCents: 2957,
       refundId: expect.stringMatching(/^re_fake_/), // C-PR5 (D58) — rapprochement exact
+      // A166 — le remboursement entre dans la liste, avec sa nature et le même identifiant.
+      refunds: [{ refundId: data.refundId, amountCents: 2957, refundedAt: NOW, kind: "PICKUP_REFUSED" }],
     });
     expect(recomputeBookingParties).toHaveBeenCalledWith(expect.objectContaining({ shipperId: SHIPPER_ID, carrierId: CARRIER_ID }));
     expect(prismaMock.trip.updateMany).toHaveBeenCalledWith({

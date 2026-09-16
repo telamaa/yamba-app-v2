@@ -5492,6 +5492,93 @@ les deux, sur les trois anomalies. Après correction : 6/6 verts, deux passages.
   est refusé) ; le Fake honorant désormais les clés de remboursement, `_forgetIdempotencyKeysForTest` couvre aussi les
   remboursements. *Harnais* : WEB-CNF-10 recopie la table des libellés du portefeuille, cas `AFTER_COMPLETION` ajouté.
 
+## Cahier 02-ADMIN — § 5.16 Rapport mensuel et export finances · **CONFORME après correction** (3 fiches + 2 ajoutées · 3 anomalies closes dont 2 majeures · 7 améliorations · 3 écarts documentaires · 5 scénarios, 2 min)
+
+`apps/e2e/src/admin/adm-rpt-rapport.spec.ts`. Deux propriétés qu'aucun bouton ne montre : **le rapport dit la vérité du
+mois** (chaque fait à sa date UTC, un passif n'est jamais un revenu, ce qui n'a pas été débité n'est pas remboursé) et
+**un mois clos ne change pas après coup**. L'écran est comparé à l'API, l'API à un calcul indépendant en base
+(`lireCoteServeur`) ; le CSV est téléchargé par l'écran, relu octet par octet (BOM) et parsé. Jeu d'essai rejoué avant
+chaque fiche ; une manœuvre base consignée (ADM-RPT-4 : un remboursement du mois dernier écrit comme un document antérieur
+à A166). **Contre-épreuve** sur le serveur du § 5.15 (sans A166) et l'écran non corrigé : RPT-1 et RPT-3 conformes (hors
+lecture du nouveau champ), **RPT-4 et RPT-5 rouges**, RPT-2 rouge à l'écran (aucun contrôle de période). Après correction :
+5/5 verts, deux passages.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-RPT-1 | Le rapport et ses passifs | **Conforme** — lien « Rapport mensuel et export → » ; titre, sous-titre ; cinq tuiles = API au centime : Dû aux Voyageurs 26,00 € · PENDING + FAILED, Gelé par un litige 68,00 €, Renversé à décider 30,00 €, Retenues à arbitrer 14,56 €, Remboursements proposés 0,00 € ; aucune tuile ne porte « revenu » ; colonnes du cahier (+ « Revenu moyen / deal ») ; 3 / 6 / 24 / 12 mois → une lecture 200 chacun ; chaque mois écran = API (revenu, terminés / annulés) ; pied « Du 1 oct. 2025 au 30 sept. 2026 (mois UTC) · calculé le … Un deal capturé en mars… » (amélioration) ; aucun « frais » ; aucune ligne de journal. **Avant** : « Du 01 oct. 2025, 02:00 au 01 oct. 2026, 02:00 » |
+| ADM-RPT-2 | L'export CSV | **Conforme après correction** — texte ; 400 jours par appel direct → 400 « The period cannot exceed 366 days. », fin avant début → 400 ; à l'écran « Période trop longue : 397 jours, 366 au plus… » et « La fin précède le début… », bouton inactif (amélioration) ; mois courant téléchargé **par la page** : `yamba-finances-2026-09-01-2026-09-14.csv` (dernier jour inclus, amélioration), BOM, 29 colonnes du cahier dans l'ordre + `refundCount`, `refundedInPeriodCents` ; `X-Row-Count` = 24 = lignes du fichier = « 24 lignes exportées » ; chaque ligne a un fait d'argent dans la période ; journal `FINANCE_EXPORTED BOOKING` sans identifiant, `{ from, to, rows: 24, filename }` ; Médiateur : rapport lisible, bloc d'export absent, appel direct 403. **Avant** : `window.open` (ANO-ADM-39) |
+| ADM-RPT-3 | Le revenu reconnu | **Conforme** — revenu de septembre 14,88 € sur 4 deals = calcul indépendant en base (Σ commission + prime des deals COMPLETED du mois) ; proposer un remboursement ne change pas le revenu ; litige tranché en remboursement total → deal CANCELLED, revenu inchangé, remboursé du mois +31,36 €, annulés +1, liste `[DISPUTE 31,36 €]` |
+| ADM-RPT-4 (ajoutée) | Un mois clos ne change pas | **Conforme après correction** — 10,00 € remboursés le 15 août (document antérieur à A166), puis 5,00 € aujourd'hui : août 10,00 € ×1 → **10,00 € ×1** ; septembre 48,16 € ×2 → 53,16 € ×3 ; en base `[LEGACY 10,00 € re_recette_rpt4 15 août, MANUAL 5,00 €]` ; fiche argent : deux remboursements, chronologie en deux lignes ; export d'août relu aujourd'hui : le deal y est, `refundCount 2`, `refundedInPeriodCents 1000`. **Avant** : août 10,00 € ×1 → **0,00 € ×0** (ANO-ADM-37) |
+| ADM-RPT-5 (ajoutée) | Annulation avant capture | **Conforme après correction** — Aminata annule sa demande en attente (empreinte libérée) : rapport du mois inchangé (48,16 € ×2), annulés +1 ; fiche argent : aucun remboursement, bilan remboursé 0, aucune anomalie, pas de ligne « Remboursé ». **Avant** : rapport +28,00 € ×1, bilan « remboursé 28,00 € » et anomalie `OVERSPENT` (ANO-ADM-38) |
+
+### Anomalies
+
+- **ANO-ADM-37 (majeure, close — A166)** — **un nouveau remboursement effaçait les précédents du rapport.** Un deal ne
+  gardait que le cumul (`refundAmountCents`) et le DERNIER remboursement (`refundedAt`, `refundId`) ; `buildFinanceReport`
+  datait le cumul du dernier remboursement. Un remboursement de mars suivi d'un geste manuel en avril quittait mars : un
+  mois clos changeait après coup, un export relu le mois suivant ne rendait plus les mêmes chiffres, le premier `refundId`
+  était perdu. Correction : `Booking.refunds` (une entrée par remboursement émis, écrite dans la transaction du cumul par
+  les cinq chemins), lue par le rapport, l'export, la chronologie et le bilan ; sur un document antérieur, l'ancien
+  remboursement est matérialisé à SA date au moment où un nouveau l'écraserait.
+- **ANO-ADM-38 (majeure, close — A166)** — **une annulation avant capture comptait comme un remboursement.** L'annulation
+  d'une demande en attente pose `refundAmountCents = total` et `refundedAt` alors que rien n'a été débité (l'empreinte est
+  libérée). Le rapport l'ajoutait au « Remboursé » du mois ; le bilan de la fiche argent (§ 5.12) en déduisait « la
+  plateforme a rendu plus qu'elle n'a reçu » et levait `OVERSPENT`. Correction : seuls les remboursements d'un deal capturé
+  existent pour les lecteurs (`refundEntries`).
+- **ANO-ADM-39 (mineure, close)** — **l'export finances avait échappé au correctif des exports (ANO-ADM-13, § 5.6)** :
+  `window.open` sur l'URL — refus en JSON anglais dans un onglet, jeton expiré en « Unauthorized! », aucun contrôle de la
+  période. Correction : `downloadFile`, contrôle de période à l'écran, refus lus par code, nombre de lignes affiché.
+
+### Écarts documentaires
+
+- **« Sur le jeu d'essai neuf, aucune n'est nulle »** : « Remboursements proposés » vaut 0,00 € — le § 2.4 du même cahier
+  dit « aucun remboursement proposé au départ ». Le § 5.16 est à corriger.
+- **ADM-RPT-3 étape 3** : le deal en litige est passé de DELIVERED à DISPUTED sans jamais être terminé ; il ne contribuait
+  pas au revenu avant la décision. « ne contribue plus » se lit « ne contribue pas ».
+- **Pied du rapport et nom du fichier** : dates en UTC, dernier jour inclus (« au 30 sept. 2026 », `…-2026-09-14.csv`) ;
+  export : deux colonnes ajoutées en fin de ligne (`refundCount`, `refundedInPeriodCents`).
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **RPT-1** — *Fait* : période en UTC, dernier jour inclus ; message d'échec de chargement en français. *Proposé* : exporter
+  le tableau mensuel lui-même (aujourd'hui seul l'export par deal existe) — petit. *À trancher* : mois UTC ou mois de Paris
+  pour la clôture comptable (un deal terminé le 31 à 23 h 30 à Paris compte le mois suivant).
+- **RPT-2** — *Fait* : ANO-ADM-39 ; nom de fichier au dernier jour inclus ; `refundedInPeriodCents`. *Proposé* : la même
+  vérification de période sur les autres exports datés — petit.
+- **RPT-3** — *Constat* : conforme d'emblée. *À trancher* : un geste commercial sur un deal terminé laisse le revenu reconnu
+  intact (le remboursement apparaît en « Remboursé ») — charge ou moins-revenu, question de comptable ; la part que Yamba
+  garde sur une annulation tardive n'est reconnue nulle part.
+- **RPT-4** — *Fait* : A166. *À trancher* : les VERSEMENTS ont le même défaut — re-verser écrase `payoutSentAt`,
+  `payoutAmountCents` et `transferId` (§ 5.14 : seul le journal garde l'ancien transfert) ; une liste des transferts
+  réglerait « Versé » comme `refunds` règle « Remboursé » — moyen.
+- **RPT-5** — *Fait* : ANO-ADM-38. *Proposé* : que l'annulation avant capture n'écrive plus `refundAmountCents` (le
+  portefeuille et les emails le lisent aujourd'hui comme « libéré ») — à mesurer avant de toucher, moyen.
+- **Invariant Σ liste = cumul** (demandé par le fondateur) — *Fait* : `refundListExcessCents` ; anomalie de bilan
+  `REFUND_RECORDS_MISMATCH` (« Remboursements incohérents : la liste des remboursements enregistre plus que le cumul du
+  deal… ») ; ADM-ARG-3 vérifie l'invariant sur chaque deal du jeu d'essai et le contre-éprouve (`bzv-held` : cumul remis à
+  zéro, liste gardée → anomalie à l'API et à l'écran). La manœuvre d'ARG-3 qui simule « jamais remboursé » efface
+  désormais aussi la liste (sinon la liste, fidèle, contredisait la manœuvre — ARG-3 rouge dans le lot, cause lue avant
+  correction). *Proposé* : que le rapprochement (§ 5.13) compare aussi la liste aux remboursements du fournisseur, un par un
+  (identifiant, montant) — moyen.
+- **Pilotage (§ 5.17)** — *Constat* : `apps/auth-service/src/lib/pilotage.rules.ts` date encore le cumul du dernier
+  remboursement et compte les annulations avant capture — jumeau d'ANO-ADM-37/38, que la fiche ADM-PIL-2 (« mêmes règles de
+  datation que le rapport ») mesurera. *Prévu au § 5.17* : sortir `refundEntries` dans une bibliothèque partagée, lue par
+  les deux services.
+- **Non-régression** — ARG, CSV, FIN, MED, RAP, RET, RMB, RPT, VER, WEB-ANN, WEB-CNF, WEB-PIC, WEB-E2E-3, WEB-E2E-5 (80
+  scénarios, 37 min) : 67 verts, 4 rouges, 9 non joués derrière eux (mode série). Deux rouges venaient du harnais que A166
+  rendait faux — ADM-ARG-3 (sa manœuvre « jamais remboursé » gardait la liste) et ADM-REM-2 (elle lisait la ligne
+  « Remboursement », remplacée par la liste) — alignés. Deux autres, reproductibles trois fois, n'étaient pas des
+  instabilités : **WEB-CNF-9** lisait le texte pendant « Chargement de tes finances… » (`Finances.ouvrir` attend désormais
+  la fin du chargement) ; **WEB-PIC-6** dépendait de l'ORDRE des fichiers — WEB-CNF termine un deal de Marc, le rejeu du
+  jeu d'essai recrée les deals sans remettre `completedDealsCount`, et le recalcul réel du refus au pickup « changeait » son
+  profil (1 → 0). Le jeu d'essai recalcule maintenant la réputation dénormalisée sur les deals recréés (mêmes faits que
+  `reputation.service.ts`). Rejeux : ARG, REM, RPT (second passage) verts ; WEB-CNF puis WEB-PIC dans l'ordre fautif :
+  21/21.
+- **Transversal** — *Fait* : le jeu d'essai crée désormais `deliveryPhotoUrls: []` (23 documents sans la liste trouvés par
+  `repair-absent-lists.ts`, le piège des listes absentes était revenu par le seed). *Test* : la contre-épreuve s'est faite
+  sans worktree — la pile tournait encore sur le serveur de la branche précédente ; les fiches ont été réordonnées pour
+  que les preuves du rapport passent avant la lecture du nouveau champ.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
