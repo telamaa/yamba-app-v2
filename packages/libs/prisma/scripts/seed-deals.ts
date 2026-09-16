@@ -642,6 +642,25 @@ async function main() {
       });
       console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose, 1 message signale)`);
     }
+    // Recette 02-ADMIN § 6 (ADM-E2E-1, étape 6) — le dossier YAM-2041 renvoie à « la conversation des deux parties » :
+    // sans fil, le Médiateur lisait « Ce deal n'a pas de conversation. » et l'étape ne se jouait pas. Un numéro tapé par
+    // l'Expéditrice prouve le masquage au back-office (ANO-ADM-42, § 5.18).
+    if (b.key === "bzv-disputed") {
+      const shipperId = userIds.get(b.shipperKey)!;
+      const carrierId = userIds.get(t.carrierKey)!;
+      const conversation = await prisma.conversation.create({
+        // Les deux parties ont LU le fil (lastReadAt après le dernier message) : aucun « non lu » ne s'ajoute aux compteurs
+        // du jeu d'essai (WEB-MSG-1 attend UN message non lu chez Thomas, celui de bzv-accepted).
+        data: { bookingId: booking.id, shipperId, carrierId, lastMessageAt: days(-1), lastMessageAuthorRole: "SHIPPER", shipperLastReadAt: hours(-12), carrierLastReadAt: hours(-12), shipperRemindedAt: null, carrierRemindedAt: null },
+      });
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Colis remis ce matin au destinataire, carton ferme comme a la prise en charge.", photoUrls: [], createdAt: days(-2) },
+      });
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Deux jouets manquent dans le carton. Appelle-moi au 06 12 34 56 78 pour qu'on regle ca.", photoUrls: [], createdAt: days(-1) },
+      });
+      console.log(`    · conversation seedee sur ${b.key} (2 messages, dont un numero tape)`);
+    }
     if (b.status === "DISPUTED") {
       await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });
       await prisma.dispute.create({

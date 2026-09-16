@@ -9637,3 +9637,72 @@ nombre de codes de secours réglable), connectés par l'écran dans un contexte 
 - Typecheck auth, deal, trip, message, notification, admin-ui, harnais ; cinq `openapi.json` régénérés.
 - Déploiement : rebâtir auth-service ; aucun changement de schéma ; les sessions admin ouvertes avant le déploiement
   affichent « Appareil inconnu » jusqu'à leur premier renouvellement.
+
+# Cahier 02-ADMIN, § 6 : cas de bout en bout — la cohérence entre écrans, services, emails et journal
+
+Branche `chore/recette-admin-6`, empilée sur `chore/recette-admin-5-26`. Huit parcours du cahier joués d'une traite avec les
+vrais profils, plus les lots décidés au § 5.26 (A190) et une correction de fond sur les emails de sanction (A191).
+
+## Ce qui a été corrigé
+
+- **ANO-ADM-87 — motif interne dans l'email de sanction** (`apps/auth-service/src/emails/admin-emails.ts`,
+  `controller/admin-users.controller.ts`). `AccountStatusParams` perd son champ `reason` : le contrôleur ne peut plus le
+  passer (erreur de compilation), et `accountRestricted` / `accountSuspended` disent un motif générique en FR et EN. Pourquoi
+  par le TYPE plutôt qu'en retirant une interpolation : l'en-tête du fichier promettait déjà « motif GÉNÉRIQUE » et le code
+  passait `p.reason` quand même ; une promesse en commentaire ne protège rien, un type si. Test :
+  `admin-emails.spec.ts` (texte générique, adresse de recours, `@ts-expect-error` sur un appel avec `reason`).
+- **ANO-ADM-85** — `DisputeFileView.tsx` : « rapprochement fournisseur ».
+- **ANO-ADM-86** — `ConversationView.tsx` : un 404 « pas de conversation » est un état normal, texte explicatif en gris ;
+  `adm-cnv-conversations.spec.ts` réaligné.
+- **Jeu d'essai** — `packages/libs/prisma/scripts/seed-deals.ts` : conversation de deux messages sur `bzv-disputed`
+  (Thomas, puis Chinwe avec un numéro tapé), supprimée comme les autres fils du seed au rejeu.
+  Piège payé : un fil posé NON LU change les compteurs de la bulle « Messages » que d'autres chapitres lisent (WEB-MSG-1
+  attend un seul non lu chez Thomas) — `shipperLastReadAt` et `carrierLastReadAt` sont posés après le dernier message.
+
+## Lots décidés au § 5.26 (A190)
+
+- **a. Régénérer ses codes de secours** — `POST /admin/me/backup-codes` (`regenerateAdminBackupCodes`). Code TOTP à six
+  chiffres vérifié avec `totpLastUsedStep` (anti-rejeu) et le compteur d'échecs de la connexion (`registerTotpFailure`,
+  `totpFailuresExceeded`). Un code de secours est refusé : la régénération remplace la clé de secours, elle ne peut pas être
+  autorisée par elle. `prisma.$transaction` : `user.update({ totpLastUsedStep, totpBackupCodeHashes })` + ligne
+  `ADMIN_BACKUP_CODES_REGENERATED { before: { remaining }, after: { remaining } }`. Erreurs : 400 `OTP_INCORRECT`, 403
+  `TOO_MANY_ATTEMPTS` / `TOTP_NOT_ENABLED` — **jamais 401** : le client `apps/admin-ui/src/lib/api.ts` traite un 401 comme
+  une session expirée (renouvellement puis rejeu de la requête, donc second échec compté, puis `/login`). Écran
+  (`SessionsList.tsx`) : champ « Code à 6 chiffres », bouton actif sur six chiffres, codes affichés une fois, « Je les ai
+  notés » les efface de la mémoire du composant.
+- **b. Révoquer toutes mes autres sessions** — `DELETE /admin/me/sessions` (`revokeOtherAdminSessions`) : `SCAN
+  admin_jti:<user>:*`, `revokeAdminSession` sur chaque jti ≠ celui du jeton présenté (`currentJti`), une ligne
+  `ADMIN_SESSIONS_REVOKED { count }` si au moins une session a été fermée. Le bouton n'apparaît que s'il existe une autre
+  session. Route déclarée AVANT `DELETE /admin/me/sessions/:jti` (lisibilité ; Express ne confond pas les deux chemins).
+- **c. Jeton renouvelé complet** — `adminAccessClaims(user, jti)` : une seule fonction pour `issueAdminSession` et
+  `adminRefresh` (le renouvellement signait `{ id, jti, roles, adm, amr }` sans `adminRole` / `adminRoles`).
+- **d. Rotation réclamée** — dans `adminRefresh`, avant toute écriture :
+  `redis.set("admin_rotated:<user>:<ancien jti>", candidat, "EX", 30, "NX")`. Le gagnant (`"OK"`) relit l'ancienne session,
+  écrit la nouvelle (`storeAdminSession`), efface l'ancienne. Un perdant (`null`) relit le successeur, attend au plus
+  10 × 50 ms que sa session existe, et signe des jetons pour CE jti. Pourquoi `SET NX` et pas « `DEL` = 1 gagne » : avec
+  `DEL`, le gagnant efface puis écrit la clé de rotation ; un perdant qui lit entre les deux ne trouve rien et perd sa session
+  (le test unitaire de la course l'a montré). `SET NX` fait de la clé de rotation elle-même le verrou.
+- `ADMIN_ACTIONS` (`packages/libs/admin-audit`) et `ACTION_LABEL` (`apps/admin-ui/src/lib/format.ts`) : deux actions
+  ajoutées (liste fermée A183 : la compilation échoue si l'une manque). `backupCodesWarning` dit le nouveau recours. OpenAPI
+  (`build-openapi.ts`) : les deux routes documentées.
+
+## Harnais
+
+- `adm-e2e-bout-en-bout-1-4.spec.ts` (litige, sanction, signalements, paramètre) et `adm-e2e-bout-en-bout-5-8.spec.ts`
+  (maintenance, effacement, versements, billet et masquage) : `mode: "default"` (un échec n'arrête pas les autres cas),
+  `beforeEach` rejoue le jeu d'essai (et remet la maintenance à plat dans le second fichier). Chaque cas se termine par
+  `lireLeJournal` filtré (cible, type, auteur) avec un compte `finance` (le Support et le Médiateur n'ont pas `audit.read`).
+- Pièges payés : le rapport `/admin/finances/report` agrège par mois (pas d'identifiant de deal) — comparer un relevé avant /
+  après ; `/api/conversations` n'existe pas, le préfixe est `/api/messages/…` ; un colis de 2 kg ne montre pas un passage de
+  commission de 12 à 15 % (plancher de 3 €) ; l'`<input>` de note des signalements n'a pas d'attribut `type` (viser par
+  placeholder) ; « Prioritaire » disparaît dès que les ouverts passent sous trois.
+- `adm-ses-mes-sessions.spec.ts` : SES-6 (lots a, b, écran + API + journal) et SES-7 (trois renouvellements simultanés du
+  même cookie par trois contextes API) ; SES-1 et SES-5 réalignés (bouton de régénération présent, nouveau texte).
+
+## Vérifications
+
+- Tests : auth-service **342** (+8 : `admin-auth-sessions.controller.spec.ts` +6, `admin-emails.spec.ts` +2) ; deal 644,
+  message 57, trip 293, notification 122 inchangés ; harnais **534 scénarios** (524 + E2E 8 + SES 2).
+- Typecheck auth-service, admin-ui, harnais ; `npm run generate:openapi` (seul `apps/auth-service/openapi.json` change).
+- Déploiement : rebâtir auth-service (vérifier `grep -c admin_rotated dist/main.js`) et admin-ui ; aucun changement de
+  schéma ; rejouer `seed-deals.ts` sur les environnements de recette pour le fil de YAM-2041.

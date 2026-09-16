@@ -127,16 +127,18 @@ test.describe("ADM-SES — mes sessions (cahier 02-ADMIN § 5.26)", () => {
       await expect(barre.getByText("Recette SES-1", { exact: true })).toBeVisible();
       await expect(barre.getByText("Support + Finance", { exact: true }), "profils cumulés").toBeVisible();
       // ANO-ADM-84 — « Il te reste 2 code(s) de secours. » : le pluriel est accordé.
-      await expect(barre.getByText("Il te reste 2 codes de secours.", { exact: true })).toBeVisible();
+      await expect(barre.getByText("Il te reste 2 codes de secours — tu peux les régénérer depuis « Mes sessions ».", { exact: true })).toBeVisible();
       await expect(barre.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
       /* 3. « Mes sessions » : la session courante, marquée. */
       await ouvrirMesSessions(page);
       await expect(lignesDeSessions(page).filter({ hasText: "cette session" })).toHaveCount(1, { timeout: 30_000 });
-      /* 4. Aucun geste de compte dans le back-office. */
-      for (const nom of [/mot de passe/i, /e-?mail/i, /codes? de secours/i, /régénérer/i]) {
+      /* 4. Aucun geste de compte dans le back-office — sauf, depuis A190 a (§ 6), la régénération des codes de secours. */
+      for (const nom of [/mot de passe/i, /e-?mail/i]) {
         await expect(page.getByRole("link", { name: nom }), `aucun lien ${nom}`).toHaveCount(0);
         await expect(page.getByRole("button", { name: nom }), `aucun bouton ${nom}`).toHaveCount(0);
       }
+      await expect(page.getByRole("button", { name: "Régénérer mes codes de secours" }), "A190 a").toHaveCount(1);
+      await expect(page.getByRole("button", { name: "Révoquer toutes mes autres sessions" }), "une seule session : rien à révoquer").toHaveCount(0);
       /* Se déconnecter : /login, la session Redis n'existe plus, une ligne ADMIN_LOGOUT. */
       const debut = await debutDuScenario();
       await barre.getByRole("button", { name: "Se déconnecter" }).click();
@@ -258,12 +260,12 @@ test.describe("ADM-SES — mes sessions (cahier 02-ADMIN § 5.26)", () => {
     try {
       const { page, contexte } = await navigateurDe(browser, j);
       const barre = page.locator("aside");
-      await expect(barre.getByText("Il te reste 1 code de secours.", { exact: true }), "singulier").toBeVisible({ timeout: 60_000 });
+      await expect(barre.getByText("Il te reste 1 code de secours — tu peux les régénérer depuis « Mes sessions ».", { exact: true }), "singulier").toBeVisible({ timeout: 60_000 });
       /* Plus aucun code : le recours est dit. */
       poserLesCodesDeSecours(j, 0);
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(barre.getByText(/Tu n'as plus de code de secours/), "zéro code : le recours").toBeVisible({ timeout: 60_000 });
-      await expect(barre).toContainText("un super administrateur");
+      await expect(barre, "A190 a : le recours est la régénération").toContainText("régénère-les depuis « Mes sessions »");
       /* Au-delà de deux codes : aucun avertissement. */
       poserLesCodesDeSecours(j, 3);
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -279,6 +281,81 @@ test.describe("ADM-SES — mes sessions (cahier 02-ADMIN § 5.26)", () => {
       await page.getByRole("button", { name: "Réessayer" }).click();
       await expect(lignesDeSessions(page).filter({ hasText: "cette session" })).toHaveCount(1, { timeout: 30_000 });
       await contexte.close();
+    } finally {
+      retirerLAcces(j);
+    }
+  });
+
+  /* ══ Lots du § 5.26, décidés au § 6 (A190) ══════════════════════════════════════════════════ */
+
+  test("ADM-SES-6 · « Révoquer toutes mes autres sessions » et régénérer ses codes de secours (A190 a, b)", async ({ browser, navigateurAdmin }) => {
+    test.setTimeout(6 * 60_000);
+    const j = creerAdminEnrole("SES-6", ["SUPPORT"], 1);
+    try {
+      const autre = await requeteApi.newContext({ userAgent: UA_WINDOWS_FIREFOX });
+      await connecterParApi(autre, j);
+      const { page } = await navigateurDe(browser, j, UA_MAC_CHROME);
+      await ouvrirMesSessions(page);
+      await expect(lignesDeSessions(page)).toHaveCount(2, { timeout: 60_000 });
+      const debut = await debutDuScenario();
+      /* b. Un geste, la session courante reste. */
+      await page.getByRole("button", { name: "Révoquer toutes mes autres sessions" }).click();
+      await expect(page.getByText("1 autre session fermée. Cette session reste ouverte.")).toBeVisible({ timeout: 30_000 });
+      await expect(lignesDeSessions(page)).toHaveCount(1);
+      await expect(lignesDeSessions(page).first()).toContainText("cette session");
+      await expect(page.getByRole("button", { name: "Révoquer toutes mes autres sessions" }), "plus rien à révoquer").toHaveCount(0);
+      expect(sessionsRedis(j)).toBe(1);
+      expect((await autre.get(`${api()}/admin/me`, { failOnStatusCode: false })).status(), "l'autre session est coupée").toBe(401);
+      /* a. Mauvais code : refus en français, la session reste ouverte (jamais /login). */
+      const champ = page.getByLabel("Code de l'application d'authentification");
+      await champ.fill("000000");
+      await page.getByRole("button", { name: "Régénérer mes codes de secours" }).click();
+      await expect(page.getByText(/^Code incorrect : saisis le code à six chiffres/)).toBeVisible({ timeout: 30_000 });
+      await expect(page).toHaveURL(/\/sessions$/);
+      /* a. Bon code (pas suivant : le pas de la connexion ne sert qu'une fois) → codes montrés une fois. */
+      await new Promise((r) => setTimeout(r, (resteDuPas() + 1) * 1000));
+      await champ.fill(totpCode(j.secret));
+      await page.getByRole("button", { name: "Régénérer mes codes de secours" }).click();
+      const liste = page.locator("section").filter({ has: page.getByRole("heading", { name: "Codes de secours" }) }).locator("ul li");
+      await expect(liste.first()).toBeVisible({ timeout: 30_000 });
+      const codes = (await liste.allInnerTexts()).map((c) => c.trim());
+      expect(codes.length).toBeGreaterThanOrEqual(8);
+      await page.getByRole("button", { name: "Je les ai notés" }).click();
+      await expect(liste, "montrés une seule fois").toHaveCount(0);
+      /* Un nouveau code ouvre une session ; l'avertissement « 1 code » a disparu. */
+      const neuve = await requeteApi.newContext();
+      expect((await neuve.post(`${api()}/auth/admin/login`, { data: { email: j.email, password: MOT_DE_PASSE_SEED } })).status()).toBe(200);
+      const parSecours = await neuve.post(`${api()}/auth/admin/totp/verify`, { data: { code: codes[0] } });
+      expect(parSecours.status(), "un code régénéré ouvre une session").toBe(200);
+      expect(((await parSecours.json()) as { remainingBackupCodes: number }).remainingBackupCodes).toBe(codes.length - 1);
+      await neuve.dispose();
+      /* Journal : une ligne par geste, jamais un code en clair. */
+      const lignes = (await lireLeJournal((await navigateurAdmin("finance")).contexte.request, { from: debut, adminUserId: j.id })).filter((l) => ["ADMIN_SESSIONS_REVOKED", "ADMIN_BACKUP_CODES_REGENERATED"].includes(l.action));
+      expect(lignes.map((l) => [l.action, l.after])).toEqual([["ADMIN_SESSIONS_REVOKED", { count: 1 }], ["ADMIN_BACKUP_CODES_REGENERATED", { remaining: codes.length }]]);
+      expect(JSON.stringify(lignes)).not.toContain(codes[1]);
+      await autre.dispose();
+    } finally {
+      retirerLAcces(j);
+    }
+  });
+
+  test("ADM-SES-7 · deux onglets renouvellent au même instant : une seule session, pas de fantôme (A190 d)", async () => {
+    test.setTimeout(3 * 60_000);
+    const j = creerAdminEnrole("SES-7", ["SUPPORT"]);
+    try {
+      const requete = await requeteApi.newContext();
+      await connecterParApi(requete, j);
+      expect(sessionsRedis(j)).toBe(1);
+      const jeton = (await requete.storageState()).cookies.find((c) => c.name === "admin_refresh_token")!.value;
+      const onglets = [0, 1, 2].map(() => requeteApi.newContext({ extraHTTPHeaders: { cookie: `admin_refresh_token=${jeton}` } }));
+      const ctx = await Promise.all(onglets);
+      const reponses = await Promise.all(ctx.map((c) => c.post(`${api()}/auth/admin/refresh`, { failOnStatusCode: false })));
+      expect(reponses.map((r) => r.status()), "trois renouvellements simultanés du même jeton").toEqual([200, 200, 200]);
+      expect(sessionsRedis(j), "une seule session suivante, aucune fantôme").toBe(1);
+      const jtis = new Set(reponses.map((r) => /admin_refresh_token=([^;]+)/.exec(r.headers()["set-cookie"] ?? "")?.[1]).map((t) => JSON.parse(Buffer.from(t!.split(".")[1], "base64url").toString()).jti));
+      expect(jtis.size, "les trois onglets reçoivent la même session").toBe(1);
+      for (const c of ctx) await c.dispose();
+      await requete.dispose();
     } finally {
       retirerLAcces(j);
     }

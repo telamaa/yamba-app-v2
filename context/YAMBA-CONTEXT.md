@@ -796,6 +796,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 6 CAS DE BOUT EN BOUT (branche `chore/recette-admin-6`, empilee sur `chore/recette-admin-5-26`)** —
+  8 scenarios ADM-E2E (`adm-e2e-bout-en-bout-1-4.spec.ts` : litige → argent, sanction proposee → appliquee → levee, trois
+  signalements, parametre < 30 s ; `adm-e2e-bout-en-bout-5-8.spec.ts` : lecture seule et levee, effacement RGPD, versement
+  en echec → cloture, billet + masquage) + ADM-SES-6, 7 (lots du § 5.26), SES-1 et 5 realignees. ANO-ADM-87 CLOSE
+  (majeure) : l'email « compte restreint / suspendu » citait le motif interne (souvent repris de la proposition du Support)
+  → `reason` retire du type `AccountStatusParams`, motif generique (A191). ANO-ADM-85 (lien « rapprochement Stripe »),
+  ANO-ADM-86 (deal sans fil affiche comme une erreur) closes ; jeu d'essai : fil de deux messages sur YAM-2041. DECISIONS :
+  A190 (`POST /admin/me/backup-codes` sur code TOTP, jamais 401 ; `DELETE /admin/me/sessions` ; `adminAccessClaims` unique ;
+  renouvellement reclame par `SET admin_rotated:<user>:<jti> NX EX 30`), A191 (email de sanction generique ; categorie de
+  motif en liste fermee PROPOSEE). CONTRE-EPREUVE : rouges vus en recette (E2E-1 libelle et fil, E2E-2 motif) ; unitaires
+  sur le code d'origine 6/20 rouges. Tests : auth 342, deal 644, message 57, trip 293, notification 122, harnais 534.
+  Reste : § 7 (ADM-NRG-1 a 7 + P2034 admin-users / admin-auth), § 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.26 MES SESSIONS (branche `chore/recette-admin-5-26`, empilee sur #326) — FIN DU § 5** —
   5 scenarios ADM-SES (1 du cahier + SES-2 reconnaitre une session, SES-3 serveur injoignable, SES-4 journal des sessions
   fermees, SES-5 codes de secours et panne de lecture) + ADM-CPT-12, 13 (lots du § 5.25), CPT-4 realignee (invite du

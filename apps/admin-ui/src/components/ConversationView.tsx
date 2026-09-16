@@ -27,10 +27,11 @@ export default function ConversationView({ bookingId }: { bookingId: string }) {
     apiFetch<AdminConversation>(`/admin/conversations/by-deal/${bookingId}`)
       .then(setData)
       // Recette § 5.18 — un refus se dit en français (la Finance qui ouvre l'adresse lisait un message anglais).
-      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Ce deal n'a pas de conversation." : e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas les conversations : c'est une garde de vie privée (Médiateur et Support seulement)." : "La conversation n'a pas pu être chargée. Recharge la page."));
+      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Les deux parties n'ont échangé aucun message sur ce deal : il n'y a pas de fil à lire." : e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas les conversations : c'est une garde de vie privée (Médiateur et Support seulement)." : "La conversation n'a pas pu être chargée. Recharge la page."));
   }, [bookingId]);
 
-  if (error) return <p className="text-[13px] text-red-700">{error}</p>;
+  // Recette § 6 (ANO-ADM-86) — un deal sans fil n'est pas une panne : les parties n'ont simplement rien échangé.
+  if (error) return <p className={`text-[13px] ${error.startsWith("Les deux parties") ? "text-slate-600" : "text-red-700"}`}>{error}</p>;
   if (!data) return <p className="text-[13px] text-slate-500">Chargement de la conversation…</p>;
 
   const nameOf = (role: string) => (role === "SHIPPER" ? `${data.shipper.firstName} ${data.shipper.lastName}` : role === "CARRIER" ? `${data.carrier.firstName} ${data.carrier.lastName}` : "Système");

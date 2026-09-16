@@ -104,7 +104,7 @@ test.describe("ADM-CNV — conversations (cahier 02-ADMIN § 5.18)", () => {
     /* 7. Un deal sans conversation. */
     const sansFil = jeuEssai.deal("bzv-pending").id;
     await page.goto(`${bo()}/conversations/${sansFil}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Ce deal n'a pas de conversation.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Les deux parties n'ont échangé aucun message sur ce deal : il n'y a pas de fil à lire.")).toBeVisible({ timeout: 60_000 });
     const direct = await med.contexte.request.get(`${api()}/admin/conversations/by-deal/${sansFil}`, { failOnStatusCode: false });
     expect(direct.status()).toBe(404);
     /* Journal : une ligne pour l'ouverture du fil. */

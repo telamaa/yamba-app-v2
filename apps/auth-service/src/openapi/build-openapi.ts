@@ -160,7 +160,15 @@ export function buildOpenApiDocument() {
       "/auth/admin/logout": { post: { tags: ["admin-auth"], summary: "ADMIN logout", operationId: "adminLogout", responses: { "200": okOnly, "500": r500 } } },
       "/auth/admin/invite/accept": { post: { tags: ["admin-auth"], summary: "Accept an admin invitation (public token, D56)", description: "Sets the password of the invited account; the token is single-use and expires.", operationId: "acceptAdminInvite", requestBody: jsonBody("AcceptAdminInviteRequest"), responses: { "200": inline("Accepted", { type: "object", properties: { ok: { type: "boolean" }, email: { type: "string" } }, required: ["ok", "email"] }), "400": r400, "404": r404, "500": r500 } } },
       "/admin/me": { get: admin("(session)", { tags: ["admin-auth"], summary: "The ADMIN account and its profiles", operationId: "getAdminMe", responses: { "200": ok("AdminMeResponse", "Admin"), "401": r401a, "500": r500 } }) },
-      "/admin/me/sessions": { get: admin("(session)", { tags: ["admin-auth"], summary: "ADMIN sessions", operationId: "listAdminSessions", responses: { "200": inline("Sessions", { type: "object", properties: { items: { type: "array", items: ref("AdminSessionItem") } }, required: ["items"] }), "401": r401a, "500": r500 } }) },
+      "/admin/me/sessions": {
+        get: admin("(session)", { tags: ["admin-auth"], summary: "ADMIN sessions", operationId: "listAdminSessions", responses: { "200": inline("Sessions", { type: "object", properties: { items: { type: "array", items: ref("AdminSessionItem") } }, required: ["items"] }), "401": r401a, "500": r500 } }),
+        // A190 b (recette 02-ADMIN § 6)
+        delete: admin("(session)", { tags: ["admin-auth"], summary: "Revoke every other ADMIN session (the current one stays)", description: "One ADMIN_SESSIONS_REVOKED audit line with the count; none when nothing was revoked.", operationId: "revokeOtherAdminSessions", responses: { "200": inline("OtherSessionsRevoked", { type: "object", properties: { ok: { type: "boolean" }, revoked: { type: "integer" } }, required: ["ok", "revoked"] }), "401": r401a, "500": r500 } }),
+      },
+      "/admin/me/backup-codes": {
+        // A190 a (recette 02-ADMIN § 6)
+        post: admin("(session)", { tags: ["admin-auth"], summary: "Regenerate my backup codes with a valid TOTP code", description: "Old codes are invalidated in the same write as the ADMIN_BACKUP_CODES_REGENERATED audit line; the new codes are returned once and never readable again. A backup code is refused.", operationId: "regenerateAdminBackupCodes", requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { code: { type: "string", pattern: "^\\d{6}$" } }, required: ["code"] } } } }, responses: { "200": inline("BackupCodesRegenerated", { type: "object", properties: { backupCodes: { type: "array", items: { type: "string" } } }, required: ["backupCodes"] }), "400": r400, "401": r401a, "403": r403, "500": r500 } }),
+      },
       "/admin/me/sessions/{jti}": { delete: admin("(session)", { tags: ["admin-auth"], summary: "Revoke one ADMIN session", operationId: "revokeAdminSession", parameters: [jtiParam], responses: { "200": okOnly, "400": r400, "401": r401a, "404": r404, "500": r500 } }) },
 
       /* ── admin ─────────────────────────────────────────────────────── */
