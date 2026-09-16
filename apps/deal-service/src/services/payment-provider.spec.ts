@@ -97,3 +97,25 @@ describe("createPaymentProviderFromEnv", () => {
     expect(isStripeResourceMissing(null)).toBe(false);
   });
 });
+
+describe("FakePaymentProvider — findTransfers (recette § 5.14, A164)", () => {
+  it("rend les transferts d'un groupe avec leurs métadonnées et la part renversée ; lecture seule", async () => {
+    const provider = new FakePaymentProvider();
+    const base = { currencyCode: "EUR", destinationAccountId: "acct_fake", description: "t" };
+    const a = await provider.transfer({ ...base, amountCents: 2400, metadata: { bookingId: "b1", reason: "DELIVERY" }, transferGroup: "b1", idempotencyKey: "payout:b1" });
+    await provider.transfer({ ...base, amountCents: 900, metadata: { bookingId: "b2" }, transferGroup: "b2", idempotencyKey: "payout:b2" });
+    provider._reverseTransferForTest(a.transferId, 400);
+    const found = await provider.findTransfers("b1");
+    expect(found).toEqual([{ id: a.transferId, amountCents: 2400, reversedCents: 400, metadata: { bookingId: "b1", reason: "DELIVERY" }, createdAt: null }]);
+    expect(await provider.findTransfers("inconnu")).toEqual([]);
+    expect(provider.transfers).toHaveLength(2);
+  });
+  it("_forgetIdempotencyKeysForTest : la même clé redevient un NOUVEAU transfert (ce que fait Stripe après 24 h)", async () => {
+    const provider = new FakePaymentProvider();
+    const input = { amountCents: 100, currencyCode: "EUR", destinationAccountId: "acct_fake", description: "t", metadata: {}, idempotencyKey: "k" };
+    const a = await provider.transfer(input);
+    provider._forgetIdempotencyKeysForTest();
+    const b = await provider.transfer(input);
+    expect(b.transferId).not.toBe(a.transferId);
+  });
+});

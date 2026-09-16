@@ -100,6 +100,32 @@ export const CHAT_ROLE_LABEL: Record<string, string> = { SHIPPER: "Expéditeur",
 /* C-PR5a (D58) */
 export const PAYOUT_STATUS_LABEL: Record<string, string> = { PENDING: "en attente d'envoi", SENT: "envoyé", FAILED: "en échec", FROZEN: "gelé (litige)", REVERSED: "renversé" };
 export const PAYOUT_FAILURE_LABEL: Record<string, string> = { ACCOUNT_NOT_READY: "compte Stripe du Voyageur non prêt", PROVIDER_ERROR: "refus du fournisseur", REVERSED: "transfert renversé par Stripe" };
+/**
+ * Recette § 5.14 — le motif d'un échec de versement tel que le serveur le rend (`CARRIER_ACCOUNT_NOT_READY`,
+ * `PROVIDER_ERROR:<message>`), dit en français. Le message brut du fournisseur reste lisible entre parenthèses.
+ */
+export function payoutReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return "motif inconnu";
+  if (reason === "CARRIER_ACCOUNT_NOT_READY") return PAYOUT_FAILURE_LABEL.ACCOUNT_NOT_READY;
+  if (reason.startsWith("PROVIDER_ERROR:transfer lookup failed")) return "le fournisseur n'a pas pu dire si un transfert était déjà parti : rien n'est reparti, par prudence";
+  if (reason.startsWith("PROVIDER_ERROR:")) {
+    const detail = reason.slice("PROVIDER_ERROR:".length).trim();
+    return detail ? `${PAYOUT_FAILURE_LABEL.PROVIDER_ERROR} (${detail})` : PAYOUT_FAILURE_LABEL.PROVIDER_ERROR;
+  }
+  return reason;
+}
+
+/** Recette § 5.14 — un refus d'un geste de versement (relancer, re-verser, abandonner), lu par son code (A146). */
+export function payoutRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "PAYOUT_NOT_RETRYABLE") return { text: "Rien à relancer : ce versement n'est plus en échec (envoyé ou traité entre-temps). La fiche est rechargée.", reload: true };
+  if (code === "NO_PAYOUT_FOR_STATUS") return { text: "Ce deal n'a pas de versement : seul un deal terminé, ou annulé tardivement, en a un.", reload: false };
+  if (code === "REVERSAL_NOT_OPEN") return { text: "Ce renversement est déjà clos (un autre administrateur vient de décider ?). La fiche est rechargée.", reload: true };
+  if (code === "ADMIN_IS_PARTY") return { text: "Tu es partie à ce deal : un autre administrateur doit décider.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne permet pas ce geste.", reload: false };
+  if (e?.status === 400) return { text: "Demande refusée : vérifie le motif (20 caractères au moins) et réessaie.", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: false };
+}
 export const TIMELINE_LABEL: Record<string, string> = {
   AUTHORIZED: "Empreinte posée (autorisation)", CAPTURED: "Débité (capture)", REFUNDED: "Remboursé à l'Expéditeur", DISPUTED: "Litige ouvert",
   COMPLETED: "Deal terminé", CANCELLED: "Deal annulé", PAYOUT_SENT: "Versement envoyé au Voyageur", PAYOUT_FAILED: "Versement en échec",
@@ -209,7 +235,7 @@ export function timelineDetailLabel(detail: string | null): string | null {
   if (!detail) return null;
   return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
 }
-const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert", providerError: "échec" };
+const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert", previousTransferId: "transfert renversé", providerError: "échec" };
 /** § 5.13 — valeurs codées du journal qui ont un libellé. */
 const AFTER_VALUE_LABEL: Record<string, string> = { PROVIDER_UNAVAILABLE: "fournisseur injoignable, rien comparé" };
 /** Le « after » d'une action admin en une ligne lisible (montants en euros, codes traduits) ; une clé inconnue garde son nom. */

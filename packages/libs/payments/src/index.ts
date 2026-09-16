@@ -120,6 +120,12 @@ export function isStripeResourceMissing(err: unknown): boolean {
   return !!e && (e.code === "resource_missing" || (e.statusCode === 404 && e.type === "StripeInvalidRequestError"));
 }
 
+/**
+ * Recette 02-ADMIN § 5.14 (A164) — un transfert déjà émis pour un deal, lu par son `transfer_group` (= bookingId).
+ * Sert à ne jamais verser deux fois quand la clé d'idempotence ne protège plus (Stripe l'oublie au bout de 24 h).
+ */
+export type ExistingTransfer = { id: string; amountCents: number; reversedCents: number; metadata: Record<string, string>; createdAt: string | null };
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   authorize(input: AuthorizeInput): Promise<PaymentAuthorization>;
@@ -130,6 +136,8 @@ export interface PaymentProvider {
   transfer(input: TransferInput): Promise<TransferResult>;
   /** Lecture seule : intent + remboursements + transfert (C-PR5). Jette si l'intent est inconnu. */
   inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection>;
+  /** Lecture seule (A164) : les transferts d'un groupe. Optionnel : un fournisseur qui ne l'offre pas n'est pas consulté. */
+  findTransfers?(transferGroup: string): Promise<ExistingTransfer[]>;
 }
 
 /* ══ Stripe ═══════════════════════════════════════════════════ */
@@ -229,6 +237,12 @@ export class StripePaymentProvider implements PaymentProvider {
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined
     );
     return { provider: "STRIPE", transferId: t.id, amountCents: t.amount, currencyCode: t.currency.toUpperCase() };
+  }
+
+  async findTransfers(transferGroup: string): Promise<ExistingTransfer[]> {
+    // Une panne REMONTE : l'appelant ne doit pas conclure « aucun transfert » d'un fournisseur injoignable (ANO-ADM-32).
+    const list = await this.stripe.transfers.list({ transfer_group: transferGroup, limit: 100 });
+    return list.data.map((t) => ({ id: t.id, amountCents: t.amount, reversedCents: t.amount_reversed, metadata: (t.metadata ?? {}) as Record<string, string>, createdAt: new Date(t.created * 1000).toISOString() }));
   }
 
   async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
@@ -370,7 +384,21 @@ export class FakePaymentProvider implements PaymentProvider {
     };
     this.transfers.push(result);
     if (input.idempotencyKey) this.transfersByKey.set(input.idempotencyKey, result);
+    if (input.transferGroup) this.groupByTransfer.set(result.transferId, { group: input.transferGroup, metadata: { ...input.metadata } });
     return result;
+  }
+
+  private readonly groupByTransfer = new Map<string, { group: string; metadata: Record<string, string> }>();
+
+  async findTransfers(transferGroup: string): Promise<ExistingTransfer[]> {
+    return this.transfers
+      .filter((t) => this.groupByTransfer.get(t.transferId)?.group === transferGroup)
+      .map((t) => ({ id: t.transferId, amountCents: t.amountCents, reversedCents: this.reversedByTransfer.get(t.transferId) ?? 0, metadata: { ...(this.groupByTransfer.get(t.transferId)?.metadata ?? {}) }, createdAt: null }));
+  }
+
+  /** aide aux tests (A164) : simuler une clé d'idempotence OUBLIÉE par le fournisseur (Stripe : 24 h). */
+  _forgetIdempotencyKeysForTest() {
+    this.transfersByKey.clear();
   }
 
   private readonly reversedByTransfer = new Map<string, number>();

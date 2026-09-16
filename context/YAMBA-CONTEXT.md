@@ -796,6 +796,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.14 VERSEMENTS : REJEU ET RENVERSEMENT (branche `chore/recette-admin-5-14`, empilee sur
+  #314)** — 7 scenarios CONFORMES (VER-1, 2, 3 du cahier + VER-1 bis double clic, VER-1 ter quatre relances simultanees,
+  VER-2 bis deux re-versements simultanes, VER-4 ecran perime), joues contre le code non corrige (6/6 verts : le parcours
+  et la concurrence LOCALE tenaient), puis verts deux fois ; ARG, FIN, RET, RAP, MED rejouees (33/33). Quatre relances simultanees
+  → 4 × 200 SENT, MEME transfert, UN `booking.payout_sent`, compteur +1 ; deux re-versements → 200 + 400. ANO-ADM-33 CLOSE
+  (bloquante, trouvee a la lecture du code, prouvee en tests unitaires : le Fake ne simule pas la course fournisseur) :
+  `markPayoutFailed` ecrivait FAILED sur `{id, status}` seulement → un executeur concurrent recevant le 409 Stripe « cle en
+  cours » ecrasait le SENT de l'autre, transfert reel compris ; le rejeu suivant, cle expiree (24 h), aurait verse DEUX
+  fois. A164 : ecriture conditionnelle `payoutStatus ∈ {PENDING, FAILED}` + relecture ; apres une tentative,
+  `PaymentProvider.findTransfers` (optionnel, Stripe `transfers.list` + Fake) → le transfert vivant du deal est ADOPTE
+  (`adoptableTransfer`) ; recherche en panne → rien n'est emis. AMELIORATIONS : refus des gestes de versement en
+  francais par code (`payoutRefusalMessage`, recharge sur ecran perime), motif d'echec lisible (`payoutReasonLabel`),
+  garde de double clic par ref, message qui nomme montant / Voyageur / transfert, formulaire de renversement qui nomme le
+  fournisseur reel (Fake en local) + compteur n/20 + consequence de chaque bouton, journal `previousTransferId`.
+  Tests : deal 607, harnais 426. Reste : § 5.15 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

@@ -1,4 +1,4 @@
-import { buildMoneyTimeline, maskAccountId, moneyBalance, nextPayoutRetryAt, payoutFailureDetail, payoutFailureKind, payoutRetryDelayMs, payoutRetryDueFilter, reconcile } from "./admin-finance.rules";
+import { adoptableTransfer, buildMoneyTimeline, maskAccountId, moneyBalance, nextPayoutRetryAt, payoutNeedsTransferLookup, payoutFailureDetail, payoutFailureKind, payoutRetryDelayMs, payoutRetryDueFilter, reconcile } from "./admin-finance.rules";
 
 const NOW = new Date("2026-09-04T10:00:00.000Z");
 const live = (o: Partial<Parameters<typeof reconcile>[1]> = {}) => ({
@@ -228,5 +228,27 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(manualRefundBounds({ ...base, status: "ACCEPTED" }).allowed).toBe(false);
     expect(manualRefundBounds({ ...base, capturedAt: null })).toMatchObject({ maxRefundableCents: 0, allowed: false });
     expect(manualRefundBounds({ ...base, status: "CANCELLED", refundAmountCents: 1479 })).toMatchObject({ maxRefundableCents: 1478, allowed: true });
+  });
+});
+
+describe("Recette § 5.14 (A164) — jamais deux fois", () => {
+  it("payoutNeedsTransferLookup : seulement après une tentative (ou un transfert connu)", () => {
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 0, transferId: null })).toBe(false);
+    expect(payoutNeedsTransferLookup({})).toBe(false);
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 1 })).toBe(true);
+    expect(payoutNeedsTransferLookup({ payoutAttempts: 0, transferId: "tr_1" })).toBe(true);
+  });
+  it("adoptableTransfer : vivant, même montant, même motif, même deal — jamais un transfert renversé, même en partie", () => {
+    const expected = { bookingId: "b1", amountCents: 2400, reason: "DELIVERY" };
+    const t = (o: Partial<{ id: string; amountCents: number; reversedCents: number; metadata: Record<string, string> }>) => ({ id: "tr", amountCents: 2400, reversedCents: 0, metadata: { bookingId: "b1", reason: "DELIVERY" }, ...o });
+    expect(adoptableTransfer([], expected)).toBeNull();
+    expect(adoptableTransfer([t({ id: "tr_ok" })], expected)).toEqual({ id: "tr_ok" });
+    expect(adoptableTransfer([t({ reversedCents: 2400 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ reversedCents: 100 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ amountCents: 1200 })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ metadata: { bookingId: "b1", reason: "LATE_CANCELLATION" } })], expected)).toBeNull();
+    expect(adoptableTransfer([t({ metadata: { bookingId: "b2", reason: "DELIVERY" } })], expected)).toBeNull();
+    // Transfert ancien sans métadonnées : le montant et le groupe suffisent.
+    expect(adoptableTransfer([t({ id: "tr_legacy", metadata: {} })], expected)).toEqual({ id: "tr_legacy" });
   });
 });

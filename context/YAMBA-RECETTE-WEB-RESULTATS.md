@@ -5353,6 +5353,73 @@ MED rejouées vertes (27/27).
 
 ---
 
+## Cahier 02-ADMIN — § 5.14 Versements : rejeu et renversement · **CONFORME** (3 fiches + 4 ajoutées · 1 anomalie bloquante close · 7 améliorations · 2 écarts documentaires · 7 scénarios, 3 min)
+
+`apps/e2e/src/admin/adm-ver-versements.spec.ts`. La question du chapitre n'est pas « le bouton marche-t-il » mais
+**« l'argent peut-il partir deux fois ? »**. Preuves lues dans les faits durables : le **même `transferId`** dans toutes les
+réponses (le Fake, comme Stripe, rend le transfert existant pour une clé déjà vue), **un seul** événement d'outbox
+`booking.payout_sent`, un compteur de tentatives à +1. La concurrence est **réelle** : appels lancés ensemble
+(`Promise.all`) par l'API de l'écran. Jeu d'essai rejoué avant chaque fiche. Les six premiers scénarios ont été joués
+contre le code non corrigé : **tous verts** — la protection locale tenait, le défaut était ailleurs (course avec une erreur
+fournisseur, clé expirée), établi à la lecture du code et prouvé en tests unitaires. Après corrections : 7/7 verts deux
+fois ; ADM-ARG, FIN, RET, RAP, MED rejouées avec le second passage (33/33, 17 min).
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-VER-1 | Relancer un versement en échec | **Conforme** — avant : 4 tentatives, montant figé 26,00 € ; « Relancer » depuis `/finances?kind=FAILED` → `200 SENT`, « Versement de 26,00 € envoyé à Thomas. » ; fiche : tentatives 5, montant 26,00 €, transfert = celui rendu, bouton disparu ; un `booking.payout_sent` ; deal `ACCEPTED` → 400 « Only a completed or late-cancelled deal has a payout. » ; versement `SENT` → 400 « Nothing to retry… » ; journal `PAYOUT_RETRIED BOOKING · id`, `after { outcome: SENT, transferId }`. ⏭ admin partie au deal : aucun compte admin partie (tests unitaires) |
+| ADM-VER-1 bis (ajoutée) | Le double clic, à l'écran | **Conforme** — double clic natif sur « Relancer le versement » : **une** requête, un transfert, un événement, tentatives +1 ; le message nomme montant, Voyageur et transfert (amélioration), jamais un code HTTP brut |
+| ADM-VER-1 ter (ajoutée) | Quatre relances simultanées par l'API | **Conforme** — Finance, Médiateur, Finance, Médiateur ensemble → 4 × `200 SENT` portant **le même** `tr_fake_…` ; un seul `booking.payout_sent` ; compteur +1 (pas +4) ; jamais de 500 ; 4 lignes `PAYOUT_RETRIED` (une par relance exécutée, conforme au cahier) |
+| ADM-VER-2 | Re-verser | **Conforme** — « Décider » depuis `/finances?kind=REVERSED` ; texte « Transfert renversé par **le fournisseur de test (Fake)** : … » (amélioration : le fournisseur réel) ; motif de 11 caractères → compteur « 11 / 20 », boutons inactifs ; motif du cahier, « Re-verser » → `200 RESENT / SENT`, « Nouveau transfert envoyé : 26,00 €, renversement clos. » ; **nouveau** transfert (≠ `tr_fake_seed_bzv-reversed`), +1 `booking.payout_sent` ; carte « Renversement clos : re-versé par … — motif » ; ligne sortie de la file ; second envoi → 400 « This payout is not an open reversal. », aucun envoi de plus ; journal `PAYOUT_REVERSAL_RESOLVED` `{ outcome: RESENT, reason, previousTransferId: tr_fake_seed_bzv-reversed }` |
+| ADM-VER-2 bis (ajoutée) | Deux « Re-verser » simultanés | **Conforme** — `200 + 400`, un seul nouveau transfert, une seule clôture journalisée |
+| ADM-VER-3 | Abandonner | **Conforme** — « Renversement abandonné, clos : le manque à gagner est tracé au journal. » ; versement toujours `REVERSED`, transfert inchangé, aucun envoi ; carte « abandonné par … » ; sortie de la file ; journal `{ outcome: WRITTEN_OFF, reason }` |
+| ADM-VER-4 (ajoutée) | Un écran périmé | **Conforme après amélioration** — fiche de renversement ouverte, le Médiateur abandonne entre-temps ; « Re-verser » → 400, « Ce renversement est déjà clos (un autre administrateur vient de décider ?). La fiche est rechargée. », formulaire disparu, « abandonné par », rien d'envoyé. File des échecs ouverte, le Médiateur relance d'abord ; « Relancer » → « Rien à relancer : ce versement n'est plus en échec (envoyé ou traité entre-temps). La fiche est rechargée. », la ligne disparaît. Avant : `400 : This payout is not an open reversal.` et un formulaire resté affiché (lecture du code) |
+
+### Anomalie
+
+- **ANO-ADM-33 (bloquante, close — A164)** — **un échec pouvait écraser un versement envoyé, et le rejeu suivant verser une
+  seconde fois.** `markPayoutFailed` (`apps/deal-service/src/services/deal-settlement.service.ts`) écrivait `FAILED` sous la
+  seule condition du statut du deal. Deux exécuteurs sur le même versement (un admin qui relance pendant le cron, deux
+  admins) : l'un obtient le transfert et écrit `SENT` ; l'autre, dont la requête croise la première, reçoit de Stripe une
+  erreur 409 « clé en cours » et écrit `FAILED` **par-dessus**, argent parti compris. Stripe n'honorant une clé
+  d'idempotence que 24 h et le rejeu passant à une tentative par jour, le transfert suivant partait pour de bon.
+  Établie à la lecture du code, prouvée par tests unitaires (le Fake ne simule ni la clé « en cours » ni l'oubli d'une
+  clé). Correction : échec conditionnel `payoutStatus ∈ {PENDING, FAILED}` + relecture (l'issue rendue est `SENT`) ;
+  **A164** : après une tentative, `findTransfers` interroge le fournisseur (Stripe `transfers.list` par `transfer_group`) et
+  le transfert vivant du deal est adopté au lieu d'être réémis ; recherche en panne → rien n'est émis.
+
+### Écarts documentaires
+
+- **Messages** : le cahier attend « Versement envoyé. », « Nouveau transfert envoyé. », « Renversement abandonné, clos. » ;
+  l'écran nomme désormais le montant, le Voyageur et le transfert, et le formulaire nomme le fournisseur réel.
+- **« Versement en échec immédiatement rejouable (prochaine relance datée d'hier) »** : depuis la recette du § 5.1, le jeu
+  d'essai pose la prochaine relance à +23 h (le cron FAKE vidait la file) ; « Relancer » n'attend pas l'échéance, la fiche
+  est jouable.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **VER-1** — *Fait* : motif d'échec lisible (`payoutReasonLabel`) dans la file et la fiche, refus en français par code.
+  *Proposé* : afficher dans la fiche la date et l'issue de chaque tentative (aujourd'hui, seul le compteur et la dernière
+  raison) — petit.
+- **VER-1 bis** — *Fait* : garde synchrone `useRef` (un `disabled` ne s'applique qu'au rendu suivant). *Test* : le double
+  clic natif ne partait déjà qu'une fois sur ce poste ; la garde protège les postes lents — rien à faire de plus.
+- **VER-1 ter** — *Fait* : ANO-ADM-33 et A164. *Proposé* : une ligne de journal par **versement** plutôt que par clic quand
+  plusieurs relances concluent sur le même transfert — à trancher (le cahier veut une ligne par clic).
+- **VER-2** — *Fait* : fournisseur réel nommé, compteur n/20, conséquence de chaque bouton écrite, `previousTransferId`
+  au journal. *Proposé* : afficher le transfert renversé dans la carte après re-versement (il n'est plus qu'au journal) —
+  petit.
+- **VER-2 bis** — *Constat* : conforme d'emblée (clôture conditionnelle). *Test* : rien à faire.
+- **VER-3** — *À trancher* : « Abandonner » n'écrit aucun événement d'outbox et ne prévient pas le Voyageur, alors que
+  l'argent ne viendra jamais ; la règle « pas de changement d'état sans événement dans la même transaction » est à
+  confronter à ce sous-état de versement.
+- **VER-4** — *Fait* : lecteur de refus unique (`payoutRefusalMessage`) qui recharge sur `PAYOUT_NOT_RETRYABLE` et
+  `REVERSAL_NOT_OPEN`, et qui ne promet pas « rien n'est parti » sur une erreur réseau. *Test* : fiche ajoutée, deux profils.
+- **Transversal** — *Test* : un Fake qui honore l'idempotence mais ne sait ni échouer en course ni oublier une clé fait
+  passer au vert les scénarios de concurrence ; les aides `findTransfers` et `_forgetIdempotencyKeysForTest` permettent
+  désormais le scénario complet en test unitaire. *Proposé* : un mode « chaos » du Fake piloté par variable
+  d'environnement (409 sur clé en cours, réponse perdue) pour le jouer aussi en e2e — moyen.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

@@ -266,7 +266,8 @@ describe("B — executePayout : le net du snapshot, rattaché à la charge, jama
     expect(outcome.payoutStatus).toBe("FAILED");
     expect(provider.calls).toHaveLength(0);
     const last = updates().pop()!;
-    expect(last.where).toEqual({ id: BOOKING_ID, status: "COMPLETED" });
+    // ANO-ADM-33 : l'échec ne s'écrit que sur un versement encore à envoyer (jamais sur un SENT concurrent)
+    expect(last.where).toEqual({ id: BOOKING_ID, status: "COMPLETED", payoutStatus: { in: ["PENDING", "FAILED"] } });
     // C-PR5 (A111) : compteur lu puis écrit (pas d'increment — pitfall Mongo), horodatage et prochaine relance espacée
     expect(last.data).toEqual({
       payoutStatus: "FAILED",
@@ -304,6 +305,72 @@ describe("B — executePayout : le net du snapshot, rattaché à la charge, jama
     prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 });
     const outcome = await makeService().executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING" }) as never, NOW);
     expect(outcome.payoutStatus).toBe("SENT");
+  });
+
+  it("ANO-ADM-33 : course — le fournisseur refuse la seconde requête (clé en cours) APRÈS que l'autre exécuteur a écrit SENT → rien n'est écrasé, l'issue rendue est SENT", async () => {
+    prismaMock.carrierPage.findUnique.mockResolvedValue({ stripeAccountId: "acct_123", stripePayoutsEnabled: true });
+    const provider = stripeLike({ transfer: async () => { throw new Error("Keys for idempotent requests can only be used for one request at a time"); } });
+    prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 }); // l'écriture FAILED ne trouve plus un versement à envoyer
+    prismaMock.booking.findUnique.mockResolvedValueOnce({ payoutStatus: "SENT", transferId: "tr_winner" });
+    const outcome = await makeService(provider).executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING" }) as never, NOW);
+    expect(outcome).toEqual({ payoutStatus: "SENT", transferId: "tr_winner", reason: null });
+    expect(updates()[0].where).toEqual({ id: BOOKING_ID, status: "COMPLETED", payoutStatus: { in: ["PENDING", "FAILED"] } });
+    expect(writtenEventTypes()).toEqual([]);
+  });
+
+  it("A164 : après une tentative, un transfert VIVANT du deal chez le fournisseur est adopté — aucun second transfert (clé d'idempotence expirée)", async () => {
+    prismaMock.carrierPage.findUnique.mockResolvedValue({ stripeAccountId: "acct_123", stripePayoutsEnabled: true });
+    const provider = stripeLike({
+      findTransfers: async (group: string) => [
+        { id: "tr_reversed", amountCents: 2400, reversedCents: 2400, metadata: { bookingId: group, reason: "DELIVERY" }, createdAt: null },
+        { id: "tr_live", amountCents: 2400, reversedCents: 0, metadata: { bookingId: group, reason: "DELIVERY" }, createdAt: null },
+      ],
+    });
+    const outcome = await makeService(provider).executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 25 }) as never, NOW);
+    expect(outcome).toEqual({ payoutStatus: "SENT", transferId: "tr_live", reason: null });
+    expect(provider.calls).toHaveLength(0);
+    expect(updates()[0].data).toMatchObject({ payoutStatus: "SENT", transferId: "tr_live", payoutAttempts: 26 });
+    expect(writtenEventTypes()).toEqual(["booking.payout_sent"]);
+  });
+
+  it("A164 : seuls des transferts renversés, d'un autre montant ou d'un autre motif → nouveau transfert ; première tentative → aucune recherche", async () => {
+    prismaMock.carrierPage.findUnique.mockResolvedValue({ stripeAccountId: "acct_123", stripePayoutsEnabled: true });
+    const findTransfers = jest.fn(async () => [
+      { id: "tr_old", amountCents: 2400, reversedCents: 2400, metadata: { reason: "DELIVERY" }, createdAt: null },
+      { id: "tr_other", amountCents: 1200, reversedCents: 0, metadata: { reason: "DELIVERY" }, createdAt: null },
+      { id: "tr_comp", amountCents: 2400, reversedCents: 0, metadata: { reason: "LATE_CANCELLATION" }, createdAt: null },
+    ]);
+    const provider = stripeLike({ findTransfers });
+    const outcome = await makeService(provider).executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING", payoutAttempts: 1 }) as never, NOW);
+    expect(outcome.transferId).toBe("tr_test_1");
+    expect(provider.calls).toHaveLength(1);
+    findTransfers.mockClear();
+    await makeService(provider).executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING", payoutAttempts: 0 }) as never, NOW);
+    expect(findTransfers).not.toHaveBeenCalled();
+  });
+
+  it("A164 : la recherche échoue (fournisseur injoignable) → FAILED, AUCUN transfert émis à l'aveugle", async () => {
+    prismaMock.carrierPage.findUnique.mockResolvedValue({ stripeAccountId: "acct_123", stripePayoutsEnabled: true });
+    const provider = stripeLike({ findTransfers: async () => { throw new Error("connection reset"); } });
+    const outcome = await makeService(provider).executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 3 }) as never, NOW);
+    expect(outcome.payoutStatus).toBe("FAILED");
+    expect(outcome.reason).toMatch(/^PROVIDER_ERROR:transfer lookup failed — connection reset/);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it("A164 : de bout en bout sur le Fake — clé oubliée par le fournisseur, le rejeu retrouve le transfert au lieu de verser deux fois", async () => {
+    const fake = new FakePaymentProvider();
+    const svc = makeService(fake);
+    const first = await svc.executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING", payoutAttempts: 0 }) as never, NOW);
+    fake._forgetIdempotencyKeysForTest();
+    const again = await svc.executePayout(makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 1 }) as never, NOW);
+    expect(again.transferId).toBe(first.transferId);
+    expect(fake.transfers).toHaveLength(1);
+    // Une fois le transfert renversé (re-verser), le rejeu en émet bien un NOUVEAU.
+    fake._reverseTransferForTest(first.transferId!);
+    const resent = await svc.executePayout({ ...makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING", payoutAttempts: 1 }), payoutIdempotencyKey: `payout:${BOOKING_ID}:resend:1` } as never, NOW);
+    expect(resent.transferId).not.toBe(first.transferId);
+    expect(fake.transfers).toHaveLength(2);
   });
 
   it("un deal non COMPLETED ne se verse pas (INV-2) — sauf la compensation d'un CANCELLED tardif (A80)", async () => {
