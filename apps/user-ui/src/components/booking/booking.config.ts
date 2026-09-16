@@ -188,8 +188,9 @@ export function validateStep1(
   }
   if (draft.insurance === "EXTENDED_500" && draft.photos.length === 0) {
     errors.photos = isFr
-      ? "Au moins 1 photo requise avec l'assurance 500 €"
-      : "At least 1 photo required with the 500 € insurance";
+      // ANO-WEB-33 (recette 5.12) — le mot « assurance » ne s'affiche nulle part : c'est une garantie.
+      ? "Au moins 1 photo requise avec la Garantie Yamba 500 €"
+      : "At least 1 photo required with the Yamba Guarantee €500";
   }
 
   return errors;

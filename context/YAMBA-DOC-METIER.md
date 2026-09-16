@@ -3388,3 +3388,90 @@ ne suis plus ce voyageur » ; le compteur d'abonnés suit.
 | 166 | Notification coupée | aucun email, abonnement gardé | oui |
 | 167 | Se désabonner | toast, ligne retirée, abonnés −1 | oui (ANO-WEB-31 close) |
 | 168 | Soi-même / vide | pas de Suivre, 400 ; état vide | oui |
+
+
+---
+
+# Réserver : l'assistant en quatre étapes et le devis — ce que le chapitre 5.12 fait respecter
+
+*(PR `chore/recette-web-5-12` (#277), 11/09/2026 — cahier 01-WEB chapitre 5.12, WEB-RSV-1 à 22.)*
+
+## Le besoin
+
+Un Expéditeur décrit son colis, désigne le destinataire, s'engage, autorise le paiement. Le prix
+qu'il voit est celui que le serveur figera ; rien n'est débité avant l'accord du Voyageur ; il ne
+peut réserver ni son propre trajet, ni un trajet parti, masqué ou plein.
+
+## Les règles
+
+**RG-WEB-137 — La porte de réservation reprend le colis et le trajet après connexion.**
+
+**RG-WEB-138 — Quatre étapes nommées, deux retours distincts, un récapitulatif toujours visible.**
+
+**RG-WEB-139 — Les lieux du trajet sont proposés ; un lieu unique est pré-sélectionné ; sans lieu,
+l'écran le dit.**
+
+**RG-WEB-140 — Les règles d'or et la liste des produits interdits sont à portée de clic.**
+
+**RG-WEB-141 — Le produit dépend de l'offre du trajet** (colis au kilo, bagage soute si proposé,
+cabine si proposé) ; **une famille refusée est visible, barrée et expliquée** ; un supplément
+s'annonce avant le choix.
+
+**RG-WEB-142 — Le poids est pré-rempli (2 kg ou poids mémorisé), jamais vide ; 30 kg maximum ;
+jamais plus que les kilos restants.**
+
+**RG-WEB-143 — Le devis suit la note de calcul au centime** : taille (S ×1, M ×1,1, L ×1,25),
+supplément de famille, plancher 8 € (0,5 kg facturé minimum), service max(12 %, 3 €).
+
+**RG-WEB-144 — La description fait 5 caractères au moins ; au plus 5 photos de 10 Mo, refusées
+dès la sélection ; les deux premières sont « Contenu » et « Emballé ».**
+
+**RG-WEB-145 — Deux protections : de base (incluse) et Garantie Yamba 500 € (+6 €, photo
+obligatoire). Le mot « assurance » n'apparaît jamais.**
+
+**RG-WEB-146 — Un bagage entier est un forfait** : ni poids ni taille, service 12 %.
+
+**RG-WEB-147 — Le récapitulatif ne montre jamais zéro** : sans poids ou sans taille, un indice.
+
+**RG-WEB-148 — Le destinataire n'a pas de compte** ; téléphone d'abord (indicatif, numéro
+valide), email facultatif ; le code de livraison lui sera transmis.
+
+**RG-WEB-149 — Une seule case vaut Charte, CGV et Contrat de transport ; sans elle, pas de
+paiement.**
+
+**RG-WEB-150 — Le paiement est une autorisation** (débit à l'acceptation, sous 24 h) ; un seul
+composant de paiement ; « Payer {montant} ».
+
+**RG-WEB-151 — La demande envoyée réserve les kilos et prévient chacun de ce qui le concerne**
+(l'Expéditrice son total, le Voyageur son gain net, jamais l'inverse).
+
+**RG-WEB-152 — Le serveur a le dernier mot** : devis divergent → nouveau total affiché, rien de
+posé ; dernier kilo → refus sans trace ; son propre trajet, un trajet parti ou masqué → refus à
+l'ouverture ; l'assistant survit à un rechargement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 169 | Porte visiteur | par-dessus la page, puis pleine page | oui |
+| 170 | Entrée | étapes, titres, retours, colonne collante | oui |
+| 171 | Lieux | pré-sélectionnés, types en clair | oui |
+| 172 | Règles d'or | quatre puces + liste | oui |
+| 173 | Produit / famille refusée | soute 230 €, cabine absent, refus expliqué, +20 % | oui |
+| 174 | Poids | 2 par défaut, 35 refusé, borne des kilos restants | oui (ANO-WEB-34 close) |
+| 175 | Taille | S 32,20 · L 40,25 | oui |
+| 176 | Supplément / plancher | 38,64 · 11 | oui |
+| 177 | Description / photos | min. 5 ; tags ; > 10 Mo refusé à la sélection | oui (ANO-WEB-39 close) |
+| 178 | Protection | 38,20 ; photo requise ; jamais « assurance » | oui (ANO-WEB-33 close) |
+| 179 | Bagage entier | 257,60, champs masqués | oui |
+| 180 | Jamais zéro | indices seuls | oui (ANO-WEB-37 close) |
+| 181 | Destinataire | téléphone d'abord, 12 refusé, email optionnel | oui |
+| 182 | Engagement | une case, bloqué sans elle | oui |
+| 183 | Paiement | textes, Payer 32,20 €, un seul composant | oui |
+| 184 | Carte refusée | erreur, rien créé | ⏭ (FAKE ; recette API) |
+| 185 | Demande envoyée | suivi, −2,5 kg, deux emails | oui |
+| 186 | Devis divergent | message, 42 €, rien créé | oui (ANO-WEB-36 close) |
+| 187 | Dernier kilo | A créée, B refusée sans trace | oui |
+| 188 | Propre trajet | refus à l'ouverture | oui (ANO-WEB-35 close) |
+| 189 | Parti / masqué | refus à l'ouverture / introuvable | oui (ANO-WEB-38 close) |
+| 190 | Rechargement | saisies retrouvées | oui |

@@ -5061,3 +5061,81 @@ l'élément.
 trip-service **261** (+1, ANO-WEB-32) — plateforme **994** ; auth 229 inchangé. `apps/e2e` :
 **131 scénarios** (119 + WEB-FAV ×12). Typecheck trip-service, user-ui et harnais verts ; OpenAPI
 régénérés.
+
+
+---
+
+# Chapitre 5.12 du cahier 01-WEB : l'assistant de réservation — sept défauts sur l'écran cœur, tous des branchements
+
+*(PR `chore/recette-web-5-12` (#277), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le douzième chapitre « fiches » du cahier 01-WEB : `WEB-RSV` (le tunnel de réservation en quatre
+étapes et le devis). Vingt-deux fiches : vingt et une jouées et conformes (sept après correction),
+une `⏭` (carte refusée : fournisseur FAKE). Sept anomalies closes (`ANO-WEB-33` à `39`).
+
+```
+apps/e2e/src/chapitres/web-rsv-devis.spec.ts                12 scénarios, 2 min 05 (complète web-rsv.spec.ts et web-rsv-assistant.spec.ts)
+apps/user-ui/src/components/booking/booking.config.ts       ANO-WEB-33 (« Garantie Yamba », pas « assurance »)
+apps/user-ui/src/components/booking/booking.copy.ts         ANO-WEB-33 (copy legacy)
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-34 (buildInitialDraft(trip))
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-34
+apps/user-ui/src/app/[locale]/trips/[tripId]/book/BookingClient.tsx   ANO-WEB-35 / 38 (propre trajet, trajet parti : refus à l'ouverture)
+apps/user-ui/src/components/booking/useBookingCheckout.ts   ANO-WEB-36 (trajet relu après QUOTE_DIVERGENCE)
+apps/user-ui/src/components/booking/BookingSummarySidebar.tsx   ANO-WEB-37 (jamais « 0 € »)
+apps/user-ui/src/components/booking/BookingBottomSheet.tsx  ANO-WEB-37
+apps/user-ui/src/components/booking/steps/StepParcel.tsx    ANO-WEB-39 (photo > 10 Mo refusée à la sélection)
+```
+
+## Le devis au centime, contre la note de calcul
+
+Le cahier donne la règle (`transport = max(€/kg × poids facturable × coefficient × (1 + supplément), 8 €)`,
+`service = max(12 %, 3 €)`) et sept montants attendus. Le harnais les lit dans la colonne de droite
+(« Total 32,20 € », le détail « × S · +20 % 34,50 € », « Minimum par colis appliqué : 8 € ») et sur
+le bouton « Payer … » à l'étape 4 — tous exacts. Deux subtilités de lecture : les décimales nulles
+tombent (« 8 € », « 42 € ») et les kilos s'écrivent avec un point (« 15.5 kg ») — consignés à
+trancher, absorbés par le harnais (`eur()`, `[.,]`).
+
+## Sept anomalies, une seule famille
+
+Aucune règle de calcul n'était fausse ; les sept défauts sont des **branchements** :
+
+1. **`buildInitialDraft(trip)` n'était appelée par personne** (ANO-WEB-34) : la fabrique du
+   brouillon (poids 2 kg ou mémorisé, première famille acceptée, lieu unique pré-sélectionné)
+   existait, testée nulle part, et les deux wizards partaient du brouillon vide. `useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]))`,
+   la reprise `sessionStorage` gardant la priorité.
+2. **Le récapitulatif rendait des zéros** quand le devis était indisponible (ANO-WEB-37) :
+   `computeTotal` renvoie `{ transport: 0, …, quoteError }` et les deux composants affichaient les
+   lignes avant l'indice. Quand `quote === null && quoteError`, l'indice seul.
+3. **Le message « nouveau total affiché » mentait** (ANO-WEB-36) : le devis client se calcule sur
+   le trajet en cache TanStack (`["public-trip", id]`) ; après `QUOTE_DIVERGENCE` on redemandait
+   l'intention (bon montant) sans relire le trajet (ancien montant à l'écran).
+   `invalidateQueries` avant `refreshIntent()`.
+4. **Deux gardes serveur sans miroir à l'ouverture** (ANO-WEB-35, 38) : `checkTripBookable`
+   refuse son propre trajet et un trajet parti — à l'intention de paiement. `BookingClient`
+   applique les deux règles à l'ouverture (`user.id === trip.carrier.id`, `dates.departureAt`
+   passé) avec les messages de l'étape 4. Le regard d'expert propose de servir `bookable: { ok,
+   reason }` dans le DTO public pour ne pas dupliquer la règle.
+5. **La borne de taille des photos se jouait au paiement** (ANO-WEB-39) : le hook la vérifie à
+   l'envoi, et l'envoi part au clic « Payer ». `handleAddPhotos` filtre dès la sélection.
+6. **Le mot « assurance »** (ANO-WEB-33) dans un message de validation et cinq chaînes mortes.
+
+Leçon transversale (regard d'expert) : un test de composant sur le wizard avec un trajet fixture
+aurait pris 1, 2 et 3 avant la recette.
+
+## Le harnais
+
+- Les deux Expéditeurs du « dernier kilo » (Aminata, João) sont menés chacun à l'étape 4 sur un
+  trajet de Joséphine à **2 kg** ; A paie, B paie → `409 CAPACITY_EXCEEDED` et rien dans ses
+  réservations (`GET /me/bookings`).
+- Le devis divergent : Joséphine `PUT /trips/:id` (prix 15,00) pendant qu'Aminata est à l'étape 4.
+- Les kilos restants se lisent dans le DTO **public** (`remainingKg`) : le DTO propriétaire répond
+  403 à l'Expéditrice, et la valeur bouge à chaque tour (RSV-17 réserve 2,5 kg).
+- ImageKit intercepté pour les photos ; Mailpit pour les deux emails (32,20 chez l'Expéditrice,
+  28,75 chez le Voyageur, jamais l'inverse).
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **143 scénarios** (131 + WEB-RSV ×12, dont
+1 `⏭`). Typecheck user-ui et harnais verts.

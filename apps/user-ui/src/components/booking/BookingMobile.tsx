@@ -3,6 +3,8 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
+// ANO-WEB-34 (recette 5.12) — le brouillon de départ dépend du TRAJET (poids 2 kg ou mémorisé, lieux pré-sélectionnés) : `buildInitialDraft` existait mais n'était jamais appelée.
+import { buildInitialDraft } from "./booking.state";
 import { useBookingCheckout } from "./useBookingCheckout";
 import { canContinueStep, computeTotal, validateStep } from "./booking.config";
 import type { Step, TripContext, ValidationErrors } from "./booking.types";
@@ -37,7 +39,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
   const locale = useLocale();
   const isFr = locale === "fr";
 
-  const { draft, setDraft, step, setStep, clear } = useBookingDraft();
+  const { draft, setDraft, step, setStep, clear } = useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]));
   const [showErrors, setShowErrors] = useState(false);
   const checkout = useBookingCheckout({ draft, trip, step, clear });
   const isSubmitting = checkout.isSubmitting;
