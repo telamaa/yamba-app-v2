@@ -5,7 +5,7 @@ Quatre cahiers de bout en bout, à jouer avant l'ouverture du chantier mobile. C
 | # | Cahier | Public | Scénarios | Fichier |
 |---|---|---|---|---|
 | 1 | Web — site membre | testeur produit | ~330 | `RECETTE-01-WEB.md` |
-| 2 | Admin — back-office | opérateur, testeur | 125 | `RECETTE-02-ADMIN.md` |
+| 2 | Admin — back-office | opérateur, testeur | 126 | `RECETTE-02-ADMIN.md` |
 | 3 | API — sans navigateur | développeur, intégrateur | 146 | `RECETTE-03-API.md` |
 | 4 | Tâches planifiées, relais, consommateurs | développeur, exploitation | 90 | `RECETTE-04-CRONS.md` |
 
@@ -32,6 +32,11 @@ Les configurations qui manquent rendent certains scénarios non jouables : ils s
 ## Consignation
 
 Chaque cahier porte son tableau. Une anomalie se consigne avec son identifiant de scénario, sa gravité et sa reproduction. Les corrections partent en PR groupées par domaine, jamais scénario par scénario.
+
+## Le `.md` fait foi
+
+Les `.md` sont tenus à jour au fil des corrections ; les `.pdf` datent du 06/09/2026 et ne sont **pas** régénérés à
+chaque passe. En cas de divergence, le `.md` fait foi — et, au-dessus de lui, le code et ses tests (précédence du dépôt).
 
 ## Régénérer les PDF
 

@@ -9945,3 +9945,61 @@ transaction la première fois (P2034) ou l'écriture (P2002 / `count: 0`). Typec
 constantes de tête tombent dans la portée globale partagée par toutes les fiches du projet, et `prismaMock`
 s'y heurte à celui d'une autre (TS2451 au `nx typecheck`, jamais vu par `nx test`). D'où le `export {};` en
 pied des deux fiches qui chargent leur module par `require`.
+
+---
+
+# PR — Cahier 02-ADMIN remis à l'état du code (réserve documentaire levée) · `chore/cahier-admin-a-jour`
+
+## Pourquoi
+
+La recette admin avait été prononcée « **conforme avec réserves documentaires** » : les 92 anomalies étaient closes,
+mais `docs/recette/RECETTE-02-ADMIN.md` décrivait encore des états d'avant correction. Une réserve documentaire n'a l'air
+de rien — jusqu'au passage suivant, où le testeur consigne comme anomalie ce qui est en réalité la correction, et où
+personne ne sait plus qui a raison du cahier ou du code.
+
+Le handoff du 16/09 nommait trois points. Il y en avait **quatorze** : la source exacte, ce sont les sections « Écarts
+avec le cahier » que chaque chapitre des résultats a consignées au fil de la campagne (`YAMBA-RECETTE-WEB-RESULTATS.md`).
+C'est là qu'il fallait aller les chercher, pas dans le résumé.
+
+## Ce qui a changé dans le cahier
+
+| Où | Avant | Maintenant |
+|---|---|---|
+| En-tête | référence `feat/f3-messaging-admin` au 06/09 | `dev` au 17/09 ; **le `.md` fait foi**, le `.pdf` du 06/09 n'est plus régénéré à chaque passe |
+| § 1.2 et pied de page | renvois vers `RECETTE-01-MEMBRE.md` / `RECETTE-04-EXPLOITATION.md` — **fichiers inexistants** | `RECETTE-01-WEB.md` / `RECETTE-04-CRONS.md` |
+| Prérequis, `ADM-CPT-5`, `ADM-SES-1`, § 7 écart 5 | « aucun écran pour régénérer des codes de secours ni réinitialiser la 2FA » | régénérer **ses propres** codes existe (A190 a) ; seule la 2FA d'un **autre** admin reste sans écran |
+| § 5.26 | un seul scénario | **`ADM-SES-2` ajouté** : régénérer ses codes, fermer ses autres sessions (A190 a, b), avec le piège du pas TOTP brûlé et les refus 400 / 403 (jamais 401) |
+| `ADM-SEC-4`, `ADM-SES-1` | « Il te reste {n} code(s) de secours. » | texte réel : pluriel accordé, renvoi à « Mes sessions », et à zéro le recours |
+| `ADM-ACC-1` | tuile « Sanctions proposées » → `/users` | → `/users?proposal=1` (A194) |
+| `ADM-JRN-1` | six filtres ; select proposant `DISPUTE`, `MAINTENANCE`, `EXPORT` | six filtres saisissables **+ l'auteur par clic** ; les sept types réellement écrits (A183), en français |
+| `ADM-JRN-2` | « Rapprochement Stripe » | « Rapprochement fournisseur » |
+| `ADM-MNT-4` étape 4 | « impossible » sans dire comment | le formulaire est remplacé par l'explication (A182) ; le 409 se prouve par l'API |
+| `ADM-CPT-3` étape 5 | 400 sur réinvitation | 400 aussi pour le **perdant de deux invitations simultanées** |
+| `ADM-CPT-4` étapes 3, 4 | « tenter » → 403 | l'écran **ne propose plus** le geste ; le 403 reste la réponse de l'API |
+| `ADM-E2E-1` étapes 2, 3, 15, 16 | délai 1 h, tuile = 2, « toutes les lignes » | minimum **12 h**, tuile = 1 (A169), et le filtre « cible = deal » montre **quatre** lignes — une conversation et un paramètre visent autre chose |
+| `ADM-E2E-2` étape 17 | cinq lignes | **quatre** gestes + les consultations |
+| `ADM-E2E-3` étape 11 | — | dès le **premier** « Traité », la ligne n'est plus « Prioritaire » |
+| `ADM-E2E-6` étapes 4, 10 | 409 au clic ; `ACCOUNT_DELETED` | bouton **inactif** (A179 b) ; **`INVALID_CREDENTIALS`** — dire « compte effacé » révélerait qu'il a existé |
+| `ADM-E2E-7` étape 2 | « 1 critique » | le jeu d'essai franchit d'autres seuils : lire le bandeau, ne pas exiger un chiffre |
+| `ADM-NRG-6` étape 3 | « identifiant trop court → ignoré » | **faux** depuis ANO-ADM-74 : un identifiant court est légitime (`maintenance`, clé de paramètre, session 32 hex) et rend « 0 ligne » ; seul un caractère interdit fait un filtre ignoré |
+| `ADM-NRG-7` | « les cinq écarts documentaires » | 4 **LEVÉ** (A194), 5 **RÉDUIT** (A190 a) ; les numéros sont conservés, les résultats y renvoient |
+| § 5.21 | connexion d'un compte effacé → `ACCOUNT_DELETED` | `INVALID_CREDENTIALS` (le code `ACCOUNT_DELETED` existe, mais pour refuser un **profil admin** à un compte effacé) |
+| Renvois | `ADM-ETA-5` et `ADM-CPT-8` n'existent pas dans ce cahier | `ADM-ETA-3` ; le harnais nommé par son fichier |
+
+## Vérifications faites, pas supposées
+
+- Chaque correction est **vérifiée dans le code**, pas seulement recopiée des résultats : `ADMIN_TARGET_TYPES` et
+  `TARGET_TYPE_LABEL` pour les types de cible, `backupCodesWarning` pour le texte exact, `HomeKpis` pour les liens des
+  tuiles, `admin-audit.query.ts` pour la règle du filtre, `ops-alerts.rules.ts` pour les seuils par défaut.
+- **Les délais « 72 h » / « 48 h » n'étaient PAS un écart** (la réserve les citait) : ce sont les valeurs par défaut de
+  `alerts.disputeUndecidedHours` et `alerts.payoutFailedHours`, et le cahier les présentait déjà comme des paramètres.
+  Rien corrigé de ce côté — une correction inutile est une régression documentaire de plus.
+- **Aucun renvoi mort** : tout `ADM-XXX-n` cité dans le cahier existe dans son tableau de suivi (vérifié par `comm`).
+- Compte de scénarios : 125 → **126** (`ADM-SES-2`), reporté dans `docs/recette/README.md`.
+
+## Le PDF
+
+Les `.pdf` datent du 06/09 et ont divergé dès le 09/09 — la question « régénérer ou pas » était déjà tranchée par les
+faits. C'est désormais écrit noir sur blanc dans l'en-tête du cahier et dans `docs/recette/README.md` : **le `.md` fait
+foi**, le code et ses tests au-dessus de lui (précédence du dépôt). `python3 scripts/build-doc-pdf.py <fichier.md>` reste
+disponible pour une remise à niveau ponctuelle, avant une transmission externe par exemple.
