@@ -6292,3 +6292,60 @@ réinitialiser la double authentification d'un autre administrateur (aujourd'hui
 | S4 | Connexion depuis un nouvel appareil | email quand/appareil/IP/localisation + « pas toi ? » | oui (règle) |
 | S5 | Géoloc par défaut | aucune (IP seule) ; ipapi seulement si activé | oui (unitaire) |
 | S6 | « Autres » vs « tous » les appareils | autres = courante gardée ; tous = courante coupée + retour accueil | oui |
+
+---
+
+# Passe concurrence MEMBRE (A195) — « deux mains sur le même objet »
+
+## Le besoin
+
+Les règles RG-CNC-01 à 03 étaient écrites, et tenues côté back-office (A192). Côté membre, elles ne
+l'étaient pas partout. Ce n'est pas une hypothèse de laboratoire : un double clic sur un bouton, un
+téléphone et un ordinateur ouverts sur le même fil, l'Expéditeur et le Voyageur qui réagissent à la même
+notification — c'est la vie normale d'une place de marché. Sept situations rendaient soit une panne, soit
+pire : un résultat faux que personne ne voyait.
+
+Deux d'entre elles ne se rattrapent pas après coup, et ce sont celles qui ont motivé la passe :
+
+- **la purge nocturne effaçait un fil redevenu actif.** Le cron lit les fils silencieux depuis un an, puis
+  les efface. Un membre qui écrit entre les deux perdait son message avec le fil. Aucun journal, aucune
+  alerte : les données sont parties, point.
+- **deux propositions de rendez-vous simultanées laissaient DEUX rendez-vous ouverts du même type.** Les
+  deux parties voyaient chacune « sa » proposition acceptée, pour des lieux ou des heures différents. Le
+  numéro de téléphone s'ouvre à partir du rendez-vous d'enlèvement : lequel des deux ?
+
+## Les règles
+
+- **RG-CNC-04** — La plateforme n'efface un objet que si l'état qu'elle a LU est encore celui de la base.
+  La purge automatique des conversations est conditionnée à la dernière écriture du fil : si le fil a vécu
+  depuis la lecture, rien ne part — ni le fil, ni ses messages, ni ses rendez-vous, ni ses traces. Il
+  repassera au prochain tour s'il redevient silencieux.
+- **RG-CNC-05** — Une vérification de disponibilité (« cet email est libre », « ce fil n'existe pas
+  encore ») ne **réserve** rien. Quand la base refuse l'écriture parce qu'un autre est passé avant, le
+  membre reçoit **la même réponse** que si la vérification avait vu l'objet : « cette adresse est déjà
+  utilisée », ou le résultat déjà écrit par l'autre (le fil ouvert, le numéro déjà révélé). Jamais une panne.
+- **RG-CNC-06** — Un geste idempotent reste idempotent sous concurrence : révéler deux fois un numéro rend
+  deux fois le même numéro et la même date, sans écrire deux traces ; ouvrir un fil à deux ouvre UN fil ;
+  se rattacher deux fois à Google connecte, sans dupliquer l'identité.
+- **RG-CNC-07** — Un marqueur de lecture n'**avance** que. Deux appareils du même membre ne peuvent pas
+  faire reculer le marqueur et rendre « non lus » des messages déjà lus.
+- **RG-CNC-08** — Un refus qui protège l'état porte un code et invite à recharger : `PROFILE_STATE_CHANGED`
+  (profil, avatar), `PASSWORD_STATE_CHANGED` (réinitialisation). Le membre n'a jamais à deviner : l'écran
+  recharge l'état réel et rejoue son geste s'il le veut toujours.
+- **RG-CNC-09** — Aucun changement d'état sans son événement dans la même transaction (rappel de la règle
+  D2, ici rétablie pour les rendez-vous et la révélation du numéro) : un rendez-vous accepté dont
+  l'événement n'est pas parti est un rendez-vous dont l'autre partie ne sera jamais prévenue.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| CNC5 | Un membre poste un message pendant que la purge nocturne examine son fil | **Rien n'est effacé** ; le bilan du passage compte le fil comme examiné, non purgé |
+| CNC6 | Deux propositions de rendez-vous du même type à la même seconde | **Une seule proposition ouverte** ; la seconde annule la première (contre-proposition), les deux parties voient la même |
+| CNC7 | L'Expéditeur et le Voyageur ouvrent le fil au même instant | **Un seul fil**, le même pour les deux, aucune erreur |
+| CNC8 | Double clic sur « Voir le numéro » | Le même numéro et la **même date de révélation** ; une seule trace, un seul événement |
+| CNC9 | Deux validations du même code d'inscription | Un compte créé ; la seconde lit **« cette adresse est déjà utilisée »**, pas une panne |
+| CNC10 | Deux connexions Google simultanées sur un nouveau compte | Un compte créé, la seconde connexion **rattachée** au même compte |
+| CNC11 | Deux envois d'avatar simultanés | Un avatar en place ; le perdant lit « le profil a changé, rechargez » et **l'image du gagnant n'est pas supprimée** chez l'hébergeur |
+| CNC12 | Réinitialisation du mot de passe alors qu'il vient d'être changé ailleurs | Refus `PASSWORD_STATE_CHANGED`, **aucun écrasement**, aucun email « mot de passe modifié » |
+| CNC13 | « Marquer comme lu » depuis deux appareils, à une seconde d'écart | Le marqueur reste sur la lecture **la plus récente** |

@@ -796,6 +796,25 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 16/09 : **PASSE CONCURRENCE MEMBRE (A195, PR #332, branche `feat/concurrence-membre`)** — suite directe d'A192, qui avait
+  solde le perimetre ADMIN et laisse l'inventaire des cinq fichiers MEMBRE. Trois regles etendues : (1) l'ecriture se
+  conditionne a l'etat LU (`updateMany`/`deleteMany` qui COMPTENT, jamais `update`/`delete` qui levent P2025 -> 500) —
+  profil, avatar pose, avatar supprime, reinitialisation du mot de passe (garde sur l'empreinte LUE, pas sur `updatedAt` :
+  le jeton est deja consomme, un refus faux couterait tout le parcours email), marqueur de lecture (n'AVANCE que), purge
+  des fils a un an ; (2) une collision d'unicite P2002 porte une REPONSE METIER, jamais un 500 — une lecture d'unicite ne
+  reserve rien : inscription -> 409 EMAIL_ALREADY_USED, Google -> rattachement, ouverture d'un fil et revelation d'un
+  numero -> idempotents (champ visé lu dans `meta.target` : un slug public est un TIRAGE, on retire) ; (3) un geste = UNE
+  transaction rejouee par `withWriteConflictRetry` — proposer/accepter un rendez-vous et reveler un numero ecrivaient leur
+  changement d'etat PUIS, dans une seconde transaction, le message et l'evenement (violation D2 restee invisible).
+  DEUX COURSES QUI NE SE RATTRAPAIENT PAS : la purge nocturne effacait un fil redevenu actif avec son message tout neuf ;
+  deux propositions simultanees laissaient DEUX rendez-vous PROPOSED du meme type. PIEGE STRUCTURANT : deux transactions
+  qui creent chacune LEUR document ne se voient pas (Mongo detecte le conflit PAR DOCUMENT, jamais par predicat) — c'est
+  la `Conversation`, document PARTAGE (`lastMessageAt` bouge a chaque message), qui rend le conflit detectable ; la
+  perdante rejouee annule alors la proposition de la gagnante, ce qui EST la regle metier (contre-proposition).
+  PIEGE D'OUTILLAGE : un fichier de test sans `import` ni `export` est un SCRIPT pour TypeScript — ses constantes de tete
+  tombent dans la portee globale partagee et se heurtent a celles des autres fiches (TS2451 au `nx typecheck`, rapporte
+  sur le FICHIER VOISIN, jamais vu par `nx test`) -> `export {};` en pied. Tests : message 57 -> 68, auth 376 -> 393
+  (plateforme 1144). Docs : A195, DOC-TECHNIQUE, DOC-METIER (RG-CNC-04 a 09, CNC5 a CNC13), APPRENTISSAGE ch. 188.
 - 16/09 : **TOUTE LA CAMPAGNE DE RECETTE EST DANS `dev`** — les 59 PR empilees (#270 -> #329, cahiers 01-WEB et 02-ADMIN,
   200 commits) plus #271 (D78 securite de la connexion) mergees ; **zero PR ouverte**. La pile etait strictement lineaire
   (`dev` en etait un ancetre) : aucun conflit sur les 59. Les dix dernieres (#320 -> #329) n'avaient jamais eu de CI — le

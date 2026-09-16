@@ -7,6 +7,7 @@
  * sont des dossiers de modération, pas des propos) — ils perdent seulement leur corps.
  */
 import prisma from "@packages/libs/prisma";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
 import { isPurgeable } from "../lib/conversation-retention.rules";
@@ -41,13 +42,21 @@ export function makeConversationRetentionService(clock: () => Date = () => new D
           ? { bookingStatus: booking.status, bookingEndedAt: booking.completedAt ?? booking.closedAt ?? null, conversationUpdatedAt: c.updatedAt }
           : { bookingStatus: "CANCELLED", bookingEndedAt: null, conversationUpdatedAt: c.updatedAt };
         if (!isPurgeable(input, now, retentionDays)) continue;
-        await prisma.$transaction([
-          prisma.phoneReveal.deleteMany({ where: { conversationId: c.id } }),
-          prisma.meetup.deleteMany({ where: { conversationId: c.id } }),
-          prisma.message.deleteMany({ where: { conversationId: c.id } }),
-          prisma.conversation.delete({ where: { id: c.id } }),
-        ]);
-        purged += 1;
+        // A195 — la purge lit les candidates puis les efface : un message posté entre les deux rendait le fil
+        // ACTIF, et il partait quand même avec ce message tout neuf. La suppression du fil est donc conditionnée
+        // à l'état LU (`updatedAt`, bougé par toute écriture du fil) et passe D'ABORD : si elle n'écrit rien, le
+        // fil a vécu depuis la lecture, on le laisse — il repassera au prochain tour s'il redevient silencieux.
+        const purge = await withWriteConflictRetry(() =>
+          prisma.$transaction(async (tx) => {
+            const ferme = await tx.conversation.deleteMany({ where: { id: c.id, updatedAt: c.updatedAt } });
+            if (ferme.count !== 1) return false;
+            await tx.phoneReveal.deleteMany({ where: { conversationId: c.id } });
+            await tx.meetup.deleteMany({ where: { conversationId: c.id } });
+            await tx.message.deleteMany({ where: { conversationId: c.id } });
+            return true;
+          })
+        );
+        if (purge) purged += 1;
       }
       return { examined: candidates.length, purged };
     },

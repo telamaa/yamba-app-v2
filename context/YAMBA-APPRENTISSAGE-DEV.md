@@ -1036,3 +1036,212 @@ condition — un second système de vérité, c'est une seconde source de pannes
 
 ## Chapitre 187 — Sécurité de la connexion (D78) · Throttler sans friction, alerter sans fatiguer, géolocaliser sans fuiter
 Trois arbitrages d'expert derrière une demande simple (« mets un anti-force-brute et un email de connexion »). (1) **La bonne réponse à ANO-WEB-19 n'est pas un OTP.** Question posée : faut-il un code à chaque connexion ? Non — ni Airbnb ni BlaBlaCar ne le font, ce serait de la friction pour 100 % des connexions pour gêner 0,01 % d'attaques. Le standard est un throttling des ÉCHECS : invisible pour qui tape son bon mot de passe, dissuasif pour qui en essaie mille. On réutilise le patron déjà présent (le barème OTP `otp-policy.ts` + son câblage Redis) sans l'imposer à l'utilisateur. Leçon : « réutiliser la mécanique OTP » voulait dire réutiliser le SCAFFOLDING de verrouillage, pas le code — une ambiguïté qui a failli faire prendre la mauvaise route, levée en une question. (2) **Un verrou par compte est un couteau à double tranchant.** Verrouiller un compte après N échecs protège… et ouvre un déni de service : un tiers verrouille la victime en tapant de faux mots de passe. On choisit des verrous COURTS (max 1 h, jamais 24 h) qui expirent seuls : le brute-force retombe à quelques essais/minute, le vrai titulaire n'est jamais bloqué durablement. Et le compteur s'indexe sur l'adresse tapée, existante ou non, pour que le 429 ne trahisse jamais l'existence d'un compte (même exigence d'indistinguabilité que le temps constant d'ANO-API-18). (3) **Une alerte de sécurité mal dosée ne protège personne.** Envoyer un email à CHAQUE connexion entraîne l'utilisateur à tous les ignorer (fatigue d'alerte) : on notifie donc par défaut sur NOUVEL APPAREIL (comparé aux sessions actives), avec `every` disponible pour les comptes sensibles et `off` pour couper. Et la localisation touche au RGPD : résoudre une IP, c'est l'envoyer à un tiers — on ne le fait donc PAS par défaut (l'email montre l'IP seule), on offre un provider activable en connaissance de cause, et on recommande une base hors-ligne. L'appel géo, lui, vit dans le chemin asynchrone de l'email : la connexion ne paie jamais sa latence, ni son échec. Détail d'implémentation qui compte : tout ce qui est règle (barème, IP privée, appareil connu, mode d'alerte) est PUR et testé ; seul le câblage Redis/SMTP reste non testé, comme le reste du service — on teste les décisions, pas la plomberie.
+
+## Chapitre 188 — Concurrence côté membre (A195) · Ce qu'une lecture ne promet pas, et le document qui rend un conflit visible
+
+Le chapitre 186 expliquait la concurrence côté back-office : lire, puis écrire en conditionnant à ce qu'on a
+lu. Ce chapitre-ci pousse le raisonnement là où il devient contre-intuitif — parce que sur MongoDB, deux
+transactions peuvent **toutes les deux réussir** et laisser une base fausse, sans la moindre erreur.
+
+### 1. Une lecture d'unicité ne réserve rien
+
+Le code d'inscription disait ceci, et il a l'air irréprochable :
+
+```ts
+const existingUser = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
+if (existingUser) return next(new ConflictError("User already exists…", { code: "EMAIL_ALREADY_USED" }));
+// … puis, quelques lignes plus bas :
+await tx.user.create({ data: { emailNormalized: pending.emailNormalized, … } });
+```
+
+Entre la lecture et l'écriture il y a du temps : une lecture Redis, un hachage, une génération de slug —
+des millisecondes, largement de quoi laisser passer la requête d'à côté. Un double clic sur « Valider »
+envoie deux requêtes ; les deux lisent « libre » ; les deux créent. L'index unique de MongoDB en refuse une,
+Prisma lève **P2002**, et le membre lit « Something went wrong » alors que la bonne réponse était déjà
+écrite quinze lignes plus haut, dans la même fonction.
+
+La leçon générale, valable dans n'importe quel langage et n'importe quelle base : **un `SELECT` ne pose pas
+de verrou sur ce qui n'existe pas encore**. Il ne réserve pas la place, il photographie un instant. Le seul
+juge de l'unicité, c'est la contrainte. Donc on n'oppose pas la lecture à la contrainte : on **traduit** la
+contrainte dans le même vocabulaire métier que la lecture.
+
+```ts
+try {
+  await creerLeCompte();
+} catch (error) {
+  if (!collisionSur(error, "email")) throw error;
+  return next(new ConflictError("User already exists with this email!", { code: "EMAIL_ALREADY_USED", … }));
+}
+```
+
+La lecture reste utile — elle évite un aller-retour et un hachage inutile dans 99,99 % des cas —, mais elle
+n'est plus la garantie. Elle est une optimisation ; la contrainte est la vérité.
+
+**Sur quel champ ?** Un `User` a deux index uniques : l'email et le slug public. Répondre « cette adresse est
+déjà utilisée » à une collision de slug serait un mensonge. Prisma met le champ visé dans `e.meta.target` —
+tableau de champs, ou nom d'index Mongo selon les cas, d'où une comparaison souple :
+
+```ts
+function collisionSur(e: unknown, champ: "email" | "slug"): boolean {
+  if (typeof e !== "object" || e === null || (e as { code?: string }).code !== "P2002") return false;
+  const cible = (e as { meta?: { target?: unknown } }).meta?.target;
+  const texte = (Array.isArray(cible) ? cible.join(",") : String(cible ?? "")).toLowerCase();
+  if (!texte) return champ === "email";   // cible absente : seule collision plausible sur ce chemin
+  return texte.includes(champ);
+}
+```
+
+Et surtout : **toutes les collisions ne méritent pas la même réponse**. Un email en double est une réponse au
+membre. Un slug en double est un accident de TIRAGE (le slug porte un discriminant aléatoire) : on retire, une
+fois, et on n'embête personne avec.
+
+### 2. Idempotent sous concurrence : la collision comme non-nouvelle
+
+Trois gestes de la passe ne sont pas des créations « qui doivent réussir », mais des gestes **idempotents** :
+ouvrir le fil d'un deal, rattacher une identité Google, révéler un numéro. Pour eux, P2002 n'est même pas un
+refus — c'est la nouvelle que quelqu'un a fait le travail à notre place :
+
+```ts
+try {
+  conversation = await prisma.conversation.create({ data: { bookingId, … }, select: CONVERSATION_SELECT });
+} catch (e) {
+  if (!estCollisionUnique(e)) throw e;
+  conversation = await prisma.conversation.findUniqueOrThrow({ where: { bookingId }, select: CONVERSATION_SELECT });
+}
+```
+
+Le fil de l'autre EST le fil qu'on voulait : `bookingId` est unique, il n'y en a qu'un par deal. On relit, on
+continue, personne ne voit rien. Noter le `if (!estCollisionUnique(e)) throw e;` : on ne rattrape **que** ce
+qu'on a compris. Avaler une erreur inconnue, c'est transformer une panne en résultat faux.
+
+### 3. Le piège : deux transactions qui ne se voient pas
+
+Voici le cœur du chapitre. Proposer un rendez-vous, c'est annuler la proposition ouverte du même type, puis
+créer la nouvelle. Le code faisait exactement cela — et il était faux :
+
+```ts
+await prisma.meetup.updateMany({ where: { conversationId, kind, status: "PROPOSED" }, data: { status: "CANCELLED" } });
+const meetup = await prisma.meetup.create({ data: { … } });   // une autre transaction
+await writeMessage(conversationId, { … }, evenement, now);     // et encore une autre
+```
+
+Deux membres proposent au même instant. Aucun des deux ne voit la proposition de l'autre (elle n'existe pas
+encore quand le `updateMany` passe), les deux créent : **deux rendez-vous PROPOSED du même type**. Et ici
+vient le point que beaucoup de développeurs découvrent tard : mettre le tout dans une transaction **ne
+suffit pas**. Une transaction MongoDB détecte un conflit quand deux transactions concurrentes touchent le
+**même document**. Deux `insert` de documents différents ne se marchent pas dessus : les deux transactions
+commitent tranquillement, et l'invariant tombe en silence.
+
+Il faut donc un document PARTAGÉ que les deux gestes écrivent. Ici, il existe déjà et il est naturel : la
+**conversation**, dont le `lastMessageAt` bouge à chaque message — et un rendez-vous proposé s'annonce
+toujours par un message.
+
+```ts
+const meetup = await withWriteConflictRetry(() =>
+  prisma.$transaction(async (tx) => {
+    await tx.meetup.updateMany({ where: { conversationId, kind, status: "PROPOSED" }, data: { status: "CANCELLED", cancelledAt: now } });
+    const cree = await tx.meetup.create({ data: { … } });
+    await writeMessageIn(tx, conversationId, { … }, evenement, now);  // touche la conversation
+    return cree;
+  })
+);
+```
+
+Ce qui se passe alors, dans l'ordre : les deux transactions veulent écrire la conversation → MongoDB en
+rejette une avec **P2034** → `withWriteConflictRetry` la rejoue → au second essai, la proposition de l'autre
+est là et visible → le `updateMany` l'annule → il ne reste qu'une proposition ouverte. Ce n'est pas un
+rattrapage bricolé : c'est **exactement la règle métier** (une nouvelle proposition remplace la précédente,
+c'est une contre-proposition), obtenue par la sérialisation naturelle du conflit.
+
+**À retenir bien au-delà de Yamba** : quand un invariant porte sur un ENSEMBLE (« au plus une ligne ouverte
+par type »), un verrou optimiste sur les lignes ne le tient pas, parce que la ligne fautive n'existe pas
+encore au moment de la garde. Il faut soit un index unique partiel (quand la base sait l'exprimer), soit un
+document « parent » que toute écriture de l'ensemble touche — ce que la littérature appelle un *materializing
+conflict*. Le fil de conversation jouait déjà ce rôle sans qu'on le sache.
+
+### 4. `update` lève, `updateMany` compte
+
+Une différence d'API qui a des conséquences visibles pour l'utilisateur :
+
+| Appel | Document absent / changé | Ce que voit le membre |
+|---|---|---|
+| `update` / `delete` | lève **P2025** | 500 « Something went wrong » |
+| `updateMany` / `deleteMany` | rend `{ count: 0 }` | ce que le code décide : 409, ou rien du tout |
+
+```ts
+const efface = await prisma.image.deleteMany({ where: { id: previous.id, fileId: previous.fileId } });
+if (efface.count === 1) await deleteImageKitFile(previous.fileId).catch(() => undefined);
+```
+
+Deux choses dans ces deux lignes. D'abord un double clic sur « Supprimer l'avatar » ne fait plus de 500 : le
+second compte zéro et répond 200, ce qui est vrai — l'avatar est bien parti. Ensuite, et c'est plus subtil :
+**seul celui qui a effacé la LIGNE efface le FICHIER**. Sans la condition `fileId`, deux requêtes entrelacées
+pouvaient supprimer chez l'hébergeur d'images le fichier d'un avatar que l'autre venait tout juste de poser.
+Une base cohérente et une image cassée : le pire résultat, parce qu'aucun test de base ne le voit.
+
+### 5. Choisir la bonne condition
+
+Réflexe naturel après le chapitre 186 : conditionner sur `updatedAt`. C'est le bon choix pour une sanction
+admin. C'est le **mauvais** choix pour une réinitialisation de mot de passe, et la raison mérite d'être
+comprise : `updatedAt` bouge à la moindre écriture sur le compte (un changement de langue, un compteur). Le
+membre qui réinitialise recevrait un refus pour une raison sans rapport — alors que son jeton de
+réinitialisation est **déjà consommé** : il devrait tout recommencer, email compris.
+
+La condition doit porter sur **ce dont la décision dépend**. Le refus « nouveau mot de passe identique à
+l'ancien » porte sur l'empreinte lue ; c'est donc l'empreinte qui conditionne l'écriture :
+
+```ts
+const ancienne = user.passwordHash;
+const ecrit = await withWriteConflictRetry(() =>
+  prisma.user.updateMany({
+    where: ancienne === null
+      ? { id: user.id, OR: [{ passwordHash: null }, { passwordHash: { isSet: false } }] }
+      : { id: user.id, passwordHash: ancienne },
+    data: { passwordHash },
+  })
+);
+if (ecrit.count !== 1) return next(new ConflictError("…", { code: "PASSWORD_STATE_CHANGED" }));
+```
+
+Et l'on retrouve au passage le piège Mongo payé six fois dans ce dépôt : un compte créé par Google n'a pas de
+mot de passe, et son champ est `null` **ou absent** — `{ passwordHash: null }` seul ne voit pas l'absent,
+d'où le `OR` avec `isSet: false`. Même histoire pour le marqueur de lecture d'un fil, qui ne doit
+qu'**avancer** :
+
+```ts
+where: { id: conversation.id, OR: [{ [champ]: null }, { [champ]: { isSet: false } }, { [champ]: { lt: now } }] }
+```
+
+### 6. Tester une course sans horloge ni hasard
+
+Une course ne se teste pas en lançant deux requêtes et en espérant. On **joue** le perdant : le mock de
+`$transaction` échoue une fois, ou l'écriture rend `count: 0`, ou la création lève P2002. Déterministe,
+instantané, et lisible par quelqu'un qui découvre le code :
+
+```ts
+prismaMock.$transaction.mockImplementationOnce(async () => { throw conflitEcriture(); });
+const rdv = await service.proposeMeetup(CARRIER, CONV, proposition);
+expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);  // rejouée
+expect(prismaMock.meetup.create).toHaveBeenCalledTimes(1); // une seule proposition écrite
+```
+
+Deux pièges rencontrés en écrivant ces fiches, à connaître :
+
+1. **Jest ne rendait pas la main.** Les modules réels de l'auth ouvrent Redis et le transport email au
+   chargement ; sans doubles, la suite passe puis reste suspendue sur une connexion ouverte (« Jest did not
+   exit one second after the test run has completed »). Mocker les singletons d'infrastructure fait partie de
+   la fiche, pas du confort.
+2. **`nx test` vert, `nx typecheck` rouge.** Un fichier de test sans `import` ni `export` est un *script*
+   pour TypeScript : ses constantes de tête (`prismaMock`, `collision`…) tombent dans la portée globale
+   partagée par toutes les fiches du projet et se heurtent à celles des autres (TS2451 — rapporté, comble de
+   la confusion, sur le FICHIER VOISIN). Un `export {};` en pied suffit à en refaire un module.
+
+### Pour aller plus loin
+
+- *Designing Data-Intensive Applications*, ch. 7 — « write skew » et « phantoms » : exactement le cas des
+  deux propositions de rendez-vous, et pourquoi une garde qui lit ne suffit jamais à empêcher une ligne qui
+  n'existe pas encore d'apparaître. La parade décrite (*materializing conflicts*) est celle retenue ici.
+- La documentation MongoDB sur les transactions : le conflit est détecté **par document**, jamais par
+  prédicat ; c'est toute la différence avec un `SERIALIZABLE` PostgreSQL.
+- Les codes d'erreur Prisma : P2002 (contrainte unique), P2025 (document introuvable à l'écriture), P2034
+  (conflit d'écriture / interblocage). Les connaître par cœur change la façon d'écrire un `catch`.

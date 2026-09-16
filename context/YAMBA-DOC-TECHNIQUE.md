@@ -9866,3 +9866,82 @@ choisit) :
 auth-service **229 → 249** : `login-policy.spec` (barème), `geoip.spec` (IP privées, provider,
 best-effort), `session-device.spec` (isDeviceKnown), `notify-sign-in.spec` (mode d'alerte), plus
 le miroir des emails (newSignIn FR/EN). Build webpack et typecheck verts.
+
+---
+
+# PR — Passe concurrence MEMBRE (A195) · `feat/concurrence-membre`
+
+## Pourquoi
+
+A192 avait soldé le périmètre ADMIN : tout geste qui lit un document puis l'écrit conditionne son écriture à
+l'état LU et se rejoue sur conflit. L'inventaire de cette PR-là nommait cinq fichiers restés hors périmètre,
+côté MEMBRE. Ils sont traités ici. Laisser l'asymétrie aurait été le pire des deux mondes : un back-office
+durci, et les gestes que font des milliers de membres (poster, proposer un rendez-vous, changer d'avatar,
+s'inscrire) toujours exposés.
+
+Ce que la passe a réellement trouvé, par ordre de gravité :
+
+| Geste | Course | Conséquence AVANT |
+|---|---|---|
+| Purge des fils à un an (cron) | un membre écrit entre la lecture et la purge | **le fil part avec son message tout neuf** — perte de données sèche |
+| Proposer un rendez-vous | deux propositions simultanées | **deux rendez-vous PROPOSED du même type** (invariant cassé, invisible) |
+| Proposer / accepter un rendez-vous, révéler un numéro | — | changement d'état commité **hors de la transaction de son événement** (violation D2) |
+| Ouvrir un fil, révéler un numéro, s'inscrire, changer d'avatar | deux requêtes simultanées | **500** sur un index unique (P2002) |
+| Modifier le profil, supprimer l'avatar | le document lu a disparu | **500** (P2025) |
+| Réinitialiser le mot de passe | mot de passe changé entre-temps | écrasement **silencieux** |
+| Marquer un fil comme lu | deux clients du même membre | marqueur de lecture qui **recule** |
+
+## Les trois règles appliquées
+
+**1. L'écriture se conditionne à l'état LU.** `updateMany` / `deleteMany` COMPTENT ce qu'ils ont écrit ;
+`update` / `delete` LÈVENT (P2025) quand le document a bougé. Un compte à zéro est une réponse métier
+(409 `PROFILE_STATE_CHANGED`, `PASSWORD_STATE_CHANGED`), pas une panne. La condition porte sur ce dont la
+décision dépend vraiment : l'empreinte du mot de passe pour une réinitialisation (et non `updatedAt`, qui
+bouge pour n'importe quelle autre écriture et produirait des refus faux alors que le jeton est déjà consommé),
+le `fileId` lu pour un avatar, l'`updatedAt` du fil pour la purge.
+
+**2. Une collision d'unicité (P2002) porte une réponse métier.** Une lecture d'unicité ne RÉSERVE rien :
+entre « cet email est libre » et l'écriture, l'autre requête est passée. La base est le seul juge, et sa
+collision dit exactement ce que la lecture disait — `EMAIL_ALREADY_USED` à l'inscription, « le fil existe
+déjà, relis-le », « le numéro est déjà révélé, rends la même trace ». Le champ visé se lit dans `meta.target`
+(comparaison souple : Mongo y met un nom d'index). Un slug public est un TIRAGE, pas une réponse au membre :
+sa collision se rejoue avec un second tirage.
+
+**3. Un geste = une transaction, rejouée sur conflit.** Trois gestes du fil écrivaient leur changement
+d'état, puis — dans une SECONDE transaction — le message et l'événement outbox. C'était une violation de la
+règle non négociable D2 restée invisible parce que rien ne la teste en production. Tout tient désormais dans
+`prisma.$transaction`, enveloppé de `withWriteConflictRetry`.
+
+Le point fin, celui qui fait toute la différence sur MongoDB : **deux transactions qui créent chacune leur
+propre document ne se voient pas**. Rien ne les met en conflit, elles passent toutes les deux, et l'invariant
+« une seule proposition ouverte » tombe sans un seul message d'erreur. Ce qui rend le conflit détectable,
+c'est le document PARTAGÉ que les deux touchent : ici la `Conversation` (son `lastMessageAt` bouge à chaque
+message). MongoDB rejette alors la perdante (P2034), le rejeu repart d'une lecture fraîche, et la seconde
+proposition annule proprement la première — une contre-proposition, ce qui est exactement la règle métier.
+
+## Fichiers
+
+- `apps/message-service/src/services/conversation.service.ts` — `writeMessageIn(tx, …)` (rejoint la
+  transaction de l'appelant) / `writeMessage(…)` (ouvre la sienne) ; `loadContext` tolère P2002 ;
+  `markRead` monotone ; `proposeMeetup`, `acceptMeetup`, `revealPhone` en une transaction rejouée.
+- `apps/message-service/src/services/conversation-retention.service.ts` — suppression du fil conditionnée à
+  son `updatedAt` et jouée D'ABORD ; les enfants ne partent que si le fil est parti.
+- `apps/auth-service/src/controller/profile.controller.ts` — profil, avatar posé, avatar supprimé.
+- `apps/auth-service/src/controller/auth.controller.ts` — `collisionSur(e, champ)`, inscription, réinitialisation.
+- `apps/auth-service/src/services/google-auth.service.ts` — `lierIdentite` idempotent, création rattrapée.
+
+## Tests
+
+message-service **57 → 68**, auth-service **376 → 393**. Totaux mesurés après la passe : trip 293, deal 644,
+notification 122, message 68 — soit **1116 → 1127** dans la base annoncée par `CLAUDE.md` (qui exclut auth) — et
+auth 393, soit **1492 → 1520** toutes suites confondues. Quatre nouvelles
+fiches : `conversation-concurrency.service.spec.ts`, `conversation-retention-concurrency.spec.ts`,
+`profile-concurrency.controller.spec.ts`, `auth-concurrency.controller.spec.ts`, plus trois scénarios ajoutés
+à `google-auth.service.spec.ts`. Aucune horloge, aucun hasard : les courses se jouent en faisant échouer la
+transaction la première fois (P2034) ou l'écriture (P2002 / `count: 0`). Typecheck et builds verts,
+`scripts/smoke-services.sh` : les six bundles bootent.
+
+**Piège payé au passage** : un fichier de test sans `import` ni `export` est un SCRIPT pour TypeScript — ses
+constantes de tête tombent dans la portée globale partagée par toutes les fiches du projet, et `prismaMock`
+s'y heurte à celui d'une autre (TS2451 au `nx typecheck`, jamais vu par `nx test`). D'où le `export {};` en
+pied des deux fiches qui chargent leur module par `require`.
