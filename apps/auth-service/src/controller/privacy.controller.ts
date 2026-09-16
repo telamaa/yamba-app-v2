@@ -16,6 +16,7 @@ import {
   resolveLocale,
   type DataRequestsResponse,
   type ErasureBlockedResponse,
+  type ErasureCheckResponse,
 } from "@packages/api-contracts";
 import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
@@ -166,17 +167,36 @@ export const adminEraseUser = async (req: AuthenticatedRequest, res: Response, n
   }
 };
 
+/** A179 (recette § 5.22) — les bloqueurs d'effacement avant le clic. Lecture seule, non journalisée (rien de personnel servi). */
+export const adminErasureBlockers = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = ObjectIdSchema.safeParse(req.params.id);
+    if (!id.success) throw new ValidationError("Invalid user id.", { code: "INVALID_ID" });
+    const target = await prisma.user.findUnique({ where: { id: id.data }, select: { id: true, isDeleted: true } });
+    if (!target || target.isDeleted) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" });
+    const check = await privacyService.erasureBlockers(id.data);
+    const body: ErasureCheckResponse = { blockers: check.blockers, counts: check.counts };
+    return res.status(200).json(body);
+  } catch (e) {
+    return next(e);
+  }
+};
+
 export const listDataRequests = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const cursor = typeof req.query.cursor === "string" && /^[a-f0-9]{24}$/.test(req.query.cursor) ? req.query.cursor : undefined;
-    const rows = await prisma.dataRequest.findMany({ orderBy: { requestedAt: "desc" }, take: REQUESTS_PAGE + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+    // A179 (recette § 5.22) — le registre d'UN membre (lien depuis sa fiche) : `?userId=`, journalisé avec sa cible.
+    const userId = req.query.userId === undefined ? undefined : ObjectIdSchema.safeParse(req.query.userId);
+    if (userId && !userId.success) throw new ValidationError("Invalid user id.", { code: "INVALID_ID" });
+    const byUser = userId?.success ? userId.data : null;
+    const rows = await prisma.dataRequest.findMany({ where: byUser ? { userId: byUser } : {}, orderBy: { requestedAt: "desc" }, take: REQUESTS_PAGE + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
     const page = rows.slice(0, REQUESTS_PAGE);
     const ids = [...new Set([...page.map((r) => r.userId), ...page.map((r) => r.requestedByAdminId).filter((x): x is string => !!x)])];
     const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true, isDeleted: true } }) : [];
     const label = new Map(users.map((u) => [u.id, u.isDeleted ? "Membre supprimé" : `${u.firstName} ${u.lastName.charAt(0)}.`]));
     // ANO-ADM-57 (recette 02-ADMIN § 5.21) — une ouverture du registre écrivait deux lignes (double lecture de l'écran) :
     // la première page est une lecture d'écran coalescée (A168) ; « Charger la suite » (curseur) s'écrit toujours.
-    const viewed = { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED", targetType: "USER", targetId: null, after: { rows: page.length }, ...meta(req) };
+    const viewed = { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED", targetType: "USER", targetId: byUser, after: { rows: page.length }, ...meta(req) };
     if (cursor) await recordAdminAction(prisma, viewed);
     else await recordAdminRead(prisma, redis, viewed);
     const body: DataRequestsResponse = {

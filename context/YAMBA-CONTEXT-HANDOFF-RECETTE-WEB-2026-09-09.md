@@ -3,6 +3,22 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.22 LIVRÉ
+>
+> Branche `chore/recette-admin-5-22` empilée sur #322 : 7 scénarios ADM-ETA + ADM-RGP-7, RGP-2 réalignée ; ANO-ADM-61,
+> 62 (majeures) closes ; arbitrages délégués A176 (seuil parqué borné par le relais), A177 (emails sur le cycle de vie),
+> A178 (catalogue des crons), A179 (lots RGPD : recomptage dans la transaction, clôture du User par la réservation,
+> bloqueurs avant le clic, registre `?userId=`), A180 (purge manuelle écartée). Chiffres : auth **282**, deal **643**,
+> message **57**, trip **293**, notification **122**, harnais **487** ; dernière anomalie ANO-ADM-62 ; dernier arbitrage
+> A180 ; dernier chapitre d'apprentissage **180**. POSTE : auth, deal (FAKE, `STRIPE_SECRET_KEY=`) et message rebâtis et
+> relancés en bundles `nohup` (logs `/tmp/claude-501/*-5-22.log`) ; ADM-ETA-1 tue message-service et le relance lui-même
+> (log dans `tmpdir()`), ADM-ETA-3 arrête puis relance `yamba-redpanda` — si une fiche est interrompue, vérifier
+> `lsof -iTCP:6005` et `docker ps | grep redpanda` avant la suite, et supprimer les `OutboxEvent` `correlationId:
+> "seed-outbox"`. Pièges : StrictMode double la première lecture d'un écran (compter les relectures espacées) ; des emails
+> partent pendant une fiche (stabiliser les compteurs avant de mesurer) ; le journal ne se lit pas avec le profil Support ;
+> `useSearchParams` dans admin-ui exige une frontière `<Suspense>`. **ENGAGEMENT § 7** inchangé (P2034 sur admin-admins /
+> admin-users / admin-auth). Suite : § 5.23 (maintenance).
+>
 > ## ▶ 15/09/2026 — § 5.21 LIVRÉ
 >
 > Branche `chore/recette-admin-5-21` empilée sur #321 : 6 scénarios ADM-RGP + ADM-PAR-13, 14 ; ANO-ADM-57, 58

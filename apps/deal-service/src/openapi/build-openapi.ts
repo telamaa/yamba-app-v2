@@ -58,7 +58,7 @@ const response409 = jsonResponse(
   "ErrorResponse",
   "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | " +
     "TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED | " +
-    "NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value)"
+    "NEW_ACCOUNT_CAP (D71: details.cap ∈ DECLARED_VALUE | WEIGHT | SHIPMENTS_PER_MONTH, limit, value) | ACCOUNT_DELETED (A179)"
 );
 const response500 = jsonResponse("UnhandledError", "Unhandled server error");
 

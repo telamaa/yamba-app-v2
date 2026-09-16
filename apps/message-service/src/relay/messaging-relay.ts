@@ -13,7 +13,7 @@ import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "pino";
 import prisma from "@packages/libs/prisma";
-import { MessagingDomainEventSchema } from "@packages/api-contracts";
+import { MessagingDomainEventSchema, OUTBOX_MAX_RELAY_ATTEMPTS } from "@packages/api-contracts";
 import { TOPICS, type EventPublisher } from "@packages/messaging";
 import { isBrokerUnavailable } from "../../../../packages/libs/messaging/src/broker-errors";
 
@@ -21,7 +21,8 @@ export const MESSAGING_RELAY_LEASE_ID = "messaging-relay";
 export const MESSAGING_RELAY_POLL_MS = 2_000;
 export const MESSAGING_RELAY_BATCH = 50;
 export const MESSAGING_RELAY_LEASE_MS = 15_000;
-export const MAX_RELAY_ATTEMPTS = 10;
+/** A176 — seule source : `OUTBOX_MAX_RELAY_ATTEMPTS` (@packages/api-contracts), que le seuil d'alerte ne peut pas dépasser. */
+export const MAX_RELAY_ATTEMPTS = OUTBOX_MAX_RELAY_ATTEMPTS;
 export const RELAY_BACKOFF_MAX_MS = 30_000;
 
 const buildOwner = () => `${hostname()}#${process.pid}#${randomUUID().slice(0, 8)}`;

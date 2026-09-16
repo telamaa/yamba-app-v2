@@ -120,6 +120,39 @@ describe("eraseAccount (D63 4A)", () => {
     expect(db.tables.dataRequest[0]).toMatchObject({ channel: "ADMIN", reason: "Demande reçue par email le 4 septembre 2026", status: "DONE" });
     expect(db.tables.erasedAccount[0]).toMatchObject({ channel: "ADMIN", stripeAccountId: null });
   });
+  it("A179 — une réservation créée ENTRE la vérification et la transaction est vue dans la transaction : refus, rien d'effacé", async () => {
+    const db = fakeDb({ user: [member] });
+    const transaction = db.$transaction;
+    db.$transaction = async (fn) => {
+      // la course : l'Expéditeur valide sa demande pendant que l'admin clique « Effacer »
+      db.tables.booking.push({ shipperId: U, carrierId: "x", status: "PENDING", isDeleted: false });
+      return transaction(fn);
+    };
+    const afterErase = jest.fn(async () => undefined);
+    await expect(makePrivacyService({ db, clock: () => NOW, afterErase }).eraseAccount({ userId: U, channel: "ADMIN", requestedByAdminId: "bbbbbbbbbbbbbbbbbbbbbbbb", reason: "Demande reçue par email, identité vérifiée" })).rejects.toMatchObject({ check: { blockers: ["PENDING_REQUEST"] } });
+    expect(db.tables.user[0]).toMatchObject({ isDeleted: false, email: "awa@example.com" });
+    expect(db.tables.erasedAccount).toEqual([]);
+    expect(db.tables.adminAction).toEqual([]);
+    expect(db.tables.dataRequest).toEqual([expect.objectContaining({ status: "REFUSED", refusalReasons: ["PENDING_REQUEST"], channel: "ADMIN" })]);
+    expect(afterErase).not.toHaveBeenCalled();
+  });
+  it("A179 — la réservation concurrente a écrit le même User (P2034) : le rejeu recompte et refuse", async () => {
+    const db = fakeDb({ user: [member] });
+    const transaction = db.$transaction;
+    let essais = 0;
+    db.$transaction = async (fn) => {
+      essais++;
+      if (essais === 1) {
+        db.tables.booking.push({ shipperId: U, carrierId: "x", status: "PENDING", isDeleted: false }); // commit de la réservation gagnante
+        throw Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" });
+      }
+      return transaction(fn);
+    };
+    await expect(makePrivacyService({ db, clock: () => NOW }).eraseAccount({ userId: U, channel: "MEMBER" })).rejects.toBeInstanceOf(ErasureBlockedError);
+    expect(essais).toBe(2);
+    expect(db.tables.user[0].isDeleted).toBe(false);
+    expect(db.tables.dataRequest).toHaveLength(1);
+  });
   it("un compte déjà effacé ne s'efface pas deux fois", async () => {
     const db = fakeDb({ user: [{ ...member, isDeleted: true }] });
     await expect(makePrivacyService({ db }).eraseAccount({ userId: U, channel: "MEMBER" })).rejects.toThrow("ACCOUNT_NOT_FOUND");

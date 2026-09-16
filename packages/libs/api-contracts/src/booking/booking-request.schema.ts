@@ -137,5 +137,6 @@ export const BOOKING_REQUEST_ERROR_CODES = [
   "PAYMENT_MISMATCH",
   "PAYMENT_ALREADY_USED",
   "NEW_ACCOUNT_CAP", // D71 — plafond progressif CNF-06 (details.cap, limit, value)
+  "ACCOUNT_DELETED", // A179 — le compte de l'Expéditeur a été effacé pendant la création
 ] as const;
 export type BookingRequestErrorCode = (typeof BOOKING_REQUEST_ERROR_CODES)[number];

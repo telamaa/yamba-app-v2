@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import type { Logger } from "pino";
 import type { OutboxEvent } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
-import { BookingDomainEventSchema } from "@packages/api-contracts";
+import { BookingDomainEventSchema, OUTBOX_MAX_RELAY_ATTEMPTS } from "@packages/api-contracts";
 import { TOPICS, type EventPublisher } from "@packages/messaging";
 import { buildLeaseOwner, releaseLease, tryAcquireLease } from "./relay-lease";
 import { isBrokerUnavailable } from "../../../../packages/libs/messaging/src/broker-errors";
@@ -38,7 +38,8 @@ import { isBrokerUnavailable } from "../../../../packages/libs/messaging/src/bro
 
 export const RELAY_POLL_INTERVAL_MS = 1_000;
 export const RELAY_BATCH_SIZE = 50;
-export const MAX_RELAY_ATTEMPTS = 10;
+/** A176 — seule source : `OUTBOX_MAX_RELAY_ATTEMPTS` (@packages/api-contracts), que le seuil d'alerte ne peut pas dépasser. */
+export const MAX_RELAY_ATTEMPTS = OUTBOX_MAX_RELAY_ATTEMPTS;
 export const RELAY_BACKOFF_MAX_MS = 30_000;
 
 export interface OutboxRelayOptions {
