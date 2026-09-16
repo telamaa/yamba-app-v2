@@ -610,6 +610,40 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 5.29 DU CAHIER 01-WEB — WEB-ERR, PAGES D'ERREUR ET PAGE INTROUVABLE (branche
+  `chore/recette-web-5-29`, empilee sur #293)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios en
+  serie, 2 min 06 (`apps/e2e/src/chapitres/web-err.spec.ts`). COMMENT ON DECLENCHE UN INCIDENT : le cahier prevoit
+  « demander a un developpeur un moyen sur de declencher l'erreur » — deux routes de recette le font,
+  `/[locale]/dev/erreur` (hors tunnel) et `/[locale]/bookings/dev-erreur` (dedans, car la frontiere n'ajoute la
+  phrase sur le paiement que sous `/book` ou `/bookings`), toutes deux INTROUVABLES EN PRODUCTION (`notFound()` des
+  que `NODE_ENV === "production"`) ; `?type=chunk` porte la signature d'un morceau de code manquant (version publiee
+  pendant la navigation). QUATRE METHODES ESSAYEES ET ECARTEES, et c'est un resultat : couper la passerelle ne fait
+  PAS tomber la frontiere (les ecrans chargent cote navigateur et affichent leurs propres etats d'erreur), pas plus
+  qu'une charge d'API malformee, qu'une charge RSC en 500, ou qu'un chunk coupe sur une page qui n'en charge pas —
+  L'APPLICATION EST GARDEE PARTOUT OU ON L'A POUSSEE. ANO-WEB-92 close (mineure) : la copie de la reference
+  d'incident echouait EN SILENCE (`navigator.clipboard` n'existe pas hors contexte securise, le `catch` ne faisait
+  rien) — le bouton restait muet au moment precis ou le membre veut transmettre la panne au support ; meme regle
+  qu'ANO-WEB-59 : un echec se dit (`errors.boundary.copyFailed`, FR + EN, miroir i18n vert). Prouve : page
+  introuvable (404, titre, texte exact, trois actions, aucune trace, plus jamais le 404 interne de Next — acquis
+  d'ANO-WEB-88) ; « Trajet introuvable » et « Profil introuvable » avec leurs phrases exactes et aucun indice sur
+  l'existence reelle ; page d'erreur generale avec sa reference (le `digest` de Next suffit, meme sans Sentry),
+  copiable — CONTENU DU PRESSE-PAPIERS VERIFIE — son aide et le lien support ; la reassurance paiement EN TETE dans
+  le tunnel et absente ailleurs ; la variante « nouvelle version » qui remplace le message ET le bouton
+  (« Recharger la page », « Reessayer » disparait) ; et cinq situations d'erreur (trajet inexistant, service muet,
+  session expiree, formulaire refuse, refus metier CODE) sans un seul chemin de fichier, trace, identifiant brut
+  (QUOTE_DIVERGENCE, SUDO_REQUIRED, P2002, PrismaClient) ni anglais non traduit. A TRANCHER : « Ecrire au support »
+  vit DANS le bloc de reference (sans reference, l'action disparait — trou fonctionnel) ; le cahier attend un toast
+  « Reference copiee » alors que le produit change le libelle du bouton (amender le cahier) ; la longueur de la
+  reference varie selon son origine (Sentry 8 caracteres / `digest` variable) ; les deux routes de panne restent
+  livrees (inertes en production) — a retirer le jour ou une preproduction permet de couper une dependance pour de
+  vrai. Regard d'expert : sortir le lien support du bloc, joindre le chemin de la page au courriel pre-rempli,
+  recharger automatiquement apres trois secondes sur « nouvelle version », rendre la garde « aucun code technique »
+  automatique. PIEGES : **`innerText` sur un `body` CLONE (detache) retombe sur `textContent`** et rend le contenu
+  des `<script>` — charge RSC comprise, ce qui ressemble a une fuite technique ; le `body` VIVANT ne rend que ce qui
+  est affiche et exclut la fenetre d'erreur de Next (`nextjs-portal` a racine fantome) ; `domcontentloaded` rend la
+  main AVANT le rendu (lire le corps aussitot donne une chaine vide) ; le presse-papiers doit etre interpose en
+  memoire de page sur l'adresse LAN. Plateforme inchangee (1000 + auth 230), harnais : 296 scenarios. PR a ouvrir
+  (empilee sur #293). Reste : 5.30 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.28 DU CAHIER 01-WEB — WEB-MNT, LE MODE MAINTENANCE VU DU MEMBRE (branche
   `chore/recette-web-5-28`, empilee sur #292)** — 4 fiches jouees CONFORMES (1 apres correction), 4 scenarios en
   serie, 1 min 42 (`apps/e2e/src/chapitres/web-mnt.spec.ts` ; l'annonce est posee PAR L'ECRAN du back-office

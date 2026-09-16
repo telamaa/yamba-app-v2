@@ -3489,6 +3489,87 @@ suivants.
 - **Les résultats de recherche arrivent après le titre** : lire le corps de la page juste après la navigation ne
   montre que l'en-tête (« Tous les trajets disponibles »). On attend le contenu (`expect.poll`).
 
+## Chapitre 5.29 — Pages d'erreur et page introuvable · **CONFORME** (5 fiches jouées, 1 après correction · 1 anomalie close · 5 scénarios en série, 2 min 06)
+
+`web-err.spec.ts`. **Comment on déclenche un incident** : le cahier prévoit de « demander à un développeur un moyen
+sûr de déclencher l'erreur » — c'est fait. Deux routes de recette lèvent une panne volontaire,
+`/fr/dev/erreur` (hors tunnel) et `/fr/bookings/dev-erreur` (dedans, car la frontière n'ajoute la phrase sur le
+paiement que sous `/book` ou `/bookings`) ; elles répondent **page introuvable en production**
+(`notFound()` dès que `NODE_ENV === "production"`). `?type=chunk` lève une erreur portant la signature d'un morceau
+de code manquant — ce que produit une version publiée pendant la navigation.
+
+**Les autres méthodes ont été essayées, et leur échec est un résultat** : couper la passerelle ne fait pas tomber la
+frontière d'erreur (les écrans se chargent côté navigateur et affichent leurs propres états d'erreur), pas plus
+qu'une charge d'API malformée (`{"notifications": 42}`, `{"booking": null}`…), ni un morceau de code coupé sur une
+page qui n'en charge pas, ni une charge RSC en 500. **L'application est gardée partout où on l'a poussée** — ce qui
+est excellent, et qui explique pourquoi la fiche 3 avait besoin d'une porte dédiée.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-ERR-1 | La page introuvable | **Conforme** — `/fr/cette-page-nexiste-pas` répond **404** avec « Cette page n'existe pas », le texte exact du cahier et les trois actions (« Chercher un trajet », « Publier un trajet », « Retour à l'accueil ») ; **aucune trace technique**, et plus jamais le 404 interne de Next (acquis d'`ANO-WEB-88`, chapitre 5.26) |
+| WEB-ERR-2 | Trajet et profil inexistants | **Conforme** — `/fr/trips/000000000000000000000000` → « Trajet introuvable » / « Ce trajet n'existe pas ou n'est plus disponible. » ; `/fr/u/slug-inexistant` → « Profil introuvable » / « Ce profil n'existe pas ou a été supprimé. » ; aucun indice sur l'existence réelle, aucune trace |
+| WEB-ERR-3 | La page d'erreur générale | **Conforme après correction** → `ANO-WEB-92` ; hors tunnel : titre, message de réassurance, « Réessayer » et « Retour à l'accueil », **pas** la phrase du paiement ; **référence d'incident** présente (le `digest` de Next suffit, même sans Sentry), copiable — le **contenu du presse-papiers est vérifié** — avec « Communique-la au support si le problème se répète. » et « Écrire au support » ; dans le tunnel (`/fr/bookings/…`) : la phrase « Aucun paiement n'a été effectué. Ta carte n'a pas été débitée et aucune demande n'a été envoyée au Voyageur. » s'affiche **avant les actions** ; aucune trace de pile nulle part |
+| WEB-ERR-4 | La version publiée pendant la navigation | **Conforme** — `?type=chunk` : le message devient « Une nouvelle version de Yamba vient d'être publiée. Recharge la page pour la récupérer. », le bouton devient « **Recharger la page** » et « Réessayer » disparaît ; le message d'incident ordinaire et la réassurance paiement s'effacent |
+| WEB-ERR-5 | Une erreur ne montre jamais de code | **Conforme** — cinq situations (trajet inexistant, service de recherche muet, session expirée, formulaire refusé, refus métier **codé** : réserver son propre trajet) : dans aucune le membre ne lit un chemin de fichier, une trace, `QUOTE_DIVERGENCE` / `SUDO_REQUIRED` / `P2002` / `PrismaClient`, ni un message anglais brut (« Not Found », « Bad Request », « Something went wrong »…) |
+
+### Anomalies
+
+- **ANO-WEB-92 (mineure, close)** — la référence d'incident se copie par `navigator.clipboard`, qui **n'existe pas
+  hors contexte sécurisé** : le `catch` de la page d'erreur ne faisait rien, le bouton ne répondait pas, et le
+  membre ne savait pas s'il tenait la référence à donner au support — au pire moment, celui où il en a besoin. Même
+  règle qu'`ANO-WEB-59` (code de livraison, chapitre 5.17) : un échec se dit. `errors.boundary.copyFailed` est
+  ajoutée en FR et en EN, et la page l'affiche en cas d'échec.
+
+### À trancher (produit)
+
+- **Le lien « Écrire au support » vit à l'intérieur du bloc de référence** : s'il n'y a ni `digest` ni Sentry, tout
+  le bloc disparaît — et avec lui l'action que le cahier compte parmi les trois. Sortir le lien du bloc (le support
+  doit être joignable même sans référence) — petit, mais c'est un vrai trou fonctionnel.
+- **Le cahier parle d'un « toast “Référence copiée” »** ; l'implémentation change le **libellé du bouton** pendant
+  deux secondes. C'est équivalent à l'usage (et plus discret) : amender le cahier plutôt que le produit.
+- **La référence fait 8 caractères quand elle vient de Sentry, mais la longueur du `digest` de Next varie** : la
+  fiche accepte 6 à 12 caractères. Normaliser (toujours 8) éviterait qu'un membre et le support ne parlent pas de la
+  même chaîne.
+- **Les deux routes de panne sont livrées dans l'application** (inertes en production). C'est assumé et documenté :
+  elles donnent à la recette un moyen **stable** de revérifier la page d'erreur à chaque campagne. À retirer le jour
+  où un environnement de préproduction permet de couper une dépendance serveur pour de vrai.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **ERR-1** — La page introuvable est complète et branchée (5.26) ; il lui manque la seule chose qu'un membre
+  cherche parfois : un champ de recherche directement dans la page, plutôt qu'un lien vers `/search` — petit.
+- **ERR-2** — Deux écrans différents pour deux ressources introuvables, avec des textes propres : très bien. Ils ne
+  répondent pas **404** au niveau HTTP (la page existe, la ressource non) — sans importance pour le membre, mais
+  un `notFound()` rendrait le statut cohérent pour les robots et le référencement — moyen.
+- **ERR-3** — La hiérarchie de l'information est juste : la question d'argent d'abord, la référence ensuite, la
+  trace jamais. Deux améliorations : sortir « Écrire au support » du bloc de référence, et joindre au courriel
+  pré-rempli le chemin de la page (le `mailto:` ne porte que la référence) — petit.
+- **ERR-4** — Reconnaître un déploiement à la signature de l'erreur (`ChunkLoadError`, « Loading chunk ») est la
+  bonne heuristique, et le bouton change vraiment de geste. Recharger **automatiquement** après trois secondes
+  (avec un compte à rebours visible) éviterait au membre de comprendre ce qui s'est passé — moyen.
+- **ERR-5** — Aucun code technique ne fuit, y compris sur un refus métier qui, lui, en porte un (`details.code`) :
+  la chaîne « code serveur → phrase traduite » tient. La garde mériterait d'être **automatique** : un test qui
+  balaie les écrans d'erreur et refuse toute chaîne en majuscules_avec_underscores — moyen.
+- **Transversal** — Ce chapitre est le seul où **rien n'a été trouvé côté produit sauf un échec silencieux** : les
+  pages d'erreur, écrites après un constat de recette, tiennent. La leçon est ailleurs — dans ce qu'il a fallu pour
+  les éprouver : une application bien gardée ne tombe pas sur commande, et il faut alors une **porte de panne**
+  explicite plutôt qu'une astuce fragile.
+
+### Pièges de poste payés ici
+
+- **`innerText` sur un `body` CLONÉ (détaché) retombe sur `textContent`** : on récupère alors le contenu des
+  `<script>`, charge RSC comprise — des milliers de caractères qui ressemblent à une fuite technique. Le `body`
+  **vivant** ne rend que ce qui est affiché, et la fenêtre d'erreur de Next (un `nextjs-portal` à racine fantôme)
+  n'en fait pas partie : c'est la bonne lecture.
+- **`waitUntil: "domcontentloaded"` rend la main avant le rendu** : lire le corps tout de suite donne une chaîne
+  vide. Chaque fiche attend son titre avant de lire.
+- **Le presse-papiers n'existe pas sur l'adresse LAN du poste** (contexte non sécurisé) : le harnais en interpose un
+  en mémoire de page (`observerLePressePapiers`, déjà employé aux chapitres 5.17 et 5.23) — et c'est en le posant
+  qu'on découvre l'anomalie inverse, l'absence de message quand il n'y en a pas.
+- **Une application bien gardée résiste aux pannes simulées** : quatre méthodes (passerelle coupée, charge d'API
+  malformée, morceau de code coupé, charge RSC en 500) n'ont produit aucune frontière d'erreur. Ne pas s'acharner :
+  demander la porte de panne, et **consigner** que les gardes tiennent.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
