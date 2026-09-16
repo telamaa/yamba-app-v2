@@ -126,7 +126,8 @@
       "regenerating": "Regenerating…",
       "toastRegenerated": "New code generated! Don''t forget to send it to {recipientFirstName}.",
       "toastMaxReached": "You''ve reached the regeneration limit. Contact support if needed.",
-      "toastError": "Error regenerating. Try again."
+      "toastError": "Error regenerating. Try again.",
+      "copyFailed": "Copying is not available in this browser — select the code and copy it by hand."
     },
     "share": {
       "title": "Share the code with {recipientFirstName}",
