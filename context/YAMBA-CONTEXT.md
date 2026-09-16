@@ -610,6 +610,24 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 7 DU CAHIER 01-WEB — WEB-NRG, NON-REGRESSION (branche `chore/recette-web-7`, empilee sur #297)**
+  — 12 fiches CONFORMES (3 apres correction), 11 scenarios NON sequentiels (`apps/e2e/src/chapitres/web-nrg.spec.ts`,
+  NRG-6 et 12 partagent un releve console + textes). 3 ANOMALIES CLOSES. ANO-WEB-104 (MAJEURE) : « Voir mes
+  virements sur Stripe » testait `carrierPage.stripeAccountId`, que `/auth/me` ne sert JAMAIS (liste blanche) → TOUS
+  les Voyageurs voyaient « Finalise d'abord ton compte Stripe », serveur jamais appele, porte sudo jamais atteinte ;
+  le bouton appelle maintenant toujours le serveur (SUDO_REQUIRED puis STRIPE_ACCOUNT_MISSING traduits). ANO-WEB-103
+  (mineure) : Finances s'ouvrait sur « Paiements » chez un Voyageur (`useState(isCarrier ? …)` fige au montage, avant
+  le chargement du membre) → onglet derive. ANO-WEB-105 (mineure) : bouton mobile « Partager » sans nom complet →
+  aria-label « Partager un trajet ». NRG-10 MESURE : 6,2 appels d'API par page ; projete sur les plafonds de
+  PRODUCTION (le poste les releve a 5000/2000) : membre actif ≈ 56 % de 1000, visiteur ≈ 16 pages / 15 min —
+  mesure pessimiste (`page.goto` recharge + StrictMode double `GET /api/maintenance`) → a remesurer sur build de
+  production. NRG-7 : cinq portes sudo verifiees SANS demander de code ; la suppression sur un COMPTE NEUF JETABLE
+  (destructif si une fenetre sudo etait ouverte). HARNAIS : `pages/ecran.ts` (gardes d'ecran extraites de web-mob +
+  `ecouterLaConsole`), `JeuEssai.tousLesTrajets()`, `MesTrajets.actionDuMenu()`, « Proposer un autre ». Pieges
+  repayes : `\b` et « é », « 230,00 € » contient « 0,00 € », `count()` avant hydratation. A TRANCHER : plafond
+  visiteurs ; origine refusee en 500 au lieu de 403 ; `BecomeYamber` lit aussi `stripeAccountId`. web-mob 10/10,
+  web-msg 21/21 rejoues. Plateforme inchangee (1000 + auth 230), harnais : 332 scenarios. PR #298 (empilee sur #297). **Le cahier 01-WEB est entierement joue** (§ 5, § 6, § 7). Reste : cahier 02-ADMIN. AUCUNE attribution
+  Claude.
 - 13/09 : **CHAPITRE 5.32 DU CAHIER 01-WEB — WEB-VOC, VOCABULAIRE ET COHERENCE DE LANGUE (branche
   `chore/recette-web-5-32`, empilee sur #296) — DERNIER CHAPITRE DU § 5 DU CAHIER 01-WEB** — 6 fiches CONFORMES
   (4 apres correction), 7 scenarios, 16 min (`apps/e2e/src/chapitres/web-voc.spec.ts`). METHODE : un RELEVE commun

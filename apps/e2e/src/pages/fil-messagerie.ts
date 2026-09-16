@@ -82,7 +82,8 @@ export class FilMessagerie {
   }
 
   async proposerRendezVous(rdv: RendezVous): Promise<void> {
-    await this.page.getByRole("button", { name: "Proposer", exact: true }).click();
+    // « Proposer » sur un fil sans rendez-vous, « Proposer un autre » quand l'autre en a déjà proposé un (WEB-NRG-5).
+    await this.page.getByRole("button", { name: /^Proposer( un autre)?$/ }).filter({ visible: true }).first().click();
     await this.page.getByLabel("Lieu").fill(rdv.lieu);
     await this.page.getByLabel("Début").fill(rdv.debut);
     await this.page.getByLabel("Fin").fill(rdv.fin);

@@ -3921,6 +3921,118 @@ pareil — c'est la sonde de session du visiteur, pas la fermeture de la porte. 
 *Axe : un visiteur qui n'a jamais eu de session ne devrait pas tenter de rafraîchissement (le marqueur
 d'ANO-WEB-01 le sait) — une requête inutile par visite, petit.*
 
+## Chapitre 7 — Non-régression · **CONFORME** (12 fiches jouées, 3 après correction · 3 anomalies closes · 11 scénarios)
+
+`web-nrg.spec.ts`. Douze points qui ont **déjà cassé** : le cahier les veut rejoués à chaque session, avant de déclarer
+une recette terminée. Ils vivent donc dans UN fichier, à lancer seul. Trois partis pris écrits en tête de spec :
+chaque fiche joue le cahier **en entier** (« chaque trajet », « les quatre portes », « écris et envoie un message ») ;
+la **console est un témoin** (erreurs, avertissements React, erreurs next-intl) ; les gestes sensibles **s'arrêtent à la
+porte** (aucun code demandé : quota OTP). Les fiches ne sont pas en série : une régression qui revient ne masque pas
+les onze autres.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-NRG-1 | Heure d'arrivée sur les cartes | **Conforme** — desktop puis téléphone, chaque carte visible : une heure réelle ou rien, jamais « — » |
+| WEB-NRG-2 | Jamais un prix à zéro | **Conforme** — recherche sans critère, la page des **8 trajets** du jeu d'essai (chaque trajet au kilo porte un exemple chiffré « ≈ … € »), étape 1 sans poids → « Indique le poids du colis pour voir le prix. » ; aucune note « ⭐ 0.0 » |
+| WEB-NRG-3 | La croix des quatre portes, sur téléphone | **Conforme après correction** → `ANO-WEB-105` ; « Réserver », le cœur, « Suivre », « Partager un trajet » : croix « Fermer » visible, dans l'écran, qui ferme ; « Plus tard » présent |
+| WEB-NRG-4 | L'étape 1 sur chaque trajet | **Conforme** — 8 trajets : l'étape 1, ou un refus explicite (« Ce trajet n'accepte plus de demandes. » pour le trajet parti) ; aucune exception dans la console |
+| WEB-NRG-5 | Les bulles de l'autrice sur téléphone | **Conforme** — Pauline **écrit et envoie** un message (sa bulle tient dans l'écran), propose un rendez-vous au **lieu long** (le lieu passe à la ligne), la rangée des réponses rapides défile **dans son cadre**, « Voir le numéro » dans l'écran, aucun défilement horizontal |
+| WEB-NRG-6 / 12 | Console et textes, FR et EN | **Conforme** — 10 écrans à listes × 2 langues (recherche, mes envois, mes trajets, finances, notifications, messages, détail d'un trajet, étape 1, demande reçue, suivi) : aucun avertissement « unique key », aucune erreur next-intl (`MISSING_MESSAGE`, `INVALID_KEY`), aucune section vide, aucune clé affichée |
+| WEB-NRG-7 | Les cinq gestes sensibles | **Conforme après correction** → `ANO-WEB-103`, `ANO-WEB-104` ; mot de passe, adresse email, données, **tableau de bord Stripe**, suppression du compte : 403 `SUDO_REQUIRED` et la porte « Confirme que c'est bien toi » / « M'envoyer le code », sans demander de code |
+| WEB-NRG-8 | Libellés des statuts et toasts | **Conforme** — « En ligne » / « Online », jamais « Actif », « En pause », « Active », « Paused » ; par le menu d'un trajet créé pour la fiche : toasts « **Trajet masqué** » puis « **Trajet remis en ligne** », badge « Masqué » entre les deux |
+| WEB-NRG-9 | Annuler un trajet qui porte des deals | **Conforme** — 409, « Ce trajet porte encore … deals en cours », le trajet reste « PUBLISHED » |
+| WEB-NRG-10 | Cinq minutes de navigation | **Conforme** — aucun 429, aucun « Trop de tentatives ». **Mesuré** : 77 pages, 475 appels en 5 min, soit **6,2 appels d'API par page** ; projeté sur les plafonds **de production** (le poste les relève : 5000 / 2000) : un membre actif (90 pages / 15 min) ≈ 555 appels, **56 %** du plafond de 1000 ; un visiteur atteint son plafond de 100 en ≈ 16 pages |
+| WEB-NRG-11 | Les origines du poste (CORS) | **Conforme** — `localhost:3000`, `localhost:3001` et l'adresse LAN : réponse < 500 et `Access-Control-Allow-Origin` égal à l'origine ; contre-épreuve : une origine étrangère n'est pas autorisée |
+
+### Anomalies
+
+- **ANO-WEB-104 (majeure, close)** — **le tableau de bord Stripe était inaccessible à TOUS les Voyageurs.** Le bouton
+  « Voir mes virements sur Stripe » testait `user.carrierPage.stripeAccountId` ; or `/auth/me` ne sert jamais ce champ
+  (liste blanche du DTO, à juste titre). Chaque Voyageur voyait « Finalise d'abord ton compte Stripe », le serveur
+  n'était jamais appelé, la porte par code jamais atteinte. Exactement la famille que WEB-NRG-7 garde : « une fonction
+  entière morte, sans erreur visible ». Correction : le bouton appelle toujours le serveur, qui décide (porte par code,
+  puis `STRIPE_ACCOUNT_MISSING`) ; le front traduit ce code. Vérifié sur `/auth/me` de Thomas : `carrierPage` porte
+  `stripeOnboardingComplete`, jamais `stripeAccountId`.
+- **ANO-WEB-103 (mineure, close)** — **Finances s'ouvrait sur « Paiements » chez un Voyageur.** `useState(isCarrier ?
+  "wallet" : "payments")` n'est évalué qu'au montage, avant que le membre soit chargé : `isCarrier` vaut `false`,
+  l'onglet reste « Paiements » (vide), les gains et le lien Stripe sont un clic plus loin. Invisible en navigation
+  interne (cache chaud), systématique à l'ouverture directe. Correction : onglet **dérivé** tant que le membre n'a
+  rien choisi.
+- **ANO-WEB-105 (mineure, close)** — **sur téléphone, le bouton de l'en-tête s'annonçait « Partager »** : partager
+  quoi ? Le libellé visible est raccourci ; il porte désormais le nom complet « Partager un trajet », qui contient le
+  mot visible (WCAG 2.5.3).
+
+### Défauts de l'instrument, corrigés avant de conclure
+
+- **« 230,00 € » contient « 0,00 € »** : la garde des prix nuls a d'abord accusé le forfait soute. Garde « aucun
+  chiffre avant ».
+- **`\bMasqué\b` ne matche jamais** : `\b` ne connaît pas « é ». La leçon du chapitre 5.32, repayée ici — frontières
+  `(?<![\p{L}])…(?![\p{L}])` avec le drapeau `u`.
+- **« Proposer » ou « Proposer un autre »** : le fil de `bzv-accepted` porte déjà un rendez-vous de Thomas. Le page
+  object `FilMessagerie.proposerRendezVous` accepte désormais les deux.
+- **Un `count()` immédiat** tombait avant l'hydratation, ouvrait le menu, qui recouvrait l'en-tête : on attend le
+  bouton.
+- **Le cinquième geste est destructeur** : taper « SUPPRIMER » puis confirmer effacerait VRAIMENT le compte si une
+  fenêtre sudo était déjà ouverte. La fiche le joue sur un **compte neuf jetable**, jamais sur un compte du jeu
+  d'essai.
+
+### Ce que le harnais a gagné
+
+- `apps/e2e/src/pages/ecran.ts` : les gardes `aucunDebordement`, `tientDansLEcran`, `rienNeSortDuCadre` (sorties de
+  web-mob, qui les importe) et `ecouterLaConsole` (erreurs ET avertissements, bruit du poste écarté).
+- `JeuEssai.tousLesTrajets()` : « chaque trajet du jeu d'essai » sans liste écrite en dur.
+- `MesTrajets.actionDuMenu()` : n'importe quelle entrée du menu d'un trajet, confirmée si besoin, avec son toast.
+- `FilMessagerie.proposerRendezVous()` accepte « Proposer » et « Proposer un autre ».
+
+### À trancher (produit)
+
+- **Une origine refusée répond 500** (« Not allowed by CORS ») : c'est un refus, pas une panne — un 403 serait juste
+  et ne réveillerait pas l'alerte Sentry des 5xx. Petit.
+- **`BecomeYamber` teste encore `stripeAccountId`** pour afficher « Configuration incomplète » : même champ jamais
+  servi, donc toujours « Non configuré » pour un onboarding Stripe entamé. Petit, de la même famille qu'ANO-WEB-104.
+- **Le plafond des VISITEURS (100 / 15 min) à mesurer sur un build de production.** La mesure du poste dit ≈ 16 pages
+  par quart d'heure — mais elle est **pessimiste** : chaque `page.goto` recharge tout, et `next dev` monte deux fois
+  chaque effet (StrictMode). Répartition relevée : `GET /api/maintenance` **1,99 par page** (un seul composant, le
+  bandeau du layout, qui lit au montage — le double est l'artefact de développement), `/auth/me` 0,96,
+  `/messages/conversations` 0,88, `/me/notifications` 0,84, `/trips/my` 0,42, `/trips/:id/public` 0,35. Un visiteur qui
+  compare des trajets depuis un bureau ou un réseau mobile partagé (même IP) reste le vrai risque : rejouer la
+  mesure sur `next build && next start` en navigation par liens avant de trancher le plafond. Moyen.
+
+### Regard d'expert — optimisations et améliorations (produit ET test, une ligne par fiche)
+
+- **NRG-1** — *Produit* : rien. *Test* : compter les cartes attendues (API de recherche) plutôt que « au moins une » —
+  une recherche vide passerait. Petit.
+- **NRG-2** — *Produit* : un prix nul devrait être refusé en base (garde de publication ET contrainte de lecture),
+  pas seulement masqué à l'affichage. Moyen. *Test* : relire aussi la carte mobile et le récapitulatif mobile. Petit.
+- **NRG-3** — *Produit* : ANO-WEB-105 réglée ; aligner les autres libellés raccourcis sur téléphone (« Réserver »
+  seul dans la barre du bas). Petit. *Test* : jouer aussi en desktop (le cahier dit « sur mobile comme sur
+  desktop »). Petit.
+- **NRG-4** — *Produit* : le refus « Ce trajet n'accepte plus de demandes. » ne propose aucune suite (trajets
+  similaires). Petit. *Test* : forcer un trajet SANS lieu en base (manœuvre consignée) pour éprouver réellement le
+  message du cahier — aucun trajet du jeu d'essai n'en est dépourvu. Moyen.
+- **NRG-5** — *Produit* : rien. *Test* : MOB-5 (chapitre 5.30) n'envoyait aucun message et sautait « Voir le numéro »
+  en silence — NRG-5 le fait ; MOB-5 peut être allégée d'autant. Petit.
+- **NRG-6/12** — *Produit* : rien. *Test* : la console ne voit que les avertissements du DÉVELOPPEMENT ; en
+  production React les tait — c'est donc bien sur `next dev` qu'il faut la jouer (écrit dans l'en-tête). Élargir aux
+  écrans de l'admin. Moyen.
+- **NRG-7** — *Produit* : ANO-WEB-103 et 104 réglées ; auditer tous les `user.carrierPage.*` du front contre la liste
+  blanche de `/auth/me` (une garde de type : exposer un type `MeCarrierPage` généré depuis le contrat). Moyen, c'est la
+  vraie protection. *Test* : un compte jetable par exécution s'accumule en base (piège 22) — les purger. Petit.
+- **NRG-8** — *Produit* : rien. *Test* : les six libellés ne sont pas tous portés par un trajet de Thomas ; créer un
+  trajet par statut rendrait la fiche exhaustive. Moyen.
+- **NRG-9** — *Produit* : le refus nomme le nombre de deals ; y ajouter un lien direct vers la liste des deals à
+  annuler. Petit.
+- **NRG-10** — *Produit* : `useUser`, notifications et conversations rechargés à chaque page : un
+  `staleTime` TanStack Query de 30 s en couperait une bonne part. Moyen. *Test* : la fiche projette désormais sur les
+  plafonds de production et publie la répartition par route — un écran qui se met à sonder en rafale se voit AVANT
+  le 429. Reste à la jouer en **navigation par liens** (et sur un build de production) pour une mesure réaliste,
+  sans rechargements ni double montage. Petit.
+- **NRG-11** — *Produit* : 403 au lieu de 500 (à trancher). *Test* : ajouter l'origine de production quand elle
+  existera. Petit.
+- **Transversal** — Deux des trois anomalies sont des **fonctions mortes sans erreur visible** : un front qui décide à
+  la place du serveur (A146 dit l'inverse). La garde qui manque : relire, à chaque PR front, tout champ lu sur `user`
+  contre la réponse réelle de `/auth/me`.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
