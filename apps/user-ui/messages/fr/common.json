@@ -24,7 +24,7 @@
     "notifications": "Notifications",
     "messages": "Messages",
     "welcomeTitle": "Bienvenue sur Yamba",
-    "welcomeSubtitle": "Envoyez vos colis légers autrement.",
+    "welcomeSubtitle": "Envoie tes colis légers autrement.",
     "createAccount": "Créer un compte"
   },
   "userMenu": {
@@ -137,7 +137,7 @@
     "flexNext3Months": "3 prochains mois",
     "apply": "Appliquer",
     "clear": "Effacer",
-    "selectDate": "Sélectionnez une date"
+    "selectDate": "Choisis une date"
   },
   "transportTabs": {
     "all": "Tout",
@@ -157,8 +157,8 @@
     "phone": "Téléphone",
     "computer": "Ordinateur",
     "otherElectronics": "Autres électronique",
-    "checkedBag": "Valise soute 23 Kg",
-    "cabinBag": "Valise cabine 12 Kg"
+    "checkedBag": "Bagage en soute 23 kg",
+    "cabinBag": "Bagage cabine 12 kg"
   },
   "common": {
     "yes": "Oui",

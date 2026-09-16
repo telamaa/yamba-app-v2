@@ -30,7 +30,7 @@
                         <h1 style="margin:0;font-size:22px;line-height:1.3;font-weight:800;color:#0f172a;">
                             <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
                                 <% if (locale === "fr") { %>
-                                    Un trajet de <%= tripper.firstName %> correspond à votre alerte
+                                    Un trajet de <%= tripper.firstName %> correspond à ton alerte
                                 <% } else { %>
                                     A trip by <%= tripper.firstName %> matches your alert
                                 <% } %>
@@ -42,13 +42,13 @@
                                 <% } %>
                             <% } else if (recipient.matchingSavedRoute && recipient.matchingSavedRoute.matchScore >= 100) { %>
                                 <% if (locale === "fr") { %>
-                                    Un nouveau trajet correspond à votre alerte
+                                    Un nouveau trajet correspond à ton alerte
                                 <% } else { %>
                                     A new trip matches your alert
                                 <% } %>
                             <% } else { %>
                                 <% if (locale === "fr") { %>
-                                    Un trajet proche de votre alerte a été publié
+                                    Un trajet proche de ton alerte a été publié
                                 <% } else { %>
                                     A trip near your alert has been published
                                 <% } %>
@@ -88,26 +88,26 @@
                                 <td style="padding:14px 18px;font-size:14px;line-height:1.55;color:#334155;">
                                     <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
                                         <% if (locale === "fr") { %>
-                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que vous suivez, a publié un trajet qui correspond à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que tu suis, a publié un trajet qui correspond à ton alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                         <% } else { %>
                                             <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, who you follow, published a trip matching your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                         <% } %>
                                     <% } else if (recipient.followsTripper) { %>
                                         <% if (locale === "fr") { %>
-                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que vous suivez, vient de publier un nouveau trajet.
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que tu suis, vient de publier un nouveau trajet.
                                         <% } else { %>
                                             <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, who you follow, just published a new trip.
                                         <% } %>
                                     <% } else if (recipient.matchingSavedRoute) { %>
                                         <% if (recipient.matchingSavedRoute.matchScore >= 100) { %>
                                             <% if (locale === "fr") { %>
-                                                Ce trajet correspond <strong>exactement</strong> à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                                Ce trajet correspond <strong>exactement</strong> à ton alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                             <% } else { %>
                                                 This trip <strong>exactly matches</strong> your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                             <% } %>
                                         <% } else { %>
                                             <% if (locale === "fr") { %>
-                                                Ce trajet est <strong>proche</strong> de votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                                Ce trajet est <strong>proche</strong> de ton alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                             <% } else { %>
                                                 This trip is <strong>near</strong> your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                             <% } %>
@@ -184,7 +184,7 @@
                         <p style="margin:0;font-size:13px;line-height:1.55;color:#475569;">
                             <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
                                 <% if (locale === "fr") { %>
-                                    Vous suivez <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> et ce trajet correspond à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                    Tu suis <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> et ce trajet correspond à ton alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                 <% } else { %>
                                     You follow <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> and this trip matches your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                 <% } %>
@@ -194,7 +194,7 @@
                                 </a>
                             <% } else if (recipient.followsTripper) { %>
                                 <% if (locale === "fr") { %>
-                                    Vous suivez <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> avec les notifications activées.
+                                    Tu suis <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> avec les notifications activées.
                                 <% } else { %>
                                     You follow <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> with notifications enabled.
                                 <% } %>
@@ -206,7 +206,7 @@
                                 <% } %>
                             <% } else if (recipient.matchingSavedRoute) { %>
                                 <% if (locale === "fr") { %>
-                                    Vous avez une alerte active pour la route <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                    Tu as une alerte active pour la route <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                 <% } else { %>
                                     You have an active alert for <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
                                 <% } %>

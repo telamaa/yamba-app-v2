@@ -81,7 +81,7 @@ test.describe("WEB-TRJ — publier un trajet et son cycle de vie (chapitre 5.7)"
   test("WEB-TRJ-1 · l'assistant s'ouvre en trois étapes", async ({ navigateurConnecte }) => {
     const { page } = await navigateurConnecte("josephine", { parEcran: true });
     await page.goto("/fr/trips/create", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Votre trajet")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Ton trajet")).toBeVisible({ timeout: 60_000 });
     // Trois étapes nommées.
     for (const etape of ["Trajet", "Conditions", "Vérification"]) {
       await expect(page.getByText(etape, { exact: true }).first()).toBeVisible();

@@ -169,10 +169,11 @@ test.describe("WEB-ALR — alertes de route (chapitre 5.10)", () => {
     const trajet = await publierTrajet(josephine.contexte, VILLES.bruxelles, VILLES.kinshasa);
     const email = await mailpit.attendreEmail({ pour: COMPTES.aminata.email, sujet: /Nouveau trajet Bruxelles → Kinshasa/ });
     expect(email.sujet).toBe("Nouveau trajet Bruxelles → Kinshasa");
-    expect(email.texte + email.html, "le corps parle de l'alerte").toMatch(/correspond à votre alerte/);
+    expect(email.texte + email.html, "le corps parle de l'alerte").toMatch(/correspond à ton alerte/);
     expect(email.html, "le lien vers le trajet").toContain(`/trips/${trajet}`);
     await mailpit.aucunEmailPour(COMPTES.josephine.email, 6_000);
-    test.info().annotations.push({ type: "constat", description: "l'email vouvoie (« Un nouveau trajet correspond à votre alerte ») là où le produit tutoie (décision du 03/09)" });
+    // Constat du 5.10 réglé au 5.32 (ANO-WEB-101) : l'email vouvoyait (« … correspond à votre alerte »).
+    expect(email.texte, "l'email tutoie, comme le produit").not.toMatch(/(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])/iu);
   });
 
   test("WEB-ALR-5 · l'anti-spam de 24 heures", async ({ navigateurConnecte, mailpit }) => {
@@ -202,7 +203,7 @@ test.describe("WEB-ALR — alertes de route (chapitre 5.10)", () => {
     await mailpit.vider();
     const trajetOrly = await publierTrajet(josephine.contexte, VILLES.orly, VILLES.brazzaville);
     const email = await mailpit.attendreEmail({ pour: COMPTES.aminata.email, sujet: /Nouveau trajet Orly → Brazzaville/ });
-    expect(email.texte + email.html, "un trajet PROCHE de l'alerte").toMatch(/proche de votre alerte/);
+    expect(email.texte + email.html, "un trajet PROCHE de l'alerte").toMatch(/proche de ton alerte/);
     expect(email.html).toContain(`/trips/${trajetOrly}`);
 
     // 3. Au-delà de 50 km (Lille, ≈ 204 km de Paris) : jamais rien — sur une alerte NEUVE (Pauline),

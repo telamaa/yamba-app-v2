@@ -45,7 +45,8 @@ export default function ReviewsCard({ tripper }: Props) {
 
       <div className="px-5 pb-4">
         <Link
-          href={`/tripper/${tripper.id}`}
+          // Recette 5.32 : `/tripper/<id>` n'existe pas (404) — les avis vivent sur la page publique `/u/<slug>`.
+          href={`/u/${tripper.publicSlug}`}
           className="inline-flex items-center gap-1 text-sm font-semibold text-[#B45309] transition-colors hover:text-[#FF9900] dark:text-[#FFB84D]"
         >
           {t("reviews.viewAll", { count: tripper.carrier.ratingsCount })}

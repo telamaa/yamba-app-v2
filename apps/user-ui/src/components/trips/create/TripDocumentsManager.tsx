@@ -411,7 +411,7 @@ export default function TripDocumentsManager({
       {canEdit && (
         <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
           {isFr
-            ? "Un billet vérifié augmente votre fiabilité de 40%."
+            ? "Un billet vérifié augmente ta fiabilité de 40%."
             : "A verified ticket increases your trust score by 40%."}
         </p>
       )}

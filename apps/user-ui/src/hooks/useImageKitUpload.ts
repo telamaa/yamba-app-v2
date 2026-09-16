@@ -89,7 +89,7 @@ export function useImageKitUpload(folder = "/trips", options: UploadOptions = {}
     if (!allowedMimeTypes.includes(file.type.toLowerCase())) {
       return {
         code: "INVALID_TYPE",
-        message: "Format non supporté. Utilisez PDF, JPG, PNG ou HEIC.",
+        message: "Format non supporté. Utilise PDF, JPG, PNG ou HEIC.",
       };
     }
     if (file.size > maxSizeBytes) {

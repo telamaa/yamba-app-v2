@@ -139,7 +139,7 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     await assistant.ouvrir(id);
     // Les trois choix : colis, soute (230 €) ; le cabine n'est pas offert par ce trajet.
     await expect(page.getByRole("button", { name: /^Un colis \(au kilo\)/ })).toBeVisible();
-    const soute = page.getByRole("button", { name: /^Un bagage soute 23 kg/ });
+    const soute = page.getByRole("button", { name: /^Un bagage en soute 23 kg/ });
     await expect(soute).toBeVisible();
     await expect(soute).toBeEnabled();
     const cabine = page.getByRole("button", { name: /^Un bagage cabine 12 kg/ });
@@ -289,7 +289,7 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     const { page } = await navigateurConnecte("aminata", { parEcran: true });
     const assistant = new AssistantReservation(page);
     await assistant.ouvrir(id);
-    await page.getByRole("button", { name: /^Un bagage soute 23 kg/ }).click();
+    await page.getByRole("button", { name: /^Un bagage en soute 23 kg/ }).click();
     await expect(poids(page)).toHaveCount(0);
     await expect(page.getByText("Taille — pas besoin de mesurer")).toHaveCount(0);
     await expect.poll(async () => await texte(page), { timeout: 15_000 }).toMatch(/Total 257,60 €/);

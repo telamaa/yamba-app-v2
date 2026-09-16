@@ -123,7 +123,9 @@ test.describe("WEB-DEA — la demande côté Voyageur (chapitre 5.14)", () => {
     const accueil = await texte(page);
     // Le titre et sa méta sont deux nœuds adjacents (« Demande de Aminata· Paris → … » sans espace dans innerText).
     expect(accueil).toMatch(/Demande de Aminata ?· Paris → Brazzaville · [a-zé]{3}\. \d{1,2} [a-zéû]+\.?/);
-    expect(accueil, "ANO-WEB-41 : plus jamais l'époque Unix comme date de trajet").not.toContain("1 janv.");
+    // `(?<!\d)` : « 11 janv. », « 21 janv. », « 31 janv. » CONTIENNENT « 1 janv. » — le jeu d'essai étant daté relativement
+    // au jour du rejeu, une garde en `toContain` échouait à tort chaque mois de janvier (revue des dates du harnais, 5.32).
+    expect(accueil, "ANO-WEB-41 : plus jamais l'époque Unix comme date de trajet").not.toMatch(/(?<!\d)1 janv\./);
     expect(accueil).toMatch(/Vêtements(?: & textile)? · 2[.,]5 kg · tu gagnes 28,75 € · reçue /);
     expect(accueil).toMatch(/Expire dans \d+ ?h/);
     // Toute la ligne est un lien vers la demande ; « Répondre » en est le libellé d'action.
@@ -137,7 +139,7 @@ test.describe("WEB-DEA — la demande côté Voyageur (chapitre 5.14)", () => {
     await expect(page.getByText("Demande de Aminata").first()).toBeVisible();
     const bande = await texte(page);
     expect(bande).toMatch(/Vêtements(?: & textile)? · 2[.,]5 kg · tu gagnes 28,75 € · reçue /);
-    expect(bande, "ANO-WEB-41").not.toContain("1 janv.");
+    expect(bande, "ANO-WEB-41").not.toMatch(/(?<!\d)1 janv\./);
     expect(bande).toMatch(/Expire dans \d+ ?h/);
     await expect(ligneDemande(page, dealId)).toBeVisible();
     // La ligne du trajet porte le badge « 1 demande » ; la section « Demandes et colis » s'ouvre au clic.
@@ -217,7 +219,7 @@ test.describe("WEB-DEA — la demande côté Voyageur (chapitre 5.14)", () => {
     // La visionneuse plein écran.
     // Les vignettes sont des boutons (l'image interceptée ne se charge pas : l'icône de repli reste) —
     // le premier bouton du bloc « PHOTOS DÉCLARÉES PAR … ».
-    await page.getByText("cliquez pour agrandir").locator("xpath=ancestor::*[.//button][1]").getByRole("button").first().click();
+    await page.getByText("clique pour agrandir").locator("xpath=ancestor::*[.//button][1]").getByRole("button").first().click();
     await expect(page.getByRole("button", { name: /^(Fermer|Suivant|Précédent)$/ }).first()).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press("Escape");
   });

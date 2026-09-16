@@ -10,21 +10,22 @@ const SKELETON_DURATION = 300;
 
 type HeroImage = {
   src: string;
-  alt: string;
+  /** Clé `home.hero.imageAlt.*` — le texte alternatif suit la langue de l'écran (chapitre 5.32 : il était en français en dur). */
+  altKey: "airport" | "station" | "planning";
 };
 
 const HERO_IMAGES: HeroImage[] = [
   {
     src: "/assets/images/hero/yamba-hero-1.jpg",
-    alt: "Voyageur consultant son téléphone à l'aéroport",
+    altKey: "airport",
   },
   {
     src: "/assets/images/hero/yamba-hero-2.jpg",
-    alt: "Voyageuse souriante en gare avec ses bagages",
+    altKey: "station",
   },
   {
     src: "/assets/images/hero/yamba-hero-3.jpg",
-    alt: "Personne planifiant son trajet sur ordinateur",
+    altKey: "planning",
   },
 ];
 
@@ -40,6 +41,7 @@ function useRandomHeroImage(): HeroImage {
 }
 
 function HeroImage({ image }: { image: HeroImage }) {
+  const t = useTranslations("home.hero");
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     "loading"
   );
@@ -64,7 +66,7 @@ function HeroImage({ image }: { image: HeroImage }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={image.src}
-          alt={image.alt}
+          alt={t(`imageAlt.${image.altKey}`)}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
             status === "loaded" ? "opacity-100" : "opacity-0"
           }`}

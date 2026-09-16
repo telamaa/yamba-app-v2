@@ -123,7 +123,7 @@ test.describe("WEB-VOY — devenir Voyageur : onboarding et Stripe (chapitre 5.6
       await page.locator("main").getByRole("button", { name: "Devenir Voyageur" }).first().click();
       await expect(page).toHaveURL(/\/fr\/carrier\/onboarding/, { timeout: 30_000 });
       // Deux étapes nommées ; « Profil » active, « Paiement » pas encore.
-      await expect(page.getByText("Votre profil", { exact: true })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText("Ton profil", { exact: true })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText("Paiement", { exact: true })).toBeVisible();
       await expect(page.locator("#carrier-name")).toBeVisible();
     });
