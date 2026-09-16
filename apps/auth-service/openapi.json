@@ -4694,6 +4694,7 @@
           "admin"
         ],
         "summary": "Switch the read-only mode (journaled, SUPER_ADMINs emailed)",
+        "description": "A181: lifting the read-only mode also clears the announcement; a new announcement date must be in the future (400 MAINTENANCE_SCHEDULE_IN_PAST). 409 STALE_VERSION (version lock, concurrent writes) or MAINTENANCE_FORCED_BY_ENVIRONMENT (A182: the gateway runs with MAINTENANCE_MODE=on).",
         "operationId": "updateMaintenance",
         "requestBody": {
           "required": true,
@@ -4738,6 +4739,16 @@
           },
           "403": {
             "description": "The ADMIN profile lacks the route permission (requireAdminPermission, ADMIN_PERMISSIONS matrix)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version or forced by the gateway environment",
             "content": {
               "application/json": {
                 "schema": {
@@ -26550,13 +26561,29 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "lagMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagThresholdMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagging": {
+                "type": "boolean"
               }
             },
             "required": [
               "unpublished",
               "oldestUnpublishedAt",
               "parked",
-              "parkedThreshold"
+              "parkedThreshold",
+              "lagMinutes",
+              "lagThresholdMinutes",
+              "lagging"
             ],
             "additionalProperties": false
           },

@@ -17,7 +17,8 @@ export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; r
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
 export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
 /** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
-export type MaintenanceChangedParams = { firstName: string; byName: string; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
+/** `kind` (A181) : la transition choisit le sujet — lever une maintenance annoncée n'est pas une maintenance planifiée. */
+export type MaintenanceChangedParams = { firstName: string; byName: string; kind: "ENABLED" | "LIFTED" | "SCHEDULED" | "UNSCHEDULED" | "UPDATED"; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
 export type SettingsChangedParams = { firstName: string; byName: string; at: string; reason: string; changes: Array<{ label: string; before: string; after: string }>; settingsUrl: string; reset: boolean };
 
 export type AdminEmailDictionary = {
@@ -121,21 +122,27 @@ const fr: AdminEmailDictionary = {
       reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque modification de paramètre est annoncée à tous les super administrateurs (D62).",
     },
   }),
-  maintenanceChanged: (p) => ({
-    subject: p.enabled ? "Maintenance activée sur Yamba" : p.scheduledAt ? "Maintenance planifiée sur Yamba" : "Maintenance levée sur Yamba",
-    content: {
-      preheader: `${p.byName} a modifié l'état de maintenance.`,
-      title: p.enabled ? "Plateforme en lecture seule" : p.scheduledAt ? "Maintenance annoncée" : "Retour à la normale",
-      greeting: `Bonjour ${p.firstName},`,
-      paragraphs: [
-        p.enabled ? `${p.byName} a passé la plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office).` : p.scheduledAt ? `${p.byName} a annoncé une maintenance pour le ${new Date(p.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} : le bandeau est affiché sur les deux fronts.` : `${p.byName} a levé la maintenance : la plateforme est de nouveau ouverte aux écritures.`,
-        p.message ? `Message affiché : « ${p.message} »` : "Aucun message personnalisé.",
-        `Motif : ${p.reason}`,
-      ],
-      cta: { label: "Voir l'état des services", url: p.statusUrl },
-      reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque changement d'état de maintenance est annoncé à tous les super administrateurs (D64).",
-    },
-  }),
+  maintenanceChanged: (p) => {
+    const quand = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" }) : null;
+    const texte = {
+      ENABLED: { subject: "Maintenance activée sur Yamba", title: "Plateforme en lecture seule", body: `${p.byName} a passé la plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office).` },
+      LIFTED: { subject: "Maintenance levée sur Yamba", title: "Retour à la normale", body: `${p.byName} a levé la maintenance : la plateforme est de nouveau ouverte aux écritures, les bandeaux disparaissent.` },
+      SCHEDULED: { subject: "Maintenance planifiée sur Yamba", title: "Maintenance annoncée", body: `${p.byName} a annoncé une maintenance pour le ${quand} : le bandeau est affiché sur les deux fronts, rien n'est bloqué.` },
+      UNSCHEDULED: { subject: "Annonce de maintenance retirée sur Yamba", title: "Annonce retirée", body: `${p.byName} a retiré l'annonce de maintenance : plus aucun bandeau n'est affiché.` },
+      UPDATED: { subject: "Maintenance modifiée sur Yamba", title: p.enabled ? "Lecture seule : message modifié" : "Annonce modifiée", body: p.enabled ? `${p.byName} a modifié le message de la lecture seule en cours.` : quand ? `${p.byName} a modifié l'annonce de maintenance du ${quand}.` : `${p.byName} a modifié l'état de maintenance.` },
+    }[p.kind];
+    return {
+      subject: texte.subject,
+      content: {
+        preheader: `${p.byName} a modifié l'état de maintenance.`,
+        title: texte.title,
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [texte.body, p.message ? `Message affiché : « ${p.message} »` : "Aucun message personnalisé.", `Motif : ${p.reason}`],
+        cta: { label: "Voir l'état des services", url: p.statusUrl },
+        reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque changement d'état de maintenance est annoncé à tous les super administrateurs (D64).",
+      },
+    };
+  },
   accountReinstated: (p) => ({
     subject: "Ton compte Yamba est rétabli",
     content: {
@@ -228,21 +235,27 @@ const en: AdminEmailDictionary = {
       reason: "You receive this email because you are a Yamba super administrator: every settings change is announced to all super administrators (D62).",
     },
   }),
-  maintenanceChanged: (p) => ({
-    subject: p.enabled ? "Maintenance enabled on Yamba" : p.scheduledAt ? "Maintenance scheduled on Yamba" : "Maintenance lifted on Yamba",
-    content: {
-      preheader: `${p.byName} changed the maintenance state.`,
-      title: p.enabled ? "Platform in read-only mode" : p.scheduledAt ? "Maintenance announced" : "Back to normal",
-      greeting: `Hello ${p.firstName},`,
-      paragraphs: [
-        p.enabled ? `${p.byName} switched the platform to read-only: members can read, no write goes through (except sign-in and the back-office).` : p.scheduledAt ? `${p.byName} announced a maintenance for ${new Date(p.scheduledAt).toLocaleString("en-GB", { timeZone: "Europe/Paris" })}: the banner is shown on both fronts.` : `${p.byName} lifted the maintenance: the platform is open to writes again.`,
-        p.message ? `Displayed message: “${p.message}”` : "No custom message.",
-        `Reason: ${p.reason}`,
-      ],
-      cta: { label: "Open the service status", url: p.statusUrl },
-      reason: "You receive this email because you are a Yamba super administrator: every maintenance change is announced to all super administrators (D64).",
-    },
-  }),
+  maintenanceChanged: (p) => {
+    const when = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString("en-GB", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" }) : null;
+    const text = {
+      ENABLED: { subject: "Maintenance enabled on Yamba", title: "Platform in read-only mode", body: `${p.byName} switched the platform to read-only: members can read, no write goes through (except sign-in and the back-office).` },
+      LIFTED: { subject: "Maintenance lifted on Yamba", title: "Back to normal", body: `${p.byName} lifted the maintenance: the platform is open to writes again, the banners disappear.` },
+      SCHEDULED: { subject: "Maintenance scheduled on Yamba", title: "Maintenance announced", body: `${p.byName} announced a maintenance for ${when}: the banner is shown on both fronts, nothing is blocked.` },
+      UNSCHEDULED: { subject: "Maintenance announcement withdrawn on Yamba", title: "Announcement withdrawn", body: `${p.byName} withdrew the maintenance announcement: no banner is shown any more.` },
+      UPDATED: { subject: "Maintenance updated on Yamba", title: p.enabled ? "Read-only: message updated" : "Announcement updated", body: p.enabled ? `${p.byName} updated the message of the ongoing read-only mode.` : when ? `${p.byName} updated the maintenance announcement for ${when}.` : `${p.byName} changed the maintenance state.` },
+    }[p.kind];
+    return {
+      subject: text.subject,
+      content: {
+        preheader: `${p.byName} changed the maintenance state.`,
+        title: text.title,
+        greeting: `Hello ${p.firstName},`,
+        paragraphs: [text.body, p.message ? `Displayed message: “${p.message}”` : "No custom message.", `Reason: ${p.reason}`],
+        cta: { label: "Open the service status", url: p.statusUrl },
+        reason: "You receive this email because you are a Yamba super administrator: every maintenance change is announced to all super administrators (D64).",
+      },
+    };
+  },
   accountReinstated: (p) => ({
     subject: "Your Yamba account is reinstated",
     content: {

@@ -350,7 +350,7 @@ export type CronRun = { service: string; name: string; ranAt: string; durationMs
 export type AdminStatusResponse = {
   at: string; services: ServiceStatus[]; crons: Array<CronRun & { late: boolean }>;
   missingCrons: Array<{ service: string; name: string; schedule: string; intervalMs: number }>; // A178
-  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number };
+  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number; lagMinutes: number; lagThresholdMinutes: number; lagging: boolean };
   emails: { failedLast24h: number; sentLast24h: number; deliveredLast24h: number; bouncedLast24h: number }; // A177
   maintenance: MaintenanceState;
 };

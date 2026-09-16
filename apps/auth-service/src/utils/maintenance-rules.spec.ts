@@ -1,5 +1,5 @@
 /** maintenance-rules.spec.ts — D64 2A : ce qui est bloqué, ce qui passe, l'environnement qui l'emporte (règles pures du gateway). */
-import { envOverride, isBlocked, snapshotFrom, type MaintenanceSnapshot } from "@packages/libs/maintenance";
+import { envOverride, isBlocked, isForcedByEnvironment, MAINTENANCE_ENV_CHECK_ERROR, maintenanceCheckError, snapshotFrom, type MaintenanceSnapshot } from "@packages/libs/maintenance";
 
 const on: MaintenanceSnapshot = { enabled: true, message: { fr: "m", en: "m" }, scheduledAt: null, source: "db" };
 const off: MaintenanceSnapshot = { ...on, enabled: false };
@@ -28,5 +28,18 @@ describe("snapshotFrom / envOverride", () => {
     expect(snapshotFrom({ enabled: true, messageFr: "ce soir", scheduledAt: "2026-09-05T21:00:00.000Z" })).toMatchObject({ enabled: true, message: { fr: "ce soir", en: "" }, scheduledAt: "2026-09-05T21:00:00.000Z" });
     expect(envOverride({})).toBeNull();
     expect(envOverride({ MAINTENANCE_MODE: "on", MAINTENANCE_MESSAGE_FR: "panne" })).toMatchObject({ enabled: true, source: "env", message: { fr: "panne" } });
+  });
+});
+
+describe("A182 — l'interrupteur d'environnement se lit dans la santé du gateway", () => {
+  it("maintenanceCheckError / isForcedByEnvironment", () => {
+    expect(maintenanceCheckError(off)).toBeNull();
+    expect(maintenanceCheckError(on)).toBe("maintenance (db)");
+    const env = envOverride({ MAINTENANCE_MODE: "on" }) as MaintenanceSnapshot;
+    expect(maintenanceCheckError(env)).toBe(MAINTENANCE_ENV_CHECK_ERROR);
+    expect(isForcedByEnvironment({ checks: { maintenance: { error: maintenanceCheckError(env) } } })).toBe(true);
+    expect(isForcedByEnvironment({ checks: { maintenance: { error: maintenanceCheckError(on) } } })).toBe(false);
+    expect(isForcedByEnvironment({ checks: {} })).toBe(false);
+    expect(isForcedByEnvironment(null)).toBe(false);
   });
 });

@@ -5951,3 +5951,53 @@ ADM-RGP-7 (registre d'un membre) ; courses prouvées par les tests unitaires (`p
 
 **Points ouverts proposés.** Âge du plus ancien événement non publié en rouge au-delà de `alerts.outboxLagMinutes` ;
 compteurs de bloqueurs à côté des libellés ; bandeau minimal quand auth-service (qui sert la page) ne répond plus.
+
+# Cahier 02-ADMIN, § 5.23 : maintenance
+
+**Le besoin.** Avant une intervention, l'exploitation prévient les membres (annonce) ; pendant, elle coupe les écritures
+sans couper la lecture, la connexion ni le back-office (lecture seule) ; après, elle rend la main. Le jour où la base
+elle-même est en panne, un interrupteur posé sur la passerelle prend le relais. Chaque geste est tracé, et les super
+administrateurs sont prévenus.
+
+**RG-ADM-MNT-01 — Une annonce prévient, elle ne coupe pas** : bandeau ambre « Maintenance annoncée le {date} » sur les
+deux fronts, aucune écriture refusée, email « Maintenance planifiée » aux super administrateurs, une ligne de journal
+`MAINTENANCE_CHANGED` (avant / après, motif, version). La date relue par l'écran est celle saisie, à l'heure locale.
+
+**RG-ADM-MNT-02 — Une annonce se fait pour l'avenir** : une nouvelle date d'annonce déjà passée est refusée (« La date
+annoncée est déjà passée : choisis une date à venir. »).
+
+**RG-ADM-MNT-03 — La lecture seule coupe les écritures, rien d'autre** : effet en moins de 10 secondes ; toute écriture
+d'un membre répond 503 `MAINTENANCE` avec `Retry-After: 300` ; lectures, connexion (`/api/auth/*`) et back-office
+(`/api/admin/*`) restent ouverts ; la sonde publique répond 200 « maintenance » (une coupure planifiée n'est pas une
+panne) ; email « Maintenance activée ».
+
+**RG-ADM-MNT-04 — Lever, c'est revenir à la normale (A181)** : lever la lecture seule clôt aussi l'annonce qui l'a
+précédée — plus aucun bandeau, ni rouge ni ambre, écritures rouvertes en moins de 10 secondes, email « Maintenance
+levée » (jamais « planifiée »). L'email suit la transition : activée, levée, planifiée, annonce retirée, modifiée.
+
+**RG-ADM-MNT-05 — Deux gestes simultanés, une seule décision** : un enregistrement sur une page périmée est refusé
+(« L'état a changé entre-temps : la page est rechargée. ») ; trois enregistrements au même instant donnent une décision,
+deux refus, une ligne de journal.
+
+**RG-ADM-MNT-06 — L'interrupteur de la passerelle l'emporte, et l'écran le dit (A182)** : quand la passerelle tourne avec
+`MAINTENANCE_MODE=on`, le badge « forcée par l'environnement du gateway » s'affiche, le formulaire est remplacé par
+l'explication, et une écriture est refusée (409) : ni journal, ni email. Ce geste d'exploitation se consigne hors
+application.
+
+**RG-ADM-MNT-07 — Lire n'est pas modifier** : tous les profils lisent la page ; seuls l'Exploitation et le super
+administrateur modifient la maintenance ; les autres lisent « Profil Exploitation ou super administrateur pour
+modifier. ». Un formulaire en cours de saisie n'est jamais vidé par la relecture automatique.
+
+**RG-ADM-ETA-07 — Le retard du relais se voit (lot du § 5.22)** : la page affiche l'âge du plus ancien événement non
+publié, en rouge au-delà du seuil de l'alerte `alerts.outboxLagMinutes` — la même règle que l'alerte, pas un second seuil.
+
+**RG-ADM-ETA-08 — Le service qui sert la page tombe : on le dit** : si le service d'authentification ne répond plus, un
+bandeau « Service d'authentification injoignable » donne l'heure de la dernière relecture réussie ; les informations
+affichées datent de ce moment. Il disparaît à la relecture suivante qui réussit.
+
+**RG-ADM-RGP-10 — L'ampleur d'un blocage se lit** : chaque bloqueur d'effacement porte son nombre (« 2 deals en cours »,
+« 1 trajet publié ou en pause »).
+
+**Tests d'acceptation.** ADM-MNT-1 à 4 (cahier) et 5, 6 (ajoutées) dans `adm-mnt-maintenance.spec.ts` ; ADM-ETA-8, 9
+(`adm-eta-etat-services.spec.ts`) ; ADM-RGP-8 (`adm-rgp-donnees-personnelles.spec.ts`) ; transitions et courses prouvées
+par `maintenance.service.spec.ts` (auth-service) et la règle de retard par `ops-alerts.rules.spec.ts` (deal-service).

@@ -32,3 +32,13 @@ export function isBlocked(method: string, path: string, state: MaintenanceSnapsh
   if (!MAINTENANCE_WRITE_METHODS.has(method.toUpperCase())) return false;
   return !MAINTENANCE_EXEMPT_PREFIXES.some((p) => path.startsWith(p));
 }
+
+/**
+ * A182 (recette 02-ADMIN § 5.23) — la santé du gateway dit si l'environnement force la maintenance. Le gateway est le
+ * seul processus qui applique `MAINTENANCE_MODE` : l'auth-service lisait SA propre variable, et l'écran se trompait.
+ */
+export const MAINTENANCE_ENV_CHECK_ERROR = "maintenance (env)";
+export const maintenanceCheckError = (state: MaintenanceSnapshot): string | null => (state.enabled ? `maintenance (${state.source})` : null);
+export function isForcedByEnvironment(report: { checks?: Record<string, { error: string | null }> } | null | undefined): boolean {
+  return report?.checks?.maintenance?.error === MAINTENANCE_ENV_CHECK_ERROR;
+}

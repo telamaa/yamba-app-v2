@@ -3,6 +3,24 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.23 LIVRÉ
+>
+> Branche `chore/recette-admin-5-23` empilée sur #323 : 6 scénarios ADM-MNT + ADM-ETA-8, 9 + ADM-RGP-8, RGP-2 réalignée ;
+> ANO-ADM-63, 64, 65, 66 (majeures), 67 closes ; arbitrages délégués A181 (transitions de la maintenance) et A182
+> (interrupteur d'environnement lu dans la santé du gateway) ; lots du § 5.22 livrés (retard du relais, bloqueurs
+> comptés, 502 `UPSTREAM_UNREACHABLE`). Chiffres : auth **293**, deal **644**, message **57**, trip **293**,
+> notification **122**, harnais **496** ; dernière anomalie ANO-ADM-67 ; dernier arbitrage A182 ; dernier chapitre
+> d'apprentissage **181**. POSTE : **le gateway ne tourne plus sous `nx serve`** (le `run-many` gateway / notification /
+> message a été arrêté) : bundle `apps/api-gateway/dist/main.js` lancé en `nohup` ; auth-service rebâti et relancé de même
+> (deal FAKE et message inchangés). ADM-MNT-4 tue et relance le gateway (avec puis sans `MAINTENANCE_MODE=on`, log
+> `tmpdir()/yamba-recette-mnt-gateway.log`), ADM-ETA-9 tue et relance auth-service — si une fiche est interrompue :
+> `lsof -iTCP:8080 -sTCP:LISTEN` et `lsof -iTCP:6001`, vérifier que le gateway n'a PAS gardé `MAINTENANCE_MODE`
+> (`curl localhost:8080/api/maintenance`), remettre le document `maintenance` à plat, supprimer les `OutboxEvent`
+> `aggregateType: "recette-eta-8"`. Pièges : le journal ne se lit pas avec l'Exploitation (`audit.read`) ; le fil de
+> `bzv-accepted` appartient à Pauline (pas Aminata) ; `/api/trips/:id` est l'API du back-office, la lecture publique est
+> `/api/trips/:id/public`. Proposé : `AdminShell` ne devrait rediriger vers `/login` que sur 401. **ENGAGEMENT § 7**
+> inchangé (P2034 sur admin-admins / admin-users / admin-auth). Suite : § 5.24 (journal d'audit).
+>
 > ## ▶ 15/09/2026 — § 5.22 LIVRÉ
 >
 > Branche `chore/recette-admin-5-22` empilée sur #322 : 7 scénarios ADM-ETA + ADM-RGP-7, RGP-2 réalignée ; ANO-ADM-61,

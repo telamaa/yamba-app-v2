@@ -9354,3 +9354,65 @@ Branche `chore/recette-admin-5-22`, empilée sur `chore/recette-admin-5-21`.
 - Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés ; `YAMBA-PARAMETRES.md`
   régénéré (borne de `alerts.outboxParkedAttempts`).
 - Déploiement : rebâtir auth, deal, message (aucun changement de schéma Prisma).
+
+# Cahier 02-ADMIN, § 5.23 : maintenance — des transitions, pas des valeurs, et l'interrupteur lu là où il s'applique
+
+Six scénarios ADM-MNT (1 à 4 du cahier ; 5, 6 ajoutés), ADM-ETA-8, 9 et ADM-RGP-8 ajoutées, ADM-RGP-2 réalignée, quatre
+anomalies majeures et une mineure closes (`ANO-ADM-63` à `67`), deux arbitrages délégués (A181, A182) et les trois lots
+proposés au § 5.22. Branche `chore/recette-admin-5-23`, empilée sur `chore/recette-admin-5-22`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Transitions de la maintenance (A181, ANO-ADM-63, 67)** — `apps/auth-service/src/services/maintenance.service.ts`
+  gagne deux fonctions pures. `resolveMaintenanceWrite(before, body, now)` calcule ce qui est réellement écrit : lever
+  (`before.enabled && !body.enabled`) remet `scheduledAt` à `null` ; une date d'annonce NOUVELLE (différente de celle
+  stockée) et passée, hors lecture seule, lève `ValidationError` `MAINTENANCE_SCHEDULE_IN_PAST` — une date devenue passée
+  mais déjà enregistrée ne bloque pas une autre modification. Elle est appelée DANS la transaction, sur l'état relu.
+  `maintenanceChangeKind(before, after)` rend `ENABLED | LIFTED | SCHEDULED | UNSCHEDULED | UPDATED` ; la notification
+  la reçoit (`kind`) et `apps/auth-service/src/emails/admin-emails.ts` choisit sujet, titre et phrase par transition, FR
+  et EN.
+- **Conflits (ANO-ADM-65)** — la transaction est enveloppée dans `withWriteConflictRetry`
+  (`packages/libs/prisma/write-conflict-retry.ts`) : au rejeu, le verrou `expectedVersion` répond 409 `STALE_VERSION`.
+  Document absent : deux `create` concurrents butent sur la clé unique `key` (`P2002`) — ce n'est pas un conflit à
+  rejouer, c'est déjà la réponse, traduite en 409 `STALE_VERSION` dans le `catch`.
+- **Interrupteur d'environnement (A182, ANO-ADM-64)** — `packages/libs/maintenance/index.ts` exporte
+  `MAINTENANCE_ENV_CHECK_ERROR = "maintenance (env)"`, `maintenanceCheckError(state)` (utilisé par `/gateway-health` dans
+  `apps/api-gateway/src/main.ts`) et `isForcedByEnvironment(report)`. Le service reçoit `forcedByEnvironment()` :
+  `admin-status.controller.ts` sonde `/gateway-health` (repli : `process.env.MAINTENANCE_MODE` local si le gateway ne
+  répond pas) ; `GET /admin/status` réutilise la santé du gateway déjà sondée (`read({ envOverride })`, pas de seconde
+  sonde). `update()` refuse d'emblée 409 `MAINTENANCE_FORCED_BY_ENVIRONMENT` : ni écriture, ni journal, ni email.
+- **Écran** (`apps/admin-ui/src/components/StatusView.tsx`, `MaintenanceEditor`) — `toLocalDateTimeInput(iso)`
+  (`lib/format.ts`) remplace `iso.slice(0, 16)` (ANO-ADM-66) ; l'effet qui recopie l'état dans le formulaire dépend de
+  `state.version` et non plus de l'objet `state` recréé à chaque sondage ; `maintenanceRefusal(e)` lit `details.code` ;
+  `envOverride` → paragraphe explicatif à la place du formulaire.
+- **Gateway** (`apps/api-gateway/src/libs/maintenance.ts`) — le 503 porte aussi `details: { code: "MAINTENANCE" }`.
+
+## Les lots du § 5.22
+
+- **a, retard du relais** — `outboxLagMinutes(oldest, now)` et `isOutboxLagging(oldest, now, seuil)` dans
+  `packages/libs/api-contracts/src/admin/cron-catalogue.ts` (à côté de `OUTBOX_MAX_RELAY_ATTEMPTS`). `evaluateAlerts`
+  (`apps/deal-service/src/services/ops-alerts.rules.ts`) les utilise ; `getStatus` sert `outbox.lagMinutes`,
+  `lagThresholdMinutes` (`alerts.outboxLagMinutes`), `lagging`. L'écran ne compare rien : il colore selon `lagging`. Test
+  « l'alerte et la page tranchent pareil » dans `ops-alerts.rules.spec.ts`.
+- **b, bloqueurs comptés** — `GET /admin/users/:id/erasure-blockers` renvoyait déjà `counts` ; `EraseCard`
+  (`UserFileView.tsx`) les garde (lecture et refus 409) et `erasureBlockerLabel(blocker, count)` accorde le pluriel.
+- **c, service injoignable** — middleware d'erreur Express à quatre paramètres placé après le proxy fourre-tout : codes
+  `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENOTFOUND` → 502 JSON `UPSTREAM_UNREACHABLE` (jamais
+  l'adresse interne) ; les autres erreurs suivent leur cours. `StatusView` retient l'heure de la dernière relecture
+  réussie et affiche le bandeau quand le code est `UPSTREAM_UNREACHABLE`.
+
+## Harnais
+
+- `adm-mnt-maintenance.spec.ts` : `relancerLeGateway(forcer)` tue le processus du port 8080 (`lsof -t`) et relance
+  `dist/main.js` détaché avec `env` explicite ; `remettreAPlat()` en base avant / après ; journal lu par une session
+  super administrateur (l'Exploitation n'a pas `audit.read`).
+- `adm-eta-etat-services.spec.ts` : ETA-8 (événement d'un agrégat sans relais, vieilli), ETA-9 (auth-service tué puis
+  relancé en `finally`). `adm-rgp-donnees-personnelles.spec.ts` : RGP-8, RGP-2 réalignée.
+
+## Vérifications
+
+- Tests : auth-service **293** (+11), deal-service **644** (+1) ; harnais **496 scénarios** (487 + MNT 6 + ETA-8, 9 +
+  RGP-8).
+- Typecheck auth, deal, message, trip, notification, gateway, admin-ui, harnais ; cinq `openapi.json` régénérés ;
+  `YAMBA-PARAMETRES.md` régénéré (consommateur auth-service de `alerts.outboxLagMinutes`).
+- Déploiement : rebâtir auth-service, deal-service et api-gateway ; aucun changement de schéma Prisma.
