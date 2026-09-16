@@ -37,6 +37,7 @@ import {
   buildMoneyTimeline,
   csvRowInRange,
   manualRefundBounds,
+  manualRefundProposalStaleness,
   maskAccountId,
   moneyBalance,
   monthStartUtc,
@@ -47,6 +48,8 @@ import {
   type FinanceCsvRow,
 } from "./admin-finance.rules";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
+import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
+import { refundIdempotencyKey } from "../lib/refund-idempotency";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -152,7 +155,7 @@ async function stripeReadiness(carrierIds: string[]): Promise<Map<string, { acco
   return new Map(rows.map((r) => [r.userId, { accountId: r.stripeAccountId ?? null, payoutsEnabled: !!r.stripePayoutsEnabled }]));
 }
 
-export function makeAdminFinanceService(provider: PaymentProvider, settlement: DealSettlementService, clock: () => Date = () => new Date()) {
+export function makeAdminFinanceService(provider: PaymentProvider, settlement: DealSettlementService, clock: () => Date = () => new Date(), decisionLocks?: DecisionLockStore) {
   async function loadMoney(id: string): Promise<MoneyRecord> {
     const b = await prisma.booking.findUnique({ where: { id }, select: MONEY_SELECT });
     if (!b || b.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
@@ -201,6 +204,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           nextRetryAt: iso(b.payoutNextRetryAt),
           disputeTicket: b.disputeTicket ?? null,
           since: ((kind === "PROPOSED_REFUNDS" ? b.manualRefundProposedAt : null) ?? b.completedAt ?? b.closedAt ?? b.updatedAt ?? now).toISOString(),
+          proposalStale: kind === "PROPOSED_REFUNDS" ? manualRefundProposalStaleness(b.manualRefundProposedCents ?? 0, manualRefundBounds(b)).stale : null,
         };
       });
       return { kind, items, counts, truncated: counts[kind] > items.length, generatedAt: now.toISOString() };
@@ -289,7 +293,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           maxRefundableCents: refundBounds.maxRefundableCents,
           proposal:
             (b.manualRefundProposedCents ?? 0) > 0 && b.manualRefundProposedAt
-              ? { amountCents: b.manualRefundProposedCents ?? 0, reason: b.manualRefundProposedReason ?? "", byAdmin: nameOf(b.manualRefundProposedByAdminId), at: b.manualRefundProposedAt.toISOString() }
+              ? { amountCents: b.manualRefundProposedCents ?? 0, reason: b.manualRefundProposedReason ?? "", byAdmin: nameOf(b.manualRefundProposedByAdminId), at: b.manualRefundProposedAt.toISOString(), ...manualRefundProposalStaleness(b.manualRefundProposedCents ?? 0, refundBounds) }
               : null,
           last:
             (b.manualRefundCents ?? 0) > 0 && b.manualRefundAt
@@ -492,6 +496,15 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
      * Un remboursement parti puis une base non écrite est visible au rapprochement (REFUND_NOT_RECORDED).
      */
     async applyManualRefund(admin: AdminActor, id: string, input: ManualRefundRequest): Promise<ManualRefundResponse> {
+      /* ANO-ADM-34 — le verrou du cumul protège la BASE, pas l'ARGENT : trois « Rembourser maintenant » simultanés passaient
+         tous les bornes et émettaient trois remboursements, un seul s'écrivait (mesuré en recette, ADM-REM-4). Même remède
+         que la médiation (A159) : le verrou de décision AVANT toute lecture ; sans verrou câblé, on refuse (échec fermé). */
+      if (!decisionLocks) throw new Error("admin-finance: no decision lock store wired (ANO-ADM-34)");
+      return withDecisionLock(decisionLocks, id, () => applyManualRefundUnlocked(admin, id, input));
+    },
+  };
+
+  async function applyManualRefundUnlocked(admin: AdminActor, id: string, input: ManualRefundRequest): Promise<ManualRefundResponse> {
       const raw = await loadMoney(id);
       assertNotParty(admin, raw);
       const bounds = manualRefundBounds(raw);
@@ -501,7 +514,9 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const now = clock();
       let refundId: string | null = null;
       try {
-        refundId = (await provider.refund(raw.paymentIntentId!, input.amountCents)).refundId;
+        // A165 — la clé décrit le geste sur l'état lu : le même geste rejoué (reprise après une panne entre l'argent et la
+        // base) rend le même remboursement ; un nouveau geste, une fois le premier écrit, a un autre cumul donc une autre clé.
+        refundId = (await provider.refund(raw.paymentIntentId!, input.amountCents, { idempotencyKey: refundIdempotencyKey("manual", id, input.amountCents, raw.refundAmountCents ?? 0) })).refundId;
       } catch {
         throw new ValidationError("The refund could not be issued by the payment provider.", { code: "REFUND_PROVIDER_FAILED" });
       }
@@ -533,8 +548,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
         },
       });
       return { bookingId: id, refundedCents: input.amountCents, totalRefundedCents: total, refundId, currencyCode: raw.pricing.currencyCode };
-    },
-  };
+  }
 }
 
 export type AdminFinanceService = ReturnType<typeof makeAdminFinanceService>;

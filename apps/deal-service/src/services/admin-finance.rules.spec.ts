@@ -229,6 +229,14 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(manualRefundBounds({ ...base, capturedAt: null })).toMatchObject({ maxRefundableCents: 0, allowed: false });
     expect(manualRefundBounds({ ...base, status: "CANCELLED", refundAmountCents: 1479 })).toMatchObject({ maxRefundableCents: 1478, allowed: true });
   });
+  it("A165 — manualRefundProposalStaleness : caduque si le deal ne peut plus rien recevoir, ou si la proposition dépasse le reste", () => {
+    const { manualRefundProposalStaleness } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
+    const base = { status: "COMPLETED", capturedAt: d("2026-09-01T00:00:00Z"), paymentIntentId: "pi_1", refundAmountCents: null, pricing: { totalShipperCents: 2957 } };
+    expect(manualRefundProposalStaleness(500, manualRefundBounds(base))).toEqual({ stale: false, staleReason: null });
+    expect(manualRefundProposalStaleness(2957, manualRefundBounds(base))).toEqual({ stale: false, staleReason: null });
+    expect(manualRefundProposalStaleness(1000, manualRefundBounds({ ...base, refundAmountCents: 2000 }))).toEqual({ stale: true, staleReason: "ABOVE_REMAINING" });
+    expect(manualRefundProposalStaleness(100, manualRefundBounds({ ...base, refundAmountCents: 2957 }))).toEqual({ stale: true, staleReason: "NOT_REFUNDABLE" });
+  });
 });
 
 describe("Recette § 5.14 (A164) — jamais deux fois", () => {

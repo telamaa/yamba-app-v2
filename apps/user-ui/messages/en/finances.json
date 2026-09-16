@@ -62,7 +62,8 @@
       "RELEASED": "Released on {date} · transaction closed",
       "RELEASED_NO_CHARGE": "Never charged · the hold vanished",
       "REFUNDED": "Refunded {amount} on {date}",
-      "PARTIALLY_REFUNDED": "Refunded {amount} on {date} · {retention} retention passed on to the Traveler"
+      "PARTIALLY_REFUNDED": "Refunded {amount} on {date} · {retention} retention passed on to the Traveler",
+      "PARTIALLY_REFUNDED_AFTER_COMPLETION": "Refunded {amount} on {date} · {kept} paid for your shipment"
     }
   },
   "unknownName": "a member"

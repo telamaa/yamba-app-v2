@@ -23,6 +23,13 @@
                                     ? `Le remboursement de ta demande ${route} (${weightKg} kg) est émis. Ce message vaut confirmation.`
                                     : `The refund for your request ${route} (${weightKg} kg) has been issued. This message is your confirmation.` %>
                         </p>
+                        <% if (typeof commercialGesture !== "undefined" && commercialGesture) { %>
+                        <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">
+                            <%= locale === "fr"
+                                    ? "C'est un geste de l'équipe Yamba sur ton envoi. Il ne change rien pour le Voyageur, et ton envoi reste réglé."
+                                    : "This is a gesture from the Yamba team on your shipment. It changes nothing for the Traveler, and your shipment remains settled." %>
+                        </p>
+                        <% } %>
                         <% if (typeof retainedForCarrier !== "undefined" && retainedForCarrier) { %>
                         <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">
                             <%= locale === "fr"

@@ -32,6 +32,7 @@ import { recomputeBookingParties } from "./reputation.service";
 import type { PayoutExecutor } from "./deal-lifecycle.service";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
+import { refundIdempotencyKey } from "../lib/refund-idempotency";
 
 export type RequestingUser = { id: string };
 export type AdminActor = { id: string; ip?: string | null; userAgent?: string | null };
@@ -193,7 +194,7 @@ export function makeDealMediationService(
       if (money.refundCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          refundId = (await provider.refund(booking.paymentIntentId, money.refundCents)).refundId;
+          refundId = (await provider.refund(booking.paymentIntentId, money.refundCents, { idempotencyKey: refundIdempotencyKey("dispute", booking.id, money.refundCents) })).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -341,7 +342,7 @@ export function makeDealMediationService(
       if (restituteCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          restituteRefundId = (await provider.refund(booking.paymentIntentId, restituteCents)).refundId;
+          restituteRefundId = (await provider.refund(booking.paymentIntentId, restituteCents, { idempotencyKey: refundIdempotencyKey("retention", booking.id, restituteCents) })).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }

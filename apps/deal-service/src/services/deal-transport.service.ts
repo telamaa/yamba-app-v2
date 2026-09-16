@@ -23,6 +23,7 @@
  * d'état métier : pas d'événement outbox.
  */
 
+import { refundIdempotencyKey } from "../lib/refund-idempotency"; // A165
 import prisma from "@packages/libs/prisma";
 import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
@@ -138,7 +139,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       }
       let refundId: string | null = null;
       try {
-        refundId = (await provider.refund(booking.paymentIntentId, total)).refundId;
+        refundId = (await provider.refund(booking.paymentIntentId, total, { idempotencyKey: refundIdempotencyKey("pickup-refused", booking.id, total) })).refundId;
       } catch {
         throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
       }

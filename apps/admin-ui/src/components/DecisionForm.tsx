@@ -9,17 +9,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, post } from "@/lib/api";
-import { BOOKING_STATUS_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, RETENTION_DISPOSITION_LABEL, money } from "@/lib/format";
+import { BOOKING_STATUS_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, RETENTION_DISPOSITION_LABEL, money, parseEurosToCents } from "@/lib/format";
 import type { AdminDisputeFile, AdminResolutionResponse, DisputeResolutionOutcome, RetentionArbitrationOutcome } from "@/lib/types";
 
 const MIN_REASON = 50;
 
-/** Montant saisi en euros (« 15 », « 15,5 », « 1 234,50 ») → centimes ; NaN si illisible. */
-function parseEurosToCents(saisie: string): number {
-  const propre = saisie.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
-  if (!/^\d+(\.\d{1,2})?$/.test(propre)) return NaN;
-  return Math.round(Number(propre) * 100);
-}
 
 /**
  * Un refus du serveur, en français et par son code (A146) — jamais « 409 : The carrier still has time… ». La décision est

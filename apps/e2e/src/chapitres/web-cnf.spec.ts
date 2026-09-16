@@ -93,7 +93,7 @@ async function notificationsBrutes(contexte: Contexte): Promise<string> {
 
 type Portefeuille = {
   carrier: { upcomingCents: number; pendingCents: number; blockedCents: number; sentCents: number; sentThisMonthCents: number; items: Array<{ bookingId: string; kind: string; state: string; amountCents: number | null; counterpartFirstName: string | null; date: string | null }> };
-  shipper: { heldCents: number; spentCents: number; refundedCents: number; items: Array<{ bookingId: string; bookingStatus: string; state: string; amountCents: number; refundAmountCents: number | null; retentionCents: number | null; counterpartFirstName: string | null; date: string | null }> };
+  shipper: { heldCents: number; spentCents: number; refundedCents: number; items: Array<{ bookingId: string; bookingStatus: string; state: string; amountCents: number; refundAmountCents: number | null; retentionCents: number | null; keptCents?: number | null; partialKind?: string | null; counterpartFirstName: string | null; date: string | null }> };
 };
 async function portefeuille(contexte: Contexte): Promise<Portefeuille> {
   const r = await contexte.request.get(`${api()}/me/wallet`);
@@ -492,9 +492,11 @@ test.describe("WEB-CNF — confirmation, complétion et versement (chapitre 5.19
     const etatsVus = new Set<string>();
     for (const item of shipper.items) {
       const ligne = await finances.lignePaiement(item.bookingId);
-      const cle = item.state === "HELD" && item.bookingStatus === "DELIVERED" && item.date ? "HELD_UNTIL" : item.state;
+      // ANO-ADM-36 (02-ADMIN § 5.15) — un remboursement après la fin du deal n'est pas une retenue : son propre libellé.
+      const cle = item.state === "HELD" && item.bookingStatus === "DELIVERED" && item.date ? "HELD_UNTIL" : item.state === "PARTIALLY_REFUNDED" && item.partialKind === "AFTER_COMPLETION" ? "PARTIALLY_REFUNDED_AFTER_COMPLETION" : item.state;
       const rembourse = item.refundAmountCents !== null ? euros(item.refundAmountCents) : "";
       const retenue = item.retentionCents !== null ? euros(item.retentionCents) : "";
+      const garde = item.keptCents != null ? euros(item.keptCents) : "";
       const attendu: Record<string, RegExp> = {
         AUTHORIZED: /Autorisé, pas débité · en attente du Voyageur/,
         HELD: /Bloqué chez Yamba/,
@@ -503,9 +505,10 @@ test.describe("WEB-CNF — confirmation, complétion et versement (chapitre 5.19
         RELEASED_NO_CHARGE: /Jamais débité · l'empreinte a disparu/,
         REFUNDED: new RegExp(`Remboursé ${rembourse.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} le .+`),
         PARTIALLY_REFUNDED: new RegExp(`Remboursé ${rembourse.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} le .+ · retenue ${retenue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} reversée au Voyageur`),
+        PARTIALLY_REFUNDED_AFTER_COMPLETION: new RegExp(`Remboursé ${rembourse.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} le .+ · ${garde.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} ont réglé ton envoi`),
       };
       // ANO-WEB-67 : un remboursement porte toujours une date (repli serveur sur la dernière mise à jour).
-      if (cle === "REFUNDED" || cle === "PARTIALLY_REFUNDED") expect(item.date, `${cle} : jamais « le » vide`).not.toBeNull();
+      if (cle === "REFUNDED" || cle.startsWith("PARTIALLY_REFUNDED")) expect(item.date, `${cle} : jamais « le » vide`).not.toBeNull();
       expect(ligne, `ligne ${cle}`).toMatch(attendu[cle]);
       expect(ligne).toContain(`Envoi Paris → ${item.bookingId === yulDelivered ? "Montréal" : "Brazzaville"} · ${item.counterpartFirstName}`);
       etatsVus.add(cle);

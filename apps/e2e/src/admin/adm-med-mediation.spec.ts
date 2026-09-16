@@ -404,12 +404,15 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
     expect(new Date(apres.refundedAt!).getTime(), "remboursement puis versement : l'argent part avant la transition").toBeLessThanOrEqual(new Date(apres.completedAt!).getTime());
     /* Côté Mai : le portefeuille. */
     const mai = await navigateurConnecte("mai");
-    const wallet = (await (await mai.contexte.request.get(`${adresseDeLApi()}/me/wallet`)).json()) as { shipper: { items: Array<{ bookingId: string; state: string; refundAmountCents: number | null; retentionCents: number | null }> } };
+    const wallet = (await (await mai.contexte.request.get(`${adresseDeLApi()}/me/wallet`)).json()) as { shipper: { items: Array<{ bookingId: string; state: string; refundAmountCents: number | null; retentionCents: number | null; keptCents?: number | null; partialKind?: string | null }> } };
     const ligne = wallet.shipper.items.find((i) => i.bookingId === id);
     expect(ligne, "le deal est dans le portefeuille de Mai").toBeTruthy();
     expect(ligne!.state).toBe("PARTIALLY_REFUNDED");
     expect(ligne!.refundAmountCents, "part rendue « remboursée »").toBe(montant);
-    expect(ligne!.retentionCents, "part gardée « dépensée »").toBe(total - montant);
+    // ANO-ADM-36 (02-ADMIN § 5.15) — une médiation après la fin du deal n'est pas une retenue d'annulation.
+    expect(ligne!.keptCents, "part gardée « dépensée »").toBe(total - montant);
+    expect(ligne!.partialKind).toBe("AFTER_COMPLETION");
+    expect(ligne!.retentionCents, "jamais une « retenue »").toBeNull();
     const journal = (await lireLeJournal(fin.contexte.request, { from: debut, adminUserId: jeuEssai.admin("mediateur").id })).filter((l) => l.action === "DISPUTE_RESOLVED");
     expect(journal[0].after).toEqual({ finalStatus: "COMPLETED", outcome: "PARTIAL_REFUND", refundCents: montant, carrierPayoutCents: versé });
     new JeuEssai().rejouer();

@@ -337,8 +337,12 @@ export function buildBookingEmail(
             locale
           ),
           // D50/A82 — remboursement partiel : la retenue revient au Voyageur.
+          // ANO-ADM-35 (recette 02-ADMIN § 5.15) — SAUF un geste commercial d'un admin (acteur ADMIN, deal terminé) :
+          // l'email annonçait « Annulation à moins de 48 h du départ : une retenue de 32,20 € s'applique » à un Expéditeur
+          // dont l'envoi avait été livré. Aucune annulation, aucune retenue ; aucun montant du Voyageur non plus.
+          commercialGesture: event.payload.actor === "ADMIN",
           retainedForCarrier:
-            event.payload.amountCents < p.totalShipperCents
+            event.payload.actor !== "ADMIN" && event.payload.amountCents < p.totalShipperCents
               ? formatMoney(p.totalShipperCents - event.payload.amountCents, p.currencyCode, locale)
               : null,
         },

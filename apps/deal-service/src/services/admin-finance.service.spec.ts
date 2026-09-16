@@ -40,7 +40,15 @@ function record(o: Record<string, unknown> = {}) {
 }
 
 const settlement = { executePayout: jest.fn() } as never;
-const makeService = (provider = new FakePaymentProvider()) => makeAdminFinanceService(provider, settlement, () => NOW);
+/** Un Redis en mémoire pour le verrou de décision (SET NX PX + compare-and-delete). */
+function memoireVerrous() {
+  const valeurs = new Map<string, string>();
+  return {
+    async set(key: string, value: string) { if (valeurs.has(key)) return null; valeurs.set(key, value); return "OK"; },
+    async eval(_s: string, _n: number, key: string, token: string) { if (valeurs.get(key) !== token) return 0; valeurs.delete(key); return 1; },
+  };
+}
+const makeService = (provider = new FakePaymentProvider(), locks: ReturnType<typeof memoireVerrous> | null = memoireVerrous()) => makeAdminFinanceService(provider, settlement, () => NOW, locks ?? undefined);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -247,6 +255,55 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     expect(stored.payload).toMatchObject({ actor: "ADMIN", amountCents: 500, refundedAt: NOW.toISOString() });
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "REFUND_MANUAL_APPLIED", after: expect.objectContaining({ totalRefundedCents: 500 }) }));
     expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("ANO-ADM-34 : deux « Rembourser maintenant » simultanés → UN remboursement chez le fournisseur, l'autre 409 DECISION_IN_PROGRESS sans rien émettre", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: null, parcel: { category: "BOOKS", categoryFamily: null } }));
+    let liberer!: () => void;
+    const lent = new Promise<void>((r) => (liberer = r));
+    prismaMock.booking.updateMany.mockImplementation(async () => { await lent; return { count: 1 }; });
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    const svc = makeService(provider);
+    const premier = svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    const second = svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    await expect(second).rejects.toMatchObject({ statusCode: 409, details: { code: "DECISION_IN_PROGRESS" } });
+    liberer();
+    await expect(premier).resolves.toMatchObject({ refundedCents: 500 });
+    expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("ANO-ADM-34 : sans verrou câblé, l'application échoue FERMÉ (aucun appel fournisseur)", async () => {
+    const provider = new FakePaymentProvider();
+    const spy = jest.spyOn(provider, "refund");
+    await expect(makeService(provider, null).applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON })).rejects.toThrow(/no decision lock store wired/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+  it("A165 : la clé d'idempotence décrit le geste sur l'état lu — une reprise après une base non écrite rend le MÊME remboursement", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    const spy = jest.spyOn(provider, "refund");
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: 1000, parcel: { category: "BOOKS", categoryFamily: null } }));
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+    const svc = makeService(provider);
+    await expect(svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON })).rejects.toMatchObject({ statusCode: 409 });
+    const r = await svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(spy.mock.calls.map((c) => c[2])).toEqual([{ idempotencyKey: `yamba:refund:manual:${ID}:after-1000:500` }, { idempotencyKey: `yamba:refund:manual:${ID}:after-1000:500` }]);
+    const refunds = (await provider.inspect({ intentId: a.intentId })).refunds;
+    expect(refunds).toHaveLength(1);
+    expect(r.refundId).toBe(refunds[0].id);
+  });
+  it("A165 : une proposition qui dépasse le reste remboursable se dit caduque (fiche argent et file)", async () => {
+    const proposee = { manualRefundProposedCents: 3000, manualRefundProposedReason: REASON, manualRefundProposedByAdminId: ADMIN.id, manualRefundProposedAt: NOW };
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "SENT", refundAmountCents: 2000, ...proposee }));
+    const f = await makeService().getMoneyFile(ADMIN, ID);
+    expect(f.manualRefund.maxRefundableCents).toBe(957);
+    expect(f.manualRefund.proposal).toMatchObject({ amountCents: 3000, stale: true, staleReason: "ABOVE_REMAINING" });
+    prismaMock.booking.findMany.mockResolvedValue([record({ payoutStatus: "SENT", refundAmountCents: 2000, ...proposee }), record({ id: "64b0000000000000000000b9", payoutStatus: "SENT", refundAmountCents: null, ...proposee, manualRefundProposedCents: 500 })]);
+    const q = await makeService().listQueue("PROPOSED_REFUNDS");
+    expect(q.items.map((i) => i.proposalStale)).toEqual([true, false]);
   });
   it("applyManualRefund : deal non fermé (DISPUTED) → 400 avant tout appel fournisseur", async () => {
     const provider = new FakePaymentProvider();

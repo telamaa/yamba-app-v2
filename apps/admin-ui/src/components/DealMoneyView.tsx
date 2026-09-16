@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, payoutReasonLabel, payoutRefusalMessage, timelineDetailLabel } from "@/lib/format";
+import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, manualRefundRefusal, money, parseEurosToCents, payoutReasonLabel, payoutRefusalMessage, REFUND_PROPOSAL_STALE_LABEL, timelineDetailLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
@@ -122,7 +122,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
         </Card>
       </div>
 
-      <ManualRefundCard file={file} me={me} onDone={(m) => { setMsg(m); load(); }} />
+      <ManualRefundCard key={`${file.payment.refundAmountCents ?? 0}-${file.manualRefund.proposal?.at ?? ""}`} file={file} me={me} onDone={(m) => { setMsg(m); load(); }} />
 
       <Card title="Chronologie de l'argent" className="mt-5">
         {file.timeline.length === 0 ? <p className="text-[12.5px] text-slate-500">Rien.</p> : (
@@ -249,38 +249,68 @@ function DealHistoryCard({ dealId }: { dealId: string }) {
   );
 }
 const REFUND_MIN_REASON = 50;
+/**
+ * Recette § 5.15 — le remboursement manuel en deux gestes.
+ * Améliorations : montant lu à la française (« 12,50 », « 1 234,50 »), garde de double clic synchrone (un ref, comme
+ * « Relancer »), refus en français selon leur code en disant si de l'argent est parti, proposition caduque signalée
+ * (A165), avertissement quand une nouvelle proposition en remplace une autre, rappel de ce que l'Expéditeur reçoit.
+ */
 function ManualRefundCard({ file, me, onDone }: { file: AdminDealMoneyFile; me: AdminMe | null; onDone: (msg: string) => void }) {
   const cur = file.pricing.currencyCode;
   const canPropose = can(me?.adminRoles, "refunds.manual.propose") && file.allowedActions.proposeRefund;
   const canApply = can(me?.adminRoles, "refunds.manual.apply") && file.allowedActions.applyRefund;
-  const [amount, setAmount] = useState(file.manualRefund.proposal ? (file.manualRefund.proposal.amountCents / 100).toFixed(2) : "");
-  const [reason, setReason] = useState(file.manualRefund.proposal?.reason ?? "");
+  const proposal = file.manualRefund.proposal;
+  const [amount, setAmount] = useState(proposal && !proposal.stale ? (proposal.amountCents / 100).toFixed(2).replace(".", ",") : "");
+  const [reason, setReason] = useState(proposal?.reason ?? "");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [err, setErr] = useState<string | null>(null);
-  const cents = Math.round(Number(amount.replace(",", ".")) * 100);
-  const ok = !busy && Number.isFinite(cents) && cents >= 1 && cents <= file.manualRefund.maxRefundableCents && reason.trim().length >= REFUND_MIN_REASON;
+  const cents = parseEurosToCents(amount);
+  const max = file.manualRefund.maxRefundableCents;
+  const reasonLength = reason.trim().length;
+  const amountProblem = amount.trim() === "" ? null : !Number.isFinite(cents) || cents < 1 ? "Montant illisible : écris par exemple 12,50." : cents > max ? `Au-dessus du plafond : ${money(max, cur)} au plus.` : null;
+  const ok = !busy && Number.isFinite(cents) && cents >= 1 && cents <= max && reasonLength >= REFUND_MIN_REASON;
   async function run(mode: "propose" | "apply") {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setErr(null);
     try {
-      if (mode === "propose") { await post(`/admin/deals/${file.id}/refund/propose`, { amountCents: cents, reason: reason.trim() }); onDone("Remboursement proposé, en attente d'un super administrateur."); }
-      else { const r = await post<{ refundedCents: number; totalRefundedCents: number }>(`/admin/deals/${file.id}/refund`, { amountCents: cents, reason: reason.trim() }); onDone(`Remboursé ${money(r.refundedCents, cur)} (cumul ${money(r.totalRefundedCents, cur)}). L'Expéditeur est prévenu par email.`); }
-    } catch (e) { setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Action impossible."); }
-    finally { setBusy(false); }
+      if (mode === "propose") {
+        await post(`/admin/deals/${file.id}/refund/propose`, { amountCents: cents, reason: reason.trim() });
+        onDone(`Remboursement proposé, en attente d'un super administrateur. (${money(cents, cur)}${proposal ? ` — remplace la proposition de ${proposal.byAdmin}` : ""})`);
+      } else {
+        const r = await post<{ refundedCents: number; totalRefundedCents: number; refundId: string | null }>(`/admin/deals/${file.id}/refund`, { amountCents: cents, reason: reason.trim() });
+        onDone(`Remboursé ${money(r.refundedCents, cur)} (cumul ${money(r.totalRefundedCents, cur)}). L'Expéditeur est prévenu par email.${r.refundId ? ` Remboursement ${r.refundId}.` : ""}`);
+      }
+    } catch (e) {
+      const refusal = manualRefundRefusal(e instanceof ApiError ? e : null);
+      // L'état a changé sous l'écran : le message part en tête de fiche (la carte est redessinée par le rechargement).
+      if (refusal.reload) onDone(refusal.text);
+      else setErr(refusal.text);
+    } finally { inFlight.current = false; setBusy(false); }
   }
   return (
     <Card title="Remboursement manuel (geste commercial)" className="mt-5">
-      <p className="text-[12px] text-slate-500">Hors litige, sur un deal fermé et débité. Le Voyageur n'est pas touché : c'est Yamba qui rend l'argent. Plafond : <b>{money(file.manualRefund.maxRefundableCents, cur)}</b> (payé − déjà remboursé). Motif de {REFUND_MIN_REASON} caractères au moins. Un super administrateur applique.</p>
+      <p className="text-[12px] text-slate-500">Hors litige, sur un deal fermé et débité. Le Voyageur n'est pas touché : c'est Yamba qui rend l'argent. Plafond : <b>{money(max, cur)}</b> (payé − déjà remboursé). Motif de {REFUND_MIN_REASON} caractères au moins. Un super administrateur applique.</p>
       {file.manualRefund.last && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12.5px]">Dernier remboursement manuel : {money(file.manualRefund.last.amountCents, cur)} par {file.manualRefund.last.byAdmin} le {dateTime(file.manualRefund.last.at)} — {file.manualRefund.last.reason}</p>}
-      {file.manualRefund.proposal && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">Proposé : {money(file.manualRefund.proposal.amountCents, cur)} par {file.manualRefund.proposal.byAdmin} le {dateTime(file.manualRefund.proposal.at)} — {file.manualRefund.proposal.reason}</p>}
+      {proposal && (
+        <p className={`mt-2 rounded-lg border px-3 py-2 text-[12.5px] ${proposal.stale ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+          Proposé : {money(proposal.amountCents, cur)} par {proposal.byAdmin} le {dateTime(proposal.at)} — {proposal.reason}
+          {proposal.stale && <b className="block mt-1">{REFUND_PROPOSAL_STALE_LABEL[proposal.staleReason ?? "NOT_REFUNDABLE"]}{proposal.staleReason === "ABOVE_REMAINING" ? ` (il reste ${money(max, cur)}).` : "."} Ne l'applique pas telle quelle.</b>}
+        </p>
+      )}
       {!canPropose && !canApply ? (
-        <p className="mt-2 text-[12.5px] text-slate-500">{file.manualRefund.maxRefundableCents <= 0 || (!file.allowedActions.proposeRefund && !file.allowedActions.applyRefund) ? "Aucun remboursement manuel possible sur ce deal (état, montant, ou tu es partie)." : "Ton profil ne propose ni n'applique de remboursement manuel."}</p>
+        <p className="mt-2 text-[12.5px] text-slate-500">{max <= 0 || (!file.allowedActions.proposeRefund && !file.allowedActions.applyRefund) ? "Aucun remboursement manuel possible sur ce deal (état, montant, ou tu es partie)." : "Ton profil ne propose ni n'applique de remboursement manuel."}</p>
       ) : (
         <div className="mt-2">
           <div className="flex flex-wrap items-center gap-2">
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (ex. 12.50)" inputMode="decimal" className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px]" />
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (ex. 12,50)" inputMode="decimal" className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px]" />
             <span className="text-[12px] text-slate-500">{cur}</span>
+            {amountProblem && <span className="text-[12px] text-red-700">{amountProblem}</span>}
           </div>
           <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={2} placeholder={`Motif (${REFUND_MIN_REASON} caractères au moins)`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+          <p className={`text-[11px] ${reasonLength >= REFUND_MIN_REASON ? "text-slate-500" : "text-amber-700"}`}>{reasonLength} / {REFUND_MIN_REASON}{canApply ? " · l'Expéditeur reçoit l'email « Remboursement émis » ; le motif reste au journal, il ne lui est pas envoyé." : ""}</p>
+          {canPropose && !canApply && proposal && <p className="mt-1 text-[11.5px] text-amber-800">Une proposition existe déjà : en proposer une autre la remplace (l'ancienne reste au journal).</p>}
           <div className="mt-2 flex flex-wrap gap-2">
             {canPropose && !canApply && <button disabled={!ok} onClick={() => run("propose")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Proposer</button>}
             {canApply && <button disabled={!ok} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Rembourser maintenant</button>}

@@ -33,6 +33,7 @@ export const FinanceQueueItemSchema = z
     nextRetryAt: z.string().datetime().nullable(),
     disputeTicket: z.string().nullable(),
     since: z.string().datetime().describe("Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"),
+    proposalStale: z.boolean().nullable().describe("PROPOSED_REFUNDS : la proposition est devenue impossible (A165) ; null pour les autres files"),
   })
   .meta({ id: "FinanceQueueItem" });
 export type FinanceQueueItem = z.infer<typeof FinanceQueueItemSchema>;
@@ -157,7 +158,16 @@ export const AdminDealMoneyFileSchema = z
     // C-PR5b (D58 3A-c) — remboursement manuel
     manualRefund: z.object({
       maxRefundableCents: z.number().int().describe("total payé − déjà remboursé ; 0 = plus rien à rembourser"),
-      proposal: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
+      proposal: z
+        .object({
+          amountCents: z.number().int(),
+          reason: z.string(),
+          byAdmin: z.string(),
+          at: z.string().datetime(),
+          stale: z.boolean().describe("Recette § 5.15 (A165) — la proposition dépasse le reste remboursable ou le deal ne peut plus rien recevoir"),
+          staleReason: z.enum(["ABOVE_REMAINING", "NOT_REFUNDABLE"]).nullable(),
+        })
+        .nullable(),
       last: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
     }),
     allowedActions: z.object({ retryPayout: z.boolean(), resolveReversal: z.boolean(), reconcile: z.boolean(), proposeRefund: z.boolean(), applyRefund: z.boolean() }),
