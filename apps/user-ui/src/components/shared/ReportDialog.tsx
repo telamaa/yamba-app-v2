@@ -7,7 +7,8 @@
  * la porte de connexion (reporter identifié). Le serveur refuse sa propre cible, le doublon
  * (409) et une cible invisible (404) : le dialogue affiche ces refus tels quels.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useTranslations } from "next-intl";
 import { Flag, X } from "lucide-react";
 import { usePathname } from "@/i18n/navigation";
@@ -25,6 +26,9 @@ export default function ReportDialog({ target, onCloseAction }: { target: Report
   const [reason, setReason] = useState<ReportReason>(reasons[0]);
   const [details, setDetails] = useState("");
   const [state, setState] = useState<{ busy: boolean; done: boolean; error: string | null }>({ busy: false, done: false, error: null });
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94/95 — focus piégé dans la fenêtre, rendu au geste de départ, et Échap ferme (il ne faisait rien).
+  useDialogFocus(dialogRef, Boolean(user), onCloseAction);
 
   if (!user) {
     return <AuthGateModal open onCloseAction={onCloseAction} title={t("gateTitle")} subtitle={t("gateSubtitle")} redirect={pathname || "/"} />;
@@ -44,7 +48,7 @@ export default function ReportDialog({ target, onCloseAction }: { target: Report
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
       <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900">
         <div className="flex items-start justify-between gap-3">
           <h2 id="report-dialog-title" className="flex items-center gap-2 text-[15px] font-semibold text-slate-900 dark:text-white">

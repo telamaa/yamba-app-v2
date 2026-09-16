@@ -6721,3 +6721,145 @@ consigné comme tel.
 
 Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **306 scénarios**
 (296 + WEB-MOB ×10). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.
+
+---
+
+# Chapitre 5.31 du cahier 01-WEB : l'accessibilité clavier — un crochet pour toutes les fenêtres
+
+*(PR `chore/recette-web-5-31`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le trente et unième chapitre « fiches » du cahier 01-WEB : `WEB-A11Y` (parcours de l'accueil au clavier, connexion
+au clavier, fermeture par Échap avec retour du focus, piège de focus, libellés des contrôles sans texte, champs en
+erreur, contraste en mode sombre, zoom à 200 %). Huit fiches jouées et conformes (quatre après correction), quatre
+anomalies closes (`ANO-WEB-94` à `97`), et le constat du 5.30 sur la croix « Plus tard » réglé.
+
+```
+apps/e2e/src/chapitres/web-a11y.spec.ts                                   8 scénarios, au clavier réel
+apps/e2e/src/pages/mes-envois.ts                                          `ligne()` devient publique (viser l'ouvreur)
+apps/e2e/src/chapitres/web-acc.spec.ts, web-mob.spec.ts                   la croix s'appelle « Fermer » (+ ACC-5 stabilisé)
+apps/e2e/src/chapitres/web-dea.spec.ts, web-pic.spec.ts                   fiches anciennes remises d'aplomb (date, assertion périmée)
+apps/user-ui/src/hooks/useDialogFocus.ts                                  NOUVEAU — entrée, boucle, restitution, Échap
+apps/user-ui/src/components/**  (14 fenêtres modales)                     ANO-WEB-94 / 95 — le crochet, et `inert` sur 4 feuilles
+apps/user-ui/src/components/shared/photos/PhotoThumbs.tsx                 ANO-WEB-96 — vignettes nommées par leur rang
+apps/user-ui/src/components/{dashboard,trips}/…  (4 listes)               ANO-WEB-97 — en-têtes de groupe lisibles
+apps/user-ui/messages/{fr,en}/common.json                                 lightbox.open / lightbox.more / authGate.close
+```
+
+## Ce qu'une fenêtre modale promet
+
+`role="dialog"` + `aria-modal="true"` disent à un lecteur d'écran « tout le reste est inerte ». Pour que ce soit
+vrai au clavier, trois gestes sont nécessaires (WCAG 2.4.3, *focus order*) — et **aucun** n'existait dans le
+produit : 19 `role="dialog"`, zéro lecture de `document.activeElement`.
+
+1. **Entrer** : à l'ouverture, le focus va dans la fenêtre (sinon `Tab` continue sur la page du dessous).
+2. **Boucler** : `Tab` sur le dernier élément revient au premier, `Maj+Tab` sur le premier va au dernier.
+3. **Rendre** : à la fermeture, le focus revient sur l'élément qui a ouvert la fenêtre (sinon il tombe sur
+   `<body>`, et le membre repart du haut de la page).
+
+## Le crochet `useDialogFocus`
+
+```ts
+export function useDialogFocus(ref: RefObject<HTMLElement | null>, active = true, onEscape?: () => void): void {
+  const surEchap = useRef(onEscape);
+  useEffect(() => { surEchap.current = onEscape; });
+
+  useEffect(() => {
+    if (!active) return;
+    const conteneur = ref.current;
+    if (!conteneur) return;
+    const origine = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pile.push(conteneur);
+    const raf = requestAnimationFrame(() => {
+      if (conteneur.contains(document.activeElement)) return;   // un enfant a posé son propre focus : priorité
+      focalisables(conteneur)[0]?.focus();
+    });
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (pile[pile.length - 1] !== conteneur) return;          // seule la fenêtre du DESSUS réagit
+      if (e.key === "Escape" && surEchap.current) return surEchap.current();
+      if (e.key !== "Tab") return;
+      /* … boucle premier ↔ dernier … */
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      /* … retirer l'écoute, dépiler … */
+      const actif = document.activeElement;
+      const perdu = !actif || actif === document.body || conteneur.contains(actif);
+      if (perdu && origine?.isConnected) origine.focus({ preventScroll: true });
+    };
+  }, [ref, active]);
+}
+```
+
+Quatre décisions dans ces lignes :
+
+- **La pile de module.** Une confirmation peut s'ouvrir au-dessus d'un formulaire. Sans pile, les deux écoutes
+  `keydown` se battraient pour le focus, et un Échap fermerait les deux fenêtres d'un coup.
+- **`onEscape` passe par une référence.** Les appelants écrivent `onCloseAction={() => setOpen(false)}` : une
+  fonction **nouvelle à chaque rendu**. Mise en dépendance de l'effet, elle le relancerait à chaque frappe — et le
+  nettoyage rendrait le focus à l'ouvreur **en pleine saisie** dans la fenêtre. La première version l'avait ; elle
+  a été corrigée avant d'être jouée.
+- **On ne vole pas un focus posé ailleurs.** Si le membre a navigué ou cliqué un autre champ pendant la fermeture,
+  le crochet ne ramène rien : il ne rend la main que si le focus est perdu (`<body>`) ou encore dans la fenêtre.
+- **« Focalisable » veut dire « a une boîte ».** Un bouton dans un bloc replié (`display: none`) ou sous `[inert]`
+  est exclu de la boucle (`getClientRects().length > 0`).
+
+## `inert` : une feuille fermée n'est pas une feuille absente
+
+Quatre feuilles restent **montées** pour animer leur fondu ou leur glissement (`opacity-0`, `translateY(100%)`).
+`aria-hidden` les retire de l'arbre d'accessibilité, mais **pas de la tabulation** : fermées, leurs boutons
+restaient atteignables, invisibles ou hors écran. L'attribut HTML `inert` fait les deux (ni focus, ni clic, ni
+lecteur d'écran) ; React 19 le prend comme booléen :
+
+```tsx
+<div ref={dialogRef} role="dialog" aria-modal="true" aria-hidden={!isOpen} inert={!isOpen} className={…}>
+```
+
+## Le voile et la croix de la porte d'identité
+
+Le voile était un `<button aria-label="Plus tard">` : le **premier** arrêt de la boucle, et un troisième contrôle
+du même nom que la croix et le lien. Il garde son clic (souris, doigt) mais sort de la tabulation et de l'arbre :
+`aria-hidden="true" tabIndex={-1}`. La croix s'appelle « Fermer » (`common.authGate.close`).
+
+## Les vignettes de photo et les compteurs
+
+```tsx
+ariaLabel={[photo.label, t("open", { current: i + 1, total: photos.length })].filter(Boolean).join(" — ")}
+// « Agrandir la photo 1 sur 2 » ; le « +N » devient t("more", { count }) → « Voir 2 photos de plus »
+```
+
+Les en-têtes de groupe des listes (« À traiter · 3 ») passent de `text-slate-400` / `slate-300` (clair) et
+`slate-500` / `slate-600` (sombre) à `text-slate-500 dark:text-slate-400` : ≥ 4,5:1 dans les deux thèmes.
+
+## Ce que le harnais a appris ici
+
+- **Mesurer un contraste, c'est composer les fonds.** `getComputedStyle().backgroundColor` d'une puce
+  `bg-[#FF9900]/15` rend `rgba(255, 153, 0, 0.15)` : la traiter comme opaque donnait des faux positifs à 1,25:1. La
+  mesure empile les couches jusqu'au premier fond opaque et les compose de bas en haut.
+- **Vérifier le retour du focus sur l'ÉLÉMENT.** On pose `data-recette-ouvreur` sur l'ouvreur avant `Entrée`, et
+  l'on regarde si `document.activeElement` le porte après `Échap` — deux « Annuler » cohabitent sur « Mes envois ».
+- **Désigner la fenêtre par le focus**, pas par « le dialog visible » : les feuilles hors écran ont une boîte.
+- **Taper avant l'hydratation perd des frappes**, et un formulaire validé avant l'hydratation part en natif sans
+  aucune validation (`aria-invalid` absent partout) : attendre le premier appel d'API du client.
+- **Une fiche qui écrit `if (await bouton.count())` peut passer sans rien jouer** : la feuille des filtres est
+  `md:hidden`, il faut un écran de téléphone (`{ mobile: true }`).
+
+## Trois fiches anciennes remises d'aplomb
+
+La non-régression a fait tomber trois fiches ; rejouées sur le produit SANS les correctifs, elles tombaient aussi.
+C'est la méthode à retenir : **avant d'accuser son changement, rejouer sans lui** (`git stash push -- apps/user-ui`).
+
+- `web-dea.spec.ts` (DEA-1) : une date en dur contre un jeu d'essai relatif (`days(15)`) → `Intl.DateTimeFormat("fr-FR",
+  { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" })` sur `Date.now() + 15 j`.
+- `web-pic.spec.ts` (PIC-7) : assertion périmée par ANO-WEB-60 (le raccourci « Valider la livraison » est voulu) ;
+  (PIC-8) lecture du suivi par `expect.poll` au lieu d'un `innerText` immédiat qui rendait `""`.
+- `web-acc.spec.ts` (ACC-5) : clic après `goBack` enveloppé dans `expect(async () => …).toPass({ timeout })`.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **314 scénarios**
+(306 + WEB-A11Y ×8) ; non-régression rejouée sur les chapitres qui ouvrent les fenêtres modifiées (signalement,
+annulation, mobile, recherche, prise en charge, deal Voyageur, messagerie, favoris, porte d'accès). Typecheck
+user-ui vert ; i18n : trois clés ajoutées (`common.lightbox.open`, `common.lightbox.more`, `common.authGate.close`),
+miroir FR/EN parfait.

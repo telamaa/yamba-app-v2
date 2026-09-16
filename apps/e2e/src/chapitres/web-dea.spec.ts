@@ -141,7 +141,10 @@ test.describe("WEB-DEA — la demande côté Voyageur (chapitre 5.14)", () => {
     expect(bande).toMatch(/Expire dans \d+ ?h/);
     await expect(ligneDemande(page, dealId)).toBeVisible();
     // La ligne du trajet porte le badge « 1 demande » ; la section « Demandes et colis » s'ouvre au clic.
-    expect(bande).toMatch(/26 sept\. 2026 · Avion En ligne 1 demande/);
+    /* Le jeu d'essai place `bzv-perkg` à J+15 du REJEU (`days(15)`) : la date attendue se calcule. Elle
+       était écrite en dur (« 26 sept. ») et la fiche cassait dès le lendemain (constaté le 13/09, chapitre 5.31). */
+    const depart = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }).format(new Date(Date.now() + 15 * 86_400_000));
+    expect(bande).toContain(`${depart} · Avion En ligne 1 demande`);
     await trajets.ligneDuDeal(dealId); // déplie la section du trajet
     const ligne = normaliserEspaces(await page.locator(`a[href="/fr/carrier/deals/${dealId}"]`).filter({ hasText: "Demande en attente de ta réponse" }).first().innerText());
     expect(ligne, "la ligne du deal sous le trajet, avec le badge « Demande »").toMatch(/Aminata D · Vêtements · 2[.,]5 kg Demande en attente de ta réponse · expire dans \d+ h Demande \+ 28,75 €/);

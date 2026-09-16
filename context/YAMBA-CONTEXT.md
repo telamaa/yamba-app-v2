@@ -610,6 +610,37 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 5.31 DU CAHIER 01-WEB — WEB-A11Y, ACCESSIBILITE CLAVIER DE BASE (branche
+  `chore/recette-web-5-31`, empilee sur #295)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en
+  serie, 2 min (`apps/e2e/src/chapitres/web-a11y.spec.ts`, au CLAVIER REEL : Tab / Maj+Tab / Echap / Espace /
+  Entree). 4 ANOMALIES CLOSES. ANO-WEB-94 (MAJEURE) : AUCUNE fenetre modale ne gerait le focus (19 `role="dialog"`,
+  zero lecture de `document.activeElement`) — ni entree, ni boucle, ni restitution (retour sur `<body>`) ; et 4
+  feuilles toujours montees (DealDeclineSheet, PickupRefuseDialog tiroir, MobileSearchExperience,
+  MobileFieldFullScreen) restaient atteignables a la tabulation une fois fermees. Correction : crochet partage
+  `apps/user-ui/src/hooks/useDialogFocus.ts` (`useDialogFocus(ref, active, onEscape?)` : entree, boucle Tab/Maj+Tab,
+  restitution si le focus est perdu, PILE de module pour les fenetres empilees, `onEscape` lu par REFERENCE — une
+  fleche en ligne en dependance relancerait l'effet a chaque frappe et rendrait le focus a l'ouvreur en pleine
+  saisie) pose sur les 14 fenetres modales, + `inert={!isOpen}` sur les 4 feuilles. ANO-WEB-95 (MAJEURE) : les
+  fenetres de SIGNALEMENT (annonce/profil, message) ne se fermaient pas avec Echap. ANO-WEB-96 (mineure) : chaque
+  vignette de photo s'annoncait « photo » (en dur, non traduit, identique) → « Agrandir la photo 1 sur 2 », « +N »
+  → « Voir N photos de plus ». ANO-WEB-97 (mineure) : compteurs des en-tetes de groupe a 2,36:1 en sombre ET 1,5:1
+  en clair (4 listes) → `text-slate-500 dark:text-slate-400`. Constat du 5.30 REGLE : la croix de la porte
+  d'identite s'appelle « Fermer » (elle s'appelait « Plus tard » comme le voile et le lien) ; le voile sort de la
+  tabulation (`aria-hidden` + `tabIndex=-1`, clic conserve) — web-acc et web-mob mis a jour. La spec initiale
+  sous-jouait le cahier (1 fenetre sur 4 en A11Y-3, filtres sautes sur grand ecran via `if (count())`, pas de croix
+  ni de visionneuse en A11Y-5, pas de suivi en A11Y-7) : completee. Deux FAUX POSITIFS de l'instrument corriges
+  avant de conclure (fond semi-transparent pris pour opaque ; frappes perdues avant hydratation). A TRANCHER :
+  selecteur de langue nomme par langue (« Francais ») et non « Changer de langue » (meilleur, a acter) ; croix du
+  signalement « Annuler » vs « Fermer » ailleurs ; contraste en THEME CLAIR non couvert par le cahier. Regard
+  d'expert : lien « Aller au contenu », focus sur le premier champ en erreur, garde de source « tout aria-modal
+  appelle useDialogFocus », jouer 400 %. PIEGES : composer les fonds `…/15` avant un contraste ; viser la fenetre qui
+  CONTIENT le focus (feuilles hors ecran « visibles ») ; `activeElement.textContent` = du JS → focus sur `<body>` ;
+  la feuille des filtres est `md:hidden`. NON-REGRESSION : sig, ann, mob, rch, msg, fav, not, dea, acc, pic
+  rejoues verts ; trois fiches ANCIENNES remises d'aplomb (echouaient aussi SANS les correctifs, prouve par stash) :
+  DEA-1 date en dur contre un jeu d'essai relatif, PIC-7 assertion perimee par ANO-WEB-60 (+ PIC-8 lecture avant
+  rendu), ACC-5 clic apres goBack intermittent. Plateforme inchangee (1000 + auth 230), harnais : 314 scenarios. i18n :
+  `common.lightbox.open/more`, `common.authGate.close`. PR #296 (empilee sur #295). Reste : 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.30 DU CAHIER 01-WEB — WEB-MOB, RESPONSIVE MOBILE (branche `chore/recette-web-5-30`,
   empilee sur #294)** — 10 fiches jouees CONFORMES (1 apres correction), 10 scenarios en serie, 1 min 06
   (`apps/e2e/src/chapitres/web-mob.spec.ts`, emulation iPhone 14 390x844 tactile ; WEB-MOB-7 a 800 px).

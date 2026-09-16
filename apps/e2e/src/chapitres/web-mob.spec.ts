@@ -207,18 +207,13 @@ test.describe("WEB-MOB — responsive mobile (chapitre 5.30)", () => {
     await page.getByRole("button", { name: /^Réserver/ }).last().click();
     const porte = page.getByRole("dialog").first();
     await expect(porte).toBeVisible({ timeout: 60_000 });
-    /* La croix : visible AUSSI sur téléphone (régression WEB-NRG-3). Son NOM ACCESSIBLE est
-       « Plus tard » — le même que le lien du bas et que le voile : on la reconnaît donc à sa
-       position, en haut de la feuille. (Constat consigné : trois contrôles, un seul nom.) */
+    /* La croix : visible AUSSI sur téléphone (régression WEB-NRG-3). Elle s'appelait « Plus tard »,
+       comme le lien du bas et le voile ; depuis le chapitre 5.31 elle s'appelle « Fermer » et le voile
+       n'est plus annoncé — on la trouve donc par son nom, et l'on vérifie sa position. */
     const boitePorte = (await porte.boundingBox())!;
-    const candidats = porte.getByRole("button", { name: "Plus tard" });
-    let croix: { x: number; y: number; width: number; height: number } | null = null;
-    for (let i = 0; i < (await candidats.count()); i++) {
-      const b = await candidats.nth(i).boundingBox();
-      if (!b || b.width > 80 || b.height > 80) continue; // le voile plein écran n'est pas la croix
-      if (b.y < boitePorte.y + boitePorte.height / 3) croix = b;
-    }
-    expect(croix, "une croix de fermeture, en haut de la feuille").not.toBeNull();
+    const croix = await porte.getByRole("button", { name: "Fermer", exact: true }).boundingBox();
+    expect(croix, "une croix de fermeture nommée « Fermer »").not.toBeNull();
+    expect(croix!.y, "en haut de la feuille").toBeLessThan(boitePorte.y + boitePorte.height / 3);
     const largeurEcran = await page.evaluate(() => document.documentElement.clientWidth);
     expect(croix!.x + croix!.width, "la croix tient dans l'écran").toBeLessThanOrEqual(largeurEcran + 1);
     expect(croix!.x, "et elle est à droite").toBeGreaterThan(largeurEcran / 2);
@@ -228,7 +223,7 @@ test.describe("WEB-MOB — responsive mobile (chapitre 5.30)", () => {
     /* Et la croix ferme réellement. */
     await page.mouse.click(croix!.x + croix!.width / 2, croix!.y + croix!.height / 2);
     await expect(porte).toBeHidden({ timeout: 30_000 });
-    test.info().annotations.push({ type: "constat", description: `croix ${Math.round(croix!.width)}×${Math.round(croix!.height)} px en haut à droite ; son nom accessible est « Plus tard », comme le lien du bas et le voile — trois contrôles pour un seul nom` });
+    test.info().annotations.push({ type: "constat", description: `croix « Fermer » ${Math.round(croix!.width)}×${Math.round(croix!.height)} px en haut à droite (elle s'appelait « Plus tard » jusqu'au chapitre 5.31)` });
   });
 
   test("WEB-MOB-7 · l'écran du deal entre 768 et 1024 px", async ({ navigateurConnecte, jeuEssai }) => {

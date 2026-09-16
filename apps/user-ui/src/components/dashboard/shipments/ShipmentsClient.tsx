@@ -223,14 +223,14 @@ export default function ShipmentsClient({
                 "h-1.5 w-1.5 rounded-full " + GROUP_DOT_CLASSES[group]
               }
             />
-            <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {group === "action"
                 ? t("groups.action")
                 : group === "ongoing"
                   ? t("groups.ongoing")
                   : t("groups.done")}
             </h2>
-            <span className="text-[11px] text-slate-300 dark:text-slate-600">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
               · {grouped[group].length}
             </span>
           </div>
