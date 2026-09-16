@@ -9,8 +9,25 @@
  * trajet qui porte encore un deal vivant est refusé (409 `TRIP_HAS_ACTIVE_DEALS`, D72) et
  * l'écran le dit, avec le nombre de deals.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { adresseDeLApi } from "../fixtures/adresses";
 import { normaliserEspaces } from "./reservation";
+
+/**
+ * Les kilos encore disponibles d'un trajet, lus à l'API (« Mes trajets » ne les affiche pas —
+ * écart consigné en WEB-E2E-3). La vue du propriétaire (`{ success, trip }`) porte capacité et
+ * réservé ; la vue publique porte `remainingKg`.
+ */
+export async function kilosRestants(contexte: BrowserContext, tripId: string): Promise<number> {
+  const r = await contexte.request.get(`${adresseDeLApi()}/trips/${tripId}`);
+  if (!r.ok()) throw new Error(`Trajet ${tripId} : ${r.status()} ${await r.text()}`);
+  type Kilos = { remainingKg?: number; capacityKg?: number; reservedKg?: number };
+  const corps = (await r.json()) as Kilos & { trip?: Kilos };
+  const t: Kilos = corps.trip ?? corps;
+  const kg = t.remainingKg ?? (typeof t.capacityKg === "number" ? t.capacityKg - (t.reservedKg ?? 0) : undefined);
+  if (typeof kg !== "number") throw new Error(`Trajet ${tripId} : ni remainingKg ni capacityKg dans ${JSON.stringify(corps).slice(0, 200)}`);
+  return kg;
+}
 
 export class MesTrajets {
   constructor(private readonly page: Page) {}

@@ -55,7 +55,7 @@ export const AUTHENTICATED_MENU_ITEMS: MenuItem[] = [
  */
 export const DISCOVER_MENU_ITEMS: MenuItem[] = [
   { type: "link", labelKey: "howItWorks", href: "/how-it-works", icon: Info },
-  { type: "link", labelKey: "becomeYamber", href: "/become-yamber", icon: Compass },
+  { type: "link", labelKey: "becomeYamber", href: "/carrier/onboarding", icon: Compass },
   { type: "link", labelKey: "helpFaq", href: "/help", icon: HelpCircle },
 ];
 

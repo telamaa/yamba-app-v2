@@ -168,7 +168,7 @@
     "stripeCta": "Configure Stripe"
   },
   "toasts": {
-    "cancelBlocked": "This trip still has {count, plural, =1 {one deal in progress} other {# deals in progress}}: cancel them first from « My deals ». Each shipper is then refunded in full.",
+    "cancelBlocked": "This trip still has {count, plural, =1 {one deal in progress} other {# deals in progress}}: cancel them first from « My trips » (each deal is listed under its trip). Each shipper is then refunded in full.",
     "activated": "Trip activated",
     "activationFailed": "Failed to activate",
     "resumed": "Trip back online",
