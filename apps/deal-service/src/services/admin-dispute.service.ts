@@ -62,6 +62,7 @@ export type AdminDisputeRecord = {
   carrierStatement?: string | null;
   carrierStatementPhotoUrls?: string[] | null;
   carrierRespondedAt?: Date | null;
+  responseDueAt?: Date | null; // ANO-ADM-52 — échéance figée à l'ouverture
   resolutionOutcome?: string | null;
   resolutionRefundCents?: number | null;
   resolutionCarrierPayoutCents?: number | null;
@@ -85,8 +86,9 @@ export function filterQueueItems(items: ArbitrationQueueItem[], q: ArbitrationQu
 /** Export opérationnel : identifiants des parties, jamais un nom, un email ni un téléphone (D60 2A). */
 export const ARBITRATION_CSV_COLUMNS = ["bookingId", "kind", "ticketNumber", "category", "openedAt", "originCity", "destinationCity", "amountCents", "currencyCode", "shipperId", "carrierId", "carrierResponded", "decidableAt"] as const;
 
-function responseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): Date {
-  return new Date(disputedAt.getTime() + delayHours * 3_600_000);
+/** ANO-ADM-52 (D62) — l'échéance figée à l'ouverture gagne ; le paramètre courant ne sert qu'aux dossiers antérieurs. */
+function responseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS, responseDueAt?: Date | null): Date {
+  return responseDueAt ?? new Date(disputedAt.getTime() + delayHours * 3_600_000);
 }
 
 export type AdminPartyRecord = {
@@ -128,7 +130,7 @@ export function fileKindOf(
 /** Pur : une ligne de la file. */
 export function toQueueItem(
   b: AdminBookingRecord,
-  dispute: Pick<AdminDisputeRecord, "ticketNumber" | "category" | "carrierRespondedAt"> | null,
+  dispute: Pick<AdminDisputeRecord, "ticketNumber" | "category" | "carrierRespondedAt" | "responseDueAt"> | null,
   names: { shipperFirstName: string; carrierFirstName: string },
   delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS
 ): ArbitrationQueueItem | null {
@@ -136,7 +138,7 @@ export function toQueueItem(
   if (!kind) return null;
   const responded = kind === "DISPUTE" && !!dispute?.carrierRespondedAt;
   const decidableAt =
-    kind === "RETENTION" || responded || !b.disputedAt ? (b.closedAt ?? b.disputedAt ?? b.requestedAt) : responseDeadline(b.disputedAt, delayHours);
+    kind === "RETENTION" || responded || !b.disputedAt ? (b.closedAt ?? b.disputedAt ?? b.requestedAt) : responseDeadline(b.disputedAt, delayHours, dispute?.responseDueAt);
   return {
     carrierResponded: responded,
     decidableAt: decidableAt.toISOString(),
@@ -195,11 +197,11 @@ export function toDisputeFile(
       ? { outcome: (b.retentionDisposition === "CARRIER" ? "COMPENSATE_CARRIER" : "RESTITUTE_SHIPPER") as "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER", reason: b.retentionDecisionReason ?? "", decidedAt: b.retentionDecidedAt.toISOString() }
       : null;
   const decidableAt =
-    kind === "DISPUTE" && b.disputedAt ? (dispute?.carrierRespondedAt ? b.disputedAt : responseDeadline(b.disputedAt, delayHours)) : null;
+    kind === "DISPUTE" && b.disputedAt ? (dispute?.carrierRespondedAt ? b.disputedAt : responseDeadline(b.disputedAt, delayHours, dispute?.responseDueAt)) : null;
   const canDecide =
     kind === "RETENTION"
       ? b.retentionDisposition === "HELD_FOR_MEDIATION"
-      : b.status === "DISPUTED" && !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt, delayHours).getTime());
+      : b.status === "DISPUTED" && !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt, delayHours, dispute?.responseDueAt).getTime());
   const retentionCents = b.retentionCents ?? 0;
   return {
     retentionDecision,
@@ -320,7 +322,7 @@ export function makeAdminDisputeService(settings: SettingsReader = platformSetti
       const ids = bookings.map((b) => b.id);
       const userIds = [...new Set(bookings.flatMap((b) => [b.shipperId, b.carrierId]))];
       const [disputes, users] = await Promise.all([
-        prisma.dispute.findMany({ where: { bookingId: { in: ids } }, select: { bookingId: true, ticketNumber: true, category: true, carrierRespondedAt: true } }),
+        prisma.dispute.findMany({ where: { bookingId: { in: ids } }, select: { bookingId: true, ticketNumber: true, category: true, carrierRespondedAt: true, responseDueAt: true } }),
         prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstName: true } }),
       ]);
       const disputeBy = new Map(disputes.map((d) => [d.bookingId, d]));

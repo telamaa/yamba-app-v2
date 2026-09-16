@@ -17338,6 +17338,56 @@
         "additionalProperties": false,
         "description": "Consultation journalisée quand la mesure porte des personnes (inscriptions)"
       },
+      "ReportDecision": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "firstName"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "by",
+          "at",
+          "note"
+        ],
+        "additionalProperties": false,
+        "description": "Decision taken on a report, read from the audit line written in the same transaction"
+      },
       "MessageKind": {
         "type": "string",
         "enum": [
@@ -18455,6 +18505,16 @@
                 "type": "null"
               }
             ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -18469,7 +18529,8 @@
           "message",
           "conversationId",
           "bookingId",
-          "corridor"
+          "corridor",
+          "decision"
         ],
         "additionalProperties": false
       },
@@ -20729,6 +20790,16 @@
                 "type": "null"
               }
             ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -20745,7 +20816,8 @@
           "reporter",
           "openCountOnTarget",
           "priority",
-          "targetTrustLevel"
+          "targetTrustLevel",
+          "decision"
         ],
         "additionalProperties": false
       },

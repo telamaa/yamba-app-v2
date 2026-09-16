@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { ACTION_LABEL, dateTime } from "@/lib/format";
 import type { AuditItem, AuditResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const TARGET_TYPES = ["USER", "BOOKING", "DISPUTE", "TRIP", "SESSION", "SETTINGS", "REPORT", "MAINTENANCE", "EXPORT"];
 const EMPTY = { from: "", to: "", adminUserId: "", action: "", targetType: "", targetId: "", ip: "" };
@@ -30,6 +31,7 @@ function detailOf(a: AuditItem): string {
 export default function AuditTable() {
   const [items, setItems] = useState<AuditItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [applied, setApplied] = useState<string[]>([]);
@@ -59,7 +61,7 @@ export default function AuditTable() {
   );
 
   useEffect(() => {
-    const h = setTimeout(() => { void load(null, filters).catch(() => setLoading(false)); }, 300);
+    const h = setTimeout(() => { void load(null, filters).catch((e) => { setLoading(false); if (isPermissionRefusal(e)) deny("Ton profil ne lit pas le journal des actions admin."); }); }, 300);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);

@@ -10,7 +10,7 @@ import prisma from "@packages/libs/prisma";
 import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ConflictError, NotFoundError } from "@packages/error-handler";
 import { recordAdminAction, recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
-import { redactContacts, type AdminConversationResponse, type AdminMessage, type AdminMessageReportItem, type AdminMessageReportsResponse, type MessageReportReason, type MessageReportStatus, type ReviewMessageReportRequest } from "@packages/api-contracts";
+import { redactContacts, reportDecisionsFrom, type ReportDecisionLine, type AdminConversationResponse, type AdminMessage, type AdminMessageReportItem, type AdminMessageReportsResponse, type MessageReportReason, type MessageReportStatus, type ReviewMessageReportRequest } from "@packages/api-contracts";
 
 export type AdminActor = { id: string; ip: string | null; userAgent: string | null };
 
@@ -106,8 +106,12 @@ export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
       // ANO-CRON-09 — le signalant d'un message purgé n'appartient à aucune conversation
       // chargée ici : sans cette ligne, son prénom serait « — » dans la file.
       for (const r of reports) userIds.add(r.reporterUserId);
+      // Décision du 15/09 — qui a décidé, quand, la note : la ligne MESSAGE_REPORT_REVIEWED de la même transaction (lecture seule).
+      const decisionLines = status === "OPEN" ? [] : ((await prisma.adminAction.findMany({ where: { action: "MESSAGE_REPORT_REVIEWED", targetType: "REPORT", targetId: { in: reports.map((r) => r.id) } }, select: { targetId: true, adminUserId: true, createdAt: true, after: true } })) as ReportDecisionLine[]);
+      for (const l of decisionLines) userIds.add(l.adminUserId);
       const users = await prisma.user.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, firstName: true } });
       const nameOf = new Map(users.map((u) => [u.id, u.firstName]));
+      const decisions = reportDecisionsFrom(decisionLines, (id) => nameOf.get(id));
 
       const items: AdminMessageReportItem[] = [];
       for (const r of reports) {
@@ -131,6 +135,7 @@ export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
             conversationId: null,
             bookingId: null,
             corridor: null,
+            decision: decisions.get(r.id) ?? null,
           });
           continue;
         }
@@ -149,6 +154,7 @@ export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
           conversationId: conversation.id,
           bookingId: conversation.bookingId,
           corridor: { originCity: booking?.trip.originCity ?? "—", destinationCity: booking?.trip.destinationCity ?? "—" },
+          decision: decisions.get(r.id) ?? null,
         });
       }
       return { items, total: items.length };

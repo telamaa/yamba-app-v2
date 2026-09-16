@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiError, apiFetch } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import type { DataRequestItem, DataRequestsResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const TYPE: Record<string, string> = { EXPORT: "Export", ERASURE: "Effacement" };
 const CHANNEL: Record<string, string> = { MEMBER: "par le membre", ADMIN: "par l'admin" };
@@ -16,6 +17,7 @@ export default function DataRequestsList() {
   const [items, setItems] = useState<DataRequestItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback((after?: string | null) => {
@@ -25,7 +27,7 @@ export default function DataRequestsList() {
         setCursor(r.nextCursor);
         setLoaded(true);
       })
-      .catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+      .catch((e) => (isPermissionRefusal(e) ? deny("Ton profil n'ouvre pas le registre des données personnelles.") : setError(e instanceof ApiError && e.status === 404 ? "Registre introuvable." : "Registre indisponible pour le moment. Recharge la page.")));
   }, []);
   useEffect(() => load(), [load]);
 

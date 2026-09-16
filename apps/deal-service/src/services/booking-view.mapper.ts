@@ -168,6 +168,7 @@ export type DisputeRecord = {
   // C-PR2 (D55) — état de la version du Voyageur et décision (optionnels : anciens appels)
   status?: string | null;
   carrierRespondedAt?: Date | null;
+  responseDueAt?: Date | null; // ANO-ADM-52 — échéance figée à l'ouverture (D62)
   resolutionOutcome?: string | null;
   resolutionRefundCents?: number | null;
   resolutionCarrierPayoutCents?: number | null;
@@ -522,7 +523,7 @@ export function toCarrierBookingView(
             category: dispute.category as NonNullable<CarrierBookingView["dispute"]>["category"],
             disputedAt: toIsoRequired(booking.disputedAt),
             canRespond: booking.status === "DISPUTED" && !dispute.carrierRespondedAt && !dispute.resolvedAt,
-            responseDeadlineAt: new Date(booking.disputedAt.getTime() + params.disputeResponseDelayHours * 3_600_000).toISOString(),
+            responseDeadlineAt: (dispute.responseDueAt ?? new Date(booking.disputedAt.getTime() + params.disputeResponseDelayHours * 3_600_000)).toISOString(), // ANO-ADM-52
             respondedAt: toIso(dispute.carrierRespondedAt ?? null),
             resolution: toDisputeResolution(dispute),
           }

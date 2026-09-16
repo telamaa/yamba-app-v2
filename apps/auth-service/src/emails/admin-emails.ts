@@ -263,3 +263,26 @@ export function getAdminEmails(locale: string | null | undefined): AdminEmailDic
 export function adminRoleLabel(locale: string | null | undefined, role: string): string {
   return ADMIN_ROLE_LABELS[resolveLocale(locale)]?.[role] ?? role;
 }
+
+/**
+ * ANO-ADM-53 (recette 02-ADMIN § 5.20) — la valeur d'un paramètre dans l'email aux super administrateurs, dans la langue du
+ * destinataire. L'email français annonçait « 48 hours → 50 hours » et « 3.00 € » : l'unité brute du catalogue et le point
+ * décimal anglais. Même règle d'affichage que l'écran (`apps/admin-ui/src/lib/settings-format.ts`).
+ */
+const SETTING_UNIT_SUFFIX: Record<SupportedLocale, Record<string, string>> = {
+  fr: { kg: "kg", hours: "h", days: "j", minutes: "min", mb: "Mo" },
+  en: { kg: "kg", hours: "h", days: "d", minutes: "min", mb: "MB" },
+};
+export function formatSettingValue(locale: string | null | undefined, unit: string, value: number): string {
+  const loc = resolveLocale(locale);
+  const tag = loc === "fr" ? "fr-FR" : "en-GB";
+  const n = (v: number, digits?: number) => v.toLocaleString(tag, digits === undefined ? undefined : { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  switch (unit) {
+    case "cents": return `${n(value / 100, 2)} €`;
+    case "percent": return loc === "fr" ? `${n(value)} %` : `${n(value)}%`;
+    case "coef": return `× ${n(value)}`;
+    case "rating": return `${n(value)} / 5`;
+    case "count": return n(value);
+    default: return SETTING_UNIT_SUFFIX[loc][unit] ? `${n(value)} ${SETTING_UNIT_SUFFIX[loc][unit]}` : n(value);
+  }
+}

@@ -7,6 +7,7 @@ import { STATUS_LABEL, dateTime } from "@/lib/format";
 import { rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserSummary, AdminUsersResponse } from "@/lib/types";
 import ExportButton from "./ExportButton";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 type Filters = { q: string; role: string; accountStatus: string; carrierStatus: string; stripeReady: string; createdFrom: string; createdTo: string; sort: "createdAt" | "lastName"; dir: "asc" | "desc" };
 const EMPTY: Filters = { q: "", role: "", accountStatus: "", carrierStatus: "", stripeReady: "", createdFrom: "", createdTo: "", sort: "createdAt", dir: "desc" };
@@ -29,6 +30,7 @@ export default function UsersSearch() {
   const [items, setItems] = useState<AdminUserSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [loading, setLoading] = useState(false);
   const [me, setMe] = useState<AdminMe | null>(null);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
@@ -39,7 +41,7 @@ export default function UsersSearch() {
     if (after) p.set("cursor", after);
     apiFetch<AdminUsersResponse>(`/admin/users?${p.toString()}`)
       .then((r) => { setItems((prev) => (after ? [...prev, ...r.items] : r.items)); setTotal(r.total); setCursor(r.nextCursor ?? null); })
-      .catch(() => { if (!after) { setItems([]); setTotal(0); } setCursor(null); })
+      .catch((e) => { if (isPermissionRefusal(e)) return deny("Ton profil ne lit pas les utilisateurs."); if (!after) { setItems([]); setTotal(0); } setCursor(null); })
       .finally(() => setLoading(false));
   }, [f]);
   useEffect(() => { const h = setTimeout(() => load(null), 250); return () => clearTimeout(h); }, [load]);

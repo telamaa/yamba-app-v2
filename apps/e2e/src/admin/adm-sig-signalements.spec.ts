@@ -57,7 +57,7 @@ test.describe("ADM-SIG — signalements, deux files (cahier 02-ADMIN § 5.19)", 
     await aminata.page.getByRole("button", { name: "Signaler ce profil" }).click();
     const dialogue = aminata.page.getByRole("dialog");
     const libelles = (await dialogue.getByRole("combobox").locator("option").allInnerTexts()).map((o) => o.trim());
-    test.info().annotations.push({ type: "écart documentaire", description: `le cahier demande le motif « Tentative d'arnaque » : le front propose ${libelles.join(" / ")} (SCAM = « Arnaque suspectée ») ; le back-office l'affiche « Tentative d'arnaque »` });
+    expect(libelles, "décision du 15/09 : SCAM = « Arnaque suspectée » partout").toContain("Arnaque suspectée");
     await dialogue.getByRole("combobox").selectOption({ label: "Arnaque suspectée" });
     await dialogue.getByPlaceholder("Ce que tu as vu, quand…").fill(PRECISIONS);
     const envoi = aminata.page.waitForResponse((r) => r.url().endsWith("/reports") && r.request().method() === "POST");
@@ -90,7 +90,7 @@ test.describe("ADM-SIG — signalements, deux files (cahier 02-ADMIN § 5.19)", 
     const surThomas = donnees.items.filter((i) => i.targetId === thomasId);
     expect(surThomas.map((i) => i.reporter.firstName).sort(), "trois auteurs").toEqual(["Aminata", "Chinwe", "João"].sort());
     const premiere = carte(page, "signalé par Aminata").first();
-    await expect(premiere).toContainText("Tentative d'arnaque", { timeout: 60_000 });
+    await expect(premiere).toContainText("Arnaque suspectée", { timeout: 60_000 });
     await expect(premiere).toContainText(/signalé par Aminata le .+/);
     await expect(premiere).toContainText("Membre");
     await expect(premiere).toContainText(`Précisions : ${PRECISIONS}`);
@@ -254,7 +254,13 @@ test.describe("ADM-SIG — signalements, deux files (cahier 02-ADMIN § 5.19)", 
       expect((await a.contexte.request.get(`${api()}/admin/conversations/reports`, { failOnStatusCode: false })).status(), `${cle} : file messages`).toBe(403);
       await a.page.goto(`${bo()}/reports`, { waitUntil: "domcontentloaded" });
       await attendreLeChargement(a.page);
-      await expect(a.page.getByText("Ton profil ne traite pas les signalements.").first(), `${cle} : refus en français à l'ouverture directe`).toBeVisible({ timeout: 60_000 });
+      // Décision du 15/09 : UN seul refus en tête — ni consigne, ni sections, ni onglets, ni « Chargement… ».
+      await expect(a.page.locator("main").getByRole("alert"), `${cle} : un seul bloc de refus, en français`).toHaveText("Ton profil ne traite pas les signalements.", { timeout: 60_000 });
+      await expect(a.page.getByText("Ton profil ne traite pas les signalements."), `${cle} : dit une fois`).toHaveCount(1);
+      await expect(a.page.locator("main h2"), `${cle} : aucune section`).toHaveCount(0);
+      await expect(a.page.getByText(/Les plus anciens d'abord|Lis la conversation avant de décider/), `${cle} : aucune consigne`).toHaveCount(0);
+      await expect(a.page.locator("main button").filter({ hasText: /^(à traiter|traité|sans suite)$/ }), `${cle} : aucun onglet`).toHaveCount(0);
+      await expect(a.page.getByText("Chargement…"), `${cle} : pas de chargement sans fin`).toHaveCount(0);
       await expect(a.page.getByText(/^\d{3} : /), "jamais « 403 : message anglais »").toHaveCount(0);
     }
     for (const cle of ["mediateur", "support"] as const) {
@@ -370,5 +376,76 @@ test.describe("ADM-SIG — signalements, deux files (cahier 02-ADMIN § 5.19)", 
         import prisma from "./packages/libs/prisma";
         (async () => { await prisma.user.update({ where: { id: "${marcId}" }, data: { createdAt: new Date(${JSON.stringify(ancienne)}) } }); console.log("@@" + JSON.stringify("ok")); process.exit(0); })();`);
     }
+  });
+
+  test("ADM-SIG-10 · sous « traité » et « sans suite » : qui a décidé, quand, la note, dans les deux files (ajoutée, décision du 15/09)", async ({ navigateurAdmin, navigateurConnecte, jeuEssai }) => {
+    test.setTimeout(6 * 60_000);
+    const aminata = await navigateurConnecte("aminata");
+    const joao = await navigateurConnecte("joao");
+    expect([200, 201]).toContain((await signaler(aminata.contexte, { targetType: "USER", targetRef: "seed-thomas", reason: "SCAM", details: "Recette ADM-SIG-10 : membre." })).statut);
+    expect([200, 201]).toContain((await signaler(joao.contexte, { targetType: "TRIP", targetRef: jeuEssai.trajet("yul"), reason: "OTHER", details: "Recette ADM-SIG-10 : trajet." })).statut);
+    const med = await navigateurAdmin("mediateur");
+    const items = (await file(med.contexte)).items;
+    const membre = items.find((i) => i.details === "Recette ADM-SIG-10 : membre.")!;
+    const trajet = items.find((i) => i.details === "Recette ADM-SIG-10 : trajet.")!;
+    const message = (await fileMessages(med.contexte)).items[0];
+    /* API : ouvert → aucune décision. */
+    expect(((await file(med.contexte)).items as Array<Item & { decision?: unknown }>).every((i) => i.decision === null), "un signalement ouvert n'a pas de décision").toBe(true);
+    const note = "Profil vérifié : restriction proposée au Médiateur.";
+    expect((await med.contexte.request.patch(`${api()}/admin/reports/${membre.id}`, { data: { decision: "REVIEWED", note } })).ok()).toBe(true);
+    expect((await med.contexte.request.patch(`${api()}/admin/reports/${trajet.id}`, { data: { decision: "DISMISSED" } })).ok()).toBe(true);
+    expect((await med.contexte.request.patch(`${api()}/admin/conversations/reports/${message.id}`, { data: { decision: "DISMISSED", note: "Échange cordial, rien à reprocher." } })).ok()).toBe(true);
+    type AvecDecision = { id: string; decision: { by: { firstName: string } | null; at: string; note: string | null } | null };
+    const traites = (await file(med.contexte, "REVIEWED")).items as unknown as AvecDecision[];
+    expect(traites.find((i) => i.id === membre.id)!.decision).toMatchObject({ by: { firstName: "Nadia" }, note });
+    const classes = (await file(med.contexte, "DISMISSED")).items as unknown as AvecDecision[];
+    expect(classes.find((i) => i.id === trajet.id)!.decision).toMatchObject({ by: { firstName: "Nadia" }, note: null });
+    const messagesClasses = (await fileMessages(med.contexte, "DISMISSED")).items as unknown as AvecDecision[];
+    expect(messagesClasses.find((i) => i.id === message.id)!.decision).toMatchObject({ by: { firstName: "Nadia" }, note: "Échange cordial, rien à reprocher." });
+    /* Écran. */
+    const { page } = med;
+    await page.goto(`${bo()}/reports`, { waitUntil: "domcontentloaded" });
+    await attendreLeChargement(page);
+    await page.locator("main button").filter({ hasText: /^traité$/ }).first().click();
+    await expect(carte(page, "Recette ADM-SIG-10 : membre.").first()).toContainText(new RegExp(`Traité par Nadia le .+ · note : « ${note.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} »`), { timeout: 30_000 });
+    await page.locator("main button").filter({ hasText: /^sans suite$/ }).first().click();
+    await expect(carte(page, "Recette ADM-SIG-10 : trajet.").first()).toContainText(/Classé sans suite par Nadia le .+ · sans note/, { timeout: 30_000 });
+    await page.locator("main button").filter({ hasText: /^sans suite$/ }).nth(1).click();
+    await expect(carte(page, "Veut sortir de Yamba").first()).toContainText(/Classé sans suite par Nadia le .+ · note : « Échange cordial, rien à reprocher\. »/, { timeout: 30_000 });
+  });
+
+  test("ADM-SIG-11 · chaque page que le profil n'ouvre pas dit un seul refus (ajoutée, décision du 15/09)", async ({ navigateurAdmin }) => {
+    test.setTimeout(8 * 60_000);
+    const pages: Array<[cle: "privacy" | "exploitation", chemin: string, titre: string, refus: string]> = [
+      ["privacy", "/alerts", "Alertes de seuil", "Ton profil ne lit pas les alertes de seuil."],
+      ["privacy", "/disputes", "À arbitrer", "Ton profil n'ouvre pas la file d'arbitrage."],
+      ["privacy", "/tickets", "Billets à vérifier", "Ton profil ne vérifie pas les billets."],
+      ["privacy", "/trips", "Trajets", "Ton profil ne lit pas les trajets."],
+      ["privacy", "/reports", "Signalements", "Ton profil ne traite pas les signalements."],
+      ["privacy", "/finances", "Finances", "Ton profil ne donne pas accès aux finances."],
+      ["privacy", "/finances/report", "Rapport mensuel", "Ton profil ne lit pas le rapport financier."],
+      ["privacy", "/pilotage", "Pilotage", "Ton profil ne lit pas le pilotage."],
+      ["privacy", "/audit", "Journal des actions admin", "Ton profil ne lit pas le journal des actions admin."],
+      ["privacy", "/settings", "Paramètres de la plateforme", "Ton profil ne lit pas les paramètres."],
+      ["privacy", "/settings/docs", "Documentation des paramètres", "Ton profil ne lit pas les paramètres."],
+      ["privacy", "/admins", "Comptes admin", "Ton profil ne gère pas les comptes admin (super administrateur seulement)."],
+      ["exploitation", "/users", "Utilisateurs", "Ton profil ne lit pas les utilisateurs."],
+      ["exploitation", "/privacy", "Données personnelles", "Ton profil n'ouvre pas le registre des données personnelles."],
+    ];
+    const fautes: string[] = [];
+    for (const [cle, chemin, titre, refus] of pages) {
+      const { page } = await navigateurAdmin(cle);
+      await page.goto(`${bo()}${chemin}`, { waitUntil: "domcontentloaded" });
+      try {
+        await expect(page.locator("main").getByRole("alert")).toHaveText(refus, { timeout: 20_000 });
+        await expect(page.locator("main h1")).toHaveText(titre);
+        await expect(page.locator("main h2, main table, main input, main select, main textarea")).toHaveCount(0);
+        await expect(page.locator("main > p, main > div > p").filter({ hasNotText: refus })).toHaveCount(0);
+        await expect(page.getByText("Chargement…")).toHaveCount(0);
+      } catch (e) {
+        fautes.push(`${cle} ${chemin} : ${(e as Error).message.split("\n")[0]}`);
+      }
+    }
+    expect(fautes, "pages au refus incomplet").toEqual([]);
   });
 });

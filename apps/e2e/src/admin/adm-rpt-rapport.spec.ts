@@ -15,7 +15,7 @@ import { test, expect, type NavigateurAdmin } from "../fixtures/yamba";
 import { JeuEssai } from "../fixtures/jeu-essai";
 import { adresseDeLApi, adresseDeLApiAdmin, adresseDuBackOffice } from "../fixtures/adresses";
 import { lireLeJournal } from "../pages/journal-admin";
-import { attendreLeChargement, debutDuScenario, lireCoteServeur } from "../pages/ecran-admin";
+import { attendreLeChargement, debutDuScenario, lireCoteServeur, reouvrirLesLitigesSousUnDelai } from "../pages/ecran-admin";
 
 const api = () => adresseDeLApiAdmin();
 const bo = () => adresseDuBackOffice();
@@ -106,6 +106,7 @@ const section = (page: Page, titre: RegExp) => page.locator("main section").filt
 
 async function poserDelai(ctx: Contexte, heures: number): Promise<void> {
   const cur = (await (await ctx.request.get(`${api()}/admin/settings`)).json()) as { version: number; values: Record<string, number> };
+  reouvrirLesLitigesSousUnDelai(heures); // A169 : l'échéance est figée à l'ouverture, le paramètre seul ne suffit plus
   if (cur.values[DELAI] === heures) return;
   const r = await ctx.request.patch(`${api()}/admin/settings`, { data: { changes: { [DELAI]: heures }, reason: "Recette ADM-RPT : délai de réponse abaissé pour rendre un litige décidable.", expectedVersion: cur.version } });
   expect(r.ok(), `délai → ${heures} h : ${r.status()}`).toBe(true);

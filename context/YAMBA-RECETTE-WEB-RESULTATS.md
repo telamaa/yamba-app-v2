@@ -5784,6 +5784,117 @@ corrigé et sont conformes des deux côtés. Après correction : 9/9 verts, deux
   une salve simultanée au § 7 (non-régression).
 - **SIG-9** — *Fait* : ANO-ADM-48. *Test* : la date de création de Marc est déplacée puis restaurée dans un `finally`.
 
+
+
+## Cahier 02-ADMIN — § 5.20 Paramètres de la plateforme · **CONFORME après correction** (7 fiches + 5 ajoutées · 6 anomalies closes dont 2 majeures · 3 décisions du 15/09 intégrées · 2 écarts · 12 scénarios + 2 ADM-SIG, 9 min 30)
+
+`apps/e2e/src/admin/adm-par-parametres.spec.ts`. Un paramètre commande la plateforme entière (D62). Le chapitre se juge à
+cinq promesses : **une source** (page, panneaux, documentation), **un effet mesuré** (< 30 s, jamais rétroactif), **une
+trace par clé**, **des gardes qui tiennent** (un seul gagnant, jamais un 500) et **un repli sûr**. Chaque fiche part d'un
+document supprimé (`seed-settings.ts`).
+**Contre-épreuve** fiche par fiche sur le code du § 5.19 (corrections mises de côté, bundles auth / deal / message / trip
+rebâtis, `prisma generate`) : **PAR-2, 3, 8, 9, 10, 12 et ADM-SIG-5, 10, 11 rouges** (PAR-2 : aperçu « 3.00 € » ; PAR-3 :
+« 48 hours → 50 hours » ; PAR-8 : document absent `[200, 409, 500]`, présent `[200, 500, 500]` ; PAR-9 : échéance du 17/09
+10:25 ramenée au 14/09 22:25 dans le dossier ET dans la vue du Voyageur ; PAR-10 : « 400 : Some values are out of
+bounds… » ; PAR-12, SIG-5, SIG-11 : aucun bloc de refus sur les quatorze pages ; SIG-10 : aucune décision servie). PAR-1,
+4, 5, 6, 7, 11 ne touchent aucun code corrigé et sont conformes des deux côtés. Après correction : **23/23 verts, deux
+passages** (ADM-PAR 12 + ADM-SIG 11). Voisins rejoués : ADM-PRM (11), ADM-ALR (4), ADM-CNV (5), WEB-SIG (8), ADM-RPT (5)
+verts ; ADM-ACC-3 et ADM-MED (9) verts après alignement du harnais (voir « Harnais ») ; WEB-MSG (21) vert après alignement du libellé.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-PAR-1 | La page et ses trois classes | **Conforme** — « Version 0 · toutes les valeurs sont celles par défaut », pas de « Tout réinitialiser » ; douze groupes dans l'ordre du cahier puis « Modifiables par déploiement seulement » ; colonnes « Paramètre / En vigueur / Nouvelle valeur / Défaut / Portée » + bouton « historique » ; panneau de la commission (« Exemple : … », « Bornes : 5 % à 20 % · lu par deal-service, trip-service, user-ui. », mention CGU) ; classe B sans champ ; documentation au même texte, classe C en dernier avec « Un curseur qui ne commande rien… » ; chaque clé a un consommateur, aucune clé prévue n'a de curseur ; aucune ligne |
+| ADM-PAR-2 | Commission 12 → 15 % | **Conforme** — aperçu « Sur un transport de 20 € : commission 3,00 €, total Expéditeur 23,00 €. » ; « À valider — 1 modification(s) », « Commission Yamba : 12 % → 15 % », « figure dans les CGU » ; « 10/20 » bouton inactif ; « 1 paramètre(s) modifié(s) — version 1, journalisé, super administrateurs prévenus. » ; nouvelle commission servie en 18 à 22 s à l'API, 22 à 25 s dans le navigateur d'un membre (trois passages) ; email « Paramètres de la plateforme modifiés » à chaque super administrateur joignable ; « Version 1 · dernière écriture le … par Sacha S. · 1 valeur(s) modifiée(s) », badge « modifiée » ; historique « … · Sacha S. · modifié : 12 % → 15 % · « motif » » ; prix figé de `bzv-accepted` inchangé ; bandeau d'accueil ; une ligne `SETTING_CHANGED pricing.commissionPct` `{ value: 12, version: 0 }` → `{ value: 15, reason, version: 1 }` |
+| ADM-PAR-3 | Trois clés, un motif | **Conforme après correction** — Exploitation : « À valider — 3 modification(s) », trois lignes même motif même version, filtre « Paramètre modifié » de `/audit` ; email « Versement en échec depuis : 48 h → 50 h », « Retenue non arbitrée depuis : 7 j → 8 j ». **Avant** : « 48 hours → 50 hours », « 7 days → 8 days » (ANO-ADM-53) |
+| ADM-PAR-4 | Onze refus | **Conforme** — 1 commission 50 % → 400 « Some values are out of bounds. » ; 2 M < S → 400 « S ≤ M ≤ L » ; 3 → 400 (bornes, voir écart) ; 4 intervalle < délai → 400 ; 5 Exploitation / clé métier → 403 « Your admin profile cannot change: pricing.commissionPct. » ; 7 Support, Finance → 403 ; 8 mélange → 403 nommant `pricing.commissionPct, protection.extendedPremiumCents` (pas la clé d'exploitation) ; 9 motif court → 400 ; 10 valeur égale → 400 « Nothing to change » ; 11 clé inconnue → 400 ; aucune ligne ; 6 super administrateur sur `alerts.payoutFailedHours` → 200, une ligne |
+| ADM-PAR-5 | Deux admins | **Conforme** — A (super) saisit 13 %, B (Exploitation) enregistre « Relais en retard depuis » 20 min ; A enregistre → 409, « Les paramètres ont changé entre-temps : la page est rechargée, refais ta modification. », panneau disparu, « Version 1 », 20 min affiché ; une seule ligne, celle de B |
+| ADM-PAR-6 | « remettre », « Tout réinitialiser » | **Conforme** — « remettre » = « Commission Yamba : 14 % → 12 % », version 2, email « modifiés » ; « Tout réinitialiser (3) » liste exactement « Fenêtre de notation : 20 j → 14 j (défaut, D53 · RG-NOTE-01) », « Relais en retard depuis : 25 min → 15 min (défaut, D59 3A) », « Documents par trajet : 6 → 5 (défaut, ex-SiteConfig) » ; « 3 paramètre(s) remis par défaut — version 4, journalisé. » ; email « réinitialisés » ; rejeu → 400 ; Exploitation avec commission modifiée → « Tout réinitialiser (1) », seule sa clé remise, commission 13 % intacte ; lignes `SETTINGS_RESET` une par clé |
+| ADM-PAR-7 | Document supprimé | **Conforme** — commission 16 % servie, script lancé : défauts servis 27 s après la suppression ; deal membre 200, alertes 200 ; `/settings` « Version 0 · toutes les valeurs sont celles par défaut » ; aucune ligne |
+| ADM-PAR-8 (ajoutée) | Trois écritures simultanées, document absent puis présent | **Conforme après correction** — `[200, 409, 409]` deux fois, deux lignes, version 2. **Avant** : `[200, 500, 500]` puis `[200, 409, 500]` sur le document absent, `[200, 500, 500]` sur le document présent (ANO-ADM-51) |
+| ADM-PAR-9 (ajoutée) | Délai de réponse ramené à 12 h sur un litige ouvert | **Conforme après correction** — `bzv-disputed` (ouvert J−1) : échéance du dossier et `responseDeadlineAt` du Voyageur identiques avant / 35 s après ; décision du Médiateur → 409. **Avant** : les lecteurs recalculaient avec le paramètre courant (ANO-ADM-52) |
+| ADM-PAR-10 (ajoutée) | L'écran sous refus | **Conforme après correction** — 50 % saisi → « Valeur refusée — Commission Yamba : entre 5 % et 20 %. » ; double clic sur « Enregistrer » → un `PATCH`, pas de faux conflit ; réinitialisation depuis une page devenue périmée → 409 français, page rechargée, « Tout réinitialiser (2) ». **Avant** : « 400 : Some values are out of bounds. — pricing.commissionPct : Must be between 5 and 20 (percent). » (ANO-ADM-54) ; réinitialisation périmée « 409 : The settings changed meanwhile… » sans rechargement (ANO-ADM-55, lecture du code) |
+| ADM-PAR-11 (ajoutée) | Document illisible | **Conforme** — `values` remplacé par une chaîne : défauts servis, `GET /admin/settings` 200, réparation par la page acceptée |
+| ADM-PAR-12 (ajoutée, décision du 15/09) | Données personnelles sur `/settings` et `/settings/docs` | **Conforme après correction** — 403 serveur ; un seul bloc « Ton profil ne lit pas les paramètres. », titre seul, aucune section, aucun champ, aucun lien vers l'autre page refusée |
+
+### Décisions du 15/09 intégrées (lots à part)
+
+- **Libellé `SCAM` : « Arnaque suspectée » partout** — back-office (`format.ts`), message signalé au front (FR, et
+  « Suspected scam » en EN, comme le profil et l'annonce), cahiers 01-WEB / 02-ADMIN, livrables 01 et 02, specs WEB-MSG et
+  ADM-SIG. Preuve : `grep "Tentative d'arnaque\|Scam attempt"` vide sur `apps`, `packages`, `docs` (le dossier `context/`
+  garde l'historique) ; ADM-SIG-1 lit « Arnaque suspectée » des deux côtés.
+- **Décision visible** (A171) — ADM-SIG-10 : « Traité par Nadia le … · note : « … » », « Classé sans suite par Nadia le …
+  · sans note » dans la file trajets / membres ET dans la file messages ; `decision: null` sur les ouverts.
+- **Un seul refus par page** (A170) — ADM-SIG-5 renforcée (Finance, Exploitation, Données personnelles sur `/reports` :
+  un bloc, ni consigne, ni section, ni onglet, ni « Chargement… ») et ADM-SIG-11 : quatorze pages alignées — `/alerts`,
+  `/disputes`, `/tickets`, `/trips`, `/reports`, `/finances`, `/finances/report`, `/pilotage`, `/audit`, `/settings`,
+  `/settings/docs`, `/admins` (Données personnelles) ; `/users`, `/privacy` (Exploitation). Non concernées : `/home`,
+  `/sessions`, `/status` (tous les profils y ont droit) ; fiches `/users/[id]`, `/deals/[id]`, `/disputes/[id]`,
+  `/trips/[id]`, `/conversations/[id]` (écran unique, refus propre déjà en place).
+
+### Anomalies
+
+- **ANO-ADM-51 (majeure, close)** — **deux administrateurs qui enregistrent en même temps : 500.** Document absent : les
+  créations concurrentes butaient sur la clé unique (`P2002`) ; document présent : conflit d'écriture MongoDB (`P2034`)
+  avant le verrou de version. Correction : rejeu `withWriteConflictRetry` + `P2002` → 409 `STALE_VERSION`.
+- **ANO-ADM-52 (majeure, close)** — **un litige ouvert ne gardait pas son échéance** : changer
+  `dispute.responseDelayHours` déplaçait la date annoncée au Voyageur, la file, le dossier, la garde de décision et
+  l'alerte, contre D62 et le cahier (PAR-2 étape 9). Correction A169 : `Dispute.responseDueAt` figé à l'ouverture.
+- **ANO-ADM-53 (mineure, close)** — l'email aux super administrateurs écrivait les unités brutes du catalogue et le point
+  décimal (« 48 hours », « 3.00 € ») quelle que soit la langue. Correction : `formatSettingValue(locale, unit, value)`.
+- **ANO-ADM-54 (mineure, close)** — refus d'écriture affichés « 400 : <anglais> — <clé technique> : Must be between… » ;
+  et en production, faute de `details.code`, la clé fautive n'aurait même pas atteint l'écran (A146). Correction : codes
+  `SETTING_OUT_OF_BOUNDS` / `SETTINGS_INCOHERENT` / `INVALID_SETTINGS_REQUEST` + `settingsRefusalMessage`.
+- **ANO-ADM-56 (mineure, close, trouvée en rejouant ADM-ACC-3)** — le bandeau « Paramètres modifiés » de l'accueil
+  regroupait la dernière écriture par sa seule VERSION : après une remise à zéro du document (version repartie de 0),
+  il additionnait des écritures sans rapport (« Versement en échec depuis, Commission Yamba, Délai de réponse au litige,
+  … » pour UNE clé modifiée). Correction : une écriture = même version, même auteur, quelques secondes.
+- **ANO-ADM-55 (mineure, close)** — une réinitialisation depuis une page périmée affichait « 409 : The settings changed
+  meanwhile… » sans recharger (seul « Enregistrer » gérait le 409). Correction : même lecture du refus, panneau fermé,
+  page rechargée.
+
+### Harnais
+
+- **ADM-MED et ADM-RPT** rendaient un litige décidable en abaissant `dispute.responseDelayHours` APRÈS l'ouverture — ce
+  qu'ANO-ADM-52 interdit désormais. Nouvel outil `reouvrirLesLitigesSousUnDelai(heures)` (`pages/ecran-admin.ts`) :
+  manœuvre base consignée qui réaligne `responseDueAt` des litiges ouverts, appelée par leur `poserDelai`.
+- **ADM-ACC-3** lit le libellé du paramètre dans le bandeau d'accueil (plus la clé technique).
+- **ADM-MED-9** attend l'email du Voyageur par son compteur (en série, il lisait l'email d'une fiche précédente).
+- **WEB-MSG-16 / ADM-SIG-1** : libellé « Arnaque suspectée ».
+
+### Écarts
+
+- **ADM-PAR-4 cas 3** : la règle « plafond ≥ prime » ne peut jamais se déclencher — prime ≤ 50 € (5 000 c), plafond ≥
+  100 € (10 000 c) ; le geste du cahier est refusé par les bornes, pas par la cohérence.
+- **ADM-PAR-4 cas 8** : le cahier ne précise pas qu'une clé d'exploitation mêlée à la requête n'est pas nommée : seules
+  les clés refusées le sont (conforme à la règle, le cahier gagne à le dire).
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **PAR-1** — *Test* : la règle « aucun curseur sans lecteur » est vérifiée sur le contrat (consommateurs non vides,
+  classe C disjointe), pas seulement à l'œil. *Proposé* : afficher la version de la documentation générée
+  (`YAMBA-PARAMETRES.md`) dans la page docs.
+- **PAR-2** — *Fait* : aperçu « 3,00 € » (écrivait « 3.00 € ») ; bandeau d'accueil qui nomme les libellés et non les clés
+  techniques. *Test* : le délai est mesuré DEUX fois, à l'API et dans le navigateur d'un membre (cache HTTP
+  `max-age=30` + cache du lecteur 30 s ne se cumulent pas au-delà du seuil sur ce poste) ; le prix figé est lu en base.
+- **PAR-3** — *Fait* : ANO-ADM-53. *Test* : l'email est OUVERT, pas seulement compté.
+- **PAR-4** — *Test* : les onze statuts ET les corps sont consignés ; « aucune écriture partielle » vérifiée sur le
+  journal filtré `SETTINGS`. *Proposé* : juger la portée avant les bornes (un profil refusé apprend aujourd'hui les bornes
+  d'une clé qu'il ne peut pas écrire).
+- **PAR-5** — *Test* : deux navigateurs réels, la réponse 409 est interceptée au réseau.
+- **PAR-6** — *Proposé* : aligner l'API de « Tout réinitialiser » sans liste de clés sur l'écran (ne remettre que les clés
+  que le profil peut écrire, au lieu d'un 403 global).
+- **PAR-7** — *Proposé* : ne plus supprimer le document au script de recette mais remettre ses valeurs, pour garder une
+  version monotone (l'historique peut sinon montrer deux « version 1 »).
+- **PAR-8** — *Fait* : ANO-ADM-51. *Test* : chaque salve pose des valeurs neuves (sinon 400 « rien à changer »,
+  constaté au premier passage : c'est la comparaison aux valeurs en vigueur qui passe avant le verrou, voulu).
+- **PAR-9** — *Fait* : A169. *Proposé (à trancher)* : la retenue et la fenêtre d'annulation, clés « figurant dans les
+  CGU », se calculent au jour de l'annulation ; les figer à l'acceptation comme le prix est une décision produit et
+  juridique.
+- **PAR-10** — *Fait* : ANO-ADM-54, 55, envoi unique par `useRef`. *Test* : les `PATCH` sont comptés au réseau.
+- **PAR-11** — *Test* : manœuvre base consignée (valeurs illisibles), réparation par la page.
+- **PAR-12** — *Fait* : A170 sur quatorze pages. *Test* : l'annonceur de route de Next porte aussi `role="alert"` — le
+  refus se cherche dans .
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)

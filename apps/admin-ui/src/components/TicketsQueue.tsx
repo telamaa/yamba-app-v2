@@ -6,6 +6,7 @@ import { ApiError, apiFetch, post } from "@/lib/api";
 import { DOCUMENT_MIME_LABEL, TICKET_REASON_LABEL, TRANSPORT_MODE_LABEL, dateTime } from "@/lib/format";
 import type { AdminMe, TicketQueueItem, TicketQueueResponse, TicketRejectionReason } from "@/lib/types";
 import ExportButton from "./ExportButton";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 /**
  * Recette § 5.8 — un refus se dit dans les mots de l'écran, et dit la suite. `reload` : la file affichée est périmée
@@ -30,13 +31,14 @@ export default function TicketsQueue() {
   const [data, setData] = useState<TicketQueueResponse | null>(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   // C-PR7a (D60 2A) — filtres serveur + export
   const [f, setF] = useState({ originCity: "", destinationCity: "", olderThanDays: "" });
   const [me, setMe] = useState<AdminMe | null>(null);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
   const params = useCallback(() => { const p = new URLSearchParams(); if (f.originCity) p.set("originCity", f.originCity); if (f.destinationCity) p.set("destinationCity", f.destinationCity); if (f.olderThanDays) p.set("olderThanDays", f.olderThanDays); return p; }, [f]);
   const load = useCallback(() => {
-    apiFetch<TicketQueueResponse>(`/admin/tickets?${params().toString()}`).then(setData).catch((e) => setMsg({ tone: "err", text: refus(e, "Chargement impossible.").text }));
+    apiFetch<TicketQueueResponse>(`/admin/tickets?${params().toString()}`).then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne vérifie pas les billets.") : setMsg({ tone: "err", text: refus(e, "Chargement impossible.").text })));
   }, [params]);
   useEffect(() => { const h = setTimeout(load, 250); return () => clearTimeout(h); }, [load]);
 

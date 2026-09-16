@@ -5766,3 +5766,96 @@ création, rien à la décision.
 - **Un seul libellé** pour le motif `SCAM` : « Arnaque suspectée » (front membre) ou « Tentative d'arnaque » (back-office).
 - **La décision visible dans les onglets « traité » / « sans suite »** : qui, quand, avec quelle note (aujourd'hui au
   journal seulement).
+
+
+# Back-office — paramètres de la plateforme : une source, un effet mesuré, une trace par clé (cahier 02-ADMIN § 5.20)
+
+*(PR `chore/recette-admin-5-20`, 15/09/2026 — ADM-PAR-1 à 12 ; lots rattachés : décisions du 15/09 sur les signalements
+et les pages refusées.)*
+
+## Le besoin
+
+Une poignée de chiffres gouverne la plateforme : la commission, les planchers, les fenêtres d'annulation et de notation,
+le délai laissé au Voyageur dans un litige, les seuils d'alerte. Ils doivent pouvoir changer sans déploiement, par la
+bonne personne, avec une raison, sous les yeux de tous les super administrateurs — et sans jamais changer ce qui a déjà
+été promis à un membre.
+
+## Les règles
+
+**RG-ADM-PAR-01 — Une source** : la page, ses panneaux d'explication et la documentation lisent le même catalogue ; une
+clé que le code ne lit pas n'a pas de curseur (classe C) ; les invariants de sécurité se lisent sans se régler (classe B).
+
+**RG-ADM-PAR-02 — Qui règle quoi** : clés métier = super administrateur seul ; clés d'exploitation = Exploitation ou super
+administrateur ; lecture pour les autres profils sauf Données personnelles. La portée est jugée clé par clé, AVANT toute
+écriture : une requête qui mêle une clé refusée n'écrit rien et nomme la ou les clés refusées.
+
+**RG-ADM-PAR-03 — Bornes et cohérence** : hors bornes, S ≤ M ≤ L non respecté, intervalle de relance sous le délai, clé
+inconnue, motif de moins de 20 caractères, aucun changement effectif → refus, quel que soit le profil, aucune ligne.
+
+**RG-ADM-PAR-04 — Une trace par clé** : chaque clé modifiée ou remise par défaut écrit sa ligne (`SETTING_CHANGED` /
+`SETTINGS_RESET`, avant, après, motif, version), dans la même transaction ; un email « Paramètres de la plateforme
+modifiés » (ou « réinitialisés ») part à chaque super administrateur joignable, dans SA langue, valeurs et unités
+comprises (« 48 h → 50 h », jamais « 48 hours »).
+
+**RG-ADM-PAR-05 — Effet en moins de 30 secondes** : la nouvelle valeur est servie par tous les services dans les 30 s, y
+compris au navigateur d'un visiteur (cache HTTP compris).
+
+**RG-ADM-PAR-06 — Jamais rétroactif** : une réservation garde son prix figé ; **un litige ouvert garde l'échéance annoncée
+au Voyageur à son ouverture**, même si le délai de réponse change ensuite.
+
+**RG-ADM-PAR-07 — Un seul gagnant** : deux administrateurs qui enregistrent à partir de la même version → un seul
+enregistrement ; l'autre lit « Les paramètres ont changé entre-temps : la page est rechargée, refais ta modification. »,
+jamais une erreur technique, que le document existe déjà ou non. Un double clic n'enregistre qu'une fois. Une
+réinitialisation depuis une page périmée se refuse de la même façon et recharge la page.
+
+**RG-ADM-PAR-08 — Refus lisibles** : un refus s'affiche en français et nomme ce qui ne va pas (« Valeur refusée —
+Commission Yamba : entre 5 % et 20 %. »).
+
+**RG-ADM-PAR-09 — Repli sûr** : document absent ou illisible → chaque service applique les valeurs par défaut, sans
+erreur ; la page affiche « Version 0 · toutes les valeurs sont celles par défaut » ; le script de remise à zéro n'écrit
+rien au journal (geste de préparation, jamais de production).
+
+**RG-ADM-PAGE-01 — Une page refusée dit un seul refus** (décision du 15/09) : un profil qui ouvre une page dont il n'a
+pas la permission lit le titre de la page et UN bloc de refus en français — sans consigne, section, onglet ni
+« Chargement… ». Le refus vient du serveur.
+
+**RG-ADM-SIG-09 — La décision visible** (décision du 15/09) : sous « traité » et « sans suite », dans les deux files,
+chaque carte dit qui a décidé (prénom), quand, et la note (« Traité par Nadia le … · note : « … » », « Classé sans suite
+par Nadia le … · sans note ») ; une décision plus ancienne que le journal se dit « décision antérieure au journal ».
+
+**RG-ADM-SIG-10 — Un seul libellé** (décision du 15/09) : le motif `SCAM` se dit « Arnaque suspectée » partout — front
+membre (profil, annonce, message), back-office, documentation.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| PAR-1 | Page à zéro | Version 0, douze groupes, colonnes, panneau d'explication, classe B sans champ, documentation et classe C ; aucune ligne | oui |
+| PAR-2 | Commission 12 → 15 % | aperçu « 3,00 € », panneau, motif ≥ 20, message, effet < 30 s (API et navigateur), email, historique, prix figé, accueil, une ligne | oui |
+| PAR-3 | Trois seuils en une fois (Exploitation) | trois lignes, même motif, même version ; email en français | oui (email « hours / days » avant correction) |
+| PAR-4 | Onze refus + super administrateur sur une clé d'exploitation | statuts du cahier, aucune ligne ; clé acceptée écrite | oui |
+| PAR-5 | Deux administrateurs | 409 en français, saisies perdues, page rechargée, lignes de B seules | oui |
+| PAR-6 | « remettre », « Tout réinitialiser », rejeu, Exploitation | liste exacte, message, email, 400, clés métier intactes ; une ligne par clé | oui |
+| PAR-7 | Document supprimé | défauts servis, écrans intacts, Version 0, aucune ligne | oui |
+| PAR-8 | Trois écritures simultanées, document absent puis présent | 200, 409, 409 deux fois ; deux lignes | oui (500 avant correction) |
+| PAR-9 | Délai ramené à 12 h sur un litige ouvert | échéance inchangée (dossier et vue Voyageur), décision refusée 409 | oui (échéance raccourcie avant correction) |
+| PAR-10 | Écran : hors bornes, double clic, réinitialisation périmée | refus français nommant la clé ; un PATCH ; 409 français + rechargement | oui (« 400 : Some values… » avant correction) |
+| PAR-11 | Document illisible | défauts servis, page lisible, réparation par la page | oui |
+| ACC-3 (rejouée) | Dernière modification sur l'accueil après une remise à zéro | UNE écriture nommée par ses libellés | oui (écritures sans rapport additionnées avant correction) |
+| PAR-12 | Données personnelles sur /settings et /settings/docs | un seul refus, aucune section | oui (sections sous refus avant) |
+| SIG-5 | Profils sans signalements | un seul refus, ni consigne ni sections ni onglets | oui |
+| SIG-10 | Décisions dans les deux files | qui, quand, note (ou « sans note ») | oui |
+| SIG-11 | Quatorze pages refusées | un seul refus par page | oui |
+
+## Ce qui reste à trancher
+
+- **Conditions d'annulation figées à l'acceptation ?** La fenêtre de remboursement intégral et le pourcentage de retenue
+  (clés « figurant dans les CGU ») s'appliquent AU MOMENT DE L'ANNULATION, pas à celui de la réservation : les changer
+  change la retenue d'une réservation déjà acceptée. Figer la politique dans le snapshot du deal (comme le prix) ou
+  assumer que les CGU en vigueur au jour de l'annulation s'appliquent — décision produit et juridique.
+- **La version repart à 0** après le script de remise à zéro : l'historique peut alors montrer deux « version 1 ».
+  Garder un compteur monotone (ne pas supprimer le document, remettre ses valeurs) ?
+- **« Tout réinitialiser » par l'API pour l'Exploitation** : sans liste de clés, le serveur refuse (403) dès qu'une clé
+  métier diffère ; l'écran, lui, ne propose que les clés du profil. Aligner l'API (ne remettre que les clés permises) ?
+- **La règle « plafond ≥ prime » est inatteignable** avec les bornes du catalogue (prime ≤ 50 €, plafond ≥ 100 €) : la
+  garder comme filet ou la retirer de la documentation.

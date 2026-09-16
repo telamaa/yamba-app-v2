@@ -14,7 +14,10 @@ export const getPricingParams = async (_req: Request, res: Response, next: NextF
   try {
     const snapshot = await platformSettings().snapshot();
     const body: PricingParamsResponse = { ...pricingParamsFromSettings(snapshot.values), version: snapshot.version };
-    res.setHeader("Cache-Control", "public, max-age=30");
+    // Recette 02-ADMIN § 5.20 (ADM-PAR-2) — la promesse est « effet en moins de 30 s ». Le lecteur de paramètres a déjà un
+    // cache de 30 s ; un `max-age=30` navigateur s'y AJOUTAIT (jusqu'à 60 s dans le wizard). `no-cache` : le navigateur
+    // revalide (ETag → 304 sans corps), le seul cache est celui du serveur.
+    res.setHeader("Cache-Control", "public, no-cache");
     return res.status(200).json(body);
   } catch (error) {
     return next(error);

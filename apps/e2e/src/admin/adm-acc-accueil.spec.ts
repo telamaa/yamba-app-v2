@@ -192,7 +192,9 @@ test.describe("ADM-ACC — accueil et compteurs (cahier 02-ADMIN § 5.1)", () =>
       }, { timeout: 90_000, intervals: [5_000], message: "le résumé passe au vert une fois le seuil relevé (≤ 30 s de cache)" }).toBe(true);
       const bandeau = ops.page.locator("p").filter({ hasText: /^Paramètres modifiés le / });
       await expect(bandeau).toBeVisible({ timeout: 30_000 });
-      await expect(bandeau).toContainText(new RegExp(`^Paramètres modifiés le \\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2} par .+ : ${cle.replace(/\./g, "\\.")} — voir les paramètres$`));
+      // Recette § 5.20 : le bandeau nomme le LIBELLÉ du paramètre (« Versement en échec depuis »), plus sa clé technique ;
+      // ANO-ADM-56 : seule la dernière écriture, même si le document a été remis à zéro entre-temps (version réutilisée).
+      await expect(bandeau).toContainText(/^Paramètres modifiés le \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2} par .+ : Versement en échec depuis — voir les paramètres$/);
       await expect(bandeau.getByRole("link", { name: "voir les paramètres" })).toHaveAttribute("href", "/settings");
       test.info().annotations.push({ type: "constat", description: `bandeau : « ${(await bandeau.innerText()).trim()} »` });
       /* Journal : une ligne SETTING_CHANGED sur SETTINGS · clé. */
