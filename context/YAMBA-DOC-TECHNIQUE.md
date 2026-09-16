@@ -10003,3 +10003,72 @@ Les `.pdf` datent du 06/09 et ont divergé dès le 09/09 — la question « rég
 faits. C'est désormais écrit noir sur blanc dans l'en-tête du cahier et dans `docs/recette/README.md` : **le `.md` fait
 foi**, le code et ses tests au-dessus de lui (précédence du dépôt). `python3 scripts/build-doc-pdf.py <fichier.md>` reste
 disponible pour une remise à niveau ponctuelle, avant une transmission externe par exemple.
+
+---
+
+# PR — Transitions du trajet : écrire sur l'état lu (A196) · `feat/concurrence-transitions-trajet`
+
+## Pourquoi
+
+A195 avait soldé les cinq fichiers MEMBRE de l'inventaire d'A192. L'axe proposé en fin de chantier était de vérifier
+trip-service et deal-service, jamais balayés côté membre. Résultat de l'inventaire :
+
+- **deal-service : rien à faire.** Toutes ses écritures transactionnelles passent par `booking-write.ts`,
+  `deal-request.service.ts`, `deal-mediation.service.ts` ou `admin-finance.service.ts` — tous déjà sous
+  `withWriteConflictRetry` (A192). Les services de cycle de vie (`deal-lifecycle`, `deal-transport`, `deal-rating`,
+  `deal-settlement`) n'ouvrent pas de transaction eux-mêmes : ils passent par l'écrivain commun. C'est une bonne
+  architecture, et elle a tenu.
+- **trip-service : les huit transitions du trajet étaient à découvert.**
+
+## Le défaut
+
+```ts
+const ctx = await buildLifecycleCtx(trip.id);
+const check = canPerform(trip, "cancel", ctx);      // juge l'état LU
+if (!check.allowed) return next(/* … */);
+await prisma.trip.update({ where: { id }, data: { status: "CANCELLED", … } });  // écrit quoi qu'il arrive
+```
+
+La machine à états est la source de vérité — mais seulement jusqu'à la ligne suivante. Entre la garde et l'écriture,
+l'état peut avoir changé, et rien ne le rappelait. Trois conséquences, toutes silencieuses :
+
+| Course | Ce qui arrivait |
+|---|---|
+| Pause dans un onglet, annulation dans l'autre | les deux passent la garde ; **une transition jouée depuis un état qui n'existait plus** |
+| Double clic sur « Publier » | deux incréments du compteur public **et deux vagues de notifications** aux abonnés du corridor |
+| Un deal naît entre la garde et l'écriture de l'annulation | **D72 tombe** : trajet annulé avec un deal vivant |
+
+## Le correctif
+
+`ecrireTransition(trip, data, options)` conditionne l'écriture au **statut lu** et à `isDeleted: false`, sous
+`withWriteConflictRetry`. `count !== 1` → **409 `TRIP_STATE_CHANGED`** : le front recharge le trajet et ses
+`allowedActions` (il ne décide jamais lui-même — règle non négociable).
+
+Pour l'annulation, la condition porte **aussi sur `reservedKg` lu**. C'est le même raisonnement qu'en A195, appliqué à
+l'envers : la réservation d'un deal passe déjà par un `updateMany` conditionnel sur le **même document Trip** (CAP-01,
+`capacityReservationWhere`). Ce document partagé est donc le témoin dont l'annulation avait besoin — un deal né
+entre-temps a bougé `reservedKg`, la condition ne matche plus, et le refus redevient celui de D72, avec son décompte :
+
+```ts
+const ecrit = await ecrireTransition(trip, { status: "CANCELLED", cancelledAt: new Date() }, { surReservation: true });
+if (ecrit !== 1) {
+  const vivants = await countActiveBookings(trip.id);
+  if (vivants > 0) return next(new AppError("…", 409, true, { type: "trip", code: "TRIP_HAS_ACTIVE_DEALS", activeDeals: vivants }));
+  return next(trajetChange());
+}
+```
+
+**Pitfall A34 respecté** : `reservedKg` peut être ABSENT sur un trajet d'avant B2-PR1, et aucun filtre Prisma ne matche
+un champ absent sur un scalaire requis. La condition est donc **omise** dans ce cas — la refuser pour toujours serait
+pire que la course qu'on corrige. Le remède reste `backfill-reserved-kg.ts`.
+
+Les compteurs publics du Voyageur (`applyCarrierStatDeltas`) lisaient les valeurs puis écrivaient une valeur absolue :
+deux transitions simultanées en perdaient une. L'écriture est conditionnée aux valeurs lues, relue et rejouée **trois
+fois au plus** — puis abandonnée. C'est un arbitrage assumé : un compteur d'affichage ne fait pas échouer une transition
+déjà écrite, et le cron de cohérence repasse derrière.
+
+## Tests
+
+trip-service **293 → 305** (12 scénarios : conditions posées, 409 du perdant, publication jouée deux fois sans double
+notification, D72 sous concurrence, trajet legacy sans `reservedKg`, compteurs relus puis abandonnés).
+`scripts/smoke-services.sh` : les six bundles bootent.
