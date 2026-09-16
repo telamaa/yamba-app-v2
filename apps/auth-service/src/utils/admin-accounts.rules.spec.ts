@@ -1,7 +1,7 @@
 /**
  * admin-accounts.rules.spec.ts — règles pures des comptes admin (recette 02-ADMIN § 5.25, A185, A186).
  */
-import { inServiceSuperAdminsWhere, inviteMode, isUniqueViolation, removesSuperAdmin } from "./admin-accounts.rules";
+import { inServiceSuperAdminsWhere, inviteMode, isUniqueViolation, removesSuperAdmin, isPendingInvitation, canReceiveAccountEmail, rolesChanged } from "./admin-accounts.rules";
 
 describe("inviteMode — que faire de l'adresse invitée (A185)", () => {
   it("adresse inconnue → nouveau compte", () => expect(inviteMode(null)).toEqual({ kind: "NEW" }));
@@ -41,5 +41,27 @@ describe("removesSuperAdmin / inServiceSuperAdminsWhere (A186)", () => {
     expect(isUniqueViolation({ code: "P2002" })).toBe(true);
     expect(isUniqueViolation({ code: "P2034" })).toBe(false);
     expect(isUniqueViolation(new Error("x"))).toBe(false);
+  });
+});
+
+describe("A189 — invitation en attente, destinataire joignable, profils vraiment changés", () => {
+  it("isPendingInvitation : profil admin sans mot de passe, compte non supprimé", () => {
+    expect(isPendingInvitation({ passwordHash: null, adminRoles: ["SUPPORT"] })).toBe(true);
+    expect(isPendingInvitation({ passwordHash: null, adminRole: "OPS", adminRoles: [] })).toBe(true);
+    expect(isPendingInvitation({ passwordHash: "h", adminRoles: ["SUPPORT"] })).toBe(false); // acceptée
+    expect(isPendingInvitation({ passwordHash: null, adminRole: null, adminRoles: [] })).toBe(false); // retirée
+    expect(isPendingInvitation({ passwordHash: null, adminRoles: ["SUPPORT"], isDeleted: true })).toBe(false);
+    expect(isPendingInvitation(null)).toBe(false);
+  });
+  it("canReceiveAccountEmail : jamais un compte supprimé ni une adresse suppressionnée", () => {
+    expect(canReceiveAccountEmail({ isDeleted: false, emailSuppressedAt: null })).toBe(true);
+    expect(canReceiveAccountEmail({ isDeleted: true, emailSuppressedAt: null })).toBe(false);
+    expect(canReceiveAccountEmail({ isDeleted: false, emailSuppressedAt: new Date() })).toBe(false);
+    expect(canReceiveAccountEmail(null)).toBe(false);
+  });
+  it("rolesChanged : l'ordre ne compte pas", () => {
+    expect(rolesChanged(["SUPPORT", "FINANCE"], ["FINANCE", "SUPPORT"])).toBe(false);
+    expect(rolesChanged(["SUPPORT"], ["SUPPORT", "FINANCE"])).toBe(true);
+    expect(rolesChanged(["SUPPORT", "OPS"], ["SUPPORT", "FINANCE"])).toBe(true);
   });
 });

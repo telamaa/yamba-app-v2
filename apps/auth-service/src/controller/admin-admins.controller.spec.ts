@@ -6,6 +6,7 @@
  * ANO-ADM-77 : trois clics sur « Enregistrer » avec le même lien posaient trois mots de passe (trois lignes de journal).
  * ANO-ADM-78 : deux super administrateurs qui se rétrogradaient au même instant laissaient ZÉRO super administrateur.
  * ANO-ADM-79 : trois invitations simultanées de la même adresse → [201, 500, 500].
+ * A189 (§ 5.26) : renvoyer une invitation en attente, motif facultatif du retrait, email à l'admin dont les accès changent.
  */
 const store = new Map<string, string>();
 const redisMock = {
@@ -20,12 +21,17 @@ const tx = {
   platformSettings: { update: jest.fn() },
 };
 const prismaMock = {
-  user: { findUnique: jest.fn() },
+  user: { findUnique: jest.fn(), findMany: jest.fn() },
   platformSettings: { upsert: jest.fn() },
   $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
 };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined) };
-const emails = { adminInvite: jest.fn(() => ({ subject: "invite" })), adminAccessGranted: jest.fn(() => ({ subject: "granted" })) };
+const emails = {
+  adminInvite: jest.fn(() => ({ subject: "invite" })),
+  adminAccessGranted: jest.fn(() => ({ subject: "granted" })),
+  adminRolesChanged: jest.fn(() => ({ subject: "roles" })),
+  adminAccessRevoked: jest.fn(() => ({ subject: "revoked" })),
+};
 const sendAuthEmail = jest.fn(async () => undefined);
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
@@ -174,5 +180,77 @@ describe("A185 — invitations : un lien vivant par compte, à usage unique", ()
     const { error } = await call(ctrl.acceptAdminInvite as never, req({ body: { token, password: "Recette-Porte-2026!" } }));
     expect((error as unknown as Error).message).toBe("panne");
     expect(store.get("admin_invite:" + token)).toBe(B);
+  });
+});
+
+describe("A189 — renvoyer, motiver, prévenir (lots décidés au § 5.25)", () => {
+  const invite = { id: B, isDeleted: false, email: "i@x.dev", firstName: "Inès", lastName: "I", preferredLocale: "fr", passwordHash: null, adminRole: "SUPPORT", adminRoles: ["SUPPORT"], roles: ["ADMIN"], emailSuppressedAt: null };
+
+  it("a — invitation en attente : nouveau lien, l'ancien meurt, email, une ligne ADMIN_INVITE_RESENT ; la liste dit jusqu'à quand", async () => {
+    store.set("admin_invite:ancien", B);
+    store.set(`admin_invite_user:${B}`, "ancien");
+    prismaMock.user.findUnique.mockResolvedValue(invite);
+    const { res, error } = await call(ctrl.resendAdminInvite as never, req({ params: { id: B } }));
+    expect(error).toBeUndefined();
+    expect(res.json.mock.calls[0][0]).toMatchObject({ ok: true, inviteExpiresAt: expect.any(String) });
+    expect(store.has("admin_invite:ancien")).toBe(false);
+    const nouveau = store.get(`admin_invite_user:${B}`)!;
+    expect(nouveau).not.toBe("ancien");
+    expect(store.get(`admin_invite:${nouveau}`)).toBe(B);
+    expect(sendAuthEmail).toHaveBeenCalledTimes(1);
+    expect(emails.adminInvite).toHaveBeenCalledWith(expect.objectContaining({ acceptUrl: expect.stringContaining(nouveau) }));
+    expect((auditMock.recordAdminAction.mock.calls as unknown[][]).map((c) => (c[1] as { action: string }).action)).toEqual(["ADMIN_INVITE_RESENT"]);
+
+    prismaMock.user.findMany.mockResolvedValue([{ ...invite, totpEnabledAt: null, createdAt: new Date() }, { ...invite, id: A, passwordHash: "h", totpEnabledAt: new Date(), createdAt: new Date() }]);
+    const liste = await call(ctrl.listAdmins as never, req({}));
+    const items = liste.res.json.mock.calls[0][0].items as Array<{ id: string; inviteExpiresAt: string | null }>;
+    expect(items.find((i) => i.id === B)!.inviteExpiresAt).toEqual(expect.any(String)); // ttl mocké : 3600 s
+    expect(items.find((i) => i.id === A)!.inviteExpiresAt).toBeNull(); // invitation acceptée : rien à dire
+  });
+
+  it("a — invitation acceptée → 409 ADMIN_INVITE_NOT_PENDING ; compte inconnu → 404 ; ni lien, ni email, ni ligne", async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({ ...invite, passwordHash: "h" });
+    expect((await call(ctrl.resendAdminInvite as never, req({ params: { id: B } }))).error).toMatchObject({ statusCode: 409, details: { code: "ADMIN_INVITE_NOT_PENDING" } });
+    prismaMock.user.findUnique.mockResolvedValueOnce({ ...invite, adminRole: null, adminRoles: [] });
+    expect((await call(ctrl.resendAdminInvite as never, req({ params: { id: B } }))).error).toMatchObject({ statusCode: 409 });
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+    expect((await call(ctrl.resendAdminInvite as never, req({ params: { id: B } }))).error).toMatchObject({ statusCode: 404 });
+    expect(store.size).toBe(0);
+    expect(sendAuthEmail).not.toHaveBeenCalled();
+    expect(auditMock.recordAdminAction).not.toHaveBeenCalled();
+  });
+
+  it("b + c — retrait avec motif : le motif va au journal, l'email « accès retiré » part SANS motif ; sans motif : aucune clé after", async () => {
+    tx.user.findUnique.mockResolvedValue({ ...invite, passwordHash: "h" });
+    prismaMock.user.findUnique.mockResolvedValue({ ...invite, adminRole: null, adminRoles: [], roles: [] });
+    const { error } = await call(ctrl.revokeAdmin as never, req({ params: { id: B }, body: { reason: "  Compte compromis signalé par l'intéressée  " } }));
+    expect(error).toBeUndefined();
+    expect((auditMock.recordAdminAction.mock.calls[0] as unknown[])[1]).toMatchObject({ action: "ADMIN_REVOKED", after: { reason: "Compte compromis signalé par l'intéressée" } });
+    expect(emails.adminAccessRevoked).toHaveBeenCalledWith({ firstName: "Inès", revokedBy: "Sacha S", supportEmail: expect.any(String) });
+    expect(sendAuthEmail).toHaveBeenCalledWith("i@x.dev", "fr", { subject: "revoked" });
+
+    jest.clearAllMocks();
+    await call(ctrl.revokeAdmin as never, req({ params: { id: B }, body: { reason: "   " } }));
+    expect((auditMock.recordAdminAction.mock.calls[0] as unknown[])[1]).not.toHaveProperty("after");
+    expect((await call(ctrl.revokeAdmin as never, req({ params: { id: B }, body: { reason: "x".repeat(501) } }))).error).toMatchObject({ statusCode: 400 });
+  });
+
+  it("c — profils changés : email avant → après ; même liste dans un autre ordre : rien ; adresse suppressionnée ou compte supprimé : rien", async () => {
+    tx.user.findUnique.mockResolvedValue({ ...invite, passwordHash: "h", adminRoles: ["SUPPORT", "FINANCE"], adminRole: "SUPPORT" });
+    prismaMock.user.findUnique.mockResolvedValue({ ...invite, passwordHash: "h" });
+    await call(ctrl.updateAdminRole as never, req({ params: { id: B }, body: { adminRoles: ["SUPPORT"] } }));
+    expect(emails.adminRolesChanged).toHaveBeenCalledWith(expect.objectContaining({ before: "SUPPORT + FINANCE", after: "SUPPORT", changedBy: "Sacha S" }));
+    expect(sendAuthEmail).toHaveBeenCalledTimes(1);
+
+    jest.clearAllMocks();
+    await call(ctrl.updateAdminRole as never, req({ params: { id: B }, body: { adminRoles: ["FINANCE", "SUPPORT"] } }));
+    expect(sendAuthEmail).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    prismaMock.user.findUnique.mockResolvedValue({ ...invite, emailSuppressedAt: new Date() });
+    await call(ctrl.updateAdminRole as never, req({ params: { id: B }, body: { adminRoles: ["OPS"] } }));
+    prismaMock.user.findUnique.mockResolvedValue({ ...invite, isDeleted: true });
+    await call(ctrl.revokeAdmin as never, req({ params: { id: B } }));
+    expect(sendAuthEmail).not.toHaveBeenCalled();
   });
 });

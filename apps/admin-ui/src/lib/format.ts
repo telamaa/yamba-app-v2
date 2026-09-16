@@ -51,6 +51,7 @@ export const ACTION_LABEL: Record<string, string> = {
   RETENTION_ARBITRATED: "Retenue arbitrée",
   ADMIN_INVITED: "Admin invité",
   ADMIN_INVITE_ACCEPTED: "Invitation acceptée",
+  ADMIN_INVITE_RESENT: "Invitation renvoyée",
   ADMIN_ROLE_CHANGED: "Profil admin modifié",
   ADMIN_REVOKED: "Accès admin retiré",
   ADMIN_SESSION_REVOKED: "Session révoquée",
@@ -227,7 +228,9 @@ export function adminAccountRefusalMessage(e: { status?: number; data?: unknown;
   if (code === "ADMIN_ALREADY_GRANTED") return { text: "Ce compte a déjà un profil admin.", reload: true };
   if (code === "ACCOUNT_DELETED") return { text: "Ce compte est supprimé : il ne peut pas recevoir d'accès admin.", reload: false };
   if (code === "INVITATION_INVALID") return { text: "Ce lien d'invitation n'est plus valable. Demande une nouvelle invitation à un super administrateur.", reload: false };
+  if (code === "ADMIN_INVITE_NOT_PENDING") return { text: "Cette invitation n'est plus en attente (acceptée ou accès retiré). La liste est rechargée.", reload: true }; // A189 a
   if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne gère pas les comptes admin (super administrateur seulement).", reload: false };
+  if (e?.status === 400 && (e?.data as { details?: { errors?: Record<string, string> } } | undefined)?.details?.errors?.reason) return { text: "Motif trop long : 500 caractères au plus.", reload: false }; // A189 b
   if (e?.status === 400) return { text: "Demande refusée : vérifie l'adresse, le prénom, le nom (ou le mot de passe : 8 caractères au moins, sans ton nom ni ton email).", reload: false };
   return { text: "Action impossible pour le moment. Recharge la page avant de réessayer.", reload: true };
 }
@@ -483,4 +486,10 @@ export function erasureBlockerLabel(blocker: string, count: number | undefined):
     case "ADMIN_ACCOUNT": return "un profil admin (à révoquer d'abord)";
     default: return blocker;
   }
+}
+
+/** A188 d (ANO-ADM-84) — « 2 code(s) » : pluriel accordé ; à zéro, le recours est dit (aucune régénération au back-office). */
+export function backupCodesWarning(n: number): string {
+  if (n <= 0) return "Tu n'as plus de code de secours : si tu perds ton application d'authentification, un super administrateur devra réinitialiser ta double authentification.";
+  return `Il te reste ${n} ${n === 1 ? "code" : "codes"} de secours.`;
 }

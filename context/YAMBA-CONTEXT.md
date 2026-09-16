@@ -796,6 +796,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.26 MES SESSIONS (branche `chore/recette-admin-5-26`, empilee sur #326) — FIN DU § 5** —
+  5 scenarios ADM-SES (1 du cahier + SES-2 reconnaitre une session, SES-3 serveur injoignable, SES-4 journal des sessions
+  fermees, SES-5 codes de secours et panne de lecture) + ADM-CPT-12, 13 (lots du § 5.25), CPT-4 realignee (invite du
+  motif). CONTRE-EPREUVE : SES-1 a 5 ROUGES sur le code d'origine ; CPT-12, 13, SES-2, 4 ROUGES backend d'origine.
+  ANO-ADM-81 CLOSE (majeure) : sessions sans appareil ni IP (« Revoque ce que tu ne reconnais pas » impossible).
+  ANO-ADM-82 CLOSE (majeure) : « Se deconnecter » affichait /login sur une panne, session toujours ouverte. ANO-ADM-83
+  (mineure) : deconnexion rejouee / session deja fermee journalisees. ANO-ADM-84 (mineure) : « code(s) », rien a zero code,
+  panne affichee « Aucune session. ». DECISIONS : A188 (enregistrement de session : ip, userAgent, device recopies a la
+  rotation ; `revokeAdminSession` → booleen, 404 `ADMIN_SESSION_NOT_FOUND` ; /login apres 200/401 seulement), A189 (lots :
+  `POST /admin/admins/:id/invite/resend` + `inviteExpiresAt`, motif facultatif du retrait au journal, emails
+  `adminRolesChanged` / `adminAccessRevoked` sans lien ni motif). SYNTHESE § 5 : 26 chapitres conformes, 80 anomalies
+  closes (4 bloquantes, 42 majeures, 34 mineures), A155 → A189. PIEGE : `nx build` sans `--skip-sync` peut ne rien rebatir
+  en non interactif — verifier une chaine nouvelle dans `dist/main.js`. Tests : auth 334, deal 644, message 57, trip 293,
+  notification 122, harnais 524. Reste : § 6 (ADM-E2E-1 a 8), § 7 (+ P2034 admin-users / admin-auth), § 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.25 COMPTES ADMIN (branche `chore/recette-admin-5-25`, empilee sur #325)** — 11
   scenarios ADM-CPT (1 a 5 du cahier + CPT-6 compte sans mot de passe / ancien lien, CPT-7 clics simultanes, CPT-8
   retrogradations croisees, CPT-9 refus francais, CPT-10 et 11 pour les lots du § 5.24). CONTRE-EPREUVE : CPT-2, 3, 4, 6, 7,

@@ -35,3 +35,23 @@ describe("formatSettingValue — une valeur de paramètre, dans la langue du des
     expect(email.content.paragraphs).toContain("• Versement en échec depuis : 48 h → 50 h");
   });
 });
+
+describe("A189 c — l'admin dont les accès changent est prévenu, sans porte d'entrée ni motif interne", () => {
+  const liens = (e: { content: { cta?: unknown; paragraphs: string[]; footnotes?: string[] } }) => JSON.stringify(e.content).match(/https?:\/\//g) ?? [];
+  it.each(["fr", "en"] as const)("%s : profils modifiés (avant → après, auteur) et accès retiré — aucun lien, aucun bouton", (locale) => {
+    const d = getAdminEmails(locale);
+    const changed = d.adminRolesChanged({ firstName: "Sami", changedBy: "Sacha S.", before: "Support", after: "Support + Finance", supportEmail: "support@yamba.app" });
+    const revoked = d.adminAccessRevoked({ firstName: "Sami", revokedBy: "Sacha S.", supportEmail: "support@yamba.app" });
+    for (const e of [changed, revoked]) {
+      expect(e.content.cta).toBeUndefined();
+      expect(liens(e)).toEqual([]);
+    }
+    expect(changed.content.paragraphs.join(" ")).toContain("Support + Finance");
+    expect(changed.content.paragraphs.join(" ")).toContain("Sacha S.");
+    expect(revoked.content.paragraphs.join(" ")).toContain("Sacha S.");
+  });
+  it("français : sujets lisibles", () => {
+    expect(getAdminEmails("fr").adminAccessRevoked({ firstName: "Sami", revokedBy: "Sacha S.", supportEmail: "s@y.app" }).subject).toBe("Ton accès au back-office Yamba a été retiré");
+    expect(getAdminEmails("fr").adminRolesChanged({ firstName: "Sami", changedBy: "Sacha S.", before: "Support", after: "Finance", supportEmail: "s@y.app" }).subject).toBe("Tes profils sur le back-office Yamba ont changé");
+  });
+});
