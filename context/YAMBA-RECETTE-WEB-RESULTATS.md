@@ -4992,6 +4992,100 @@ trajets créés (Joséphine, super administrateur) sont supprimés en fin de fic
 
 ---
 
+## Cahier 02-ADMIN — § 5.9 Médiation : la file, le dossier, la décision · **CONFORME** (6 fiches + 3 ajoutées · 3 anomalies closes dont 1 BLOQUANTE (double remboursement) · 2 améliorations de fond (A160, écran) · 4 écarts documentaires · 9 scénarios, 6 min 30)
+
+`apps/e2e/src/admin/adm-med-mediation.spec.ts`. Le geste le plus lourd du back-office : il déplace de l'argent, clôt un
+deal et marque la réputation d'une partie. Chaque décision est vérifiée à **cinq** endroits : l'écran (récapitulatif,
+message), l'API, la base (statut, compteur interne, événement d'outbox), **le fournisseur de paiement** (remboursements
+réellement émis, lus par la fiche argent → `provider.inspect` du FAKE) et les emails des deux parties.
+
+**Terrain mesuré avant d'écrire** : YAM-2041 signalé à J−1, YAM-2042 à H−8, retenue close à J−4 ; délai de réponse 72 h →
+**aucun** litige décidable après le seed. Deux manœuvres consignées, par des gestes réels : `dispute.responseDelayHours`
+abaissé à **12 h** par le super administrateur (minimum du catalogue ; le cahier dit « 1 heure », hors bornes), rétabli en
+`finally` ; la **version du Voyageur** déposée par Adebayo depuis son espace pour rendre YAM-2042 décidable. Le jeu d'essai
+est rejoué après chaque décision. **Chaque fiche a d'abord été jouée contre le code non corrigé.**
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-MED-1 | La file « À arbitrer » | **Conforme** (+ amélioration) — titre ; sous-titre citant le paramètre **par son libellé réel** « Délai de réponse au litige » (corrigé) ; « 3 affiché(s) · file entière : 2 litige(s) · 1 retenue(s) » ; colonnes exactes ; YAM-2041 « Contenu manquant · Paris → Brazzaville · Chinwe (Exp.) · Thomas (Voy.) · J+1 », YAM-2042 « Londres → Lagos · Mai (Exp.) · Adebayo (Voy.) · attend le Voyageur · n h », retenue « Annulation après le départ · à trancher », J+4 pas rouge ; délai à 12 h → YAM-2041 « sans réponse · à trancher », YAM-2042 « attend le Voyageur · ≤ 4 h » ; filtres type / origine / destination / âge / décidabilité, compteurs de la file entière **inchangés**, y compris quand un filtre ne rend rien (corrigé) ; `?kind=RETENTION` et `?decidable=1` présélectionnent ; aucune ligne de journal |
+| ADM-MED-2 | Ouvrir un dossier | **Conforme** (+ amélioration) — « YAM-2041 », « Paris → Brazzaville · DISPUTED », « ← À arbitrer » ; bandeau « Version du Voyageur attendue jusqu'au … — décision possible dès sa réponse ou à l'échéance. » ; blocs Chronologie, Argent, Expéditeur, Voyageur, Colis déclaré, Prise en charge, Signalement (description, « Remboursement partiel », engagement) ; catégorie « Petits jouets » et versement « gelé (litige) » **en français** (corrigé) ; code `742891` absent de la page **et de la réponse de l'API** ; lien « Lire la conversation des deux parties → · Lecture journalisée. » pour le Médiateur, absent pour la Finance ; journal `DISPUTE_VIEWED BOOKING · id`, `{ kind: "DISPUTE", ticketNumber: "YAM-2041" }` |
+| ADM-MED-3 | Les gardes du formulaire | **Conforme** (+ amélioration) — Support : « Ton profil lit ce dossier mais ne tranche pas (médiateur ou super administrateur). » ; YAM-2042 avant l'échéance : « Décision possible à partir du … », appel direct **409** `TRANSITION_NOT_ALLOWED` portant `decidableAt` ; partiel 0 et total → « entre 0,01 et {total − 1 centime} », serveur 400 `PARTIAL_REFUND_OUT_OF_BOUNDS` ; motif de 30 caractères → bouton inactif, « 30 / 50 min » ; Finance → 403 ; un refus du serveur s'affiche **en français par son code** (« Le délai de réponse du Voyageur court encore : décision possible à partir du … ») au lieu de « 409 : The carrier still has time… » (corrigé) ; aucune décision |
+| ADM-MED-4 | Rejet | **Conforme** — indice « Voyageur : 28,00 € · Yamba garde … » ; récapitulatif « Remboursé à l'Expéditeur (Chinwe) : 0,00 € · Versé au Voyageur (Thomas) : 28,00 € · Conservé par Yamba : commission + prime » ; « Décision enregistrée · … deal COMPLETED · remboursé 0,00 € · versé 28,00 € (versement envoyé) » (statut du versement en français, corrigé) ; base : COMPLETED, `completedBy: ADMIN`, versement parti (FAKE : SENT) ; **Chinwe** +1 litige perdu, Thomas inchangé ; **un** `booking.dispute_resolved` à l'horodatage exact de la transition ; **aucun** remboursement émis chez le fournisseur ; seconde décision → 409 ; deux emails « Décision rendue » (un par partie, montant propre, motif intégral, jamais le code) ; aucune fenêtre de notation ; journal `DISPUTE_RESOLVED` avant/après exacts |
+| ADM-MED-5 | Remboursement partiel | **Conforme** — version d'Adebayo déposée → « Version du Voyageur reçue le … — décision possible. » ; montant = moitié du total (< net) ; récapitulatif dont les trois lignes totalisent **exactement** le payé ; COMPLETED ; **Adebayo** +1 litige perdu, Mai inchangée ; **un** remboursement du montant saisi chez le fournisseur ; `refundedAt` ≤ `completedAt` (l'argent d'abord) ; portefeuille de Mai : `PARTIALLY_REFUNDED`, part rendue = montant, part gardée = total − montant ; journal exact |
+| ADM-MED-6 | Remboursement total | **Conforme** — indice « Expéditeur : {total} (commission comprise) · Voyageur : 0 » ; CANCELLED, `closedBy: ADMIN`, remboursé = total, versement nul ; Thomas +1 ; **un** remboursement du total ; journal `FULL_REFUND` exact |
+| ADM-MED-7 (ajoutée) | Deux décisions simultanées | **Conforme après correction** → `ANO-ADM-22` ; Médiateur et super administrateur valident au même instant deux partiels différents : **200 + 409 `DECISION_IN_PROGRESS`**, **un** remboursement émis, base = ce remboursement, **une** ligne de journal. Avant : 200 + 500 au premier passage, puis 200 + 409 **avec deux remboursements émis (7,84 € et 15,68 €)** |
+| ADM-MED-8 (ajoutée) | Un dossier tranché se relit | **Conforme après amélioration** → **A160** ; après un rejet, la Finance ouvre YAM-2041 : bloc « Décision rendue » (issue, motif), « Ce dossier est déjà tranché. », plus de bandeau d'attente, relecture journalisée `DISPUTE_VIEWED` ; la file ne le montre plus ; un deal jamais passé en médiation → 404. Avant : « Ce deal n'est pas en attente d'arbitrage. » |
+| ADM-MED-9 (ajoutée) | Partiel supérieur au net | **Conforme après correction** → `ANO-ADM-23` ; Chinwe lit « nous te remboursons 29,68 €. Le Voyageur ne reçoit rien sur ce deal. », Thomas « Aucun versement ne te revient sur ce deal. ». Avant : « Le reste est versé au Voyageur. » alors qu'il ne reçoit rien (le « avant » est prouvé par le test unitaire : notification-service, lancé sous `nx serve`, avait déjà rechargé la correction quand la fiche a été jouée) |
+
+### Anomalies
+
+- **ANO-ADM-22 (BLOQUANTE, close)** — **deux décisions simultanées remboursaient deux fois.** La médiation fait partir le
+  remboursement avant la transaction (D39) ; les deux requêtes passaient les vérifications, émettaient chacune leur
+  remboursement, et seul le second enregistrement échouait (500, puis 409 selon le moment). Mesuré : deux remboursements
+  FAKE sur le même paiement, un seul en base. Correction (**A159**) : verrou Redis par deal pris AVANT toute lecture
+  (`apps/deal-service/src/lib/decision-lock.ts`, câblé dans `deal.routes.ts`, gestes `resolveDispute` et
+  `resolveRetention` de `deal-mediation.service.ts`), code 409 `DECISION_IN_PROGRESS` ajouté au contrat
+  (`booking-lifecycle.schema.ts`). 4 tests unitaires (`decision-lock.spec.ts`).
+- **ANO-ADM-23 (mineure, close)** — **l'email de l'Expéditeur mentait sur un partiel supérieur au net** : « Le reste est
+  versé au Voyageur. » quand le Voyageur ne reçoit rien et que Yamba garde la différence. Correction
+  (`apps/notification-service/src/emails/settlement-emails.ts`, FR et EN) : « Le Voyageur reçoit {montant}. » ou « Le
+  Voyageur ne reçoit rien sur ce deal. » ; test unitaire (`booking-emails.spec.ts`).
+- **ANO-ADM-24 (mineure, close, établie par lecture du code)** — **l'alerte « litiges décidables sans décision » ignorait
+  le paramètre de délai** : elle codait 72 h en dur et partait de la création de la fiche `Dispute`, là où l'écran de
+  médiation lit `dispute.responseDelayHours` et `Booking.disputedAt`. Avec un délai abaissé à 24 h, l'alerte arrivait
+  48 h trop tard. Correction : règle pure `countUndecidedDisputes` (`ops-alerts.rules.ts`), branchée dans
+  `ops-alerts.service.ts` avec le paramètre ; 3 tests unitaires.
+
+### Écarts documentaires
+
+- **Délai « abaissé à 1 heure »** (MED-3) : hors bornes, le minimum de `dispute.responseDelayHours` est 12 h.
+- **Blocs « Trancher », « Jalons du voyage », « Remise »** (MED-2) : avant l'échéance, « Trancher » cède la place à la
+  date de décision ; les deux autres n'apparaissent qu'avec des jalons ou des photos de remise, que le jeu d'essai ne pose
+  pas.
+- **Sous-titre de la file** : le cahier et l'écran citaient « Litige : délai de réponse » ; le paramètre s'appelle « Délai
+  de réponse au litige » (écran corrigé, cahier à aligner).
+- **Messages** : statut du versement en français dans le message de succès ; un dossier tranché affiche la décision au lieu
+  d'un 404.
+
+### Améliorations faites
+
+- **A160** — dossier tranché relisible (`admin-dispute.service.ts` `fileKindOf`, test unitaire ; `DecisionForm.tsx` :
+  « déjà tranché » avant la permission).
+- **Écran de décision** (`DecisionForm.tsx`) : refus lus par leur code et traduits (délai, verrou, bornes, fournisseur,
+  conflit d'intérêts, permission — chacun dit si **rien n'est parti**) ; montant accepté avec espaces (« 1 234,50 ») ;
+  dossier rechargé après la décision (bloc « Décision rendue » affiché, bandeau retiré) ; statut du versement en français.
+- **Dossier** (`DisputeFileView.tsx`, `format.ts`) : catégorie du colis et statut du versement en français
+  (`PARCEL_CATEGORY_LABEL`, mêmes libellés que le site).
+- **File** (`QueueTable.tsx`, `disputes/page.tsx`) : compteurs de la file entière visibles même sans résultat ; libellé réel
+  du paramètre ; erreur de chargement explicite.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **MED-1** — *Fait* : compteurs toujours visibles, libellé du paramètre. *Proposé* : trier par **échéance de décision**
+  plutôt que par ouverture (un litige où le Voyageur a répondu est décidable avant un plus ancien sans réponse) — petit.
+  *Test* : le rouge à J+5 n'est prouvé que dans le sens « pas rouge » (J+4) ; une retenue vieillie le prouverait — petit.
+- **MED-2** — *Fait* : libellés français. *Proposé* : le numéro de téléphone et l'adresse du destinataire manquent au
+  dossier alors que le litige « non livré » les appelle — à trancher (données personnelles). *Test* : le code de livraison
+  est cherché dans la page ET dans la réponse de l'API — rien à faire.
+- **MED-3** — *Fait* : refus traduits. *Proposé* : afficher le compte à rebours du délai dans le formulaire plutôt qu'une
+  date — petit.
+- **MED-4** — *Constat* : le versement part immédiatement (FAKE : SENT) ; en réel, un compte Stripe du Voyageur non prêt le
+  mettrait en échec sans bloquer la décision — c'est voulu. *Proposé* : le récapitulatif pourrait prévenir « compte de
+  paiement du Voyageur non prêt : le versement sera rejoué » — petit.
+- **MED-5** — *Proposé* : afficher dans le récapitulatif **qui perd le litige** (compteur interne) : c'est une conséquence de
+  la décision que le médiateur ne voit nulle part — petit.
+- **MED-6** — *Constat* : le remboursement total rend les kilos au trajet (`releaseKg`), sur un trajet déjà parti — sans
+  effet visible, à connaître.
+- **MED-7** — *Fait* : verrou (A159). *Proposé* : passer le **remboursement manuel appliqué** (§ 5.15) et les annulations
+  remboursées sous le même verrou — même risque, non mesuré ici ; ajouter une clé d'idempotence Stripe
+  (`idempotencyKey` sur `refunds.create`) pour qu'une reprise après panne entre le remboursement et la transaction ne
+  rembourse pas deux fois — moyen.
+- **MED-8** — *Fait* : A160. *Proposé* : un lien « Dossier de médiation » depuis la fiche argent d'un deal tranché — petit.
+- **MED-9** — *Fait* : email juste. *Test* : piège de poste — un service lancé sous `nx serve` recharge le code modifié
+  PENDANT le passage « avant correction » ; la preuve « avant » d'un défaut côté notification-service doit être unitaire.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

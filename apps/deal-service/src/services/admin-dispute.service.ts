@@ -108,6 +108,23 @@ export function arbitrationKindOf(b: Pick<AdminBookingRecord, "status" | "retent
   return null;
 }
 
+/**
+ * Amélioration § 5.9 (A160) — le DOSSIER se relit après la décision : un litige tranché (deal COMPLETED / CANCELLED, fiche
+ * `Dispute` présente) ou une retenue arbitrée restent consultables, décision comprise ; la FILE, elle, ne les montre plus
+ * (`arbitrationKindOf`). Avant, l'écran répondait « Ce deal n'est pas en attente d'arbitrage. » et son bloc « Décision
+ * rendue » n'était jamais atteint pour un litige.
+ */
+export function fileKindOf(
+  b: Pick<AdminBookingRecord, "status" | "retentionDisposition" | "retentionDecidedAt">,
+  dispute: Pick<AdminDisputeRecord, "ticketNumber"> | null
+): "DISPUTE" | "RETENTION" | null {
+  const live = arbitrationKindOf(b);
+  if (live) return live;
+  if (dispute) return "DISPUTE";
+  if (b.retentionDecidedAt && (b.retentionDisposition === "CARRIER" || b.retentionDisposition === "SHIPPER")) return "RETENTION";
+  return null;
+}
+
 /** Pur : une ligne de la file. */
 export function toQueueItem(
   b: AdminBookingRecord,
@@ -161,7 +178,7 @@ export function toDisputeFile(
   now: Date = new Date(),
   delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS
 ): AdminDisputeFile | null {
-  const kind = arbitrationKindOf(b);
+  const kind = fileKindOf(b, dispute);
   if (!kind) return null;
   const resolution =
     dispute?.resolvedAt && dispute.resolutionOutcome
@@ -182,7 +199,7 @@ export function toDisputeFile(
   const canDecide =
     kind === "RETENTION"
       ? b.retentionDisposition === "HELD_FOR_MEDIATION"
-      : !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt, delayHours).getTime());
+      : b.status === "DISPUTED" && !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt, delayHours).getTime());
   const retentionCents = b.retentionCents ?? 0;
   return {
     retentionDecision,
@@ -329,7 +346,7 @@ export function makeAdminDisputeService(settings: SettingsReader = platformSetti
 
     async getFile(admin: { id: string; ip?: string | null; userAgent?: string | null }, bookingId: string): Promise<AdminDisputeFile> {
       const booking = (await prisma.booking.findFirst({ where: { id: bookingId, isDeleted: false } })) as unknown as AdminBookingRecord | null;
-      if (!booking || !arbitrationKindOf(booking)) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
+      if (!booking) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
       const [dispute, shipper, carrier] = await Promise.all([
         prisma.dispute.findUnique({ where: { bookingId } }),
         prisma.user.findUnique({ where: { id: booking.shipperId }, select: partySelect }),

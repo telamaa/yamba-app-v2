@@ -7997,3 +7997,106 @@ rien. Le message est rendu hors du bloc « Chargement… » : un refus au tout p
 - `apps/e2e` : **393 scénarios** (385 + 8) ; chaque fiche jouée seule AVANT correction (BIL-1, 5, 6, 7, 8 en échec sur
   leur défaut), puis 8/8 verts deux fois.
 - Typecheck trip-service, admin-ui, harnais verts ; contrats OpenAPI inchangés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.9 : la médiation — un verrou avant l'argent, un dossier qui se relit, un email qui ne ment plus
+
+*(PR `chore/recette-admin-5-9`, empilée sur #309, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Neuf scénarios (ADM-MED-1 à 6 du cahier, 7 à 9 ajoutés), trois anomalies closes dont une **bloquante**, deux décisions
+au registre (A159, A160).
+
+```
+apps/e2e/src/admin/adm-med-mediation.spec.ts                 9 scénarios, 5 sources de preuve par décision
+apps/deal-service/src/lib/decision-lock.ts (+ spec)          NOUVEAU — ANO-ADM-22 / A159, verrou Redis par deal
+apps/deal-service/src/services/deal-mediation.service.ts     gestes de médiation sous verrou (échec fermé sans magasin)
+apps/deal-service/src/routes/deal.routes.ts                  câblage du Redis partagé
+packages/libs/api-contracts/src/booking/booking-lifecycle.schema.ts   code 409 DECISION_IN_PROGRESS
+apps/deal-service/src/services/admin-dispute.service.ts (+ spec)      A160 — fileKindOf : un dossier tranché se relit
+apps/deal-service/src/services/ops-alerts.rules.ts (+ spec)  ANO-ADM-24 — countUndecidedDisputes, délai = paramètre
+apps/deal-service/src/services/ops-alerts.service.ts         branchement du paramètre dispute.responseDelayHours
+apps/notification-service/src/emails/settlement-emails.ts (+ spec)    ANO-ADM-23 — partiel au-delà du net
+apps/admin-ui/src/components/DecisionForm.tsx                refus par code, montant « 1 234,50 », rechargement, « déjà tranché »
+apps/admin-ui/src/components/DisputeFileView.tsx, QueueTable.tsx, lib/format.ts, app/(back)/disputes/page.tsx
+```
+
+## ANO-ADM-22 : le verrou optimiste protège la base, pas l'argent
+
+`resolveDispute` suit D39 : **l'argent d'abord**. L'ordre était :
+
+```
+loadBookingForWrite → canPerform → dispute.resolvedAt ? → isDisputeDecidable → provider.refund(…) → applyBookingTransition (updateMany conditionnel)
+```
+
+Deux administrateurs qui valident au même instant lisent tous deux un dossier non tranché, passent toutes les
+vérifications, et appellent tous deux `provider.refund`. Le verrou optimiste (`updateMany` sur `from: "DISPUTED"`) fait
+échouer la seconde **transaction** — mais son **remboursement** est déjà parti. Mesuré avec le fournisseur FAKE, dont les
+remboursements sont relus par la fiche argent (`POST /admin/deals/:id/money/reconcile` → `provider.inspect`) : `[784, 1568]`
+pour un deal, 784 en base.
+
+Correction : réserver le geste **avant toute lecture**.
+
+```ts
+// apps/deal-service/src/lib/decision-lock.ts
+export async function withDecisionLock<T>(store: DecisionLockStore, dealId: string, fn: () => Promise<T>, ttlMs = 60_000): Promise<T> {
+  const key = `yamba:deal:decision:${dealId}`;
+  const token = randomUUID();
+  if ((await store.set(key, token, "PX", ttlMs, "NX")) !== "OK") {
+    throw new BookingLifecycleError("DECISION_IN_PROGRESS", "Another decision is being recorded on this deal: reload it in a few seconds.");
+  }
+  try { return await fn(); }
+  finally { await store.eval(RELEASE, 1, key, token).catch(() => undefined); } // compare-and-delete : jamais le verrou d'un autre
+}
+
+// deal-mediation.service.ts — le gagnant RELIT le deal sous verrou
+resolveDispute: (admin, dealId, input) => withDecisionLock(requireLock(), dealId, () => gestures.resolveDisputeUnlocked(admin, dealId, input)),
+```
+
+Trois choix : (1) **verrou avant lecture**, sinon le perdant qui obtient le verrou après la libération agirait sur une
+lecture périmée ; (2) **jeton + compare-and-delete** (script Lua), pour qu'un geste plus long que le TTL ne libère pas le
+verrou d'un autre ; (3) **échec fermé** : le magasin est injecté (`deal.routes.ts` passe le Redis partagé), et un service
+construit sans magasin lève une erreur plutôt que de trancher sans verrou. Le module ne charge pas Redis lui-même : ses
+tests unitaires utilisent une `Map`.
+
+Ce que le verrou ne couvre pas : une **panne** entre le remboursement et la transaction (le deal reste DISPUTED, un nouvel
+essai rembourserait à nouveau). La défense est une clé d'idempotence du fournisseur (`refunds.create(…, { idempotencyKey })`),
+proposée. Le même risque de concurrence existe sur le remboursement manuel appliqué (§ 5.15).
+
+## A160 : un dossier tranché se relit
+
+`getFile` refusait tout deal que `arbitrationKindOf` ne rangeait pas dans la file (DISPUTED, ou CANCELLED +
+HELD_FOR_MEDIATION). Après une décision, le dossier répondait 404 et le bloc « Décision rendue » de `DisputeFileView` — déjà
+écrit — n'était jamais atteint pour un litige. `fileKindOf(booking, dispute)` ajoute deux cas : une fiche `Dispute` existe
+(litige tranché), ou une retenue a été arbitrée (`retentionDecidedAt` + disposition CARRIER/SHIPPER). La file garde
+`arbitrationKindOf` ; `canDecide` exige désormais aussi `status === "DISPUTED"`.
+
+## ANO-ADM-24 : deux définitions de « décidable »
+
+L'écran de médiation : `isDisputeDecidable({ disputedAt, carrierRespondedAt }, now, settings["dispute.responseDelayHours"])`.
+L'alerte : `carrierRespondedAt ?? createdAt + 72 h`. Deux sources de date et une constante là où il y a un paramètre. La
+règle pure `countUndecidedDisputes(disputes, now, responseDelayHours, thresholdHours)` reprend la définition de l'écran ;
+le service charge `Booking.disputedAt` des litiges ouverts et passe le paramètre.
+
+## Le harnais : cinq preuves, et deux pièges
+
+- **Le fournisseur FAKE indexe par intent**, et l'intent d'un deal du jeu d'essai (`pi_fake_seed_bzv-disputed`) est le même
+  d'un rejeu à l'autre : sa liste de remboursements cumule les fiches précédentes. La fiche relève la liste avant le geste
+  et compare la **différence**.
+- **`nx serve` recharge un service modifié pendant un passage** : notification-service a pris la correction d'ANO-ADM-23
+  au milieu du passage « avant correction ». La preuve « avant » d'un défaut dans un service sous `nx serve` doit être
+  unitaire (ou le service lancé en bundle).
+- Le cache de 30 s des paramètres côté deal-service impose d'attendre `canDecide` (sonde sur l'API du dossier) après chaque
+  changement de délai — y compris le retour à 72 h de la fiche précédente.
+
+## Tests
+
+- deal-service **586** (+8 : `decision-lock.spec.ts` ×4, `ops-alerts.rules.spec.ts` ×3, `admin-dispute.service.spec.ts` ×1)
+  ; notification-service **120** (+1) ; autres services inchangés.
+- `apps/e2e` : **402 scénarios** (393 + 9) ; passage contre le code non corrigé (MED-1/2/3 sur l'écran, MED-7 double
+  remboursement, MED-8 404), puis 9/9 verts deux fois.
+- Typecheck deal, notification, auth, trip, message, admin-ui, harnais verts ; contrats OpenAPI inchangés (le code d'erreur
+  n'est pas exposé en énumération).

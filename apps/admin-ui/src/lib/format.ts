@@ -21,6 +21,13 @@ export const CATEGORY_LABEL: Record<string, string> = {
   OTHER: "Autre",
 };
 
+/** Catégories du colis déclaré (ParcelCategory) — mêmes libellés que le site (messages/fr/booking.json). */
+export const PARCEL_CATEGORY_LABEL: Record<string, string> = {
+  CLOTHES: "Vêtements", SHOES: "Chaussures", FASHION_ACCESSORIES: "Accessoires de mode", OTHER_ACCESSORIES: "Autres accessoires",
+  BOOKS: "Livres", DOCUMENTS: "Documents", SMALL_TOYS: "Petits jouets", PHONE: "Téléphone", COMPUTER: "Ordinateur",
+  OTHER_ELECTRONICS: "Autre électronique", CHECKED_BAG_23KG: "Bagage en soute 23 kg", CABIN_BAG_12KG: "Bagage cabine 12 kg",
+};
+
 export const OUTCOME_LABEL: Record<string, string> = {
   FULL_REFUND: "Remboursement total",
   PARTIAL_REFUND: "Remboursement partiel",

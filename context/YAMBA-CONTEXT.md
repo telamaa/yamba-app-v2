@@ -727,6 +727,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   TRANCHER : URL ImageKit publiques et permanentes (fichiers prives + URL signees) ; prevenir le Voyageur que modifier
   date/ville retire le badge ; rouvrir un rejet « dates » quand les dates sont corrigees. Tests : trip 292, harnais 393.
   Reste : § 5.9 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.9 MEDIATION (branche `chore/recette-admin-5-9`, empilee sur #309)** — 9 scenarios
+  CONFORMES (MED-1 a 6 du cahier + 7 a 9 ajoutees), joues contre le code non corrige puis 9/9 verts deux fois
+  (`adm-med-mediation.spec.ts`, 5 preuves par decision dont les remboursements REELLEMENT emis, lus par la fiche argent).
+  Manoeuvres : `dispute.responseDelayHours` a 12 h (min du catalogue) et version du Voyageur deposee par Adebayo.
+  TROIS ANOMALIES CLOSES : ANO-ADM-22 BLOQUANTE (deux decisions simultanees remboursaient DEUX FOIS — mesure : 7,84 € et
+  15,68 € emis, un seul en base ; l'argent part avant la transaction, le verrou optimiste ne protege que la base → A159
+  verrou Redis par deal pris AVANT toute lecture, `apps/deal-service/src/lib/decision-lock.ts`, 409 DECISION_IN_PROGRESS,
+  echec ferme sans magasin), ANO-ADM-23 (email « le reste est verse au Voyageur » quand il ne recoit rien), ANO-ADM-24
+  (alerte « litiges decidables » : 72 h en dur au lieu du parametre → `countUndecidedDisputes`). AMELIORATIONS : A160
+  dossier tranche relisible (`fileKindOf`) ; refus par code et traduits, montant « 1 234,50 », rechargement apres
+  decision, statut du versement et categorie en francais, compteurs de file toujours visibles, libelle reel du parametre.
+  A TRANCHER : meme verrou pour le remboursement manuel (§ 5.15) et les annulations ; cle d'idempotence Stripe ;
+  coordonnees du destinataire au dossier. PIEGES : FAKE indexe par intent reutilise d'un seed a l'autre (comparer en
+  difference) ; `nx serve` recharge le code pendant un passage « avant ». Tests : deal 586, notification 120, harnais 402.
+  Reste : § 5.10 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
