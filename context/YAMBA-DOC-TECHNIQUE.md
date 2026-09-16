@@ -6318,3 +6318,132 @@ n'existe pas. `/es` répond maintenant 404 avec la page du produit en français,
 Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **280 scénarios**
 (274 + WEB-PRF ×6). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (les libellés de l'écran vivent dans
 `dashboard.copy.ts`), miroir i18n donc inchangé.
+
+---
+
+# Chapitre 5.27 du cahier 01-WEB : la mesure d'audience — une bannière qui condamnait un bouton, et un corridor jamais mesuré
+
+*(PR `chore/recette-web-5-27`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-septième chapitre « fiches » du cahier 01-WEB : `WEB-ANA` (la bannière de consentement, ses deux issues, ce
+qui part quand on accepte, la reprise du choix du compte sur un autre appareil, le retrait de l'accord, l'absence de
+clé). Six fiches jouées et conformes (deux après correction) **plus une contre-épreuve**, deux anomalies closes
+(`ANO-WEB-89`, `ANO-WEB-90`).
+
+```
+apps/e2e/src/chapitres/web-ana.spec.ts                                            7 scénarios, DEUX passes (avec clé / sans clé)
+scripts/recette/collecteur-audience.ts                                            un faux PostHog local qui journalise ce qui part
+apps/user-ui/src/components/layout/ConsentBanner.tsx                              ANO-WEB-89 (la bannière publie sa hauteur)
+apps/user-ui/src/app/global.css                                                   `--yamba-consent-space`, `--yamba-viewport`
+apps/user-ui/src/app/[locale]/layout.tsx                                          la place réservée en bas de page
+apps/user-ui/src/app/[locale]/(marketing)/layout.tsx, dashboard/layout.tsx        `100vh` → `var(--yamba-viewport)`
+apps/user-ui/src/components/auth/forms/*.tsx, auth/skeleton/*.tsx                 idem (onze écrans d'authentification)
+apps/user-ui/src/hooks/useTripsSearch.ts                                          ANO-WEB-90 (`from` / `to`, pas `origin` / `destination`)
+```
+
+## Le montage : un faux PostHog, local, qui dit la vérité
+
+Le cahier déclare ce chapitre `⏭` sans clé PostHog. S'en contenter aurait laissé sans preuve la promesse la plus
+sensible du produit : « aucune donnée personnelle ne part à la mesure ». On a donc posé une clé de recette et un hôte
+local dans `apps/user-ui/.env.local`, et écrit un **collecteur** :
+
+```
+npx tsx scripts/recette/collecteur-audience.ts --out <fichier> --clear
+```
+
+Il écoute sur `127.0.0.1:9977` et répond comme PostHog : `404` sur `/array/<clé>/config.js` (le SDK retombe alors sur
+la variante JSON), une configuration minimale où tout ce qui capture de lui-même est coupé, des drapeaux vides, des
+« extensions » inertes mais bien formées, et `{"status":1}` sur les points d'entrée d'événements — dont il écrit le
+contenu, **une ligne de JSON par événement**, dans un fichier que la fiche relit. Le corps est décodé quelle que soit
+sa forme (JSON nu, `data=` encodé en base64, gzip).
+
+Pourquoi un vrai serveur plutôt qu'une interception Playwright ? Parce qu'un collecteur qui répond mal **casse le SDK
+en silence** : sans configuration crédible — ou avec les extensions servies vides — la fin de `init()` échoue,
+`capture()` est appelé et rien ne part. On aurait « prouvé » qu'aucune donnée ne fuit… en ayant cassé la mesure
+soi-même. Mesuré, puis corrigé.
+
+Deuxième piège, plus vicieux : **posthog-js refuse de capturer depuis un navigateur automatisé**. Dans le `dist` du
+SDK (1.427.2) :
+
+```js
+var ol = function (t, i) { … return !!t.webdriver };   // _is_bot()
+…
+if (this.is_capturing()) { var c = !this.config.opt_out_useragent_filter && this._is_bot(); if (!c || …) { … } }
+```
+
+`navigator.webdriver` vaut `true` sous Playwright : `capture()` s'arrête là, sans un mot. Le harnais masque donc ce
+**seul** drapeau (`Object.defineProperty(navigator, "webdriver", { get: () => false })`) — l'application n'est pas
+touchée. Sans cela, les fiches « rien ne part » seraient vertes pour la mauvaise raison.
+
+## ANO-WEB-89 : une bannière `fixed` qui ne réservait pas sa place
+
+`ConsentBanner` est `fixed inset-x-3 bottom-3 z-50`. Rien ne réservait sa hauteur : sur les pages calées sur la
+hauteur de la fenêtre — les onze écrans d'authentification (`lg:min-h-[calc(100vh-64px)]`), la vitrine, le tableau de
+bord — elle **recouvrait** le bas de la carte. Mesuré sur `/fr/login` en 1280×720 : « Se connecter » et
+« Inscris-toi » sous le dialogue, le clic intercepté (`… intercepts pointer events`), et aucun défilement possible
+puisque le document tenait dans la fenêtre. Il fallait répondre à la bannière pour pouvoir se connecter.
+
+La correction ne déplace pas la bannière : elle lui fait **annoncer sa taille**.
+
+```tsx
+// ConsentBanner.tsx — tant qu'elle est là, elle publie sa hauteur
+const hauteur = boite.current?.offsetHeight ?? 0;
+racine.style.setProperty("--yamba-consent-space", `${hauteur + 24}px`);
+```
+
+```css
+/* global.css — la hauteur d'écran UTILE */
+:root {
+  --yamba-consent-space: 0px;
+  --yamba-viewport: calc(100vh - var(--yamba-consent-space));
+}
+```
+
+Les quatorze mises en page qui raisonnaient en `calc(100vh-…)` utilisent désormais `calc(var(--yamba-viewport)-…)`,
+et le conteneur de page réserve la même hauteur (`pb-[var(--yamba-consent-space,0px)]`). Effet mesuré : la bannière
+fait 163 px, la variable vaut 187 px, la page peut défiler d'autant, un défilement libère le bouton
+(`document.elementFromPoint` renvoie bien le bouton), et **tout est rendu** dès qu'on a répondu.
+
+La leçon est générale : un élément `fixed` qui recouvre du contenu doit publier sa taille, et la mise en page doit la
+retirer de la hauteur utile. Le bandeau de maintenance (D64), lui, est en flux — il n'a jamais eu ce défaut.
+
+## ANO-WEB-90 : un cast qui mentait, et un corridor jamais mesuré
+
+`search_performed` est le premier événement du funnel (D66 3A). Il partait ainsi :
+
+```ts
+void track("search_performed", {
+  origin: (params as { origin?: string }).origin ?? null,        // ← n'existe pas
+  destination: (params as { destination?: string }).destination ?? null,
+  …
+});
+```
+
+`SearchTripsParams` n'a pas de `origin` ni de `destination` : les critères s'appellent **`from`** et **`to`**. Les deux
+propriétés partaient donc **toujours à `null`** — la mesure n'a jamais pu dire quel corridor était cherché, alors que
+c'est exactement le signal dont le pilotage (D59, D74) et la « demande visible » ont besoin. Le typage ne pouvait rien
+dire : les deux lectures étaient **castées**. Une ligne corrigée, un cast supprimé, et les noms de propriétés — le
+contrat de la mesure, en anglais — inchangés.
+
+À retenir : `as { … }` sur un objet dont le type est connu ne convertit rien, il **fait taire** le compilateur. C'est
+la deuxième anomalie de cette campagne née d'un accès de champ jamais vérifié.
+
+## Ce que le harnais a appris ici
+
+- **`storageState` mémorise aussi le `localStorage`.** Dès qu'une fiche a accepté, la session enregistrée d'Aminata
+  porte `yamba.analytics.consent` : la bannière ne se présente plus, ni dans ce chapitre au passage suivant, ni dans
+  les chapitres d'après. Chaque fiche repart donc « sans choix » (`partirSansChoix` : on efface la clé sur l'origine
+  puis on recharge) et l'`afterAll` oublie la session mémorisée.
+- **`networkidle` n'arrive jamais quand le SDK tourne** (le collecteur est sollicité en continu) : `page.goto` en
+  délai d'attente de 120 s. Tout le chapitre navigue en `domcontentloaded`.
+- **Un événement se rate en naviguant trop vite.** Chaque étape attend SON événement (`expect.poll` sur le journal du
+  collecteur) au lieu d'un `waitForTimeout` global.
+- **Deux passes valent mieux qu'un `⏭`.** Les fiches 1 à 5 se sautent sans clé, la fiche 6 se saute avec : le fichier
+  est rejouable dans les deux états du poste, et chaque passe dit ce qu'elle prouve.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **287 scénarios**
+(280 + WEB-ANA ×6 + la contre-épreuve ANO-WEB-89). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.

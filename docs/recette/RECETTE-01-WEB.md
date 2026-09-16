@@ -4684,7 +4684,9 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 ### 5.27 — `WEB-ANA` · Le consentement à la mesure d'audience
 
 **Ce que couvre ce chapitre.** La bannière de consentement, ses deux issues, et la persistance du choix.
-**Préconditions communes** — `NEXT_PUBLIC_POSTHOG_KEY` et `NEXT_PUBLIC_POSTHOG_HOST` posées, front redémarré. **Sans ces clés, tout ce chapitre est `⏭`, motif « clé PostHog absente ».**
+**Préconditions communes** — `NEXT_PUBLIC_POSTHOG_KEY` et `NEXT_PUBLIC_POSTHOG_HOST` posées, front redémarré. **Sans ces clés, tout ce chapitre est `⏭`, motif « clé PostHog absente »** — sauf `WEB-ANA-6`, qui EXIGE au contraire qu'elles soient retirées.
+
+*Procédure de recette (12/09/2026) — comment jouer ce chapitre sans compte PostHog et sans rien envoyer dehors.* Poser dans `apps/user-ui/.env.local` une clé de recette et un hôte local (`NEXT_PUBLIC_POSTHOG_KEY=phc_recette_web_5_27`, `NEXT_PUBLIC_POSTHOG_HOST=http://127.0.0.1:9977`), redémarrer le front, et lancer le **collecteur d'audience** : `npx tsx scripts/recette/collecteur-audience.ts --out <fichier> --clear`. C'est un faux PostHog local qui répond comme le vrai et journalise chaque événement reçu : on lit exactement ce que le navigateur aurait envoyé, et rien ne sort du poste. Le chapitre se joue alors en **deux passes** : 1 à 5 avec les clés, puis 6 après les avoir commentées et redémarré le front. Deux pièges à connaître : un collecteur qui répond mal (extensions servies vides) casse la fin de `init()` et rend la mesure muette ; et **posthog-js refuse de capturer depuis un navigateur automatisé** (`navigator.webdriver`) — le harnais masque ce seul drapeau. Détails au rapport, § 5.27.
 
 ---
 

@@ -3292,6 +3292,122 @@ chapitre les pose lui-même dans son `beforeAll` — Aminata en français **avec
   tiennent 4 Gio) : la charge moyenne monte à 6–7 et c'est ce qui produit les délais d'attente ci-dessus. Les arrêter
   avant une campagne.
 
+## Chapitre 5.27 — Le consentement à la mesure d'audience · **CONFORME** (6 fiches jouées + 1 contre-épreuve, 2 après correction · 2 anomalies closes · 7 scénarios, 2 passes, 1 min 36 + 19 s)
+
+`web-ana.spec.ts`. Le chapitre exige `NEXT_PUBLIC_POSTHOG_KEY` et `NEXT_PUBLIC_POSTHOG_HOST` posées (cahier § 5.27,
+sinon tout est `⏭`). **Il ne s'est donc pas contenté du `⏭`** : la clé de recette `phc_recette_web_5_27` et l'hôte
+`http://127.0.0.1:9977` ont été posés dans `apps/user-ui/.env.local`, et le chapitre démarre **son propre
+collecteur** — `scripts/recette/collecteur-audience.ts`, un faux PostHog local qui répond comme le vrai
+(configuration distante, drapeaux, extensions inertes) et écrit chaque événement reçu dans un fichier. Rien ne sort
+du poste, et la fiche 3 lit **exactement** ce que le navigateur aurait envoyé. La mesure SERVEUR (`POSTHOG_API_KEY`)
+reste absente : elle n'est pas du ressort de ce chapitre, et elle ne serait pas observable de la même façon.
+
+**Deux passes, chacune honnête sur sa précondition** : les fiches 1 à 5 avec la clé, la fiche 6 (« sans clé ») après
+l'avoir retirée et redémarré le front. Chaque fiche se saute d'elle-même si sa précondition n'est pas remplie — le
+chapitre est donc rejouable dans les deux états du poste. **État laissé au poste : les deux lignes sont COMMENTÉES**
+dans `.env.local` (pas de bannière pour les chapitres suivants ni pour les parcours) ; les décommenter et redémarrer
+le front suffit à rejouer 1 à 5.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-ANA-1 | La bannière s'affiche | **Conforme** — `role="dialog"` « Mesure d'audience », le texte du cahier **mot pour mot**, les trois éléments (« En savoir plus » lien, « Accepter », « Refuser ») ; **même poids visuel** mesuré : même hauteur (à 2 px), largeurs comparables, même taille de police, et « Refuser » est un vrai `<button>` (jamais un lien de bas de page) |
+| **ANO-WEB-89** | La bannière ne condamne aucun bouton (contre-épreuve) | **Conforme après correction** — sur `/fr/login`, la bannière recouvrait « Se connecter » et « Inscris-toi » et le clic était **intercepté par le dialogue** (mesuré en 1280×720, sans défilement possible) ; elle publie maintenant sa hauteur (`--yamba-consent-space` = 187 px ici), la page peut défiler d'au moins sa hauteur, un défilement libère le bouton (`elementFromPoint` renvoie le bouton), et la place est **rendue** dès qu'on a répondu |
+| WEB-ANA-2 | Refuser ne charge rien | **Conforme** — après « Refuser » : **aucune** requête vers l'hôte de mesure sur accueil → recherche → page d'un trajet → accueil, **aucun** événement au collecteur, **aucune** clé `ph_…` (le SDK n'a jamais démarré), et la bannière ne revient pas, même après rechargement. *Constat : en développement, `next dev` précharge le chunk `node_modules_posthog-js_…js` — vérifié absent du build de production (HTML servi et scripts chargés après un refus), c'est un artefact du serveur de développement, pas un chargement du SDK.* |
+| WEB-ANA-3 | Accepter, et vérifier ce qui part | **Conforme après correction** → `ANO-WEB-90` ; le SDK démarre après l'accord (clé `ph_…`), puis partent `$pageview`, `search_performed` (**`origin: "Paris"`, `destination: "Brazzaville"`, `resultsCount` numérique** — les deux premiers partaient toujours à `null`), `trip_viewed` (avec `tripId`), `booking_step_viewed`, `$identify` (l'**identifiant** du compte, jamais autre chose) ; **aucune donnée personnelle** dans ce qui part : ni prénom, ni nom, ni email du membre, ni code de livraison (`742891`, `742 891`), ni prénom/nom/numéro du destinataire |
+| WEB-ANA-4 | Le choix suit le compte | **Conforme** — `analyticsOptIn: true` relu au serveur, puis un **second navigateur neuf** connecté au même compte : aucune bannière, et le choix est recopié dans le navigateur (`yamba.analytics.consent` = `granted`) |
+| WEB-ANA-5 | Retirer son accord | **Conforme** — bascule « Mesure d'audience » dans « Mes données » → `PATCH /auth/me/preferences`, `analyticsOptIn: false` relu au serveur ; ensuite, recherche + accueil + rechargement : **aucune requête, aucun événement**. *Constat : le retrait n'annule pas ce qui était déjà capturé — le SDK vide sa file dans la seconde qui suit (ici les deux pages vues de l'écran « Sécurité », capturées quand l'accord tenait encore).* |
+| WEB-ANA-6 | Sans clé, rien ne s'affiche | **Conforme** (seconde passe, clés retirées, front redémarré) — aucune bannière, aucun envoi, aucune clé `ph_…`, la page est normale, et **aucune erreur de console** hors les deux 401 du sondage de session (ANO-WEB-01, connus depuis 5.3) |
+
+### Anomalies
+
+- **ANO-WEB-89 (mineure, close)** — la bannière de consentement est `fixed` en bas d'écran et **ne réservait aucune
+  place**. Sur les pages calées sur la hauteur de la fenêtre (les onze écrans d'authentification, la vitrine, le
+  tableau de bord), elle recouvrait le bas de la carte : sur la page de connexion, en 1280×720, « Se connecter » et
+  « Inscris-toi » étaient sous le dialogue, le clic **intercepté**, et la page ne défilait pas — il fallait répondre à
+  la bannière pour pouvoir se connecter. Correction en deux temps : la bannière publie sa hauteur dans
+  `--yamba-consent-space`, et `global.css` en déduit `--yamba-viewport` (`calc(100vh - var(--yamba-consent-space))`)
+  dont les **quatorze** mises en page en `calc(100vh-…)` se servent désormais. Résultat : le contenu se recentre
+  au-dessus de la bannière, la page peut défiler de sa hauteur, et tout est rendu dès qu'on a répondu.
+- **ANO-WEB-90 (mineure, close)** — `search_performed`, le premier événement du funnel (D66 3A), lisait
+  `params.origin` et `params.destination`. Ces deux clés **n'existent pas** dans `SearchTripsParams` : les critères
+  s'appellent `from` et `to`. L'événement partait donc toujours avec `origin: null, destination: null` — la mesure
+  n'a jamais pu dire **quel corridor** était cherché, alors que c'est précisément le signal dont le pilotage (D59,
+  D74) et la « demande visible » (chantier proposé au handoff) ont besoin. Les noms de propriétés ne changent pas
+  (contrat de la mesure, en anglais) : seule la lecture est corrigée. Un défaut que le typage ne pouvait pas
+  attraper — les deux lectures étaient **castées** (`(params as { origin?: string }).origin`).
+
+### À trancher (produit)
+
+- **La page où l'on accepte n'est jamais comptée.** L'effet des pages vues (`AnalyticsProvider`) ne dépend que du
+  chemin : au moment du clic sur « Accepter » il a déjà renoncé, et il ne repasse qu'à la navigation suivante. La
+  première page d'une visite manque donc systématiquement à la mesure. Sans conséquence pour la vie privée, mais le
+  taux d'entrée est faux : ajouter le consentement aux dépendances de l'effet (ou capturer la page courante dans
+  `choose("granted")`).
+- **Le retrait ne jette pas ce qui est déjà en file.** `disableAnalytics()` appelle `opt_out_capturing()` +
+  `reset()`, mais la file du SDK se vide quand même (mesuré : deux pages vues parties juste après le retrait).
+  Défendable — ces événements avaient été capturés **sous consentement** — mais à dire dans la politique de
+  confidentialité, ou à jeter explicitement.
+- **En développement, chaque page vue part en DOUBLE** (deux `$pageview` identiques, `$prev_pageview_duration` de
+  0,036 s) : c'est le double appel des effets de React en `StrictMode`. À vérifier sur le build de production avant
+  de lire les chiffres — sinon toute la mesure est à diviser par deux.
+- **Le `$pageview` porte l'URL complète** (`$current_url`, `$pathname`). Aujourd'hui sans conséquence, mais la page
+  publique du destinataire vit sous `/fr/track/<jeton>` : si un destinataire accepte la mesure sur cette page, **le
+  jeton du lien de suivi partirait au collecteur**. Le jeton est une capacité (il ouvre le suivi sans compte) :
+  normaliser le chemin (`/fr/track/:jeton`) avant capture. À trancher avant d'activer la mesure en production —
+  **candidat au registre**.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **ANA-1** — Le texte de la bannière est dans `messages/*/consent.json` et la fiche le compare mot pour mot : bonne
+  chaîne de garde. La bannière n'a ni `aria-modal` ni piège de focus, et elle n'est pas la première chose lue par un
+  lecteur d'écran : la poser en `role="region"` annoncé (ou la rendre focalisable à l'ouverture) serait plus juste —
+  petit.
+- **ANO-WEB-89** — La correction a créé une variable de mise en page (`--yamba-viewport`) : c'est le bon endroit
+  pour toutes les bannières à venir (maintenance, lecture seule, cookies) — et le bandeau de maintenance (D64), qui
+  est en flux, n'a pas ce défaut. Y ajouter la même mesure pour la barre mobile éventuelle — petit.
+- **ANA-2** — « Aucun script chargé » est la seule phrase du cahier qui n'est pas vérifiable telle quelle en
+  développement (Next précharge le module). La preuve retenue est meilleure : aucune requête, aucun événement,
+  aucune clé `ph_…`. À reprendre dans le cahier — petit.
+- **ANA-3** — La liste des événements est courte et lisible (`search_performed`, `trip_viewed`,
+  `booking_step_viewed`, `booking_payment_started`, `booking_created`, `tracking_link_shared`, `trip_published`), et
+  aucune ne porte de donnée personnelle. Elle mériterait un **test unitaire** côté front qui interdit d'ajouter une
+  propriété hors liste blanche — l'équivalent de `analyticsEventsFor` côté serveur (D66), qui, lui, est protégé —
+  moyen.
+- **ANA-4** — Reprendre le choix du compte sans redemander est exactement ce qu'il faut ; le consentement est écrit
+  en *best-effort* (`.catch(() => undefined)`) : un échec réseau laisse le navigateur en accord et le compte sans
+  rien, et la bannière reviendra sur l'autre appareil. Rejouer l'écriture (ou la confirmer comme la bascule de
+  « Mes données ») — petit.
+- **ANA-5** — Le retrait passe par la préférence du compte (leçon d'ANO-WEB-81) et vaut immédiatement : très bien.
+  Jeter la file du SDK au retrait, et journaliser le retrait dans `ConsentLog` comme l'acceptation — petit.
+- **ANA-6** — « Aucune clé, aucune bannière » est correct, mais c'est aussi ce qui a produit ANO-WEB-81 : la bascule
+  de « Mes données » ne doit **pas** disparaître avec la clé du front (elle gouverne la mesure serveur). C'est déjà
+  le cas depuis 5.25 ; la fiche 6 le confirme indirectement — rien à faire.
+- **Transversal** — Les deux anomalies sont de la même famille que celles de 5.26 : **une convention qui ne va pas
+  jusqu'au bout** (une bannière fixe qui ne réserve pas sa place) et **une lecture de champ jamais vérifiée** (un
+  cast qui ment). La parade générique existe pour la seconde : interdire les `as { … }` sur des objets dont le type
+  est connu — un `origin` inexistant serait devenu une erreur de compilation. À porter comme règle de revue — moyen.
+
+### Pièges de poste payés ici
+
+- **Un faux collecteur qui répond mal rend la mesure muette, sans un mot.** Sans configuration distante crédible, ou
+  avec les extensions (sondages) servies **vides**, la fin de `init()` échoue : `capture()` est appelé, rien ne part,
+  et l'on conclurait « aucune mesure » alors qu'on a cassé le SDK soi-même. Le collecteur sert donc des extensions
+  inertes mais **bien formées**, et refuse `config.js` en 404 pour que le SDK retombe sur la variante JSON.
+- **posthog-js REFUSE de capturer depuis un navigateur automatisé** : `_is_bot()` renvoie `!!navigator.webdriver` et
+  `capture()` s'arrête là, en silence (1.427.2, `opt_out_useragent_filter` non posé). Diagnostic obtenu en lisant le
+  `dist` du SDK après trois impasses. Le harnais masque ce **seul** drapeau ; sans lui, les fiches « rien ne part »
+  seraient vraies pour la mauvaise raison.
+- **`storageState` mémorise aussi le `localStorage`** : dès qu'une fiche a accepté, la session enregistrée d'Aminata
+  porte `yamba.analytics.consent` et la bannière ne se présente plus — dans ce chapitre **comme dans les suivants**.
+  Chaque fiche repart donc « sans choix » (`partirSansChoix`), et l'`afterAll` oublie la session mémorisée.
+- **`networkidle` n'arrive jamais quand le SDK tourne** (le collecteur est sollicité en continu) : `page.goto` en
+  délai d'attente de 120 s. Tout le chapitre navigue en `domcontentloaded` et attend ensuite ce qu'il vise.
+- **Un événement se rate en naviguant trop vite** : `search_performed` et `trip_viewed` manquaient parce que la
+  fiche était déjà sur l'écran suivant. Chaque étape attend SON événement (`expect.poll` sur le journal).
+- **Le poste a lâché deux fois** : Atlas (réplique sans primaire) a fait échouer le seed en 180 s, et la charge
+  moyenne montait à 10 avec les dix-sept conteneurs Docker étrangers relancés par Docker Desktop. Le back-office
+  (3001) a été arrêté pour ce chapitre — il n'y sert pas.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

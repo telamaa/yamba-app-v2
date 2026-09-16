@@ -4260,3 +4260,67 @@ page d'outil, jamais une langue à moitié traduite, jamais une erreur brute.
   le sont pas (RG-WEB-267) — candidat au registre.
 - **Notifications push** : rien n'est branché. À arbitrer dans le même geste, avant de remettre une ligne active.
 - **Le thème ne suit pas le compte** : un autre appareil repart sur « Automatique ». Assumé, mais à dire au membre.
+
+---
+
+# Le consentement à la mesure d'audience — ce que le chapitre 5.27 fait respecter
+
+*(PR `chore/recette-web-5-27`, 12/09/2026 — cahier 01-WEB chapitre 5.27, WEB-ANA-1 à 6.)*
+
+## Le besoin
+
+Yamba veut savoir comment son site est utilisé — quels corridors sont cherchés, où une réservation s'arrête — sans
+jamais savoir **qui** a fait quoi. La mesure ne démarre donc qu'après un accord explicite, elle ne transporte aucune
+donnée personnelle, le choix suit le compte d'un appareil à l'autre, il se retire en un geste, et sans clé de mesure
+rien ne s'affiche ni ne part. Et la demande d'accord ne doit pas gêner l'usage du site : une bannière qui recouvre le
+bouton « Se connecter » transforme un consentement en péage.
+
+## Les règles
+
+**RG-WEB-269 — Rien ne se charge avant l'accord.** Le SDK de mesure n'est chargé qu'après « Accepter » : un refus ne
+déclenche aucune requête, aucun script utile, aucun stockage de mesure.
+
+**RG-WEB-270 — Les deux issues ont le même poids.** « Accepter » et « Refuser » sont deux vrais boutons, de même
+taille et de même typographie, au même endroit. Un « Refuser » discret est une anomalie majeure.
+
+**RG-WEB-271 — La demande d'accord ne condamne aucune action.** La bannière réserve sa place : le contenu de la page
+reste atteignable (au pire d'un défilement), et la place est rendue dès qu'on a répondu.
+
+**RG-WEB-272 — Ce qui part est une liste fermée d'événements sans donnée personnelle** : page vue, recherche
+effectuée (origine, destination, poids, nombre de résultats), trajet consulté, étape de réservation, paiement
+autorisé, demande créée, lien de suivi partagé, trajet publié. Jamais un nom, un prénom, une adresse email, un
+numéro de téléphone, un code de livraison ni l'identité d'un destinataire. L'identité d'un membre n'est transmise que
+par son **identifiant**.
+
+**RG-WEB-273 — La recherche mesurée dit quel corridor a été cherché** : origine et destination réelles, et le nombre
+de résultats obtenus (c'est la matière du pilotage).
+
+**RG-WEB-274 — Le choix vit sur le COMPTE.** Un membre qui a répondu sur un appareil n'est pas redemandé sur un
+autre ; la bascule de « Mes données » retire l'accord, et ce retrait vaut immédiatement.
+
+**RG-WEB-275 — Sans clé de mesure, rien** : aucune bannière, aucun envoi, aucune erreur. (La bascule de « Mes
+données » reste, elle, toujours affichée : elle gouverne aussi la mesure côté serveur — RG de 5.25.)
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 310 | Visiteur neuf | bannière « Mesure d'audience », texte exact, trois éléments, deux boutons de même poids | oui |
+| 311 | Bannière affichée sur la page de connexion | le bouton principal reste atteignable, la place est rendue après la réponse | oui (ANO-WEB-89 close) |
+| 312 | « Refuser » puis navigation | aucune requête, aucun événement, aucun stockage de mesure, la bannière ne revient pas | oui |
+| 313 | « Accepter » puis recherche, trajet, réservation | les événements attendus partent, avec origine et destination réelles, et aucune donnée personnelle | oui (ANO-WEB-90 close) |
+| 314 | Même compte, second navigateur neuf | aucune bannière, choix repris | oui |
+| 315 | Retrait dans « Mes données » | enregistré sur le compte, plus rien n'est mesuré ensuite | oui |
+| 316 | Sans clé de mesure | aucune bannière, aucun envoi, aucune erreur de console | oui |
+
+## Ce qui reste à trancher
+
+- **La page où l'on accepte n'est pas comptée** (l'effet des pages vues ne se rejoue qu'à la navigation suivante) :
+  le taux d'entrée est donc faux. À corriger avant de lire les chiffres.
+- **Le retrait ne jette pas ce qui est déjà en file** : jusqu'à un lot d'événements déjà capturés part après le
+  retrait. Défendable (ils l'ont été sous consentement) — à dire ou à jeter.
+- **La page publique du destinataire porte un jeton dans son URL** (`/track/<jeton>`), et la page vue transporte
+  l'URL complète : si un destinataire accepte la mesure, le jeton partirait au collecteur. Normaliser le chemin
+  avant capture — **candidat au registre**, à trancher avant toute activation en production.
+- **En développement, chaque page vue part en double** (effets rejoués par React en `StrictMode`) : à vérifier sur
+  le build de production avant d'interpréter les volumes.
