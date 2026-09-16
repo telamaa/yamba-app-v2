@@ -14,8 +14,8 @@
   "h1": "Valide la livraison",
   "h1Subtitle": "{recipientFirstName} va te donner un code à 6 chiffres. Tape-le ci-dessous pour officialiser la remise du colis.",
   "h1SubtitleShort": "Demande à {recipientFirstName} son code à 6 chiffres et saisis-le.",
-  "infoBox": "**{recipientFirstName} est devant toi ?** Demande-lui le code de livraison qu''{shipperFirstName} lui a communiqué. Sans ce code, tu ne peux pas remettre le colis. Si elle ne le retrouve pas, propose-lui de contacter {shipperFirstName}.",
-  "infoBoxShort": "**{recipientFirstName} est devant toi ?** Demande-lui le code qu''{shipperFirstName} lui a envoyé. Sans ça, pas de remise possible.",
+  "infoBox": "**{recipientFirstName} est devant toi ?** Demande-lui le code de livraison {queShipper} lui a communiqué. Sans ce code, tu ne peux pas remettre le colis. Si elle ne le retrouve pas, propose-lui de contacter {shipperFirstName}.",
+  "infoBoxShort": "**{recipientFirstName} est devant toi ?** Demande-lui le code {queShipper} lui a envoyé. Sans ça, pas de remise possible.",
   "recipientRole": "Destinataire",
   "otp": {
     "label": "CODE DE LIVRAISON REÇU PAR {recipientFirstName}",
