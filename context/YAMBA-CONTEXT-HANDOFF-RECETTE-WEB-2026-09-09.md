@@ -3,6 +3,16 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.18 LIVRÉ
+>
+> PR #318 (§ 5.17) : CI 17/17. Branche `chore/recette-admin-5-18` empilée sur #318 : 5 scénarios ADM-CNV, contre-épreuve
+> rouge sur les cinq, ANO-ADM-42, 44 (majeures), 43, 45 closes, **A168** (lectures d'écran coalescées). Chiffres : message
+> **51**, harnais **448** ; dernière anomalie ANO-ADM-45 ; dernier chapitre d'apprentissage **176**. POSTE : message-service
+> tourne désormais en bundle détaché (`apps/message-service`, `node --env-file=../../.env dist/main.js`) comme auth / trip /
+> deal / notification ; seul le gateway reste sous `nx serve`. Pièges : relire le journal avec le super administrateur ;
+> une coupure réseau du poste donne `PrismaClientInitializationError` au rejeu du jeu d'essai — vérifier `/health` et
+> relancer. Suite : § 5.19 (signalements) — y reprendre l'erreur brute de `MessageReportsQueue.tsx`.
+>
 > ## ▶ 15/09/2026 — § 5.17 LIVRÉ
 >
 > PR #317 (§ 5.16) : CI 17/17. Branche `chore/recette-admin-5-17` empilée sur #317 : 6 scénarios ADM-PIL, contre-épreuve

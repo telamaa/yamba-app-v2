@@ -21,6 +21,7 @@ export * from "./booking/booking.schema";
 export * from "./booking/booking-events.schema";
 export * from "./booking/booking-request.schema";
 export * from "./booking/booking-refunds"; // A166 / A167 — liste des remboursements, règle partagée
+export * from "./admin/redact-contacts"; // § 5.12, partagée au § 5.18 — coordonnées masquées pour les lectures admin
 export * from "./booking/booking-lifecycle.schema";
 export * from "./booking/booking-transport.schema";
 export * from "./booking/booking-settlement.schema";

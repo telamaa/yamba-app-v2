@@ -108,3 +108,33 @@ export async function recordAdminAction(db: AdminActionWriter, input: AdminActio
     },
   });
 }
+
+/* ── A168 (recette 02-ADMIN § 5.18) — lectures coalescées ─────────────────────────────── */
+
+/** Le minimum de Redis dont la coalescence a besoin (ioredis convient tel quel). */
+export type ReadCoalescer = { set(key: string, value: string, mode: "EX", seconds: number, flag: "NX"): Promise<unknown> };
+
+export const READ_COALESCE_SECONDS = 10;
+export const readCoalesceKey = (input: Pick<AdminActionInput, "adminUserId" | "action" | "targetType" | "targetId">) =>
+  `yamba:audit:read:${input.adminUserId}:${input.action}:${input.targetType}:${input.targetId ?? "-"}`;
+
+/**
+ * Une LECTURE déclenchée par l'ouverture d'un écran (USER_VIEWED, DISPUTE_VIEWED, DEAL_MONEY_VIEWED, TRIP_VIEWED,
+ * CONVERSATION_VIEWED) : même admin, même action, même cible dans la fenêtre → une seule ligne. Mesuré en recette : trois
+ * ouvertures de chaque écran écrivaient six lignes (effet de montage rejoué par React en développement, double appel).
+ * Rend `true` si la ligne a été écrite. Sans coalesceur, ou si Redis ne répond pas, la ligne est écrite : un doublon vaut
+ * mieux qu'une lecture perdue. Jamais pour un GESTE : un geste s'écrit toujours, dans sa transaction.
+ */
+export async function recordAdminRead(db: AdminActionWriter, coalescer: ReadCoalescer | null | undefined, input: AdminActionInput, windowSeconds: number = READ_COALESCE_SECONDS): Promise<boolean> {
+  if (coalescer) {
+    let first = true;
+    try {
+      first = (await coalescer.set(readCoalesceKey(input), "1", "EX", windowSeconds, "NX")) !== null;
+    } catch {
+      first = true;
+    }
+    if (!first) return false;
+  }
+  await recordAdminAction(db, input);
+  return true;
+}

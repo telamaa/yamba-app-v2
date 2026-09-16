@@ -184,8 +184,9 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
     const med = await navigateurAdmin("mediateur");
     const fin = await navigateurAdmin("finance");
     const id = jeuEssai.deal("bzv-disputed").id;
-    await attendreDecidable(med.contexte, id, false); // le délai de 72 h relu (cache de 30 s après la fiche précédente)
+    // A168 (§ 5.18) — `attendreDecidable` lit le dossier par l'API (une ouverture journalisée) : le scénario commence avant.
     const debut = await debutDuScenario();
+    await attendreDecidable(med.contexte, id, false); // le délai de 72 h relu (cache de 30 s après la fiche précédente)
     const { page } = med;
     const reponses: string[] = [];
     page.on("response", async (r) => { if (r.url().includes(`/admin/disputes/${id}`)) reponses.push(await r.text().catch(() => "")); });

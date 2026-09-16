@@ -9,7 +9,7 @@
  */
 import prisma from "@packages/libs/prisma";
 import { NotFoundError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
+import { recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
 import { DISPUTE_RESPONSE_DELAY_HOURS, type AdminDisputeFile, type ArbitrationQueueItem, type ArbitrationQueueQuery, type ArbitrationQueueResponse } from "@packages/api-contracts";
 import { computeLateCancellationCompensationCents } from "./booking-lifecycle";
 import { platformSettings } from "@packages/libs/settings/default";
@@ -293,7 +293,7 @@ const partySelect = {
   carrierPage: { select: { ratingsAvg: true, ratingsCount: true, completedDealsCount: true, lateCancellationsCount: true, disputesLostCount: true } },
 } as const;
 
-export function makeAdminDisputeService(settings: SettingsReader = platformSettings()) {
+export function makeAdminDisputeService(settings: SettingsReader = platformSettings(), readCoalescer?: ReadCoalescer) {
   return {
     /** C-PR7a — lignes d'export (ids des parties) : mêmes filtres que la file. */
     async exportRows(q: ArbitrationQueueQuery, now = new Date()): Promise<Array<Record<(typeof ARBITRATION_CSV_COLUMNS)[number], unknown>>> {
@@ -356,7 +356,7 @@ export function makeAdminDisputeService(settings: SettingsReader = platformSetti
       const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord, new Date(), (await settings.get())["dispute.responseDelayHours"]);
       if (!file) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
       // Journal : l'admin a ouvert un dossier (identités, photos, montants).
-      await recordAdminAction(prisma, {
+      await recordAdminRead(prisma, readCoalescer, { // A168 — ouverture d'écran coalescée
         adminUserId: admin.id,
         action: "DISPUTE_VIEWED",
         targetType: "BOOKING",

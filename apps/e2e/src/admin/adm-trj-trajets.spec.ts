@@ -229,8 +229,8 @@ test.describe("ADM-TRJ — trajets, fiche et masquage (cahier 02-ADMIN § 5.7)",
     for (const libelle of ["Capacité / réservé", "Créé", "Publié", "Billet"]) await expect(carteTrajet).toContainText(libelle);
     await expect(carteTrajet).toContainText("à vérifier");
     const docs = page.locator("section").filter({ has: page.getByRole("heading", { name: "Documents (1)", exact: true }) });
-    await expect(docs).toContainText("TICKET_PROOF");
-    await expect(docs).toContainText("PENDING");
+    await expect(docs).toContainText("Billet"); // § 5.8 (865c93b) — le type du document est traduit, plus « TICKET_PROOF »
+    await expect(docs).toContainText("à vérifier"); // § 5.8 — le statut du document est traduit, plus « PENDING »
     /* Réservations : les cinq deals du trajet, statuts et montants. */
     const resa = page.locator("section").filter({ has: page.getByRole("heading", { name: "Réservations (5)", exact: true }) });
     const statuts = (await resa.locator("tbody tr td:nth-child(3)").allInnerTexts()).map((s) => s.trim()).sort();

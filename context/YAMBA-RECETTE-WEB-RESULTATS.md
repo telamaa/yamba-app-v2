@@ -5639,6 +5639,77 @@ conformes ; **PIL-3, 5, 6 rouges**. Après correction : 6/6 verts, deux passages
   réexportée par deal-service). *Test* : deux invariants e2e (courbe = rapport, point = drilldown) protègent désormais
   toute future mesure d'argent ajoutée à l'une des deux lectures.
 
+## Cahier 02-ADMIN — § 5.18 Conversations · **CONFORME après correction** (3 fiches + 2 ajoutées · 4 anomalies closes dont 2 majeures · 4 améliorations · 2 écarts · 5 scénarios, 5 min)
+
+`apps/e2e/src/admin/adm-cnv-conversations.spec.ts`. Lire le fil de deux membres est le geste le plus intrusif du
+back-office ; le chapitre se juge aux trois promesses que la page écrit elle-même : **« Lecture journalisée »** (une
+ouverture, une ligne), **« Le numéro de téléphone n'apparaît jamais ici »** (cherché par ses chiffres, y compris ce qu'un
+membre a TAPÉ), **lecture seule**. Les gestes des membres (message, rendez-vous, révélation du numéro) passent par la
+vraie API de messagerie. Le journal est relu avec le super administrateur (cahier § 2.7). **Contre-épreuve** fiche par
+fiche sur le code du § 5.17 : **les cinq rouges** (CNV-1 : lien mort et journal doublé ; CNV-2 : refus d'écran ;
+CNV-3 : journal doublé ; CNV-4 : numéro et adresse lisibles ; CNV-5 : six lignes pour trois ouvertures, sur cinq écrans).
+Après correction : 5/5 verts, deux passages.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-CNV-1 | Lire un fil depuis un dossier | **Conforme après correction** — depuis `/reports`, « Lire la conversation → » ; titre, sous-titre « Paris → Brazzaville · ACCEPTED · Expéditeur Pauline Lemaire · Voyageur Thomas Nkounkou », mention exacte ; rendez-vous « Remise · Paris CDG, terminal 2E… proposé (par Voyageur) » ; « Personne n'a encore vu le numéro de l'autre. » ; fil de 2 messages, Expéditeur à gauche, Voyageur à droite portant « ⚑ … signalé par Expéditeur … « Il propose de regler hors de Yamba. » » ; aucun numéro (numéros des deux comptes cherchés par leurs chiffres) ; aucun champ ni bouton ; « ← Fiche du deal » → la fiche du deal ; deal sans fil → « Ce deal n'a pas de conversation. », API 404 ; **une** ligne `CONVERSATION_VIEWED CONVERSATION · id` `{ bookingId, messages: 2 }`. **Avant** : « ← Dossier du deal » → « Ce deal n'est jamais passé en médiation. » (ANO-ADM-43), deux lignes (ANO-ADM-44) |
+| ADM-CNV-2 | La Finance ne lit aucune conversation | **Conforme après correction** — dossier de médiation sans lien « Lire la conversation » ; `GET /api/admin/conversations/by-deal/:id` → 403 ; l'adresse de l'écran ouverte directement → « Ton profil ne lit pas les conversations : c'est une garde de vie privée… » ; aucune ligne. **Avant** : message d'erreur anglais (ANO-ADM-45) |
+| ADM-CNV-3 | Révélations tracées | **Conforme après correction** — rendez-vous de remise dans 40 min proposé par Pauline, accepté par Thomas, « Voir le numéro » par Pauline (API réelle) ; Support : « Expéditeur a vu le numéro le … », message système « Numéro affiché » centré, aucun numéro ; une ligne. **Avant** : deux lignes |
+| ADM-CNV-4 (ajoutée) | Un numéro tapé dans un message | **Conforme après correction** — Thomas écrit « Appelle-moi plutôt au 06 12 34 56 78 ou écris à thomas.perso@exemple.fr » ; le Médiateur lit « … au [numéro masqué] ou écris à [adresse masquée] … », badge « coordonnées détectées » conservé. **Avant** : numéro et adresse en clair sous la mention « Le numéro de téléphone n'apparaît jamais ici » (ANO-ADM-42) |
+| ADM-CNV-5 (ajoutée) | Une ouverture, une ligne — cinq écrans | **Conforme après correction** — trois ouvertures espacées de chaque écran qui journalise une lecture : `CONVERSATION_VIEWED 3 · USER_VIEWED 3 · DISPUTE_VIEWED 3 · DEAL_MONEY_VIEWED 3 · TRIP_VIEWED 3`. **Avant** : 6 partout (ANO-ADM-44) |
+
+### Anomalies
+
+- **ANO-ADM-42 (majeure, close)** — **un numéro ou une adresse tapés par un membre s'affichaient au back-office**, sous la
+  phrase « Le numéro de téléphone n'apparaît jamais ici ». Le service (`apps/message-service/src/services/admin-conversation.service.ts`)
+  rendait `body` brut ; seules les révélations étaient protégées. Même défaut dans les précisions d'un signalement et dans
+  la file des messages signalés. Correction : `redactContacts` (règle du § 5.12, déplacée dans `@packages/api-contracts`)
+  sur le corps des messages TEXT, les précisions et la file ; la trace « [numéro masqué] » et le badge restent.
+- **ANO-ADM-43 (mineure, close)** — **« ← Dossier du deal » menait à « Ce deal n'est jamais passé en médiation »** pour tout fil
+  hors litige (le cas du jeu d'essai) : le lien visait `/disputes/:id`. Correction : « ← Fiche du deal » (`/deals/:id`)
+  toujours, « ← Dossier de médiation » seulement si `mediationFile` (litige ou retenue, même définition qu'A160).
+- **ANO-ADM-44 (majeure, close — A168)** — **chaque ouverture d'un écran journalisé écrivait deux lignes**, sur les cinq écrans
+  (`CONVERSATION_VIEWED`, `USER_VIEWED`, `DISPUTE_VIEWED`, `DEAL_MONEY_VIEWED`, `TRIP_VIEWED`) : la lecture part d'un effet au
+  montage, que React rejoue en développement ; le serveur écrivait chaque appel. Le poste de recette lisait un journal
+  doublé, et tout double appel (rechargement réflexe, client futur) le doublerait en production. Correction :
+  `recordAdminRead` — même admin, même action, même cible, 10 s → une ligne ; Redis en panne → écrite quand même.
+- **ANO-ADM-45 (mineure, close)** — l'écran d'une conversation ouvert par un profil sans `conversations.read` affichait le
+  message anglais du serveur. Correction : refus en français par statut.
+
+### Écarts
+
+- **ADM-CNV-2** : le cahier appelle `/api/admin/conversations/<bookingId>` — la route n'existe pas (404) ; la lecture est
+  `/api/admin/conversations/by-deal/<bookingId>` (403 pour la Finance).
+- **Lien du dossier** : « ← Dossier du deal » devient « ← Fiche du deal », et « ← Dossier de médiation » n'apparaît que
+  s'il existe.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **CNV-1** — *Fait* : ANO-ADM-43. *Test* : le lien est suivi et la page d'arrivée LUE, pas seulement l'attribut `href`.
+- **CNV-2** — *Fait* : ANO-ADM-45. *Proposé* : la file des messages signalés (`MessageReportsQueue.tsx`) affiche encore le
+  message brut du serveur sur erreur — à reprendre au § 5.19 (signalements).
+- **CNV-3** — *Constat* : conforme sur le fond (révélation tracée, numéro absent). *Test* : la révélation passe par l'API
+  membre réelle (rendez-vous à 40 min), aucune écriture en base.
+- **CNV-4** — *Fait* : ANO-ADM-42. *À trancher* : faut-il permettre au Médiateur de **démasquer** un message à la demande
+  (preuve d'une tentative de sortie de plateforme), comme geste journalisé à part ? Aujourd'hui la trace suffit à qualifier
+  le signalement.
+- **CNV-5** — *Fait* : A168, cinq écrans. *Test* : ouvertures espacées de 12 s (au-delà de la fenêtre) — une ouverture
+  volontaire n'est jamais avalée ; le test unitaire prouve la coalescence dans la fenêtre et l'écriture si Redis tombe.
+- **Transversal** — *Test* : le journal se relit avec le super administrateur ; un Médiateur n'a pas `audit.read` et une
+  fiche qui l'oublie échoue sur un 403 qui ne dit rien du produit (premier passage de la contre-épreuve).
+- **Non-régression** — CNV, PRM (profils, garde serveur), USR, RAP, ARG, BIL, TRJ, MED, SNC (57 scénarios, 17 min) : 44
+  verts, 4 rouges, 9 non joués derrière eux. Trois rouges étaient des fiches que A168 rend fausses **dans leur manière de
+  mesurer**, pas dans le produit : ADM-ARG-1 et ADM-MED-2 lisaient la fiche par l'API AVANT `debutDuScenario()` puis
+  l'ouvraient à l'écran moins de 10 s après — la ligne existait, datée d'avant le scénario (le début est désormais posé
+  avant toute lecture) ; ADM-USR-2 attendait « au moins deux lignes » pour deux ouvertures rapprochées (double effet React
+  consigné au § 5.3) — une ligne sous A168. Le quatrième, ADM-TRJ-2, attendait « TICKET_PROOF » là où l'écran dit
+  « Billet » (et « PENDING » là où il dit « à vérifier ») depuis le § 5.8 (`865c93b`) : fiche restée périmée, alignée.
+  Le rejeu a fait apparaître **ADM-USR-3** : rejeter le litige de Chinwe TERMINE son deal, et le facteur « deals
+  terminés » du TrustScore baisse de 4 points (+25 − 4 = +21) ; la fiche ne passait avant que grâce au compteur de
+  réputation rémanent du jeu d'essai (corrigé au § 5.16) — elle attend désormais les deux mouvements, et relit ses
+  `USER_VIEWED` par admin sous A168 (super administrateur 1 écran → 1 ligne ; Médiateur 3 lectures API → 1 à 3 lignes
+  espacées d'au moins 10 s). Rejeux : ARG, MED, CNV, TRJ, USR verts.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)

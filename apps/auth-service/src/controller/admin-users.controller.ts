@@ -17,7 +17,8 @@ import { AdminUsersQuerySchema, EXPORT_REASON_MIN_LENGTH } from "@packages/api-c
 import { CSV_BOM, buildCsv, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { USERS_CSV_COLUMNS } from "../lib/admin-users.query";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
+import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
+import redis from "@packages/libs/redis";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ApplySuspensionRequestSchema, LiftSuspensionRequestSchema, ObjectIdSchema, ProposeSuspensionRequestSchema, resolveLocale } from "@packages/api-contracts";
@@ -116,7 +117,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
       try {
         const userId = parseId(req.params.id);
         const file = await service.getFile(req.user.id, userId);
-        await recordAdminAction(prisma, { adminUserId: req.user.id, action: "USER_VIEWED", targetType: "USER", targetId: userId, ...meta(req) });
+        await recordAdminRead(prisma, redis, { adminUserId: req.user.id, action: "USER_VIEWED", targetType: "USER", targetId: userId, ...meta(req) }); // A168 — ouverture d'écran coalescée
         res.status(200).json(file);
       } catch (e) {
         next(e);

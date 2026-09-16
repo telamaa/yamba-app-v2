@@ -174,6 +174,7 @@ export const AdminConversationResponseSchema = z
     conversationId: ObjectIdSchema,
     bookingId: ObjectIdSchema,
     bookingStatus: z.string(),
+    mediationFile: z.boolean().describe("Recette § 5.18 — le deal a un dossier de médiation (litige ouvert, ou retenue arbitrée) : le lien « Dossier de médiation » ne mène jamais à « jamais passé en médiation »"),
     corridor: z.object({ originCity: z.string(), destinationCity: z.string(), departureAt: z.string().datetime().nullable() }),
     shipper: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),
     carrier: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),

@@ -32,17 +32,11 @@ export function whitelistPayload(payload: unknown): Record<string, unknown> {
 }
 
 /**
- * Recette 02-ADMIN § 5.12 — une erreur TECHNIQUE (SMTP, fournisseur d'email, relais) cite souvent le destinataire
- * (« 550 5.1.1 <aminata@…>: mailbox unavailable »). La chronologie est lue par des profils qui n'ont pas la lecture des
- * coordonnées : adresses email et numéros de téléphone y sont masqués. Pur, testé.
+ * Recette 02-ADMIN § 5.12 — les erreurs techniques citent souvent un destinataire : masquées. Depuis le § 5.18 (A168), la
+ * règle vit dans `@packages/api-contracts` : le fil d'une conversation lu par un admin la partage.
  */
-export function redactContacts(text: string | null): string | null {
-  if (!text) return text;
-  return text
-    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[adresse masquée]")
-    // Un numéro, c'est 9 chiffres au moins : « 550 5.1.1 » (code SMTP) n'en est pas un.
-    .replace(/\+?\d[\d .-]{7,}\d/g, (m) => (m.replace(/\D/g, "").length >= 9 ? "[numéro masqué]" : m));
-}
+import { redactContacts } from "@packages/api-contracts";
+export { redactContacts };
 
 /** Fusion PURE des quatre sources, triée par date ; `roleOf` traduit un id en SHIPPER / CARRIER, `nameOf` un admin en nom court. */
 export function mergeDealHistory(

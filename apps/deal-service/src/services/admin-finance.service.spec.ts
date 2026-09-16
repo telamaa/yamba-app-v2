@@ -14,7 +14,8 @@ const prismaMock = {
 };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 const recordAdminAction = jest.fn();
-jest.mock("@packages/admin-audit", () => ({ recordAdminAction: (...a: unknown[]) => recordAdminAction(...a) }), { virtual: true });
+// A168 — la lecture coalescée : sans coalesceur (ici), elle écrit toujours, comme recordAdminAction.
+jest.mock("@packages/admin-audit", () => ({ recordAdminAction: (...a: unknown[]) => recordAdminAction(...a), recordAdminRead: (db: unknown, _c: unknown, input: unknown) => recordAdminAction(db, input) }), { virtual: true });
 
 import { ForbiddenError, ValidationError } from "@packages/error-handler";
 import { FakePaymentProvider } from "@packages/payments";
