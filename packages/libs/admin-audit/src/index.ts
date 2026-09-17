@@ -64,6 +64,9 @@ export const ADMIN_ACTIONS = [
   "SETTINGS_RESET",
   // C-PR8b (D63 6A)
   "ACCOUNT_ERASED",
+  // A198 (a) — un effacement REFUSÉ était inscrit au seul registre `DataRequest` : c'était le seul geste admin
+  // sensible absent du journal, et un audit interne qui lit le journal d'un opérateur croyait qu'il n'avait rien tenté.
+  "ACCOUNT_ERASURE_REFUSED",
   "DATA_REQUESTS_VIEWED",
   // C-PR8c (D64 1A)
   "MAINTENANCE_CHANGED",

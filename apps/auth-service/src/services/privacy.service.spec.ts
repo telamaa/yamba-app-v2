@@ -132,7 +132,11 @@ describe("eraseAccount (D63 4A)", () => {
     await expect(makePrivacyService({ db, clock: () => NOW, afterErase }).eraseAccount({ userId: U, channel: "ADMIN", requestedByAdminId: "bbbbbbbbbbbbbbbbbbbbbbbb", reason: "Demande reçue par email, identité vérifiée" })).rejects.toMatchObject({ check: { blockers: ["PENDING_REQUEST"] } });
     expect(db.tables.user[0]).toMatchObject({ isDeleted: false, email: "awa@example.com" });
     expect(db.tables.erasedAccount).toEqual([]);
-    expect(db.tables.adminAction).toEqual([]);
+    // A198 (a) — le refus est désormais AUSSI au journal admin : le registre prouve au régulateur, le journal
+    // raconte ce que l'opérateur a tenté. Les deux dans la même transaction, avec les motifs de la liste fermée.
+    expect(db.tables.adminAction).toEqual([
+      expect.objectContaining({ adminUserId: "bbbbbbbbbbbbbbbbbbbbbbbb", action: "ACCOUNT_ERASURE_REFUSED", targetType: "USER", targetId: U, after: { blockers: ["PENDING_REQUEST"], reason: "Demande reçue par email, identité vérifiée" } }),
+    ]);
     expect(db.tables.dataRequest).toEqual([expect.objectContaining({ status: "REFUSED", refusalReasons: ["PENDING_REQUEST"], channel: "ADMIN" })]);
     expect(afterErase).not.toHaveBeenCalled();
   });

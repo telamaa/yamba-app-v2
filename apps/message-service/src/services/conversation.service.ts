@@ -376,7 +376,7 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
      */
     async reportMessage(userId: string, conversationId: string, messageId: string, input: ReportMessageRequest): Promise<ReportMessageResponse> {
       const { conversation, role } = await loadContext(userId, { conversationId });
-      const message = await prisma.message.findFirst({ where: { id: messageId, conversationId: conversation.id }, select: { id: true, kind: true, authorRole: true } });
+      const message = await prisma.message.findFirst({ where: { id: messageId, conversationId: conversation.id }, select: { id: true, kind: true, authorRole: true, flaggedContact: true } });
       if (!message) throw new NotFoundError("Message not found.", { code: "MESSAGE_NOT_FOUND" });
       const existing = await prisma.report.findFirst({ where: { targetType: "MESSAGE", targetId: message.id, reporterUserId: userId }, select: { id: true } });
       const verdict = canReportMessage(role, message, !!existing);
@@ -384,10 +384,24 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
         if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this message.", { code: "ALREADY_REPORTED" });
         throw new ValidationError(verdict.reason === "OWN_MESSAGE" ? "You cannot report your own message." : "Only text messages can be reported.", { code: verdict.reason });
       }
-      const report = await prisma.report.create({
-        data: { reporterUserId: userId, targetType: "MESSAGE", targetId: message.id, reason: input.reason, details: input.details?.trim() || null, status: "OPEN" },
-        select: { id: true, createdAt: true },
-      });
+      // A198 (g) — la lecture d'unicité ci-dessus ne réserve rien : deux clics simultanés créaient DEUX dossiers
+      // de modération. Il n'existe pas d'index unique possible ici (re-signaler un message dont le dossier a été
+      // CLOS est légitime : un index simple l'interdirait). On rend donc le conflit DÉTECTABLE en écrivant, dans la
+      // même transaction, le message visé — document froid, qu'aucun autre geste n'écrit en continu. Deux
+      // transactions concurrentes se disputent alors ce document : MongoDB en rejette une (P2034), le rejeu relit,
+      // voit le dossier de l'autre et rend le refus métier. `flaggedContact` est réécrit À SA VALEUR : c'est une
+      // écriture, pas un changement — le message n'est pas modifié par le fait d'être signalé.
+      const report = await withWriteConflictRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const deja = await tx.report.findFirst({ where: { targetType: "MESSAGE", targetId: message.id, reporterUserId: userId }, select: { id: true } });
+          if (deja) throw new ConflictError("You already reported this message.", { code: "ALREADY_REPORTED" });
+          await tx.message.updateMany({ where: { id: message.id }, data: { flaggedContact: message.flaggedContact } });
+          return tx.report.create({
+            data: { reporterUserId: userId, targetType: "MESSAGE", targetId: message.id, reason: input.reason, details: input.details?.trim() || null, status: "OPEN" },
+            select: { id: true, createdAt: true },
+          });
+        })
+      );
       return { reportId: report.id, createdAt: report.createdAt.toISOString() };
     },
 

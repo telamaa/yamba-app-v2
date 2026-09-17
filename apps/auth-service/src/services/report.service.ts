@@ -81,9 +81,20 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       const userTargetIds = reports.filter((r) => r.targetType === "USER").map((r) => r.targetId as string);
       const trips = tripIds.length ? await db.trip.findMany({ where: { id: { in: tripIds } }, select: { id: true, userId: true, originCity: true, destinationCity: true } }) : [];
       const byTrip = new Map(trips.map((t) => [t.id as string, t]));
-      const openRows = await db.report.findMany({ where: { targetType: { in: ["TRIP", "USER"] }, status: "OPEN", targetId: { in: [...new Set(reports.map((r) => r.targetId as string))] } }, select: { targetId: true } });
-      const openCount = new Map<string, number>();
-      for (const r of openRows) openCount.set(r.targetId as string, (openCount.get(r.targetId as string) ?? 0) + 1);
+      // A198 (g) — « prioritaire dès 3 ouverts » compte des SIGNALANTS DISTINCTS, pas des lignes. Trois personnes
+      // qui signalent la même cible, c'est un signal ; une personne qui clique trois fois (ou dont le double clic a
+      // créé deux lignes malgré la lecture d'unicité — voir plus bas), ce n'en est pas un. La garde d'unicité, elle,
+      // reste une lecture : matérialiser le conflit demanderait d'écrire sur le Trip ou le User visé, documents
+      // CHAUDS (la réservation d'un deal écrit `reservedKg` sur le Trip), et ferait payer des réessais à des gestes
+      // qui n'ont rien à voir. Le doublon résiduel coûte une carte de plus dans la file, plus un faux « prioritaire ».
+      const openRows = await db.report.findMany({ where: { targetType: { in: ["TRIP", "USER"] }, status: "OPEN", targetId: { in: [...new Set(reports.map((r) => r.targetId as string))] } }, select: { targetId: true, reporterUserId: true } });
+      const signalants = new Map<string, Set<string>>();
+      for (const r of openRows) {
+        const cible = r.targetId as string;
+        if (!signalants.has(cible)) signalants.set(cible, new Set());
+        signalants.get(cible)!.add(r.reporterUserId as string);
+      }
+      const openCount = new Map<string, number>([...signalants].map(([cible, qui]) => [cible, qui.size]));
       const userIds = new Set<string>([...userTargetIds, ...reports.map((r) => r.reporterUserId as string), ...trips.map((t) => t.userId as string)]);
       const users = await db.user.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, firstName: true, lastName: true } });
       const byUser = new Map(users.map((u) => [u.id as string, u]));

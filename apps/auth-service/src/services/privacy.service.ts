@@ -116,7 +116,29 @@ export function makePrivacyService(deps: {
     async eraseAccount(input: EraseInput): Promise<EraseResult> {
       const now = clock();
       const refuse = async (check: ErasureCheck): Promise<never> => {
-        await deps.db.dataRequest.create!({ data: { userId: input.userId, type: "ERASURE", channel: input.channel, status: "REFUSED", refusalReasons: check.blockers, requestedByAdminId: input.requestedByAdminId ?? null, reason: input.reason ?? null, ip: input.ip ?? null, userAgent: input.userAgent ?? null, requestedAt: now, completedAt: now } });
+        // A198 (a) — le registre `DataRequest` porte la preuve RÉGLEMENTAIRE (motifs fermés, demandeur, horodatage) ;
+        // le journal admin répond à une autre question : « qu'a fait cet opérateur ce jour-là ». Un refus était le seul
+        // geste sensible absent du second, et les deux doivent tomber ou passer ENSEMBLE : même transaction.
+        const inscription = { userId: input.userId, type: "ERASURE", channel: input.channel, status: "REFUSED", refusalReasons: check.blockers, requestedByAdminId: input.requestedByAdminId ?? null, reason: input.reason ?? null, ip: input.ip ?? null, userAgent: input.userAgent ?? null, requestedAt: now, completedAt: now };
+        const parUnAdmin = input.channel === "ADMIN" && input.requestedByAdminId;
+        if (!parUnAdmin) {
+          // Demande du membre lui-même : une seule écriture, donc aucune transaction à ouvrir.
+          await deps.db.dataRequest.create!({ data: inscription });
+        } else {
+          await withWriteConflictRetry(() => deps.db.$transaction(async (tx) => {
+            await tx.dataRequest.create!({ data: inscription });
+            await recordAdminAction(tx as never, {
+              adminUserId: input.requestedByAdminId!,
+              action: "ACCOUNT_ERASURE_REFUSED",
+              targetType: "USER",
+              targetId: input.userId,
+              // Les bloqueurs sont une liste FERMÉE (`ErasureBlocker`) : lisible par le support, sans donnée du membre.
+              after: { blockers: check.blockers, reason: input.reason ?? null },
+              ip: input.ip ?? null,
+              userAgent: input.userAgent ?? null,
+            });
+          }));
+        }
         throw new ErasureBlockedError(check);
       };
       const check = await erasureBlockers(deps.db, input.userId);

@@ -155,7 +155,12 @@ export function makeAdminUsersService() {
       };
     },
 
-    async getFile(adminId: string, userId: string): Promise<AdminUserFile> {
+    /**
+     * A198 (f) — `avecSignalements` vient du CONTRÔLEUR, qui seul connaît les permissions de l'appelant :
+     * le détail d'un signalement est écrit par un membre et peut nommer des tiers, il ne se sert qu'à qui a
+     * `reports.review`. Le champ est alors `null` — et `null` ne veut pas dire « aucun signalement ».
+     */
+    async getFile(adminId: string, userId: string, avecSignalements = false): Promise<AdminUserFile> {
       const u = await prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -176,7 +181,7 @@ export function makeAdminUsersService() {
       });
       if (!u) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" });
 
-      const [trips, bookings, actions, adminNames, activeSessionsCount] = await Promise.all([
+      const [trips, bookings, actions, adminNames, activeSessionsCount, signalements] = await Promise.all([
         prisma.trip.findMany({
           where: { userId },
           orderBy: { departureAt: "desc" },
@@ -195,6 +200,9 @@ export function makeAdminUsersService() {
           select: { id: true, firstName: true, lastName: true },
         }),
         countActiveUserSessions(userId),
+        avecSignalements
+          ? prisma.report.findMany({ where: { targetType: "USER", targetId: userId, status: "OPEN" }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, reason: true, details: true, createdAt: true } })
+          : Promise.resolve(null),
       ]);
       const actorIds = [...new Set(actions.map((a) => a.adminUserId))];
       const actors = actorIds.length ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, firstName: true, lastName: true } }) : [];
@@ -280,6 +288,10 @@ export function makeAdminUsersService() {
         },
         adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
         trust: await assessTrust(u.id), // D71 — aide à la décision, jamais une sanction
+        // A198 (f) — ce que le Support sanctionne, sous ses yeux au moment de sanctionner.
+        openReports: signalements
+          ? signalements.map((r) => ({ id: r.id, reason: r.reason, details: r.details ?? null, at: r.createdAt.toISOString() }))
+          : null,
       };
     },
 
