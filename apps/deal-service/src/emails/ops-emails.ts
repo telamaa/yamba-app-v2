@@ -7,8 +7,13 @@
  *    son tableau de bord Stripe pour le RIB), copie calme, jamais le
  *    message brut de la banque.
  *  - `opsDigest` : récapitulatif quotidien à l'adresse support (A88) —
- *    versements en échec depuis > 24 h, transferts renversés, retenues
- *    « à arbitrer ». Filet de sécurité avant l'admin (chantier C).
+ *    versements en échec SANS MOUVEMENT depuis > 24 h (la requête porte sur
+ *    `updatedAt` : un rejeu remet le compteur à zéro), transferts renversés,
+ *    retenues « à arbitrer ». Filet de sécurité avant l'admin (chantier C).
+ *  - `reversalWrittenOffCarrier` : A198 (d) — la plateforme renonce à refaire
+ *    un virement renversé. Seule décision d'argent qui ne disait RIEN à la
+ *    personne concernée. Motif GÉNÉRIQUE (principe d'A191 : le motif interne
+ *    ne sort jamais) et une adresse de recours.
  */
 import type { EmailContent } from "@packages/email";
 import type { SupportedLocale } from "@packages/api-contracts";
@@ -16,18 +21,36 @@ import type { SupportedLocale } from "@packages/api-contracts";
 export type OpsEmail = { subject: string; content: EmailContent };
 
 export type PayoutFailedParams = { firstName: string; financesUrl: string };
+/** A198 (d) — le montant et la date du deal concerné, jamais le motif interne de la décision. */
+export type ReversalWrittenOffParams = { firstName: string; amount: string; dealRef: string; supportEmail: string };
 export type OpsDigestLine = { label: string; amount: string; since: string; url: string };
 export type OpsDigestParams = { date: string; failed: OpsDigestLine[]; reversed: OpsDigestLine[]; held: OpsDigestLine[]; appUrl: string };
 export type OpsAlertsParams = { date: string; alerts: Array<{ title: string; detail: string; url: string }>; adminUrl: string };
 
 type Dictionary = {
   payoutFailedCarrier(p: PayoutFailedParams): OpsEmail;
+  reversalWrittenOffCarrier(p: ReversalWrittenOffParams): OpsEmail;
   opsDigest(p: OpsDigestParams): OpsEmail;
   /** C-PR6b (D59 3A) — alertes de seuil nouvelles du jour, une par ligne avec le lien admin */
   opsAlerts(p: OpsAlertsParams): OpsEmail;
 };
 
 const fr: Dictionary = {
+  reversalWrittenOffCarrier: (p) => ({
+    subject: "Au sujet du virement de tes gains",
+    content: {
+      preheader: "Le virement de ce deal a été renversé et ne sera pas relancé.",
+      title: "Au sujet du virement de tes gains",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [
+        `Le virement de ${p.amount} correspondant au deal ${p.dealRef} a été renversé par notre prestataire de paiement, et notre équipe a décidé de ne pas le relancer.`,
+        "Si tu penses que c'est une erreur, réponds à cet email ou écris-nous : nous réexaminons le dossier avec toi.",
+      ],
+      notice: { tone: "warning", text: "Cette décision ne remet en cause ni ton compte, ni tes autres virements." },
+      cta: { label: "Nous écrire", url: `mailto:${p.supportEmail}` },
+      reason: "Tu reçois cet email parce qu'une décision a été prise sur un virement de tes gains Yamba.",
+    },
+  }),
   payoutFailedCarrier: (p) => ({
     subject: "Ton virement bancaire n'a pas abouti",
     content: {
@@ -53,7 +76,7 @@ const fr: Dictionary = {
         title: "Argent à surveiller",
         greeting: "Bonjour,",
         paragraphs: [
-          ...lines("Versements en échec depuis plus de 24 h", p.failed),
+          ...lines("Versements en échec, sans mouvement depuis plus de 24 h", p.failed), // A198 (c) — le titre dit ce que la requête mesure (`updatedAt`)
           ...lines("Transferts renversés par Stripe", p.reversed),
           ...lines("Retenues d'annulation à arbitrer", p.held),
         ],
@@ -77,6 +100,21 @@ const fr: Dictionary = {
 };
 
 const en: Dictionary = {
+  reversalWrittenOffCarrier: (p) => ({
+    subject: "About the payout of your earnings",
+    content: {
+      preheader: "The payout for this deal was reversed and will not be sent again.",
+      title: "About the payout of your earnings",
+      greeting: `Hello ${p.firstName},`,
+      paragraphs: [
+        `The ${p.amount} payout for deal ${p.dealRef} was reversed by our payment provider, and our team decided not to send it again.`,
+        "If you believe this is a mistake, reply to this email or write to us: we will review the case with you.",
+      ],
+      notice: { tone: "warning", text: "This decision affects neither your account nor your other payouts." },
+      cta: { label: "Contact us", url: `mailto:${p.supportEmail}` },
+      reason: "You are receiving this email because a decision was made about a payout of your Yamba earnings.",
+    },
+  }),
   payoutFailedCarrier: (p) => ({
     subject: "Your bank transfer did not go through",
     content: {

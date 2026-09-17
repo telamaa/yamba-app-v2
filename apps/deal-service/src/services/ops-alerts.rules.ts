@@ -38,7 +38,12 @@ export type AlertThresholds = { [K in keyof typeof ALERT_THRESHOLDS]: number };
 /** `T` : seuils lus dans les paramètres (`alerts.*`, D62) — les constantes ne sont que les défauts. */
 export function evaluateAlerts(s: OpsSnapshot, now: Date, T: AlertThresholds = ALERT_THRESHOLDS): OpsAlert[] {
   const out: OpsAlert[] = [];
-  if (s.failedPayoutsOverThreshold > 0) out.push({ rule: "PAYOUT_FAILED_48H", severity: "critical", title: `Versements en échec depuis plus de ${T.payoutFailedHours} h`, detail: `${s.failedPayoutsOverThreshold} versement(s) rejoué(s) sans succès depuis plus de ${T.payoutFailedHours} h.`, count: s.failedPayoutsOverThreshold, href: "/finances?kind=FAILED" });
+  // A198 (c) — le libellé disait « en échec depuis 48 h » ; la requête compte tout autre chose : des deals TERMINÉS
+  // depuis plus de 48 h dont le versement est encore en échec, quelle que soit l'ancienneté de l'échec (un versement
+  // qui vient d'échouer sur un deal fini il y a trois jours alerte immédiatement). La mesure est la bonne — c'est
+  // l'argent dû au Voyageur qui est en retard — donc on corrige le MOT, pas la requête. Le nom de la règle
+  // (`PAYOUT_FAILED_48H`) ne bouge pas : c'est un identifiant, pas une phrase, et les journaux le citent.
+  if (s.failedPayoutsOverThreshold > 0) out.push({ rule: "PAYOUT_FAILED_48H", severity: "critical", title: `Versements non partis ${T.payoutFailedHours} h après la fin du deal`, detail: `${s.failedPayoutsOverThreshold} deal(s) terminé(s) depuis plus de ${T.payoutFailedHours} h dont le versement est toujours en échec.`, count: s.failedPayoutsOverThreshold, href: "/finances?kind=FAILED" });
   if (s.undecidedDisputesOverThreshold > 0) out.push({ rule: "DISPUTE_UNDECIDED_72H", severity: "critical", title: "Litiges décidables sans décision", detail: `${s.undecidedDisputesOverThreshold} litige(s) tranchable(s) depuis plus de ${T.disputeUndecidedHours} h.`, count: s.undecidedDisputesOverThreshold, href: "/disputes?decidable=1" });
   if (s.heldRetentionsOverThreshold > 0) out.push({ rule: "RETENTION_HELD_7D", severity: "warning", title: "Retenues non arbitrées", detail: `${s.heldRetentionsOverThreshold} retenue(s) conservée(s) depuis plus de ${T.retentionHeldDays} j.`, count: s.heldRetentionsOverThreshold, href: "/disputes?kind=RETENTION" });
   if (s.openReversalsOverThreshold > 0) out.push({ rule: "REVERSAL_OPEN_48H", severity: "warning", title: "Transferts renversés sans décision", detail: `${s.openReversalsOverThreshold} renversement(s) ouvert(s) depuis plus de ${T.reversalOpenHours} h.`, count: s.openReversalsOverThreshold, href: "/finances?kind=REVERSED" });

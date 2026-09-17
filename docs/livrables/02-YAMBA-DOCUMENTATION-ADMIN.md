@@ -830,7 +830,7 @@ Format : étape / acteur / action / système / résultat / journal. Les prénoms
 |---|---|---|---|---|---|
 | 1 | Cron `payout-bookings` | Tente le versement J+4 d'`ines` (compte Stripe non prêt) | `markPayoutFailed` : compteur, `payoutNextRetryAt` espacé | Deal en `FAILED`, file « Versements en échec » | — |
 | 2 | Cron `ops-alerts` (h+5) | Évalue `PAYOUT_FAILED_48H` | Clé Redis `yamba:alerts:sent:…` posée | Email « Yamba — 1 alerte » au support | — |
-| 3 | Finance (Léa) | Accueil : bandeau rouge « Versements en échec depuis plus de 48 h » → lien | `GET /admin/finances/queue?kind=FAILED` | Ligne avec « compte Stripe du Voyageur non prêt », 12 tentatives, prochaine relance | — |
+| 3 | Finance (Léa) | Accueil : bandeau rouge « Versements non partis 48 h après la fin du deal » → lien | `GET /admin/finances/queue?kind=FAILED` | Ligne avec « compte Stripe du Voyageur non prêt », 12 tentatives, prochaine relance | — |
 | 4 | Léa | Ouvre la fiche argent, écrit à `ines` par le support pour finaliser Stripe | `GET /admin/deals/:id/money` | Compte Stripe « virements NON activés » | `DEAL_MONEY_VIEWED` |
 | 5 | `ines` | Finalise son compte Stripe Express | — | `stripePayoutsEnabled = true` | — |
 | 6 | Léa | « Relancer le versement » | `POST …/payout/retry`, même clé d'idempotence | « Versement envoyé », ligne sortie de la file, alerte disparue | `PAYOUT_RETRIED` (`outcome: SENT`) |

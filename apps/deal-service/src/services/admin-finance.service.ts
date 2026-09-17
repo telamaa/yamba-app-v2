@@ -47,6 +47,7 @@ import {
   type ClaimRow,
   type FinanceCsvRow,
 } from "./admin-finance.rules";
+import { notifyCarrierReversalWrittenOff } from "./ops-notify.service";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
 import { refundIdempotencyKey } from "../lib/refund-idempotency";
@@ -400,7 +401,12 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
         // ne survivrait nulle part (tableau de bord du fournisseur, litige bancaire). Le journal le garde.
         await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason, previousTransferId: booking.transferId ?? null }));
       }));
-      if (input.outcome === "WRITTEN_OFF") return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
+      if (input.outcome === "WRITTEN_OFF") {
+        // A198 (d) — hors transaction et best effort : la décision est écrite et journalisée, l'email ne la
+        // conditionne pas. Mais elle ne reste plus muette pour le Voyageur qui attendait cet argent.
+        await notifyCarrierReversalWrittenOff(id).catch(() => undefined);
+        return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
+      }
       const fresh = await loadBookingForWrite(id);
       const outcome = await settlement.executePayout(fresh, now);
       return { outcome: "RESENT", payoutStatus: outcome.payoutStatus, reason: outcome.reason };
