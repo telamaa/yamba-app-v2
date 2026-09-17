@@ -6428,3 +6428,52 @@ décision d'argent dans ce cas.
 | FIN32 | Lire cet email | Montant, référence du deal, adresse de recours ; **aucune** trace du motif interne |
 | FIN33 | Abandonner deux fois (double clic) | **Une** seule notification ; la décision reste écrite même si l'email échoue |
 | FIN34 | Le Voyageur a effacé son compte | Aucun email ; la décision passe quand même |
+
+---
+
+# Trois arbitrages de traçabilité et de modération (A198 bis)
+
+## (a) Un refus d'effacement laisse une trace lisible par un auditeur INTERNE
+
+Le registre `DataRequest` portait déjà la preuve réglementaire d'un refus (motifs de la liste fermée,
+demandeur, horodatage). Mais le **journal admin** — celui qui répond à « qu'a fait cet opérateur ce jour-là »
+— ne voyait rien : un effacement refusé était le seul geste sensible invisible.
+
+- **RG-RGP-20** — Un effacement **refusé** demandé par un administrateur écrit une ligne de journal
+  (« Effacement refusé (RGPD) ») **dans la même transaction** que son inscription au registre : les deux
+  tombent ou passent ensemble.
+- **RG-RGP-21** — Cette ligne porte les **motifs de refus** (liste fermée) et le motif saisi par l'opérateur.
+  Jamais une donnée personnelle du membre.
+- **RG-RGP-22** — Un refus opposé à une demande **du membre lui-même** n'écrit rien au journal admin : il n'y
+  a pas d'opérateur à tracer.
+
+## (f) Sanctionner en voyant ce qu'on sanctionne
+
+- **RG-SIG-30** — La fiche d'un membre montre les signalements **ouverts** qui le visent, à côté du formulaire
+  de sanction : l'opérateur n'a plus à rouvrir la file de modération pour relire les faits.
+- **RG-SIG-31** — Ces signalements ne sont servis qu'aux profils qui ont le **droit de lire la file de
+  modération**. Le détail est écrit par un membre et peut nommer des tiers.
+- **RG-SIG-32** — Quand l'opérateur n'a pas ce droit, l'écran **n'affiche rien** — il n'affiche pas « aucun
+  signalement », ce qui serait faux.
+- **RG-SIG-33** — L'écran **montre**, il ne **pré-coche pas** : la catégorie de sanction est communiquée au
+  membre, elle se choisit à chaque fois.
+
+## (g) Un doublon ne fabrique pas un faux signal
+
+- **RG-SIG-34** — Signaler deux fois le même message (double clic) ne crée qu'**un** dossier de modération.
+- **RG-SIG-35** — « Prioritaire dès 3 signalements ouverts » compte des **personnes distinctes**. Une seule
+  personne qui signale trois fois ne rend pas une cible prioritaire.
+- **RG-SIG-36** — Re-signaler une cible dont le dossier précédent a été **clos** reste possible : c'est un
+  fait nouveau, pas un doublon.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| RGP20 | Un admin tente d'effacer un compte avec un deal en cours | Refus, registre **et** journal : « Effacement refusé (RGPD) » avec le motif du blocage |
+| RGP22 | Le membre demande lui-même et le refus tombe | Registre seul, **aucune** ligne de journal admin |
+| SIG30 | Support sur la fiche d'un membre signalé | Les signalements ouverts s'affichent au-dessus du formulaire de sanction |
+| SIG32 | Un profil sans droit de modération ouvre la même fiche | **Aucun** bloc de signalements — ni « aucun signalement » |
+| SIG33 | Ouvrir le formulaire de sanction | La catégorie reste sur « — choisir — » |
+| SIG34 | Double clic sur « Signaler » | **Un** dossier ; le second lit « tu as déjà signalé ce message » |
+| SIG35 | Trois signalements du même membre sur la même cible | La cible **n'est pas** prioritaire (1 signalant) |

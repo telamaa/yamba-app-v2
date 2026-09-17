@@ -22,7 +22,7 @@ import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
 import redis from "@packages/libs/redis";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { ApplySuspensionRequestSchema, LiftSuspensionRequestSchema, ObjectIdSchema, ProposeSuspensionRequestSchema, resolveLocale } from "@packages/api-contracts";
+import { adminRolesAllow, type AdminRole, ApplySuspensionRequestSchema, LiftSuspensionRequestSchema, ObjectIdSchema, ProposeSuspensionRequestSchema, resolveLocale } from "@packages/api-contracts";
 import { revokeRefreshJti } from "../utils/auth.helper";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
@@ -125,7 +125,10 @@ export function makeAdminUsersController(service: AdminUsersService) {
     async getFile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const userId = parseId(req.params.id);
-        const file = await service.getFile(req.user.id, userId);
+        // A198 (f) — le détail d'un signalement est écrit par un membre : il ne se sert qu'à qui a le droit de
+        // le lire dans la file de modération. Le contrôleur est le seul à connaître les permissions de l'appelant.
+        const peutLireLesSignalements = adminRolesAllow((req.adminRoles ?? []) as AdminRole[], "reports.review");
+        const file = await service.getFile(req.user.id, userId, peutLireLesSignalements);
         await recordAdminRead(prisma, redis, { adminUserId: req.user.id, action: "USER_VIEWED", targetType: "USER", targetId: userId, ...meta(req) }); // A168 — ouverture d'écran coalescée
         res.status(200).json(file);
       } catch (e) {

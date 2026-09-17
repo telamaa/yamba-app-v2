@@ -220,6 +220,14 @@ export const AdminUserFileSchema = z
     ),
     /** D71 — TrustScore interne (aide à la décision, jamais une sanction automatique). */
     trust: TrustAssessmentSchema.nullable(),
+    /**
+     * A198 (f) — les signalements OUVERTS visant ce membre, pour que le Support sanctionne en voyant ce qu'il
+     * sanctionne, sans rouvrir la file. Servis UNIQUEMENT à un opérateur qui a `reports.review` (le détail est
+     * écrit par un membre : il peut nommer des tiers) ; `null` sinon — l'absence n'est pas « aucun signalement ».
+     */
+    openReports: z
+      .array(z.object({ id: ObjectIdSchema, reason: z.string(), details: z.string().nullable(), at: z.string().datetime() }))
+      .nullable(),
   })
   .meta({ id: "AdminUserFile", description: "Everything an operator needs on a user — never a secret, never a delivery code" });
 export type AdminUserFile = z.infer<typeof AdminUserFileSchema>;

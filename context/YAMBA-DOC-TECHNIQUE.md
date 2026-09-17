@@ -10236,3 +10236,59 @@ type au contrat pour une décision rare aurait coûté une migration de schéma 
 deal-service **649 → 659** (10 scénarios : libellés, seuil qui suit le paramètre, nom de règle stable,
 notification + email, idempotence du double clic, compte effacé, adresse supprimée, deal disparu, et le motif
 interne qui ne fuit dans aucune des deux langues).
+
+---
+
+# PR — Arbitrages (a), (f), (g) : tracer, montrer, ne pas compter deux fois (A198 bis) · `feat/arbitrages-moderation`
+
+## (a) Le refus d'effacement au journal
+
+Le registre `DataRequest` et le journal admin ne répondent pas à la même question. Le premier prouve à un
+régulateur qu'une demande a été traitée et pourquoi elle a été refusée ; le second raconte ce qu'un opérateur
+a fait ce jour-là. Un refus n'existait que dans le premier — le seul geste sensible dans ce cas.
+
+Nouvelle action de la liste fermée : `ACCOUNT_ERASURE_REFUSED`, écrite **dans la même transaction** que
+l'inscription au registre. Détail d'implémentation qui vaut d'être noté : la transaction n'est ouverte que
+lorsqu'il y a **deux** écritures à lier (refus venu d'un admin). Un refus opposé à la demande du membre
+lui-même n'a qu'une écriture : pas de transaction pour rien — et la fiche existante qui comptait les
+transactions reste juste.
+
+## (f) Les signalements sur la fiche membre
+
+`AdminUserFile.openReports` sert les signalements ouverts visant le membre. Trois précautions :
+
+1. **Permission-aware, décidé par le contrôleur.** Le service ne connaît pas les permissions de l'appelant ;
+   le contrôleur, oui. `getFile(adminId, userId, avecSignalements)` — et `avecSignalements` vaut
+   `adminRolesAllow(roles, "reports.review")`.
+2. **`null` ≠ tableau vide.** `null` veut dire « pas le droit de lire » ; l'écran n'affiche alors **rien**,
+   plutôt qu'un « aucun signalement » qui serait faux.
+3. **Montrer, pas pré-remplir.** La catégorie de sanction part au membre (A193) : une case pré-cochée est une
+   case acceptée sans réfléchir. L'encart porte d'ailleurs l'avertissement « écrit par un membre : à recouper,
+   jamais à recopier dans un message au membre visé ».
+
+## (g) Le doublon de signalement — et pourquoi le même remède ne convient pas des deux côtés
+
+**message-service : conflit matérialisé.** La création du dossier écrit aussi le **message visé** dans la même
+transaction. Deux clics simultanés se disputent ce document, MongoDB en rejette un (P2034), le rejeu relit et
+rend 409 `ALREADY_REPORTED`. `flaggedContact` est réécrit **à sa valeur** : c'est une écriture, pas un
+changement — signaler ne modifie pas le message.
+
+**auth-service : le même remède est refusé.** La cible y est un `Trip` ou un `User` — documents **chauds** (la
+réservation d'un deal écrit `reservedKg` sur le Trip). Matérialiser un conflit dessus ferait payer des
+réessais à des gestes qui n'ont rien à voir avec un signalement. On corrige donc la **conséquence** : le
+badge « prioritaire dès 3 ouverts » compte des **signalants distincts**. Trois personnes, c'est un signal ;
+une personne qui clique trois fois, non.
+
+> La leçon générale : matérialiser un conflit est un bon outil **sur un document froid**. Sur un document
+> chaud, c'est un générateur de contention — et le bon réflexe devient de supprimer le préjudice plutôt que la
+> course.
+
+**L'index unique, écarté deux fois.** `(cible, signalant)` serait faux : re-signaler une cible dont le dossier
+a été **clos** est légitime, et un index simple l'interdirait. Un index **partiel** (`status: "OPEN"`) le
+dirait exactement — mais il vivrait hors de la gestion Prisma, à recréer et re-vérifier à la main après chaque
+`db push`. Le coût de maintenance dépasse le préjudice.
+
+## Tests
+
+auth-service **393 → 395**, message-service **74 → 79**. La fiche `privacy.service.spec.ts` est **mise à jour**
+(et non contournée) : elle affirmait « un refus n'écrit aucune ligne de journal », ce que l'arbitrage change.

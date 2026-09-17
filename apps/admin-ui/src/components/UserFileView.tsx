@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, auditDetail, SANCTION_CATEGORY_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
+import { ACTION_LABEL, auditDetail, REPORT_REASON_LABEL, SANCTION_CATEGORY_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserFile, ErasureBlocker, SanctionCategory } from "@/lib/types";
 
@@ -203,6 +203,24 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
   const okSanction = ok && category !== ""; // proposer / appliquer exigent la catégorie ; lever n'en a pas
   return (
     <Card title="Sanction">
+      {/* A198 (f) — ce qu'on sanctionne, sous les yeux au moment de sanctionner : le Support n'a plus à rouvrir la
+          file de modération pour relire le motif. On MONTRE, on ne PRÉ-COCHE pas : la catégorie part au membre
+          (A193), une case pré-cochée est une case acceptée sans réfléchir. `null` = pas le droit de lire, ce qui
+          n'est pas « aucun signalement » : dans ce cas on n'affiche rien plutôt qu'un « aucun » mensonger. */}
+      {file.openReports && file.openReports.length > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          <p className="font-semibold">{file.openReports.length} signalement(s) ouvert(s) sur ce membre</p>
+          <ul className="mt-1 space-y-1">
+            {file.openReports.map((r) => (
+              <li key={r.id}>
+                <span className="font-medium">{REPORT_REASON_LABEL[r.reason] ?? r.reason}</span> — {dateTime(r.at)}
+                {r.details ? <span className="block text-amber-800">« {r.details} »</span> : null}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-amber-700">Écrit par un membre : à recouper, jamais à recopier dans un message au membre visé.</p>
+        </div>
+      )}
       <div className="flex gap-3 text-[12.5px]">
         <label className="flex items-center gap-1"><input type="radio" checked={level === "RESTRICTED"} onChange={() => setLevel("RESTRICTED")} /> Restreint (ni publier ni réserver)</label>
         <label className="flex items-center gap-1"><input type="radio" checked={level === "SUSPENDED"} onChange={() => setLevel("SUSPENDED")} /> Suspendu (connexion refusée)</label>
