@@ -6828,6 +6828,14 @@ légitime depuis ANO-ADM-74) ; NRG-1 (le cinquième écran est un texte de formu
 les valeurs PAR DÉFAUT des paramètres (`alerts.disputeUndecidedHours`, `alerts.payoutFailedHours`) et sont déjà
 présentés comme tels — rien à corriger de ce côté.
 
+> **STATUT AU 17/09/2026 (fin de journée) : les SIX « oui » du dossier sont LIVRÉS et mergés.** (a) refus
+> d'effacement journalisé — PR #341 · (c) libellé de l'alerte corrigé — PR #340 · (d) email au Voyageur sur un
+> renversement abandonné — PR #340 · (e) URL signées pour les justificatifs — PR #342 · (f) signalements montrés
+> sur la fiche membre, sans pré-cochage — PR #341 · (g) doublon de signalement — PR #341. Le seul **non** reste
+> (b), l'écran de réinitialisation de la 2FA d'un autre administrateur : il créerait exactement le pouvoir qu'un
+> attaquant cherche, et le détour « retirer / réinviter » est devenu rare depuis A190 a. Arbitrages gravés :
+> **A198**, **A198 bis**, **A198 ter**. Le dossier ci-dessous reste la trace du RAISONNEMENT.
+
 **Reste à trancher par le fondateur — DOSSIER INSTRUIT le 17/09/2026.** Chaque point ci-dessous a été **vérifié dans le
 code** (pas déduit du cahier) : état réel, enjeu, options, recommandation et coût. Il ne manque que la décision.
 ~~(g) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés)~~ — **FAITE** le 16/09 (A195, PR #332),
