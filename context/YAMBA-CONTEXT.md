@@ -796,6 +796,31 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 17/09 (soir) : **LES SIX « OUI » DU DOSSIER D'ARBITRAGES SONT LIVRES (A198, A198 bis, A198 ter) + A199.**
+  (c) L'alerte « Versements en echec depuis plus de 48 h » mesurait autre chose que son libelle (des deals
+  TERMINES depuis 48 h dont l'argent n'est pas parti) : la mesure est gardee, le LIBELLE corrige partout —
+  alerte, recapitulatif quotidien (« sans mouvement depuis 24 h », sa requete porte sur `updatedAt`), catalogue
+  de parametres, OpenAPI, doc admin livree, harnais. Le NOM de la regle ne bouge pas : c'est un identifiant.
+  (d) « Abandonner » un renversement etait la SEULE decision d'argent muette pour la personne concernee :
+  notification + email FR/EN (montant, reference, recours), JAMAIS le motif interne (A191), best effort, hors
+  transaction, identifiant de notification DETERMINISTE. (a) Un effacement RGPD refuse etait le seul geste admin
+  sensible absent du journal : `ACCOUNT_ERASURE_REFUSED` dans la MEME transaction que le registre — et pas de
+  transaction quand il n'y a qu'une ecriture (refus oppose au membre lui-meme). (f) La fiche membre porte les
+  signalements OUVERTS, servis UNIQUEMENT a qui a `reports.review` (le controleur est seul a connaitre les
+  permissions) ; `null` = pas le droit de lire, JAMAIS « aucun signalement » ; on MONTRE, on ne PRE-COCHE pas.
+  (g) Doublon de signalement : conflit MATERIALISE cote message-service (le message vise est un document FROID),
+  REFUSE cote auth-service (Trip et User sont CHAUDS — materialiser un conflit dessus ferait payer des reessais
+  a des gestes sans rapport) ou l'on corrige la CONSEQUENCE : « prioritaire des 3 ouverts » compte des
+  SIGNALANTS DISTINCTS. L'index unique est ecarte deux fois : re-signaler une cible dont le dossier est CLOS est
+  legitime. (e) Justificatifs servis par URL SIGNEE a duree courte, posee A LA LECTURE — la moitie du dispositif
+  est HORS du depot (« Restrict unsigned URLs » chez ImageKit), consignee dans 05-YAMBA-CONFIGURATION.
+  SEUL « NON » : (b) l'ecran de reinitialisation de la 2FA d'un AUTRE admin — il creerait exactement le pouvoir
+  qu'un attaquant cherche, et le detour est devenu rare depuis A190 a.
+  **A199, trouve en livrant A198** : `jest.mock(@packages/…, …, { virtual: true })` declare « ce module n'existe
+  pas », ce qui est FAUX (le resolver Nx resout les alias) ; sous workers PARALLELES la substitution s'appliquait
+  par INTERMITTENCE et le VRAI PrismaClient partait en base. Symptome : une fiche passe seule, echoue dans la
+  suite, et le fichier qui tombe CHANGE d'un passage a l'autre. Retire des 30 fiches concernees ; trois passages
+  paralleles verts. Tests : trip 308, deal 659, message 79, auth 395 (1563 au total).
 - 17/09 : **QUATRE LIVRAISONS — cahier admin a jour (#334), A196 (#335), A197 (#336), arbitrages instruits (#337).**
   (1) **Cahier 02-ADMIN remis a l'etat du code** : la reserve documentaire du § 8 est LEVEE. Le handoff nommait trois
   ecarts ; il y en avait QUATORZE — la source exacte etant les sections « Ecarts avec le cahier » de chaque chapitre des
