@@ -10292,3 +10292,44 @@ dirait exactement — mais il vivrait hors de la gestion Prisma, à recréer et 
 
 auth-service **393 → 395**, message-service **74 → 79**. La fiche `privacy.service.spec.ts` est **mise à jour**
 (et non contournée) : elle affirmait « un refus n'écrit aucune ligne de journal », ce que l'arbitrage change.
+
+---
+
+# PR — (e) Les justificatifs servis par une URL signée (A198 ter)
+
+Un billet d'avion porte un nom, un numéro de vol, parfois un numéro de réservation. Servi par une URL ImageKit
+ordinaire, il restait lisible **pour toujours** par quiconque a l'URL.
+
+Le risque n'est pas l'énumération — le chemin est aléatoire — c'est le **partage** : une URL se recopie dans un
+message, un ticket de support, un journal. Et une fois recopiée, rien ne permettait de la **révoquer**.
+
+```ts
+export function signedImageKitUrl(url: string, expireSeconds = 300): string {
+  if (!url || !process.env.IMAGEKIT_PRIVATE_KEY) return url;
+  try { return imagekit.url({ src: url, signed: true, expireSeconds }); } catch { return url; }
+}
+```
+
+Trois choix à noter :
+
+- **Signer à la LECTURE**, pas à l'écriture : rien n'est stocké, rien à migrer, et l'échéance court à partir du
+  moment où l'opérateur ouvre le document — pas depuis le téléversement.
+- **Dégradation choisie** : sans clé privée (dev, tests), l'URL est rendue telle quelle. Un justificatif
+  illisible en développement coûterait plus cher que le risque qu'on couvre ici.
+- **Périmètre étroit** : seuls les justificatifs. Tout signer casserait le cache des images publiques (avatars,
+  photos de trajet) pour un gain nul.
+
+## La moitié qui n'est pas dans le dépôt
+
+La signature ne **protège** que si le compte ImageKit **refuse les URL non signées** (« Restrict unsigned
+URLs »). Sans ce réglage, l'URL signée fonctionne… et l'URL nue aussi. C'est écrit dans
+`docs/livrables/05-YAMBA-CONFIGURATION.md`, avec la mention « à vérifier à chaque nouvel environnement » — une
+mesure de sécurité à moitié déployée est une mesure qui rassure sans protéger.
+
+**Écarté** : proxifier les fichiers par le service. Le trip-service deviendrait un serveur de fichiers, avec sa
+bande passante et son cache à tenir, pour un bénéfice que la signature obtient sans code.
+
+## Tests
+
+trip-service **305 → 308** : l'URL rendue est signée (jamais celle de la base), l'ouverture reste journalisée,
+et un document introuvable ne signe ni ne journalise rien.
