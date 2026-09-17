@@ -24,14 +24,10 @@ const prismaMock = {
 };
 jest.mock(
   "@packages/libs/prisma",
-  () => ({ __esModule: true, default: prismaMock }),
-  { virtual: true }
-);
+  () => ({ __esModule: true, default: prismaMock }));
 jest.mock(
   "@packages/messaging",
-  () => ({ CONSUMER_GROUPS: { NOTIFICATION_SERVICE: "notification-service" } }),
-  { virtual: true }
-);
+  () => ({ CONSUMER_GROUPS: { NOTIFICATION_SERVICE: "notification-service" } }));
 // Le canal email (D41) a son propre spec — ici on ne prouve que
 // l'ORCHESTRATION : appelé au bon moment, pas sur les skips.
 jest.mock("../emails/booking-emails", () => ({

@@ -32,9 +32,7 @@ const prismaMock = {
   outboxEvent: { create: jest.fn() },
   $transaction: jest.fn(),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), {
-  virtual: true,
-});
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { ForbiddenError, NotFoundError } from "@packages/error-handler";
 import { FakePaymentProvider, type PaymentProvider } from "@packages/payments";

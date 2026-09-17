@@ -10132,3 +10132,47 @@ d'exécution, déjà écrits sous condition, sans événement de domaine attendu
 ## Tests
 
 message-service **68 → 74**, deal-service **644 → 649**.
+
+---
+
+# PR — Suite de tests déterministe (A199) · `chore/tests-deterministes`
+
+## Le symptôme
+
+En livrant A198, la suite deal-service est tombée sur `reputation.service.spec.ts` — une fiche que je n'avais
+pas touchée. Relancée seule : verte. Relancée en entier : rouge, mais **sur un autre fichier**. En
+`--runInBand` : verte à tous les coups.
+
+C'est la signature d'une interférence entre workers, pas d'un bug métier.
+
+## La cause
+
+```ts
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+```
+
+`virtual: true` déclare « ce module n'existe pas sur le disque ». C'est **faux** : le resolver Nx
+(`@nx/jest/plugins/resolver`, posé par le préset) résout les alias `@packages/*` par les chemins du
+`tsconfig`. Sous workers parallèles, un mock virtuel posé sur un module réellement résolu s'applique **par
+intermittence** — et quand il manque, le VRAI `PrismaClient` part en base au milieu d'un test unitaire
+(`PrismaClientValidationError`), ou les compteurs d'appels restent vides.
+
+Le drapeau venait d'une précaution honnête, écrite noir sur blanc dans `outbox-relay.spec.ts` : « le préset
+résout `@packages/api-contracts`… mais rien ne prouve qu'il résout les autres alias ; `virtual: true`
+court-circuite toute résolution. » La preuve est maintenant faite — il les résout — et la précaution coûtait
+la reproductibilité.
+
+## Le correctif
+
+`virtual: true` retiré des **30 fiches** concernées dans les cinq services, uniquement sur les modules
+`@packages/*` (les mocks relatifs et les modules réellement absents ne sont pas touchés), plus un `require`
+après les doubles là où l'import ES du module testé passait avant eux.
+
+**Vérification** : trois passages **parallèles** verts sur deal-service (649) et trip-service (305), plus les
+cinq suites au complet. Avant le correctif, deux passages sur trois tombaient — sur un fichier différent.
+
+## Pourquoi ça compte plus qu'il n'y paraît
+
+Un test qui échoue au hasard finit par être relancé sans être lu. C'est la porte d'entrée de la « CI rouge
+tolérée », et le dépôt en dépend pour 17 checks obligatoires. Le défaut était **latent** : il existait avant
+mes fiches, et le prochain fichier ajouté l'aurait réveillé ailleurs.

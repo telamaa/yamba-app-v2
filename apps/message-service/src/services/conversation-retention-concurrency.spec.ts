@@ -17,7 +17,7 @@ const prismaMock = {
   phoneReveal: { deleteMany: jest.fn() },
   $transaction: jest.fn(),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { makeConversationRetentionService } from "./conversation-retention.service";
 

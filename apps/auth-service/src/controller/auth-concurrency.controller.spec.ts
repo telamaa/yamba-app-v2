@@ -31,11 +31,11 @@ const helpers = {
 const generateUniquePublicSlug = jest.fn(async () => "awa-diop");
 const recordRegistrationConsents = jest.fn(async () => undefined);
 
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 // Redis et le transport email sont des SINGLETONS ouverts au chargement du module : sans ces doubles, la
 // suite passe mais Jest ne rend jamais la main (connexion laissée ouverte).
-jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: { get: jest.fn(), set: jest.fn(), del: jest.fn(), incr: jest.fn(), expire: jest.fn(), ttl: jest.fn(), keys: jest.fn(async () => []) } }), { virtual: true });
-jest.mock("@packages/email", () => ({ isEmailConfigured: () => false, sendTransactionalEmail: jest.fn(async () => ({ provider: "fake", providerMessageId: "x" })) }), { virtual: true });
+jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: { get: jest.fn(), set: jest.fn(), del: jest.fn(), incr: jest.fn(), expire: jest.fn(), ttl: jest.fn(), keys: jest.fn(async () => []) } }));
+jest.mock("@packages/email", () => ({ isEmailConfigured: () => false, sendTransactionalEmail: jest.fn(async () => ({ provider: "fake", providerMessageId: "x" })) }));
 // Le module réel ouvre Redis et le transport email au chargement : on le remplace en entier (les
 // fonctions non listées ne sont pas appelées par les deux chemins testés).
 jest.mock("../utils/auth.helper", () => helpers);

@@ -18,7 +18,7 @@ const prismaMock = {
   user: { findMany: jest.fn() },
   adminAction: { findMany: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { makeAdminConversationService } from "./admin-conversation.service";
 

@@ -22,16 +22,14 @@ const prismaMock = {
 };
 jest.mock(
   "@packages/libs/prisma",
-  () => ({ __esModule: true, default: prismaMock }),
-  { virtual: true }
-);
+  () => ({ __esModule: true, default: prismaMock }));
 
 const emailMock = {
   isEmailConfigured: jest.fn(),
   sendTemplatedEmail: jest.fn(),
   sendTransactionalEmail: jest.fn(),
 };
-jest.mock("@packages/email", () => emailMock, { virtual: true });
+jest.mock("@packages/email", () => emailMock);
 
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import {

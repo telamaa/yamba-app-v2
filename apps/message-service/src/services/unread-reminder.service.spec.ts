@@ -4,8 +4,8 @@ const prismaMock = {
   user: { findUnique: jest.fn() },
   booking: { findUnique: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/settings/default", () => ({ platformSettings: () => ({ get: async () => ({ "messaging.reminderDelayMinutes": 15, "messaging.reminderMinIntervalMinutes": 60 }) }) }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/settings/default", () => ({ platformSettings: () => ({ get: async () => ({ "messaging.reminderDelayMinutes": 15, "messaging.reminderMinIntervalMinutes": 60 }) }) }));
 
 import { makeUnreadReminderService } from "./unread-reminder.service";
 

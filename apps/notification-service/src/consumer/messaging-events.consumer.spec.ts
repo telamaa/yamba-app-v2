@@ -8,7 +8,7 @@ const prismaMock = {
   consumedEvent: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   notification: { upsert: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { Prisma } from "@prisma/client";
 import { handleMessagingEventMessage, recipientOf } from "./messaging-events.consumer";

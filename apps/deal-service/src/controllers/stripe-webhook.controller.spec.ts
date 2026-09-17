@@ -17,10 +17,10 @@
  * qu'on ignore volontairement ferait retenter Stripe indéfiniment.
  */
 const construct = jest.fn();
-jest.mock("@packages/payments", () => ({ __esModule: true, constructStripeWebhookEvent: construct }), { virtual: true });
+jest.mock("@packages/payments", () => ({ __esModule: true, constructStripeWebhookEvent: construct }));
 
 const prismaMock = { carrierPage: { findFirst: jest.fn(), update: jest.fn() } };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 const notifyCarrierPayoutFailed = jest.fn();
 jest.mock("../services/ops-notify.service", () => ({ __esModule: true, notifyCarrierPayoutFailed }));

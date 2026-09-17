@@ -8,10 +8,10 @@
 const prismaMock = { dataRequest: { findMany: jest.fn() }, user: { findMany: jest.fn(), findUnique: jest.fn() }, booking: { count: jest.fn() }, trip: { count: jest.fn() } };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => true) };
 const redisMock = { set: jest.fn() };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
-jest.mock("@packages/admin-audit", () => auditMock, { virtual: true });
-jest.mock("@packages/libs/imagekit", () => ({ deleteImageKitFile: jest.fn() }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }));
+jest.mock("@packages/admin-audit", () => auditMock);
+jest.mock("@packages/libs/imagekit", () => ({ deleteImageKitFile: jest.fn() }));
 jest.mock("../utils/auth.helper", () => ({ checkSudoOtpRestrictions: jest.fn(), revokeRefreshJti: jest.fn(), sendSudoOtp: jest.fn(), trackSudoOtpRequests: jest.fn() }));
 jest.mock("../utils/sudo", () => ({ requireSudo: jest.fn() }));
 jest.mock("../emails/send-auth-email", () => ({ sendAuthEmail: jest.fn() }));

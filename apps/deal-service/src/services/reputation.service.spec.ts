@@ -7,7 +7,7 @@ const prismaMock = {
   carrierPage: { findUnique: jest.fn(), update: jest.fn() },
   user: { update: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 jest.mock("@packages/libs/settings/default", () => ({ platformSettings: () => ({ get: async () => ({}) }) }));
 
 import { averageOf, computeReputationLevel, recomputeReputation } from "./reputation.service";

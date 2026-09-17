@@ -23,9 +23,9 @@ const countActiveBookings = jest.fn(async () => 0);
 const hasActiveBookings = jest.fn(async () => false);
 const triggerTripPublishedNotifications = jest.fn();
 
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
-jest.mock("@packages/libs/redis/trip-stats", () => ({ recordTripView: jest.fn(), tripViews: jest.fn(), viewerKey: jest.fn() }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }));
+jest.mock("@packages/libs/redis/trip-stats", () => ({ recordTripView: jest.fn(), tripViews: jest.fn(), viewerKey: jest.fn() }));
 jest.mock("../lib/imagekit", () => ({ __esModule: true, default: {} }));
 jest.mock("../services/booking-queries", () => ({ countActiveBookings, hasActiveBookings }));
 jest.mock("../services/trigger-trip-notifications", () => ({ triggerTripPublishedNotifications }));

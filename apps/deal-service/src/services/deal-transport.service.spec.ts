@@ -21,7 +21,7 @@ const prismaMock = {
   outboxEvent: { create: jest.fn() },
   $transaction: jest.fn(),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 // ANO-WEB-10 — le refus au pickup recalcule la réputation des deux parties (pour prouver qu'elle ne bouge pas).
 const recomputeBookingParties = jest.fn().mockResolvedValue(undefined);
 jest.mock("./reputation.service", () => ({ recomputeBookingParties: (...a: unknown[]) => recomputeBookingParties(...a) }));

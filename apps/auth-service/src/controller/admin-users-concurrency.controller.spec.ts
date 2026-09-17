@@ -24,10 +24,10 @@ const prismaMock = {
 };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => true) };
 const sendAuthEmail = jest.fn(async () => undefined);
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: {} }), { virtual: true });
-jest.mock("@packages/admin-audit", () => auditMock, { virtual: true });
-jest.mock("@packages/email", () => ({ isEmailConfigured: () => false, sendTransactionalEmail: jest.fn() }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: {} }));
+jest.mock("@packages/admin-audit", () => auditMock);
+jest.mock("@packages/email", () => ({ isEmailConfigured: () => false, sendTransactionalEmail: jest.fn() }));
 jest.mock("../utils/auth.helper", () => ({ revokeRefreshJti: jest.fn(async () => undefined) }));
 jest.mock("../emails/send-auth-email", () => ({ sendAuthEmail }));
 

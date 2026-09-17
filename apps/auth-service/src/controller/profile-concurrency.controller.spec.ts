@@ -19,8 +19,8 @@ const prismaMock = {
   $transaction: jest.fn(),
 };
 const deleteImageKitFile = jest.fn(async () => undefined);
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/imagekit", () => ({ deleteImageKitFile }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/imagekit", () => ({ deleteImageKitFile }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { deleteMyAvatar, setMyAvatar, updateMyProfile } = require("./profile.controller") as typeof import("./profile.controller");

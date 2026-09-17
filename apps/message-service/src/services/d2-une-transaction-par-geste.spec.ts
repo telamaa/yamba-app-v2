@@ -79,7 +79,7 @@ const prismaMock: Record<string, unknown> = {
     }
   }),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { makeConversationService } from "./conversation.service";
 
