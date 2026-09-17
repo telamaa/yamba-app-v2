@@ -4865,11 +4865,12 @@ décidables, retenues ; les règles techniques et de liquidité mènent au pilot
 
 ## Ce qui reste à trancher
 
-- **Ce que mesure « Versements en échec depuis plus de 48 h »** : le serveur compte les deals **terminés** depuis plus
-  de 48 h dont le versement est toujours en échec — pas les versements **en échec** depuis 48 h. Le résultat métier est
-  défendable (un Voyageur non payé 48 h après la fin du deal), mais le libellé et le détail (« rejoué(s) sans succès
-  depuis plus de 48 h ») annoncent autre chose : un versement tenté pour la première fois il y a une heure s'y affiche
-  déjà. Choisir la mesure, puis aligner le libellé (ou la requête).
+- ~~**Ce que mesure « Versements en échec depuis plus de 48 h »**~~ — **TRANCHÉ le 17/09 (A198 c)** : la mesure est
+  gardée (un Voyageur non payé 48 h après la fin du deal est le vrai sujet), c'est le LIBELLÉ qui est corrigé —
+  « Versements non partis 48 h après la fin du deal », détail « n deal(s) terminé(s) depuis plus de 48 h dont le
+  versement est toujours en échec ». Mesurer depuis le premier échec aurait demandé un champ inexistant, et les rejeux
+  espacés auraient repoussé l'alerte à chaque tentative. Le nom de la règle (`PAYOUT_FAILED_48H`) ne bouge pas : c'est
+  un identifiant, pas une phrase.
 - Le cahier (§ 5.2) est à corriger : le versement du jeu d'essai franchit déjà le seuil par défaut.
 - Six règles ne sont pas observables juste après le seed (litige, renversement, événement parqué, relais en retard,
   emails en échec, absence de publication) : un jeu d'essai « vieilli » pour les alertes rendrait l'écran démontrable.
@@ -6383,3 +6384,47 @@ téléphone et un ordinateur) passaient donc tous les deux.
 | CNC16 | Un Expéditeur réserve pendant que le Voyageur annule | L'annulation est refusée avec le nombre de deals actifs ; le deal existe bel et bien |
 | CNC17 | Publier deux trajets à la même seconde | Le compteur public affiche **+2**, pas +1 |
 | CNC18 | Annuler un trajet d'avant la reprise de capacité (`reservedKg` absent) | L'annulation fonctionne — jamais un refus permanent dû au champ absent |
+
+---
+
+# Deux arbitrages d'argent tranchés (A198)
+
+## (c) Une alerte doit dire ce qu'elle mesure
+
+**Le constat.** L'alerte « Versements en échec depuis plus de 48 h » comptait en réalité les deals **terminés**
+depuis plus de 48 h dont le versement est encore en échec — un versement qui vient d'échouer pour la première
+fois, sur un deal fini il y a trois jours, y apparaissait immédiatement.
+
+**La décision.** La mesure est la bonne : ce qui compte, c'est l'argent dû au Voyageur qui n'est pas parti. Le
+libellé est corrigé, pas la requête.
+
+- **RG-ALR-10** — Le titre d'une alerte de seuil nomme **ce que la requête mesure**. « Versements non partis
+  {n} h après la fin du deal », et non « en échec depuis {n} h ».
+- **RG-ALR-11** — Le **nom technique** d'une règle (`PAYOUT_FAILED_48H`) est un identifiant : il ne suit pas
+  les changements de libellé, parce que les journaux, les emails déjà partis et les tests s'y réfèrent.
+
+## (d) Une décision d'argent ne reste pas muette pour la personne concernée
+
+**Le constat.** « Abandonner » un renversement (la plateforme renonce à refaire un virement que le prestataire
+a repris) écrivait la décision et sa ligne de journal — et ne disait **rien** au Voyageur. C'était la seule
+décision d'argent dans ce cas.
+
+- **RG-FIN-31** — Quand la plateforme renonce définitivement à verser une somme, le Voyageur est prévenu :
+  notification dans l'application **et** email, dans **sa** langue.
+- **RG-FIN-32** — Ce message porte le **montant**, la **référence du deal** et une **voie de recours**. Il ne
+  porte **jamais** le motif interne saisi par l'administrateur (il peut nommer un signalant ou un collègue —
+  même principe que pour les sanctions, RG issue d'A191).
+- **RG-FIN-33** — Prévenir est **best effort** : un email qui ne part pas ne fait pas échouer la décision, qui
+  est déjà écrite et journalisée. Deux clics ne produisent qu'**une** notification (identifiant déterministe).
+- **RG-FIN-34** — Un compte effacé ou dont l'adresse est supprimée ne reçoit rien (règle générale du dépôt).
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| ALR10 | Lire l'alerte de versements | « Versements non partis 48 h après la fin du deal » ; le détail parle de **deals terminés**, pas de tentatives |
+| ALR11 | Changer le seuil à 6 h | Le titre affiche **6 h** ; le nom de règle reste `PAYOUT_FAILED_48H` |
+| FIN31 | Un administrateur abandonne un renversement | Le Voyageur reçoit une notification **et** un email dans sa langue |
+| FIN32 | Lire cet email | Montant, référence du deal, adresse de recours ; **aucune** trace du motif interne |
+| FIN33 | Abandonner deux fois (double clic) | **Une** seule notification ; la décision reste écrite même si l'email échoue |
+| FIN34 | Le Voyageur a effacé son compte | Aucun email ; la décision passe quand même |

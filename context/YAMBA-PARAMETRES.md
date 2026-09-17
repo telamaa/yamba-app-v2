@@ -114,7 +114,7 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 
 | Clé | Libellé | Défaut | Bornes | Portée | Règle | Lu par |
 |---|---|---|---|---|---|---|
-| `alerts.payoutFailedHours` | Versement en échec depuis | **48 h** | 1 h → 336 h | exploitation | D59 3A | deal-service |
+| `alerts.payoutFailedHours` | Deal terminé, versement toujours en échec depuis | **48 h** | 1 h → 336 h | exploitation | D59 3A · A198 | deal-service |
 | `alerts.disputeUndecidedHours` | Litige décidable sans décision depuis | **72 h** | 1 h → 336 h | exploitation | D59 3A · A131 | deal-service |
 | `alerts.retentionHeldDays` | Retenue non arbitrée depuis | **7 j** | 1 j → 60 j | exploitation | D59 3A | deal-service |
 | `alerts.reversalOpenHours` | Renversement ouvert depuis | **48 h** | 1 h → 336 h | exploitation | D59 3A | deal-service |
@@ -126,7 +126,7 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 | `alerts.acceptanceRateMinPct` | Taux d'acceptation minimum | **30 %** | 0 % → 100 % | exploitation | D59 3A | deal-service |
 | `alerts.acceptanceRateMinRequests` | Taux d'acceptation : demandes minimum | **5** | 1 → 1000 | exploitation | D59 3A | deal-service |
 
-- **Versement en échec depuis** (`alerts.payoutFailedHours`) — Heures après lesquelles un versement en échec devient une alerte.
+- **Deal terminé, versement toujours en échec depuis** (`alerts.payoutFailedHours`) — Heures APRÈS LA FIN DU DEAL au-delà desquelles un versement encore en échec devient une alerte. La mesure porte sur la fin du deal (l'argent dû au Voyageur est en retard), pas sur la date du premier échec (A198 c).
 - **Litige décidable sans décision depuis** (`alerts.disputeUndecidedHours`) — Heures après lesquelles un litige décidable et non décidé devient une alerte.
 - **Retenue non arbitrée depuis** (`alerts.retentionHeldDays`) — Jours après lesquels une retenue d'annulation non arbitrée devient une alerte.
 - **Renversement ouvert depuis** (`alerts.reversalOpenHours`) — Heures après lesquelles un renversement de versement ouvert devient une alerte.

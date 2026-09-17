@@ -1,11 +1,16 @@
 /**
  * ops-notify.service.ts — notifications HORS événement de booking (A87/A88)
  * ========================================================================
- * Deux exceptions assumées au patron « outbox → notification-service » :
+ * Trois exceptions assumées au patron « outbox → notification-service » :
  * l'événement porte sur un COMPTE (webhook Connect `payout.failed`) ou sur
  * l'exploitation (récapitulatif support), pas sur un deal. Le deal-service
  * écrit alors lui-même la notification in-app (table partagée, id
  * d'événement synthétique) et envoie l'email par le gabarit partagé (D44).
+ *
+ * A198 (d) — la troisième : un renversement ABANDONNÉ. C'est une décision
+ * humaine du back-office, pas une transition du deal : elle n'a pas d'événement
+ * de domaine (aucun autre consommateur à prévenir), mais elle a une personne
+ * concernée. C'était la seule décision d'argent muette pour elle.
  */
 
 import { randomBytes } from "node:crypto";
@@ -24,6 +29,52 @@ const syntheticEventId = () => randomBytes(12).toString("hex");
 
 function money(cents: number, currency: string, locale: "fr" | "en"): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency }).format(cents / 100);
+}
+
+/**
+ * A198 (d) — la plateforme renonce à refaire un virement renversé : le Voyageur l'apprend.
+ * Le motif est GÉNÉRIQUE (principe d'A191 : le motif interne saisi par l'admin peut nommer un
+ * signalant ou un collègue) et une adresse de recours est donnée. Best effort : l'email ne doit
+ * jamais faire échouer la décision, qui est déjà écrite et journalisée.
+ */
+export async function notifyCarrierReversalWrittenOff(bookingId: string): Promise<boolean> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, carrierId: true, payoutAmountCents: true, pricing: true },
+  });
+  if (!booking) return false;
+  const user = await prisma.user.findUnique({
+    where: { id: booking.carrierId },
+    select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true },
+  });
+  if (!user) return false;
+  const locale = resolveLocale(user.preferredLocale);
+  const pricing = (booking.pricing ?? {}) as { currencyCode?: string };
+
+  await prisma.notification.upsert({
+    where: { eventId_userId: { eventId: `reversal-written-off:${booking.id}`, userId: user.id } },
+    create: {
+      userId: user.id,
+      eventId: `reversal-written-off:${booking.id}`, // déterministe : deux clics ne font pas deux notifications
+      type: "carrier.payout_reversal_written_off",
+      bookingId: booking.id,
+      payload: {},
+      readAt: null,
+    },
+    update: {},
+  });
+
+  // D35 4A / D63 4A — tout résolveur de destinataire saute isDeleted ET emailSuppressedAt.
+  if (user.email && !user.isDeleted && !user.emailSuppressedAt && isEmailConfigured()) {
+    const built = OPS_EMAILS[locale].reversalWrittenOffCarrier({
+      firstName: user.firstName,
+      amount: money(booking.payoutAmountCents ?? 0, pricing.currencyCode ?? "EUR", locale),
+      dealRef: booking.id.slice(-6).toUpperCase(),
+      supportEmail: SUPPORT_EMAIL,
+    });
+    await sendTransactionalEmail({ to: user.email, locale, subject: built.subject, content: built.content });
+  }
+  return true;
 }
 
 /** `payout.failed` sur le compte connecté : prévenir le Voyageur (in-app + email), jamais le message brut de la banque. */

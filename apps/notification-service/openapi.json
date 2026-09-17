@@ -18972,7 +18972,7 @@
             "type": "number",
             "minimum": 1,
             "maximum": 336,
-            "description": "Versement en échec depuis (hours) — D59 3A"
+            "description": "Deal terminé, versement toujours en échec depuis (hours) — D59 3A · A198"
           },
           "alerts.disputeUndecidedHours": {
             "type": "number",

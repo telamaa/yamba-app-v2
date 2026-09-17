@@ -39,9 +39,13 @@ const prismaMock: Record<string, unknown> = {
     }
   }),
 };
+// A199 — PAS de `virtual: true` : le resolver Nx résout réellement `@packages/libs/prisma` (chemins du
+// tsconfig), et sous workers parallèles un mock « virtuel » posé sur un module résolu s'appliquait par
+// intermittence — le VRAI PrismaClient partait alors en base.
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
-import { applyBookingTransition } from "./booking-write";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { applyBookingTransition } = require("./booking-write") as typeof import("./booking-write");
 
 const BOOKING = "64b00000000000000000b001";
 const TRIP = "64b00000000000000000c001";
@@ -174,3 +178,5 @@ describe("D2, exécutable — l'écrivain commun des deals", () => {
     expect(appels.filter((a) => a.cible === "outboxEvent.create")).toHaveLength(1); // un seul événement écrit
   });
 });
+
+export {};

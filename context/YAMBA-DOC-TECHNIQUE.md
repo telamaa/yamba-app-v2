@@ -10176,3 +10176,63 @@ cinq suites au complet. Avant le correctif, deux passages sur trois tombaient �
 Un test qui échoue au hasard finit par être relancé sans être lu. C'est la porte d'entrée de la « CI rouge
 tolérée », et le dépôt en dépend pour 17 checks obligatoires. Le défaut était **latent** : il existait avant
 mes fiches, et le prochain fichier ajouté l'aurait réveillé ailleurs.
+
+---
+
+# PR — Arbitrages (c) et (d) : le libellé qui ment, le Voyageur qu'on ne prévient pas (A198) · `feat/arbitrages-argent`
+
+## (c) Une alerte doit dire ce qu'elle mesure
+
+La requête n'a pas changé d'un caractère — elle était juste :
+
+```ts
+prisma.booking.count({ where: { payoutStatus: "FAILED", status: { in: ["COMPLETED", "CANCELLED"] },
+  OR: [{ completedAt: { lt: il_y_a_48h } }, { closedAt: { lt: il_y_a_48h } }] } })
+```
+
+Elle compte des **deals terminés depuis 48 h dont l'argent n'est pas parti**. Le titre, lui, annonçait
+« Versements en échec depuis plus de 48 h » — soit une panne qui dure. Un opérateur qui cherche une panne
+durable et trouve un incident de la minute cesse de croire l'alerte ; c'est ainsi qu'on apprend à ignorer un
+bandeau rouge.
+
+Corrigé partout où la phrase se lit : l'alerte (titre + détail), le récapitulatif quotidien au support (dont
+la requête porte sur `updatedAt` → « sans mouvement depuis plus de 24 h »), le catalogue de paramètres
+(`alerts.payoutFailedHours`), donc l'OpenAPI et `YAMBA-PARAMETRES.md` régénérés, la documentation admin livrée
+et les deux assertions du harnais.
+
+**Ce qui ne bouge pas** : `PAYOUT_FAILED_48H`. Un nom de règle est un identifiant — les journaux le citent,
+des emails déjà partis le portent, des tests s'y réfèrent. Renommer un identifiant pour suivre un libellé,
+c'est casser l'historique pour une question de style.
+
+**L'alternative écartée** : mesurer depuis le premier échec. Le champ n'existe pas, et surtout les rejeux sont
+**espacés** (`payoutNextRetryAt`) : une mesure « depuis la dernière tentative » repousserait l'alerte à chaque
+rejeu — une alerte qui ne sonne jamais.
+
+## (d) Aucune décision d'argent ne reste muette
+
+`WRITTEN_OFF` — la plateforme renonce à refaire un virement repris par le prestataire — écrivait la décision
+et sa ligne de journal. Le Voyageur, lui, n'apprenait rien : il avait vu passer un virement, puis son
+renversement, et le silence.
+
+`notifyCarrierReversalWrittenOff` est la **troisième exception assumée** au patron « outbox →
+notification-service », pour la même raison que les deux autres : ce n'est pas une transition du deal, c'est
+une décision humaine du back-office. Elle écrit la notification in-app et envoie l'email FR/EN.
+
+Trois précautions, toutes déjà des règles du dépôt :
+- **identifiant déterministe** `reversal-written-off:<bookingId>` → deux clics, une notification ;
+- **best effort, hors transaction** → un email qui ne part pas ne fait pas échouer une décision déjà écrite et
+  journalisée ;
+- **`isDeleted` et `emailSuppressedAt` sautés** (D35 4A / D63 4A), comme tout résolveur de destinataire.
+
+Et la règle d'A191 est reprise telle quelle : le message porte le montant, la référence du deal et une voie de
+recours — **jamais** le motif interne saisi par l'administrateur, qui peut nommer un signalant ou un collègue.
+Le test le vérifie explicitement (le mot « fraude » ne doit apparaître dans aucune langue).
+
+**L'alternative écartée** : un événement outbox. Il n'y a aucun autre consommateur à prévenir ; ajouter un
+type au contrat pour une décision rare aurait coûté une migration de schéma d'événement pour rien.
+
+## Tests
+
+deal-service **649 → 659** (10 scénarios : libellés, seuil qui suit le paramètre, nom de règle stable,
+notification + email, idempotence du double clic, compte effacé, adresse supprimée, deal disparu, et le motif
+interne qui ne fuit dans aucune des deux langues).

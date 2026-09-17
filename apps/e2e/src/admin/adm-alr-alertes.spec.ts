@@ -138,7 +138,7 @@ test.describe("ADM-ALR — alertes de seuil (cahier 02-ADMIN § 5.2)", () => {
       await expect(critiques.getByRole("heading"), "le groupe « Critiques · 1 »").toHaveText("Critiques · 1", { timeout: 30_000 });
       const carte = critiques.locator("li").filter({ hasText: "PAYOUT_FAILED_48H" });
       await expect(carte).toHaveCount(1);
-      await expect(carte).toContainText("Versements en échec depuis plus de 1 h");
+      await expect(carte).toContainText("Versements non partis 1 h après la fin du deal"); // A198 (c)
       await expect(carte).toContainText("1 concerné");
       await expect(carte).toContainText("1 versement(s) rejoué(s) sans succès depuis plus de 1 h.");
       test.info().annotations.push({ type: "constat", description: `carte : « ${(await carte.innerText()).replace(/\s+/g, " ").trim()} » — le code garde « 48H » avec un seuil à 1 h (identifiant, pas une valeur : attendu)` });
@@ -203,7 +203,7 @@ test.describe("ADM-ALR — alertes de seuil (cahier 02-ADMIN § 5.2)", () => {
     const email = await mailpit.attendreEmail({ pour: SUPPORT, sujet: new RegExp(`^Yamba — ${actives.length} alerte\\(s\\)`) }, 60_000);
     expect(await mailpit.compter({ pour: SUPPORT, sujet }), "UN email").toBe(avant + 1);
     expect(email.texte, "en français").toContain("Alertes de seuil");
-    expect(email.texte).toContain("Versements en échec depuis plus de 48 h");
+    expect(email.texte).toContain("Versements non partis 48 h après la fin du deal"); // A198 (c)
     expect(email.texte, "un lien vers la file").toMatch(/\/finances\?kind=FAILED/);
     expect(email.texte, "la mention d'unicité").toContain("Chaque alerte n'est envoyée qu'une fois par jour");
     test.info().annotations.push({ type: "constat", description: `✉ « ${email.sujet} » → ${email.destinataire}` });
