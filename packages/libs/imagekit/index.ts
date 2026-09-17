@@ -44,3 +44,30 @@ export async function deleteImageKitFile(fileId: string): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * A198 (e) — une URL SIGNÉE, à durée courte, pour un justificatif.
+ * ================================================================
+ * Un billet d'avion porte un nom, un numéro de vol, parfois un numéro de réservation. Servi par une URL
+ * ImageKit ordinaire, il reste lisible **pour toujours** par quiconque a l'URL — et une URL se recopie : dans
+ * un message, dans un ticket de support, dans un journal. Le risque n'est pas l'énumération (le chemin est
+ * aléatoire), c'est le PARTAGE, et surtout l'impossibilité de révoquer.
+ *
+ * Une URL signée porte une empreinte et une échéance : le lien recopié cesse de fonctionner.
+ *
+ * ⚠️ **Deux moitiés, dont une hors du code.** La signature ne PROTÈGE que si le compte ImageKit refuse les URL
+ * non signées (« Restrict unsigned URLs » dans le tableau de bord). Sans ce réglage, l'URL signée fonctionne…
+ * et l'URL nue aussi. Le réglage est documenté dans `docs/livrables/05-YAMBA-CONFIGURATION.md`.
+ *
+ * Sans clé privée (dev, tests), on rend l'URL telle quelle : un justificatif illisible en développement
+ * coûterait plus cher que le risque qu'on couvre ici.
+ */
+export function signedImageKitUrl(url: string, expireSeconds = 300): string {
+  if (!url || !process.env.IMAGEKIT_PRIVATE_KEY) return url;
+  try {
+    return imagekit.url({ src: url, signed: true, expireSeconds });
+  } catch {
+    // Une URL d'un autre domaine, ou un endpoint mal configuré : mieux vaut l'URL d'origine qu'une page vide.
+    return url;
+  }
+}

@@ -147,6 +147,13 @@ Le site relaie alors les appels vers la passerelle, et les cookies restent valid
 | `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT` | Signature des téléversements côté serveur, suppression de fichiers | **Tout téléversement échoue** : photos de colis, justificatifs, avatars |
 | `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY`, `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Téléversement depuis le navigateur | Idem |
 
+> **⚠️ Réglage à faire DANS le tableau de bord ImageKit, pas dans le code (A198 e).** Les justificatifs (billets
+> d'avion : nom, numéro de vol, parfois numéro de réservation) sont servis au back-office par une **URL signée à
+> durée courte** — un lien recopié dans un message ou un ticket de support cesse de fonctionner. Mais la signature
+> ne **protège** que si le compte ImageKit **refuse les URL non signées** : activer « Restrict unsigned URLs »
+> (Dashboard → Settings → Images/Security). Sans ce réglage, l'URL signée fonctionne… et l'URL nue aussi. C'est la
+> moitié du dispositif qui ne peut pas vivre dans le dépôt : à vérifier à chaque nouvel environnement.
+
 ### Chiffrement
 
 | Variable | Rôle | Sans elle |

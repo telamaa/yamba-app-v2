@@ -11,6 +11,7 @@
  */
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
+import { signedImageKitUrl } from "@packages/libs/imagekit";
 import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
@@ -344,7 +345,10 @@ export const viewTicket = async (req: AuthenticatedRequest, res: Response, next:
     if (!d) throw new NotFoundError("Document not found.", { code: "DOCUMENT_NOT_FOUND" });
     // 7A — un billet est une donnée personnelle : chaque ouverture est journalisée.
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "DOCUMENT_VIEWED", targetType: "TRIP", targetId: d.tripId, after: { documentId: d.id }, ...meta(req) });
-    res.status(200).json({ id: d.id, url: d.url, mimeType: d.mimeType, originalName: d.originalName, status: String(d.status) });
+    // A198 (e) — l'URL n'est pas servie nue : signée et à durée courte (5 min), le temps d'ouvrir le document.
+    // Recopiée dans un ticket de support ou un message, elle cesse de fonctionner — ce qu'une URL permanente
+    // ne permettait pas. La signature est posée À LA LECTURE : rien n'est stocké, rien à migrer.
+    res.status(200).json({ id: d.id, url: signedImageKitUrl(d.url), mimeType: d.mimeType, originalName: d.originalName, status: String(d.status) });
   } catch (e) {
     next(e);
   }
