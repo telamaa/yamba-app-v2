@@ -1573,3 +1573,121 @@ doubles de test sont du code ; ils méritent la même défiance que le reste, et
   approché, un agrégat périodique, ou en changeant la question posée (ici : compter des personnes).
 - Sur les mocks : exécuter la suite en `--runInBand` est le premier réflexe de diagnostic quand une fiche est
   instable. Si le rouge disparaît, ce n'est pas le test qui est faux — c'est ce qui est partagé entre eux.
+
+---
+
+## Chapitre 194 — La chaîne morte, et pourquoi la CI ne la voit pas (passe 01-WEB)
+
+Le chapitre 192 parlait d'un document qui ment, le 193 d'un test qui passe en enseignant le
+contraire. Celui-ci parle du **mécanisme** qui fabrique les deux : une chaîne de traduction que plus
+personne n'affiche, et qui continue de décrire un écran qui n'existe plus.
+
+### 1. Le symptôme
+
+Quatre chaînes trouvées mortes dans la même passe :
+
+| Clé | Texte | Le cahier en avait déduit |
+|---|---|---|
+| `common.json → header.toggleLanguage` | « Changer de langue » | une info-bulle sur le sélecteur |
+| `dashboardHome.json → demandsTitle` / `ctaRespond` | « {n} demandes en attente » / « Voir les demandes » | une carte d'accueil agrégée |
+| `carrierDealRequest.json → coverage.title` | « COUVERTURE DU COLIS » | un intitulé de section |
+| `create-trip.copy.ts → netGainSub` | « … ton prix = ton net » | une mention sur la carte de gain |
+
+Aucune n'est rendue par un composant. Elles ont toutes été écrites pour un écran qui a existé, puis
+l'écran a été refait — et la chaîne est restée. Le rédacteur du cahier a lu la traduction, en a déduit
+l'écran, et a écrit un attendu que le produit ne tient pas.
+
+```sh
+# Le diagnostic tient en une ligne
+grep -rn 'toggleLanguage' apps/user-ui/src   # → rien
+```
+
+### 2. Pourquoi la CI ne l'attrape pas — et ce que ça dit des contrôles en général
+
+Le contrôle i18n de ce dépôt vérifie deux choses, et les vérifie bien :
+
+1. le **miroir FR/EN** — toute clé présente d'un côté l'est de l'autre ;
+2. l'**absence de point** dans les clés — `"meetup.proposed"` fait exploser tout un espace de noms
+   **au rendu** (piège payé, #174).
+
+Les deux sont des contrôles de **cohérence interne** : ils comparent les fichiers de traduction
+**entre eux**. Une chaîne morte est parfaitement cohérente — elle est dans les deux langues, sa clé
+est bien formée. Ce qui lui manque est **externe** : un lecteur.
+
+> **La leçon générale** : un contrôle de cohérence interne ne détecte jamais l'inutile. Pour ça il
+> faut un contrôle de **rattachement** — chaque ressource a-t-elle au moins un consommateur ? C'est
+> la même idée que la règle déjà écrite dans ce dépôt pour les paramètres de plateforme : « une clé
+> du catalogue doit avoir un vrai consommateur, sinon c'est une classe C ». La règle existe pour les
+> paramètres ; elle n'existe pas pour l'i18n.
+
+Le contrôle correspondant coûterait presque rien :
+
+```sh
+# Esquisse : toute clé de messages/** apparaît-elle quelque part dans src/ ?
+# (à affiner : clés composées dynamiquement, namespaces passés à useTranslations)
+```
+
+Et c'est justement là que la prudence s'impose. `t(`status.${s}`)` compose la clé à l'exécution :
+un contrôle naïf la déclarerait morte. Il faudrait donc une liste d'exceptions — **et une liste
+d'exceptions qui grossit est un contrôle qui meurt**, parce qu'on finit par y ajouter tout ce qui
+gêne. C'est pourquoi la piste est écrite comme piste, pas comme décision.
+
+### 3. Le corollaire : la copie n'est pas la spécification
+
+Ce qu'il faut retenir au-delà de l'i18n : **un fichier de traduction n'est pas une source de vérité
+sur l'interface.** Il dit ce qu'on *pourrait* afficher, jamais ce qu'on affiche. La source de vérité
+est le composant qui appelle `t()`.
+
+Cela vaut pour toute ressource déclarative détachée de son consommateur : une constante de messages
+d'erreur, un catalogue d'icônes, une liste d'États, un dictionnaire d'emails. Chaque fois qu'on peut
+ajouter une entrée sans que rien ne la réclame, on crée un endroit où la documentation peut diverger
+en silence.
+
+### 4. Deux écarts qui ne se corrigent pas en changeant le code
+
+**Celui où le code disait mieux.** Le cahier attendait « Versement à J+4 après livraison validée ·
+sur ton compte Stripe ». L'écran dit « Versé {n} jours après livraison validée **par code
+confidentiel** ». Le texte réel nomme **la condition**, pas seulement la destination — il est plus
+juste. On aligne le cahier sur le code, pas l'inverse.
+
+> Quand un écart apparaît, la première question n'est pas « qui corrige ? » mais **« lequel des deux
+> a raison ? »**. Ce n'est pas toujours la spécification.
+
+**Celui qui ne mesurait rien.** Une étape de parcours demandait de « vérifier qu'aucun SMS n'a été
+envoyé ». Il n'y a aucune dépendance SMS et aucun appel SMS dans le dépôt : l'étape ne peut pas
+échouer. Une étape qui ne peut pas échouer n'est pas une preuve, c'est une ligne qui occupe la place
+d'une preuve — et qui donne au rapport un air de couverture qu'il n'a pas.
+
+> **Une assertion dont on ne peut pas construire l'échec ne teste rien.** C'est le même principe que
+> la règle du dépôt sur les tests structurels : *un test doit avoir été vu échouer*. Ici l'échec est
+> impossible **par construction** — le remède n'est pas de corriger le test, c'est de le remplacer
+> par ce qui se mesure vraiment (l'absence d'email au tiers, l'adressage exclusif aux membres).
+
+### 5. Et la manière de classer un écart, qui vaut pour les quatre cahiers
+
+Sur les dix-sept fiches corrigées, **une seule** cachait une anomalie (`ANO-WEB-43`). Les seize
+autres se répartissaient en deux familles, et les confondre coûte cher :
+
+| Famille | Nature | Ce que le testeur doit faire |
+|---|---|---|
+| **le code a raison** | l'attendu était faux ou trop littéral | corriger sa lecture, ne rien consigner |
+| **décision de produit en attente** | l'écart est réel, la question a été posée, rien n'a changé | ne rien consigner non plus |
+
+La seconde ligne est la moins intuitive et la plus importante. Un écart **instruit et laissé tel
+quel** n'est pas un oubli : c'est une décision de ne pas décider tout de suite. Si le cahier ne le
+dit pas, chaque passe le rouvre, on réenquête, et on finit par croire que personne ne s'en occupe.
+
+> **Dater et qualifier un écart vaut mieux que l'effacer.** C'est ce que le 02-ADMIN avait fait en
+> gardant les numéros `NRG-7` avec leurs mentions `LEVÉ` / `RÉDUIT` : un écart effacé revient, un
+> écart daté ne revient pas.
+
+### Pour aller plus loin
+
+- La famille des « ressources sans consommateur » a des outils dans d'autres écosystèmes :
+  `knip` / `ts-prune` pour les exports morts, `depcheck` pour les dépendances inutilisées,
+  `eslint-plugin-i18n-json` et `i18next-parser --fail-on-update` côté traductions. Le principe est
+  toujours le même : comparer une déclaration à ses usages, pas à ses jumelles.
+- Sur « une assertion dont l'échec est impossible » : c'est le cœur du *mutation testing* — on
+  introduit un défaut et on vérifie qu'un test tombe. Un test qu'aucune mutation ne fait échouer ne
+  couvre rien. La règle « un test structurel doit avoir été vu échouer » en est la version manuelle,
+  et elle est déjà écrite dans les pièges de ce dépôt.

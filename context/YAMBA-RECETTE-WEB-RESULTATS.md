@@ -4243,6 +4243,68 @@ jalons, remise) et la page du destinataire — un visiteur, navigateur C — est
 **Le chapitre 6 est clos** : six parcours, 100 étapes, tous conformes, quatre anomalies
 majeures corrigées en chemin (ANO-WEB-08 à 11).
 
+---
+
+# Passe du 18/09/2026 — les écarts du cahier 01-WEB reportés
+
+*Troisième et dernier volet de la passe cahiers (après 04-CRONS et 03-API). Le cahier
+`docs/recette/RECETTE-01-WEB.md` décrivait encore, en dix-sept fiches, un comportement que le code
+n'a pas — et les six parcours du chapitre 6 portaient des étapes dont ce journal disait déjà qu'elles
+étaient « assumées ». Tout est reporté sur place, chaque écart **vérifié dans le code**.*
+
+## Ce que le cahier porte désormais
+
+Un encadré **« Écart connu, vérifié le 18/09/2026 »** sur chaque fiche concernée, avec l'une de deux
+mentions — et la distinction compte, parce qu'elle dit au testeur quoi faire :
+
+| Mention | Ce que ça veut dire | Quoi faire à la passe suivante |
+|---|---|---|
+| **le code a raison** | l'attendu du cahier était faux ou trop littéral | corriger sa lecture, **ne rien consigner** |
+| **décision de produit en attente** | l'écart est réel, la question a été posée le 09/09, rien n'a été changé | **ne rien consigner non plus** : c'est déjà tranché comme question ouverte |
+
+Les dix-sept fiches : `WEB-ACC-1`, `-2`, `-10`, `-11` · `WEB-INS-1`, `-5`, `-6` · `WEB-CNX-3`, `-7`,
+`-10`, `-11` · `WEB-PRO-8` · `WEB-TRJ-3` · `WEB-DEA-1`, `-2` · `WEB-MSG-3`, `-21`. Plus onze étapes
+des six parcours du chapitre 6.
+
+## Trois découvertes de la passe
+
+**1. Trois chaînes de traduction sont mortes.** Elles existent dans `messages/fr` (et leur miroir
+`en`, sinon la CI tomberait), et **aucun composant ne les rend** :
+
+| Clé | Texte | Attendue par |
+|---|---|---|
+| `common.json → header.toggleLanguage` | « Changer de langue » | `WEB-ACC-2` (info-bulle du sélecteur) |
+| `dashboardHome.json → demandsTitle` / `ctaRespond` | « {n} demandes en attente » / « Voir les demandes » | `WEB-DEA-1` (carte d'accueil) |
+| `carrierDealRequest.json → coverage.title` | « COUVERTURE DU COLIS » | `WEB-DEA-2` (intitulé de section) |
+
+À quoi s'ajoute `create-trip.copy.ts → netGainSub` (« ton prix = ton net »), même symptôme hors
+`messages/` (`WEB-TRJ-3`).
+
+Le contrôle CI sur l'i18n vérifie le **miroir FR/EN** et l'**absence de point** dans les clés. Il ne
+détecte pas une clé que plus personne ne lit — et c'est précisément le cas qui fait écrire un cahier
+faux : quelqu'un a lu la traduction, en a déduit l'écran, et l'écran a changé depuis.
+
+> **Piste, non engagée** : un contrôle « clé orpheline » (chaque clé de `messages/**` apparaît-elle
+> dans une source ?) attraperait cette famille pour un coût proche de zéro. À arbitrer — les clés
+> composées dynamiquement demanderaient une liste d'exceptions.
+
+**2. Un écart du cahier était plus juste que le cahier.** `WEB-DEA-2` attendait « Versement à J+4
+après livraison validée · sur ton compte Stripe ». L'écran dit « Versé {n} jours après livraison
+validée **par code confidentiel** ». Le texte réel est meilleur : il nomme **ce qui déclenche** le
+versement, là où le cahier nommait seulement où l'argent arrive. Reporté dans ce sens.
+
+**3. Une étape de parcours ne mesurait rien.** `WEB-E2E-6`, étape 9 : « vérifie qu'aucun SMS n'a été
+envoyé ». Il n'y a **aucune dépendance SMS et aucun appel SMS** dans le dépôt (vérifié :
+`package.json` et balayage des sources). Ce n'est pas une observation de recette, c'est un **fait de
+plateforme** : il n'y a rien à mesurer. L'étape porte maintenant ce qui se mesure vraiment —
+l'absence d'email au tiers, et l'adressage exclusif aux membres.
+
+## Ce qui reste ouvert après la passe
+
+`ANO-WEB-43` (mineure) : le bloc « DE LA PART DE » de `WEB-DEA-2` ne porte ni « {n} envois » ni
+« Membre depuis » — le DTO ne transporte pas ces compteurs. C'est la **seule** anomalie des
+dix-sept fiches ; les seize autres étaient des attendus de cahier ou des questions de produit.
+
 
 
 ---
