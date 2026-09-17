@@ -1,5 +1,9 @@
 # Handoff — 16/09/2026 · la campagne de recette est terminée et mergée
 
+> ⚠️ **Ce document n'est plus le point d'entrée.** Voir `YAMBA-CONTEXT-HANDOFF-2026-09-17.md` : la passe
+> concurrence MEMBRE (§ 2 c ci-dessous) est FAITE (A195), le cahier 02-ADMIN est à jour (§ 2 a, réserve levée) et
+> les arbitrages du § 2 b sont tranchés (A198). Ce handoff reste la mémoire de la campagne de recette.
+
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est le dépôt, ce qui tourne sur le poste, ce qui
 reste à faire, et les pièges déjà payés qu'il ne faut pas repayer. Il remplace, comme point d'entrée, les handoffs de
 campagne (`…-RECETTE-WEB-2026-09-09.md`, `…-RECETTE-API-2026-09-07.md`), qui restent la mémoire détaillée de chaque

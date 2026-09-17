@@ -1479,3 +1479,97 @@ l'exécution qu'il faut la vérifier.
   suite les attrape. Une contre-épreuve manuelle sur le test qui compte donne 80 % du bénéfice pour 1 % du coût.
 - Relire le patron `$transaction: (fn) => fn(prismaMock)` partout où il traîne : il est commode, il est
   partout, et il ment sur exactement une propriété — celle qu'on écrit une transaction pour obtenir.
+
+## Chapitre 191 — Corriger la course, ou corriger le préjudice ? (A198, A199)
+
+Ce chapitre boucle la série sur la concurrence par la question qu'on se pose **après** avoir compris une course :
+faut-il l'empêcher ? Et il finit sur un défaut d'outillage trouvé en livrant — le second mock qui mentait.
+
+### 1. Le même défaut, deux remèdes opposés
+
+Signaler un message et signaler un trajet, c'est le même code : lire « ai-je déjà signalé ? », puis créer. Donc
+la même course, et la même conséquence — deux dossiers dans la file de modération pour un double clic. Le
+réflexe, après les chapitres 188 et 189, est de matérialiser le conflit : écrire, dans la même transaction, un
+document que les deux requêtes se disputent.
+
+Côté **message**, c'est exactement ce qu'on fait :
+
+```ts
+await tx.message.updateMany({ where: { id: message.id }, data: { flaggedContact: message.flaggedContact } });
+```
+
+Une écriture qui remet la valeur en place : ce n'est pas un changement, c'est un **témoin**. Un message est un
+document **froid** — personne d'autre ne l'écrit en continu.
+
+Côté **trajet**, le même geste serait une faute. La cible est un `Trip`, et un `Trip` est **chaud** : chaque
+réservation de deal y écrit `reservedKg`. Matérialiser un conflit dessus, c'est faire payer des réessais — et
+parfois des refus — à des réservations qui n'ont rien à voir avec un signalement. On corrige donc la
+**conséquence** plutôt que la course :
+
+```ts
+// « prioritaire dès 3 ouverts » compte des SIGNALANTS DISTINCTS, pas des lignes
+const openCount = new Map([...signalants].map(([cible, qui]) => [cible, qui.size]));
+```
+
+Le doublon peut encore exister — une carte de plus dans une file — mais il ne **fabrique plus de faux signal**.
+
+> **La règle à emporter** : matérialiser un conflit est un excellent outil **sur un document froid**. Sur un
+> document chaud, c'est un générateur de contention. Et quand le préjudice d'une course est petit et local,
+> le supprimer coûte souvent moins cher que d'empêcher la course.
+
+### 2. Savoir dire non à sa propre recommandation
+
+L'index unique `(cible, signalant)` semblait évident. Il est **faux** : la règle métier autorise à re-signaler
+une cible dont le dossier a été **clos**. Un index partiel (`status: "OPEN"`) le dirait exactement — mais il
+vivrait hors de la gestion du schéma, à recréer et re-vérifier à la main après chaque synchronisation.
+
+Trois questions à se poser devant une contrainte de base de données :
+1. **Dit-elle la règle, toute la règle ?** (ici : non, elle interdit un cas légitime) ;
+2. **Qui la maintient ?** (un index hors schéma est un index qu'on oublie) ;
+3. **Que coûte son absence ?** (ici : une carte en double, pas une perte d'argent).
+
+### 3. Une mesure juste peut porter un nom faux
+
+L'alerte « Versements en échec depuis plus de 48 h » comptait en réalité des **deals terminés depuis 48 h dont
+l'argent n'est pas parti**. La tentation est de changer la requête pour qu'elle colle au nom. C'est l'inverse
+qu'il fallait faire : la mesure répondait à la bonne question (un Voyageur n'a pas été payé), c'est le nom qui
+mentait. Et mesurer « depuis le premier échec » aurait été pire — le champ n'existe pas, et comme les rejeux
+sont **espacés**, une mesure « depuis la dernière tentative » repousserait l'alerte à chaque rejeu : une alerte
+qui ne sonne jamais.
+
+Détail qui compte : le **nom technique** de la règle (`PAYOUT_FAILED_48H`) n'a pas bougé. Un identifiant est
+cité par des journaux, des emails déjà partis, des tests. Le renommer pour suivre un libellé, c'est casser
+l'historique pour une question de style.
+
+### 4. Le second mock qui mentait (A199)
+
+En livrant tout cela, la suite est tombée sur un fichier que je n'avais pas touché — puis sur un autre au
+passage suivant. En `--runInBand`, tout passait. Signature d'une interférence entre workers.
+
+```ts
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+```
+
+`virtual: true` déclare « ce module n'existe pas sur le disque ». C'était **faux** : le resolver Nx résout les
+alias `@packages/*` par les chemins du `tsconfig`. Sous workers parallèles, la substitution s'appliquait par
+intermittence, et quand elle manquait, le **vrai client Prisma partait en base** au milieu d'un test unitaire.
+
+Le drapeau venait d'une précaution honnête, écrite en commentaire des années plus tôt : « rien ne prouve que le
+préset résout les autres alias ». Deux enseignements :
+
+- **Une précaution non vérifiée est une dette.** Elle coûte quelque chose (ici la reproductibilité) en échange
+  d'un risque qu'on n'a jamais mesuré. La vérifier prend une minute : retirer le drapeau, lancer la suite.
+- **Le symptôme d'une interférence entre fichiers de test est toujours le même** : ça passe seul, ça échoue en
+  groupe, et **le fichier qui tombe change**. Devant ce triplet, on ne cherche pas le bug dans le fichier qui
+  tombe — on cherche ce qui fuit entre les fichiers.
+
+C'est le deuxième mock à mentir dans cette série (chapitre 190 : `$transaction` qui passe le même client). Les
+doubles de test sont du code ; ils méritent la même défiance que le reste, et un test qui les vérifie eux.
+
+### Pour aller plus loin
+
+- Sur le choix « empêcher la course » vs « supprimer le préjudice » : la littérature parle de *contention* et
+  de *hot documents*. Un compteur très sollicité se traite rarement par un verrou — plutôt par un décompte
+  approché, un agrégat périodique, ou en changeant la question posée (ici : compter des personnes).
+- Sur les mocks : exécuter la suite en `--runInBand` est le premier réflexe de diagnostic quand une fiche est
+  instable. Si le rouge disparaît, ce n'est pas le test qui est faux — c'est ce qui est partagé entre eux.
