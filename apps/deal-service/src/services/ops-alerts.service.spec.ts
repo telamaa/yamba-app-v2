@@ -1,8 +1,8 @@
 /** ops-alerts.service.spec.ts — dédoublonnage du cron (C-PR6b, D59 4A) */
 const prismaMock = { booking: { count: jest.fn() }, dispute: { findMany: jest.fn() }, outboxEvent: { count: jest.fn(), findFirst: jest.fn() }, emailDelivery: { count: jest.fn() }, trip: { findFirst: jest.fn() } };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 const sendTransactionalEmail = jest.fn().mockResolvedValue(undefined);
-jest.mock("@packages/email", () => ({ isEmailConfigured: () => true, sendTransactionalEmail: (...a: unknown[]) => sendTransactionalEmail(...a) }), { virtual: true });
+jest.mock("@packages/email", () => ({ isEmailConfigured: () => true, sendTransactionalEmail: (...a: unknown[]) => sendTransactionalEmail(...a) }));
 
 import { makeOpsAlertsService, type AlertDedupStore } from "./ops-alerts.service";
 

@@ -14,7 +14,7 @@ const prismaMock = {
   report: { findMany: jest.fn() },
   adminAction: { create: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { recordAdminRead, readCoalesceKey } from "@packages/admin-audit";
 import { makeAdminConversationService } from "./admin-conversation.service";

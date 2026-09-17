@@ -14,7 +14,7 @@ const prismaMock = {
   carrierPage: { findUnique: jest.fn(), update: jest.fn() },
   $transaction: jest.fn(),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 // La réputation a ses propres tests (reputation.service.spec) : ici on vérifie seulement QUAND elle est recalculée.
 const reputationMock = { recomputeBookingParties: jest.fn().mockResolvedValue(undefined) };
 jest.mock("./reputation.service", () => reputationMock);

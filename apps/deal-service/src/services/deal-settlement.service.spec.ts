@@ -19,7 +19,7 @@ const prismaMock = {
   carrierPage: { findUnique: jest.fn() },
   $transaction: jest.fn(),
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { Prisma } from "@prisma/client";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";

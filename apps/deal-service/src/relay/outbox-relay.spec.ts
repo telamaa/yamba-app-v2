@@ -3,10 +3,13 @@
  * ====================================================================
  * Stratégie de mock :
  * - publisher : mock de l'INTERFACE EventPublisher (jamais kafkajs).
- * - prisma & @packages/messaging : mocks VIRTUELS — le préset jest
- *   résout @packages/api-contracts (prouvé par les 202 tests PR3) mais
- *   rien ne prouve qu'il résout les autres alias ; virtual: true
- *   court-circuite toute résolution.
+ * - prisma & @packages/messaging : mocks ordinaires. A199 — ils étaient
+ *   VIRTUELS par précaution (« rien ne prouve que le préset résout les
+ *   autres alias »). Il le fait : le resolver Nx lit les chemins du
+ *   tsconfig, c'est prouvé par les cinq suites. Et la précaution avait un
+ *   coût — sous workers parallèles, un mock virtuel posé sur un module qui
+ *   se résout VRAIMENT s'appliquait par intermittence, et le VRAI client
+ *   Prisma partait en base.
  * - relay-lease : mock relatif (le bail a sa logique, testée via ses
  *   effets : leader/pas leader, release à l'arrêt).
  * - LE CONTRAT EST RÉEL : les fixtures passent le vrai
@@ -21,14 +24,10 @@ const prismaMock = {
     update: jest.fn(),
   },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), {
-  virtual: true,
-});
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 jest.mock(
   "@packages/messaging",
-  () => ({ TOPICS: { BOOKING_EVENTS: "booking-events" } }),
-  { virtual: true }
-);
+  () => ({ TOPICS: { BOOKING_EVENTS: "booking-events" } }));
 jest.mock("./relay-lease", () => ({
   buildLeaseOwner: () => "test-host#1#abcd1234",
   tryAcquireLease: jest.fn(),

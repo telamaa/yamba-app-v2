@@ -4,7 +4,7 @@
  */
 jest.mock("@packages/libs/settings/default", () => ({
   platformSettings: () => ({ snapshot: async () => ({ values: jest.requireActual("@packages/api-contracts").SETTINGS_DEFAULTS, version: 3 }) }),
-}), { virtual: true });
+}));
 
 import { getPricingParams } from "./pricing-params.controller";
 

@@ -54,9 +54,9 @@ const prismaMock = {
   $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
 };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => undefined) };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
-jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
-jest.mock("@packages/admin-audit", () => auditMock, { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
+jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }));
+jest.mock("@packages/admin-audit", () => auditMock);
 jest.mock("../emails/send-auth-email", () => ({ sendAuthEmail: jest.fn(async () => undefined) }));
 
 process.env.REFRESH_TOKEN_SECRET = "refresh-secret-de-test";

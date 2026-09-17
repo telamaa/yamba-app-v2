@@ -21,7 +21,7 @@ const prismaMock = {
   emailDelivery: { updateMany: jest.fn() },
   user: { updateMany: jest.fn() },
 };
-jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 
 import { svixSign } from "@packages/email";
 import { makeEmailWebhookController, type RawBodyRequest } from "./email-webhook.controller";
