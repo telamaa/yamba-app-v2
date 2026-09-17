@@ -59,6 +59,8 @@ la démontrer** qui manque. Recommandation : rendre la boucle injectable (passer
 argument, comme le font `recipient-redaction` ou `unread-reminder`) pour qu'un test unitaire puisse
 faire échouer un trajet sur trois. Écart **documentaire**, à corriger dans le cahier.
 
+> **Reporté le 18/09/2026.** La fiche CRON-TRAJETS-4 du cahier ne propose plus de provocation : elle dit que les trois moyens envisagés sont inopérants et pourquoi (`if (carrierPage)` tolère l'absence par conception ; un `userId` malformé casse le **scan**, avant la boucle), et fait vérifier la **forme** de la garde — try/catch par trajet, `skipped++`, ligne de journal, aucun `throw`. Le verdict du § 9.1 devient « Conforme (par lecture) ». L'amélioration proposée (rendre la boucle injectable) reste **non faite**.
+
 *(Tentative d'une provocation de remplacement — écrire un `userId` malformé pour faire lever P2023 —
 abandonnée : elle a écrit les dates en TEXTE au lieu de dates BSON, ce qui casse le **scan** avant
 la boucle, donc à un autre endroit que celui qu'on cherche à éprouver. Document réparé, jeu d'essai
@@ -165,6 +167,8 @@ un rejeu des versements *< 10 essais* ». Vérifié : l'en-tête dit exactement 
 « Le plafond de 10 essais a disparu avec D58 : le rejeu est espacé (`payoutNextRetryAt`), sans
 limite ». Le commentaire est à jour ; c'est **la liste de divergences du cahier** qui ne l'est
 plus. Écart documentaire, à corriger dans le cahier.
+
+> **Reporté le 18/09/2026.** `DIV-3` est marquée **refermée** au § 1.5 du cahier, avec la phrase exacte que porte aujourd'hui l'en-tête du cron. La relecture a montré que `DIV-2` l'était aussi (le tableau transverse du livrable dit désormais « deal / message »), et que `DIV-1` ne l'est qu'**à moitié** : le livrable technique se contredit lui-même — « n'est appelé nulle part » au § 4.1 et au § 9.4, « Démarré depuis A148 » dans le tableau des crons du même § 9.4.
 
 ---
 
@@ -645,7 +649,7 @@ alerte sur une **absence**, alors que tout le reste alerte sur une présence ano
 
 ```
 ANO-CRON-08
-Fiche          : CRON-CONSO-3 · Gravité : BLOQUANTE · ÉTAT : OUVERTE (correction proposée)
+Fiche          : CRON-CONSO-3 · Gravité : BLOQUANTE · ÉTAT : CLOSE (livrée ; vérifiée dans le code le 18/09/2026)
 Attendu        : « Si la partition se bloquait ici, une seule ligne malformée arrêterait toutes
                  les notifications de la plateforme. C'est le scénario à ne jamais laisser
                  régresser. »
@@ -680,11 +684,14 @@ Correction     : (1) `KafkaEventConsumer` expose l'événement `CRASH` de kafkaj
                  **bruyante** au lieu d'une mort silencieuse — on ne saute jamais un message
                  qu'on n'a pas su lire.
 Note de recette: en recette, produire **toujours** avec `rpk topic produce -z none`.
+                 *(Reporté le 18/09/2026 : les DEUX commandes `produce` du cahier — CRON-CONSO-3
+                 et CRON-CONSO-4 — portent désormais `-z none`, avec l'avertissement qui explique
+                 pourquoi la commande d'origine tuait le consommateur.)*
 ```
 
 ```
 ANO-CRON-09
-Fiche          : CRON-SEC-3 · Gravité : MAJEURE · ÉTAT : OUVERTE (correction proposée)
+Fiche          : CRON-SEC-3 · Gravité : MAJEURE · ÉTAT : CLOSE (livrée ; vérifiée dans le code le 18/09/2026)
 Attendu        : « Le signalement est toujours là, avec son motif, son statut et sa date. Le
                  corps du message a disparu avec le fil. L'administrateur voit un dossier sans
                  contenu — c'est le compromis assumé entre conservation et modération. »
@@ -708,7 +715,8 @@ Correction     : rendre le dossier purgé **visible et traitable** — c'est ce 
 
 ```
 ANO-CRON-07
-Fiche          : hors fiche (constat de recette, chapitre 6) · Gravité : MINEURE · ÉTAT : OUVERTE
+Fiche          : hors fiche (constat de recette, chapitre 6) · Gravité : MINEURE · ÉTAT : CLOSE
+                 (livrée ; vérifiée dans le code le 18/09/2026)
 Attendu        : le jeu d'essai respecte les règles métier qu'il sert à éprouver.
 Obtenu         : `seed-deals.ts` crée `gru-completed` avec `shipperKey: "ines"` sur le trajet
                  `gru` dont `carrierKey` est… `ines`. Le membre est **son propre Expéditeur**,
@@ -763,17 +771,19 @@ voit pas.
 
 | # | Fiche | Gravité | Ce qui n'allait pas | État |
 |---|---|---|---|---|
-| ANO-CRON-01 | CRON-TRAJ-5 | mineure | un compteur de trajets pouvait descendre sous zéro (`{ decrement: 1 }` sans plancher) | **close** |
-| ANO-CRON-02 | CRON-ALERTES-2 | majeure | un événement parqué ne pouvait être remis en file par aucun outil | **close** |
-| ANO-CRON-03 | CRON-ALERTES-3 | mineure | le titre d'une alerte annonçait un seuil figé, pas celui des paramètres | **close** |
-| ANO-CRON-04 | CRON-RELANCE-2 | mineure | le battement annonçait « 1 relance » pour zéro email envoyé | **close** |
-| ANO-CRON-05 | CRON-PURGEOUT-1 | **bloquante** | la purge nocturne supprimait **tous** les événements non publiés, chaque nuit | **close** |
+| ANO-CRON-01 | CRON-TRAJETS-1 | mineure | un compteur de trajets pouvait descendre sous zéro (`{ decrement: 1 }` sans plancher) | **close** |
+| ANO-CRON-02 | CRON-ALERTES-1 | majeure | un événement parqué ne pouvait être remis en file par aucun outil | **close** |
+| ANO-CRON-03 | CRON-ALERTES-4 | cosmétique | le titre d'une alerte annonçait un seuil figé, pas celui des paramètres | **close** |
+| ANO-CRON-04 | CRON-RELANCE-5 | mineure | le battement annonçait « 1 relance » pour zéro email envoyé | **close** |
+| ANO-CRON-05 | CRON-PURGEOUT-2 | **bloquante** | la purge nocturne supprimait **tous** les événements non publiés, chaque nuit | **close** |
 | ANO-CRON-06 | CRON-RELAIS-7 | majeure | une panne de courtier de 100 s parquait définitivement des événements sains | **close** |
 | ANO-CRON-07 | chapitre 6 | mineure | le jeu d'essai créait une réservation interdite (le Voyageur son propre Expéditeur) | **close** |
 | ANO-CRON-08 | CRON-CONSO-3 | **bloquante** | un consommateur mort restait mort, en silence, `/health` répondant `ok` | **close** |
 | ANO-CRON-09 | CRON-SEC-3 | majeure | un signalement dont le message est purgé disparaissait de la file de modération | **close** |
 
-Deux bloquantes, quatre majeures, trois mineures — **toutes corrigées avec contre-épreuve**.
+Deux bloquantes, trois majeures, trois mineures, une cosmétique — **toutes corrigées avec contre-épreuve**.
+
+*(Décompte et noms de fiches rectifiés le 18/09/2026 : ce tableau nommait cinq fiches qui ne sont pas celles des chapitres — dont `CRON-TRAJ-5`, qui n'existe dans aucun cahier — et comptait quatre majeures pour trois. Les chapitres, écrits au fil de la campagne, font foi.)*
 
 ## Ce que cette campagne aura appris
 

@@ -1,7 +1,8 @@
 # YAMBA — CAHIER DE RECETTE · TÂCHES PLANIFIÉES, RELAIS D'ÉVÉNEMENTS ET CONSOMMATEURS
 
 > Périmètre testé : les **treize tâches planifiées** des cinq services, les **deux relais d'outbox** (`deal-service`, `message-service`), les **deux consommateurs** du `notification-service`, et les **battements** qui prouvent que tout cela tourne encore.
-> Version du code de référence : branche `feat/f3-messaging-admin` (base `dev`), état au 06/09/2026.
+> Version du code de référence : `dev`, état au 18/09/2026 (campagne jouée le 09/09/2026 ; cahier remis à l'état du code le 18/09).
+> **Ce fichier `.md` fait foi.** Le `.pdf` du même nom date du 06/09/2026 et n'est plus régénéré à chaque passe : en cas de divergence, c'est le `.md` qui dit vrai.
 > Document **exécutable par un testeur seul**. Chaque scénario se conclut par un verdict binaire : **conforme** ou **non conforme**.
 
 ---
@@ -41,7 +42,7 @@ Ce cahier donne donc, pour chaque tâche, deux choses que la documentation techn
 
 ### 1.3 Ce que ce cahier ne couvre pas
 
-- Les parcours **membres** (publication d'un trajet, réservation, paiement, remise, notation, messagerie) : voir **`docs/recette/RECETTE-01-MEMBRE.md`**.
+- Les parcours **membres** (publication d'un trajet, réservation, paiement, remise, notation, messagerie) : voir **`docs/recette/RECETTE-01-WEB.md`**.
 - Le **back-office** : les 23 écrans, la connexion en deux étapes, la matrice des permissions, le journal d'audit : voir **`docs/recette/RECETTE-02-ADMIN.md`**.
 - Les **contrats d'API** pris isolément (codes de retour, schémas OpenAPI, en-têtes) : voir **`docs/recette/RECETTE-03-API.md`**.
 
@@ -62,13 +63,15 @@ Quand une tâche planifiée a un effet visible côté membre (un versement qui a
 
 ### 1.5 Divergences documentaires déjà connues
 
-Ces trois écarts ont été relevés à la rédaction de ce cahier, entre le chapitre 9 de la documentation technique et le code réel. Ils sont **déjà consignés** : inutile de les rouvrir en anomalie, mais il faut les connaître pour ne pas tester la mauvaise chose.
+Ces écarts ont été relevés à la rédaction de ce cahier, entre le chapitre 9 de la documentation technique et le code réel. Ils sont **déjà consignés** : inutile de les rouvrir en anomalie, mais il faut les connaître pour ne pas tester la mauvaise chose.
 
-| # | Le document dit | Le code dit | Conséquence pour le testeur |
-|---|---|---|---|
-| DIV-1 | Le cron `onboarding-reminder` est « défini mais jamais démarré », sans interrupteur | `apps/auth-service/src/main.ts` (l. 64-72, A148) le démarre après le `listen`, coupable par `ONBOARDING_REMINDER_CRON_ENABLED=false` | Le chapitre 12 de ce cahier **teste** ce cron : il doit battre et envoyer |
-| DIV-2 | La ligne `outbox-retention` du tableau porte « trip / deal / message » | Seuls `apps/deal-service` et `apps/message-service` ont ce cron ; `apps/trip-service/src/main.ts` ne démarre que `complete-trips` | Ne pas chercher un battement `trip-service:outbox-retention` : il n'existe pas |
-| DIV-3 | L'en-tête de `payout-bookings.cron.ts` annonce un rejeu des versements « < 10 essais » | `retryFailedPayouts` n'a **aucun plafond de tentatives** depuis C-PR5 / D58 / A111 ; l'espacement se fait par `payoutNextRetryAt` | Un versement en échec est retenté indéfiniment, de plus en plus espacé (voir CRON-PAYOUT-5) |
+**Relu le 18/09/2026 contre le code.** Sur les trois divergences d'origine, **une seule est encore vraie** ; les deux autres ont été refermées depuis, et c'était la liste elle-même qui avait vieilli. Le tableau ci-dessous garde les trois lignes — une divergence refermée reste une information utile au testeur, qui a pu lire l'ancienne version.
+
+| # | État au 18/09/2026 | Le document dit | Le code dit | Conséquence pour le testeur |
+|---|---|---|---|---|
+| DIV-1 | **encore vraie (partiellement)** | Le livrable technique se **contredit** : il écrit « **n'est appelé nulle part** […] il ne démarre pas » au § 4.1 (auth-service) et « défini mais non démarré » au § 9.4, puis « **Démarré depuis A148** » dans le tableau des crons de ce même § 9.4 | `apps/auth-service/src/main.ts` (l. 65-72, A148) le démarre après le `listen`, coupable par `ONBOARDING_REMINDER_CRON_ENABLED=false` | Le chapitre 4.12 de ce cahier **teste** ce cron : il doit battre et envoyer. Ne pas se fier aux deux passages périmés du livrable |
+| DIV-2 | **refermée** | ~~La ligne `outbox-retention` du tableau porte « trip / deal / message »~~ — le tableau transverse dit désormais « deal / message » | Seuls `apps/deal-service` et `apps/message-service` ont ce cron ; `apps/trip-service/src/main.ts` ne démarre que `complete-trips` | Le fond reste vrai : ne pas chercher un battement `trip-service:outbox-retention`, il n'existe pas |
+| DIV-3 | **refermée** | ~~L'en-tête de `payout-bookings.cron.ts` annonce un rejeu des versements « < 10 essais »~~ — l'en-tête dit aujourd'hui l'inverse, mot pour mot : « Le plafond de 10 essais a disparu avec D58 : le rejeu est espacé (`payoutNextRetryAt`), sans limite » | `retryFailedPayouts` n'a **aucun plafond de tentatives** depuis C-PR5 / D58 / A111 ; l'espacement se fait par `payoutNextRetryAt` | Inchangé : un versement en échec est retenté indéfiniment, de plus en plus espacé (voir CRON-PAYOUT-5) |
 
 ---
 
@@ -169,11 +172,11 @@ Chaque tâche laisse, à chaque passage, une trace dans Redis sous la clé `yamb
 
 *(a) La page « État des services » du back-office*, `http://localhost:3001/status` (profil OPS ou SUPER_ADMIN). Elle appelle `GET /admin/status`, qui agrège les `/health` des six services, **les battements**, l'état de l'outbox (non publiés, plus ancien non publié, parqués) et les emails des 24 dernières heures. C'est la vue de l'exploitant.
 
-*(b) En ligne de commande*, avec le même code que la page admin. Créer `scripts/recette-battements.ts` :
+*(b) En ligne de commande*, avec le même code que la page admin. Créer `scripts/recette/battements.ts` :
 
 ```ts
-import redis from "../packages/libs/redis";
-import { listCronRuns } from "../packages/libs/redis/cron-heartbeat";
+import redis from "../../packages/libs/redis";
+import { listCronRuns } from "../../packages/libs/redis/cron-heartbeat";
 
 (async () => {
   const runs = await listCronRuns(redis);
@@ -188,7 +191,7 @@ import { listCronRuns } from "../packages/libs/redis/cron-heartbeat";
 ```
 
 ```sh
-npx tsx --env-file=.env scripts/recette-battements.ts
+npx tsx --env-file=.env scripts/recette/battements.ts
 ```
 
 Sortie réelle observée à la rédaction de ce cahier (six services démarrés depuis une heure environ) :
@@ -257,11 +260,29 @@ Booking expiry cron disabled (BOOKING_EXPIRY_CRON_ENABLED=false)
 
 C'est le cœur de ce cahier. Il y a exactement trois manières d'obtenir un passage sans attendre l'horaire, et elles ne s'appliquent pas aux mêmes tâches.
 
-**Méthode A — appeler la fonction exportée depuis un script.** La plupart des tâches délèguent tout leur travail à une fonction ou une méthode exportée, précisément pour être testables. Un script `tsx` lancé à la racine du dépôt résout les alias `@packages/*` (vérifié) et charge le `.env` :
+**Méthode A — appeler la fonction exportée depuis un script.** La plupart des tâches délèguent tout leur travail à une fonction ou une méthode exportée, précisément pour être testables. Un script `tsx` lancé **depuis la racine du dépôt** charge le `.env` et résout les alias `@packages/*` que les sources d'application tirent derrière elles (vérifié). Les scripts eux-mêmes, en revanche, importent en **relatif** — `../../packages/…`, `../../apps/…` — comme les seeds : les 43 scripts de `scripts/recette/` le font, aucun n'emploie l'alias directement.
 
 ```sh
-npx tsx --env-file=.env scripts/recette-<nom>.ts
+npx tsx --env-file=.env scripts/recette/<nom>.ts
 ```
+
+> **Ces scripts existent déjà — ne pas les réécrire.** Le cahier a été rédigé avant la campagne du
+> 09/09/2026 et proposait de les créer un par un à la racine de `scripts/`. La campagne les a écrits,
+> et ils sont **versionnés dans `scripts/recette/`** (45 fichiers). Les blocs de code qui suivent sont
+> donc conservés comme **documentation de ce que fait chaque script**, pas comme un travail à refaire :
+> le chemin donné en tête de chaque bloc est celui du fichier réel. Trois exceptions, signalées sur
+> place, n'ont pas été versionnées et restent **à créer** : `conservation-eligible.ts`,
+> `payload-audit.ts`, `purgeout-eligible.ts`.
+>
+> Deux scripts portent un nom différent de celui qu'annonçait le cahier d'origine, et c'est délibéré :
+>
+> | Le cahier disait | Le fichier réel | Pourquoi |
+> |---|---|---|
+> | `scripts/recette-expire-eligible.ts` | `scripts/recette/deal-eligible.ts` | il rend une réservation expirable, quel que soit le scénario qui la consomme |
+> | `scripts/recette-secret-audit.ts` | `scripts/recette/audit-code-livraison.ts` | **le nom d'origine fait tomber la CI.** Le contrôle `Anti-fuite (fichiers sensibles)` refuse tout fichier suivi dont le chemin contient `secret` : `git ls-files \| grep -iE '(^\|/)\.env($\|\.)\|secret\|\.pem$\|\.key$'`. Un script de recette versionné sous ce nom casse la branche |
+>
+> Comme les scripts vivent un niveau plus bas que `scripts/`, leurs imports relatifs sont en
+> `../../packages/…` et `../../apps/…` — les blocs de ce cahier ont été corrigés en conséquence.
 
 Deux règles impératives pour ces scripts :
 
@@ -300,7 +321,7 @@ Attention : l'horloge injectée décale la **lecture**, mais l'écriture pose ce
 Chaque chapitre du § 4 indique **le champ exact du modèle exact** à modifier. Le patron d'un tel script :
 
 ```ts
-import prisma from "../packages/libs/prisma";
+import prisma from "../../packages/libs/prisma";
 
 const ID = process.argv[2];                          // identifiant de la réservation
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
@@ -319,10 +340,10 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 
 ### 2.8 Lire l'état de l'outbox
 
-Beaucoup de vérifications de ce cahier passent par la collection `OutboxEvent`. Un script de lecture unique, `scripts/recette-outbox.ts` :
+Beaucoup de vérifications de ce cahier passent par la collection `OutboxEvent`. Un script de lecture unique, `scripts/recette/outbox.ts` :
 
 ```ts
-import prisma from "../packages/libs/prisma";
+import prisma from "../../packages/libs/prisma";
 
 (async () => {
   const absent = { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never;
@@ -465,8 +486,8 @@ Les nocturnes sont décalées de cinq minutes les unes des autres (03:15, 03:30,
 **Rendre un trajet éligible.** Modèle `Trip`, champ **`arrivalAt`** (ou `departureAt` si `arrivalAt` est absent), à reculer de plus de 24 h.
 
 ```ts
-// scripts/recette-trip-eligible.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/trip-eligible.ts
+import prisma from "../../packages/libs/prisma";
 const ID = process.argv[2];
 (async () => {
   const t = await prisma.trip.update({
@@ -483,13 +504,13 @@ const ID = process.argv[2];
 **Déclencher.**
 
 ```ts
-// scripts/recette-complete-trips.ts
-import { runCompleteTripsOnce } from "../apps/trip-service/src/cron/complete-trips.cron";
+// scripts/recette/complete-trips.ts
+import { runCompleteTripsOnce } from "../../apps/trip-service/src/cron/complete-trips.cron";
 (async () => { console.log(await runCompleteTripsOnce()); process.exit(0); })();
 ```
 
 ```sh
-npx tsx --env-file=.env scripts/recette-complete-trips.ts
+npx tsx --env-file=.env scripts/recette/complete-trips.ts
 ```
 
 ---
@@ -563,13 +584,32 @@ npx tsx --env-file=.env scripts/recette-complete-trips.ts
 |---|---|
 | **Objectif** | Vérifier que l'erreur sur un trajet est absorbée et que les suivants sont traités |
 
-**Étapes**
+> ⚠️ **La provocation que proposait ce cahier ne provoque rien.** Corrigé le 18/09/2026, après mesure
+> du 09/09. Les deux moyens d'origine — supprimer la `CarrierPage` du Voyageur, ou pointer son `userId`
+> sur un identifiant inexistant — produisent tous deux `carrierPage = null`, et le code teste
+> `if (carrierPage)` avant d'écrire : **l'absence est tolérée par conception, ce n'est pas une erreur.**
+> Joué tel quel, les trois trajets passent `COMPLETED` et aucun n'est compté en échec. Le troisième
+> essai (écrire un `userId` malformé en Mongo brut) ne marche pas non plus : Prisma refuse la valeur
+> **au scan**, avant la boucle — donc à un autre endroit que celui qu'on veut éprouver.
 
-1. Rendre **trois** trajets éligibles.
-2. Provoquer un échec sur l'un d'eux — le plus simple : supprimer sa `CarrierPage` (`prisma.carrierPage.delete`) pour que la mise à jour des compteurs soit sans cible, ou passer son `userId` sur un identifiant inexistant.
-3. Lancer la tâche.
+**Étapes** — en l'état du code, cette fiche se vérifie **par lecture**, pas par provocation.
 
-**Résultat attendu** — les deux autres trajets sont bien `COMPLETED` ; le troisième est compté dans `skipped` et une ligne `[complete-trips] Failed to complete trip <id>` apparaît. La passe **entière** ne s'arrête pas sur un cas.
+1. Rendre **trois** trajets éligibles et lancer la tâche : la passe doit rendre `completed=3`.
+2. Ouvrir `apps/trip-service/src/cron/complete-trips.cron.ts` et vérifier la **forme** de la boucle :
+   le `try { … } catch` enveloppe **le corps d'un seul trajet** (pas la boucle entière), le `catch`
+   fait `skipped++` puis `console.error("[complete-trips] Failed to complete trip <id>")`, et
+   **aucun `throw` ne remonte** — c'est cela, et cela seul, qui garantit qu'un trajet en échec ne
+   fait pas tomber la fournée.
+3. Consigner que la propriété est **structurelle** et non mesurée.
+
+**Résultat attendu** — la passe termine les trois trajets ; la garde existe, isolée par trajet, avec
+son compteur et sa ligne de journal.
+
+**Ce qu'il faudrait pour la mesurer vraiment** (amélioration proposée le 09/09, non faite) : rendre la
+boucle injectable — passer le client Prisma en argument, comme le font déjà `recipient-redaction` et
+`unread-reminder`. Un test unitaire pourrait alors faire échouer un trajet sur trois et *prouver* que
+les deux autres passent. Tant que la tâche va chercher son client elle-même, la garde reste
+invérifiable de l'extérieur.
 
 **Verdict** : ☐ conforme ☐ non conforme
 
@@ -603,8 +643,8 @@ Point important de conception : la machine considère déjà un `PENDING` périm
 **Rendre une demande éligible.** Modèle `Booking`, champ **`expiresAt`**, à reculer dans le passé, avec `status: "PENDING"`.
 
 ```ts
-// scripts/recette-expire-eligible.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/deal-eligible.ts
+import prisma from "../../packages/libs/prisma";
 const ID = process.argv[2];
 (async () => {
   const b = await prisma.booking.update({
@@ -619,8 +659,8 @@ const ID = process.argv[2];
 **Déclencher.**
 
 ```ts
-// scripts/recette-expire.ts
-import { dealLifecycleService } from "../apps/deal-service/src/routes/deal.routes";
+// scripts/recette/expire.ts
+import { dealLifecycleService } from "../../apps/deal-service/src/routes/deal.routes";
 (async () => { console.log(await dealLifecycleService.expireDueBookings(), "expirée(s)"); process.exit(0); })();
 ```
 
@@ -783,8 +823,8 @@ Il n'y a **aucun plafond** de tentatives (DIV-3) : un versement en échec est re
 | Rappel J+3 | `status: "DELIVERED"`, `payoutDueAt` entre **now** et **now + 24 h**, `verificationReminderSentAt` **absent** |
 
 ```ts
-// scripts/recette-payout-eligible.ts  —  usage : … <bookingId> <due|retry|reminder>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/payout-eligible.ts  —  usage : … <bookingId> <due|retry|reminder>
+import prisma from "../../packages/libs/prisma";
 const [ID, MODE] = process.argv.slice(2);
 const h = (n: number) => new Date(Date.now() + n * 3_600_000);
 (async () => {
@@ -805,10 +845,10 @@ Pour le mode `reminder`, il faut en plus que `verificationReminderSentAt` soit *
 **Déclencher.**
 
 ```ts
-// scripts/recette-payout.ts
+// scripts/recette/payout.ts
 import pino from "pino";
-import { dealSettlementService } from "../apps/deal-service/src/routes/deal.routes";
-import { runPayoutPasses } from "../apps/deal-service/src/cron/payout-bookings.cron";
+import { dealSettlementService } from "../../apps/deal-service/src/routes/deal.routes";
+import { runPayoutPasses } from "../../apps/deal-service/src/cron/payout-bookings.cron";
 (async () => {
   const logger = pino({ level: "info" });
   const which = process.argv[2] ?? "all";
@@ -1023,9 +1063,9 @@ La date est en **UTC** (`now.toISOString().slice(0, 10)`). L'accueil du back-off
 **Déclencher.**
 
 ```ts
-// scripts/recette-alertes.ts   —   usage : … [--email]
-import redis from "../packages/libs/redis";
-import { opsAlertsService } from "../apps/deal-service/src/routes/deal.routes";
+// scripts/recette/alertes.ts   —   usage : … [--email]
+import redis from "../../packages/libs/redis";
+import { opsAlertsService } from "../../apps/deal-service/src/routes/deal.routes";
 (async () => {
   const { alerts } = await opsAlertsService.evaluate();
   console.log("règles actives :", alerts.map((a: { rule: string }) => a.rule));
@@ -1039,8 +1079,8 @@ import { opsAlertsService } from "../apps/deal-service/src/routes/deal.routes";
 Lire ou effacer le verrou de dédoublonnage :
 
 ```ts
-// scripts/recette-alertes-verrou.ts
-import redis from "../packages/libs/redis";
+// scripts/recette/_verrous.ts
+import redis from "../../packages/libs/redis";
 (async () => {
   const keys = await redis.keys("yamba:alerts:sent:*");
   console.log(keys.length ? keys : "aucun verrou");
@@ -1193,8 +1233,8 @@ import redis from "../packages/libs/redis";
 | Révélation | `status: "COMPLETED"`, `ratingWindowEndsAt = now - 1 h`, `ratingsRevealedAt` absent |
 
 ```ts
-// scripts/recette-notation-eligible.ts  —  usage : … <bookingId> <r1|r2|reveal>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/notation-eligible.ts  —  usage : … <bookingId> <r1|r2|reveal>
+import prisma from "../../packages/libs/prisma";
 const [ID, MODE] = process.argv.slice(2);
 const d = (n: number) => new Date(Date.now() + n * 86_400_000);
 (async () => {
@@ -1211,8 +1251,8 @@ const d = (n: number) => new Date(Date.now() + n * 86_400_000);
 **Déclencher.**
 
 ```ts
-// scripts/recette-notation.ts
-import { dealRatingService } from "../apps/deal-service/src/routes/deal.routes";
+// scripts/recette/notation.ts
+import { dealRatingService } from "../../apps/deal-service/src/routes/deal.routes";
 (async () => {
   console.log("relances :", await dealRatingService.sendRatingReminders());
   console.log("révélations :", await dealRatingService.revealElapsed());
@@ -1326,8 +1366,8 @@ L'email n'est **pas** envoyé dans deux cas, dans cet ordre : l'email n'est pas 
 **Rendre le récapitulatif non vide.** Modèle `Booking` :
 
 ```ts
-// scripts/recette-digest-eligible.ts  —  usage : … <bookingId> <failed|reversed|held>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/digest-eligible.ts  —  usage : … <bookingId> <failed|reversed|held>
+import prisma from "../../packages/libs/prisma";
 const [ID, MODE] = process.argv.slice(2);
 (async () => {
   const data =
@@ -1349,9 +1389,9 @@ const [ID, MODE] = process.argv.slice(2);
 **Déclencher.**
 
 ```ts
-// scripts/recette-digest.ts
-import { dealSettlementService } from "../apps/deal-service/src/routes/deal.routes";
-import { sendOpsDigest } from "../apps/deal-service/src/services/ops-notify.service";
+// scripts/recette/digest.ts
+import { dealSettlementService } from "../../apps/deal-service/src/routes/deal.routes";
+import { sendOpsDigest } from "../../apps/deal-service/src/services/ops-notify.service";
 (async () => {
   const digest = await dealSettlementService.collectOpsDigest();
   console.log({ failed: digest.failed.length, reversed: digest.reversed.length, held: digest.held.length });
@@ -1443,8 +1483,8 @@ Si la relance est due, elle est d'abord **réclamée** par un `updateMany` condi
 **Rendre une conversation éligible.** Modèle `Conversation`, champs **`lastMessageAt`**, **`lastMessageAuthorRole`**, **`shipperLastReadAt`** / **`carrierLastReadAt`**, **`shipperRemindedAt`** / **`carrierRemindedAt`**.
 
 ```ts
-// scripts/recette-relance-eligible.ts  —  usage : … <conversationId> <SHIPPER|CARRIER>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/relance-eligible.ts  —  usage : … <conversationId> <SHIPPER|CARRIER>
+import prisma from "../../packages/libs/prisma";
 const [ID, ROLE] = process.argv.slice(2);         // ROLE = le DESTINATAIRE de la relance
 (async () => {
   const auteur = ROLE === "SHIPPER" ? "CARRIER" : "SHIPPER";
@@ -1466,8 +1506,8 @@ const [ID, ROLE] = process.argv.slice(2);         // ROLE = le DESTINATAIRE de l
 **Déclencher.**
 
 ```ts
-// scripts/recette-relance.ts
-import { makeUnreadReminderService } from "../apps/message-service/src/services/unread-reminder.service";
+// scripts/recette/relance.ts
+import { makeUnreadReminderService } from "../../apps/message-service/src/services/unread-reminder.service";
 (async () => { console.log(await makeUnreadReminderService().runOnce()); process.exit(0); })();
 ```
 
@@ -1519,8 +1559,8 @@ Cas complémentaire à jouer aussi : **conversation silencieuse depuis plus de 7
 1. Préparer une conversation éligible.
 2. Lancer **deux** exécutions du script **en parallèle** :
    ```sh
-   npx tsx --env-file=.env scripts/recette-relance.ts & \
-   npx tsx --env-file=.env scripts/recette-relance.ts & wait
+   npx tsx --env-file=.env scripts/recette/relance.ts & \
+   npx tsx --env-file=.env scripts/recette/relance.ts & wait
    ```
 
 **Résultat attendu**
@@ -1593,8 +1633,8 @@ La suppression se fait en **une transaction** de quatre opérations, dans cet or
 **Rendre une conversation purgeable.** Modèles `Conversation` (`updatedAt`) et `Booking` (`status`, `completedAt` / `closedAt`).
 
 ```ts
-// scripts/recette-purgefil-eligible.ts  —  usage : … <conversationId>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/purgefil-eligible.ts  —  usage : … <conversationId>
+import prisma from "../../packages/libs/prisma";
 const ID = process.argv[2];
 const vieux = new Date(Date.now() - 400 * 86_400_000);   // > 365 jours
 (async () => {
@@ -1615,8 +1655,8 @@ const vieux = new Date(Date.now() - 400 * 86_400_000);   // > 365 jours
 **Déclencher.**
 
 ```ts
-// scripts/recette-purgefil.ts   —   argument facultatif : un décalage en jours
-import { makeConversationRetentionService } from "../apps/message-service/src/services/conversation-retention.service";
+// scripts/recette/purgefil.ts   —   argument facultatif : un décalage en jours
+import { makeConversationRetentionService } from "../../apps/message-service/src/services/conversation-retention.service";
 const j = Number(process.argv[2] ?? 0);
 (async () => {
   const clock = () => new Date(Date.now() + j * 86_400_000);
@@ -1711,8 +1751,8 @@ La règle pure correspondante, `isOutboxEventPurgeable` dans `packages/libs/rete
 **Rendre des événements purgeables.** Modèle `OutboxEvent`, champ **`publishedAt`**.
 
 ```ts
-// scripts/recette-purgeout-eligible.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/purgeout-eligible.ts — À CRÉER : celui-ci n'a pas été versionné par la campagne
+import prisma from "../../packages/libs/prisma";
 const vieux = new Date(Date.now() - 200 * 86_400_000);   // > 90 jours
 (async () => {
   // 1. Trois événements booking publiés, très anciens → doivent être purgés
@@ -1733,8 +1773,8 @@ const vieux = new Date(Date.now() - 200 * 86_400_000);   // > 90 jours
 **Déclencher.**
 
 ```ts
-// scripts/recette-purgeout.ts   —   usage : … <booking|conversation>
-import { purgePublishedOutbox } from "../apps/deal-service/src/cron/outbox-retention.cron";
+// scripts/recette/purgeout.ts   —   usage : … <booking|conversation>
+import { purgePublishedOutbox } from "../../apps/deal-service/src/cron/outbox-retention.cron";
 (async () => {
   const type = process.argv[2] ?? "booking";
   console.log(type, "→", await purgePublishedOutbox(type), "événement(s) purgé(s)");
@@ -1857,8 +1897,8 @@ Aucun événement d'outbox, aucune transaction, aucun kilo : c'est une écriture
 **Rendre une réservation éligible.** Modèle `Booking`, champs **`status`**, **`completedAt`** ou **`closedAt`**, et **`recipientRedactedAt`** (qui doit être absent).
 
 ```ts
-// scripts/recette-destinataire-eligible.ts  —  usage : … <bookingId>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/destinataire-eligible.ts  —  usage : … <bookingId>
+import prisma from "../../packages/libs/prisma";
 const ID = process.argv[2];
 (async () => {
   const b = await prisma.booking.update({
@@ -1873,8 +1913,8 @@ const ID = process.argv[2];
 **Déclencher.**
 
 ```ts
-// scripts/recette-destinataire.ts
-import { makeRecipientRedactionService } from "../apps/deal-service/src/services/recipient-redaction.service";
+// scripts/recette/destinataire.ts
+import { makeRecipientRedactionService } from "../../apps/deal-service/src/services/recipient-redaction.service";
 (async () => { console.log(await makeRecipientRedactionService().runOnce()); process.exit(0); })();
 ```
 
@@ -1971,8 +2011,8 @@ Le troisième cas mérite une attention particulière. `ConsumedEvent` est le **
 **Rendre des lignes purgeables.**
 
 ```ts
-// scripts/recette-conservation-eligible.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/conservation-eligible.ts — À CRÉER : celui-ci n'a pas été versionné par la campagne
+import prisma from "../../packages/libs/prisma";
 const vieux = (j: number) => new Date(Date.now() - j * 86_400_000);
 (async () => {
   const n = await prisma.notification.findMany({ take: 3, select: { id: true } });
@@ -1989,8 +2029,8 @@ const vieux = (j: number) => new Date(Date.now() - j * 86_400_000);
 **Déclencher.**
 
 ```ts
-// scripts/recette-conservation.ts
-import { makeRetentionService } from "../apps/notification-service/src/cron/retention.cron";
+// scripts/recette/conservation.ts
+import { makeRetentionService } from "../../apps/notification-service/src/cron/retention.cron";
 (async () => { console.log(await makeRetentionService().runOnce()); process.exit(0); })();
 ```
 
@@ -2094,8 +2134,8 @@ Après un envoi, `CarrierPage.lastReminderSentAt` et `CarrierPage.reminderCount`
 **Rendre un compte éligible.** Modèles `User` (`carrierStatus`, `isDeleted`, `emailSuppressedAt`) et `CarrierPage` (`createdAt`, `reminderCount`, `lastReminderSentAt`).
 
 ```ts
-// scripts/recette-onboard-eligible.ts  —  usage : … <email> <1|2|3>
-import prisma from "../packages/libs/prisma";
+// scripts/recette/onboard-eligible.ts  —  usage : … <email> <1|2|3>
+import prisma from "../../packages/libs/prisma";
 const [EMAIL, ETAPE] = process.argv.slice(2);
 const h = (n: number) => new Date(Date.now() - n * 3_600_000);
 const age = { "1": 30, "2": 80, "3": 180 }[ETAPE] ?? 30;
@@ -2116,8 +2156,8 @@ const age = { "1": 30, "2": 80, "3": 180 }[ETAPE] ?? 30;
 **Déclencher.**
 
 ```ts
-// scripts/recette-onboard.ts
-import { processOnboardingReminders } from "../apps/auth-service/src/cron/onboarding-reminder.cron";
+// scripts/recette/onboard.ts
+import { processOnboardingReminders } from "../../apps/auth-service/src/cron/onboarding-reminder.cron";
 (async () => { console.log(await processOnboardingReminders()); process.exit(0); })();
 ```
 
@@ -2243,8 +2283,8 @@ docker exec yamba-redpanda rpk topic consume booking-events -f '%k | %h | %v\n'
 ```
 
 ```ts
-// scripts/recette-relais-etat.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/relais-etat.ts
+import prisma from "../../packages/libs/prisma";
 (async () => {
   const absent = { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never;
   console.log("baux :", await prisma.relayLease.findMany());
@@ -2505,8 +2545,8 @@ grep -Ei 'deliveryCode|742891|recipient(FirstName|LastName|Phone|Email)|phoneE16
 4. Refaire la même recherche dans les charges utiles stockées en base :
 
 ```ts
-// scripts/recette-payload-audit.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/payload-audit.ts — À CRÉER : celui-ci n'a pas été versionné par la campagne
+import prisma from "../../packages/libs/prisma";
 const interdits = /deliveryCode|742891|phoneE164|recipientFirstName|recipientLastName/i;
 (async () => {
   const rows = await prisma.outboxEvent.findMany({ select: { id: true, eventType: true, payload: true } });
@@ -2560,8 +2600,8 @@ docker exec yamba-redpanda rpk group describe messaging-notifications
 ```
 
 ```ts
-// scripts/recette-conso-etat.ts   —   usage : … [eventId]
-import prisma from "../packages/libs/prisma";
+// scripts/recette/conso-etat.ts   —   usage : … [eventId]
+import prisma from "../../packages/libs/prisma";
 const ID = process.argv[2];
 (async () => {
   if (ID) {
@@ -2576,9 +2616,9 @@ const ID = process.argv[2];
 ```
 
 ```ts
-// scripts/recette-rejouer.ts   —   usage : … <outboxEventId>
+// scripts/recette/rejouer.ts   —   usage : … <outboxEventId>
 // Remet un événement à l'état « non publié » : le relais le republiera au tick suivant.
-import prisma from "../packages/libs/prisma";
+import prisma from "../../packages/libs/prisma";
 (async () => {
   const r = await prisma.outboxEvent.update({ where: { id: process.argv[2] }, data: { publishedAt: null } });
   console.log("rejeu armé :", r.id, r.eventType);
@@ -2644,9 +2684,10 @@ import prisma from "../packages/libs/prisma";
 
 **Étapes**
 
-1. Publier directement un message hors contrat sur le sujet, avec un en-tête `event-id` fabriqué :
+1. Publier directement un message hors contrat sur le sujet, avec un en-tête `event-id` fabriqué —
+   **`-z none` n'est pas optionnel**, voir l'avertissement ci-dessous :
    ```sh
-   docker exec -i yamba-redpanda rpk topic produce booking-events \
+   docker exec -i yamba-redpanda rpk topic produce booking-events -z none \
      -H event-id=000000000000000000000099 -k test <<< '{"pas":"un evenement"}'
    ```
 2. Publier ensuite un message valide (ou provoquer une transition réelle).
@@ -2661,6 +2702,20 @@ import prisma from "../packages/libs/prisma";
 
 Si la partition se bloquait ici, une seule ligne malformée arrêterait toutes les notifications de la plateforme. C'est le scénario à ne jamais laisser régresser.
 
+> ⚠️ **En recette, produire TOUJOURS avec `-z none`.** Ajouté le 18/09/2026 : la commande que ce cahier
+> donnait à l'origine, sans `-z none`, est celle qui a provoqué `ANO-CRON-08` (bloquante). `rpk topic
+> produce` compresse en **snappy** par défaut ; kafkajs ne sait pas décompresser snappy et lève
+> `KafkaJSNotImplemented`, une erreur **non retriable** qui arrête le consommateur pour de bon —
+> processus toujours vivant, `/health` toujours vert, et plus une notification ni un email ne sort de
+> la plateforme. Au redémarrage, le service retombe sur le même message et remeurt.
+>
+> Le défaut découvert était réel et il est corrigé (le consommateur se relance avec retrait
+> exponentiel, et `/health` porte désormais une vérification `consumers` qui rend le service
+> `degraded`). Mais l'outil de recette ne doit pas, lui, fabriquer un poison de **transport** quand la
+> fiche veut éprouver un poison de **contrat** : ce sont deux choses différentes, et seule la seconde
+> est l'objet de cette fiche. La leçon dépasse ce cahier : quand un outil de recette provoque un
+> effondrement, vérifier d'abord ce que l'outil envoie vraiment.
+
 **Verdict** : ☐ conforme ☐ non conforme
 
 ---
@@ -2670,7 +2725,7 @@ Si la partition se bloquait ici, une seule ligne malformée arrêterait toutes l
 **Étapes**
 
 ```sh
-docker exec -i yamba-redpanda rpk topic produce booking-events -k test <<< '{"peu":"importe"}'
+docker exec -i yamba-redpanda rpk topic produce booking-events -z none -k test <<< '{"peu":"importe"}'
 ```
 
 **Résultat attendu** — le journal affiche `Message without event-id header — skipped`, avec le sujet, la partition et l'offset. Aucune ligne `ConsumedEvent`, aucune notification, et **l'offset est validé** : le message ne sera pas relivré en boucle.
@@ -3024,7 +3079,18 @@ Aucune de ces tâches ne doit faire varier `Booking` (hors le champ `recipient`)
 
 **Étapes** — signaler un message (cahier 01), rendre la conversation purgeable, purger, puis ouvrir la file `/reports` du back-office.
 
-**Résultat attendu** — le signalement est toujours là, avec son motif, son statut et sa date. Le corps du message a disparu avec le fil. L'administrateur voit un dossier sans contenu — c'est le compromis assumé entre conservation et modération.
+**Résultat attendu** *(précisé le 18/09/2026, après `ANO-CRON-09`)* — le signalement est toujours là,
+avec son motif, son statut et sa date, **et il apparaît dans la file de modération**, marqué
+`purged: true` (« contenu purgé ») : `author`, `conversationId`, `bookingId`, `corridor`,
+`message.body` et `message.createdAt` sont `null`, le reste est rendu normalement, et le dossier
+**reste traitable** (`reviewReport` fonctionne par identifiant). C'est cela, le compromis assumé entre
+conservation et modération.
+
+> Ce que ce cahier décrivait avant : « l'administrateur voit un dossier sans contenu ». C'était le
+> résultat **voulu**, pas le résultat obtenu. La file écartait purement et simplement le dossier
+> (`if (!message || !conversation) continue;`), et comme le compteur se calculait sur la liste rendue
+> (`total: items.length`), rien ne signalait la disparition : un dossier `OPEN` restait ouvert pour
+> toujours, hors de vue. Un signalement escamoté par la seule conservation — corrigé depuis.
 
 **Verdict** : ☐ conforme ☐ non conforme
 
@@ -3084,8 +3150,8 @@ Aucune de ces tâches ne doit faire varier `Booking` (hors le champ `recipient`)
 **Étapes** — reprendre l'audit de CRON-RELAIS-9, et l'étendre aux trois autres surfaces :
 
 ```ts
-// scripts/recette-secret-audit.ts
-import prisma from "../packages/libs/prisma";
+// scripts/recette/audit-code-livraison.ts
+import prisma from "../../packages/libs/prisma";
 const interdit = /deliveryCode|742891/i;
 (async () => {
   const notifs = await prisma.notification.findMany({ select: { id: true, type: true, payload: true } });
@@ -3182,7 +3248,7 @@ Trois tâches n'émettent **aucun** événement, et c'est normal : `recipient-re
 | CRON-TRAJETS-1 | Le trajet terminé passe COMPLETED | **Non conforme** | mineure | ANO-CRON-01 | Gomab (assisté) | 09/09/2026 |
 | CRON-TRAJETS-2 | Le trajet avec un deal en cours n'est pas terminé | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-TRAJETS-3 | Le litige ne bloque pas la complétion | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
-| CRON-TRAJETS-4 | Un trajet en échec ne bloque pas la fournée | **Conforme** |  | provocation du cahier inopérante | Gomab (assisté) | 09/09/2026 |
+| CRON-TRAJETS-4 | Un trajet en échec ne bloque pas la fournée | **Conforme (par lecture)** |  | provocation du cahier inopérante — fiche corrigée le 18/09/2026 | Gomab (assisté) | 09/09/2026 |
 | CRON-EXPIRE-1 | La demande dépassée expire et libère tout | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-EXPIRE-2 | La demande non dépassée n'est pas touchée | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-EXPIRE-3 | Pas de double expiration ni double restitution | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
@@ -3247,7 +3313,7 @@ Trois tâches n'émettent **aucun** événement, et c'est normal : `recipient-re
 | CRON-RELAIS-9 | Aucun secret dans un payload | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-CONSO-1 | L'événement devient notification et email | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-CONSO-2 | Rejouer ne produit pas de doublon | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
-| CRON-CONSO-3 | Le message malformé ne bloque pas la file | **Conforme** |  | tient pour un message décodable — voir ANO-CRON-08 | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-3 | Le message malformé ne bloque pas la file | **Conforme** |  | ANO-CRON-08 close — fiche corrigée le 18/09/2026 (`-z none` obligatoire) | Gomab (assisté) | 09/09/2026 |
 | CRON-CONSO-4 | Le message sans en-tête est ignoré | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-CONSO-5 | Panne du consommateur et rattrapage | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-CONSO-6 | La panne de base ne valide pas l'offset | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
@@ -3262,7 +3328,7 @@ Trois tâches n'émettent **aucun** événement, et c'est normal : `recipient-re
 | CRON-BATT-7 | La page « État des services » dit la vérité | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-SEC-1 | Une purge ne supprime jamais un non publié | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-SEC-2 | Une purge ne déborde jamais de son domaine | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
-| CRON-SEC-3 | Le signalement survit à la purge du fil | **Non conforme** | majeure | ANO-CRON-09 | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-3 | Le signalement survit à la purge du fil | **Conforme après correction** |  | ANO-CRON-09 close — fiche corrigée le 18/09/2026 | Gomab (assisté) | 09/09/2026 |
 | CRON-SEC-4 | L'effacement du tiers respecte le délai | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-SEC-5 | Aucun email vers un compte effacé | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 | CRON-SEC-6 | Le code de livraison ne sort jamais | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
@@ -3337,7 +3403,7 @@ npx tsx --env-file=.env packages/libs/prisma/scripts/seed-settings.ts
 npx tsx --env-file=.env packages/libs/prisma/scripts/seed-deals.ts
 
 # Effacer les verrous d'alerte
-npx tsx --env-file=.env scripts/recette-alertes-verrou.ts --reset
+npx tsx --env-file=.env scripts/recette/_verrous.ts --reset
 
 # Vider la boîte de recette
 curl -s -X DELETE http://localhost:8026/api/v1/messages
@@ -3345,7 +3411,7 @@ curl -s -X DELETE http://localhost:8026/api/v1/messages
 
 Et, dans `.env`, retirer toutes les variables `*_CRON_ENABLED=false`, `OUTBOX_RELAY_ENABLED=false`, `MESSAGING_RELAY_ENABLED=false`, `NOTIFICATION_CONSUMER_ENABLED=false` et la carte `CRON_HEARTBEAT_PING_URLS` de test posées pendant la campagne. Une variable de coupure oubliée est exactement la panne silencieuse que ce cahier cherche à éviter.
 
-Les scripts `scripts/recette-*.ts` créés pour la campagne sont des outils de recette : soit ils sont versionnés délibérément, soit ils sont supprimés à la fin. Ils ne doivent pas rester non suivis dans l'arbre de travail.
+Les scripts de `scripts/recette/` sont des outils de recette **versionnés délibérément** (décision prise à la campagne du 09/09/2026) : ils ne sont pas supprimés à la fin, ce sont eux qui rendent ce cahier rejouable. En revanche, un script écrit en cours de campagne et laissé **non suivi** dans l'arbre de travail est une dette : soit il rejoint `scripts/recette/`, soit il disparaît. Et son nom ne doit jamais contenir `secret` (voir § 2.7).
 
 ---
 
