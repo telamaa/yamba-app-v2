@@ -6,9 +6,13 @@
 > la bonne sémantique d'erreur, les bonnes autorisations, l'idempotence annoncée et les effets de
 > bord attendus.
 >
-> Version du cahier : 1.0 — branche `docs/recette`. Il décrit le comportement de l'API tel que le
-> code de la branche courante l'implémente ; toute divergence constatée est **soit un défaut du
-> code, soit un défaut de ce cahier**, jamais une interprétation du testeur.
+> Version du cahier : 1.1 — code de référence `dev`, état au **18/09/2026** (campagne jouée les
+> 08-09/09/2026 ; cahier remis à l'état du code le 18/09). Il décrit le comportement de l'API tel que
+> le code l'implémente ; toute divergence constatée est **soit un défaut du code, soit un défaut de ce
+> cahier**, jamais une interprétation du testeur.
+>
+> **Ce fichier `.md` fait foi.** Le `.pdf` du même nom date du 06/09/2026 et n'est plus régénéré à
+> chaque passe : en cas de divergence, c'est le `.md` qui dit vrai.
 
 ---
 
@@ -54,10 +58,10 @@ refuse tout seul, avec le bon statut et le bon code. Il vérifie en particulier 
 
 | Cahier | Fichier | Point de vue |
 |---|---|---|
-| n° 1 — Parcours membre | `docs/recette/RECETTE-01-*.md` | L'Expéditeur et le Voyageur, par l'écran. |
-| n° 2 — Back-office | `docs/recette/RECETTE-02-*.md` | Le support, la médiation, la finance, par l'écran d'administration. |
+| n° 1 — Parcours membre | `docs/recette/RECETTE-01-WEB.md` | L'Expéditeur et le Voyageur, par l'écran. |
+| n° 2 — Back-office | `docs/recette/RECETTE-02-ADMIN.md` | Le support, la médiation, la finance, par l'écran d'administration. |
 | **n° 3 — API** | **`docs/recette/RECETTE-03-API.md`** | **Le serveur seul, par le fil HTTP.** |
-| n° 4 — Technique et exploitation | `docs/recette/RECETTE-04-*.md` | Le démarrage, les crons, les événements, la supervision. |
+| n° 4 — Technique et exploitation | `docs/recette/RECETTE-04-CRONS.md` | Le démarrage, les crons, les événements, la supervision. |
 
 Quand une fiche de ce cahier dépend d'un état créé par un autre cahier (par exemple un litige
 décidé par un médiateur), elle le signale et propose une alternative jouable en `curl`.
@@ -833,10 +837,19 @@ show -X POST "$BASE/deals/payment-intents" -b shipper.txt -H 'Content-Type: appl
 show -X POST "$BASE/auth/me/data-export" -b shipper.txt
 
 # c) Un code SANS type sûr : le code de livraison écrit dans un message
-CONV=$(curl -s -b shipper2.txt "$BASE/messages/conversations/by-deal/$(bid bzv-accepted)" | jq -r .conversation.id)
-show -X POST "$BASE/messages/conversations/$CONV/messages" -b shipper2.txt \
+#    ATTENTION : la cible doit être un deal POST-PICKUP. Voir la note ci-dessous.
+CONV=$(curl -s -b shipper.txt "$BASE/messages/conversations/by-deal/$(bid bzv-picked)" | jq -r .conversation.id)
+show -X POST "$BASE/messages/conversations/$CONV/messages" -b shipper.txt \
   -H 'Content-Type: application/json' -d '{"body":"Le code est 742891, garde-le."}'
 ```
+
+> **Corrigé le 18/09/2026.** Ce cahier visait `bzv-accepted`, un deal `ACCEPTED` — donc **sans code
+> de livraison**. Or la garde est conditionnée au hash : `if (booking.deliveryCodeHash) { … }`
+> (`conversation.service.ts`). Sans code, elle ne peut pas se déclencher : le message passe, et le
+> **201 obtenu est correct**. Le seed ne pose `deliveryCodeHash` qu'à partir du pickup
+> (`...(b.pickup ? { deliveryCodeHash, deliveryCodeEncrypted } : {})`). La cible juste est donc
+> `bzv-picked` (`PICKED_UP`, Expéditrice **aminata** → `shipper.txt`), où le refus 400 est bien au
+> rendez-vous. `bzv-tracking` (`PICKED_UP`, pauline → `shipper2.txt`) convient tout aussi bien.
 
 **Attendu :**
 
@@ -1005,6 +1018,15 @@ comm -12 <(echo "$P1" | jq -r '.trips[].id' | sort) <(echo "$P2" | jq -r '.trips
 stable, et un `nextCursor` qui vaut **`null` en dernière page**. L'enveloppe de la recherche est
 **sans champ `success`** — c'est voulu et documenté ; ne pas le signaler.
 
+> **Prérequis de données, précisé le 18/09/2026.** Cette fiche a besoin d'**au moins trois** trajets
+> cherchables pour que la seconde page existe. La recherche ne rend que les trajets `PUBLISHED` dont
+> le départ est **à venir** (`departureAt >= now`), d'un compte non suspendu et non masqué. Sur un jeu
+> d'essai **fraîchement rejoué**, cela fait **cinq** trajets (`yul` J+3, `gru` J+5, `fih` J+7,
+> `bzv-upcoming` J+10, `bzv-perkg` J+15) — les trois autres (`bzv-inflight`, `los`, `sgn`) sont
+> partis. La fiche est donc jouable telle quelle. En revanche, sur une base où des fiches précédentes
+> ont annulé ou consommé des trajets, la première page peut déjà rendre `nextCursor: null` : **rejouer
+> `seed-deals.ts` avant cette fiche** plutôt que conclure à une anomalie.
+
 ---
 
 **API-GW-21 — Le fil de conversation pagine vers le passé**
@@ -1058,7 +1080,10 @@ show -X POST "$BASE/auth/register" -H 'Content-Type: application/json' -H 'x-loc
   "termsVersion":"2026-06-01","privacyVersion":"2026-06-01"}'
 ```
 
-**Attendu — HTTP 200**, corps `{ "message": "OTP sent to your email…", "verificationToken": "…" }`.
+**Attendu — HTTP 200**, corps `{ "message": "OTP sent to email. Please verify your account.",
+"verificationToken": "…" }`. *(Texte rectifié le 18/09/2026 — mais on ne juge **jamais** une fiche sur
+le message anglais : il n'est pas un contrat. Ce qui compte ici est le **200** et la présence du
+`verificationToken`.)*
 
 **Effet de bord — le point à prouver :** **rien n'est écrit en base à cette étape.** La demande vit
 **10 minutes en Redis**. Le vérifier : le compte n'apparaît ni dans une connexion (`POST /auth/login`
@@ -1239,8 +1264,8 @@ fonctionne encore, c'est une anomalie **bloquante** (rejeu de session).
 
 ```bash
 login aminata.shipper@seed.yamba.dev autre-appareil.txt   # une seconde session du même membre
-curl -s -b shipper.txt "$BASE/auth/me/sessions" | jq '[.sessions[] | {jti, device, ip, current}]'
-JTI=$(curl -s -b shipper.txt "$BASE/auth/me/sessions" | jq -r '.sessions[] | select(.current==false) | .jti' | head -1)
+curl -s -b shipper.txt "$BASE/auth/me/sessions" | jq '[.items[] | {jti, device, ip, current}]'
+JTI=$(curl -s -b shipper.txt "$BASE/auth/me/sessions" | jq -r '.items[] | select(.current==false) | .jti' | head -1)
 show -X DELETE "$BASE/auth/me/sessions/$JTI" -b shipper.txt
 show "$BASE/auth/me" -b autre-appareil.txt
 ```
@@ -1250,8 +1275,20 @@ avec son `device` (navigateur + système, ou « Appareil inconnu »), son `ip` e
 suppression répond **200**, et la session coupée répond ensuite **401** — la révocation est
 immédiate et côté serveur.
 
-**Variante :** `DELETE /api/auth/me/sessions` (sans `jti`) coupe **toutes les autres** sessions et
-laisse la courante active.
+> **Corrigé le 18/09/2026.** L'enveloppe est **`{ "items": [...] }`**, pas `{ "sessions": [...] }`
+> (`MemberSessionsResponseSchema`). Un `jq '.sessions[]'` rend `null` et la fiche semble échouer alors
+> que le serveur a raison.
+
+**Deux variantes, à ne pas confondre** *(la seconde est arrivée avec D78)* :
+
+| Appel | Effet | Réponse |
+|---|---|---|
+| `DELETE /api/auth/me/sessions` (sans `jti`) | coupe **toutes les autres** sessions, laisse la courante active | `{ ok: true, revoked: n }` |
+| `DELETE /api/auth/me/sessions/all` | coupe **toutes** les sessions, **y compris la courante** (les cookies sont effacés) | — |
+
+L'ordre de déclaration compte dans le routeur : `/sessions/all` est déclarée **avant** `/sessions/:jti`,
+sinon « all » tomberait dans le paramètre. Un `jti` doit faire 32 caractères hexadécimaux, sinon 400
+`INVALID_ID`.
 
 ---
 
@@ -1261,12 +1298,21 @@ laisse la courante active.
 ```bash
 login aminata.shipper@seed.yamba.dev autre-appareil.txt
 show -X POST "$BASE/auth/me/password" -b shipper.txt -H 'Content-Type: application/json' \
-  -d '{"currentPassword":"Yamba-Dev-2026!","newPassword":"Yamba-Recette-2026!"}'
+  -d '{"newPassword":"Yamba-Recette-2026!"}'
 show "$BASE/auth/me" -b autre-appareil.txt
 ```
 
 **Attendu :** **200** sur le changement (une fois la fenêtre sensible ouverte), puis **401** sur
-l'autre appareil. Le changement d'email produit le même effet.
+l'autre appareil. La réponse porte `{ ok: true, revokedSessions: n, hadPassword: true }`. Le
+changement d'email produit le même effet.
+
+> **Corrigé le 18/09/2026.** Ce cahier envoyait aussi `currentPassword`. Le contrat ne le porte pas —
+> `ChangePasswordRequestSchema = z.object({ newPassword })` : c'est **la fenêtre sensible qui remplace
+> le mot de passe actuel** (D65), et c'est tout l'intérêt du dispositif. Le champ en trop était
+> silencieusement ignoré (Zod n'est pas strict par défaut), donc la fiche « passait » en enseignant un
+> contrat faux. Deux refus à connaître : un mot de passe **identique à l'actuel** → 400
+> `PASSWORD_SAME_AS_CURRENT` ; sans fenêtre ouverte → 403 `SUDO_REQUIRED`. Et le changement **ferme**
+> la fenêtre sensible (`closeSudoWindow`) : un second geste sensible redemandera un code.
 
 **Effet de bord :** remettre le mot de passe d'origine, ou rejouer le jeu d'essai avant la suite du
 cahier — sinon toutes les fiches suivantes échouent à la connexion.
@@ -1319,12 +1365,25 @@ mais **la réponse HTTP ne le dit pas**. Toute différence est **bloquante**.
 ```bash
 curl -s -b shipper.txt "$BASE/auth/me/profile" | jq '{firstName, lastName, publicSlug, profilePublic, showCity}'
 show -X PATCH "$BASE/auth/me/profile" -b shipper.txt -H 'Content-Type: application/json' \
-  -d '{"displayName":"Aminata D.","bio":"Paris ⇄ Brazzaville chaque mois.","profilePublic":true,"showCity":false}'
+  -d '{"profilePublic":true,"showCity":false}'
+
+# Et la contre-épreuve : les deux champs de la PAGE VOYAGEUR, sur une Expéditrice
+show -X PATCH "$BASE/auth/me/profile" -b shipper.txt -H 'Content-Type: application/json' \
+  -d '{"displayName":"Aminata D.","bio":"Paris ⇄ Brazzaville chaque mois."}'
 ```
 
-**Attendu — 200** pour les deux, et **`publicSlug` identique avant et après**. Le slug public **ne
-change jamais** : c'est l'identifiant stable d'un membre dans les URL publiques et dans les
-signalements.
+**Attendu — 200** sur la lecture et sur le premier `PATCH`, et **`publicSlug` identique avant et
+après**. Le slug public **ne change jamais** : c'est l'identifiant stable d'un membre dans les URL
+publiques et dans les signalements.
+
+Le second `PATCH` répond **400**, avec une erreur **par champ** :
+`details.errors = { "displayName": "NO_CARRIER_PAGE", "bio": "NO_CARRIER_PAGE" }`.
+
+> **Corrigé le 18/09/2026.** Ce cahier appliquait `displayName` et `bio` à une **Expéditrice** et en
+> attendait 200. Ces deux champs sont ceux de la **page Voyageur** : sans `CarrierPage`, la règle pure
+> `profile.rules.ts` refuse, champ par champ. Le refus est **correct** — c'est l'attendu du cahier qui
+> était faux. La fiche éprouve donc maintenant les deux moitiés : ce qu'une Expéditrice peut changer,
+> et ce qu'elle ne peut pas.
 
 ---
 
@@ -1715,8 +1774,22 @@ avec une `url` Stripe **à usage unique, jamais stockée** ; (3) **200** avec `s
 `not_started` | `pending` | `complete` et les drapeaux `chargesEnabled`, `payoutsEnabled`,
 `detailsSubmitted` ; (4) **200** — le rôle `CARRIER` est accordé.
 
-**Effet de bord :** après (4), `GET /auth/me` porte `CARRIER` dans `roles`. Les drapeaux Stripe sont
-ensuite **maintenus par le webhook `account.updated`** sans repasser par l'onboarding.
+**Effet de bord :** après (4), le rôle `CARRIER` est écrit **en base** — mais `GET /auth/me`
+continue de rendre les anciens `roles` **jusqu'au renouvellement de la session**. Les drapeaux Stripe
+sont ensuite **maintenus par le webhook `account.updated`** sans repasser par l'onboarding.
+
+```bash
+show "$BASE/auth/me" -b shipper.txt | jq .roles      # PAS ENCORE de CARRIER
+curl -s -b shipper.txt -c shipper.txt -X POST "$BASE/auth/refresh"
+show "$BASE/auth/me" -b shipper.txt | jq .roles      # CARRIER apparaît
+```
+
+> **Précisé le 18/09/2026.** Ce n'est pas un défaut, c'est la conséquence d'un choix : `getMe` rend
+> `req.roles ?? fullUser.roles`, et `isAuthenticated` pose `req.roles = decoded.roles` — **les rôles
+> viennent du jeton d'accès**, pas d'une relecture de la base. Un jeton est une photographie signée
+> prise à l'émission ; accorder un rôle ne le réécrit pas rétroactivement. Le testeur doit donc
+> **renouveler la session** (`POST /auth/refresh`, ou se reconnecter) avant de constater le rôle —
+> exactement ce que fait le front. Consigner une anomalie ici serait une erreur.
 
 ---
 
@@ -1763,7 +1836,16 @@ du membre.
 **Champs d'une carte de résultat :** `id`, `fromCity`, `toCity`, `travelDate` (formatée serveur),
 `departureTime`, `pricePerKg`, `remainingKg`, `minPrice`, `currency` (**un symbole**),
 `transportMode`, `allowedCategories`, `travelerFirstName`, `travelerLastName` (initiale),
-`rating`, `reviewCount`, `isFavorite`, `viewsCount`.
+`isFavorite`, `viewsCount`.
+
+**Deux champs sont CONDITIONNELS** — `rating` et `reviewCount` : ils ne sont posés que si le
+Voyageur a **au moins un avis** (`cp.ratingsCount > 0`), sinon ils valent `undefined` et **ne
+figurent tout simplement pas** dans le JSON.
+
+> **Précisé le 18/09/2026.** Ce cahier les listait sans réserve parmi les champs d'une carte. Sur un
+> jeu d'essai **sans avis**, leur absence est le comportement **correct** — ne pas la consigner en
+> anomalie. Pour éprouver leur présence, il faut d'abord une notation révélée (chapitre 5.3,
+> `API-DEAL-20`) ou un jeu d'essai qui en porte une.
 
 ---
 
@@ -2023,10 +2105,30 @@ show -X PUT "$BASE/trips/$NEW_TRIP" -b carrier.txt -H 'Content-Type: application
   -d '{"capacityKg":50}'
 ```
 
-**Attendu :** le corps est **partiel** — seuls les champs envoyés sont écrits. La modification du
-prix passe (**200**) tant que la machine l'autorise ; **la capacité est immuable après
-publication** et le second appel doit être refusé (**400**). Une édition sur un trajet
-`COMPLETED`, `ARCHIVED` ou `CANCELLED` est refusée par la machine.
+**Attendu :** le corps est **partiel** — seuls les champs envoyés sont écrits. Les **deux** appels
+passent en **200** sur un trajet **sans réservation active** : le prix ET la capacité sont
+modifiables. Une édition sur un trajet `COMPLETED`, `ARCHIVED` ou `CANCELLED` est refusée par la
+machine.
+
+**La vraie garde se prouve sur un trajet réservé** — la partie importante de la fiche :
+
+```bash
+# bzv-upcoming porte des réservations actives (bzv-pending PENDING, bzv-accepted ACCEPTED) ;
+# thomas (carrier.txt) en est le Voyageur. bzv-perkg, lui, n'en a AUCUNE : il serait éditable.
+show -X PUT "$BASE/trips/$(tid bzv-upcoming)" -b carrier.txt -H 'Content-Type: application/json' \
+  -d '{"capacityKg":1}'
+```
+
+**Attendu — 400** `details.code = "TRIP_NOT_EDITABLE"`, message « Cannot edit a trip with active
+bookings. Cancel the trip instead. » — et le prix comme la capacité **inchangés**.
+
+> **Corrigé le 18/09/2026.** Ce cahier annonçait « la capacité est immuable après publication ».
+> Elle ne l'est pas, et **la garde réelle est meilleure** : la machine (`trip-state-machine.ts`,
+> action `edit`) refuse **toute** modification d'un trajet `PUBLISHED`/`PAUSED` dès qu'une
+> réservation active existe — « pattern BlaBlaCar strict : trajet réservé = intouchable ». Le cas
+> dangereux (réduire la capacité sous les kilos déjà réservés) est donc impossible, et le cas
+> inoffensif (corriger sa capacité avant la première réservation) reste permis. Une immuabilité
+> champ par champ aurait interdit le second sans mieux protéger du premier.
 
 ---
 
@@ -2126,6 +2228,27 @@ show -X DELETE "$BASE/uploads/imagekit/UN_FILE_ID" -b shipper.txt
 
 **Attendu :** **200** aux deux appels ; le second répond « File was already deleted. ». Un 500 sur
 un fichier déjà absent serait une anomalie majeure : la suppression doit tolérer l'absence.
+
+**La route voisine, à rejouer dans la même fiche** *(ajouté le 18/09/2026 — dette **D-3** de la
+campagne du 08/09, soldée depuis)* :
+
+```bash
+# Le document déclaré en API-TRIP-16 ; le capturer d'abord, la variable n'existe pas avant
+DOC_ID=$(curl -s -b carrier.txt "$BASE/trips/$NEW_TRIP" | jq -r '.trip.documents[0].id')
+show -X DELETE "$BASE/trips/$NEW_TRIP/documents/$DOC_ID" -b carrier.txt
+show -X DELETE "$BASE/trips/$NEW_TRIP/documents/$DOC_ID" -b carrier.txt
+```
+
+**Attendu — 200 aux deux**, le second avec « Document was already removed. ». Le rejeu répondait
+**400 « Document not found. »** au moment de la campagne : c'était la dette D-3. Trois propriétés à
+vérifier au passage :
+
+- un document appartenant à **un autre trajet** est traité comme absent — l'appelant ne peut pas
+  distinguer « n'a jamais existé » de « déjà supprimé », et rien n'est touché ;
+- un trajet qui n'est pas le sien répond **403** `NOT_TRIP_OWNER`, un trajet inexistant **404**
+  `TRIP_NOT_FOUND` — la sémantique 403/404 est respectée ici, contrairement à `API-TRIP-14` ;
+- la **base est supprimée avant le fichier** chez le fournisseur : en cas d'échec d'ImageKit il
+  reste un fichier orphelin (sans conséquence) plutôt qu'une ligne pointant vers un fichier disparu.
 
 ---
 
@@ -4164,17 +4287,17 @@ volontairement**.
 | API-GW-10 | `x-locale` pilote le formatage | mineure | dates et textes différents | dates OK ; les réponses rapides suivaient `preferredLocale`, ce qui est la règle **D44** (« une locale par utilisateur, pas par appareil ») — c'est l'attendu du cahier qui était faux. Règle unifiée depuis : `?locale` > compte > appareil | OK | attendu du cahier corrigé |
 | API-GW-11 | Langue non supportée | mineure | 400 `LOCALE_UNSUPPORTED` | 400 `LOCALE_UNSUPPORTED` | OK | — |
 | API-GW-12 | Locales exotiques tolérées | mineure | 200 ×5 | 200 ×5 | OK | — |
-| API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | 409/403/400, `details` dans les trois | OK | cible (c) à corriger |
+| API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | 409/403/400, `details` dans les trois | OK | cible (c) corrigée le 18/09 : `bzv-picked` (post-pickup), pas `bzv-accepted` |
 | API-GW-14 | Erreurs par champ | mineure | 400 + `errors` | 400 sans objet `errors` | **KO** (08/09) → **corrigé** | ANO-API-03 · close |
 | API-GW-15 | Aucune erreur non gérée | **bloquante** | 0 occurrence | 1 occurrence (cursor invalide) | **KO** (08/09) → **corrigé** | ANO-API-01 · close (PR #232) |
 | API-GW-16 | 401 sans session | **bloquante** | 401 ×4 | 401 ×4, corps plat | OK | — |
 | API-GW-17 | 403 non partie prenante | **bloquante** | 403, corps vide de données | 403, 0 donnée du deal | OK | — |
 | API-GW-18 | 404 sans divulgation | **bloquante** | 404 / 400 | corps identiques ✅, temps discriminants ❌ | **KO** (08/09) → **corrigé** | ANO-API-02 · close (PR #232) |
 | API-GW-19 | 409 conflit typé | majeure | 409 `TRANSITION_NOT_ALLOWED` | 409 typé, `details.reason` absent → **corrigé** : `details` porte `refusal`, `action`, `actor`, `from`, `allowedFrom` | **KO** (08/09) → **corrigé** | ANO-API-04 · close |
-| API-GW-20 | Pagination recherche | majeure | pages disjointes | pages disjointes, `nextCursor` null en fin | OK | — |
+| API-GW-20 | Pagination recherche | majeure | pages disjointes | pages disjointes, `nextCursor` null en fin | OK | prérequis de données précisé le 18/09 (≥ 3 trajets à venir ; le seed frais en publie 5) |
 | API-GW-21 | Pagination du fil | mineure | vers le passé | ordre ancien→récent, page antérieure vide | OK | — |
 | API-GW-22 | Listes bornées | mineure | ≤ 50 | `?limit=1000` ignoré | OK | — |
-| API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | 200, token 64 car., rien en base, code lu dans Mailpit | OK | — |
+| API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | 200, token 64 car., rien en base, code lu dans Mailpit | OK | message exact rectifié le 18/09 (on ne juge jamais sur le message) |
 | API-AUTH-02 | Consentement obligatoire | majeure | 400 | 400 (refus) et 400 (versions manquantes) | OK | — |
 | API-AUTH-03 | Email déjà pris | majeure | 409 | **400** au lieu de 409, `EMAIL_ALREADY_USED` présent | **KO** → **corrigé** | ANO-API-05 · close |
 | API-AUTH-04 | Mot de passe faible | mineure | 400 `type:"password"` | 400, `details.type:"password"`, `PASSWORD_TOO_SHORT` | OK | — |
@@ -4184,11 +4307,11 @@ volontairement**.
 | API-AUTH-08 | 401 indistinguable | **bloquante** | 401 identiques | 401 ×2, corps identiques | OK | — |
 | API-AUTH-09 | `/auth/me` sans secret | **bloquante** | 200, `fuites: []` | 200 mais **4 champs TOTP exposés** au client | **KO** (08/09) → **corrigé** | ANO-API-06 · close |
 | API-AUTH-10 | Rotation révoque l'ancien | majeure | 200 puis 401 | 200, nouveau pot 200, ancien pot **401** | OK | — |
-| API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** → **corrigé** | ANO-API-07 · close |
-| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | 200 (sudo exigé et fonctionnel), mais autres sessions encore actives | **KO** → **corrigé** | ANO-API-07 · close |
+| API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** → **corrigé** | ANO-API-07 · close · enveloppe `items[]` (pas `sessions[]`) et route `/sessions/all` (D78) écrites le 18/09 |
+| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | 200 (sudo exigé et fonctionnel), mais autres sessions encore actives | **KO** → **corrigé** | ANO-API-07 · close · `currentPassword` retiré du corps le 18/09 (D65 : la fenêtre sensible le remplace) |
 | API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | 200 puis 401 côté client — mais le pot d'avant ouvre encore /auth/me | **KO** → **corrigé** | ANO-API-07 · close |
 | API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | 200 ×2, corps identiques — mais 95,7 ms contre 18,8 ms | **KO** → **corrigé** | ANO-API-08 · close |
-| API-AUTH-15 | Profil éditable, slug stable | mineure | 200, slug inchangé | 200, `publicSlug` inchangé | OK | cible du cahier à revoir |
+| API-AUTH-15 | Profil éditable, slug stable | mineure | 200, slug inchangé | 200, `publicSlug` inchangé | OK | corrigée le 18/09 : `displayName`/`bio` sur une Expéditrice → 400 `NO_CARRIER_PAGE`, désormais éprouvé en contre-épreuve |
 | API-AUTH-16 | Date de naissance invalide | mineure | 400 + code de règle | 400 `IN_THE_FUTURE` / `TOO_YOUNG`, champ par champ | OK | — |
 | API-AUTH-17 | Avatar signé, URL gardée | majeure | 200 / 400 | signature 200 complète ; URL étrangère refusée 400 | OK | étapes 2-3 ⏭ (service tiers) |
 | API-AUTH-18 | Profil public / masqué | **bloquante** | 404 tiers, `hidden` propriétaire | jamais 401 ; masqué : tiers 404, propriétaire 200 `hidden:true` | OK | — |
@@ -4206,9 +4329,9 @@ volontairement**.
 | API-AUTH-30 | Gardes des alertes | majeure | 400 · 409 à 20 | 400 même ville ; 20 acceptées, la 21e refusée | OK | — |
 | API-AUTH-31 | Signaler un trajet | majeure | 201 | 201 `reportId` + `createdAt` | OK | — |
 | API-AUTH-32 | Gardes du signalement | majeure | 400/400/404/409 | 400 `OWN_TARGET` · 400 `REASON_NOT_ALLOWED` · 404 · 409 | OK | — |
-| API-AUTH-33 | Onboarding Voyageur | majeure | 200 ×4 | 200 ×4, `url` Stripe, statut `pending` + 3 drapeaux | OK | rôle visible après reconnexion |
+| API-AUTH-33 | Onboarding Voyageur | majeure | 200 ×4 | 200 ×4, `url` Stripe, statut `pending` + 3 drapeaux | OK | précisé le 18/09 : les rôles viennent du JETON — `POST /auth/refresh` avant de constater `CARRIER` |
 | API-AUTH-34 | Tableau de bord sans compte | mineure | 409 `STRIPE_ACCOUNT_MISSING` | 403 sans fenêtre, puis 409 `STRIPE_ACCOUNT_MISSING` | OK | — |
-| API-TRIP-01 | Recherche publique | majeure | 200 ×2 | 200 avec et sans session, enveloppe sans `success`, `isFavorite` réel | OK | `rating`/`reviewCount` absents |
+| API-TRIP-01 | Recherche publique | majeure | 200 ×2 | 200 avec et sans session, enveloppe sans `success`, `isFavorite` réel | OK | corrigée le 18/09 : `rating`/`reviewCount` sont CONDITIONNELS (posés si `ratingsCount > 0`) |
 | API-TRIP-02 | Filtres durs | **bloquante** | aucun trajet interdit | aucun non-publié, aucun départ passé, masqué exclu (2→1) | OK | — |
 | API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | `mode` inconnu → **400** ; categories et buckets tolérés | **KO** (08/09) → **corrigé** | ANO-API-10 · close |
 | API-TRIP-04 | Paramètres de prix publics | majeure | 200 | params publics 200 sans session ; devis pondéré servi | OK | — |
@@ -4220,7 +4343,7 @@ volontairement**.
 | API-TRIP-10 | `allowedActions` fait foi | majeure | 400 hors liste | actions cohérentes ; un trajet à deals vivants n'expose ni `edit` ni `cancel` | OK | — |
 | API-TRIP-11 | Cycle de vie complet | majeure | 200 / 400 cohérents | 8 transitions enchaînées : publish 200 → pause 200 → resume 200 → unpublish 200 (DRAFT) → publish 200 → cancel 200 → restore 200 → archive **400** (absente d'`allowedActions` depuis DRAFT) ; aucun 500, aucun 200 hors liste | OK | — |
 | API-TRIP-12 | **Annulation refusée, deal vivant** | **bloquante** | 409 `TRIP_HAS_ACTIVE_DEALS` | 409 `TRIP_HAS_ACTIVE_DEALS`, `activeDeals: 4` | OK | — |
-| API-TRIP-13 | Modification, capacité immuable | majeure | 200 / 400 | modification partielle OK ; capacité modifiable après publication | PARTIEL | écart de cahier |
+| API-TRIP-13 | Modification, et ce qui devient immuable | majeure | 200 / 200, puis 400 sur trajet réservé | modification partielle OK ; capacité modifiable tant qu'aucune réservation n'existe | OK | attendu du cahier corrigé le 18/09 : la vraie garde (« trajet réservé = intouchable ») est plus fine et plus juste |
 | API-TRIP-14 | Trajet d'autrui | **bloquante** | refus ×3, prix inchangé | 400 « Unauthorized. » ×3, aucune fuite, prix inchangé | OK | écart connu |
 | API-TRIP-15 | Suppression et annulation | mineure | 200 puis 404 | 200 « Draft deleted. » / « Trip cancelled. », 404 ensuite | OK | — |
 | API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | 201, statut `PENDING`, retour à `NOT_SUBMITTED` après retrait | OK | — |

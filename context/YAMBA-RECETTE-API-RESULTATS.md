@@ -181,9 +181,11 @@ Piste          : la machine à états connaît `from`, `to` et `action` — les 
 
 ### Écarts du cahier (à corriger dans le cahier, pas dans le code)
 
-1. **API-GW-13 (c)** vise `bzv-accepted`, un deal ACCEPTED **sans code de livraison** : la garde ne peut pas se déclencher et le 201 obtenu est correct. Cible à remplacer par un deal post-pickup (`bzv-picked`), où le refus 400 `DELIVERY_CODE_IN_MESSAGE` est bien au rendez-vous.
-2. **API-GW-10** attend des réponses rapides traduites par `x-locale` alors que le service suit — délibérément et conformément à la doctrine — la langue **du lecteur** (`preferredLocale`).
-3. **API-GW-20** suppose plus de deux trajets cherchables ; le jeu d'essai n'en publie que deux dans le futur.
+**Tous reportés dans le cahier le 18/09/2026** — avec une rectification sur le troisième, détaillée plus bas.
+
+1. **API-GW-13 (c)** vise `bzv-accepted`, un deal ACCEPTED **sans code de livraison** : la garde ne peut pas se déclencher et le 201 obtenu est correct. Cible à remplacer par un deal post-pickup (`bzv-picked`), où le refus 400 `DELIVERY_CODE_IN_MESSAGE` est bien au rendez-vous. → **REPORTÉ** : cible `bzv-picked` + `shipper.txt` (l'Expéditrice de ce deal est aminata, pas pauline), avec la raison écrite dans la fiche (`if (booking.deliveryCodeHash)`, et le seed ne pose le hash qu'à partir du pickup).
+2. **API-GW-10** attend des réponses rapides traduites par `x-locale` alors que le service suit — délibérément et conformément à la doctrine — la langue **du lecteur** (`preferredLocale`). → **DÉJÀ REPORTÉ le 09/09** avec le solde de la dette D-1.
+3. ~~**API-GW-20** suppose plus de deux trajets cherchables ; le jeu d'essai n'en publie que deux dans le futur.~~ → **NE TIENT PAS.** Vérifié le 18/09 contre le code et le seed : la recherche rend les trajets `PUBLISHED` dont `departureAt >= now`, et le jeu d'essai **fraîchement rejoué** en publie **cinq** dans le futur (`yul` J+3, `gru` J+5, `fih` J+7, `bzv-upcoming` J+10, `bzv-perkg` J+15) ; seuls trois sont partis. Le seed n'a pas bougé depuis la campagne (`git log` sur `seed-deals.ts`) : la mesure du 08/09 portait donc sur une base **usée par les fiches précédentes**, pas sur le jeu d'essai. Le cahier n'est pas corrigé sur ce point — un **prérequis de données** y est ajouté à la place : rejouer `seed-deals.ts` avant cette fiche plutôt que conclure à une anomalie.
 
 ### Commentaire de chapitre
 
@@ -510,12 +512,14 @@ CONTRE-ÉPREUVE   : export → 200, 14 269 octets, en-tête `content-disposition
 
 ### Écarts du cahier (chapitre 5.1)
 
-4. **API-AUTH-11** annonce une réponse `{ "sessions": [...] }` ; l'API renvoie `{ "items": [...] }`.
-6. **API-AUTH-12** : `sudo/verify` attend le champ **`code`**, le cahier écrit `otp`.
-7. **API-AUTH-15** applique `displayName` et `bio` à une **Expéditrice** : ces champs sont ceux de la page Voyageur (refus correct `NO_CARRIER_PAGE`).
-8. **API-AUTH-33** : le rôle `CARRIER` n'apparaît qu'après **renouvellement de la session**.
-9. **API-AUTH-11** annonce `sessions[]`, l'API renvoie `items[]`.
-5. **API-AUTH-01** cite un corps `"OTP sent to your email…"` ; le service dit « OTP sent to email. Please verify your account. » (sans portée : on ne juge jamais sur le message).
+**Tous reportés dans le cahier le 18/09/2026**, sauf le n° 6 qui était déjà corrigé. *(La liste
+d'origine était numérotée dans le désordre, avec le 9 qui répétait le 4 : remise d'aplomb ici.)*
+
+4. **API-AUTH-11** annonce une réponse `{ "sessions": [...] }` ; l'API renvoie `{ "items": [...] }` (`MemberSessionsResponseSchema`). → **REPORTÉ**, dans les deux `jq` de la fiche. Ajouté au passage : la route `DELETE /auth/me/sessions/all` (**D78**), qui n'existait pas à la rédaction du cahier, et la contrainte d'ordre de déclaration qui la rend possible.
+5. **API-AUTH-01** cite un corps `"OTP sent to your email…"` ; le service dit « OTP sent to email. Please verify your account. » (sans portée : on ne juge jamais sur le message). → **REPORTÉ**, avec le rappel qu'un message anglais n'est pas un contrat.
+6. ~~**API-AUTH-12** : `sudo/verify` attend le champ **`code`**, le cahier écrit `otp`.~~ → **SANS OBJET** : vérifié le 18/09, le cahier écrit déjà `{"code":"391045"}` (§ 5.1.5). Corrigé entre-temps, ou constat inexact. **Un autre écart a été trouvé sur cette fiche** : elle envoyait `currentPassword` à `POST /auth/me/password`, que le contrat ne porte pas (`ChangePasswordRequestSchema = z.object({ newPassword })`) — c'est **la fenêtre sensible qui remplace le mot de passe actuel** (D65). Zod n'étant pas strict par défaut, le champ en trop était ignoré : la fiche « passait » en enseignant un contrat faux. → **CORRIGÉ**.
+7. **API-AUTH-15** applique `displayName` et `bio` à une **Expéditrice** : ces champs sont ceux de la page Voyageur (refus correct `NO_CARRIER_PAGE`). → **REPORTÉ** : la fiche éprouve désormais les deux moitiés — ce qu'une Expéditrice peut changer (200), et ce qu'elle ne peut pas (400, erreur **par champ**).
+8. **API-AUTH-33** : le rôle `CARRIER` n'apparaît qu'après **renouvellement de la session**. → **REPORTÉ**, avec la cause : `getMe` rend `req.roles`, et `isAuthenticated` pose `req.roles = decoded.roles` — les rôles viennent du **jeton**, pas d'une relecture de la base. `POST /auth/refresh` relit `user.roles` et resigne : la fiche porte maintenant l'appel.
 
 ## Challenge expert — auth-service (au-delà des anomalies de recette)
 
@@ -919,8 +923,11 @@ PRODUCTION       : sans objet — rien n'est en production à ce jour.
 
 ### Écarts du cahier (chapitre 5.2)
 
-10. **API-TRIP-13** annonce la capacité « immuable après publication » : elle ne l'est pas, et la garde réelle (aucune modification dès qu'une réservation existe) est meilleure.
-11. **API-TRIP-01** liste `rating` et `reviewCount` parmi les champs d'une carte : ils n'apparaissent pas sur un jeu d'essai sans avis.
+**Tous reportés dans le cahier le 18/09/2026.**
+
+10. **API-TRIP-13** annonce la capacité « immuable après publication » : elle ne l'est pas, et la garde réelle (aucune modification dès qu'une réservation existe) est meilleure. → **REPORTÉ** : les deux appels passent en 200 sur un trajet sans réservation, et la fiche prouve maintenant la vraie garde sur un trajet **réservé** (`bzv-upcoming`, qui porte `bzv-pending` et `bzv-accepted` — et **non** `bzv-perkg`, qui n'a aucune réservation).
+11. **API-TRIP-01** liste `rating` et `reviewCount` parmi les champs d'une carte : ils n'apparaissent pas sur un jeu d'essai sans avis. → **REPORTÉ** : les deux champs sortent de la liste inconditionnelle et deviennent explicitement **conditionnels** (`cp.ratingsCount > 0`, sinon `undefined` donc **absents du JSON**).
+12. *(Trouvé pendant la passe du 18/09, hors liste d'origine.)* **API-TRIP-18** ne visait que `DELETE /uploads/imagekit/:fileId`. La dette **D-3**, soldée le 09/09, portait sur la route **voisine** — `DELETE /trips/:id/documents/:documentId`. La fiche porte désormais le rejeu sur les deux, plus les trois propriétés que la correction a fixées (document d'un autre trajet traité comme absent, 403/404 respectés, base supprimée avant le fichier).
 
 ## Chapitre 5.3 — deal-service, le cœur transactionnel (18 fiches jouées sur 23)
 
