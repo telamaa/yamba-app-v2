@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { Package, Plane } from "lucide-react";
 
 const SKELETON_DURATION = 300;
 
@@ -57,8 +58,9 @@ export default function FinalCtaSection() {
           {/* Shipper */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
             <div className="mb-4 flex items-center gap-3">
-              <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-lg">
-                📦
+              {/* Icône filaire lucide, comme partout ailleurs — pas d'emoji-image */}
+              <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-slate-950">
+                <Package size={20} strokeWidth={2} />
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#FF9900]">
@@ -82,8 +84,8 @@ export default function FinalCtaSection() {
           {/* Yamber */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
             <div className="mb-4 flex items-center gap-3">
-              <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-lg">
-                ✈️
+              <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-slate-950">
+                <Plane size={20} strokeWidth={2} />
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#FF9900]">
