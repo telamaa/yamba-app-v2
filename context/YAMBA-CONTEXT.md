@@ -796,6 +796,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (nuit) : **D79 — LA FICHE MEMBRE MONTRE CE QU'ON LUI A ENVOYE (PR ouverte, `feat/admin-fiche-user-communications`).**
+  Declencheur : instruction reelle « je ne recois rien » — six requetes Mongo a la main pour conclure que RIEN n'etait
+  casse (la reservation attendue avait eu lieu sur le trajet d'un AUTRE voyageur, un seed du meme ecran de recherche).
+  Inventaire d'abord : fiche trajet → reservations et fiche membre → deals existaient DEJA ; le seul trou etait les
+  notifications et emails PAR MEMBRE. Livraison : `GET /admin/users/:id/communications` (auth-service, `users.read`,
+  USER_VIEWED coalesce A168), contrats `AdminUserCommunications*`, carte « Communications » sur la fiche (30 + 30,
+  totaux, jamais un contenu, erreurs expurgees par redactContacts, lien deal via l'outbox — null si non-deal). Piege
+  readAt absent couvert par le OR isSet, PROUVE par la spec (le fake db enregistre les where). Tests auth 395 → 400.
+  Valide contre la base reelle avant la route (tsx). AUCUNE attribution Claude.
 - 18/09 (soir, suite) : **LA CREATION DE TRAJET TIENT DANS UN ECRAN DE TELEPHONE (#363).** Capture iPhone via le
   LAN : dans « Dates & horaires », les colonnes Date/Heure d'ARRIVEE debordaient de l'ecran. Cause : le piege #175 en
   version iOS — `input[type=date]`/`[time]` a une largeur min-content intrinseque qu'une piste de grille `1fr` ne

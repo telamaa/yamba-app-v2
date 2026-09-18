@@ -28,6 +28,7 @@ import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
 import type { AdminUsersService } from "../services/admin-users.service";
 import { makeEmailSuppressionService, type EmailSuppressionDb } from "../services/email-suppression.service";
+import { makeAdminUserCommunicationsService } from "../services/admin-user-communications.service";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 
@@ -60,6 +61,8 @@ const emailSuppression = makeEmailSuppressionService({
   db: prisma as unknown as EmailSuppressionDb,
   record: (tx, entry) => recordAdminAction(tx as never, entry),
 });
+
+const userCommunications = makeAdminUserCommunicationsService(); // D79
 
 export function makeAdminUsersController(service: AdminUsersService) {
   async function loadTarget(req: AuthenticatedRequest) {
@@ -131,6 +134,19 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const file = await service.getFile(req.user.id, userId, peutLireLesSignalements);
         await recordAdminRead(prisma, redis, { adminUserId: req.user.id, action: "USER_VIEWED", targetType: "USER", targetId: userId, ...meta(req) }); // A168 — ouverture d'écran coalescée
         res.status(200).json(file);
+      } catch (e) {
+        next(e);
+      }
+    },
+
+    /** D79 — carte « Communications » de la fiche : notifications + emails, types et statuts seulement. */
+    async communications(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+      try {
+        const userId = parseId(req.params.id);
+        const r = await userCommunications.getCommunications(userId);
+        // Même USER_VIEWED coalescé que la fiche (A168) : fiche + carte = une ligne de journal.
+        await recordAdminRead(prisma, redis, { adminUserId: req.user.id, action: "USER_VIEWED", targetType: "USER", targetId: userId, ...meta(req) });
+        res.status(200).json(r);
       } catch (e) {
         next(e);
       }

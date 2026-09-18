@@ -11403,3 +11403,44 @@ large que l'écran. Correctif : `grid-cols-[minmax(0,1fr)_minmax(0,1fr)]` sur la
 `minmax(0,1fr)` aussi sur la grille de l'itinéraire (défense, mêmes symptômes possibles avec
 l'autocomplétion), et `min-w-0` sur les quatre inputs date/heure. Vérifié à la sonde en viewport
 iPhone : débordement horizontal mesuré à 0 px, les quatre champs tiennent en deux colonnes.
+
+# PR — La fiche membre montre ce qu'on lui a envoyé (D79) · `feat/admin-fiche-user-communications`
+
+## Le déclencheur
+
+Une vraie instruction, le 18/09 : « les users ne reçoivent pas de mails, je ne reçois pas de notifications ».
+La réponse a exigé des requêtes Mongo à la main (bookings du trajet, outbox, notifications, EmailDelivery) —
+et la conclusion était que RIEN n'était cassé : la réservation attendue avait eu lieu **sur le trajet d'un
+autre voyageur** (un trajet du seed sur le même écran de recherche). La chronologie d'un deal (D59 5A)
+n'aidait pas : il n'y avait justement **aucun deal** du côté du membre qui « ne recevait rien ». Le trou
+d'outillage, gravé en D79 : la question du support arrive PAR MEMBRE, pas par deal.
+
+## Ce qui a été fait
+
+1. **Contrat** (`packages/libs/api-contracts/src/admin/admin-users.schema.ts`) : `AdminUserNotificationItem`
+   (type, deal, créée, lue), `AdminUserEmailItem` (template, statut, deal, dates, dernière erreur EXPURGÉE),
+   `AdminUserCommunicationsResponse` (30 + 30 max, plus les totaux en base : notifications / non lues /
+   emails / en échec). Types et statuts SEULEMENT — jamais un corps de message, jamais le code de livraison.
+2. **Service** (`apps/auth-service/src/services/admin-user-communications.service.ts`) : lecture seule,
+   Prisma injectable (pattern `email-suppression`). Le deal d'un email se retrouve par son événement
+   source : `EmailDelivery.eventId` → `OutboxEvent.aggregateId` quand `aggregateType === "booking"`, null
+   sinon (jamais inventé). Le compte des non-lues passe par `OR: [{ readAt: null }, { readAt: { isSet:
+   false } }]` — le piège Mongo payé six fois, prouvé ici par la spec ET par une exécution réelle.
+   `lastError` est tronquée à 200 puis passée à `redactContacts` (§ 5.12 : une erreur SMTP cite l'adresse).
+3. **Route** : `GET /admin/users/:id/communications` (auth-service, `users.read`) — le propriétaire de la
+   fiche, même précédent que la fiche trajet qui lit les Bookings. La lecture écrit le MÊME `USER_VIEWED`
+   coalescé que la fiche (`recordAdminRead`, A168) : fiche + carte = une ligne de journal.
+4. **OpenAPI** : chemin documenté dans `build-openapi.ts` (la spec auth refuse toute route montée non
+   documentée) ; les cinq `openapi.json` régénérés (registre Zod global : les schémas D79 apparaissent
+   dans les cinq fichiers).
+5. **Front** (`apps/admin-ui/src/components/UserFileView.tsx`) : carte « Communications envoyées à ce
+   membre », chargée à la demande comme la chronologie d'un deal. Totaux en tête (badge rouge si emails en
+   échec), deux listes datées avec lien vers la fiche deal, statut lu par `HISTORY_STATUS_LABEL`.
+
+## Vérifié
+
+- `nx test auth-service` : 395 → **400** (+5, `admin-user-communications.service.spec.ts`).
+- `nx typecheck auth-service`, `tsc --project apps/admin-ui` : verts.
+- Exécution réelle sur la base de dev : le compte du 18/09 → 2 notifications (les 2 de sa cloche),
+  marc.carrier → 81 notifications dont la `booking.requested` de 19:06 et son email SENT relié au bon
+  deal ; id inconnu → 404 `USER_NOT_FOUND`.
