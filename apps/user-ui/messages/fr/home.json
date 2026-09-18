@@ -1,10 +1,9 @@
 {
   "hero": {
-    "titleLine1": "Et si tes colis voyageaient",
-    "titleLine2": "avec",
-    "titleHighlight": "quelqu'un qui part déjà",
-    "titleEnd": "?",
-    "subtitle": "Yamba met en relation ceux qui envoient un colis et les Voyageurs qui ont de la place dans leurs bagages.",
+    "titleLine1": "Quelqu'un part déjà.",
+    "titleHighlight": "Ton colis part avec",
+    "titleEnd": ".",
+    "subtitle": "Des Voyageurs vérifiés ont de la place dans leurs bagages : ton colis arrive plus vite, moins cher, et en main propre.",
     "illustrationAlt": "Illustration : un colis voyage dans les bagages d'un Voyageur",
     "trust": {
       "escrow": "Paiement bloqué jusqu'à la livraison (Stripe)",
@@ -65,7 +64,7 @@
   },
   "trust": {
     "label": "Confiance et sécurité",
-    "title": "Conçu pour que tout se passe bien.",
+    "title": "Ton colis est entre de bonnes mains.",
     "subtitle": "Pas de promesses en l'air : voilà les mécanismes qui protègent chaque envoi.",
     "items": {
       "escrow": {
@@ -91,9 +90,9 @@
     }
   },
   "finalCta": {
-    "titleStart": "Et toi, tu",
-    "titleHighlight": "attends quoi",
-    "titleEnd": "?",
+    "titleStart": "Le prochain départ",
+    "titleHighlight": "t'attend",
+    "titleEnd": ".",
     "subtitle": "Envoie ton premier colis, ou publie ton prochain trajet.",
     "shipper": {
       "tag": "Pour envoyer",

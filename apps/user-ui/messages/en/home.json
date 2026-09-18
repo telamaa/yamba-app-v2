@@ -1,10 +1,9 @@
 {
   "hero": {
-    "titleLine1": "What if your parcels traveled",
-    "titleLine2": "with",
-    "titleHighlight": "someone already on their way",
-    "titleEnd": "?",
-    "subtitle": "Yamba connects people who need to send a parcel with Travelers who have spare room in their luggage.",
+    "titleLine1": "Someone's already going.",
+    "titleHighlight": "Your parcel goes with them",
+    "titleEnd": ".",
+    "subtitle": "Verified Travelers have spare room in their luggage: your parcel arrives faster, cheaper, and hand-delivered.",
     "illustrationAlt": "Illustration: a parcel traveling in a Traveler's luggage",
     "trust": {
       "escrow": "Payment held until delivery (Stripe)",
@@ -65,7 +64,7 @@
   },
   "trust": {
     "label": "Trust and safety",
-    "title": "Built so things go right.",
+    "title": "Your parcel is in good hands.",
     "subtitle": "No empty promises: these are the mechanisms protecting every shipment.",
     "items": {
       "escrow": {
@@ -91,9 +90,9 @@
     }
   },
   "finalCta": {
-    "titleStart": "So, what are you",
-    "titleHighlight": "waiting for",
-    "titleEnd": "?",
+    "titleStart": "The next departure",
+    "titleHighlight": "is waiting",
+    "titleEnd": ".",
     "subtitle": "Send your first parcel, or publish your next trip.",
     "shipper": {
       "tag": "To send",

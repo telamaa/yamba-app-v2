@@ -11330,3 +11330,14 @@ s'intègrent sans couture, et **le sombre reste la signature du CTA final** (eff
 mode conserve son hero sombre (`dark:` sur le dégradé et les textes). L'illustration est ancrée en
 bas de sa colonne (`self-end`) avec une marge négative : elle **plonge derrière la carte de
 recherche** qui chevauche le hero — son bas « se termine » au niveau de la barre, comme demandé.
+
+## Retouche 5 — la voix : l'insight passe à l'affirmatif (arbitrage sur poste, 4 candidates)
+
+L'accroche « Et si tes colis voyageaient… ? » était à l'HYPOTHÉTIQUE (le produit rêve au lieu
+d'exister) et décrivait le mécanisme sans le bénéfice. Retenu parmi quatre candidates :
+**« Quelqu'un part déjà. Ton colis part avec. »** — l'insight fondateur, affirmatif, 8 mots ; le
+bénéfice passe au sous-titre (« plus vite, moins cher, en main propre » — la remise humaine est
+l'argument que les transporteurs classiques n'ont pas). Harmonisés dans la même voix : bloc
+confiance « Ton colis est entre de bonnes mains. », CTA final « Le prochain départ t'attend. »
+(fonctionne pour les DEUX personas). Au passage : le contrôle i18n refuse une valeur VIDE — la clé
+`titleLine2` devenue inutile est SUPPRIMÉE (des deux locales + JSX), pas laissée à "".

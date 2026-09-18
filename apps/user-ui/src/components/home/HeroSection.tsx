@@ -37,8 +37,8 @@ export default function HeroSection() {
           {/* Colonne texte — alignée à gauche */}
           <div className="pb-2 text-center md:pb-10 md:text-left">
             <h1 className="text-[24px] font-extrabold leading-[1.12] tracking-tight text-slate-900 dark:text-white md:text-3xl lg:text-4xl">
-              {t("titleLine1")} {t("titleLine2")}{" "}
-              <span className="yamba-grad-text">{t("titleHighlight")}</span>{" "}
+              {t("titleLine1")}{" "}
+              <span className="yamba-grad-text">{t("titleHighlight")}</span>
               {t("titleEnd")}
             </h1>
             <p className="mx-auto mt-3 max-w-lg text-sm text-slate-600 dark:text-slate-300 md:mx-0 md:mt-4 md:text-base">
