@@ -11010,3 +11010,70 @@ protection de branche `dev` (réglage GitHub, hors du dépôt) — sans quoi il 
 `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
 
 ---
+
+---
+
+# PR — Autocomplétion : « Ville, Pays » aussi pour les lieux français · `fix/autocomplete-pays`
+
+## Le constat (recette manuelle du 18/09, trois captures)
+
+Sur `/fr/search`, le départ « paris » proposait « Paris » **sans pays** et posait « Paris » dans le
+champ, quand la destination « kinsha » proposait « Kinshasa · République démocratique du Congo » et
+posait le libellé complet. Ce n'est **pas** une différence Départ/Destination — les deux champs
+partagent `CityAutocomplete`, comme la création de trajet, les alertes de route et l'onboarding
+Voyageur. La vraie règle : **lieux français sans pays, lieux étrangers avec pays**.
+
+## La cause
+
+Le script Google est chargé avec `language=fr&region=FR` (`lib/googlePlaces.ts`), et **Google omet le
+pays de la région** dans ses prédictions. Le composant connaissait le piège — son commentaire disait
+« on le rétablit toujours » — mais restaurait le pays depuis le **dernier segment du sous-titre** :
+
+| Prédiction | Sous-titre | « Pays » extrait |
+|---|---|---|
+| Paris | *(vide)* | *(rien à restaurer)* → « Paris » |
+| Aéroport Paris-Beauvais (BVA) | Route de l'Aéroport, Tillé | **« Tillé »** → « …, Tillé » |
+| Kinshasa | République démocratique du Congo | correct |
+
+`ANO-WEB-13` (bloquante, close) avait déjà consigné le mécanisme en marge — « Paris passait parce que
+Google omet le pays du domicile » — et corrigé le **serveur** (`placeSearchTerm` ne lit que le premier
+segment). L'affichage, lui, était resté asymétrique.
+
+## Le correctif — un libellé en deux temps
+
+1. **Immédiat** (le champ et `onSelect` n'attendent pas le réseau) : sous-titre vide → le pays omis
+   est **par construction** celui de la région du chargeur, la France (même graphie en fr et en en).
+2. **Exact** (~200 ms) : le pays lu dans `addressComponents` via le `fetchFields` — même langue et
+   même graphie que les prédictions Google, tous cas couverts, aéroports compris (« …, Tillé »
+   devient « …, France »). Le raffinement passe par `action(...)` **seul** : `onSelect` n'est pas
+   rejoué (il peut fermer un plein écran ou déclencher une navigation), et la liste ne se rouvre pas
+   (`hasSelectedRef` reste posé).
+
+Dans la **liste**, un sous-titre vide affiche « France » ; un sous-titre non vide est laissé tel quel
+(la localité d'un aéroport français est une information juste, simplement sans pays).
+
+## Deux choix assumés
+
+- **Un appel Place Details par sélection**, même sans `onPlaceSelect` (avant : seulement la création
+  de trajet). Il clôt la session d'autocomplétion — le jeton posé par `fetchAutocompleteSuggestions`
+  suit le `toPlace()` — ce que la tarification par session de Google attend de toute façon.
+- **`region=FR` reste.** L'alternative (retirer la région du chargeur) tenait en une ligne mais
+  rendait le comportement dépendant de l'IP du visiteur : un testeur à Kinshasa aurait vu
+  « Kinshasa » nu et « Paris, France » — la même asymétrie, déplacée. Écartée aussi : reconnaître les
+  noms de pays par `Intl.DisplayNames` — les noms CLDR divergent de ceux de Google (« Congo-Kinshasa »
+  contre « République démocratique du Congo »), et le repli aurait pu produire « Kinshasa, France ».
+
+## Sans risque mesuré
+
+- Serveur : `placeSearchTerm` ne lit que le premier segment (ANO-WEB-13) — « Paris » et
+  « Paris, France » cherchent pareil ; contrôlé sur une recherche réelle.
+- Harnais : la seule assertion de libellé côté membre est `toHaveValue(/^Paris/)` (préfixe) — elle
+  tient ; `autoSelectIfPrefilled` compare au `mainText`, inchangé.
+- `npx tsc --noEmit --project apps/user-ui` vert ; validé à l'écran par la recette manuelle
+  (liste, sélection, étranger, aéroport, recherche inchangée).
+
+user-ui n'a pas d'infrastructure de tests unitaires : la garde durable de ce comportement est le
+harnais (fiches WEB-ACC), joué hors CI — à renforcer d'une assertion « Paris, France » à la prochaine
+passe du harnais.
+
+---

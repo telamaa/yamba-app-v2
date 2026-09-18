@@ -126,14 +126,38 @@ export default function CityAutocomplete({
 
   const select = useCallback(
     async (p: google.maps.places.PlacePrediction) => {
-      // Libellé normalisé « Ville, Pays » : Google omet le pays du domicile
-      // (« Paris » mais « Amsterdam, Pays-Bas ») — on le rétablit toujours.
+      /*
+       * Libellé normalisé « Ville, Pays » — en DEUX temps, parce que la prédiction seule ne
+       * suffit pas (recette manuelle du 18/09/2026, captures « paris » / « kinsha ») :
+       *
+       * Le script Google est chargé avec `region=FR`, et Google OMET le pays de la région dans
+       * ses prédictions : « Kinshasa · République démocratique du Congo », mais « Paris » avec un
+       * sous-titre VIDE, et « Paris-Beauvais (BVA) · Route de l'Aéroport, Tillé » — une LOCALITÉ
+       * en dernière position, pas un pays. L'ancien code prenait « le dernier segment du
+       * sous-titre » pour le pays : rien à rétablir sur « Paris », et « …, Tillé » sur un
+       * aéroport français.
+       *
+       * 1. IMMÉDIAT (le champ et `onSelect` ne doivent pas attendre le réseau) : un libellé
+       *    provisoire. Sous-titre vide → le pays omis est PAR CONSTRUCTION celui de la région du
+       *    chargeur, la France (« France » s'écrit pareil en fr et en en).
+       * 2. EXACT (après coup) : le pays lu dans `addressComponents` — même langue et même
+       *    graphie que les prédictions Google, tous cas couverts, aéroports compris. Le champ
+       *    est raffiné par `action(...)` seul : `onSelect` n'est PAS rejoué (il a pu fermer un
+       *    plein écran ou déclencher une navigation). Le serveur, lui, ne lit que le premier
+       *    segment avant la virgule (`placeSearchTerm`, ANO-WEB-13) : les deux formes cherchent
+       *    pareil.
+       *
+       * Coût assumé : un appel Place Details par sélection, même sans `onPlaceSelect`. Il clôt
+       * la session d'autocomplétion (le jeton posé par `fetchAutocompleteSuggestions` suit le
+       * `toPlace()`), ce que la tarification par session de Google attend de toute façon.
+       */
       const main = p.mainText?.text ?? "";
       const secondary = p.secondaryText?.text ?? "";
-      const country = secondary.split(",").map((x) => x.trim()).filter(Boolean).pop() ?? "";
+      const dernierSegment = secondary.split(",").map((x) => x.trim()).filter(Boolean).pop() ?? "";
+      const paysProvisoire = dernierSegment || "France";
       const label = main
-        ? country && country !== main
-          ? `${main}, ${country}`
+        ? paysProvisoire !== main
+          ? `${main}, ${paysProvisoire}`
           : main
         : (p.text?.text ?? "");
       hasSelectedRef.current = true;
@@ -144,31 +168,34 @@ export default function CityAutocomplete({
       setItems([]);
       setHighlightedIndex(-1);
 
-      if (onPlaceSelect) {
-        try {
-          const place = p.toPlace();
-          await place.fetchFields({
-            fields: ["formattedAddress", "location", "addressComponents"],
-          });
-          const details = extractPlaceDetails(place);
-          onPlaceSelect(details);
-        } catch (err) {
-          console.error("[CityAutocomplete] fetchFields failed:", err);
-          onPlaceSelect({
-            formattedAddress: label,
-            placeId: p.placeId ?? "",
-            lat: null,
-            lng: null,
-            streetLine1: null,
-            city: null,
-            region: null,
-            country: null,
-            cityCode: null,
-            regionCode: null,
-            countryCode: null,
-            postalCode: null,
-          });
-        }
+      try {
+        const place = p.toPlace();
+        await place.fetchFields({
+          fields: ["formattedAddress", "location", "addressComponents"],
+        });
+        const details = extractPlaceDetails(place);
+        const pays = details.country;
+        const labelExact = main && pays && pays !== main ? `${main}, ${pays}` : label;
+        // `action` seul : le texte du champ se corrige (« …, Tillé » → « …, France »), sans
+        // rejouer `onSelect` ni rouvrir la liste (`hasSelectedRef` reste posé).
+        if (labelExact !== label) action(labelExact);
+        onPlaceSelect?.(details);
+      } catch (err) {
+        console.error("[CityAutocomplete] fetchFields failed:", err);
+        onPlaceSelect?.({
+          formattedAddress: label,
+          placeId: p.placeId ?? "",
+          lat: null,
+          lng: null,
+          streetLine1: null,
+          city: null,
+          region: null,
+          country: null,
+          cityCode: null,
+          regionCode: null,
+          countryCode: null,
+          postalCode: null,
+        });
       }
 
       sessionTokenRef.current = null;
@@ -330,7 +357,11 @@ export default function CityAutocomplete({
     >
       {items.map((p, idx) => {
         const title = p.mainText?.text ?? p.text?.text ?? "";
-        const subtitle = p.secondaryText?.text ?? "";
+        // Sous-titre vide = Google a omis le pays de la région du chargeur (FR) : on l'affiche,
+        // pour que « Paris · France » et « Kinshasa · République démocratique du Congo » se
+        // lisent pareil. Un sous-titre non vide est laissé tel quel — pour un lieu français il
+        // porte la localité (« Orly »), une information juste, simplement sans pays.
+        const subtitle = p.secondaryText?.text || "France";
         const isHighlighted = idx === highlightedIndex;
         return (
           <button
