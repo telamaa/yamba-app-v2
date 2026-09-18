@@ -796,6 +796,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (soir) : **LE BADGE, LA PASSE SKELETONS — ET LE HEADER QUI NE SHIMME PLUS SON PROPRE LOGO (#361).**
+  Trois volets sur poste. (1) Le badge « Voyageur actif » du menu partageait la ligne du nom (`flex` + `truncate`) :
+  nom long ampute + pastille ecrasee sur deux lignes — il descend SOUS l'email, insecable, pour les trois etats.
+  (2) La passe skeletons : Profil n'en avait AUCUN (des « — » et champs vides), Finances et Messages affichaient un
+  TEXTE « Chargement... » brut, Notifications/Favoris/Alertes route/Voyageurs suivis des paves gris sans structure.
+  Brique partagee `Sk`/`StatCardSkeleton`/`RowSkeleton` dans `DashboardUI`, un skeleton FIDELE par ecran (memes
+  conteneurs, zero saut). Securite/Parametres/Confidentialite : statiques, rien a changer. (3) Le retour « aucune
+  page n'a de skeleton » visait le DENOMINATEUR COMMUN, mesure a la sonde (chargements a froid, reseau ralenti) :
+  `HeaderSkeleton` faisait shimmer TOUT le bandeau — logo, BETA, langue, theme, CTA — pendant le chargement de
+  l'auth. Il compose desormais les VRAIS composants statiques et ne shimme QUE la grappe d'authentification (trois
+  pastilles a la place cloche/bulle/avatar). Regle retenue : **un skeleton ne shimme que ce qu'il ne sait pas**.
+  RG-WEB-323. Tests inchanges (1565, front seul). 18 checks comptes trois fois. AUCUNE attribution Claude.
 - 18/09 (fin de journee) : **L'ALERTE PASSE PAR LA PORTE D'IDENTITE (#359) — et le poste bascule en mode proxy D48.**
   Constat visiteur non connecte : le formulaire « Nouvelle alerte » se remplissait en entier puis recevait le 401 brut
   de l'API (« Unauthorized! Token missing. », en anglais). Correctif par le motif EXISTANT des favoris (A58/A63) :
