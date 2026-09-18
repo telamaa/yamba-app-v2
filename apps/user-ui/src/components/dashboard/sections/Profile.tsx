@@ -102,6 +102,18 @@ export default function Profile({ copy }: { copy: DashboardCopy }) {
   const input = "w-full rounded-lg border border-slate-300 px-3 py-2 text-[13.5px] dark:border-slate-700 dark:bg-slate-900";
   const err = (k: string) => errors[k] ? <p className="mt-1 text-[12px] text-red-700 dark:text-red-400">{c.errors[errors[k]] ?? errors[k]}</p> : null;
 
+  // Skeleton fidèle tant que le profil charge : avant, la page rendait le VRAI
+  // layout avec des « — » et des champs vides qui se remplissaient d'un coup.
+  // Le titre reste réel (connu statiquement) — seules les données shimment.
+  if (!profile && msg?.tone !== "err") {
+    return (
+      <>
+        <SectionHeader title={copy.profile.title} subtitle={copy.profile.sub} />
+        <ProfileSkeleton hasCarrier={!!user?.roles?.includes("CARRIER")} />
+      </>
+    );
+  }
+
   return (
     <>
       <SectionHeader title={copy.profile.title} subtitle={copy.profile.sub} />
@@ -146,6 +158,67 @@ export default function Profile({ copy }: { copy: DashboardCopy }) {
       <CardSection>
         <ToggleLine label={copy.publicProfile} description={c.publicProfileHint} on={profile?.profilePublic ?? true} onToggleAction={() => toggle("profilePublic")} />
         <ToggleLine label={copy.showCity} description={copy.showCitySub} on={profile?.showCity ?? true} onToggleAction={() => toggle("showCity")} />
+      </CardSection>
+    </>
+  );
+}
+
+function Sk({ className }: { className: string }) {
+  return <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-800 ${className}`} />;
+}
+
+/**
+ * Skeleton FIDÈLE à la structure réelle (mêmes conteneurs, mêmes espacements :
+ * aucun saut de layout au passage skeleton → contenu) : carte avatar (rond 16,
+ * deux lignes, rangée de boutons), carte formulaire (3 ou 5 champs selon que le
+ * membre est Voyageur), carte des deux visibilités.
+ */
+function ProfileSkeleton({ hasCarrier }: { hasCarrier: boolean }) {
+  const field = (wide = false) => (
+    <div className={wide ? "md:col-span-2" : ""}>
+      <Sk className="mb-1.5 h-3 w-24" />
+      <Sk className={`w-full rounded-lg ${wide ? "h-20" : "h-9"}`} />
+    </div>
+  );
+  return (
+    <>
+      {/* Carte avatar */}
+      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl bg-white p-4 dark:bg-slate-950">
+        <div className="h-16 w-16 flex-shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+        <div className="min-w-0 flex-1">
+          <Sk className="h-4 w-44" />
+          <Sk className="mt-1.5 h-3 w-56" />
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <Sk className="h-7 w-32 rounded-lg" />
+            <Sk className="h-7 w-40 rounded-lg" />
+          </div>
+          <Sk className="mt-2 h-2.5 w-72" />
+        </div>
+      </div>
+
+      {/* Carte formulaire */}
+      <CardSection>
+        <div className="grid gap-3 md:grid-cols-2">
+          {field()}
+          {field()}
+          {field()}
+          {hasCarrier && field()}
+          {hasCarrier && field(true)}
+        </div>
+        <Sk className="mt-3 h-8 w-28 rounded-lg" />
+      </CardSection>
+
+      {/* Carte visibilités */}
+      <CardSection>
+        {[0, 1].map((i) => (
+          <div key={i} className="flex items-center justify-between gap-3 px-1 py-2">
+            <div className="min-w-0 flex-1">
+              <Sk className="h-3.5 w-32" />
+              <Sk className="mt-1.5 h-3 w-64 max-w-full" />
+            </div>
+            <Sk className="h-6 w-11 shrink-0 rounded-full" />
+          </div>
+        ))}
       </CardSection>
     </>
   );

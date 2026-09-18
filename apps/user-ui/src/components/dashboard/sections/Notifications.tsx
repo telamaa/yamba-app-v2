@@ -86,12 +86,20 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
       )}
 
       {isLoading && (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
+        /* Skeleton fidèle aux rangées réelles (pastille d'icône + titre + sous-ligne) */
+        <div className="space-y-2" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900"
-            />
+              className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+            >
+              <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+              <div className="min-w-0 flex-1">
+                <div className="h-3.5 w-52 max-w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                <div className="mt-1.5 h-3 w-72 max-w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              </div>
+              <div className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+            </div>
           ))}
         </div>
       )}

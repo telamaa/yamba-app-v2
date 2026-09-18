@@ -126,48 +126,49 @@ export default function HeaderUserMenuContent({
           hasPendingAction={user.hasPendingAction}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-              {user.displayName}
-            </p>
-            {user.carrierState === "active" && (
-              <span
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{
-                  backgroundColor: `${HEADER_COLORS.tealDark}26`,
-                  color: HEADER_COLORS.tealDark,
-                }}
-              >
-                {t("userMenu.badges.yamberActive")}
-              </span>
-            )}
-            {user.carrierState === "verified" && (
-              <span
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{
-                  backgroundColor: `${HEADER_COLORS.tealDark}26`,
-                  color: HEADER_COLORS.tealDark,
-                }}
-              >
-                {t("userMenu.badges.yamberVerified")}
-              </span>
-            )}
-            {user.carrierState === "pending" && (
-              <span
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{
-                  backgroundColor: `${HEADER_COLORS.mango}26`,
-                  color: HEADER_COLORS.mango,
-                }}
-              >
-                {t("userMenu.badges.yamberPending")}
-              </span>
-            )}
-          </div>
+          {/* Le badge NE partage PAS la ligne du nom : un nom long l'écrasait sur
+              deux lignes et se tronquait lui-même. Nom pleine largeur, email, puis
+              badge insécable sur sa propre ligne. */}
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+            {user.displayName}
+          </p>
           {user.email && (
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">
               {user.email}
             </p>
+          )}
+          {user.carrierState === "active" && (
+            <span
+              className="mt-1.5 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{
+                backgroundColor: `${HEADER_COLORS.tealDark}26`,
+                color: HEADER_COLORS.tealDark,
+              }}
+            >
+              {t("userMenu.badges.yamberActive")}
+            </span>
+          )}
+          {user.carrierState === "verified" && (
+            <span
+              className="mt-1.5 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{
+                backgroundColor: `${HEADER_COLORS.tealDark}26`,
+                color: HEADER_COLORS.tealDark,
+              }}
+            >
+              {t("userMenu.badges.yamberVerified")}
+            </span>
+          )}
+          {user.carrierState === "pending" && (
+            <span
+              className="mt-1.5 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{
+                backgroundColor: `${HEADER_COLORS.mango}26`,
+                color: HEADER_COLORS.mango,
+              }}
+            >
+              {t("userMenu.badges.yamberPending")}
+            </span>
           )}
         </div>
       </div>

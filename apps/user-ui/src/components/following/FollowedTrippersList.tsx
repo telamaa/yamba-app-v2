@@ -83,13 +83,34 @@ export default function FollowedTrippersList() {
 /* ============================================================ */
 
 function FollowedTrippersListSkeleton() {
+  // Fidèle à la carte de Voyageur suivi : avatar, identité, statistiques, action
+  const Sk = ({ className }: { className: string }) => (
+    <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-800 ${className}`} />
+  );
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy="true">
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="h-[220px] animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40"
-        />
+          className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+            <div className="min-w-0 flex-1">
+              <Sk className="h-4 w-40 max-w-full" />
+              <Sk className="mt-1.5 h-3 w-28" />
+            </div>
+            <Sk className="h-8 w-24 shrink-0 rounded-full" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+            {[0, 1, 2].map((j) => (
+              <div key={j}>
+                <Sk className="h-4 w-12" />
+                <Sk className="mt-1.5 h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );

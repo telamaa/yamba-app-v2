@@ -1,16 +1,20 @@
 // apps/user-ui/src/components/layout/HeaderSkeleton.tsx
 "use client";
 
+import HeaderLogo from "./header/HeaderLogo";
+import HeaderLocaleSwitcher from "./header/HeaderLocaleSwitcher";
+import HeaderThemeToggle from "./header/HeaderThemeToggle";
+import HeaderShareTripCTA from "./header/HeaderShareTripCTA";
 import { HEADER_Z_INDEX } from "./header/header.constants";
 
 type Props = {
   isCompact?: boolean;
 };
 
-function ShimmerBlock({ className = "" }: { className?: string }) {
+function ShimmerCircle({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl bg-slate-200/90 dark:bg-slate-800/80 ${className}`}
+      className={`relative overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-800/80 ${className}`}
     >
       <div
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/10"
@@ -21,11 +25,14 @@ function ShimmerBlock({ className = "" }: { className?: string }) {
 }
 
 /**
- * Skeleton du Header affiché pendant le chargement initial de l'auth.
+ * Skeleton du Header pendant le chargement initial de l'auth.
  *
- * Reflète la nouvelle structure (cloche, bulle, avatar plus gros) pour éviter
- * un saut visuel quand `useUser` se résout. La hauteur (78px) est identique
- * à celle du vrai Header.
+ * Le logo, la langue, le thème et le CTA « Partager un trajet » sont STATIQUES :
+ * ils s'affichent en vrai dès le premier rendu — un logo qui shimme dit « site
+ * pas fini » sur toutes les pages (revue du 18/09). Seule la grappe
+ * d'authentification (cloche, bulle, avatar OU « Connexion ») est inconnue tant
+ * que `useUser` ne s'est pas résolu : trois pastilles rondes à sa place exacte,
+ * mêmes conteneurs que le vrai Header (78px) — zéro saut quand il se résout.
  */
 export default function HeaderSkeleton({ isCompact = false }: Props) {
   return (
@@ -38,30 +45,28 @@ export default function HeaderSkeleton({ isCompact = false }: Props) {
           isCompact ? "py-2" : "py-3"
         }`}
       >
-        {/* Left */}
-        <div className="flex items-center gap-2 md:gap-3">
-          <ShimmerBlock className="h-9 w-9 rounded-xl" />
-          <div className="flex items-center gap-2">
-            <ShimmerBlock className="h-7 w-24 rounded-md" />
-            <ShimmerBlock className="hidden h-5 w-12 rounded-full md:block" />
-          </div>
+        <div className="hidden md:flex">
+          <HeaderLogo compact={isCompact} mobile={false} />
+        </div>
+        <div className="flex md:hidden">
+          <HeaderLogo compact={isCompact} mobile={true} />
         </div>
 
-        {/* Desktop right */}
+        {/* Desktop : statique réel + grappe auth en pastilles */}
         <div className="hidden items-center gap-3 md:flex">
-          <ShimmerBlock className="h-7 w-16 rounded-full" />
-          <ShimmerBlock className="h-10 w-10 rounded-xl" />
-          <ShimmerBlock className="h-9 w-36 rounded-full" />
-          <ShimmerBlock className="h-9 w-9 rounded-full" />
-          <ShimmerBlock className="h-9 w-9 rounded-full" />
-          <ShimmerBlock className="h-9 w-9 rounded-full" />
+          <HeaderLocaleSwitcher variant="header" />
+          <HeaderThemeToggle variant="icon" />
+          <HeaderShareTripCTA variant="desktop" />
+          <ShimmerCircle className="h-9 w-9" />
+          <ShimmerCircle className="h-9 w-9" />
+          <ShimmerCircle className="h-9 w-9" />
         </div>
 
-        {/* Mobile right */}
+        {/* Mobile : mêmes emplacements que le vrai header */}
         <div className="flex items-center gap-2 md:hidden">
-          <ShimmerBlock className="h-7 w-7 rounded-full" />
-          <ShimmerBlock className="h-7 w-7 rounded-full" />
-          <ShimmerBlock className="h-9 w-9 rounded-full" />
+          <ShimmerCircle className="h-7 w-7" />
+          <ShimmerCircle className="h-7 w-7" />
+          <ShimmerCircle className="h-9 w-9" />
         </div>
       </div>
     </header>

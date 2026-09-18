@@ -20,7 +20,7 @@ import useUser from "@/hooks/useUser";
 import { useWallet } from "@/hooks/useWallet";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
-import { EmptyState, StatCard } from "@/components/dashboard/DashboardUI";
+import { EmptyState, RowSkeleton, StatCard, StatCardSkeleton } from "@/components/dashboard/DashboardUI";
 import PayoutBlockedBanner from "@/components/dashboard/trips/PayoutBlockedBanner";
 import SudoGate from "@/components/dashboard/sections/SudoGate";
 import { isSudoRequired } from "@/services/account.api";
@@ -57,7 +57,19 @@ export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
       </div>
 
       {isPending ? (
-        <p className="text-[13px] text-slate-500 dark:text-slate-400">{t("loading")}</p>
+        /* Skeleton fidèle : les trois cartes de totaux puis les rangées — plus de texte « Chargement… » */
+        <div className="space-y-5" aria-busy="true">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+          <div className="space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <RowSkeleton key={i} />
+            ))}
+          </div>
+        </div>
       ) : isError || !data ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[13px] text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {t("error")}{" "}
