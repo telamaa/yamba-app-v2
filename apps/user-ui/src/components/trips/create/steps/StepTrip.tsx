@@ -321,7 +321,7 @@ export default function StepTrip({
 
       {/* Route: From / Swap / To */}
       <SectionLabel>{isFr ? "Itinéraire" : "Route"}</SectionLabel>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
         <CityField
           label={copy.from}
           value={draft.from}
@@ -361,7 +361,10 @@ export default function StepTrip({
       <SectionLabel>
         {isFr ? "Dates & horaires" : "Dates & times"}
       </SectionLabel>
-      <div className="grid grid-cols-2 gap-3">
+      {/* minmax(0,1fr) : sur iOS, input[type=date] a une largeur min-content
+          intrinsèque qu'une piste `1fr` ne compresse pas — la colonne de droite
+          débordait de l'écran (piège #175, mesuré sur iPhone le 18/09) */}
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <FormField label={copy.date} error={errors.departureDate}>
           <input
             type="date"
@@ -373,7 +376,7 @@ export default function StepTrip({
               }))
             }
             className={[
-              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
               errors.departureDate
                 ? "border-[#FF9900]"
                 : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
@@ -392,7 +395,7 @@ export default function StepTrip({
               }))
             }
             className={[
-              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
               errors.arrivalDate
                 ? "border-[#FF9900]"
                 : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
@@ -411,7 +414,7 @@ export default function StepTrip({
               }))
             }
             className={[
-              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
               errors.departureTime
                 ? "border-[#FF9900]"
                 : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
@@ -430,7 +433,7 @@ export default function StepTrip({
               }))
             }
             className={[
-              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
               errors.arrivalTime
                 ? "border-[#FF9900]"
                 : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
