@@ -39,6 +39,7 @@ import {
 } from "./search-results.types";
 import { SurchargePills } from "./SurchargePills";
 import { formatLocation } from "./formatTripTimes";
+import { countryName } from "@/lib/country-name";
 import TripPricingPopover from "./TripPricingPopover";
 
 type Props = {
@@ -131,8 +132,15 @@ export default function TripResultCard({
     [item.departureTime, item.arrivalTime, item.durationMinutes, item.nextDay]
   );
 
-  const fromLocation = formatLocation(item.fromCityCode, item.fromCountry);
-  const toLocation = formatLocation(item.toCityCode, item.toCountry);
+  // Pays localisé pour le VISITEUR (le texte fromCountry est figé dans la locale du créateur)
+  const fromLocation = formatLocation(
+    item.fromCityCode,
+    countryName(item.fromCountryCode, locale, item.fromCountry) ?? undefined
+  );
+  const toLocation = formatLocation(
+    item.toCityCode,
+    countryName(item.toCountryCode, locale, item.toCountry) ?? undefined
+  );
 
   const formattedDate = item.travelDate;
 

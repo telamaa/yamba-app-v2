@@ -15,6 +15,7 @@ import { useTrip, usePauseTrip, useResumeTrip, useCancelTrip, useRestoreTrip } f
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { setFlashToast } from "@/lib/flash-toast";
+import { countryName } from "@/lib/country-name";
 import TripDocumentsManager from "@/components/trips/create/TripDocumentsManager";
 import TripDealsSection from "@/components/dashboard/trips/TripDealsSection";
 import {
@@ -457,8 +458,10 @@ export default function TripDetails({ tripId }: { tripId: string }) {
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-center gap-1"><div className="h-3 w-3 rounded-full border-2" style={{ borderColor: MANGO }} /><div className="h-8 w-px bg-slate-200 dark:bg-slate-700" /><div className="h-3 w-3 rounded-full" style={{ background: TEAL }} /></div>
               <div className="flex-1 space-y-3">
-                <div><div className="text-[14px] font-medium text-slate-900 dark:text-white">{trip.originLabel ?? originCity}</div>{trip.originRegion && <div className="text-[12px] text-slate-400">{[trip.originRegion, trip.originCountry].filter(Boolean).join(", ")}</div>}</div>
-                <div><div className="text-[14px] font-medium text-slate-900 dark:text-white">{trip.destinationLabel ?? destCity}</div>{trip.destinationRegion && <div className="text-[12px] text-slate-400">{[trip.destinationRegion, trip.destinationCountry].filter(Boolean).join(", ")}</div>}</div>
+                {/* Pays localisé via le code ISO (le texte stocké est figé dans la locale du créateur),
+                    et affiché même sans région — la garde `originRegion &&` masquait le pays seul */}
+                <div><div className="text-[14px] font-medium text-slate-900 dark:text-white">{trip.originLabel ?? originCity}</div>{(trip.originRegion || trip.originCountryCode || trip.originCountry) && <div className="text-[12px] text-slate-400">{[trip.originRegion, countryName(trip.originCountryCode, locale, trip.originCountry)].filter(Boolean).join(", ")}</div>}</div>
+                <div><div className="text-[14px] font-medium text-slate-900 dark:text-white">{trip.destinationLabel ?? destCity}</div>{(trip.destinationRegion || trip.destinationCountryCode || trip.destinationCountry) && <div className="text-[12px] text-slate-400">{[trip.destinationRegion, countryName(trip.destinationCountryCode, locale, trip.destinationCountry)].filter(Boolean).join(", ")}</div>}</div>
               </div>
             </div>
             {trip.tripType && <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800"><InfoRow label={t("detail.type")} value={TRIP_TYPE_KEYS[trip.tripType] ? t(TRIP_TYPE_KEYS[trip.tripType]) : trip.tripType} /></div>}

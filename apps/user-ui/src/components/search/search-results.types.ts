@@ -51,10 +51,14 @@ export type YambaTripResult = {
   id: string;
   fromCity: string;
   fromCityCode?: string;
+  /** Texte figé dans la locale du créateur — préférer fromCountryCode + Intl.DisplayNames */
   fromCountry?: string;
+  /** ISO 3166-1 alpha-2 ("BE") — source de vérité pour le nom de pays localisé */
+  fromCountryCode?: string;
   toCity: string;
   toCityCode?: string;
   toCountry?: string;
+  toCountryCode?: string;
   travelDate: string;
   /** ISO 8601 — ANO-WEB-30 : « Trajet passé » dans les favoris. */
   departureAt?: string;

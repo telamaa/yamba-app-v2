@@ -10287,6 +10287,12 @@
             "type": "string"
           },
           "fromCountry": {
+            "description": "Texte affichable, FIGÉ dans la locale du créateur du trajet — préférer fromCountryCode côté client (Intl.DisplayNames)",
+            "type": "string"
+          },
+          "fromCountryCode": {
+            "example": "BE",
+            "description": "ISO 3166-1 alpha-2 — le client en dérive le nom localisé (Intl.DisplayNames)",
             "type": "string"
           },
           "toCity": {
@@ -10296,6 +10302,12 @@
             "type": "string"
           },
           "toCountry": {
+            "description": "Texte affichable, FIGÉ dans la locale du créateur du trajet — préférer toCountryCode côté client (Intl.DisplayNames)",
+            "type": "string"
+          },
+          "toCountryCode": {
+            "example": "CD",
+            "description": "ISO 3166-1 alpha-2 — le client en dérive le nom localisé (Intl.DisplayNames)",
             "type": "string"
           },
           "travelDate": {

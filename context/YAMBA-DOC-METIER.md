@@ -6477,3 +6477,38 @@ demandeur, horodatage). Mais le **journal admin** — celui qui répond à « qu
 | SIG33 | Ouvrir le formulaire de sanction | La catégorie reste sur « — choisir — » |
 | SIG34 | Double clic sur « Signaler » | **Un** dossier ; le second lit « tu as déjà signalé ce message » |
 | SIG35 | Trois signalements du même membre sur la même cible | La cible **n'est pas** prioritaire (1 signalant) |
+
+# Le pays sur les cartes de recherche et la page trajet · `feat/pays-cartes-et-detail`
+
+## Le besoin
+
+Un trajet international se choisit d'abord par son **corridor**. La liste des résultats mélange des
+destinations (Montréal, São Paulo, Kinshasa…) : sans le pays, l'Expéditeur devine ; avec des villes
+homonymes, il se trompe. Et depuis la PR #353 l'autocomplétion dit « Ville, Pays » — l'écran de
+résultats doit répondre dans la même langue. Enfin, sur mobile, la ville (l'information de décision)
+était affichée plus petite que les heures : hiérarchie héritée des comparateurs de vols, inadaptée à
+un colis.
+
+## Les règles
+
+- **RG-WEB-313** — Toute carte résultat de recherche affiche le **pays** de départ et d'arrivée
+  quand la plateforme le connaît, dans la **langue du visiteur** (dérivé du code ISO, jamais du
+  texte figé à la publication). Un trajet sans code pays affiche ce qu'il peut (texte stocké), sans
+  erreur ni trou de mise en page.
+- **RG-WEB-314** — La page trajet (publique et dashboard) affiche le pays sous chaque ville de
+  l'itinéraire, selon la même règle de localisation. Sur le dashboard, le pays s'affiche même quand
+  le trajet n'a pas de région.
+- **RG-WEB-315** — Sur la carte mobile, la **ville** prime visuellement sur l'heure, et le **prix**
+  est l'unique élément au niveau visuel maximal de la carte. Le front ne montre pas de code
+  technique (IATA) sur mobile.
+- **RG-WEB-316** — Les montants de la carte mobile se formatent dans la locale du visiteur (virgule
+  en FR, point en EN), comme sur desktop.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| WEB313 | `/fr/search` sur le jeu d'essai (codes ISO seuls, sans texte pays) | « France », « Canada », « Congo-Kinshasa » sous les villes |
+| WEB313b | Le même écran en `/en/search` | « France », « Canada », « Congo (DRC) » — la langue du VISITEUR |
+| WEB314 | Page d'un trajet Paris → Brazzaville | « France » sous Paris, « Congo-Brazzaville » sous Brazzaville |
+| WEB315 | Carte mobile | Ville en premier et plus grande que l'heure ; seul le prix est en 18px |
