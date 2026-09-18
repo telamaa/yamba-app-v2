@@ -11234,3 +11234,18 @@ dur deviennent `localeTag` dérivé de `useLocale()` (le desktop le faisait déj
 - Sonde navigateur (Playwright, stack réelle) : desktop « Paris / 01:51 / France », mobile
   ville-heure-pays + prix unique en gras, page détail « Paris / France → Brazzaville /
   Congo-Brazzaville ». `tsc` user-ui et `nx typecheck trip-service` verts.
+
+## Retouche avant merge — le pays rejoint la ville (revue visuelle sur poste)
+
+La première passe plaçait le pays en TROISIÈME ligne (ville / heure / pays) : « France » flottait
+sous « 01:51 » alors qu'il qualifie « Paris ». Arbitrage (option hybride retenue en revue) :
+
+- **Desktop** : « **Paris**, France » sur la ligne ville — le pays en même corps mais `font-normal`
+  gris clair ; la ligne à part disparaît (et l'ancien format « code · pays » avec elle : le code
+  IATA ne s'affiche plus sur les cartes, desktop comme mobile).
+- **Mobile** : le pays reste sur sa propre ligne (10px) mais MONTE sous la ville, l'heure passe en
+  dernier — sur ~120px de colonne, « Brazzaville, Congo-Brazzaville » en ligne tronquerait le pays
+  presque à chaque fois ; empilé, il passe entier.
+
+La règle retenue : **le pays touche toujours la ville** (même ligne quand la largeur le permet,
+ligne adjacente sinon) ; l'heure ne s'intercale jamais dans un nom de lieu.

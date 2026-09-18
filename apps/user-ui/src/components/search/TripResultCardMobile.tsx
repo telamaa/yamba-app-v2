@@ -91,14 +91,15 @@ export default function YambaTripResultCardMobile({
               <div className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">
                 {item.fromCity}
               </div>
-              <div className="mt-0.5 text-[12px] leading-snug tabular-nums text-slate-500 dark:text-slate-400">
-                {item.departureTime}
-              </div>
+              {/* Le pays COLLE à la ville (il la qualifie) ; l'heure vient après */}
               {fromCountry && (
                 <div className="mt-0.5 truncate text-[10px] leading-snug text-slate-400 dark:text-slate-500">
                   {fromCountry}
                 </div>
               )}
+              <div className="mt-0.5 text-[12px] leading-snug tabular-nums text-slate-500 dark:text-slate-400">
+                {item.departureTime}
+              </div>
             </div>
 
             {/* Duration */}
@@ -124,6 +125,11 @@ export default function YambaTripResultCardMobile({
               <div className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">
                 {item.toCity}
               </div>
+              {toCountry && (
+                <div className="mt-0.5 truncate text-[10px] leading-snug text-slate-400 dark:text-slate-500">
+                  {toCountry}
+                </div>
+              )}
               <div className="mt-0.5 text-[12px] leading-snug tabular-nums text-slate-500 dark:text-slate-400">
                 {item.arrivalTime ?? ""}
                 {item.nextDay && (
@@ -132,11 +138,6 @@ export default function YambaTripResultCardMobile({
                   </sup>
                 )}
               </div>
-              {toCountry && (
-                <div className="mt-0.5 truncate text-[10px] leading-snug text-slate-400 dark:text-slate-500">
-                  {toCountry}
-                </div>
-              )}
             </div>
 
             {/* Price — PER_KG (D13) ou legacy */}
