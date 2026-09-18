@@ -5,6 +5,7 @@
     "titleHighlight": "quelqu'un qui part déjà",
     "titleEnd": "?",
     "subtitle": "Yamba met en relation ceux qui envoient un colis et les Voyageurs qui ont de la place dans leurs bagages.",
+    "illustrationAlt": "Illustration : un colis voyage dans les bagages d'un Voyageur",
     "trust": {
       "escrow": "Paiement bloqué jusqu'à la livraison (Stripe)",
       "code": "Remise contre code confidentiel",

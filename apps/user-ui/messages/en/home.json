@@ -5,6 +5,7 @@
     "titleHighlight": "someone already on their way",
     "titleEnd": "?",
     "subtitle": "Yamba connects people who need to send a parcel with Travelers who have spare room in their luggage.",
+    "illustrationAlt": "Illustration: a parcel traveling in a Traveler's luggage",
     "trust": {
       "escrow": "Payment held until delivery (Stripe)",
       "code": "Handover against a confidential code",

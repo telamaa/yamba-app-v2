@@ -11298,3 +11298,14 @@ Sonde navigateur sur la stack réelle : hero sans photo, corridors réels (« Pa
 « 1 trip / 6 trips »). `tsc` user-ui vert, miroir i18n vérifié (30 namespaces). Limite connue : les noms
 de villes des puces sont ceux stockés sur les trajets (langue du créateur) — les localiser exigerait un
 référentiel de lieux, hors périmètre.
+
+## Retouche avant merge — l'image revient à droite, la barre colle sous le header (revue sur poste)
+
+- **Hero deux colonnes** rétabli : texte aligné à gauche, illustration à droite — l'asset maison
+  `home-hero-yamba.svg` (déjà versionné, orphelin depuis juillet), pas les photos iStock filigranées.
+- **La barre de recherche sort du hero** pour devenir un enfant DIRECT du flux de page (`HomePage`) :
+  `position: sticky` ne colle que dans les bornes de son parent, et une barre en bas d'un hero n'a
+  aucune course de collage — c'est pour cela qu'elle ne collait jamais. En enfant de la colonne pleine
+  page du layout, elle reste sous le header sur TOUTE la hauteur (à la Blablacar), en mode compact avec
+  fond translucide — mécanique déjà présente dans `TripSearchBar` (`mode="auto"` + `stickyOnScroll`),
+  simplement jamais placée là où elle pouvait servir.
