@@ -7,6 +7,7 @@
  *              session déjà fermée écrivait ADMIN_SESSION_REVOKED et répondait 200.
  */
 import jwt from "jsonwebtoken";
+import { creerPrismaJournalise } from "@packages/test-prisma";
 
 const store = new Map<string, string>();
 const redisMock = {
@@ -22,7 +23,12 @@ const redisMock = {
   exists: jest.fn(async (k: string) => (store.has(k) ? 1 : 0)),
   scan: jest.fn(async (_c: string, _m: string, pattern: string) => ["0", [...store.keys()].filter((k) => k.startsWith(pattern.replace("*", "")))]),
 };
-const prismaMock = { user: { findUnique: jest.fn(), update: jest.fn(async () => ({})), updateMany: jest.fn(async () => ({ count: 1 })) }, $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)) };
+// Le client de test vient de `@packages/test-prisma` : il JOURNALISE d'où chaque appel vient, au lieu
+// de passer le même client dedans et dehors. Bénéfice immédiat ici : plus de `prismaMock` qui se
+// référence dans son propre initialiseur (TS7022 / TS7024 au `nx typecheck`, invisible pour la CI, qui
+// typecheck `tsconfig.app.json` — lequel exclut les fiches).
+const journal = creerPrismaJournalise({ modeles: ["user"], retours: { "user.update": {}, "user.updateMany": { count: 1 } } });
+const prismaMock = journal.prisma as { user: Record<string, jest.Mock>; $transaction: jest.Mock };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => undefined) };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }));

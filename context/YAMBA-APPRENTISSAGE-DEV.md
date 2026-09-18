@@ -1979,3 +1979,154 @@ dit pas, chaque passe le rouvre, on réenquête, et on finit par croire que pers
   introduit un défaut et on vérifie qu'un test tombe. Un test qu'aucune mutation ne fait échouer ne
   couvre rien. La règle « un test structurel doit avoir été vu échouer » en est la version manuelle,
   et elle est déjà écrite dans les pièges de ce dépôt.
+
+---
+
+## Chapitre 195 — Deux filets, pas un : la garde mesurée et la garde qui lit la source (A200)
+
+Le chapitre 190 racontait un mock qui ment. Celui-ci raconte la suite : que faire quand on a corrigé
+le mensonge **à deux endroits** et qu'il en reste dix-huit — et comment choisir la garde qui vaut le
+coup qu'elle coûte.
+
+### 1. L'inventaire déplace la question
+
+Le réflexe, devant « ce patron de mock ment partout où il subsiste », est de le corriger partout.
+Vingt fiches, un après-midi mécanique. L'inventaire dit autre chose :
+
+| Invariant | Écrivains | Gardés |
+|---|---|---|
+| **D2** — l'événement dans la même transaction que l'état | 4 | 2 |
+| **Journal admin** — la ligne d'audit dans la même transaction que le geste | 8 fichiers, ~50 appels | 0 |
+
+Un mock qui ment dans une fiche qui **n'éprouve aucun invariant transactionnel** ne cache rien : il
+est laid, pas dangereux. Un écrivain d'outbox **sans aucune garde**, lui, est une régression qui
+attend son jour.
+
+> **La question utile n'est pas « où est le patron ? » mais « quel invariant n'est gardé nulle
+> part ? ».** Les deux inventaires ne donnent pas la même liste, et c'est le second qui décide.
+
+### 2. Les deux formes de garde, et ce que chacune ne sait pas faire
+
+**La garde mesurée** pilote le code réel avec un double instrumenté. C'est A197 : un client de test
+qui journalise la provenance de chaque appel.
+
+```ts
+$transaction: jest.fn(async (fn) => {
+  const precedente = transactionCourante;
+  transactionCourante = ++compteur;        // ← tout appel fait PENDANT porte ce numéro
+  try { return await fn(prisma); } finally { transactionCourante = precedente; }
+})
+```
+
+Elle prouve un **comportement**. Elle coûte cher (il faut échafauder le service), elle s'écrit
+écrivain par écrivain, et — le point décisif — **elle ne dit rien de l'écrivain ajouté demain**.
+
+**La garde qui lit la source** balaie les fichiers et refuse une forme :
+
+```ts
+const ECRITURE_OUTBOX = /(\w+)\s*\.\s*outboxEvent\s*\.\s*(create|createMany)\s*\(/g;
+// … et refuse que le récepteur soit `prisma` ou `db`, c'est-à-dire le client GLOBAL
+```
+
+Elle ne prouve qu'une **syntaxe** : un `tx` passé en argument pourrait n'être le `tx` de rien du
+tout. Mais elle couvre **tout le dépôt d'un coup**, et surtout **ce qui n'est pas encore écrit**.
+
+> Les deux ne sont pas concurrentes, elles sont **complémentaires** : mailles fines là où l'argent
+> passe, mailles larges partout. Choisir l'une *contre* l'autre est l'erreur.
+
+Ce dépôt connaissait déjà la seconde forme — `seed-integrity` lit le seed, `outbox-purge` lit la
+source du cron pour interdire le retour d'un filtre nu, `refusal-codes` lit les contrôleurs. Ce qui
+manquait, c'était de l'appliquer à D2.
+
+### 3. Une garde trop large est une garde qu'on désarme
+
+Écrite d'abord sur **toutes** les écritures d'outbox, la règle a levé **dix signalements**. Tous
+légitimes :
+
+```
+outbox-relay.ts      — prisma.outboxEvent.update(…)      marque publishedAt après publication
+outbox-retention.cron — prisma.outboxEvent.deleteMany(…)  purge les événements DÉJÀ publiés
+```
+
+Le relais et la purge touchent au **cycle de vie** d'un événement déjà né, pas à sa **naissance**, et
+n'accompagnent aucun changement d'état. D2 dit « aucun changement d'état sans son événement » : c'est
+la naissance qui doit être atomique. La règle ne retient donc que `create` / `createMany`.
+
+> **Un garde-fou qui crie à tort est un garde-fou qu'on désarme.** Le resserrement n'est pas une
+> concession faite au code : c'est la règle enfin dite juste. Une garde dont on doit ignorer les
+> alertes ne protège plus rien — elle apprend seulement à ignorer les alertes.
+
+Et la contre-épreuve, exigée par le dépôt : défaut réintroduit dans un **vrai** fichier
+(`tx.outboxEvent.create` → `prisma.outboxEvent.create`), fiche rouge, **le fichier fautif nommé**,
+code restauré à l'identique. Sans cette étape, on n'a pas écrit une garde, on a écrit un commentaire
+exécutable.
+
+### 4. Trois pièges d'outillage de test, payés dans ce lot
+
+**(a) `jest` n'est pas sur `globalThis`.** Jest l'injecte dans la portée de **chaque module** qu'il
+transforme, comme `require`, `module` ou `__dirname`. Un contournement écrit
+`(globalThis as any).jest.fn(…)` — pour éviter de dépendre des *types* jest — a fait tomber **16
+tests d'un coup** avec `Cannot read properties of undefined`. Le remède est une déclaration locale :
+
+```ts
+declare const jest: { fn: (impl: (...args: never[]) => unknown) => EspionTest };
+```
+
+Elle satisfait TypeScript **sans** exiger `@types/jest` du projet qui résout la lib, et la liaison
+réelle reste celle que Jest injecte.
+
+**(b) Un outil de test doit produire de VRAIS espions.** Si le double n'expose pas
+`toHaveBeenCalledWith`, `mockResolvedValueOnce`, `mockReset`, alors l'adopter casse toutes les
+assertions existantes — et personne ne l'adopte. Un outil qu'on n'adopte pas ne protège rien.
+
+**(c) « Réinitialiser » doit RÉPARER, pas seulement vider.** C'est le piège le plus instructif du lot,
+et je l'ai introduit moi-même :
+
+```ts
+// Dans un test, geste parfaitement banal :
+user.findUnique.mockReset().mockImplementation(async () => lu);   // `lu` est LOCAL à ce test
+```
+
+`mockReset()` efface l'implémentation journalisante ; `mockImplementation` en pose une autre, qui
+capture une variable locale. Si `reinitialiser()` se contente d'un `mockClear()`, **l'écrasement
+survit au `beforeEach`** et le test suivant hérite d'une fermeture périmée — chez moi, un secret TOTP
+d'un autre test, donc `401` au lieu de `200`.
+
+```ts
+// Le remède : réinstaller, pas vider
+espion.mockReset();
+espion.mockImplementation(journalisante(modele, methode));
+```
+
+> C'est la famille A199, vue d'un autre angle : **ce qui fuit ENTRE les fiches**, pas dans l'une
+> d'elles. Un test qui passe seul et échoue en groupe ne se diagnostique jamais sur le fichier qui
+> tombe.
+
+### 5. Et le bénéfice qu'on n'était pas venu chercher
+
+Le mock auto-référent n'était pas qu'inélégant :
+
+```ts
+const prismaMock = { …, $transaction: jest.fn(async (fn) => fn(prismaMock)) };
+//    ^^^^^^^^^^                                          ^^^^^^^^^^
+```
+
+Une variable référencée dans son propre initialiseur empêche l'inférence (`TS7022` / `TS7024`), et
+l'erreur se propage aux fiches **voisines**. `nx typecheck auth-service` passait de **53 erreurs à
+0** en corrigeant **deux** fichiers.
+
+L'annoter `: any` aurait fait taire le compilateur **en gardant le mock menteur** — un plâtre sur
+exactement ce qu'on était venu retirer.
+
+> Quand un défaut de typage et un défaut de conception ont la même racine, corriger le second fait
+> tomber le premier. L'inverse ne marche jamais.
+
+### Pour aller plus loin
+
+- La distinction « garde mesurée / garde syntaxique » a des noms ailleurs : *test comportemental* vs
+  *analyse statique*, ou *fitness function* dans la littérature sur l'architecture évolutive. Un
+  linter personnalisé (règle ESLint, `ts-morph`, `dependency-cruiser`) fait la même chose en mieux
+  qu'une expression régulière — la regex a l'avantage de tenir en dix lignes et de ne rien installer.
+- Sur ce que prouve un test qui lit du texte : il prouve une **forme**, jamais un **sens**. Il faut
+  l'écrire dans la fiche elle-même, sinon quelqu'un la lira comme une preuve de comportement — et
+  cessera d'écrire celle qui en est une.
