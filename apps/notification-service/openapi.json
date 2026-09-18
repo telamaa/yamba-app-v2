@@ -13829,6 +13829,179 @@
         ],
         "additionalProperties": false
       },
+      "AdminUserNotificationItem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Event key du contrat (ex. booking.requested) — jamais le corps affiché au membre"
+          },
+          "bookingId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "readAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "bookingId",
+          "createdAt",
+          "readAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUserEmailItem": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "description": "Nom du template (ex. booking/booking-requested-carrier) — jamais le corps"
+          },
+          "status": {
+            "type": "string",
+            "description": "PENDING / SENT / DELIVERED / FAILED / BOUNCED / COMPLAINED"
+          },
+          "bookingId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deal source via l'outbox — null pour un événement non-deal"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "sentAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Expurgée (redactContacts) et tronquée"
+          }
+        },
+        "required": [
+          "template",
+          "status",
+          "bookingId",
+          "claimedAt",
+          "sentAt",
+          "lastError"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUserCommunicationsResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserNotificationItem"
+            },
+            "description": "Les 30 dernières, de la plus récente à la plus ancienne"
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserEmailItem"
+            },
+            "description": "Les 30 derniers, du plus récent au plus ancien"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "notifications": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "unreadNotifications": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "emails": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failedEmails": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "FAILED + BOUNCED + COMPLAINED, tous envois confondus"
+              }
+            },
+            "required": [
+              "notifications",
+              "unreadNotifications",
+              "emails",
+              "failedEmails"
+            ],
+            "additionalProperties": false
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "userId",
+          "notifications",
+          "emails",
+          "counts",
+          "generatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "D79 — ce que la plateforme a envoyé à ce membre : types et statuts seulement, jamais un contenu ni le code de livraison"
+      },
       "TicketRejectionReason": {
         "type": "string",
         "enum": [

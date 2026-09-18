@@ -2398,3 +2398,42 @@ changée** — l'utilisateur, ou un `useEffect` de restauration.
   par le nombre formaté ; FR et EN portent chacun leurs règles (`one`/`other` suffisent ici).
 - Supprimer une section, c'est aussi supprimer ses clés i18n : quatre chaînes mortes découvertes la
   veille (handoff 18/09) venaient exactement de ce geste laissé inachevé.
+
+## Chapitre 200 — Outiller l'instruction : quand le bon fix n'est pas un fix
+
+Le point de départ de cette PR n'est pas un bug : c'est une **session de débogage qui n'aurait pas dû
+exiger un développeur**. Un membre « ne recevait rien » ; la vérité (les événements partaient, mais vers
+un autre voyageur — la réservation avait eu lieu sur un trajet du seed) a demandé six requêtes Mongo à la
+main. La leçon de méthode : après une instruction manuelle, se demander **« quel écran m'aurait évité ça ? »**
+— et vérifier d'abord ce qui existe. L'inventaire a d'ailleurs corrigé deux de mes propres affirmations :
+la fiche trajet listait DÉJÀ ses réservations, la fiche membre listait DÉJÀ ses deals. Le seul vrai trou :
+les notifications et les emails PAR MEMBRE.
+
+**Technique 1 — le service à dépendances injectées, sans framework de mock.** Regarde
+`admin-user-communications.service.ts` : le type `UserCommunicationsDb` déclare le STRICT nécessaire de
+Prisma (quatre modèles, cinq méthodes, aux signatures réduites à ce que le service appelle). La spec
+fournit un objet littéral qui enregistre les `where` reçus — et peut alors PROUVER des choses qu'un mock
+`jest.fn()` ne dit pas naturellement : que le compte des non-lues contient bien
+`OR: [{ readAt: null }, { readAt: { isSet: false } }]` (le piège du champ absent sur Mongo, payé six
+fois), ou que l'outbox n'est PAS interrogée quand il n'y a aucun email. Le défaut du paramètre
+(`db = prismaDefault`) branche la production sans une ligne de câblage.
+
+**Technique 2 — la jointure applicative par lot.** Mongo n'a pas de JOIN et `EmailDelivery` ne porte pas
+de `bookingId` : le deal se retrouve par l'événement source. Un seul `findMany({ id: { in: eventIds } })`
+sur l'outbox (jamais une requête par email — le N+1 classique), puis une `Map` `eventId → aggregateId`
+filtrée sur `aggregateType === "booking"`. Un événement non-deal donne `null`, jamais une valeur devinée.
+
+**Technique 3 — le journal coalescé plutôt que le sur-journal.** Deux endpoints lus à la suite (la fiche,
+puis sa carte) n'ont pas à écrire deux lignes de journal : `recordAdminRead` (A168) coalesce par une clé
+Redis fenêtrée. La carte écrit le MÊME `USER_VIEWED` que la fiche — la trace existe si la carte est lue
+seule, et n'encombre pas le journal dans le parcours normal. À l'inverse, on ne journalise pas un geste
+DIFFÉRENT sous le même nom : ici c'est la même cible, le même écran logique.
+
+**Piège rencontré** : le premier jet de D79 affirmait « la fiche n'est pas journalisée » — faux (le
+contrôleur écrivait `USER_VIEWED` depuis C-PR3). Une décision de registre se rédige APRÈS lecture du code
+qu'elle prétend décrire, pas de mémoire. Le 3A a été corrigé avant d'écrire la première ligne de service.
+
+**Pour aller plus loin** : la validation « réelle » (exécuter le service contre la base de dev via `tsx`
+avant même de brancher la route) est le complément naturel des specs à db injectée — la spec prouve la
+LOGIQUE, l'exécution réelle prouve que les filtres Prisma parlent bien au VRAI moteur (un `isSet` sur un
+champ requis, par exemple, serait refusé à l'exécution seulement).
