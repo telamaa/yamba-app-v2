@@ -10336,6 +10336,112 @@ et un document introuvable ne signe ni ne journalise rien.
 
 ---
 
+# PR — Cahier 04-CRONS remis à l'état du code · `chore/cahier-crons-a-jour`
+
+## Pourquoi
+
+Le handoff du 17/09 proposait, parmi les pistes non engagées, de « rejouer sur 01-WEB, 03-API et 04-CRONS
+l'exercice qui a levé la réserve du 02-ADMIN ». Le raisonnement était le même : une campagne de recette laisse
+derrière elle deux documents qui vieillissent à des vitesses différentes — le cahier, écrit **avant**, et les
+résultats, écrits **pendant**. Chaque correction livrée après la campagne creuse l'écart, silencieusement.
+
+Et comme sur le 02-ADMIN, l'estimation était basse : le handoff annonçait **un** écart pour ce cahier (la
+divergence `DIV-3`). Il y en avait **douze**, dont un qui casse la CI et un qui a réellement provoqué une
+anomalie bloquante pendant la campagne.
+
+La méthode est identique : la source n'est pas le résumé, ce sont les constats consignés **au fil des
+chapitres** dans `context/YAMBA-RECETTE-CRONS-RESULTATS.md`. Et chaque correction est vérifiée **dans le code**,
+jamais recopiée d'un document vers un autre.
+
+## Les douze écarts
+
+| # | Où | Avant | Maintenant |
+|---|---|---|---|
+| 1 | En-tête | référence `feat/f3-messaging-admin` au 06/09/2026 | `dev` au 18/09/2026 ; **le `.md` fait foi**, le `.pdf` du 06/09 n'est plus régénéré à chaque passe |
+| 2 | § 1.3 | renvoi vers `docs/recette/RECETTE-01-MEMBRE.md` — **fichier inexistant** | `RECETTE-01-WEB.md` |
+| 3 | § 1.5 `DIV-3` | « l'en-tête de `payout-bookings.cron.ts` annonce un rejeu < 10 essais » | **refermée** — l'en-tête dit aujourd'hui l'inverse, mot pour mot |
+| 4 | § 1.5 `DIV-2` | « la ligne `outbox-retention` porte trip / deal / message » | **refermée** — le tableau transverse du livrable dit « deal / message » |
+| 5 | § 1.5 `DIV-1` | « défini mais jamais démarré » | **encore vraie à moitié** : le livrable se contredit — « n'est appelé nulle part » au § 4.1 et au § 9.4, « Démarré depuis A148 » dans le tableau des crons du même § 9.4 |
+| 6 | § 2.7 et 36 renvois | scripts annoncés `scripts/recette-<nom>.ts`, à créer un par un | ils **existent, versionnés**, dans `scripts/recette/` (45 fichiers) ; les blocs de code deviennent la documentation de ce que fait chaque script |
+| 7 | 36 blocs de code | imports en `../packages/…` et `../apps/…` | `../../packages/…` et `../../apps/…` — les scripts vivent un niveau plus bas |
+| 8 | § 2.7 | `scripts/recette-secret-audit.ts` | `scripts/recette/audit-code-livraison.ts` — **le nom d'origine fait tomber la CI** |
+| 9 | § 2.7 | « un script `tsx` résout les alias `@packages/*` » | vrai **transitivement** seulement : les 43 scripts TS importent en relatif, aucun n'emploie l'alias |
+| 10 | `CRON-TRAJETS-4` | « supprimer la `CarrierPage` pour provoquer un échec » | la provocation **ne provoque rien** : `if (carrierPage)` tolère l'absence par conception. La fiche se vérifie désormais par la **forme** de la garde |
+| 11 | `CRON-CONSO-3` et `CRON-CONSO-4` | `rpk topic produce …` | `rpk topic produce -z none …` — **la commande d'origine a provoqué `ANO-CRON-08`** (bloquante) |
+| 12 | `CRON-SEC-3` | « l'administrateur voit un dossier sans contenu » | le dossier apparaît dans la file, marqué `purged: true`, **et reste traitable** (`ANO-CRON-09`) |
+
+## Les deux écarts qui valent plus qu'une correction de texte
+
+**Le nom de fichier qui casse la branche.** Le cahier demandait de créer `scripts/recette-secret-audit.ts`. Le
+contrôle CI `Anti-fuite (fichiers sensibles)` refuse **tout fichier suivi** dont le chemin contient `secret` :
+
+```sh
+git ls-files | grep -iE '(^|/)\.env($|\.)|secret|\.pem$|\.key$' | grep -vE '\.(example|template)$'
+```
+
+Un testeur qui suit le cahier à la lettre **et versionne son script** casse la branche, avec un message d'erreur
+qui parle de fuite de secrets alors qu'il n'y en a aucune. La campagne l'avait contourné en nommant le fichier
+`audit-code-livraison.ts` — et en écrivant la raison dans son en-tête, ce qui est exactement ce qu'il fallait
+faire. Le cahier le dit maintenant aussi, parce qu'un contournement connu d'un seul développeur n'est pas un
+contournement.
+
+**L'outil de recette qui fabrique la panne qu'il doit observer.** `CRON-CONSO-3` veut éprouver un poison de
+**contrat** : un message hors schéma doit être classé `FAILED` sans bloquer la partition. La commande du cahier,
+sans `-z none`, publiait en **snappy** — compression par défaut de `rpk` — que kafkajs ne sait pas décompresser.
+Résultat : `KafkaJSNotImplemented`, erreur **non retriable**, consommateur arrêté définitivement, processus
+toujours vivant et `/health` toujours vert. C'est `ANO-CRON-08`, bloquante.
+
+Le défaut trouvé était réel et il est corrigé (relance à retrait exponentiel, vérification `consumers` dans
+`/health`). Mais les deux choses doivent être distinguées : un poison de **transport** et un poison de
+**contrat** ne s'éprouvent pas avec la même fiche. Le cahier porte maintenant les deux : `-z none` dans la
+commande, et l'avertissement qui explique pourquoi.
+
+## La fiche qui ne peut pas être mesurée, et qu'on cesse de prétendre mesurer
+
+`CRON-TRAJETS-4` demandait de faire échouer un trajet sur trois pour prouver que la fournée continue. Les trois
+moyens envisageables échouent, et pour des raisons différentes :
+
+| Moyen | Pourquoi il ne marche pas |
+|---|---|
+| Supprimer la `CarrierPage` | le code teste `if (carrierPage)` avant d'écrire : l'absence est **tolérée par conception** |
+| Pointer `userId` sur un identifiant inexistant | même résultat — `findUnique` rend `null`, pas une erreur |
+| Écrire un `userId` malformé en Mongo brut | Prisma refuse la valeur **au scan**, avant la boucle : on casse un autre endroit que celui qu'on veut éprouver |
+
+La fiche demande donc maintenant de vérifier la **forme** de la garde — `try/catch` autour du corps d'**un seul**
+trajet, `skipped++`, la ligne de journal, aucun `throw` qui remonte — et de consigner que la propriété est
+**structurelle**, pas mesurée. L'amélioration qui la rendrait mesurable (passer le client Prisma en argument,
+comme le font déjà `recipient-redaction` et `unread-reminder`) est écrite dans la fiche, et reste **non faite**.
+
+Dire « vérifié par lecture » est honnête ; laisser une étape qui ne prouve rien ne l'est pas.
+
+## Ce qui a aussi été corrigé dans les résultats
+
+Le fichier de campagne n'était pas exempt :
+
+- `ANO-CRON-07`, `ANO-CRON-08` et `ANO-CRON-09` portaient **`ÉTAT : OUVERTE`** dans leur fiche, et **`close`**
+  dans le tableau de verdict final. Les trois corrections sont bien **dans le code** (vérifié : `shipperKey:
+  "joao"` plus le garde-fou `seed-integrity.spec.ts` ; la vérification `consumers` du `/health` du
+  notification-service ; le `purged: true` d'`admin-conversation.service.ts`). Les fiches disent maintenant
+  `CLOSE`.
+- Le tableau final nommait **cinq fiches qui ne sont pas celles des chapitres**, dont `CRON-TRAJ-5`, qui
+  n'existe dans aucun cahier. Les chapitres, écrits au fil de la campagne, font foi.
+- Il comptait « quatre majeures » pour trois, et classait `ANO-CRON-03` en mineure quand sa fiche la dit
+  cosmétique.
+
+## Vérifications faites, pas supposées
+
+- Les **13 crons** annoncés existent et sont **tous démarrés** (`ls apps/*/src/cron/*.cron.ts` croisé avec les
+  `start…Cron(` des six `main.ts`) — le chiffre du périmètre tient.
+- Les **45 scripts** de `scripts/recette/` sont bien versionnés (`git ls-files`), et chacun des 28 chemins
+  réécrits pointe sur un fichier **qui existe**. Les trois qui n'ont pas été versionnés
+  (`conservation-eligible.ts`, `payload-audit.ts`, `purgeout-eligible.ts`) sont signalés **sur place** comme
+  restant à créer.
+- La règle CI a été lue dans `.github/workflows/ci.yml`, pas supposée.
+- `DIV-1`, `DIV-2` et `DIV-3` ont été confrontées une à une au livrable technique **et** au code.
+- `ANO-CRON-08` et `ANO-CRON-09` ont été vérifiées dans les sources, pas dans leur fiche de correction.
+
+---
+
 # PR — Cahier 03-API remis à l'état du code · `chore/cahier-api-a-jour`
 
 ## Pourquoi
