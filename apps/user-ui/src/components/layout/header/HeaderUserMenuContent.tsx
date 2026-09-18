@@ -116,8 +116,13 @@ export default function HeaderUserMenuContent({
 
   return (
     <div>
-      {/* User card */}
-      <div className="flex items-center gap-3 px-4 py-4">
+      {/* User card — cliquable : le nom mène au profil (demande du 18/09).
+          Toute la rangée (avatar + identité) est la cible, motif classique. */}
+      <Link
+        href="/dashboard/profile"
+        onClick={onItemClickAction}
+        className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+      >
         <HeaderUserAvatar
           initials={user.initials}
           avatarUrl={user.avatarUrl}
@@ -171,7 +176,7 @@ export default function HeaderUserMenuContent({
             </span>
           )}
         </div>
-      </div>
+      </Link>
 
       <div className="h-px bg-slate-200 dark:bg-slate-800" aria-hidden />
 
