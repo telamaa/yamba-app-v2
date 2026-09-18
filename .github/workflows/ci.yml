@@ -54,6 +54,46 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit --project ${{ matrix.tsconfig }}
 
+  typecheck-specs:
+    # Angle mort ferme le 18/09/2026. Le job `typecheck` ci-dessus verifie
+    # `tsconfig.app.json`, qui EXCLUT `src/**/*.spec.ts` — c'est le bon choix (une fiche de
+    # test ne doit pas bloquer un build), mais la consequence est qu'un defaut vivant
+    # UNIQUEMENT dans les fiches etait invisible pour les 17 checks. Mesure du 18/09 :
+    # `nx typecheck auth-service` etait a 53 erreurs pendant que la CI etait verte, sur un
+    # piege pourtant deja consigne (une fiche sans `import` ni `export` est un SCRIPT, ses
+    # constantes se heurtent a celles des voisines — TS2451 rapporte sur le fichier VOISIN).
+    #
+    # La cible Nx `typecheck` prend `tsconfig.json`, qui INCLUT les fiches : c'est elle qui
+    # voit ce trou. Un seul check pour les 9 projets qui portent la cible (les deux fronts
+    # sont deja couverts par le job `typecheck`), pour ne pas gonfler le compte de checks.
+    #
+    # `--skip-sync` est deliberé : le generateur de synchronisation Nx veut ajouter a
+    # `apps/e2e/tsconfig.json` une reference vers `apps/admin-ui`, qui porte `noEmit: true`
+    # — un projet reference NE PEUT PAS desactiver l'emission (TS6310). Appliquer la
+    # synchronisation CASSE donc `nx typecheck e2e` ; mesure faite le 18/09, branche
+    # abandonnee. Tant que `admin-ui` est en `noEmit`, on saute la synchronisation.
+    name: TypeScript (fiches de test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm (meme version que le poste qui genere le lock)
+        run: npm install -g npm@10.9.8
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck (fiches de test incluses)
+        run: npx nx run-many --target=typecheck --all --skip-sync
+
   contracts:
     name: Contrats OpenAPI (generate + diff)
     runs-on: ubuntu-latest
