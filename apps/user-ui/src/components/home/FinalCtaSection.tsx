@@ -74,7 +74,7 @@ export default function FinalCtaSection() {
             </p>
             <Link
               href="/search"
-              className="yamba-grad-bg mt-auto pt-0 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-slate-950 transition-transform hover:scale-[1.02]"
+              className="yamba-grad-bg mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-slate-950 transition-transform hover:scale-[1.02]"
             >
               {t("shipper.cta")}
               <span>→</span>
