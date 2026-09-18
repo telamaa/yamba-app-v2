@@ -6555,3 +6555,14 @@ la confiance — l'argument central d'une plateforme qui séquestre de l'argent 
 |---|---|---|
 | WEB322 | Visiteur non connecté clique « Créer une alerte » | Porte « Connecte-toi pour créer une alerte » ; après connexion dans la modale, le formulaire d'alerte s'ouvre |
 | WEB322b | Session expirée pendant la saisie de l'alerte | Message FR « Ta session a expiré… », jamais « Unauthorized! Token missing. » |
+
+# Le badge du menu et le skeleton du Profil · `fix/profil-badge-skeleton`
+
+- **RG-WEB-323** — Un badge d'état ne rogne jamais le nom du membre : il vit sur sa propre ligne et
+  ne se replie pas. Un écran en chargement montre sa **structure** (skeleton fidèle), jamais des
+  tirets ou des champs vides qui se remplissent d'un coup.
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| WEB323 | Menu utilisateur, nom long + profil Voyageur actif | Nom sur sa ligne (tronqué proprement si besoin), badge entier dessous, jamais sur deux lignes |
+| WEB323b | `/dashboard/profile` sur réseau lent | Skeleton aux emplacements exacts du contenu ; aucun « — » |

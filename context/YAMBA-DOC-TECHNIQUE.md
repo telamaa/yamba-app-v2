@@ -11354,3 +11354,15 @@ s'ouvre (`onSignedInAction`). Filet dans `CreateSavedRouteModal` : un 401 en cou
 (session expirée) affiche un message FR dédié, jamais le texte brut. Clés :
 `common.authGate.savedRoute` + `savedRoutes.create.errors.notLoggedIn` (FR/EN). Vérifié à la
 sonde en anonyme : clic → porte, plus aucun formulaire accessible avant identité.
+
+# PR — Le badge du menu et le skeleton du Profil · `fix/profil-badge-skeleton`
+
+Deux constats sur poste (18/09). (1) Le badge « Voyageur actif » du menu utilisateur partageait la
+LIGNE du nom (`flex` + `truncate`) : un nom long se tronquait brutalement ET écrasait la pastille
+sur deux lignes. Le badge descend SOUS l'email, sur sa propre ligne, `whitespace-nowrap` — le nom
+récupère toute la largeur (les trois états : actif / vérifié / en attente). (2) La page
+`/dashboard/profile` n'avait AUCUN skeleton : pendant le chargement elle rendait le vrai layout
+avec des « — » et des champs vides remplis d'un coup. Ajout d'un skeleton FIDÈLE (règle du dépôt :
+mêmes conteneurs, mêmes espacements, zéro saut de layout) — carte avatar, formulaire à 3 ou 5
+champs selon que le membre est Voyageur, carte des visibilités ; le titre reste réel (connu
+statiquement). Vérifié à la sonde avec une réponse profil retardée de 4 s.
