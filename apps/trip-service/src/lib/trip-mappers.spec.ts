@@ -54,4 +54,21 @@ describe("mapTripToYambaResult — tolérance et moteur PER_KG", () => {
   it("sans departureAt → rejeté (critère de recherche)", () => {
     expect(() => mapTripToYambaResult(fixture({ departureAt: null }), "fr")).toThrow(/departureAt/);
   });
+
+  it("expose les codes pays ISO (fromCountryCode/toCountryCode) — le client en dérive le nom localisé", () => {
+    const dto = mapTripToYambaResult(
+      fixture({ originCountryCode: "BE", destinationCountryCode: "CD" }),
+      "fr"
+    );
+    expect(dto.fromCountryCode).toBe("BE");
+    expect(dto.toCountryCode).toBe("CD");
+  });
+
+  it("codes pays absents (vieux documents) → champs ABSENTS, jamais null (contrat optional)", () => {
+    const dto = mapTripToYambaResult(fixture(), "fr");
+    expect(dto.fromCountryCode).toBeUndefined();
+    expect(dto.toCountryCode).toBeUndefined();
+    // Absent du JSON sérialisé, pas `null` : le schéma Zod dit .optional(), pas .nullish()
+    expect("fromCountryCode" in JSON.parse(JSON.stringify(dto))).toBe(false);
+  });
 });

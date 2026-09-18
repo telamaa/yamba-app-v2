@@ -2296,3 +2296,66 @@ remontages, et une régénération le recrée — comme symptôme du vrai bug.
 - La régénération d'arbre sur échec d'hydratation est un comportement React 18+ documenté (« client
   render fallback ») : coûteuse (tout re-render), elle masque en production ce que le dev signale.
   Une page qui « marche quand même » avec un écart d'hydratation paie le double rendu à chaque visite.
+
+## Chapitre 198 — Le nom de pays qu'on ne stocke pas : `Intl.DisplayNames`, et une hiérarchie visuelle qui dit qui décide
+
+### 1. Le piège du texte stocké
+
+Le schéma `Trip` porte deux champs pays : `originCountry` (texte : « Belgique ») et
+`originCountryCode` (code ISO 3166-1 : « BE »). Le texte semble prêt à afficher — c'est un piège
+double :
+
+- il est **facultatif dans les faits** : le jeu d'essai ne remplit que le code, et la carte qui ne
+  lisait que le texte n'affichait rien du tout ;
+- il est **figé dans la locale du créateur** : publié depuis l'interface FR, il dira « Belgique »
+  pour toujours, même à un visiteur anglophone.
+
+La règle générale : **stocker le code, dériver le nom à l'affichage**. Le code est stable,
+compact, non ambigu ; le nom est une affaire de présentation.
+
+### 2. `Intl.DisplayNames` — le dictionnaire de pays que personne ne maintient
+
+```ts
+new Intl.DisplayNames(["fr"], { type: "region" }).of("CD") // « Congo-Kinshasa »
+new Intl.DisplayNames(["en"], { type: "region" }).of("CD") // « Congo (DRC) »
+```
+
+C'est la base CLDR embarquée dans le runtime (navigateur comme Node full-ICU) : ~250 régions dans
+chaque langue, gratuitement. Bonus mesuré sur notre corridor : CG et CD se traduisent
+« Congo-Brazzaville » / « Congo-Kinshasa » — la désambiguïsation que nous n'aurions jamais osé
+écrire à la main. Le helper (`apps/user-ui/src/lib/country-name.ts`) ajoute trois choses que l'API
+brute n'a pas :
+
+- un **cache par locale** (`Map<string, Intl.DisplayNames>`) — les cartes se rendent en liste ;
+- la lecture du cas « région inconnue » : `.of()` renvoie alors le **code tel quel**, qu'on
+  remplace par le texte stocké s'il existe ;
+- le `try/catch` du code malformé (`RangeError`) et de la locale inconnue.
+
+Ordre des fallbacks : nom localisé → texte stocké → code brut → rien. Chaque étage est plus
+« vrai » que le suivant.
+
+### 3. `.optional()` au contrat = clé ABSENTE, pas `null`
+
+Le mapper émet `trip.originCountryCode || undefined` : en JSON, la clé **disparaît**. Le test le
+verrouille par `"fromCountryCode" in JSON.parse(JSON.stringify(dto))` — pas seulement
+`toBeUndefined()`, qui serait vrai aussi pour une clé présente à `null`… ce que le contrat Zod
+(`.optional()`, pas `.nullish()`) refuserait chez un client strict.
+
+### 4. La hiérarchie typographique dit qui décide
+
+La carte mobile donnait 18px aux heures et 11px aux villes : copie d'un comparateur de vols, où le
+**passager** choisit son horaire. Notre décideur est un **Expéditeur** : il choisit un corridor, une
+date, un prix au kilo. La refonte applique une règle simple : **une carte n'a droit qu'à un seul
+niveau visuel maximal**, et il revient à l'information qui fait décider (le prix) ; la ville passe
+en tête de colonne (14px semibold), l'heure descend au rang de détail (12px gris). Quand deux
+éléments crient au même niveau, aucun ne porte le message.
+
+### Pour aller plus loin
+
+- `Intl.DisplayNames` couvre aussi `language`, `script`, `currency` — même principe : stocker le
+  code, afficher le nom.
+- La graisse et la couleur hiérarchisent mieux que la taille seule : notre 12px gris « recule »
+  derrière un 14px semibold plus sûrement qu'un 16px normal ne l'aurait fait.
+- Le point de vigilance d'`Intl` côté SSR : le rendu serveur et le rendu client doivent utiliser la
+  MÊME locale (ici `useLocale()` de next-intl des deux côtés), sinon écart d'hydratation — le sujet
+  du chapitre 197.

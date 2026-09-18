@@ -38,7 +38,7 @@ import {
   YambaTripResult,
 } from "./search-results.types";
 import { SurchargePills } from "./SurchargePills";
-import { formatLocation } from "./formatTripTimes";
+import { countryName } from "@/lib/country-name";
 import TripPricingPopover from "./TripPricingPopover";
 
 type Props = {
@@ -131,8 +131,11 @@ export default function TripResultCard({
     [item.departureTime, item.arrivalTime, item.durationMinutes, item.nextDay]
   );
 
-  const fromLocation = formatLocation(item.fromCityCode, item.fromCountry);
-  const toLocation = formatLocation(item.toCityCode, item.toCountry);
+  // Pays localisé pour le VISITEUR (le texte fromCountry est figé dans la locale du créateur).
+  // Affiché DANS la ligne ville (« Paris, France ») : le pays qualifie la ville, pas l'heure —
+  // et c'est la langue de l'autocomplétion (#353).
+  const fromCountry = countryName(item.fromCountryCode, locale, item.fromCountry);
+  const toCountry = countryName(item.toCountryCode, locale, item.toCountry);
 
   const formattedDate = item.travelDate;
 
@@ -226,15 +229,13 @@ export default function TripResultCard({
         <div className="min-w-0">
           <div className="truncate text-[15px] font-semibold leading-tight text-slate-950 dark:text-white">
             {item.fromCity}
+            {fromCountry && (
+              <span className="font-normal text-slate-400 dark:text-slate-500">, {fromCountry}</span>
+            )}
           </div>
           {times.departure && (
             <div className="mt-0.5 text-[13px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">
               {times.departure}
-            </div>
-          )}
-          {fromLocation && (
-            <div className="mt-0.5 truncate text-[10px] text-slate-400 dark:text-slate-500">
-              {fromLocation}
             </div>
           )}
         </div>
@@ -266,6 +267,9 @@ export default function TripResultCard({
         <div className="min-w-0 text-right">
           <div className="truncate text-[15px] font-semibold leading-tight text-slate-950 dark:text-white">
             {item.toCity}
+            {toCountry && (
+              <span className="font-normal text-slate-400 dark:text-slate-500">, {toCountry}</span>
+            )}
           </div>
           {times.arrival && (
             <div className="mt-0.5 inline-flex items-baseline gap-1">
@@ -277,11 +281,6 @@ export default function TripResultCard({
                   +1
                 </sup>
               )}
-            </div>
-          )}
-          {toLocation && (
-            <div className="mt-0.5 truncate text-[10px] text-slate-400 dark:text-slate-500">
-              {toLocation}
             </div>
           )}
         </div>

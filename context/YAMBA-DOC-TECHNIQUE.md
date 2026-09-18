@@ -11182,3 +11182,70 @@ partait nue (mesuré : `?limit=10&locale=fr`, sans `from`). La garde est devenue
 Et le parcours SANS brouillon (six points du thème) reste intégralement vert.
 
 `YAMBA-DOC-METIER.md` non touché : aucune règle métier ne bouge.
+
+# PR — Le pays sur les cartes de recherche et la page trajet, hiérarchie mobile remise à l'endroit · `feat/pays-cartes-et-detail`
+
+## Le constat (recette visuelle du 18/09, deux captures)
+
+1. La carte résultat de `/search` affiche la ville sans le pays — alors que l'autocomplétion
+   (PR #353) dit désormais « Ville, Pays » : la carte ne parlait pas la langue du champ de saisie.
+2. En mobile, les **heures** (18px semibold) et le **prix** (18px semibold) criaient au même niveau,
+   la **ville** (11px gris) était l'information la plus petite de la carte. C'est une hiérarchie de
+   comparateur de vols ; ici l'Expéditeur décide sur le corridor (villes), la date, le prix/kg — pas
+   sur l'horaire.
+
+## Le diagnostic — la ligne pays existait déjà, la donnée n'arrivait pas
+
+La carte desktop portait depuis toujours une ligne « code · pays » (`formatLocation`) jamais rendue :
+
+- le **jeu d'essai** (`seed-deals.ts`) ne remplit que `originCountryCode` (« BE »), jamais le texte
+  `originCountry` — le DTO de recherche ne servait que le texte, donc rien ;
+- même rempli (formulaire de publication), ce texte est **figé dans la locale du créateur** : un
+  trajet publié en FR montrerait « Belgique » à un visiteur EN.
+
+## La solution — le code ISO voyage, le nom se traduit chez le visiteur
+
+- **Contrat** (`packages/libs/api-contracts/src/trip/trip-search.schema.ts`) : `fromCountryCode` /
+  `toCountryCode` (ISO 3166-1 alpha-2) optionnels sur `YambaTripResult` ; les cinq `openapi.json`
+  regénérés. Le mapper (`apps/trip-service/src/lib/trip-mappers.ts`) les émet en `|| undefined`
+  (absent du JSON, jamais `null` — le contrat dit `.optional()`).
+- **Helper front** `apps/user-ui/src/lib/country-name.ts` : `countryName(code, locale, fallback)` —
+  `Intl.DisplayNames(locale, { type: "region" })` avec cache par locale ; fallbacks dans l'ordre
+  nom localisé → texte stocké → code brut. Zéro dictionnaire à maintenir, et CLDR désambiguïse
+  gratuitement le corridor Congo : CG → « Congo-Brazzaville », CD → « Congo-Kinshasa ».
+- **Branchements** : carte desktop (`TripResultCard`), carte mobile (`TripResultCardMobile`), page
+  trajet publique (`ItineraryCard` — les DEUX rendus : le cas direct qui lit `trip.origin.country`
+  en dur ET le cas avec escales qui passe par `points[].sublabel`), page trajet du dashboard
+  (`TripDetails` — au passage, la garde `originRegion &&` masquait le pays d'un trajet sans région).
+  Le type front `TripLocation` gagne `countryCode`, que le serveur envoyait déjà.
+
+## La hiérarchie mobile remise à l'endroit
+
+Dans `TripResultCardMobile` : **ville d'abord** (14px semibold, truncate), heure dessous (12px
+tabular, gris), pays en dessous (10px gris clair) ; le badge « +1 » suit l'heure. Le **prix devient
+le seul élément en 18px** de la carte — un unique point focal. La parenthèse `(code IATA)` mobile
+disparaît (jargon, et jamais rendue faute de donnée). Au passage, deux `toLocaleString("fr-FR")` en
+dur deviennent `localeTag` dérivé de `useLocale()` (le desktop le faisait déjà).
+
+## Vérification
+
+- `mapTripToYambaResult` : 2 tests ajoutés (codes présents ; codes absents → clés ABSENTES du JSON).
+  trip-service **308 → 310**, la plateforme passe à **1565**.
+- Sonde navigateur (Playwright, stack réelle) : desktop « Paris / 01:51 / France », mobile
+  ville-heure-pays + prix unique en gras, page détail « Paris / France → Brazzaville /
+  Congo-Brazzaville ». `tsc` user-ui et `nx typecheck trip-service` verts.
+
+## Retouche avant merge — le pays rejoint la ville (revue visuelle sur poste)
+
+La première passe plaçait le pays en TROISIÈME ligne (ville / heure / pays) : « France » flottait
+sous « 01:51 » alors qu'il qualifie « Paris ». Arbitrage (option hybride retenue en revue) :
+
+- **Desktop** : « **Paris**, France » sur la ligne ville — le pays en même corps mais `font-normal`
+  gris clair ; la ligne à part disparaît (et l'ancien format « code · pays » avec elle : le code
+  IATA ne s'affiche plus sur les cartes, desktop comme mobile).
+- **Mobile** : le pays reste sur sa propre ligne (10px) mais MONTE sous la ville, l'heure passe en
+  dernier — sur ~120px de colonne, « Brazzaville, Congo-Brazzaville » en ligne tronquerait le pays
+  presque à chaque fois ; empilé, il passe entier.
+
+La règle retenue : **le pays touche toujours la ville** (même ligne quand la largeur le permet,
+ligne adjacente sinon) ; l'heure ne s'intercale jamais dans un nom de lieu.

@@ -42,10 +42,12 @@ export type YambaTripResultDto = {
   id: string;
   fromCity: string;
   fromCityCode?: string;
-  fromCountry?: string;
+  fromCountry?: string;      // Texte figé dans la locale du créateur — préférer fromCountryCode
+  fromCountryCode?: string;  // ISO 3166-1 alpha-2 — le client dérive le nom localisé (Intl.DisplayNames)
   toCity: string;
   toCityCode?: string;
   toCountry?: string;
+  toCountryCode?: string;
   travelDate: string;            // "12 juin 2026" / "June 12, 2026"
   departureAt?: string;          // ISO 8601 — ANO-WEB-30 (badge « Trajet passé » des favoris)
   departureTime: string;         // "08:00"
@@ -345,9 +347,11 @@ export function mapTripToYambaResult(
     fromCity: trip.originCity,
     fromCityCode: trip.originCityCode || undefined,
     fromCountry: trip.originCountry || undefined,
+    fromCountryCode: trip.originCountryCode || undefined,
     toCity: trip.destinationCity,
     toCityCode: trip.destinationCityCode || undefined,
     toCountry: trip.destinationCountry || undefined,
+    toCountryCode: trip.destinationCountryCode || undefined,
     travelDate,
     departureAt: new Date(trip.departureAt).toISOString(),
     departureTime,

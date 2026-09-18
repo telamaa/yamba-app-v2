@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle, Eye } from "lucide-react";
 import { isPopular } from "@/lib/trip-signals";
 import { Link } from "@/i18n/navigation";
@@ -9,6 +9,7 @@ import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
 import { SurchargePills } from "./SurchargePills";
+import { countryName } from "@/lib/country-name";
 
 type Props = {
   item: YambaTripResult;
@@ -26,10 +27,16 @@ export default function YambaTripResultCardMobile({
                                          weightKg = null,
                                                   }: Props) {
   const t = useTranslations("search");
+  const locale = useLocale();
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
   const { isOpen, open, close } = useBottomSheet();
 
   const transportLabel = t(`transportTabs.${item.transportMode}`);
   const TransportIcon = getTransportIcon(item.transportMode);
+
+  // Pays localisé pour le visiteur (le texte stocké est figé dans la locale du créateur)
+  const fromCountry = countryName(item.fromCountryCode, locale, item.fromCountry);
+  const toCountry = countryName(item.toCountryCode, locale, item.toCountry);
 
   const showRemainingAlert =
     typeof item.remainingSlots === "number" && item.remainingSlots <= 3;
@@ -77,19 +84,21 @@ export default function YambaTripResultCardMobile({
         {/* ── Body : horaires + prix ── */}
         <div className="px-3.5 py-3">
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-start gap-2">
-            {/* From */}
+            {/* From — la VILLE d'abord : c'est l'info de décision de l'Expéditeur,
+                l'heure est secondaire (le colis ne choisit pas son horaire).
+                Le prix reste le seul élément en 18px de la carte. */}
             <div className="min-w-0">
-              <div className="text-[18px] font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">
-                {item.departureTime}
-              </div>
-              <div className="mt-1 truncate text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              <div className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">
                 {item.fromCity}
-                {item.fromCityCode && (
-                  <span className="text-slate-400 dark:text-slate-500">
-                    {" "}
-                    ({item.fromCityCode})
-                  </span>
-                )}
+              </div>
+              {/* Le pays COLLE à la ville (il la qualifie) ; l'heure vient après */}
+              {fromCountry && (
+                <div className="mt-0.5 truncate text-[10px] leading-snug text-slate-400 dark:text-slate-500">
+                  {fromCountry}
+                </div>
+              )}
+              <div className="mt-0.5 text-[12px] leading-snug tabular-nums text-slate-500 dark:text-slate-400">
+                {item.departureTime}
               </div>
             </div>
 
@@ -113,21 +122,20 @@ export default function YambaTripResultCardMobile({
 
             {/* To */}
             <div className="min-w-0 text-right">
-              <div className="text-[18px] font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">
+              <div className="truncate text-[14px] font-semibold leading-tight text-slate-900 dark:text-white">
+                {item.toCity}
+              </div>
+              {toCountry && (
+                <div className="mt-0.5 truncate text-[10px] leading-snug text-slate-400 dark:text-slate-500">
+                  {toCountry}
+                </div>
+              )}
+              <div className="mt-0.5 text-[12px] leading-snug tabular-nums text-slate-500 dark:text-slate-400">
                 {item.arrivalTime ?? ""}
                 {item.nextDay && (
                   <sup className="ml-1 inline-block rounded bg-[#FFEDD5] px-1 py-px align-super text-[9px] font-medium text-[#9A3412] dark:bg-[#FF9900]/20 dark:text-[#FFB84D]">
                     +1
                   </sup>
-                )}
-              </div>
-              <div className="mt-1 truncate text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                {item.toCity}
-                {item.toCityCode && (
-                  <span className="text-slate-400 dark:text-slate-500">
-                    {" "}
-                    ({item.toCityCode})
-                  </span>
                 )}
               </div>
             </div>
@@ -140,7 +148,7 @@ export default function YambaTripResultCardMobile({
                     {t("card.perKg")}
                   </div>
                   <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                    {item.pricePerKg.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {item.pricePerKg.toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     {item.currency ?? "€"}
                     <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">/kg</span>
                   </div>
@@ -152,7 +160,7 @@ export default function YambaTripResultCardMobile({
                   <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} size="[9px]" />
                   {weightKg && typeof item.totalForWeight === "number" && (
                     <div className="mt-0.5 text-[9px] text-slate-600 dark:text-slate-300">
-                      {t("card.exampleForWeight", { kg: weightKg, price: item.totalForWeight.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) })}
+                      {t("card.exampleForWeight", { kg: weightKg, price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }) })}
                     </div>
                   )}
                 </>

@@ -26,6 +26,7 @@ import {
   formatMemberSince,
   getInitials,
 } from "@/lib/public-trip.helpers";
+import { countryName } from "@/lib/country-name";
 
 type Props = {
   trip: PublicTrip;
@@ -53,6 +54,11 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
   const co2Kg = weightKg ?? 2;
   const co2Saved = calculateCO2SavedKg(trip, co2Kg);
   const memberSince = formatMemberSince(trip.tripper.memberSince, locale);
+
+  // Pays localisé pour le VISITEUR — le texte `country` stocké est figé dans la
+  // locale du créateur du trajet, et le jeu d'essai ne remplit que le code ISO.
+  const originCountry = countryName(trip.origin.countryCode, locale, trip.origin.country);
+  const destinationCountry = countryName(trip.destination.countryCode, locale, trip.destination.country);
 
   // Détermination des stopovers selon le mode
   const stopoverCities = (() => {
@@ -90,7 +96,7 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
       duration: null,  // ← plus de duration ici
       label: trip.origin.city,
       cityCode: trip.origin.cityCode,
-      sublabel: trip.origin.country,
+      sublabel: originCountry,
     },
     ...stopoverCities.map<TimelinePoint>((city) => ({
       type: "stopover",
@@ -106,7 +112,7 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
       duration: null,
       label: trip.destination.city,
       cityCode: trip.destination.cityCode,
-      sublabel: trip.destination.country,
+      sublabel: destinationCountry,
     },
   ];
 
@@ -250,9 +256,9 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
             </span>
                 )}
               </div>
-              {trip.origin.country && (
+              {originCountry && (
                 <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                  {trip.origin.country}
+                  {originCountry}
                 </div>
               )}
             </div>
@@ -266,9 +272,9 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
             </span>
                 )}
               </div>
-              {trip.destination.country && (
+              {destinationCountry && (
                 <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                  {trip.destination.country}
+                  {destinationCountry}
                 </div>
               )}
             </div>

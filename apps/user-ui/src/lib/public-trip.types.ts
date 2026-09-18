@@ -73,7 +73,10 @@ export type TripLocation = {
   city: string | null;
   cityCode: string | null;
   region: string | null;
+  /** Texte figé dans la locale du créateur — préférer countryCode + Intl.DisplayNames */
   country: string | null;
+  /** ISO 3166-1 alpha-2 ("BE") — le serveur l'envoie déjà */
+  countryCode: string | null;
   lat: number | null;
   lng: number | null;
   timezone: string | null;
