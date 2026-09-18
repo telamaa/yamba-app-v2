@@ -11404,6 +11404,13 @@ large que l'écran. Correctif : `grid-cols-[minmax(0,1fr)_minmax(0,1fr)]` sur la
 l'autocomplétion), et `min-w-0` sur les quatre inputs date/heure. Vérifié à la sonde en viewport
 iPhone : débordement horizontal mesuré à 0 px, les quatre champs tiennent en deux colonnes.
 
+# PR — Le nom dans le menu mène au profil · `fix/menu-nom-vers-profil`
+
+Demande du 18/09 : la carte utilisateur du menu (avatar + nom + email + badge) devient un LIEN vers
+`/dashboard/profile` — « Mon compte » va sur `/dashboard/home`, le nom offre donc le raccourci
+direct vers la page que l'on vient de soigner. Toute la rangée est la cible (motif classique),
+survol discret, fermeture du menu au clic (`onItemClickAction`) ; vaut pour le dropdown desktop ET
+la bottom-sheet mobile (même composant). Vérifié à la sonde : clic sur le nom → `/dashboard/profile`.
 # PR — La fiche membre montre ce qu'on lui a envoyé (D79) · `feat/admin-fiche-user-communications`
 
 ## Le déclencheur
