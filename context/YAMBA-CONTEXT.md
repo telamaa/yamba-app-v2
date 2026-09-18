@@ -796,6 +796,43 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 : **LA PASSE CAHIERS EST CLOSE — les quatre cahiers de recette sont a l'etat du code (#345, #346, #347).**
+  Piste laissee ouverte par le handoff du 17/09 : rejouer sur 01-WEB, 03-API et 04-CRONS l'exercice qui avait leve la
+  reserve documentaire du 02-ADMIN (#334). Meme methode : la source n'est PAS le resume mais les ecarts consignes AU FIL
+  DES CHAPITRES dans les fichiers de resultats, et chaque ecart est VERIFIE DANS LE CODE avant d'etre reporte.
+  Meme surprise, trois fois : **04-CRONS** — 1 ecart annonce, **12** trouves ; **03-API** — 11 listes, dont **un qui ne
+  tient pas** et un deja corrige, plus **deux que la campagne n'avait pas vus** ; **01-WEB** — les ecarts ne sont pas en
+  sections mais EN LIGNE dans les cellules de resultats : **17 fiches + 11 etapes** des six parcours du chapitre 6.
+  QUATRE TROUVAILLES QUI VALENT PLUS QU'UNE CORRECTION DE TEXTE. (1) `scripts/recette-secret-audit.ts`, nom demande par
+  le cahier 04-CRONS, **fait tomber la CI** : le controle Anti-fuite refuse tout fichier suivi dont le chemin contient
+  `secret`. Le fichier reel s'appelle `audit-code-livraison.ts` pour cette raison, ecrite jusqu'ici dans son seul
+  en-tete — un contournement connu d'un seul developpeur n'en est pas un. (2) La commande `rpk topic produce` du cahier,
+  sans `-z none`, publie en **snappy** que kafkajs ne sait pas lire : c'est **elle** qui a provoque ANO-CRON-08
+  (bloquante, consommateur mort en silence, `/health` vert). Un poison de TRANSPORT et un poison de CONTRAT ne
+  s'eprouvent pas avec la meme fiche. (3) `API-AUTH-12` envoyait `currentPassword`, que le contrat ne porte pas (D65 :
+  la fenetre sensible le remplace) — Zod n'etant pas strict par defaut, le champ etait retire en silence : **la fiche
+  PASSAIT en enseignant un contrat faux**. (4) **Quatre chaines de traduction sont mortes** (`header.toggleLanguage`,
+  `dashboardHome.demandsTitle`/`ctaRespond`, `carrierDealRequest.coverage.title`, plus `netGainSub` hors `messages/`) :
+  presentes, miroitees FR/EN, jamais rendues — c'est le mecanisme meme qui fabrique un cahier faux.
+  DEUX FOIS OU LA SOURCE N'A PAS ETE SUIVIE. L'ecart API n° 3 (« le jeu d'essai ne publie que deux trajets dans le
+  futur ») **ne tient pas** : il en publie CINQ et `git log` montre qu'aucun n'a ete ajoute depuis — la mesure du 08/09
+  portait sur une base usee par les fiches precedentes. Le cahier recoit un PREREQUIS DE DONNEES, pas une fausse
+  contrainte. Et la correction d'`API-TRIP-13` visait d'abord `bzv-perkg` pour prouver la garde « trajet reserve =
+  intouchable » : ce trajet porte ZERO reservation, rattrape avant commit (c'est `bzv-upcoming`).
+  CLASSEMENT DES ECARTS (la partie reutilisable). Deux familles, jamais a confondre : **« le code a raison »** (attendu
+  faux ou trop litteral -> corriger sa lecture) et **« decision de produit en attente »** (ecart reel, question posee,
+  rien change -> ne rien consigner NON PLUS : c'est deja tranche COMME QUESTION OUVERTE). Sur les 17 fiches du 01-WEB,
+  une seule cachait une anomalie (ANO-WEB-43, mineure, le DTO ne porte ni « {n} envois » ni « Membre depuis »).
+  Corrige aussi dans les RESULTATS : ANO-CRON-07/08/09 portaient « ETAT : OUVERTE » en fiche et « close » au tableau
+  final (les trois corrections sont bien dans le code) ; ce tableau nommait **cinq fiches qui ne sont pas celles des
+  chapitres**, dont `CRON-TRAJ-5` qui n'existe nulle part, et comptait quatre majeures pour trois.
+  PIEGE DE MERGE PAYE : les trois branches ajoutaient en fin des MEMES documents cumulatifs. Le script de resolution
+  exigeait un saut de ligne avant `>>>>>>>` et ne voyait donc pas un bloc dont le cote distant est VIDE — il a declare
+  « 1 conflit, traite » en en laissant un. Rattrape par le `grep` des marqueurs fait derriere. **Aucun des 17 checks de
+  CI ne relit les `.md`** : un marqueur de conflit dans un cahier partirait sur `dev` en silence.
+  Documentation seule : aucun code touche, **1563 tests inchanges**. DOC-METIER non touche (aucune regle metier ne
+  bouge). Chapitres d'apprentissage **192, 193, 194**. PR **#345** (04-CRONS), **#346** (03-API), **#347** (01-WEB),
+  17 checks comptes sur chacune. La passe cahiers est CLOSE. AUCUNE attribution Claude.
 - 17/09 (soir) : **LES SIX « OUI » DU DOSSIER D'ARBITRAGES SONT LIVRES (A198, A198 bis, A198 ter) + A199.**
   (c) L'alerte « Versements en echec depuis plus de 48 h » mesurait autre chose que son libelle (des deals
   TERMINES depuis 48 h dont l'argent n'est pas parti) : la mesure est gardee, le LIBELLE corrige partout —
