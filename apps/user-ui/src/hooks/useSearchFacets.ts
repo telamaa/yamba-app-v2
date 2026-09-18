@@ -14,8 +14,10 @@ import { getSearchFacets, type SearchFacetsParams } from "@/services/trip.api";
  *
  * ⚠️ Comme useTripsSearch, params doit être stable (useMemo).
  */
-export function useSearchFacets(params: SearchFacetsParams) {
+export function useSearchFacets(params: SearchFacetsParams, options: { enabled?: boolean } = {}) {
   return useQuery({
+    // Même garde d'hydratation que useTripsSearch : pas de requête sur le brouillon par défaut.
+    enabled: options.enabled ?? true,
     queryKey: ["trips-search-facets", params],
     queryFn: () => getSearchFacets(params),
     staleTime: 1000 * 60 * 2,

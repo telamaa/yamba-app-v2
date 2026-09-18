@@ -2211,3 +2211,88 @@ virgule). Le correctif d'affichage s'est appuyé dessus au lieu de la redouter.
   avec le Place Details qui la clôt. Un flux qui sélectionne sans jamais appeler Details paie ses
   requêtes une à une — l'appel ajouté ici n'est donc pas un pur surcoût, il fait entrer la page de
   recherche dans le modèle de session que Google tarife.
+
+---
+
+## Chapitre 197 — L'avertissement n'était pas le bug (hydratation, brouillons et symptômes)
+
+La recette manuelle a montré deux erreurs console à quelques minutes d'écart : « script tag while
+rendering » d'abord seule, puis accompagnée de « Hydration failed ». La première a reçu un correctif ;
+c'est la seconde qui était le bug. Ce chapitre raconte comment on distingue les deux — et deux pièges
+d'implémentation payés en corrigeant.
+
+### 1. Symptôme et cause : l'ordre d'apparition trompe
+
+Le premier signalement ne montrait QUE l'avertissement script, pointé sur le provider de thème. Tout
+y invitait à corriger le thème — c'est ce qui a été fait, et ce n'était pas inutile (le script de
+next-themes vivait dans un composant client, recréé à chaque remontage). Mais la formule écrite dans
+la PR — « impossible par construction » — était fausse, et la récidive l'a prouvé en montrant enfin
+la pièce manquante :
+
+```
+Hydration failed because the server rendered text didn't match the client.
+As a result this tree will be regenerated on the client.
+```
+
+La dernière phrase est la clé : **sur un échec d'hydratation, React régénère l'arbre ENTIER côté
+client** — layout compris, script du layout compris. N'importe quel `<script>` rendu par React,
+serveur ou client, est alors recréé et signalé. L'avertissement script est donc un **détecteur
+d'écarts d'hydratation** : le faire taire sans corriger l'écart, c'est débrancher l'alarme.
+
+> Quand deux erreurs arrivent ensemble, chercher celle qui EXPLIQUE l'autre. Ici : l'échec
+> d'hydratation explique la régénération, qui explique le script recréé. L'inverse n'explique rien.
+
+### 2. La cause : lire le stockage dans l'initialiseur d'état
+
+```ts
+const [state] = useState<T>(() => {
+  if (typeof window === "undefined") return initialValue;   // ← serveur
+  return { ...initialValue, ...sessionStorage.getItem(...) }; // ← client
+});
+```
+
+C'est littéralement la « branche serveur/client » que le message de React cite en premier. Dès qu'un
+brouillon existe, le premier rendu client diffère du HTML serveur. Le remède est un patron, pas une
+astuce : **premier rendu identique au serveur, relecture dans un effet après montage**, et un drapeau
+`hydrated` pour ceux qui doivent attendre.
+
+Corollaire de recette : c'est aussi pourquoi six sondes n'avaient rien reproduit — profil neuf, pas
+de brouillon. **Reproduire un bug d'hydratation exige l'état stocké de l'utilisateur** ; la sonde
+utile préensemence `sessionStorage` (`addInitScript`) avant de charger la page.
+
+### 3. Les requêtes doivent attendre l'hydratation — sinon on paie double
+
+Sans garde, la recherche part au montage avec les valeurs par défaut, puis repart quand le brouillon
+arrive : deux appels réseau — et surtout **deux `search_performed`** dans la mesure d'audience,
+puisque l'événement s'émet dans la `queryFn`. La garde est une option `enabled` sur les deux hooks de
+requête, alimentée par le drapeau du brouillon. Mesuré avant/après : une requête, la bonne.
+
+> Un état qui arrive en deux temps contamine tout ce qui en dérive : requêtes, événements de mesure,
+> redirections. Le drapeau d'hydratation fait partie du contrat du hook, pas du confort.
+
+### 4. Deux pièges d'implémentation, payés à la sonde
+
+**(a) La ref posée dans la même passe d'effets.** Première version de la garde de sauvegarde :
+`hydratedRef.current = true` dans l'effet de relecture, testé par l'effet de sauvegarde. Or les
+effets d'un même commit s'exécutent **dans la même passe** : la sauvegarde tournait juste après la
+relecture, avec l'état encore initial → elle écrasait le brouillon stocké. Et sous **StrictMode**
+(double montage des effets en dev), la seconde relecture retrouvait ce brouillon écrasé : perdu. La
+sonde l'a montré froidement — requête partie sans `from`. Le remède : la garde est l'**état**
+`hydrated` (un commit sépare la relecture de la première sauvegarde), pas une ref.
+
+> StrictMode n'a pas créé le bug, il l'a **révélé** : l'écrasement existait déjà, la double passe l'a
+> rendu observable. C'est exactement son travail.
+
+**(b) La formule absolue dans la doc.** « Impossible par construction » ne couvrait qu'un des deux
+chemins de recréation (le remontage, pas la régénération). Une garantie écrite doit nommer sa
+limite ; celle-ci est maintenant écrite dans le commentaire du layout : le script serveur échappe aux
+remontages, et une régénération le recrée — comme symptôme du vrai bug.
+
+### Pour aller plus loin
+
+- Le patron « premier rendu = serveur, stockage en effet » est celui de tous les états persistés
+  côté client (localStorage, sessionStorage, IndexedDB). React documente l'alternative
+  `useSyncExternalStore` avec `getServerSnapshot` — même idée, formalisée.
+- La régénération d'arbre sur échec d'hydratation est un comportement React 18+ documenté (« client
+  render fallback ») : coûteuse (tout re-render), elle masque en production ce que le dev signale.
+  Une page qui « marche quand même » avec un écart d'hydratation paie le double rendu à chaque visite.

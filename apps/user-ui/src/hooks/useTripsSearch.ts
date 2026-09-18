@@ -19,8 +19,13 @@ const PAGE_SIZE = 10;
  *   const query = useTripsSearch(params);
  *   const trips = query.data?.pages.flatMap(p => p.trips) ?? [];
  */
-export function useTripsSearch(params: SearchTripsParams) {
+export function useTripsSearch(params: SearchTripsParams, options: { enabled?: boolean } = {}) {
   return useInfiniteQuery({
+    // `enabled` : la page recherche attend l'hydratation du brouillon (usePersistedFormState)
+    // avant de lancer la requête — sinon elle part une première fois avec les valeurs par
+    // défaut puis repart avec le brouillon : double appel, et `search_performed` compté DEUX
+    // fois dans la mesure d'audience (il s'émet dans la queryFn, première page).
+    enabled: options.enabled ?? true,
     queryKey: ["trips-search", params],
     queryFn: async ({ pageParam }) => {
       const page = await searchTrips({

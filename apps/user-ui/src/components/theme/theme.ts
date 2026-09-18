@@ -11,8 +11,10 @@
  * mars 2025).
  *
  * Ici, le script est une CHAÎNE, rendue par le layout RACINE — un composant serveur : son HTML est
- * adopté à l'hydratation et n'est jamais recréé par React côté client. Plus aucun `<script>` ne vit
- * dans un composant client : l'avertissement est impossible par construction.
+ * adopté à l'hydratation et échappe à tout remontage client. Plus aucun `<script>` ne vit dans un
+ * composant client. Une limite, vue à l'écran le 18/09 : une HYDRATATION QUI ÉCHOUE fait régénérer
+ * l'arbre entier par React, script compris — l'avertissement y redevient possible, mais comme
+ * symptôme de l'écart d'hydratation lui-même, à corriger à sa source.
  *
  * Sémantique conservée à l'identique (mêmes réglages que l'ancien provider) :
  * clé de stockage `theme` (les préférences déjà enregistrées survivent au remplacement),
