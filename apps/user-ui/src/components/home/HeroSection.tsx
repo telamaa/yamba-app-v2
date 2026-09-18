@@ -32,8 +32,8 @@ export default function HeroSection() {
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-8 md:pb-6 md:pt-8">
-        <div className="grid items-center gap-5 md:grid-cols-[1.2fr_1fr] md:gap-8">
+      <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-8 md:pb-16 md:pt-8">
+        <div className="grid items-center gap-5 md:grid-cols-2 md:gap-8">
           {/* Colonne texte — alignée à gauche */}
           <div className="pb-2 text-center md:pb-10 md:text-left">
             <h1 className="text-[24px] font-extrabold leading-[1.12] tracking-tight text-slate-900 dark:text-white md:text-3xl lg:text-4xl">
@@ -56,15 +56,18 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* Illustration (desktop only) — descend jusqu'à la barre de recherche :
-              la marge négative la fait plonger derrière la carte qui chevauche le hero */}
-          <div className="hidden md:flex md:items-end md:justify-center md:self-end">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/images/home-hero-yamba.svg"
-              alt={t("illustrationAlt")}
-              className="-mb-10 w-full max-w-[300px] lg:max-w-[330px]"
-            />
+          {/* Illustration (desktop only) — bloc arrondi façon Blablacar : de la moitié
+              du conteneur au bord droit, le bas JUSTE AU-DESSUS de la barre (le pb du
+              hero absorbe le chevauchement de la carte, l'image ne passe pas derrière) */}
+          <div className="hidden md:block">
+            <div className="h-[260px] w-full overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/5 lg:h-[290px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/images/home-hero-yamba.svg"
+                alt={t("illustrationAlt")}
+                className="h-full w-full object-cover object-[center_30%]"
+              />
+            </div>
           </div>
         </div>
       </div>
