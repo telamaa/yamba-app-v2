@@ -796,6 +796,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (apres-midi) : **LE PAYS S'AFFICHE PARTOUT, DERIVE DU CODE ISO — ET LA HIERARCHIE MOBILE REMISE A L'ENDROIT (#355).**
+  Constat de recette visuelle : la carte resultat de `/search` n'affichait pas le pays (l'autocompletion #353 dit
+  pourtant « Ville, Pays »), et en mobile heures et prix criaient tous deux en 18px quand la ville (l'info de decision)
+  etait la plus petite de la carte. DIAGNOSTIC : la ligne pays existait deja sur la carte desktop mais la donnee
+  n'arrivait pas — le jeu d'essai ne remplit que `originCountryCode`, jamais le texte `originCountry`, et ce texte est
+  de toute facon FIGE dans la locale du createur. SOLUTION : le code ISO voyage (`fromCountryCode`/`toCountryCode` au
+  contrat `YambaTripResult`, mapper trip-service, cinq openapi.json regeneres), le front derive le nom localise via
+  `Intl.DisplayNames` (`apps/user-ui/src/lib/country-name.ts`, cache par locale, fallbacks nom -> texte stocke -> code ;
+  CLDR desambiguise CG/CD en « Congo-Brazzaville »/« Congo-Kinshasa »). Branche sur les deux cartes de recherche, la
+  page trajet publique (les DEUX rendus de l'itineraire) et la page dashboard (la garde `originRegion &&` masquait le
+  pays seul). REGLE UX retenue apres revue sur poste (2 commits) : **le pays touche toujours la ville** — meme ligne en
+  desktop (« Paris, France », pays en gris leger), ligne adjacente en mobile (en ligne, « Congo-Brazzaville » tronquerait
+  sur ~120px) ; l'heure ne s'intercale JAMAIS dans un nom de lieu. Mobile : ville 14px semibold, pays 10px, heure 12px,
+  le prix redevient l'UNIQUE element en 18px ; la parenthese (code IATA) disparait ; deux `toLocaleString("fr-FR")` en
+  dur suivent desormais `useLocale()`. Tests : trip-service **308 -> 310** (codes presents ; absents -> cles ABSENTES du
+  JSON, jamais null), plateforme **1565**. RG-WEB-313 a 316, chapitre d'apprentissage 198. 18 checks comptes deux fois
+  (les deux runs). AUCUNE attribution Claude.
 - 18/09 : **LA PASSE CAHIERS EST CLOSE — les quatre cahiers de recette sont a l'etat du code (#345, #346, #347).**
   Piste laissee ouverte par le handoff du 17/09 : rejouer sur 01-WEB, 03-API et 04-CRONS l'exercice qui avait leve la
   reserve documentaire du 02-ADMIN (#334). Meme methode : la source n'est PAS le resume mais les ecarts consignes AU FIL
