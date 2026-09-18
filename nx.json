@@ -104,5 +104,10 @@
       }
     }
   },
-  "analytics": true
+  "analytics": true,
+  "sync": {
+    "disabledTaskSyncGenerators": [
+      "@nx/js:typescript-sync"
+    ]
+  }
 }

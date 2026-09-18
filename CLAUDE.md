@@ -21,6 +21,16 @@ Precedence on divergence: code + its tests > registre > business rules > synthes
 
 Always run tasks through Nx (see also `AGENTS.md`):
 
+> **Nothing is deployed: everything runs locally.** The three commands below are meant to be run BY HAND,
+> each in its own terminal. `nx.json` carries `sync.disabledTaskSyncGenerators: ["@nx/js:typescript-sync"]`
+> — without it, Nx interrupts each one with « The workspace is out of sync » and offers to fix it; saying
+> yes adds a reference from `apps/e2e` to `apps/admin-ui` (`noEmit: true`) and **breaks** `nx typecheck e2e`
+> (TS6310), i.e. the `TypeScript (fiches de test)` CI check. Passing `--skip-sync` on the npm script is NOT
+> enough: it does not propagate to the nested `serve` tasks (measured — three services still refused).
+>
+> Also: `nx build user-ui` / `nx build admin-ui` REWRITE the tracked `next-env.d.ts` (a production build
+> writes `./.next/types/…`, `next dev` writes `./.next/dev/types/…`). Check `git status --short` afterwards.
+
 ```sh
 npm run dev                        # the SIX services only (nx run-many serve) — the two Next fronts start separately (below)
 npx nx dev user-ui                 # Next.js frontend only (port 3000)
