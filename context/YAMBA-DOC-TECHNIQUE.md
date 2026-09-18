@@ -11379,3 +11379,16 @@ point non-lu), Favoris (carte trajet : bandeau/corps/pied), Alertes route (corri
 actions), Voyageurs suivis (avatar + identité + 3 statistiques). Les pages Sécurité / Paramètres /
 Confidentialité sont des formulaires au contenu statique : rien à changer. Vérifié à la sonde avec
 les API retardées de 5 s.
+
+## Extension 2 — le header ne shimme plus son propre logo (même PR)
+
+Le retour « le skeleton n'est fait sur aucune page » visait en réalité le DÉNOMINATEUR COMMUN :
+pendant le chargement de l'auth, `HeaderSkeleton` faisait shimmer TOUT le header — logo, badge BETA,
+langue, thème, CTA — alors que tout cela est STATIQUE. Mesuré à la sonde (chargement à froid,
+réseau ralenti) : les sections étaient bonnes, c'est le bandeau du haut qui disait « site pas
+fini » sur chaque page. Le skeleton compose désormais les VRAIS composants statiques (`HeaderLogo`,
+`HeaderLocaleSwitcher`, `HeaderThemeToggle`, `HeaderShareTripCTA`) et ne fait shimmer QUE la grappe
+d'authentification (trois pastilles rondes à l'emplacement exact de la cloche, la bulle et
+l'avatar — la seule zone réellement inconnue tant que `useUser` ne s'est pas résolu). Règle
+générale : **un skeleton ne shimme que ce qu'il ne sait pas** ; le statique s'affiche en vrai dès
+le premier rendu.
