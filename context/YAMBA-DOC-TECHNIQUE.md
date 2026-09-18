@@ -11341,3 +11341,16 @@ l'argument que les transporteurs classiques n'ont pas). Harmonisés dans la mêm
 confiance « Ton colis est entre de bonnes mains. », CTA final « Le prochain départ t'attend. »
 (fonctionne pour les DEUX personas). Au passage : le contrôle i18n refuse une valeur VIDE — la clé
 `titleLine2` devenue inutile est SUPPRIMÉE (des deux locales + JSX), pas laissée à "".
+
+# PR — L'alerte passe par la porte d'identité · `fix/alerte-porte-identite`
+
+Constat sur poste (18/09) : un visiteur NON CONNECTÉ remplissait tout le formulaire « Nouvelle
+alerte » de `/search`, cliquait, et recevait le message brut de l'API — « Unauthorized! Token
+missing. », en anglais. Deux défauts en un : l'effort demandé avant l'annonce du refus, et la fuite
+du message technique. Correctif par le motif EXISTANT (A58/A63, celui des favoris) :
+`SavedRouteCTA` interroge `useUser()` et ouvre `AuthGateModal` (« Connecte-toi pour créer une
+alerte », connexion DANS la modale) ; après connexion, le geste reprend — le formulaire d'alerte
+s'ouvre (`onSignedInAction`). Filet dans `CreateSavedRouteModal` : un 401 en cours de saisie
+(session expirée) affiche un message FR dédié, jamais le texte brut. Clés :
+`common.authGate.savedRoute` + `savedRoutes.create.errors.notLoggedIn` (FR/EN). Vérifié à la
+sonde en anonyme : clic → porte, plus aucun formulaire accessible avant identité.

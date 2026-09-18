@@ -34,7 +34,8 @@
     "errors": {
       "missingCities": "Please select both cities",
       "sameOriginDestination": "Departure and arrival must be different",
-      "unknown": "An error occurred"
+      "unknown": "An error occurred",
+      "notLoggedIn": "Your session has expired: log back in, then create the alert again."
     }
   },
   "card": {

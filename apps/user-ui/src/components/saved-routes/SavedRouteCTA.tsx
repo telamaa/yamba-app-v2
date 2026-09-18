@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Bell, Sparkles, BellRing } from "lucide-react";
+import { usePathname } from "@/i18n/navigation";
+import useUser from "@/hooks/useUser";
+import AuthGateModal from "@/components/auth/shared/AuthGateModal";
 import CreateSavedRouteModal from "./CreateSavedRouteModal";
 import type { PlaceDetails } from "@/components/search/CityAutocomplete";
 
@@ -25,7 +28,35 @@ export default function SavedRouteCTA({
                                         destinationPlace,
                                       }: Props) {
   const t = useTranslations("savedRoutes.cta");
+  const tGate = useTranslations("common.authGate.savedRoute");
+  const pathname = usePathname();
+  const { user, isLoading: userLoading } = useUser();
   const [modalOpen, setModalOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // Une alerte est liée à un compte : un visiteur voit la porte d'identité
+  // AVANT le formulaire (le serveur répondait 401 « Token missing » APRÈS
+  // qu'il avait tout rempli). A63 : après connexion dans la modale, le geste
+  // reprend — le formulaire d'alerte s'ouvre.
+  const openCreate = () => {
+    if (userLoading) return;
+    if (!user) {
+      setGateOpen(true);
+      return;
+    }
+    setModalOpen(true);
+  };
+
+  const gate = (
+    <AuthGateModal
+      open={gateOpen}
+      onCloseAction={() => setGateOpen(false)}
+      title={tGate("title")}
+      subtitle={tGate("subtitle")}
+      redirect={pathname || "/search"}
+      onSignedInAction={() => setModalOpen(true)}
+    />
+  );
 
   if (variant === "noResults") {
     return (
@@ -42,13 +73,14 @@ export default function SavedRouteCTA({
           </p>
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
+            onClick={openCreate}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#FF9900] px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
           >
             <Sparkles size={14} />
             {t("noResultsCta")}
           </button>
         </div>
+        {gate}
         <CreateSavedRouteModal
           isOpen={modalOpen}
           closeAction={() => setModalOpen(false)}
@@ -80,13 +112,14 @@ export default function SavedRouteCTA({
         </div>
         <button
           type="button"
-          onClick={() => setModalOpen(true)}
+          onClick={openCreate}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#FF9900] px-4 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
         >
           <Sparkles size={12} />
           {t("bannerCta")}
         </button>
       </div>
+      {gate}
       <CreateSavedRouteModal
         isOpen={modalOpen}
         closeAction={() => setModalOpen(false)}

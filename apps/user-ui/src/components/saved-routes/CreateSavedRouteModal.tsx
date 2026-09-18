@@ -8,6 +8,7 @@ import CityAutocomplete, {
   type PlaceDetails,
 } from "@/components/search/CityAutocomplete";
 import { useCreateSavedRoute } from "@/hooks/useSavedRouteMutations";
+import { getApiErrorData } from "@/services/auth.api";
 import { applyDateRangePreset } from "@/lib/saved-route.helpers";
 import type {
   CreateSavedRoutePayload,
@@ -161,6 +162,14 @@ export default function CreateSavedRouteModal({
         closeAction();
       },
       onError: (err: unknown) => {
+        // La porte d'identité vit en AMONT (SavedRouteCTA) ; ici, un 401 ne
+        // peut être qu'une session expirée en cours de saisie — message FR,
+        // jamais le « Unauthorized! Token missing. » brut de l'API.
+        const details = getApiErrorData(err).details as { code?: string } | undefined;
+        if (details?.code === "TOKEN_MISSING" || details?.code === "TOKEN_EXPIRED") {
+          setFormError(t("errors.notLoggedIn"));
+          return;
+        }
         const message = err instanceof Error ? err.message : t("errors.unknown");
         setFormError(message);
       },

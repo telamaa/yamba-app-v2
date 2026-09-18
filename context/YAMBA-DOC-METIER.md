@@ -6544,3 +6544,14 @@ la confiance — l'argument central d'une plateforme qui séquestre de l'argent 
 | WEB317b | Base sans aucun trajet publié | La section corridors est absente — pas de puces vides ni de faux exemples |
 | WEB318 | Clic sur « Paris → Brazzaville » | `/search` s'ouvre préremplie, résultats filtrés sur ce corridor, aucun menu de suggestions ouvert |
 | WEB320 | Onglet « Je voyage » | Les 4 étapes Voyageur s'affichent sans quitter la page ; le hero porte le lien « Rentabilise tes kilos » |
+
+# L'alerte passe par la porte d'identité · `fix/alerte-porte-identite`
+
+- **RG-WEB-322** — Une action réservée aux membres (créer une alerte) annonce la connexion **avant**
+  de faire remplir quoi que ce soit : la porte d'identité s'ouvre au clic, et le geste reprend tout
+  seul après connexion. Un message technique de l'API n'atteint jamais l'écran d'un visiteur.
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| WEB322 | Visiteur non connecté clique « Créer une alerte » | Porte « Connecte-toi pour créer une alerte » ; après connexion dans la modale, le formulaire d'alerte s'ouvre |
+| WEB322b | Session expirée pendant la saisie de l'alerte | Message FR « Ta session a expiré… », jamais « Unauthorized! Token missing. » |

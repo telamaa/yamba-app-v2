@@ -34,7 +34,8 @@
     "errors": {
       "missingCities": "Sélectionne les deux villes",
       "sameOriginDestination": "Le départ et l'arrivée doivent être différents",
-      "unknown": "Une erreur est survenue"
+      "unknown": "Une erreur est survenue",
+      "notLoggedIn": "Ta session a expiré : reconnecte-toi puis relance la création de l'alerte."
     }
   },
   "card": {
