@@ -4,7 +4,11 @@
 >
 > **Périmètre : `apps/user-ui`** — le site que voient les Expéditeurs, les Voyageurs et les destinataires, sur `http://localhost:3000`.
 >
-> Version du document : 1.0 — 6 septembre 2026. Branche de référence : `dev` (chantiers B1→B5, C-PR1→C-PR8c, F-PR1→F-PR3, D35, D65→D72 livrés).
+> Version du document : 1.1 — code de référence `dev`, état au **18/09/2026** (campagne jouée du 09 au 13/09/2026 ; cahier remis à l'état du code le 18/09). Chantiers B1→B5, C-PR1→C-PR8c, F-PR1→F-PR3, D35, D65→D78 livrés.
+>
+> **Ce fichier `.md` fait foi.** Le `.pdf` du même nom date du 06/09/2026 et n'est plus régénéré à chaque passe : en cas de divergence, c'est le `.md` qui dit vrai.
+>
+> **Les « écarts connus » sont signalés sur place.** Dix-sept fiches portent un encadré « Écart connu, vérifié le 18/09/2026 » : le comportement décrit par le cahier d'origine et celui du code diffèrent, et la différence a été **instruite**. Deux familles à ne pas confondre — *« le code a raison »* (corriger sa lecture, ne rien consigner) et *« décision de produit en attente »* (ne pas consigner en anomalie non plus : c'est déjà tranché comme question ouverte). Dans les deux cas, **ré-ouvrir une anomalie dessus est une perte de temps**.
 
 ---
 
@@ -343,7 +347,15 @@ Une session complète représente environ **deux journées de test**. Découpage
 
 **Résultat attendu**
 - La page d'accueil s'affiche en français, avec l'en-tête Yamba en haut.
-- L'en-tête contient au moins : le logo Yamba, un lien « Rechercher un trajet », un lien « Partager un trajet », un bouton « Connexion » et un bouton « Créer un compte ».
+- L'en-tête contient au moins : le logo Yamba, un lien « Partager un trajet » et un bouton « Connexion ».
+
+> **Écart connu, vérifié le 18/09/2026 — décision de produit en attente.** Ce cahier attendait aussi
+> « Rechercher un trajet » et « Créer un compte » dans l'en-tête **desktop**. Ils n'y sont pas : ils
+> n'existent que dans la feuille **mobile**. Sur desktop, la recherche passe par la barre de l'accueil
+> (et par le logo depuis une autre page), la création de compte par l'écran de connexion.
+> Recommandation consignée le 09/09, **non appliquée** : un « Créer un compte » plein (mangue) à droite
+> de « Connexion », et « Rechercher un trajet » en lien texte à gauche. **Ne pas consigner en
+> anomalie** — la question est ouverte, pas ignorée.
 - Une barre de recherche est présente avec les champs « Ville de départ », « Ville d'arrivée » et « Date ».
 - Le pied de page contient les rubriques « Découvrir », « Entreprise », « Légal », et la phrase « La marketplace P2P qui repense l'envoi de colis légers entre particuliers. »
 - Aucun squelette gris ne subsiste après 5 secondes.
@@ -357,8 +369,15 @@ Une session complète représente environ **deux journées de test**. Découpage
 
 **Préconditions** — Suite de WEB-ACC-1.
 **Étapes**
-1. Clique le sélecteur de langue de l'en-tête (info-bulle « Changer de langue »).
+1. Clique le sélecteur de langue de l'en-tête — un **segment « FR | EN »** (libellés « Français » / « English »).
 2. Choisis l'anglais.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, la lecture est à corriger.** Ce cahier
+> décrivait un contrôle portant l'info-bulle « Changer de langue ». Le sélecteur réel est un segment
+> sans info-bulle. La clé `common.json → header.toggleLanguage` (« Changer de langue ») existe
+> toujours et **n'est utilisée par aucun composant** : c'est une **chaîne morte**, pas un texte
+> manquant. Le contrôle de CI sur l'i18n vérifie le miroir FR/EN et l'absence de point dans les clés ;
+> il ne détecte pas une clé que plus personne ne lit.
 
 **Résultat attendu**
 - L'adresse de la page passe de `/fr` à `/en`.
@@ -474,7 +493,15 @@ Une session complète représente environ **deux journées de test**. Découpage
 **Étapes**
 1. Sur `/search`, avec Paris → Brazzaville renseigné, clique le bouton d'inversion (libellé accessible « Intervertir départ et destination »).
 
-**Résultat attendu** — Le départ devient Brazzaville, la destination devient Paris, et les résultats sont recalculés (probablement aucun trajet : voir WEB-RCH-9).
+**Résultat attendu** — Le départ devient Brazzaville, la destination devient Paris. Les résultats ne
+se recalculent **qu'au clic sur « Rechercher »** ; le titre devient alors « Trajets pour
+Brazzaville → Paris » (probablement aucun trajet : voir WEB-RCH-9).
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, la lecture est à corriger.** Ce cahier
+> attendait un recalcul **d'office** à l'inversion. Il n'a pas lieu : intervertir remplit les deux
+> champs, la recherche reste à déclencher. C'est cohérent avec le reste du formulaire (changer une
+> ville ou une date ne relance rien non plus) — un recalcul automatique lancerait une requête sur un
+> état de saisie que le membre n'a pas fini de composer.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -487,7 +514,15 @@ Une session complète représente environ **deux journées de test**. Découpage
 
 **Résultat attendu**
 - L'en-tête ne montre plus « Connexion » ni « Créer un compte » mais un menu utilisateur (libellé accessible « Menu utilisateur »), une cloche de « Notifications » et une entrée « Messages ».
-- Le menu utilisateur contient au moins : « Mon compte », « Mes envois », « Messages », « Mes favoris », « Notifications », « Aide », « Déconnexion », plus les sections « Compte », « Préférences », « Support ».
+- Le menu utilisateur contient au moins : « Mon compte », « Mes envois », « Mes trajets », « Mes favoris », « Notifications », « Messages », « Centre d'aide », « Déconnexion ».
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, la lecture est à corriger.** Deux points.
+> **(a)** L'entrée s'appelle « **Centre d'aide** » (`common.json → helpCenter`), pas « Aide ».
+> **(b)** Les **intitulés de section** (« Compte », « Préférences », « Support ») et les préférences
+> de langue et d'apparence ne sont rendus que dans la **feuille mobile**. Sur desktop, le menu est
+> une liste plate, et la langue comme le thème vivent dans l'en-tête, à côté du menu. Les exiger sur
+> desktop reviendrait à consigner une anomalie sur la **double arborescence** desktop / mobile, qui
+> est un choix du produit (voir § « Double UI »).
 
 **Verdict** ⬜   **Note** :
 
@@ -517,7 +552,9 @@ Une session complète représente environ **deux journées de test**. Découpage
 #### WEB-INS-1 — L'écran d'inscription · gravité **bloquant**
 
 **Étapes**
-1. Depuis l'accueil, clique « Créer un compte ».
+1. Depuis l'accueil, clique « Connexion », puis le lien « Créer un compte » de l'écran de connexion
+   (sur **desktop**, l'en-tête ne porte pas de « Créer un compte » — voir WEB-ACC-1). Sur la feuille
+   **mobile**, le bouton de l'en-tête existe et mène au même écran.
 
 **Résultat attendu**
 - L'adresse est `/fr/register`.
@@ -527,7 +564,12 @@ Une session complète représente environ **deux journées de test**. Découpage
 - Un bouton « Créer mon compte », un séparateur « ou par e-mail », un bouton Google et un bouton « Continuer avec Facebook ».
 - En bas : « Déjà membre ? » suivi de « Connecte-toi ».
 
-**Note de recette** — Le titre « Deviens Voyageur » sur un écran d'inscription générique (un Expéditeur qui s'inscrit n'a pas vocation à devenir Voyageur) est à consigner comme **écart de libellé, gravité mineure**, si l'équipe produit attendait « Crée ton compte Yamba ». Le verdict du scénario reste ✅ si tout le reste est conforme.
+**Note de recette** — Le titre « Deviens Voyageur » sur un écran d'inscription générique (un Expéditeur
+qui s'inscrit n'a pas vocation à devenir Voyageur) est un **écart de libellé, gravité mineure**.
+
+> **Écart connu, vérifié le 18/09/2026 — décision de produit en attente.** Le libellé est **toujours**
+> « Deviens Voyageur ». La question a été posée le 09/09 et **rien n'a été changé** : inutile de la
+> rouvrir en anomalie à chaque passe. Le verdict du scénario reste ✅ si tout le reste est conforme.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -579,10 +621,24 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 | b | `motdepasse` | Une phrase nommant l'absence de majuscule (ou le premier critère manquant), **pas** « ne respecte pas tous les critères » |
 | c | `Motdepasse1` | Une phrase nommant l'absence de caractère spécial |
 | d | `Recette-2026!` | Une phrase disant que le mot de passe **ne doit pas contenir le prénom** |
-| e | `01/01/2000!` | Une phrase disant que ce n'est pas une date valable comme mot de passe |
+| e | `01/01/2000!` | Une phrase nommant l'absence de **minuscule** — voir l'encadré |
 | f | `Abcdefg1!` ou `Aaaaaaa1!` | Une phrase nommant la suite ou la répétition |
 
-**Résultat attendu** — Pour chaque cas, **une seule** règle est nommée, dans une phrase compréhensible, en français, sous le champ « Mot de passe ». Un message générique est une anomalie **majeure**.
+**Résultat attendu** — Pour chaque cas, **une seule** règle est nommée, dans une phrase compréhensible,
+en français, sous le champ « Mot de passe ». Un message générique est une anomalie **majeure**.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, l'attendu du cahier était faux.** Le cas
+> **e** attendait « ce n'est pas une date valable ». Le produit nomme la **première** règle non
+> satisfaite, dans un ordre fixe (`CHECK_ORDER`, `lib/auth/auth-error-codes.ts`) :
+>
+> ```
+> minLength → lowercase → uppercase → number → special → simpleDate → predictable → personalInfo
+> ```
+>
+> Or `01/01/2000!` n'a **aucune lettre** : `lowercase` échoue, et `lowercase` vient **avant**
+> `simpleDate`. La phrase nomme donc la minuscule, et elle a raison — la règle de la fiche (« une
+> seule règle nommée ») est respectée. Pour éprouver spécifiquement le refus de date, il faut une
+> valeur qui satisfasse tout le reste, par exemple `Le01/01/2000!`.
 **Vérification complémentaire** — Un indicateur de force du mot de passe accompagne la saisie.
 **Verdict** ⬜   **Note** :
 
@@ -600,7 +656,17 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 **Résultat attendu**
 - Étape 3 : le compte n'est **pas** créé ; un message dit que l'acceptation est nécessaire.
 - Étape 5 : l'écran passe à la vérification, adresse `/fr/register/verify`.
-- Le nouvel écran porte « Vérification sécurisée », le titre « Plus qu'une étape ! » et le sous-titre « Nous avons envoyé un code à 6 chiffres à : » suivi de l'adresse saisie.
+- Le nouvel écran porte « Vérification sécurisée », le titre « Plus qu'une étape ! » et le sous-titre
+  « Nous avons envoyé un code à 6 chiffres à : » suivi de l'adresse **masquée** (par exemple
+  `n*********5@r***.dev`).
+
+> **Écart connu, vérifié le 18/09/2026 — décision de produit en attente.** Ce cahier attendait
+> l'adresse **saisie**, en clair. Le produit la masque (`lib/auth/email-mask.ts`, `maskEmail`).
+> L'intention est saine sur un écran où l'adresse n'a **pas** été saisie à l'instant (récupération de
+> mot de passe, écran rouvert dans un autre onglet) ; elle l'est moins ici, où le membre vient de
+> taper cette adresse trois secondes plus tôt et où le masque l'empêche de relire une faute de frappe
+> — la cause n° 1 d'un code qui n'arrive jamais. Question posée le 09/09, **rien n'a été changé** :
+> ne pas consigner en anomalie.
 - Un compte à rebours « Code valable » démarre à **10:00** et décroît seconde par seconde.
 - Un champ « Saisis ton code » à six cases, l'indice « Astuce : tu peux coller le code directement. », et le bouton « Valider mon code ».
 
@@ -791,8 +857,18 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 2. Laisse « Rester connecté sur cet appareil » **décochée**.
 3. Clique « Se connecter ».
 
-**Résultat attendu** — Redirection vers l'espace membre. L'en-tête affiche le menu utilisateur, la cloche de notifications et « Messages ». Le prénom « Aminata » apparaît dans le menu.
-**Vérification complémentaire** — Cookies `access_token` et `refresh_token` présents.
+**Résultat attendu** — Redirection vers l'**accueil connecté** (`/fr`), pas vers un tableau de bord.
+L'en-tête affiche le menu utilisateur, la cloche de notifications et « Messages ». Le prénom
+« Aminata » apparaît dans le menu.
+**Vérification complémentaire** — Cookies `access_token` et `refresh_token` présents. Le cookie de
+rafraîchissement est un cookie **de session** (sans date d'expiration) quand « Rester connecté » est
+décochée : le profil « 60 min » vit côté **serveur**, pas dans le cookie.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, la lecture est à corriger.** Ce cahier
+> disait « l'espace membre », ce qu'un testeur lit comme « le tableau de bord ». Le code fait
+> `router.push(redirectTo || "/")` : la connexion **honore l'intention qui l'a déclenchée** (réserver,
+> publier…) et, à défaut, ramène à l'accueil. Une redirection forcée vers un tableau de bord
+> perdrait le `?redirect=` — c'est-à-dire exactement ce que le membre était en train de faire.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -843,9 +919,16 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 **Préconditions** — Connecté avec Aminata.
 **Étapes**
 1. Ouvre le tableau de bord, section « Sécurité ».
-2. Ouvre « Appareils connectés ».
+2. Ouvre « **Sessions actives** ».
 
-**Résultat attendu** — Au moins une ligne, portant : le navigateur et le système (dérivés de l'agent utilisateur, par exemple « Chrome sur macOS »), la date de dernière activité, l'adresse IP, et la mention **« cet appareil »** sur la session courante.
+**Résultat attendu** — Au moins une ligne, portant : le navigateur et le système (dérivés de l'agent
+utilisateur, rendus « **Chrome · macOS** »), la date de dernière activité, l'adresse IP, et la
+mention **« cet appareil »** sur la session courante.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, la lecture est à corriger.** Deux
+> libellés : la rubrique s'appelle « **Sessions actives** » (`dashboard.copy.ts`, `activeSessions`),
+> pas « Appareils connectés » ; et l'appareil est rendu « Chrome · macOS » (point médian), pas
+> « Chrome sur macOS ». Rien à consigner : ce sont des attendus de cahier trop littéraux.
 **Note** — Une session ouverte avant la livraison de cette fonction s'affiche « Appareil inconnu » : ce n'est pas une anomalie, c'est documenté.
 **Verdict** ⬜   **Note** :
 
@@ -887,9 +970,19 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 1. Va dans « Sécurité », rubrique du mot de passe, et clique « Changer ».
 
 **Résultat attendu**
-- Avant tout formulaire, une porte de confirmation s'ouvre avec un bouton « M'envoyer le code ».
+- Le formulaire s'ouvre, tu le remplis, et c'est **à la validation** que la porte « Confirme que c'est
+  bien toi » se présente, avec un bouton « M'envoyer le code ».
 - En cliquant, un email dont le sujet contient « Ton code de confirmation Yamba » arrive dans Mailpit.
-- Le code accepté **ouvre le formulaire** de changement de mot de passe.
+- Le code accepté **rejoue le geste** : le mot de passe est changé, sans avoir à ressaisir le
+  formulaire.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, l'attendu du cahier décrivait une autre
+> mécanique.** Ce cahier attendait une porte **avant** le formulaire, et un code qui « ouvre le
+> formulaire ». Le produit fait l'inverse, et c'est le bon sens du dispositif : la route répond 403
+> `SUDO_REQUIRED`, le front ouvre `SudoGate`, et **rejoue la requête** une fois la fenêtre ouverte.
+> Demander le code avant le formulaire ferait payer une vérification à quelqu'un qui va peut-être
+> renoncer, et obligerait à ressaisir après. **Le fond est identique et c'est lui qui compte : aucun
+> geste sensible n'aboutit sans code.**
 
 **Anomalie à guetter** — Si le clic répond une erreur muette sans ouvrir la porte, c'est la régression du code d'erreur `SUDO_REQUIRED` : anomalie **bloquante** (voir WEB-NRG-7).
 **Verdict** ⬜   **Note** :
@@ -898,11 +991,22 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 
 #### WEB-CNX-11 — La fenêtre de 15 minutes couvre un second geste · gravité **majeur** · `[SES5]`
 
-**Préconditions** — Suite immédiate de WEB-CNX-10, code saisi il y a moins de 15 minutes.
+**Préconditions** — Une fenêtre sensible ouverte il y a moins de 15 minutes par un geste qui **ne la
+ferme pas**. ⚠ **Ne pas enchaîner depuis WEB-CNX-10** : voir l'encadré.
 **Étapes**
-1. Sans quitter la session, va dans « Sécurité » › « Mes données » et clique « Télécharger mes données ».
+1. Ouvre la fenêtre par « Télécharger mes données » (code saisi, export obtenu).
+2. Sans quitter la session, enchaîne un second geste sensible qui ne ferme pas la fenêtre — par
+   exemple « Télécharger mes données » de nouveau, ou l'ouverture du tableau de bord Stripe.
 
-**Résultat attendu** — **Aucun nouveau code n'est demandé** : la fenêtre ouverte couvre ce second geste. Le téléchargement démarre.
+**Résultat attendu** — **Aucun nouveau code n'est demandé** : la fenêtre ouverte couvre ce second
+geste.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, l'ordre du cahier était impossible.**
+> L'ordre littéral de ce cahier (mot de passe en WEB-CNX-10, **puis** export en WEB-CNX-11, dans la
+> même fenêtre) **redemande un code** : un changement de mot de passe **ferme** la fenêtre
+> (`closeSudoWindow`, `account.controller.ts`) — et il doit la fermer, puisqu'il révoque aussi toutes
+> les autres sessions. La propriété que la fiche veut prouver (« un code, plusieurs gestes ») est
+> vraie ; elle se prouve avec des gestes qui ne referment pas la porte derrière eux.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -1144,7 +1248,16 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 2. Change son « nom affiché » depuis son écran Profil.
 3. Recharge la page publique par l'ancienne adresse.
 
-**Résultat attendu** — L'adresse **ne change pas** : un lien partagé ne meurt jamais. Le nom affiché, lui, est à jour.
+**Résultat attendu** — L'adresse **ne change pas** : un lien partagé ne meurt jamais. La page publique
+continue de répondre.
+
+> **Écart connu, vérifié le 18/09/2026 — le code a raison, l'attendu du cahier était faux.** Ce
+> cahier ajoutait « le nom affiché, lui, est à jour ». Il ne l'est pas, et il ne doit pas l'être : la
+> page publique montre l'identité **« Prénom N. »** (prénom + initiale), **jamais** le « nom
+> affiché » de la page Voyageur (`CarrierPage.name`). C'est une règle de minimisation — une vitrine
+> lue par des inconnus ne porte pas un nom de famille, et elle ne porte pas non plus un libellé
+> librement choisi qui pourrait usurper une identité. Ce que la fiche prouve reste entier : **le slug
+> ne bouge pas**, donc le lien survit.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -1355,7 +1468,16 @@ Chaque essai se fait avec Prénom `Recette`, Nom `Neuf`, E-mail `recette+neuf@se
 - Le curseur va de **5 à 20 €/kg** par pas de **0,50**.
 - Une suggestion indicative affiche une fourchette basse / médiane / haute, et un verdict du type « Prix juste », « Sous le marché — tu laisses de l'argent » ou « Au-dessus — moins de demandes probables ».
 - **La suggestion ne bloque jamais** : un prix hors fourchette reste enregistrable.
-- La mention « Ton prix = ton net » (la commission est payée par l'Expéditeur) est présente.
+- La carte de gain porte « net, versé à J+4 après livraison ».
+
+> **Écart connu, vérifié le 18/09/2026 — la phrase existe, elle n'est plus rendue.** Ce cahier
+> attendait « Ton prix = ton net ». La chaîne existe bel et bien —
+> `create-trip.copy.ts`, clé `netGainSub` : « Versé à J+4 après livraison confirmée · la commission
+> est côté Expéditeur, ton prix = ton net » — mais **aucun composant ne la rend** depuis la refonte
+> de l'étape 2 : c'est une **chaîne morte**. Le fait (la commission est côté Expéditeur) reste vrai
+> et reste prouvé par WEB-DEA-2, où le Voyageur ne voit jamais le total Expéditeur. À signaler comme
+> **écart de copie, gravité mineure** si l'équipe produit tient à la phrase — ne pas le consigner en
+> anomalie fonctionnelle.
 
 **Verdict** ⬜   **Note** :
 
@@ -2661,7 +2783,17 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 3. Ouvre la cloche de notifications.
 
 **Résultat attendu**
-- Accueil : une carte « {n} demandes en attente » / « Paris → Brazzaville · réponds avant l'expiration des 24 h » avec le badge « À répondre » et le bouton « Voir les demandes ».
+- Accueil : la bande « **À traiter · {n}** », puis **une ligne par demande** — « Demande de {prénom}
+  · Paris → Brazzaville · {date} », « {famille} · {poids} · tu gagnes {gain} · reçue {quand} »,
+  « Expire dans {durée} », bouton « Répondre ».
+
+> **Écart connu, vérifié le 18/09/2026 — la copie existe, la carte n'existe pas.** Ce cahier
+> attendait une carte agrégée « {n} demandes en attente » avec un badge « À répondre » et un bouton
+> « Voir les demandes ». Les trois textes existent dans `messages/fr/dashboardHome.json`
+> (`demandsTitle`, `ctaRespond`…) et **aucun composant ne les rend** : l'accueil affiche une ligne par
+> demande. C'est une **copie morte**, la troisième relevée dans ce cahier (voir aussi WEB-ACC-2 et
+> WEB-TRJ-3). L'information est là, sous une autre forme : ne pas consigner en anomalie
+> fonctionnelle.
 - « Mes trajets » : la bande « À traiter » en tête, avec « Demande de {prénom} », le sous-titre « {famille} · {poids} · tu gagnes {gain} · reçue {quand} », le badge « Expire dans {durée} » et le bouton « Répondre ».
 - La ligne du trajet porte le badge « Demande » sous la section « Demandes et colis ».
 - Notification in-app « Nouvelle demande de {prénom} » / « Paris → Brazzaville · {poids} · réponds sous 24 h ».
@@ -2677,17 +2809,35 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 1. Clique « Répondre » sur la demande d'Aminata.
 
 **Résultat attendu**
-- Titre « Nouvelle demande de Deal », « Reçue il y a {durée} », « État : demande reçue, en attente de réponse ».
+- Titre « Nouvelle demande de Deal », « Reçue il y a {durée} · {route} · {date} ».
 - « Cette demande expire dans {h} » avec un compte à rebours qui se rafraîchit ; la puce passe en ambre puis en rouge à moins de 2 heures.
-- Bloc « DE LA PART DE » : avatar, prénom et initiale, « {n} envois », « Membre depuis {mois} {année} », lien « Voir profil ».
+- Bloc « DE LA PART DE » : avatar, prénom et initiale, lien « Voir profil ».
 - Bloc « DÉTAILS DU COLIS » : catégorie, « Poids déclaré », « Valeur déclarée », description.
 - Bloc « PHOTOS DÉCLARÉES PAR {prénom} », avec la visionneuse plein écran.
 - Bloc « MODALITÉS DE REMISE ET LIVRAISON » portant la mention « Téléphone du destinataire communiqué à la prise en charge ».
-- Bloc « COUVERTURE DU COLIS » : « Garantie Yamba incluse » ou « Protection étendue 500 € incluse » — **jamais le mot « assurance »**.
+- Une carte de couverture : « Garantie Yamba incluse » ou « Protection étendue 500 € incluse » —
+  **jamais le mot « assurance »**. *(L'intitulé « COUVERTURE DU COLIS » existe en traduction mais
+  n'est pas rendu : `DealCoverageCard.tsx` n'affiche que la valeur.)*
 - Encart « Avant d'accepter, lis bien ces points » avec ses quatre puces.
-- Bloc « TU GAGNES » avec **le net (28,75 €)** et « Versement à J+4 après livraison validée · sur ton compte Stripe ».
+- Bloc « TU GAGNES » avec **le net (28,75 €)** et la note « Versé {n} jours après livraison validée
+  par code confidentiel ».
 
-**Anomalie bloquante à guetter** — Le Voyageur ne doit **jamais** voir le total payé par l'Expéditeur (32,20 €), ni la commission de Yamba.
+**Anomalie bloquante à guetter** — Le Voyageur ne doit **jamais** voir le total payé par l'Expéditeur
+(32,20 €), ni la commission de Yamba. *(Vérifié en recette : absent de l'écran **et** du DTO —
+`totalShipperCents` n'y figure pas.)*
+
+> **Écarts connus, vérifiés le 18/09/2026.** Quatre attendus de ce cahier ne correspondaient pas à
+> l'écran :
+>
+> | Ce que le cahier attendait | Ce que l'écran rend | Statut |
+> |---|---|---|
+> | « {n} envois » et « Membre depuis {mois} {année} » | absents | **`ANO-WEB-43` ouverte** (le DTO ne porte pas ces compteurs) |
+> | ligne « État : demande reçue, en attente de réponse » | absente — l'état se lit dans le compte à rebours | texte de cahier jamais rendu |
+> | intitulé de section « COUVERTURE DU COLIS » | absent — seule la valeur est affichée | clé traduite non rendue |
+> | « Versement à J+4 … sur ton compte Stripe » | « Versé {n} jours après livraison validée par code confidentiel » | **le texte réel est meilleur** : il dit ce qui déclenche le versement |
+>
+> Seul `ANO-WEB-43` reste une anomalie ; les trois autres sont des attendus de cahier à corriger, ce
+> qui est fait ici.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -2848,7 +2998,15 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 **Étapes**
 1. Ouvre le suivi de cet envoi et cherche un bouton de message.
 
-**Résultat attendu** — Le bouton explique que la conversation s'ouvrira à l'acceptation : « La conversation s'ouvre une fois le deal accepté. » Aucun fil n'est créé.
+**Résultat attendu** — **Aucun bouton de message** n'est proposé sur le suivi d'une demande en
+attente. Aucun fil n'est créé : `GET /conversations/by-deal/<deal PENDING>` répond **403
+`CONVERSATION_NOT_OPEN`**.
+
+> **Écart connu, vérifié le 18/09/2026 — décision de produit en attente.** Ce cahier attendait un
+> bouton **qui explique** (« La conversation s'ouvre une fois le deal accepté. »). Il n'y en a aucun :
+> l'absence est silencieuse. La garde serveur, elle, est en place et c'est l'essentiel de la fiche.
+> Recommandation consignée le 09/09, **non appliquée** : un bouton inactif portant la phrase, plutôt
+> qu'un vide qui laisse croire à un oubli. Ne pas consigner en anomalie.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -3098,6 +3256,14 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 - Étape 4 : **aucun second email** avant une heure : au plus un par heure et par conversation.
 
 **Vérification complémentaire** — La notification in-app, elle, est immédiate à chaque message.
+
+> **Écart connu, vérifié le 18/09/2026 — décision de produit en attente.** La bulle de l'en-tête
+> compte les **messages** non lus, pas les **conversations** : `totalUnread = items.reduce((a, i) =>
+> a + i.unreadCount, 0)` (`conversation.service.ts`). Huit messages non lus d'une **seule**
+> conversation affichent donc « 8 ». Ce cahier attendait le nombre de conversations. Les deux
+> lectures se défendent — « 8 choses à lire » contre « 1 personne qui attend » — et la seconde est
+> celle des messageries courantes. Question posée le 09/09, **rien n'a été changé** : ne pas
+> consigner en anomalie.
 **Verdict** ⬜   **Note** :
 
 ---
@@ -5281,8 +5447,8 @@ Un parcours de bout en bout n'est `✅` que si **toutes** ses étapes le sont. U
 | 8 | Mailpit | — | Vérifie. | João : accusé avec le ticket, le gel et les 48 h ouvrées. Thomas : email **calme**, catégorie seule, jamais la description ni les photos. |
 | 9 | B | Thomas | Ouvre le deal. | « Signalement en cours · dossier YAM-XXXX » ; le versement passe « en attente » ; carte « Donne ta version ». |
 | 10 | B | Thomas | Vérifie qu'il ne voit **pas** la description de João. | Seule la **catégorie** est affichée. |
-| 11 | B | Thomas | Clique « Donner ma version », écris moins de 50 caractères. | Refus « Au moins 50 caractères. » |
-| 12 | B | Thomas | Écris un texte suffisant, ajoute une photo, « Envoyer ma version ». | « Ta version est enregistrée. » puis « Version envoyée » ; **le bouton ne revient pas**. |
+| 11 | B | Thomas | Dans la carte « Donne ta version » — **déjà ouverte, il n'y a pas de bouton « Donner ma version »** (ce libellé est celui de l'email) —, écris moins de 50 caractères. | Refus « Au moins 50 caractères. », bouton inactif. |
+| 12 | B | Thomas | Écris un texte suffisant, ajoute une photo, « Envoyer ma version » (`POST /deals/:id/dispute/statement`). | « Ta version est enregistrée. » puis « Version envoyée » ; **le formulaire ne revient pas**. |
 | 13 | A | João | Recharge son dossier. | Il apprend que Thomas a donné sa version, **jamais son contenu**. |
 | 14 | D | Administrateur | Tranche le dossier en **remboursement partiel de 15,00 €**, avec un motif d'au moins 50 caractères (RECETTE-02-ADMIN). | La décision est enregistrée. |
 | 15 | A | João | Recharge. | « Décision rendue » ; « Ton signalement est retenu en partie : remboursement partiel. » ; « 15,00 € te sont remboursés, sur ta carte sous 5 à 10 jours. » ; le **motif de l'équipe** est lisible. |
@@ -5312,10 +5478,10 @@ Un parcours de bout en bout n'est `✅` que si **toutes** ses étapes le sont. U
 | 9 | A | Marie-Claire | Rouvre et clique « Confirmer l'annulation ». | Toast « Envoi annulé. Remboursement de {montant} en cours. » |
 | 10 | A | Marie-Claire | Ouvre « Finances » › « Paiements ». | Ligne « Remboursé {montant} le {date} · retenue {retenue} reversée au Voyageur ». |
 | 11 | B | Marc | Ouvre « Finances » › « Portefeuille ». | Ligne « Compensation · annulation tardive de Marie-Claire », état « Parti le {date} · 2 à 7 jours » ou « En cours d'envoi ». |
-| 12 | B | Marc | Ouvre « Mes trajets ». | La ligne du deal porte « Annulée tardivement · {montant} de compensation … ». Les kilos sont **rendus** au trajet. |
+| 12 | B | Marc | Ouvre « Mes trajets ». | La ligne du deal porte « Annulée tardivement · {montant} de compensation … ». Les kilos sont **rendus** au trajet — mais **l'écran ne les affiche pas** : le vérifier à l'API (`capacityKg − reservedKg`), avant et après. |
 | 13 | Mailpit | — | Vérifie. | Marie-Claire : « annulée » puis « Remboursement émis » mentionnant que la retenue revient au Voyageur. Marc : notification + email de compensation. |
 | 14 | A + B | — | Rouvrent le fil de messagerie. | Le fil reste **lisible** ; il se ferme à l'écriture 14 jours après la fin du deal. |
-| 15 | B | Marc | Tente d'annuler le trajet lui-même. | Si un autre deal y est vivant, refus : « Ce trajet porte encore … : annule-les d'abord depuis « Mes deals ». Chaque Expéditeur sera remboursé intégralement. » Sinon, l'annulation passe. |
+| 15 | B | Marc | Tente d'annuler le trajet lui-même. | Refus (D72) : « Ce trajet porte encore … : annule-les d'abord depuis « Mes deals ». Chaque Expéditeur sera remboursé intégralement. » ⚠ **Sur le jeu d'essai, seule cette branche est atteignable** : un deal `DELIVERED` d'Aminata reste vivant sur `yul` et n'est pas annulable. Pour éprouver « sinon, l'annulation passe », prendre un trajet **sans aucun deal**. |
 
 **Verdict global** ⬜   **Note** :
 
@@ -5338,8 +5504,8 @@ Un parcours de bout en bout n'est `✅` que si **toutes** ses étapes le sont. U
 | 9 | A | Nouveau | Parcours son profil, son tableau de bord, sa page publique. | **Aucune mention** d'un score, d'un niveau de risque ou de points. |
 | 10 | A | Nouveau | « Sécurité » › « Mes données » › « Télécharger mes données », franchit la porte par code. | Fichier JSON téléchargé ; **aucune trace du score** à l'intérieur. |
 | 11 | B | Thomas | Accepte l'une des demandes du compte neuf. | Deal accepté ; le compte neuf reçoit notification + email. |
-| 12 | A | Nouveau | Laisse la session inactive plus d'une heure, puis clique une action. | Fenêtre « Ta session a expiré » **par-dessus la page courante** ; reconnexion sur place ; le geste reprend. |
-| 13 | A | Nouveau | « Sécurité » › « Appareils connectés ». | Une ligne « cet appareil » avec navigateur, système, dernière activité, adresse IP. |
+| 12 | A | Nouveau | Laisse la session inactive plus d'une heure, puis clique une action. | Fenêtre « Ta session a expiré » **par-dessus la page courante** ; reconnexion sur place, **URL inchangée**. ⚠ Le produit **ne rejoue pas** le geste qui a échoué : il rafraîchit les données de la page, et le geste est à refaire à la main — il passe alors. *(Copie du cahier ajustée le 18/09/2026 ; un rejeu automatique reste une évolution possible, non décidée.)* |
+| 13 | A | Nouveau | « Sécurité » › « **Sessions actives** » (sous-titre « Les appareils connectés à ton compte »). | Une ligne « cet appareil » avec navigateur, système, dernière activité, adresse IP. |
 | 14 | A | Nouveau | Tente « Supprimer mon compte ». | Bandeau ambre « Impossible pour l'instant : termine d'abord ce qui est en cours. » avec le motif du deal en cours ; **aucun code envoyé**. |
 
 **Verdict global** ⬜   **Note** :
@@ -5357,9 +5523,9 @@ Un parcours de bout en bout n'est `✅` que si **toutes** ses étapes le sont. U
 | 3 | B | Joséphine | Ouvre l'écran de prise en charge et clique « Refuser le colis ». | Fenêtre « Refuser ce colis ? » avec le rappel « Refuser un colis non conforme ne pénalise jamais ta réputation. » |
 | 4 | B | Joséphine | Choisis « Le contenu ne correspond pas à la déclaration » et confirme. | Toast « Colis refusé. {prénom} a été notifiée et sera remboursée. » |
 | 5 | A | Aminata | Recharge « Mes envois » et « Finances ». | Statut « Annulée » ; ligne « Remboursé {total intégral} le {date} ». |
-| 6 | Mailpit | — | Vérifie. | Deux emails : « refus à la remise » avec la raison traduite, puis « Remboursement émis » du montant **intégral**. |
+| 6 | Mailpit | — | Vérifie. | Deux emails. Le premier a pour **sujet** « Ton colis … n'a pas pu être pris en charge » — *et non « refus à la remise », qui n'est le sujet d'aucun email* ; la raison traduite est dans le **corps**. Puis « Remboursement émis » du montant **intégral**. |
 | 7 | B | Joséphine | Ouvre sa page publique. | **Aucune annulation supplémentaire** n'apparaît dans la ligne de faits : un refus au pickup n'est pas une annulation fautive. |
-| 8 | B | Joséphine | Ouvre « Mes trajets ». | Les kilos sont **rendus** au trajet. |
+| 8 | B | Joséphine | Ouvre « Mes trajets ». | Les kilos sont **rendus** au trajet — **l'écran ne les affiche pas** (même écart qu'en WEB-E2E-3, étape 12) : les lire à l'API du trajet, avant, après l'acceptation, après le refus. |
 
 **Verdict global** ⬜   **Note** :
 
@@ -5373,13 +5539,13 @@ Un parcours de bout en bout n'est `✅` que si **toutes** ses étapes le sont. U
 |---|---|---|---|---|
 | 1 | C | — | Ouvre le lien de suivi reçu (étape 15 de WEB-E2E-1). | « Ton colis arrive, {prénom} », corridor, dates, frise. |
 | 2 | C | — | Cherche une adresse, un numéro, un code, une photo, un montant. | **Aucun**, ni à l'écran, ni dans le code source de la page. |
-| 3 | C | — | Recharge après chaque jalon confirmé par le Voyageur. | La frise progresse ; les aides changent à chaque étape. |
+| 3 | C | — | Recharge après chaque jalon **public** confirmé par le Voyageur. | La frise progresse ; les aides changent à chaque étape. ⚠ **Tous les jalons ne sont pas publics** (D69) : `IN_TRANSIT` naît au **décollage**, `ARRIVED` à l'**atterrissage**. « Je suis à l'aéroport » ne fait **pas** bouger la page destinataire — ce n'est pas un défaut. |
 | 4 | C | — | Recharge après l'atterrissage. | « {Voyageur} est arrivé. Il te contacte pour convenir de la remise : prépare le code que {Expéditrice} t'a donné. » |
 | 5 | C | — | Recharge après la remise. | « Le colis t'a été remis. Bonne réception ! » |
 | 6 | C | — | Lis la mention de confidentialité et clique le lien. | « {Expéditrice} a confié ton prénom et ton numéro à Yamba pour cette livraison, et à personne d'autre. Ils sont effacés après la remise. » ; le lien ouvre la politique de confidentialité. |
 | 7 | C | — | Clique « Envoyer un colis » puis « Devenir Voyageur » dans le bloc d'acquisition. | Les deux mènent aux écrans attendus. |
 | 8 | C | — | Modifie un caractère du jeton dans l'adresse. | « Ce lien de suivi n'est plus valide », sans révéler l'existence du deal. |
-| 9 | C | — | Vérifie que **rien n'a été envoyé** au destinataire par Yamba. | Aucun SMS, aucun email : Yamba n'écrit jamais au destinataire. Le lien est partagé par l'Expéditeur seul. |
+| 9 | C | — | Vérifie qu'**aucun email** n'a été envoyé au destinataire par Yamba (Mailpit), et que chaque email de la boîte vise un **membre**. | Aucun email au destinataire : Yamba n'écrit jamais au tiers. Le lien est partagé par l'Expéditeur seul. *(« Aucun SMS » n'est pas une observation de recette mais un **fait de plateforme** : il n'existe aucune dépendance ni aucun appel SMS dans le dépôt — rien à mesurer ici.)* |
 
 **Verdict global** ⬜   **Note** :
 

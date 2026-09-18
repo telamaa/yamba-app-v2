@@ -10578,8 +10578,118 @@ assumé, d'un jeton qu'on n'a pas à revalider en base à chaque requête.
   `conversation.service.ts`, la condition de `rating` dans `trip-mappers.ts`.
 - L'écart n° 6 déclaré « sans objet » après vérification : le cahier écrit déjà `{"code":…}`.
 
+---
+
+# PR — Cahier 01-WEB remis à l'état du code · `chore/cahier-web-a-jour`
+
+## Pourquoi
+
+Troisième et dernier volet de la passe cahiers (après #345 pour le 04-CRONS et #346 pour le 03-API).
+C'est le plus gros des quatre cahiers — ~330 scénarios — et le seul dont les écarts ne sont **pas**
+consignés en sections : ils sont **en ligne**, au fil des tableaux de résultats, en gras
+(`**Écart** : …`), une phrase perdue au milieu d'un verdict de quinze lignes.
+
+```sh
+# Sur le 02-ADMIN et le 03-API, les écarts avaient leur section :
+grep -n -i '^#\{2,4\}.*écart' context/YAMBA-RECETTE-*-RESULTATS.md
+# Sur le 01-WEB, il faut les cueillir dans les cellules :
+sed -n '1151,4249p' context/YAMBA-RECETTE-WEB-RESULTATS.md | grep -o '\*\*Écarts\?\*\*[^|]*'
+```
+
+**Dix-sept fiches** portaient un attendu que le code ne tient pas, plus **onze étapes** des six
+parcours du chapitre 6 que le journal de campagne décrivait déjà comme « écarts assumés ».
+
+## La distinction qui structure toute la correction
+
+Un écart de cahier n'a pas toujours le même remède. Deux familles, et le testeur doit pouvoir les
+distinguer **au premier coup d'œil** — sinon il rouvre à chaque passe une question déjà tranchée :
+
+| Mention portée par l'encadré | Ce que ça veut dire | Quoi faire |
+|---|---|---|
+| **le code a raison** | l'attendu du cahier était faux, ou trop littéral | corriger sa lecture, **ne rien consigner** |
+| **décision de produit en attente** | l'écart est réel, la question a été posée le 09/09, **rien n'a été changé** | **ne rien consigner non plus** — c'est déjà tranché *comme question ouverte* |
+
+C'est la leçon du 02-ADMIN, où les écarts `NRG-7` avaient été marqués `LEVÉ` / `RÉDUIT` **en gardant
+leurs numéros** : un écart qu'on efface revient ; un écart qu'on date et qu'on qualifie ne revient
+pas.
+
+## Les dix-sept fiches
+
+| Fiche | L'attendu du cahier | Ce que fait le code | Famille |
+|---|---|---|---|
+| `WEB-ACC-1` | « Rechercher un trajet » + « Créer un compte » dans l'en-tête desktop | absents sur desktop, présents en mobile | produit |
+| `WEB-ACC-2` | info-bulle « Changer de langue » | segment « FR \| EN », pas d'info-bulle ; la clé est **morte** | code |
+| `WEB-ACC-10` | l'inversion recalcule les résultats | recalcul au clic « Rechercher » | code |
+| `WEB-ACC-11` | « Aide » + sections du menu | « **Centre d'aide** » ; sections en mobile seulement | code |
+| `WEB-INS-1` | clic « Créer un compte » depuis l'accueil | passer par « Connexion » ; titre « Deviens Voyageur » conservé | code + produit |
+| `WEB-INS-5` | `01/01/2000!` → « pas une date valable » | → « minuscule » (`CHECK_ORDER`) | code |
+| `WEB-INS-6` | l'adresse saisie, en clair | adresse **masquée** (`maskEmail`) | produit |
+| `WEB-CNX-3` | atterrissage « espace membre » | `router.push(redirectTo \|\| "/")` | code |
+| `WEB-CNX-7` | « Appareils connectés », « Chrome sur macOS » | « **Sessions actives** », « Chrome · macOS » | code |
+| `WEB-CNX-10` | porte **avant** le formulaire, code qui l'ouvre | porte **au geste**, code qui **rejoue** le geste | code |
+| `WEB-CNX-11` | mot de passe puis export, même fenêtre | le mot de passe **ferme** la fenêtre (`closeSudoWindow`) | code |
+| `WEB-PRO-8` | « le nom affiché est à jour » sur la page publique | **« Prénom N. »**, jamais `CarrierPage.name` | code |
+| `WEB-TRJ-3` | mention « Ton prix = ton net » | chaîne **morte** (`netGainSub`) | copie |
+| `WEB-DEA-1` | carte « {n} demandes en attente » | copie **morte**, une ligne par demande | copie |
+| `WEB-DEA-2` | 4 attendus | 1 anomalie (`ANO-WEB-43`) + 3 textes non rendus | mixte |
+| `WEB-MSG-3` | un bouton qui explique | aucun bouton ; garde serveur 403 en place | produit |
+| `WEB-MSG-21` | la bulle compte les conversations | elle compte les **messages** (`reduce` des `unreadCount`) | produit |
+
+## Trois découvertes de la passe
+
+**1. Quatre chaînes sont mortes.** Elles existent en traduction, la CI les voit bien miroitées FR/EN
+— et **aucun composant ne les rend** : `header.toggleLanguage`, `dashboardHome.demandsTitle` /
+`ctaRespond`, `carrierDealRequest.coverage.title`, plus `create-trip.copy.ts → netGainSub` hors
+`messages/`.
+
+C'est exactement le mécanisme qui fabrique un cahier faux : quelqu'un lit la traduction, en déduit
+l'écran, et l'écran a changé depuis. Le contrôle CI vérifie le **miroir** et l'**absence de point**
+dans les clés ; il ne détecte pas une clé que plus personne ne lit.
+
+> **Piste, non engagée** : un contrôle « clé orpheline » (chaque clé de `messages/**` apparaît-elle
+> dans une source ?) attraperait cette famille pour un coût proche de zéro. À arbitrer — les clés
+> composées dynamiquement demanderaient une liste d'exceptions, et une liste d'exceptions qui grossit
+> est un contrôle qui meurt.
+
+**2. Un écart où le code disait mieux que le cahier.** `WEB-DEA-2` attendait « Versement à J+4 après
+livraison validée · sur ton compte Stripe ». L'écran dit « Versé {n} jours après livraison validée
+**par code confidentiel** ». Le texte réel nomme **ce qui déclenche** le versement, là où le cahier
+nommait seulement où l'argent arrive. C'est le cahier qui est aligné sur le code, pas l'inverse.
+
+**3. Une étape de parcours ne mesurait rien.** `WEB-E2E-6` étape 9 : « vérifie qu'aucun SMS n'a été
+envoyé ». Vérifié : **aucune dépendance SMS** dans `package.json`, **aucun appel** dans les sources.
+Ce n'est pas une observation de recette, c'est un **fait de plateforme** — il n'y a rien à mesurer,
+et une étape qui ne peut pas échouer occupe la place d'une vraie preuve. L'étape porte maintenant ce
+qui se mesure : l'absence d'email au tiers, et l'adressage exclusif aux membres.
+
+## Les onze étapes des parcours du chapitre 6
+
+`WEB-E2E-2` (11, 12 : pas de bouton « Donner ma version », l'endpoint nommé) · `WEB-E2E-3` (12 : les
+kilos ne sont pas à l'écran ; 15 : la branche « sinon, l'annulation passe » n'est pas atteignable sur
+le jeu d'essai) · `WEB-E2E-4` (12 : le geste n'est **pas** rejoué, la page est rafraîchie ; 13 :
+« Sessions actives ») · `WEB-E2E-5` (6 : le sujet réel de l'email ; 8 : mêmes kilos) · `WEB-E2E-6`
+(3 : `IN_TRANSIT` au décollage, `ARRIVED` à l'atterrissage — l'aéroport n'est pas un jalon public ;
+9 : le SMS).
+
+## Vérifications faites, pas supposées
+
+Chaque écart ouvert dans le code avant d'être écrit : `CHECK_ORDER` (`auth-error-codes.ts`),
+`router.push(redirectTo || "/")` (`LoginForm.tsx`), `closeSudoWindow` (`account.controller.ts`),
+`activeSessions` (`dashboard.copy.ts`), `maskEmail` (`email-mask.ts`), `totalUnread` (`reduce` des
+`unreadCount`, `conversation.service.ts`), `netGainSub` et `coverage.title` (présents, non rendus),
+`edit` de la machine à états, et l'absence de SMS (`package.json` + balayage des sources).
+
+## Ce qui reste ouvert
+
+`ANO-WEB-43` (mineure) : le bloc « DE LA PART DE » ne porte ni « {n} envois » ni « Membre depuis » —
+le DTO ne transporte pas ces compteurs. C'est la **seule** anomalie des dix-sept fiches ; les seize
+autres étaient des attendus de cahier ou des questions de produit.
+
 ## Périmètre
 
 Documentation seule. `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
+
+**La passe cahiers est close** : les quatre cahiers (01-WEB, 02-ADMIN, 03-API, 04-CRONS) sont à
+l'état du code.
 
 ---
