@@ -1,216 +1,109 @@
 {
   "hero": {
-    "imageAlt": {
-      "airport": "Voyageur consultant son téléphone à l'aéroport",
-      "station": "Voyageuse souriante en gare avec ses bagages",
-      "planning": "Personne planifiant son trajet sur ordinateur"
+    "titleLine1": "Il y a toujours quelqu'un qui part vers",
+    "titleHighlight": "ta destination",
+    "titleEnd": ". Confie-lui ton colis.",
+    "subtitle": "Des Voyageurs vérifiés ont de la place dans leurs bagages : ton colis arrive plus vite, moins cher, et en main propre.",
+    "illustrationAlt": "Illustration : un colis voyage dans les bagages d'un Voyageur",
+    "trust": {
+      "escrow": "Paiement bloqué jusqu'à la livraison (Stripe)",
+      "code": "Remise contre code confidentiel",
+      "verified": "Profils et billets vérifiés"
     },
-    "metric": "{count}+ colis livrés depuis 2024",
-    "titleLine1": "Et si tes colis voyageaient",
-    "titleLine2": "avec",
-    "titleHighlight": "quelqu'un qui part déjà",
-    "titleEnd": "?",
-    "subtitle": "Yamba connecte les expéditeurs aux Voyageurs partout dans le monde.",
-    "search": {
-      "from": "Départ",
-      "fromPlaceholder": "Paris",
-      "to": "Arrivée",
-      "toPlaceholder": "Bruxelles",
-      "date": "Date",
-      "datePlaceholder": "Aujourd'hui",
-      "button": "Chercher"
-    },
-    "stats": {
-      "rating": "⭐ 4,8/5",
-      "ratingLabel": "1 200+ avis",
-      "users": "12k+",
-      "usersLabel": "utilisateurs",
-      "cities": "80+",
-      "citiesLabel": "villes",
-      "co2": "2,4T",
-      "co2Label": "CO₂ évités"
-    }
+    "travelerLink": "Tu voyages bientôt ? Rentabilise tes kilos"
   },
-  "pillars": {
-    "speed": {
-      "tag": "Vitesse",
-      "value": "24h",
-      "valueUnit": "max",
-      "title": "Livraison éclair",
-      "description": "Au lieu de 3 à 5 jours avec un envoi classique. Ton colis voyage à la vitesse d'un Voyageur."
-    },
-    "ecology": {
-      "tag": "Écologie",
-      "value": "0",
-      "valueUnit": "km en plus",
-      "title": "Zéro CO₂ supplémentaire",
-      "description": "Le Voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
-    },
-    "savings": {
-      "tag": "Économie",
-      "value": "-73",
-      "valueUnit": "%",
-      "title": "Jusqu'à 73% moins cher",
-      "description": "Tu partages les frais d'un trajet déjà payé. Pas de marge sur du transport dédié."
-    }
+  "corridors": {
+    "label": "En ce moment",
+    "title": "Des Voyageurs partent bientôt",
+    "subtitle": "Ces trajets sont publiés et réservables aujourd'hui — touche un corridor pour voir les départs.",
+    "tripCount": "{count, plural, one {# trajet} other {# trajets}}"
   },
-  "liveMap": {
-    "badge": "En direct",
-    "titleLine1": "Yamba bouge",
-    "titleHighlight": "en ce moment",
-    "titleEnd": ".",
-    "subtitle": "Chaque trajet sur la carte = un colis qui voyagera sans CO₂ supplémentaire.",
-    "stats": {
-      "activeTrips": "Trajets actifs",
-      "inTransit": "En transit"
+  "how": {
+    "label": "Comment ça marche",
+    "title": "Simple des deux côtés.",
+    "tabs": {
+      "send": "J'envoie un colis",
+      "travel": "Je voyage"
     },
-    "mobileStats": {
-      "activeTripsLabel": "dans 23 pays",
-      "inTransitLabel": "colis en ce moment",
-      "globalTitle": "Yamba est mondial",
-      "globalSubtitle": "De Paris à Brazzaville, de Tokyo à New York"
-    },
-    "viewAll": "Voir tous les trajets disponibles",
-    "tripStatus": {
-      "active": "En cours",
-      "pending": "À venir"
-    }
-  },
-  "journey": {
-    "label": "Le parcours Yamba",
-    "titleStart": "Un envoi en",
-    "titleHighlight": "5 étapes",
-    "titleEnd": ".",
-    "subtitle": "Conçu pour te protéger à chaque étape, du paiement à la livraison.",
-    "swipeHint": "← Glissez pour découvrir les 5 étapes →",
-    "exclusivityBadge": "🔐 Exclusivité",
-    "stepLabel": "ÉTAPE",
-    "steps": {
+    "send": {
       "find": {
-        "title": "Trouve",
-        "description": "Un Voyageur qui se rend à ta destination."
+        "title": "Trouve un trajet",
+        "description": "Cherche ta destination : les Voyageurs qui y partent affichent leur date, leurs kilos disponibles et leur prix."
       },
       "book": {
         "title": "Réserve",
-        "description": "Paiement sécurisé via Stripe, bloqué jusqu'à la livraison."
+        "description": "Tu paies à la réservation, mais l'argent reste bloqué chez Stripe jusqu'à la livraison."
       },
-      "sign": {
-        "title": "Signez",
-        "description": "Contrat de confiance avec engagements mutuels."
+      "handoff": {
+        "title": "Remets ton colis",
+        "description": "Vous fixez le rendez-vous dans la messagerie Yamba, avant le départ du Voyageur."
       },
-      "track": {
-        "title": "Suis",
-        "description": "Tracking temps réel et messagerie directe."
-      },
-      "receive": {
-        "title": "Récupérez",
-        "description": "Code confidentiel pour la personne autorisée."
+      "delivered": {
+        "title": "C'est livré",
+        "description": "Ton destinataire donne le code confidentiel à la remise — toi seul le connais. L'argent est alors débloqué."
       }
-    }
-  },
-  "pricing": {
-    "label": "Tarification",
-    "titleStart": "100%",
-    "titleHighlight": "transparent",
-    "titleEnd": ".",
-    "subtitle": "Aucun frais caché. Aucun abonnement.",
-    "breakdown": {
-      "title": "Sur chaque transaction",
-      "yamberLabel": "Voyageur",
-      "yambaLabel": "Commission Yamba",
-      "yambaSubtitle": "Sécurité, support, garanties",
-      "insuranceLabel": "Protection étendue en option",
-      "insuranceSubtitle": "Couverture jusqu'à 500€"
     },
-    "timeline": {
-      "label": "Protection mutuelle",
-      "titleStart": "Voyageur payé",
-      "titleHighlight": "3 jours",
-      "titleEnd": "après livraison",
-      "subtitle": "Période de sécurité pour signaler tout problème avant déblocage des fonds.",
-      "steps": {
-        "day0": {
-          "label": "J0",
-          "title": "Réservation",
-          "subtitle": "Paiement bloqué"
-        },
-        "day1": {
-          "label": "J1",
-          "title": "Livraison",
-          "subtitle": "Code confidentiel"
-        },
-        "day23": {
-          "label": "J2-3",
-          "title": "Vérification",
-          "subtitle": "Filet sécurité"
-        },
-        "day4": {
-          "label": "J4",
-          "title": "Paiement",
-          "subtitle": "Voyageur payé"
-        }
+    "travel": {
+      "publish": {
+        "title": "Publie ton trajet",
+        "description": "Destination, date, kilos disponibles, ton prix au kilo : deux minutes suffisent."
       },
-      "shipperBenefit": "3 jours pour vérifier",
-      "yamberBenefit": "Paiement automatique garanti",
-      "shipperTag": "Expéditeur",
-      "travelerTag": "Voyageur"
+      "accept": {
+        "title": "Accepte les demandes",
+        "description": "Tu vois le contenu déclaré et tu choisis ce que tu transportes — rien ne t'est imposé."
+      },
+      "deliver": {
+        "title": "Transporte et livre",
+        "description": "Tu remets le colis contre le code de livraison : c'est ta preuve de remise."
+      },
+      "paid": {
+        "title": "Reçois ton gain",
+        "description": "Après la livraison, ton gain est versé sur ton compte — le paiement était sécurisé dès la réservation."
+      }
     }
   },
-  "reviews": {
-    "ratingValue": "4,8/5",
-    "ratingCount": "1 200+ avis",
-    "title": "Ils ont adopté",
-    "titleHighlight": "Yamba",
-    "titleEnd": ".",
+  "trust": {
+    "label": "Confiance et sécurité",
+    "title": "Ton colis est entre de bonnes mains.",
+    "subtitle": "Pas de promesses en l'air : voilà les mécanismes qui protègent chaque envoi.",
     "items": {
-      "r1": {
-        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La Voyageuse m'a tenue au courant tout du long.",
-        "name": "Aminata L.",
-        "role": "Paris → Brazzaville"
+      "escrow": {
+        "title": "L'argent est bloqué",
+        "description": "Payé à la réservation, séquestré chez Stripe, versé au Voyageur seulement après la livraison."
       },
-      "r2": {
-        "quote": "Voyageur depuis 6 mois sur Lyon-Paris. Mes billets de train sont financés. Vraiment au top.",
-        "name": "Thomas F.",
-        "role": "Voyageur · Lyon"
+      "code": {
+        "title": "Le code de livraison",
+        "description": "Six chiffres connus de toi seul : sans lui, la remise n'est pas validée et l'argent ne bouge pas."
       },
-      "r3": {
-        "quote": "Service nickel. Le système de notation et les paiements sécurisés m'ont rassurée dès le début.",
-        "name": "Marie S.",
-        "role": "Bordeaux → Madrid"
+      "verified": {
+        "title": "Profils et billets vérifiés",
+        "description": "Identité contrôlée via Stripe, billets de transport vérifiables — le badge le montre sur chaque trajet."
       },
-      "r4": {
-        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un Voyageur sympa. Bluffant.",
-        "name": "David K.",
-        "role": "Bruxelles → Paris"
-      },
-      "r5": {
-        "quote": "Le code confidentiel à la livraison rassure énormément. C'est ça qui fait la différence.",
-        "name": "Sarah E.",
-        "role": "Casablanca → Lyon"
+      "support": {
+        "title": "Une équipe en cas de pépin",
+        "description": "Signalement, médiation et remboursement selon la politique d'annulation, directement dans l'application."
       }
+    },
+    "pricing": {
+      "promise": "Le prix affiché est le prix payé.",
+      "detail": "Le Voyageur fixe son prix au kilo ; le total que tu vois inclut le service Yamba. Aucun frais caché, aucun abonnement."
     }
   },
   "finalCta": {
-    "trustSignals": {
-      "stripe": "✅ Paiement sécurisé Stripe",
-      "insurance": "🛡️ Protection jusqu'à 500 €",
-      "speed": "⚡ Livraison 24h max",
-      "ecology": "🌱 Zéro CO₂ supplémentaire"
-    },
-    "titleStart": "Et toi, tu",
-    "titleHighlight": "attends quoi",
-    "titleEnd": "?",
-    "subtitle": "Rejoins 12 000+ personnes qui envoient et transportent autrement.",
+    "titleStart": "Le prochain départ",
+    "titleHighlight": "t'attend",
+    "titleEnd": ".",
+    "subtitle": "Envoie ton premier colis, ou publie ton prochain trajet.",
     "shipper": {
       "tag": "Pour envoyer",
       "title": "Expéditeur",
-      "description": "Envoie ton colis en 24h pour 73% moins cher qu'un envoi classique.",
+      "description": "Ton colis voyage avec quelqu'un qui partait déjà — plus vite et moins cher qu'un envoi classique.",
       "cta": "Trouver un trajet"
     },
     "yamber": {
       "tag": "Pour transporter",
       "title": "Voyageur",
-      "description": "Tu voyages déjà ? Gagne en moyenne 120€/mois sur tes trajets prévus.",
+      "description": "Tu voyages déjà ? Les kilos libres de tes bagages peuvent financer une partie de ton billet.",
       "cta": "Devenir Voyageur"
     }
   }

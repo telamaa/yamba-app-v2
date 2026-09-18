@@ -1,216 +1,109 @@
 {
   "hero": {
-    "imageAlt": {
-      "airport": "Traveler checking their phone at the airport",
-      "station": "Smiling Traveler at a train station with her luggage",
-      "planning": "Person planning a trip on a computer"
+    "titleLine1": "Someone is always heading",
+    "titleHighlight": "your way",
+    "titleEnd": ". Trust them with your parcel.",
+    "subtitle": "Verified Travelers have spare room in their luggage: your parcel arrives faster, cheaper, and hand-delivered.",
+    "illustrationAlt": "Illustration: a parcel traveling in a Traveler's luggage",
+    "trust": {
+      "escrow": "Payment held until delivery (Stripe)",
+      "code": "Handover against a confidential code",
+      "verified": "Verified profiles and tickets"
     },
-    "metric": "{count}+ parcels delivered since 2024",
-    "titleLine1": "What if your parcels traveled",
-    "titleLine2": "with",
-    "titleHighlight": "someone already going",
-    "titleEnd": "?",
-    "subtitle": "Yamba connects senders with Travelers all around the world.",
-    "search": {
-      "from": "From",
-      "fromPlaceholder": "Paris",
-      "to": "To",
-      "toPlaceholder": "Brussels",
-      "date": "Date",
-      "datePlaceholder": "Today",
-      "button": "Search"
-    },
-    "stats": {
-      "rating": "⭐ 4.8/5",
-      "ratingLabel": "1,200+ reviews",
-      "users": "12k+",
-      "usersLabel": "users",
-      "cities": "80+",
-      "citiesLabel": "cities",
-      "co2": "2.4T",
-      "co2Label": "CO₂ saved"
-    }
+    "travelerLink": "Traveling soon? Make your spare kilos pay"
   },
-  "pillars": {
-    "speed": {
-      "tag": "Speed",
-      "value": "24h",
-      "valueUnit": "max",
-      "title": "Lightning delivery",
-      "description": "Instead of 3-5 days with a traditional shipping service. Your parcel travels at the speed of a Traveler."
-    },
-    "ecology": {
-      "tag": "Ecology",
-      "value": "0",
-      "valueUnit": "extra km",
-      "title": "Zero additional CO₂",
-      "description": "The Traveler was going anyway. Yamba doesn't create transport, it optimizes the existing."
-    },
-    "savings": {
-      "tag": "Savings",
-      "value": "-73",
-      "valueUnit": "%",
-      "title": "Up to 73% cheaper",
-      "description": "You share the cost of an already-paid trip. No margin on dedicated transport."
-    }
+  "corridors": {
+    "label": "Right now",
+    "title": "Travelers are leaving soon",
+    "subtitle": "These trips are published and bookable today — tap a route to see the departures.",
+    "tripCount": "{count, plural, one {# trip} other {# trips}}"
   },
-  "liveMap": {
-    "badge": "Live",
-    "titleLine1": "Yamba is moving",
-    "titleHighlight": "right now",
-    "titleEnd": ".",
-    "subtitle": "Each trip on the map = one parcel traveling without additional CO₂.",
-    "stats": {
-      "activeTrips": "Active trips",
-      "inTransit": "In transit"
+  "how": {
+    "label": "How it works",
+    "title": "Simple on both sides.",
+    "tabs": {
+      "send": "I'm sending a parcel",
+      "travel": "I'm traveling"
     },
-    "mobileStats": {
-      "activeTripsLabel": "in 23 countries",
-      "inTransitLabel": "parcels right now",
-      "globalTitle": "Yamba is global",
-      "globalSubtitle": "From Paris to Brazzaville, from Tokyo to New York"
-    },
-    "viewAll": "See all available trips",
-    "tripStatus": {
-      "active": "In progress",
-      "pending": "Upcoming"
-    }
-  },
-  "journey": {
-    "label": "The Yamba journey",
-    "titleStart": "A delivery in",
-    "titleHighlight": "5 steps",
-    "titleEnd": ".",
-    "subtitle": "Designed to protect you at every step, from payment to delivery.",
-    "swipeHint": "← Swipe to discover all 5 steps →",
-    "exclusivityBadge": "🔐 Exclusive",
-    "stepLabel": "STEP",
-    "steps": {
+    "send": {
       "find": {
-        "title": "Find",
-        "description": "A Traveler going to your destination."
+        "title": "Find a trip",
+        "description": "Search your destination: Travelers heading there show their date, available kilos and price."
       },
       "book": {
         "title": "Book",
-        "description": "Secure payment via Stripe, held until delivery."
+        "description": "You pay when you book, but the money stays held by Stripe until delivery."
       },
-      "sign": {
-        "title": "Sign",
-        "description": "Trust contract with mutual commitments."
+      "handoff": {
+        "title": "Hand over your parcel",
+        "description": "You arrange the meetup in Yamba's messaging, before the Traveler departs."
       },
-      "track": {
-        "title": "Track",
-        "description": "Real-time tracking and direct messaging."
-      },
-      "receive": {
-        "title": "Receive",
-        "description": "Confidential code for the authorized person."
+      "delivered": {
+        "title": "It's delivered",
+        "description": "Your recipient gives the confidential code at handover — only you know it. The money is then released."
       }
-    }
-  },
-  "pricing": {
-    "label": "Pricing",
-    "titleStart": "100%",
-    "titleHighlight": "transparent",
-    "titleEnd": ".",
-    "subtitle": "No hidden fees. No subscription.",
-    "breakdown": {
-      "title": "On every transaction",
-      "yamberLabel": "Traveler",
-      "yambaLabel": "Yamba commission",
-      "yambaSubtitle": "Security, support, guarantees",
-      "insuranceLabel": "Optional extended protection",
-      "insuranceSubtitle": "Coverage up to €500"
     },
-    "timeline": {
-      "label": "Mutual protection",
-      "titleStart": "Traveler paid",
-      "titleHighlight": "3 days",
-      "titleEnd": "after delivery",
-      "subtitle": "Safety period to report any issue before fund release.",
-      "steps": {
-        "day0": {
-          "label": "D0",
-          "title": "Booking",
-          "subtitle": "Payment held"
-        },
-        "day1": {
-          "label": "D1",
-          "title": "Delivery",
-          "subtitle": "Confidential code"
-        },
-        "day23": {
-          "label": "D2-3",
-          "title": "Verification",
-          "subtitle": "Safety net"
-        },
-        "day4": {
-          "label": "D4",
-          "title": "Payment",
-          "subtitle": "Traveler paid"
-        }
+    "travel": {
+      "publish": {
+        "title": "Publish your trip",
+        "description": "Destination, date, available kilos, your price per kilo: it takes two minutes."
       },
-      "shipperBenefit": "3 days to verify",
-      "yamberBenefit": "Automatic guaranteed payment",
-      "shipperTag": "Shipper",
-      "travelerTag": "Traveler"
+      "accept": {
+        "title": "Accept requests",
+        "description": "You see the declared contents and choose what you carry — nothing is forced on you."
+      },
+      "deliver": {
+        "title": "Carry and deliver",
+        "description": "You hand over the parcel against the delivery code: that's your proof of delivery."
+      },
+      "paid": {
+        "title": "Get your earnings",
+        "description": "After delivery, your earnings are paid out to your account — the payment was secured from the booking."
+      }
     }
   },
-  "reviews": {
-    "ratingValue": "4.8/5",
-    "ratingCount": "1,200+ reviews",
-    "title": "They adopted",
-    "titleHighlight": "Yamba",
-    "titleEnd": ".",
+  "trust": {
+    "label": "Trust and safety",
+    "title": "Your parcel is in good hands.",
+    "subtitle": "No empty promises: these are the mechanisms protecting every shipment.",
     "items": {
-      "r1": {
-        "quote": "Sent a parcel to Brazzaville for 3 times less. The Traveler kept me updated all the way.",
-        "name": "Aminata L.",
-        "role": "Paris → Brazzaville"
+      "escrow": {
+        "title": "The money is held",
+        "description": "Paid at booking, held in escrow by Stripe, released to the Traveler only after delivery."
       },
-      "r2": {
-        "quote": "Traveler for 6 months on Lyon-Paris. My train tickets are paid. Really top-notch.",
-        "name": "Thomas F.",
-        "role": "Traveler · Lyon"
+      "code": {
+        "title": "The delivery code",
+        "description": "Six digits only you know: without it, the handover isn't validated and the money doesn't move."
       },
-      "r3": {
-        "quote": "Excellent service. The rating system and secure payments reassured me from the start.",
-        "name": "Marie S.",
-        "role": "Bordeaux → Madrid"
+      "verified": {
+        "title": "Verified profiles and tickets",
+        "description": "Identity checked through Stripe, transport tickets verifiable — the badge shows it on every trip."
       },
-      "r4": {
-        "quote": "Got my parcel in less than 24h, hand-delivered by a friendly Traveler. Mind-blowing.",
-        "name": "David K.",
-        "role": "Brussels → Paris"
-      },
-      "r5": {
-        "quote": "The confidential code at delivery is super reassuring. That's what makes the difference.",
-        "name": "Sarah E.",
-        "role": "Casablanca → Lyon"
+      "support": {
+        "title": "A team when things go wrong",
+        "description": "Reporting, mediation and refunds under the cancellation policy, right inside the app."
       }
+    },
+    "pricing": {
+      "promise": "The price you see is the price you pay.",
+      "detail": "The Traveler sets their price per kilo; the total you see includes Yamba's service. No hidden fees, no subscription."
     }
   },
   "finalCta": {
-    "trustSignals": {
-      "stripe": "✅ Stripe secure payment",
-      "insurance": "🛡️ Protection up to €500",
-      "speed": "⚡ 24h max delivery",
-      "ecology": "🌱 Zero additional CO₂"
-    },
-    "titleStart": "And you, what are you",
-    "titleHighlight": "waiting for",
-    "titleEnd": "?",
-    "subtitle": "Join 12,000+ people who send and transport differently.",
+    "titleStart": "The next departure",
+    "titleHighlight": "is waiting",
+    "titleEnd": ".",
+    "subtitle": "Send your first parcel, or publish your next trip.",
     "shipper": {
       "tag": "To send",
       "title": "Shipper",
-      "description": "Send your parcel in 24h for 73% less than a traditional shipping service.",
+      "description": "Your parcel travels with someone already going — faster and cheaper than standard shipping.",
       "cta": "Find a trip"
     },
     "yamber": {
-      "tag": "To transport",
+      "tag": "To carry",
       "title": "Traveler",
-      "description": "Already traveling? Earn an average of €120/month on your planned trips.",
+      "description": "Already traveling? The spare kilos in your luggage can pay for part of your ticket.",
       "cta": "Become a Traveler"
     }
   }

@@ -246,6 +246,26 @@ export function usePersistedFormState<T extends object>(
 }
 
 /**
+ * Écrit un brouillon SANS passer par le hook — pour préremplir un formulaire
+ * depuis un autre écran (ex. : une puce corridor de l'accueil qui prépare la
+ * recherche avant d'ouvrir `/search`). Même préfixe, même enveloppe
+ * `{version, data}` : le hook relira ce brouillon comme un des siens.
+ */
+export function seedPersistedFormState<T extends object>(
+  key: string,
+  data: Partial<T>,
+  version = 1
+) {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: StoredState<T> = { version, data };
+    sessionStorage.setItem(`${PREFIX}${key}`, safeStringify(payload));
+  } catch {
+    // sessionStorage peut échouer (mode privé, quota, etc.) — silencieux
+  }
+}
+
+/**
  * Helper pour nettoyer TOUS les formulaires persistés.
  * À utiliser par exemple lors du logout.
  */

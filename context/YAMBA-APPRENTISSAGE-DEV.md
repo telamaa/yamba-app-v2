@@ -2359,3 +2359,42 @@ en tête de colonne (14px semibold), l'heure descend au rang de détail (12px gr
 - Le point de vigilance d'`Intl` côté SSR : le rendu serveur et le rendu client doivent utiliser la
   MÊME locale (ici `useLocale()` de next-intl des deux côtés), sinon écart d'hydratation — le sujet
   du chapitre 197.
+
+## Chapitre 199 — Une page d'accueil honnête : la preuve par le produit, et deux leçons d'hydratation
+
+### 1. Le faux signal coûte plus qu'il ne rapporte
+
+Des « 12k+ utilisateurs » à côté d'un badge BETA : le visiteur attentif voit la contradiction, le
+distrait la sent. La règle de conception retenue : **un bloc marketing est soit adossé à une donnée
+réelle, soit supprimé** — et un bloc adossé à une donnée réelle doit savoir DISPARAÎTRE quand elle est
+vide (`if (corridors.length === 0) return null`), jamais montrer un exemple. C'est le même principe que
+le « fail-safe » des paramètres plateforme : l'absence de donnée est un état normal, pas une occasion
+d'inventer.
+
+### 2. Réutiliser un brouillon persisté depuis un autre écran
+
+Le brouillon de recherche vit en sessionStorage via `usePersistedFormState` — préfixe `yamba:form:`,
+enveloppe `{version, data}`. Premier jet de la puce corridor : `sessionStorage.setItem("trip-search", …)`
+— clé NUE, enveloppe recopiée à la main. Résultat mesuré à la sonde : `/search` s'ouvrait vide. La leçon
+n'est pas « ajouter le préfixe » mais **« l'enveloppe appartient à son module »** : le hook exporte
+désormais `seedPersistedFormState(key, data, version)`, et le jour où l'enveloppe change (chiffrement,
+migration de version), il n'y a qu'UN endroit à modifier.
+
+### 3. Une valeur hydratée n'est pas une interaction
+
+À l'arrivée sur `/search` avec un brouillon prérempli, les DEUX autocomplétions ouvraient leur menu :
+l'effet qui interroge Google Places se déclenche sur `value` — et l'hydratation du brouillon EST un
+changement de `value`. Le composant savait déjà distinguer l'humain de la machine (`hasInteractedRef`,
+posé au focus et à la saisie) ; il ne s'en servait que pour l'auto-sélection. Le correctif tient en une
+condition : la liste ne s'ouvre que si `hasInteractedRef.current` — les suggestions restent préchargées
+pour le premier focus. Généralisation : **tout effet déclenché par une valeur doit se demander qui l'a
+changée** — l'utilisateur, ou un `useEffect` de restauration.
+
+### Pour aller plus loin
+
+- Le tri des corridors (`Map` de groupage puis `sort` sur le compte) est un « group by » classique en
+  TypeScript — pas besoin de bibliothèque pour 50 lignes.
+- `{count, plural, one {# trajet} other {# trajets}}` : le pluriel ICU de next-intl. Le `#` est remplacé
+  par le nombre formaté ; FR et EN portent chacun leurs règles (`one`/`other` suffisent ici).
+- Supprimer une section, c'est aussi supprimer ses clés i18n : quatre chaînes mortes découvertes la
+  veille (handoff 18/09) venaient exactement de ce geste laissé inachevé.

@@ -270,8 +270,10 @@ export default function CityAutocomplete({
             }
           }
 
-          // Sinon : ouvre la dropdown si l'utilisateur a interagi ou pas d'autoSelect
-          if (!autoSelectIfPrefilled || hasInteractedRef.current) {
+          // Un brouillon hydraté (accueil → /search, puce corridor) n'est PAS une
+          // interaction : la liste ne s'ouvre que si l'utilisateur a touché le champ
+          // (focus ou saisie) — les suggestions restent prêtes pour son premier focus.
+          if (hasInteractedRef.current) {
             setOpen(top.length > 0);
           }
         } catch (err) {
