@@ -796,6 +796,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (fin de journee) : **L'ALERTE PASSE PAR LA PORTE D'IDENTITE (#359) — et le poste bascule en mode proxy D48.**
+  Constat visiteur non connecte : le formulaire « Nouvelle alerte » se remplissait en entier puis recevait le 401 brut
+  de l'API (« Unauthorized! Token missing. », en anglais). Correctif par le motif EXISTANT des favoris (A58/A63) :
+  `SavedRouteCTA` interroge `useUser` et ouvre `AuthGateModal` AVANT le formulaire ; apres connexion dans la modale le
+  geste reprend (le formulaire s'ouvre). Filet : un 401 en cours de saisie (session expiree) affiche un message FR
+  dedie. RG-WEB-322. MAIS le symptome persistant venait du POSTE, pas du code : `.env.local` etait reste en « TEST
+  MOBILE » (`NEXT_PUBLIC_API_BASE_URL=http://192.168.1.155:8080/api`) — sur `localhost:3000` les cookies de connexion
+  appartenaient a l'IP LAN, jamais renvoyes : connexion « reussie » dans la modale, AUCUNE session ensuite (le piege
+  paye de C-PR1). Bascule en **mode proxy D48** (`API_PROXY_TARGET` + `NEXT_PUBLIC_API_BASE_URL=/api`) : cookies
+  first-party sur N'IMPORTE QUEL hote — le test mobile LAN marche sans changer l'env. user-ui redemarre (tourne
+  DETACHE, log `/tmp/user-ui-dev.log`). Parcours verifie a la sonde : porte -> connexion seed -> formulaire rouvert ->
+  « Alerte creee ! » -> session globale au rechargement. ImageKit « Restrict unsigned URLs » : DEUX activations sans
+  effet mesure (URL nue ET signature falsifiee en 200 apres 50 min de sondes cumulees) — mauvaise case probable, en
+  attente d'une capture du dashboard. 18 checks comptes. AUCUNE attribution Claude.
 - 18/09 (fin d'apres-midi) : **L'ACCUEIL REFONDU — UNE PAGE QUI NE DIT QUE DU VRAI (#357, 12 commits de revue iterative sur poste).**
   SUPPRIMES : statistiques inventees (12k+ utilisateurs, 1200+ avis 4,8/5, 2,4T CO2, 45 trajets actifs), quatre
   temoignages fictifs (risque juridique : avis fictifs = pratique commerciale trompeuse), carte Leaflet decorative aux
