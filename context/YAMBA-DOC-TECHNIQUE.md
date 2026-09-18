@@ -11321,3 +11321,12 @@ d'options de la référence), et corridors visibles au-dessus de la ligne de flo
 `disableCompact` : la barre **garde ses dimensions pleines** (labels compris), seul le bandeau
 translucide apparaît. Mobile : carte en chevauchement aussi — piège payé : le hero est `relative`, la
 carte statique passait DERRIÈRE lui ; l'enveloppe mobile porte désormais `relative z-10`.
+
+## Retouche 4 — le hero passe en CLAIR, l'illustration descend jusqu'à la barre (revue sur poste)
+
+Décision UX validée sur poste : la coupure sombre/clair était le dernier défaut — en hero clair
+(dégradé chaud `#FFF6EA → blanc → #ECFAF7`, halos mango/teal discrets), la barre et l'illustration
+s'intègrent sans couture, et **le sombre reste la signature du CTA final** (effet bookend). Le dark
+mode conserve son hero sombre (`dark:` sur le dégradé et les textes). L'illustration est ancrée en
+bas de sa colonne (`self-end`) avec une marge négative : elle **plonge derrière la carte de
+recherche** qui chevauche le hero — son bas « se termine » au niveau de la barre, comme demandé.
