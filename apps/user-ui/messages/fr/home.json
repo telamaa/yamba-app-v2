@@ -1,8 +1,8 @@
 {
   "hero": {
-    "titleLine1": "Quelqu'un part déjà.",
-    "titleHighlight": "Ton colis part avec",
-    "titleEnd": ".",
+    "titleLine1": "Il y a toujours quelqu'un qui part vers",
+    "titleHighlight": "ta destination",
+    "titleEnd": ". Confie-lui ton colis.",
     "subtitle": "Des Voyageurs vérifiés ont de la place dans leurs bagages : ton colis arrive plus vite, moins cher, et en main propre.",
     "illustrationAlt": "Illustration : un colis voyage dans les bagages d'un Voyageur",
     "trust": {
