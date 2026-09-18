@@ -10441,3 +10441,145 @@ Le fichier de campagne n'était pas exempt :
 - `ANO-CRON-08` et `ANO-CRON-09` ont été vérifiées dans les sources, pas dans leur fiche de correction.
 
 ---
+
+# PR — Cahier 03-API remis à l'état du code · `chore/cahier-api-a-jour`
+
+## Pourquoi
+
+Deuxième volet de la passe cahiers ouverte par `chore/cahier-crons-a-jour`. Même méthode, même
+précaution : la source, ce sont les sections « Écarts du cahier » consignées chapitre par chapitre
+dans `context/YAMBA-RECETTE-API-RESULTATS.md` — et **chaque écart est confronté au code avant
+d'être reporté**, jamais recopié.
+
+Cette précaution a payé immédiatement : sur les onze écarts listés, **un ne tient pas** et **un
+était déjà corrigé**. En revanche la relecture en a trouvé **deux que la campagne n'avait pas vus**.
+
+## Les onze écarts, et ce qu'ils sont devenus
+
+| # | Fiche | L'écart consigné | Verdict après vérification |
+|---|---|---|---|
+| 1 | `API-GW-13` (c) | vise `bzv-accepted`, sans code de livraison | **reporté** — cible `bzv-picked` + `shipper.txt` |
+| 2 | `API-GW-10` | `x-locale` contre `preferredLocale` | **déjà reporté** le 09/09 (dette D-1) |
+| 3 | `API-GW-20` | « le jeu d'essai ne publie que deux trajets futurs » | **ne tient pas** — il en publie **cinq** |
+| 4 | `API-AUTH-11` | `{sessions:[]}` contre `{items:[]}` | **reporté** + la route `/sessions/all` (D78) |
+| 5 | `API-AUTH-01` | message de retour inexact | **reporté** |
+| 6 | `API-AUTH-12` | `sudo/verify` attendrait `otp` | **sans objet** — mais **un autre écart trouvé** |
+| 7 | `API-AUTH-15` | `displayName`/`bio` sur une Expéditrice | **reporté** — 400 `NO_CARRIER_PAGE` |
+| 8 | `API-AUTH-33` | `CARRIER` visible après renouvellement | **reporté**, avec la cause |
+| 9 | — | doublon du n° 4 | fondu dans le 4 |
+| 10 | `API-TRIP-13` | capacité « immuable après publication » | **reporté** — la vraie garde est meilleure |
+| 11 | `API-TRIP-01` | `rating`/`reviewCount` inconditionnels | **reporté** — ils sont **conditionnels** |
+| 12 | `API-TRIP-18` | *(hors liste)* ne visait pas la route de la dette D-3 | **ajouté** |
+
+Plus l'en-tête (« Version 1.0 — branche `docs/recette` » → `dev` au 18/09, le `.md` fait foi) et les
+trois renvois croisés par joker (`RECETTE-01-*.md`) ramenés aux noms exacts.
+
+## L'écart qui ne tenait pas, et pourquoi il faut le dire
+
+Le constat du 08/09 était : « `API-GW-20` suppose plus de deux trajets cherchables ; le jeu d'essai
+n'en publie que deux dans le futur ». Vérifié contre le code et le seed :
+
+```ts
+// apps/trip-service/src/controllers/trip-search.controller.ts
+const where = { status: "PUBLISHED", user: { is: notSuspendedOwnerFilter() }, ...notHiddenFilter() };
+where.departureAt = { gte: effectiveFrom };     // effectiveFrom = now, sauf dateFrom futur
+```
+
+Le jeu d'essai publie **huit** trajets, dont **cinq** à départ futur (`yul` J+3, `gru` J+5, `fih`
+J+7, `bzv-upcoming` J+10, `bzv-perkg` J+15) ; trois sont partis. Et `git log` sur `seed-deals.ts`
+montre qu'**aucun trajet n'a été ajouté depuis la campagne**.
+
+La mesure du 08/09 portait donc sur une base **usée par les fiches précédentes**, pas sur le jeu
+d'essai. Corriger le cahier aurait propagé une fausse contrainte. Ce qui y est ajouté à la place est
+un **prérequis de données** : cette fiche a besoin d'au moins trois trajets cherchables, un seed
+frais en fournit cinq, et une première page qui rend déjà `nextCursor: null` veut dire « rejouer le
+seed », pas « anomalie ».
+
+> Un journal de campagne est une source primaire, mais il date d'un **état de base** qu'il ne décrit
+> pas toujours. Vérifier même ce qu'on est venu chercher.
+
+## L'écart que la campagne n'avait pas vu — un contrat enseigné faux
+
+`API-AUTH-12` envoyait :
+
+```bash
+-d '{"currentPassword":"Yamba-Dev-2026!","newPassword":"Yamba-Recette-2026!"}'
+```
+
+Le contrat ne porte pas `currentPassword` :
+
+```ts
+export const ChangePasswordRequestSchema = z.object({ newPassword: z.string().min(1).max(200) })
+  .meta({ description: "Under sudo (D65 3A); every other session is revoked" });
+```
+
+C'est **la fenêtre sensible qui remplace le mot de passe actuel** — c'est tout l'intérêt de D65, et
+c'est ce qui permet de changer son mot de passe quand on ne s'en souvient plus, sans passer par une
+réinitialisation.
+
+Le champ en trop ne faisait rien tomber : **Zod n'est pas strict par défaut**, les clés inconnues
+sont retirées silencieusement. La fiche répondait donc 200, le testeur cochait « conforme », et le
+cahier continuait d'enseigner un contrat qui n'existe pas. Un intégrateur qui lit ce cahier construit
+son client sur une supposition fausse — et ne s'en aperçoit jamais, puisque le serveur ne s'en plaint
+pas.
+
+## Deux fiches qui décrivaient une garde moins bonne que la vraie
+
+**`API-TRIP-13`** annonçait « la capacité est immuable après publication ». Elle ne l'est pas. La
+règle réelle, dans la machine :
+
+```ts
+edit: {
+  from: ["DRAFT", "PUBLISHED", "PAUSED"],
+  guard: (trip, ctx) => trip.status !== "DRAFT" && ctx.hasActiveBookings
+    ? "Cannot edit a trip with active bookings. Cancel the trip instead." : null,
+}
+```
+
+C'est **plus fin et plus juste** : le cas dangereux (réduire la capacité sous les kilos déjà
+réservés) est impossible, et le cas inoffensif (corriger sa capacité avant la première réservation)
+reste permis. Une immuabilité champ par champ aurait interdit le second sans mieux protéger du
+premier. La fiche prouve désormais la vraie garde, sur `bzv-upcoming` — le seul trajet du seed qui
+porte des réservations actives (`bzv-perkg`, que le premier jet de cette correction visait, n'en a
+**aucune** : vérifié avant d'écrire).
+
+**`API-TRIP-01`** listait `rating` et `reviewCount` parmi les champs d'une carte. Ils sont
+**conditionnels** :
+
+```ts
+const rating = cp && cp.ratingsCount > 0 ? cp.ratingsAvg : undefined;
+```
+
+`undefined` ne se sérialise pas : sur un jeu d'essai sans avis, les deux champs sont **absents du
+JSON**. Leur absence est le comportement correct, et la fiche le dit maintenant.
+
+## Le rôle qui vient du jeton, pas de la base
+
+`API-AUTH-33` annonçait « après (4), `GET /auth/me` porte `CARRIER` dans `roles` ». En réalité :
+
+```ts
+req.roles = decoded.roles ?? user.roles ?? [];        // packages/middleware/isAuthenticated.ts
+return res.status(200).json({ …, roles: req.roles ?? fullUser.roles ?? [] });   // getMe
+```
+
+Les rôles viennent du **jeton d'accès**. Accorder un rôle en base ne réécrit pas un jeton déjà signé.
+`POST /auth/refresh` relit `user.roles` et resigne — c'est ce que fait le front, et c'est ce que la
+fiche demande maintenant de faire avant de constater le rôle. Ce n'est pas un défaut : c'est le prix,
+assumé, d'un jeton qu'on n'a pas à revalider en base à chaque requête.
+
+## Vérifications faites, pas supposées
+
+- Les enveloppes lues dans les **schémas de contrat** (`MemberSessionsResponseSchema`,
+  `ChangePasswordRequestSchema`, `SudoVerifyRequestSchema`), pas dans les fiches.
+- Le seed compté **trajet par trajet** et **réservation par réservation** — c'est ce qui a rattrapé
+  une cible fausse dans la correction elle-même.
+- `refreshAuthTokens` lu en entier pour confirmer que le renouvellement relit bien `user.roles`.
+- La garde `edit` lue dans la machine à états, la garde du code de livraison dans
+  `conversation.service.ts`, la condition de `rating` dans `trip-mappers.ts`.
+- L'écart n° 6 déclaré « sans objet » après vérification : le cahier écrit déjà `{"code":…}`.
+
+## Périmètre
+
+Documentation seule. `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
+
+---

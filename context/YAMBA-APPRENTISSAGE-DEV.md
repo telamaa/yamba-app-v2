@@ -1742,3 +1742,122 @@ table de synthèse écrite de mémoire, en fin de campagne.
 - Sur la compression Kafka : `snappy`, `lz4` et `zstd` demandent un codec côté client. kafkajs n'embarque que
   `gzip` ; les autres passent par `@kafkajs/*-compression`. Un producteur tiers qui compresse autrement suffit
   à faire tomber un consommateur — c'est ce qui rend `ANO-CRON-08` intéressante bien au-delà de la recette.
+
+---
+
+## Chapitre 193 — Le test qui passe en enseignant le contraire (passe 03-API)
+
+Le chapitre 192 parlait d'un document d'instructions qui ment. Celui-ci parle du cas plus retors : un
+test qui **passe**, dont le verdict est « conforme », et qui enseigne pourtant un contrat faux. Trois
+mécanismes, tous rencontrés dans la même passe.
+
+### 1. Zod n'est pas strict — et c'est ce qui rend le faux invisible
+
+La fiche `API-AUTH-12` envoyait :
+
+```bash
+curl -X POST "$BASE/auth/me/password" -d '{"currentPassword":"…","newPassword":"…"}'
+```
+
+Le contrat, lui :
+
+```ts
+export const ChangePasswordRequestSchema = z.object({ newPassword: z.string().min(1).max(200) });
+```
+
+Un `z.object` **retire silencieusement** les clés inconnues : `safeParse` réussit, `parsed.data` ne
+contient que `newPassword`, et le serveur répond 200. Le testeur coche « conforme ». Le cahier
+continue d'enseigner un champ qui n'existe pas, et un intégrateur qui lit ce cahier construit son
+client dessus — sans jamais recevoir la moindre plainte du serveur.
+
+> **Un test qui passe ne valide que ce qu'il observe.** Il ne dit rien de ce qu'il a envoyé en trop.
+> Une fiche de recette décrit un **contrat** : ce qu'elle envoie compte autant que ce qu'elle attend.
+
+Les trois postures possibles, à connaître pour choisir :
+
+| | Clé inconnue | Quand la choisir |
+|---|---|---|
+| `z.object` (défaut) | **retirée** en silence | API publique tolérante : un client d'une version ultérieure ne casse pas |
+| `.strict()` | **400** | contrat interne, ou quand un champ ignoré serait dangereux (un `role` qu'on croit envoyer) |
+| `.passthrough()` | conservée | rarement ce qu'on veut sur une frontière |
+
+Ici la tolérance est le bon choix — un client mobile en retard d'une version ne doit pas tomber. Ce
+qui manquait, c'est que la **documentation** dise la vérité malgré la tolérance.
+
+### 2. Le champ conditionnel, qui est absent et non `null`
+
+`API-TRIP-01` listait `rating` et `reviewCount` parmi les champs d'une carte de résultat. Le mapper :
+
+```ts
+const rating = cp && cp.ratingsCount > 0 ? cp.ratingsAvg : undefined;
+```
+
+`undefined` ne se sérialise pas en JSON : la clé **n'apparaît pas**. Ce n'est pas `null`, ce n'est pas
+`0` — elle n'est pas là. Un testeur voit un champ manquant et hésite entre « anomalie » et « normal » ;
+un client TypeScript qui déclare `rating: number` se trompe, il lui faut `rating?: number`.
+
+> **Trois états à ne jamais confondre** dans un contrat : la clé **absente** (« la question ne se pose
+> pas »), `null` (« la question se pose, la réponse est vide ») et la **valeur par défaut** (« voici
+> zéro »). Une documentation qui liste un champ sans dire lequel des trois il peut être est
+> incomplète, même quand elle est exacte.
+
+C'est le même sujet que le piège Mongo payé six fois dans ce dépôt (`field: null` ne matche pas un
+champ **absent**) — vu de l'autre côté du fil.
+
+### 3. Le jeton est une photographie, pas une fenêtre
+
+`API-AUTH-33` annonçait qu'après l'onboarding, `GET /auth/me` porte `CARRIER`. La chaîne réelle :
+
+```ts
+// packages/middleware/isAuthenticated.ts
+req.roles = decoded.roles ?? user.roles ?? [];
+// auth.controller.ts — getMe
+return res.status(200).json({ …, roles: req.roles ?? fullUser.roles ?? [] });
+```
+
+Les rôles viennent du **jeton d'accès**, signé à l'émission. Écrire `CARRIER` en base ne réécrit pas
+un jeton déjà remis au client — c'est même toute la raison d'être d'un jeton : ne pas avoir à
+revalider en base à chaque requête.
+
+```ts
+// refreshAuthTokens — le renouvellement, lui, relit et resigne
+const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+const newAccessToken = jwt.sign({ id: user.id, roles: user.roles, jti: newJti }, SECRET, { expiresIn: "15m" });
+```
+
+> **Une revendication portée par un jeton vit jusqu'à l'expiration du jeton.** C'est un choix de
+> conception avec un prix : toute élévation de droits est **différée** (≤ 15 min ici, ou immédiate si
+> le client rafraîchit), et — le point important — **toute révocation l'est aussi**. C'est pourquoi ce
+> dépôt ne se repose pas sur le jeton pour les sanctions : `isAuthenticated` relit le compte et refuse
+> un `SUSPENDED` en 401, et `refreshAuthTokens` refuse de renouveler. Un retrait de droits doit passer
+> par une lecture ; un ajout peut attendre le renouvellement.
+
+Un testeur qui ignore cela consigne une anomalie majeure sur un comportement voulu. La fiche porte
+maintenant l'appel `POST /auth/refresh` **et** la raison.
+
+### 4. Et la précaution qui a payé deux fois
+
+La passe consistait à reporter onze écarts d'un journal de campagne. Deux choses à ne pas tenir pour
+acquises :
+
+- **Le journal peut se tromper.** L'écart n° 3 disait « le jeu d'essai ne publie que deux trajets dans
+  le futur ». Compté : **cinq** (`yul` J+3, `gru` J+5, `fih` J+7, `bzv-upcoming` J+10, `bzv-perkg`
+  J+15), et `git log` confirme qu'aucun trajet n'a été ajouté depuis. La mesure portait sur une base
+  **usée par les fiches précédentes**, pas sur le jeu d'essai. Corriger le cahier aurait gravé une
+  fausse contrainte ; ce qu'il fallait écrire est un **prérequis de données**.
+- **La correction elle-même peut se tromper.** Le premier jet de la correction d'`API-TRIP-13` visait
+  `bzv-perkg` pour prouver la garde « trajet réservé = intouchable ». Compté avant de committer :
+  `bzv-perkg` porte **zéro** réservation. Le bon trajet est `bzv-upcoming`.
+
+> Dans les deux cas, le remède est le même et il est bête : **compter**. Une ligne de `grep` sur le
+> seed, une ligne de `git log`. Ce qui coûte cher n'est pas la vérification, c'est de s'en dispenser
+> parce que la source avait l'air fiable.
+
+### Pour aller plus loin
+
+- Les postures de validation ont un nom en théorie des schémas : *open world* (tolérant) contre
+  *closed world* (strict). JSON Schema a `additionalProperties`, Protobuf ignore les champs inconnus
+  par conception, GraphQL refuse. Le choix se fait par frontière, pas par goût — et il se **documente**.
+- Sur les jetons : la littérature parle de *token staleness*. Les remèdes classiques sont la durée de
+  vie courte (15 min ici), une liste de révocation, ou une relecture en base sur les décisions
+  critiques. Ce dépôt combine les trois, chacune à sa place.
