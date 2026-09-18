@@ -38,6 +38,12 @@ type Props = {
    * Si non fourni, le bouton se contente de logger en console.
    */
   onSearchAction?: (value: TripSearchValue) => void;
+  /**
+   * Classes ajoutées aux DEUX enveloppes (desktop sticky + carte mobile) —
+   * ex. une marge négative pour chevaucher le hero de l'accueil. Une marge
+   * sur un élément sticky ne change pas son point de collage.
+   */
+  wrapperClassName?: string;
 };
 
 type FocusedField = "from" | "to" | "date" | null;
@@ -70,6 +76,7 @@ export default function TripSearchBar({
                                         forceCompactOnScroll = false,
                                         disableCompact = false,
                                         onSearchAction,
+                                        wrapperClassName = "",
                                       }: Props) {
   const t = useTranslations("common");
   const locale = useLocale();
@@ -146,7 +153,9 @@ export default function TripSearchBar({
   return (
     <>
       {/* ── Mobile version ── */}
-      <AppContainer className="md:hidden">
+      {/* `relative z-10` : la carte doit peindre AU-DESSUS d'un hero `relative`
+          qu'elle chevauche (marge négative de l'accueil) — sans lui, le hero la recouvre */}
+      <AppContainer className={`relative z-10 md:hidden ${wrapperClassName}`}>
         <MobileSearchExperience
           mode="card"
           from={draft.from}
@@ -163,6 +172,7 @@ export default function TripSearchBar({
       <div
         className={[
           "hidden md:block",
+          wrapperClassName,
           useSticky ? "sticky z-[90]" : "",
           useSticky && isScrolled
             ? "border-b border-slate-200/60 bg-white/95 py-3 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-slate-800/60 dark:bg-slate-950/95"

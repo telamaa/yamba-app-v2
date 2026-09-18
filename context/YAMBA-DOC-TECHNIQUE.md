@@ -11309,3 +11309,15 @@ référentiel de lieux, hors périmètre.
   page du layout, elle reste sous le header sur TOUTE la hauteur (à la Blablacar), en mode compact avec
   fond translucide — mécanique déjà présente dans `TripSearchBar` (`mode="auto"` + `stickyOnScroll`),
   simplement jamais placée là où elle pouvait servir.
+
+## Retouche 3 — les proportions Blablacar, sans copier (revue sur poste, 2 captures comparées)
+
+Le hero occupait presque tout l'écran avant la barre. Aligné sur les proportions de la référence, en
+gardant l'identité sombre Yamba : hero ~2× moins haut (illustration 400px max, paddings resserrés), la
+**barre chevauche la frontière** hero sombre / fond clair (`wrapperClassName="-mt-10 md:-mt-12"` —
+nouvelle prop de `TripSearchBar`, appliquée aux deux enveloppes ; une marge sur un élément sticky ne
+change pas son point de collage), la **ligne de confiance passe SOUS la barre** (comme la ligne
+d'options de la référence), et corridors visibles au-dessus de la ligne de flottaison. Au scroll,
+`disableCompact` : la barre **garde ses dimensions pleines** (labels compris), seul le bandeau
+translucide apparaît. Mobile : carte en chevauchement aussi — piège payé : le hero est `relative`, la
+carte statique passait DERRIÈRE lui ; l'enveloppe mobile porte désormais `relative z-10`.
