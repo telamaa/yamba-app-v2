@@ -6512,3 +6512,35 @@ un colis.
 | WEB313b | Le même écran en `/en/search` | « France », « Canada », « Congo (DRC) » — la langue du VISITEUR |
 | WEB314 | Page d'un trajet Paris → Brazzaville | « France » sous Paris, « Congo-Brazzaville » sous Brazzaville |
 | WEB315 | Carte mobile | Ville en premier et plus grande que l'heure ; seul le prix est en 18px |
+
+# L'accueil ne dit que du vrai · `feat/accueil-refonte`
+
+## Le besoin
+
+La page d'accueil affichait des statistiques et des témoignages inventés à côté du badge BETA. Au-delà du
+risque juridique (des avis fictifs présentés comme réels sont une pratique commerciale trompeuse), c'est
+la confiance — l'argument central d'une plateforme qui séquestre de l'argent — qui se joue dès cet écran.
+
+## Les règles
+
+- **RG-WEB-317** — L'accueil n'affiche **aucun chiffre invérifiable** : pas de compteurs d'utilisateurs,
+  d'avis, de notes ou de CO₂ tant que la plateforme ne les mesure pas réellement. Un bloc qui dépend de
+  données réelles **disparaît** quand elles sont absentes ; il ne montre jamais de valeurs de démonstration.
+- **RG-WEB-318** — Les corridors mis en avant proviennent des trajets **publiés et réservables** ; le clic
+  ouvre la recherche préremplie sur ce corridor.
+- **RG-WEB-319** — La confiance s'argumente par les **mécanismes du produit** (paiement séquestré, code de
+  livraison, vérifications, médiation), jamais par des témoignages non collectés par la plateforme. Le jour
+  où de vrais avis existent, ils s'affichent depuis l'API, avec leur source.
+- **RG-WEB-320** — L'accueil présente les **deux faces** de la place de marché avant le pied de page : le
+  parcours Voyageur est accessible depuis le hero et depuis « Comment ça marche ».
+- **RG-WEB-321** — Le détail de la répartition (part Voyageur / commission) n'apparaît pas sur l'accueil ;
+  la promesse est « le prix affiché est le prix payé », le détail vit sur les pages de tarification.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| WEB317 | Accueil avec le jeu d'essai | Aucun compteur global, aucun avis ; les corridors listés correspondent aux trajets publiés |
+| WEB317b | Base sans aucun trajet publié | La section corridors est absente — pas de puces vides ni de faux exemples |
+| WEB318 | Clic sur « Paris → Brazzaville » | `/search` s'ouvre préremplie, résultats filtrés sur ce corridor, aucun menu de suggestions ouvert |
+| WEB320 | Onglet « Je voyage » | Les 4 étapes Voyageur s'affichent sans quitter la page ; le hero porte le lien « Rentabilise tes kilos » |

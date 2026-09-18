@@ -6,19 +6,10 @@ import { Link } from "@/i18n/navigation";
 
 const SKELETON_DURATION = 300;
 
-const TRUST_SIGNALS = ["stripe", "insurance", "speed", "ecology"] as const;
-
 function FinalCtaSkeleton() {
   return (
     <section className="yamba-hero-mesh relative overflow-hidden py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-4">
-        {/* Trust signals skeleton */}
-        <div className="mb-10 flex flex-wrap justify-center gap-x-6 gap-y-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-4 w-32 animate-pulse rounded bg-white/10" />
-          ))}
-        </div>
-
         {/* Title skeleton */}
         <div className="mx-auto mb-10 max-w-xl space-y-3 text-center">
           <div className="mx-auto h-10 w-3/4 animate-pulse rounded-lg bg-white/10 md:h-14" />
@@ -49,15 +40,6 @@ export default function FinalCtaSection() {
   return (
     <section className="yamba-hero-mesh relative overflow-hidden py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-4">
-        {/* Trust signals au-dessus */}
-        <div className="mb-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400">
-          {TRUST_SIGNALS.map((signal) => (
-            <div key={signal} className="flex items-center gap-1.5">
-              {t(`trustSignals.${signal}`)}
-            </div>
-          ))}
-        </div>
-
         {/* Title */}
         <div className="mb-10 text-center">
           <h2 className="text-3xl font-extrabold leading-[1.05] tracking-tight text-white md:text-5xl">

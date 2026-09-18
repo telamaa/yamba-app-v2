@@ -11249,3 +11249,52 @@ sous « 01:51 » alors qu'il qualifie « Paris ». Arbitrage (option hybride ret
 
 La règle retenue : **le pays touche toujours la ville** (même ligne quand la largeur le permet,
 ligne adjacente sinon) ; l'heure ne s'intercale jamais dans un nom de lieu.
+
+# PR — Refonte de l'accueil : une page qui ne dit que du vrai · `feat/accueil-refonte`
+
+## Le constat (revue UX du 18/09, 7 captures)
+
+L'accueil accumulait des signaux inventés — « 12k+ utilisateurs », « 1 200+ avis 4,8/5 », « 2,4T CO₂ »,
+« 45 trajets actifs / 128 en transit », quatre témoignages fictifs — à côté d'un badge **BETA**, plus une
+photo iStock **filigranée** plein hero. Trois répétitions du même trio « 24h/−73 %/0 CO₂ », quatre
+titres-gradient, cinq étapes qui mélangeaient tutoiement/vouvoiement et inventaient une étape « Signez un
+contrat », une carte Leaflet décorative aux compteurs factices, la grille de commission 85/15 étalée en
+page d'accueil, et la face Voyageur invisible avant le pied de page.
+
+## La refonte — six blocs, tous adossés au produit réel
+
+- **Hero typographique** (`HeroSection`) : titre conservé (le bon accroche), plus de photo ni de fausses
+  statistiques ; la recherche en vedette, une ligne de confiance qui ne cite que des MÉCANISMES (paiement
+  bloqué Stripe, remise contre code, profils vérifiés), et la passerelle Voyageur dès le hero.
+- **`CorridorsSection` (nouveau)** : les corridors dérivés des trajets PUBLIÉS réels (`searchTrips`
+  limit 50, groupés par ville→ville, top 6). Chaque puce préremplit le brouillon de recherche partagé et
+  ouvre `/search`. Zéro trajet → la section disparaît : elle ne peut pas mentir.
+- **`HowItWorksSection` (nouveau)** : deux onglets « J'envoie un colis » / « Je voyage », 4 étapes
+  chacun, qui décrivent le VRAI parcours (réservation séquestrée, rendez-vous en messagerie, code de
+  livraison, versement après livraison). Tutoiement partout.
+- **`TrustSection` (nouveau)** : quatre dispositifs réels (séquestre, code 6 chiffres, vérifications,
+  médiation) + la promesse de prix en une ligne (« le prix affiché est le prix payé ») — la grille de
+  commission quitte l'accueil.
+- **`FinalCtaSection`** conservé, sans le bandeau de badges redondant ni le « 12 000+ ».
+- **Supprimés** : `PillarsSection`, `LiveMapSection` (et Leaflet au chargement de l'accueil),
+  `JourneySection`, `ReviewsTickerSection`, `PricingSection`, trois skeletons, les trois JPG iStock.
+  `messages/{fr,en}/home.json` réécrits (miroir vérifié) — aucune clé morte laissée derrière.
+
+## Deux mécanismes techniques à retenir
+
+- **`seedPersistedFormState(key, data, version)`** (ajouté à `usePersistedFormState.ts`) : écrire un
+  brouillon DEPUIS un autre écran sans dupliquer l'enveloppe `{version, data}` ni le préfixe
+  `yamba:form:` — le premier jet de la puce corridor écrivait la clé nue et la page de résultats ne
+  voyait rien. L'enveloppe reste chez son propriétaire.
+- **`CityAutocomplete` : une valeur hydratée n'est pas une interaction.** L'arrivée avec un brouillon
+  prérempli ouvrait les DEUX menus de suggestions (l'effet sur `value` s'exécute à l'hydratation). La
+  liste ne s'ouvre plus que si `hasInteractedRef` est vrai (focus ou saisie) ; les suggestions restent
+  préchargées pour le premier focus.
+
+## Vérification
+
+Sonde navigateur sur la stack réelle : hero sans photo, corridors réels (« Paris → Brazzaville ·
+6 trajets »), clic corridor → `/search` préremplie SANS menus ouverts, onglets, version EN (pluriels ICU
+« 1 trip / 6 trips »). `tsc` user-ui vert, miroir i18n vérifié (30 namespaces). Limite connue : les noms
+de villes des puces sont ceux stockés sur les trajets (langue du créateur) — les localiser exigerait un
+référentiel de lieux, hors périmètre.
