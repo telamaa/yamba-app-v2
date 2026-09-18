@@ -55,7 +55,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **1168 tests** (trip-service 308, deal-service 659, notification-service 122, message-service 79) + auth-service 395 (also a CI check) — any deviation must be explained. Measured 17/09/2026, after the four recette campaigns, D78, the three concurrency passes (A195 member, A196 trip transitions, A197 D2 executable), the determinism fix A199 and the six arbitrages of A198.
+Test platform baseline: **1170 tests** (trip-service 310, deal-service 659, notification-service 122, message-service 79) + auth-service 400 (also a CI check) — any deviation must be explained. Measured 18/09/2026, after D79 (fiche membre « Communications », auth +5) ; trip était resté noté 308 alors que la mesure disait 310 depuis la passe du 18/09. Historique proche : les quatre campagnes de recette, D78, les trois passes de concurrence (A195/A196/A197), le déterminisme A199 et les six arbitrages A198.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 

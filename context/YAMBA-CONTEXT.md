@@ -796,7 +796,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
-- 18/09 (nuit) : **D79 — LA FICHE MEMBRE MONTRE CE QU'ON LUI A ENVOYE (PR ouverte, `feat/admin-fiche-user-communications`).**
+- 18/09 (nuit, suite) : **LE NOM DU MENU MENE AU PROFIL (#365).** La carte utilisateur du menu (avatar + nom +
+  email + badge) devient un lien vers /dashboard/profile, dropdown desktop ET bottom-sheet mobile (meme composant).
+  Mergee APRES #366 : conflit attendu sur YAMBA-DOC-TECHNIQUE (deux ajouts en fin de fichier), resolu en gardant les
+  deux sections. 18 checks comptes. AUCUNE attribution Claude.
+- 18/09 (nuit) : **D79 — LA FICHE MEMBRE MONTRE CE QU'ON LUI A ENVOYE (#366).**
   Declencheur : instruction reelle « je ne recois rien » — six requetes Mongo a la main pour conclure que RIEN n'etait
   casse (la reservation attendue avait eu lieu sur le trajet d'un AUTRE voyageur, un seed du meme ecran de recherche).
   Inventaire d'abord : fiche trajet → reservations et fiche membre → deals existaient DEJA ; le seul trou etait les
