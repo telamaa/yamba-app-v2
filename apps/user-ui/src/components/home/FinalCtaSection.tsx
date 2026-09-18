@@ -56,7 +56,7 @@ export default function FinalCtaSection() {
         {/* 2 cards Shipper + Yamber */}
         <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-2">
           {/* Shipper */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
+          <div className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
             <div className="mb-4 flex items-center gap-3">
               {/* Icône filaire lucide, comme partout ailleurs — pas d'emoji-image */}
               <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-slate-950">
@@ -69,12 +69,12 @@ export default function FinalCtaSection() {
                 <p className="text-base font-bold text-white">{t("shipper.title")}</p>
               </div>
             </div>
-            <p className="text-sm leading-relaxed text-slate-300">
+            <p className="mb-5 text-sm leading-relaxed text-slate-300">
               {t("shipper.description")}
             </p>
             <Link
               href="/search"
-              className="yamba-grad-bg mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-slate-950 transition-transform hover:scale-[1.02]"
+              className="yamba-grad-bg mt-auto pt-0 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-slate-950 transition-transform hover:scale-[1.02]"
             >
               {t("shipper.cta")}
               <span>→</span>
@@ -82,7 +82,7 @@ export default function FinalCtaSection() {
           </div>
 
           {/* Yamber */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
+          <div className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.08]">
             <div className="mb-4 flex items-center gap-3">
               <div className="yamba-grad-bg grid h-10 w-10 place-items-center rounded-xl text-slate-950">
                 <Plane size={20} strokeWidth={2} />
@@ -94,12 +94,12 @@ export default function FinalCtaSection() {
                 <p className="text-base font-bold text-white">{t("yamber.title")}</p>
               </div>
             </div>
-            <p className="text-sm leading-relaxed text-slate-300">
+            <p className="mb-5 text-sm leading-relaxed text-slate-300">
               {t("yamber.description")}
             </p>
             <Link
               href="/carrier/onboarding"
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/15"
+              className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/15"
             >
               {t("yamber.cta")}
               <span>→</span>
