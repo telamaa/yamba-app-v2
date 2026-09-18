@@ -11077,3 +11077,61 @@ harnais (fiches WEB-ACC), joué hors CI — à renforcer d'une assertion « Pari
 passe du harnais.
 
 ---
+
+---
+
+# PR — Le thème sans `<script>` dans l'arbre client (next-themes remplacé) · `fix/theme-sans-script`
+
+## Le constat (recette manuelle du 18/09)
+
+La console de développement a montré « Encountered a script tag while rendering React component »,
+pile pointée sur `ThemeProvider` → `RootLayout`. React 19.2 signale tout `<script>` rendu par React
+côté client — un tel script ne s'exécute jamais.
+
+## Le point important : la parade précédente ÉVITAIT, elle n'empêchait pas
+
+Le dépôt avait **déjà payé** cet avertissement (recette 01-WEB : la bascule FR/EN remontait le layout
+de locale). La parade d'alors — monter le provider dans le layout **racine**, « qui ne se remonte
+jamais » — était un évitement : le `<script>` de next-themes restait un élément React dans un
+composant client, et **tout** remontage client du sous-arbre le recrée. La recette du 18/09 l'a revu
+à l'écran.
+
+La reproduction a d'ailleurs résisté à **six déclencheurs** (chargement, bascule de thème ×2, FR→EN,
+EN→FR, HMR sur une feuille, HMR sur le provider lui-même — sondes Playwright sur le poste réel) :
+l'occurrence vue tenait vraisemblablement à un remontage de récupération pendant que les services
+étaient arrêtés. C'est le propre d'un évitement : il tient jusqu'à un chemin qu'on n'a pas prévu.
+
+`next-themes` 0.4.6 (mars 2025) rend son script **inconditionnellement** (vérifié dans le dist :
+composant mémoïsé, aucun opt-out) ; aucune version corrigée n'est publiée (seule une 1.0.0-bêta).
+
+## Le correctif — l'avertissement devient impossible par construction
+
+| Avant | Après |
+|---|---|
+| script anti-flash = élément React dans un composant **client** (next-themes) | script anti-flash = **chaîne** rendue par le layout **racine, composant serveur**, premier enfant du `<body>` : adopté à l'hydratation, jamais recréé par React côté client |
+| provider next-themes | provider **maison** (`components/theme/`), même surface d'API (`theme`, `setTheme`, `resolvedTheme`, `systemTheme`, `themes`) — **zéro `<script>`** |
+
+Sémantique conservée à l'identique : clé de stockage `theme` (**les préférences déjà enregistrées
+survivent**), défaut `light`, `system` via `prefers-color-scheme` (suivi du changement d'OS), classe
+`light`/`dark` sur `<html>` (stratégie Tailwind), `color-scheme` posé, transitions coupées pendant la
+bascule, synchronisation entre onglets (`storage`). Et une propriété **meilleure** qu'avant : `theme`
+vaut `undefined` au rendu serveur ET au premier rendu client — identiques, donc aucun écart
+d'hydratation possible chez les consommateurs (les gardes `mounted` existantes restent).
+
+Deux consommateurs seulement (`HeaderThemeToggle`, `SettingsSection`) : bascule d'import, zéro autre
+changement. **`next-themes` désinstallé.**
+
+## Vérifié sur le poste réel (sondes Playwright, front de développement)
+
+1. chargement → classe `light` + `color-scheme: light` ;
+2. bascule → `dark`, `localStorage.theme = dark` ;
+3. **rechargement → classe `dark` dès `domcontentloaded`** (l'anti-flash tient) ;
+4. bascule FR→EN → thème conservé ;
+5. re-bascule → `light` ;
+6. le script anti-flash est bien dans le **HTML serveur** ;
+— et **zéro** erreur console (hors les deux 401 documentés de la sonde de session).
+
+Typecheck vert, **build de production vert sans la dépendance**. Le harnais (WEB-ACC-4) asserte le
+comportement — la classe `dark` sur `html` après bascule — pas la bibliothèque : il reste valable.
+
+`YAMBA-DOC-METIER.md` non touché : aucune règle métier ne bouge.
