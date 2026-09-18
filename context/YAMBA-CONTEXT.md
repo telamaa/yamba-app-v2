@@ -796,6 +796,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (soir, suite) : **LA CREATION DE TRAJET TIENT DANS UN ECRAN DE TELEPHONE (#363).** Capture iPhone via le
+  LAN : dans « Dates & horaires », les colonnes Date/Heure d'ARRIVEE debordaient de l'ecran. Cause : le piege #175 en
+  version iOS — `input[type=date]`/`[time]` a une largeur min-content intrinseque qu'une piste de grille `1fr` ne
+  compresse pas, la grille `grid-cols-2` devenait plus large que l'ecran. Correctif : `minmax(0,1fr)` sur la grille
+  des dates ET celle de l'itineraire (defense), `min-w-0` sur les quatre inputs. Sonde en viewport iPhone :
+  debordement horizontal 0 px. Tests inchanges. 18 checks comptes. AUCUNE attribution Claude.
 - 18/09 (soir) : **LE BADGE, LA PASSE SKELETONS — ET LE HEADER QUI NE SHIMME PLUS SON PROPRE LOGO (#361).**
   Trois volets sur poste. (1) Le badge « Voyageur actif » du menu partageait la ligne du nom (`flex` + `truncate`) :
   nom long ampute + pastille ecrasee sur deux lignes — il descend SOUS l'email, insecable, pour les trois etats.
