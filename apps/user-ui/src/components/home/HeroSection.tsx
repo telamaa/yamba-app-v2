@@ -32,11 +32,11 @@ export default function HeroSection() {
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-8 md:pb-20 md:pt-10">
-        <div className="grid items-center gap-6 md:grid-cols-[1.15fr_1fr] md:gap-10">
+      <div className="relative mx-auto max-w-7xl px-4 pb-14 pt-6 md:pb-16 md:pt-6">
+        <div className="grid items-center gap-5 md:grid-cols-[1.2fr_1fr] md:gap-8">
           {/* Colonne texte — alignée à gauche */}
           <div className="text-center md:text-left">
-            <h1 className="text-[26px] font-extrabold leading-[1.12] tracking-tight text-white md:text-4xl lg:text-[44px]">
+            <h1 className="text-[24px] font-extrabold leading-[1.12] tracking-tight text-white md:text-3xl lg:text-4xl">
               {t("titleLine1")} {t("titleLine2")}{" "}
               <span className="yamba-grad-text">{t("titleHighlight")}</span>{" "}
               {t("titleEnd")}
@@ -62,7 +62,7 @@ export default function HeroSection() {
             <img
               src="/assets/images/home-hero-yamba.svg"
               alt={t("illustrationAlt")}
-              className="w-full max-w-[360px] lg:max-w-[400px]"
+              className="w-full max-w-[260px] lg:max-w-[300px]"
             />
           </div>
         </div>
