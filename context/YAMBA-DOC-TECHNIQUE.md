@@ -11392,3 +11392,14 @@ d'authentification (trois pastilles rondes à l'emplacement exact de la cloche, 
 l'avatar — la seule zone réellement inconnue tant que `useUser` ne s'est pas résolu). Règle
 générale : **un skeleton ne shimme que ce qu'il ne sait pas** ; le statique s'affiche en vrai dès
 le premier rendu.
+
+# PR — La création de trajet tient dans un écran de téléphone · `fix/create-trip-mobile`
+
+Constat sur iPhone (capture du 18/09, page `/trips/create` via le LAN) : dans « Dates & horaires »,
+les colonnes Date/Heure d'ARRIVÉE débordaient de l'écran à droite, champs coupés. La cause est le
+piège documenté #175, version iOS : `input[type=date]` (et `time`) a une largeur min-content
+intrinsèque qu'une piste de grille `1fr` ne compresse PAS — la grille `grid-cols-2` devenait plus
+large que l'écran. Correctif : `grid-cols-[minmax(0,1fr)_minmax(0,1fr)]` sur la grille des dates,
+`minmax(0,1fr)` aussi sur la grille de l'itinéraire (défense, mêmes symptômes possibles avec
+l'autocomplétion), et `min-w-0` sur les quatre inputs date/heure. Vérifié à la sonde en viewport
+iPhone : débordement horizontal mesuré à 0 px, les quatre champs tiennent en deux colonnes.
