@@ -196,6 +196,10 @@
     "sessionExpired": {
       "title": "Ta session a expiré",
       "subtitle": "Par sécurité, une session se ferme après une heure sans activité (coche « Rester connecté » pour 7 jours). Reconnecte-toi : tu restes sur cette page."
+    },
+    "savedRoute": {
+      "title": "Connecte-toi pour créer une alerte",
+      "subtitle": "Ton alerte est liée à ton compte : c'est là qu'arrivent les emails dès qu'un trajet correspond. Elle t'attend après connexion."
     }
   },
   "report": {

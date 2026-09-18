@@ -196,6 +196,10 @@
     "sessionExpired": {
       "title": "Your session has expired",
       "subtitle": "For safety, a session closes after one hour without activity (tick “Stay signed in” for 7 days). Sign in again: you stay on this page."
+    },
+    "savedRoute": {
+      "title": "Log in to create an alert",
+      "subtitle": "Your alert is tied to your account: that's where the emails land when a trip matches. It's waiting for you after login."
     }
   },
   "report": {
