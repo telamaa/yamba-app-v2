@@ -2130,3 +2130,84 @@ exactement ce qu'on était venu retirer.
 - Sur ce que prouve un test qui lit du texte : il prouve une **forme**, jamais un **sens**. Il faut
   l'écrire dans la fiche elle-même, sinon quelqu'un la lira comme une preuve de comportement — et
   cessera d'écrire celle qui en est une.
+
+---
+
+## Chapitre 196 — Le pays que Google ne dit pas (fix/autocomplete-pays)
+
+Un petit correctif d'affichage, et trois leçons qui dépassent l'autocomplétion.
+
+### 1. L'asymétrie n'était pas où l'œil la voyait
+
+La recette manuelle voyait : départ « Paris » nu, destination « Kinshasa, République démocratique du
+Congo ». Le réflexe est de chercher une différence entre les deux champs. Il n'y en a **aucune** — le
+même composant sert les deux, et quatre flux du produit. La vraie ligne de partage : **français /
+étranger**. Le script Google est chargé avec `region=FR`, et Google **omet le pays de la région** dans
+ses prédictions.
+
+> Quand deux instances du même composant divergent, la cause est dans la **donnée**, pas dans le
+> composant. Chercher « ce qui diffère entre les deux champs » aurait fait perdre une heure ;
+> chercher « ce qui diffère entre les deux valeurs » a donné la réponse en une capture.
+
+### 2. Un commentaire qui promet n'est pas un code qui tient
+
+Le composant portait ce commentaire :
+
+```ts
+// Libellé normalisé « Ville, Pays » : Google omet le pays du domicile
+// (« Paris » mais « Amsterdam, Pays-Bas ») — on le rétablit toujours.
+const country = secondary.split(",").map((x) => x.trim()).filter(Boolean).pop() ?? "";
+```
+
+L'intention est juste, le mécanisme est faux deux fois : pour « Paris » le sous-titre est **vide**
+(rien à restaurer), et pour un aéroport français le dernier segment est une **localité** — le champ
+posait « Aéroport Paris-Beauvais (BVA), Tillé », une localité promue pays. Le « toujours » du
+commentaire ne couvrait en réalité que… les lieux étrangers, ceux qui n'avaient pas besoin d'être
+couverts.
+
+C'est la même famille que le chapitre 193 (« le test qui passe en enseignant le contraire ») : une
+promesse écrite à côté d'un mécanisme qui ne peut pas la tenir vaut pire qu'une absence de promesse —
+elle dissuade d'aller vérifier.
+
+### 3. Le libellé en deux temps, et pourquoi pas les deux alternatives « simples »
+
+Le correctif pose un libellé **provisoire** immédiat (sous-titre vide → « France », car le pays omis
+est *par construction* celui de la région du chargeur), puis le **raffine** avec le pays exact lu
+dans `addressComponents` (~200 ms). Deux subtilités :
+
+- le raffinement passe par `action(...)` seul — **`onSelect` n'est pas rejoué**. Un rappel de
+  sélection peut fermer un plein écran, déclencher une navigation : le rejouer sur une correction
+  cosmétique serait un double événement pour l'appelant ;
+- `hasSelectedRef` reste posé, donc la mise à jour programmatique du champ ne rouvre pas la liste —
+  seul un `onChange` clavier le remet à faux.
+
+Les deux alternatives d'une ligne, écartées **après** en avoir mesuré le coût :
+
+| Alternative | Pourquoi non |
+|---|---|
+| retirer `region=FR` du chargeur | le formatage suivrait l'**IP du visiteur** : un testeur à Kinshasa verrait « Kinshasa » nu et « Paris, France » — la même asymétrie, déplacée chez quelqu'un d'autre |
+| reconnaître les pays par `Intl.DisplayNames` | les noms CLDR divergent de ceux de Google (« Congo-Kinshasa » vs « République démocratique du Congo ») : le repli aurait pu produire… « Kinshasa, France » |
+
+> **La source des noms doit être celle des données qu'on corrige.** Pour compléter un libellé Google,
+> la seule référence sûre est Google lui-même (`addressComponents`) — pas une table tierce qui écrit
+> les mêmes pays autrement.
+
+### 4. Et le garde-fou d'amont qui a rendu le correctif sans risque
+
+Changer le libellé posé dans le champ aurait pu casser la recherche — c'est exactement l'anomalie
+bloquante `ANO-WEB-13` de la campagne, dans l'autre sens. Elle ne pouvait pas revenir : sa correction
+avait déplacé la règle au **serveur** (`placeSearchTerm` ne lit que le premier segment avant la
+virgule). Le correctif d'affichage s'est appuyé dessus au lieu de la redouter.
+
+> Une correction bien placée (au serveur, sur la règle) rend les corrections suivantes (à l'écran,
+> sur la forme) **libres**. C'est l'inverse d'un patch d'écran qui aurait figé le format à jamais.
+
+### Pour aller plus loin
+
+- Le paramètre `region` de l'API Maps ne fait pas que biaiser le classement : il gouverne le
+  **formatage** (omission du pays domestique, ordre des composants). Les deux effets sont couplés —
+  on ne peut pas garder l'un sans l'autre, d'où le rétablissement côté client.
+- La facturation Places par **session** : les frappes d'autocomplétion d'une session se facturent
+  avec le Place Details qui la clôt. Un flux qui sélectionne sans jamais appeler Details paie ses
+  requêtes une à une — l'appel ajouté ici n'est donc pas un pur surcoût, il fait entrer la page de
+  recherche dans le modèle de session que Google tarife.
