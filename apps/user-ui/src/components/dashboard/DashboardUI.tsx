@@ -283,3 +283,38 @@ export function InfoBanner({
     </div>
   );
 }
+
+/* ── Skeletons partagés ──────────────────────────────────────────
+ * Règle du dépôt : un skeleton est FIDÈLE à la structure qu'il remplace
+ * (mêmes conteneurs, mêmes espacements — zéro saut de layout), jamais un
+ * simple pavé gris ni un texte « Chargement… ». */
+
+/** Brique de base : une ligne/forme qui shimme. */
+export function Sk({ className }: { className: string }) {
+  return <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-800 ${className}`} />;
+}
+
+/** Miroir de StatCard (label, valeur, note). */
+export function StatCardSkeleton() {
+  return (
+    <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+      <Sk className="h-3 w-24" />
+      <Sk className="mt-2 h-6 w-28" />
+      <Sk className="mt-1.5 h-3 w-32" />
+    </div>
+  );
+}
+
+/** Rangée générique de liste : pastille ronde + deux lignes + valeur à droite. */
+export function RowSkeleton({ withBorder = true }: { withBorder?: boolean }) {
+  return (
+    <div className={`flex items-center gap-3 p-3.5 ${withBorder ? "rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950" : ""}`}>
+      <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+      <div className="min-w-0 flex-1">
+        <Sk className="h-3.5 w-40 max-w-full" />
+        <Sk className="mt-1.5 h-3 w-56 max-w-full" />
+      </div>
+      <Sk className="h-4 w-16 shrink-0" />
+    </div>
+  );
+}

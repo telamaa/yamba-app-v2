@@ -11366,3 +11366,16 @@ avec des « — » et des champs vides remplis d'un coup. Ajout d'un skeleton FI
 mêmes conteneurs, mêmes espacements, zéro saut de layout) — carte avatar, formulaire à 3 ou 5
 champs selon que le membre est Voyageur, carte des visibilités ; le titre reste réel (connu
 statiquement). Vérifié à la sonde avec une réponse profil retardée de 4 s.
+
+## Extension — la passe skeletons sur TOUT le dashboard (même PR)
+
+Inventaire des treize sections : Trips, Envois, Home avaient un skeleton dédié ; **Finances et
+Messages affichaient un texte « Chargement… » brut** ; Notifications, Favoris, Alertes route,
+Voyageurs suivis n'avaient que des pavés gris sans structure. Livré : brique partagée
+`Sk` + `StatCardSkeleton` + `RowSkeleton` dans `DashboardUI.tsx` (le miroir de `StatCard` vit à
+côté de `StatCard`), skeleton fidèle pour Finances (3 totaux + rangées, onglets réels), Messages
+(rangées de fils : avatar + deux lignes), Notifications (pastille d'icône + titre + sous-ligne +
+point non-lu), Favoris (carte trajet : bandeau/corps/pied), Alertes route (corridor + options +
+actions), Voyageurs suivis (avatar + identité + 3 statistiques). Les pages Sécurité / Paramètres /
+Confidentialité sont des formulaires au contenu statique : rien à changer. Vérifié à la sonde avec
+les API retardées de 5 s.

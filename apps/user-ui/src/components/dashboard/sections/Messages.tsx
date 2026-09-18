@@ -49,7 +49,18 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
         <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
           <div className={`min-w-0 border-slate-200 dark:border-slate-800 lg:border-r ${selectedId ? "hidden lg:block" : "block"}`}>
             {isLoading ? (
-              <p className="p-6 text-[13px] text-slate-500 dark:text-slate-400">{t("loading")}</p>
+              /* Skeleton fidèle aux rangées de fils (avatar 9 + deux lignes) — plus de texte « Chargement… » */
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800" aria-busy="true">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <li key={i} className="flex items-start gap-3 px-3 py-3">
+                    <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-3.5 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                      <div className="mt-1.5 h-3 w-44 max-w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
             ) : (
               <ConversationsList items={data?.items ?? []} selectedId={selectedId} onSelectAction={setSelectedId} />
             )}

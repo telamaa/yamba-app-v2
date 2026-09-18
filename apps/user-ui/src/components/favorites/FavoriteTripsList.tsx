@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { useFavoriteTrips } from "@/hooks/useFavoriteTrips";
 import TripResultCard from "@/components/search/TripResultCard";
 import TripResultCardMobile from "@/components/search/TripResultCardMobile";
+import { Sk } from "@/components/dashboard/DashboardUI";
 
 /** D46 — liste « Mes favoris » : mêmes cartes que la recherche, cœur plein. */
 export default function FavoriteTripsList() {
@@ -13,10 +14,26 @@ export default function FavoriteTripsList() {
   const { data, isLoading, isError } = useFavoriteTrips();
 
   if (isLoading) {
+    // Skeleton fidèle à la carte trajet (bandeau, corps ville/ligne/prix, pied Voyageur)
     return (
       <div className="space-y-3" aria-busy="true">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-40 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-900" />
+          <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
+              <Sk className="h-6 w-20 rounded-full" />
+              <Sk className="h-3 w-28" />
+            </div>
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 px-4 py-3">
+              <div><Sk className="h-4 w-24" /><Sk className="mt-1.5 h-3 w-14" /></div>
+              <Sk className="h-px w-full" />
+              <div className="flex flex-col items-end"><Sk className="h-4 w-24" /><Sk className="mt-1.5 h-3 w-14" /></div>
+              <div className="flex flex-col items-end"><Sk className="h-6 w-20" /><Sk className="mt-1.5 h-3 w-16" /></div>
+            </div>
+            <div className="flex items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
+              <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+              <Sk className="h-3 w-32" />
+            </div>
+          </div>
         ))}
       </div>
     );
