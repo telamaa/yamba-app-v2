@@ -10920,3 +10920,93 @@ deal-service **659 → 680** (+17 la lib, +4 le garde-fou). auth **395**, trip *
 `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge. Arbitrage **A200** au registre.
 
 ---
+
+---
+
+# PR — `nx typecheck` entre à la CI, et la cause est gardée avant le symptôme · `chore/ci-typecheck-fiches`
+
+## Pourquoi
+
+Le 18/09, en vérifiant la propreté de `dev`, `nx typecheck auth-service` a rendu **53 erreurs** — pendant
+que les 17 checks de la CI étaient verts. Les deux avaient raison : ils ne regardent pas les mêmes
+fichiers.
+
+| | Ce qui est typechecké | Les fiches de test ? |
+|---|---|---|
+| Job CI `TypeScript (<projet>)` | `tsconfig.app.json` | **exclues** (`"exclude": ["src/**/*.spec.ts", …]`) |
+| Cible Nx `typecheck` | `tsconfig.json` | **incluses** |
+
+Exclure les fiches du typecheck applicatif est le **bon choix** : une fiche de test ne doit pas
+bloquer un build. La conséquence n'en est pas moins un angle mort — **un défaut vivant uniquement
+dans les fiches était invisible pour l'ensemble de la CI.**
+
+## Ce qui est ajouté
+
+### Un check : `TypeScript (fiches de test)`
+
+```yaml
+- name: Typecheck (fiches de test incluses)
+  run: npx nx run-many --target=typecheck --all --skip-sync
+```
+
+**Un seul** check pour les **9** projets qui portent la cible (les deux fronts sont déjà couverts par
+le job `typecheck`), afin de ne pas gonfler le compte : **17 → 18**.
+
+`--skip-sync` est délibéré et documenté dans le job : le générateur de synchronisation Nx veut ajouter
+à `apps/e2e/tsconfig.json` une référence vers `apps/admin-ui`, qui porte `noEmit: true` — or **un
+projet référencé ne peut pas désactiver l'émission** (`TS6310`). Appliquer la synchronisation **casse**
+`nx typecheck e2e` : mesuré le 18/09, branche abandonnée. Tant qu'`admin-ui` est en `noEmit`, on saute
+la synchronisation plutôt que de casser une cible pour faire taire un avertissement.
+
+### Une garde : le balayage des fiches-scripts
+
+`apps/deal-service/src/services/fiches-sont-des-modules.spec.ts` refuse toute fiche de test sans
+`import` ni `export` en tête.
+
+**Pourquoi en plus du check CI, et pas à la place :** la contre-épreuve a montré que le check CI
+attrape le **symptôme**, pas la **cause**.
+
+| Défaut réintroduit | `nx typecheck` | le balayage |
+|---|---|---|
+| **UNE** fiche-script | **vert** — aucune collision | **rouge**, le fichier nommé |
+| **DEUX** fiches-scripts déclarant un même nom | **rouge** (12 × `TS2451`) | **rouge**, les deux nommés |
+
+Autrement dit, sans le balayage, la première fiche fautive passe — et c'est la suivante, écrite par
+quelqu'un d'autre des semaines plus tard, qui fait tomber la CI **sur un troisième fichier encore**.
+
+Le balayage n'a **aucune liste d'exceptions à maintenir** : la règle est vraie pour toute fiche, sans
+dérogation. C'est ce qui le rend soutenable, et ce qui le distingue de la piste « clé i18n orpheline »
+du 18/09, qui en exigerait une pour les clés composées à l'exécution.
+
+## Deux affirmations périmées de `CLAUDE.md`, corrigées
+
+Les deux ont été mesurées, pas déduites :
+
+- **« TypeScript ×9 »** — il y en a **huit** (`user-ui`, `admin-ui` et les six services), et il n'y en
+  a jamais eu neuf. Le total de 17 était juste : 8 + 5 + 4.
+- **« `npm audit` is expected at 0 »** — il est à **18** (1 modérée, 17 hautes). L'essentiel est la
+  famille Nx, dont le « correctif » est une **rétrogradation** vers `nx@22.6.4` depuis la 23.2 en
+  service : le piège exact déjà payé sur `imagekit`. Les seuls correctifs réels et non majeurs en
+  attente : `nodemailer` 9.0.3 → 9.1.1, `morgan` → 1.12, `svgo` (transitif).
+
+Une affirmation fausse dans le document qui fait autorité coûte plus cher qu'une absence : quelqu'un
+s'y fie.
+
+## Ce que ça ne ferme pas
+
+Le nouveau check voit les fiches **typées**, pas les fiches **justes**. Et il ne relit toujours pas les
+`.md` : un marqueur de conflit dans un cahier de recette partirait encore sur `dev` en silence (piège
+consigné au handoff du 18/09, § 5).
+
+## Tests
+
+deal-service **680 → 684** (+4, le balayage). auth **395**, trip **308**, notification **122**, message
+**79** — inchangés. **1588 au total.** Les deux gardes ont été **vues échouer** sur de vrais fichiers,
+puis le code restauré à l'identique.
+
+⚠ **Action hors dépôt** : le nouveau check doit être ajouté aux **required status checks** de la
+protection de branche `dev` (réglage GitHub, hors du dépôt) — sans quoi il tourne mais ne bloque rien.
+
+`YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
+
+---
