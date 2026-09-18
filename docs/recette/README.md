@@ -22,8 +22,9 @@ Quatre cahiers de bout en bout, à jouer avant l'ouverture du chantier mobile. C
 docker compose up -d && ./scripts/redpanda-bootstrap.sh
 npx tsx --env-file=.env packages/libs/prisma/scripts/seed-deals.ts
 npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --role SUPER_ADMIN
-npm run dev            # six services + site
-npx nx dev admin-ui    # back-office
+npm run dev            # les SIX services seuls (nx run-many serve) — pas les fronts
+npx nx dev user-ui     # site membre (port 3000)
+npx nx dev admin-ui    # back-office (port 3001)
 bash scripts/smoke-services.sh
 ```
 

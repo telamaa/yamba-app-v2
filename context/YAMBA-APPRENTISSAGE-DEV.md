@@ -1573,3 +1573,172 @@ doubles de test sont du code ; ils méritent la même défiance que le reste, et
   approché, un agrégat périodique, ou en changeant la question posée (ici : compter des personnes).
 - Sur les mocks : exécuter la suite en `--runInBand` est le premier réflexe de diagnostic quand une fiche est
   instable. Si le rouge disparaît, ce n'est pas le test qui est faux — c'est ce qui est partagé entre eux.
+
+---
+
+## Chapitre 192 — Le cahier ment plus vite que le code (passe 04-CRONS)
+
+Ce chapitre ne parle pas d'une fonctionnalité. Il parle d'un artefact qu'on fabrique à chaque campagne de
+recette et qu'on laisse pourrir : le **cahier de test**. Et de trois façons dont un document d'instructions peut
+devenir activement nuisible — pas seulement périmé.
+
+### 1. Deux documents qui vieillissent à des vitesses différentes
+
+Une campagne de recette produit toujours la même paire :
+
+| Document | Écrit | Vieillit |
+|---|---|---|
+| Le **cahier** (`docs/recette/RECETTE-*.md`) | **avant** la campagne | à chaque correction livrée **après** |
+| Les **résultats** (`context/YAMBA-RECETTE-*-RESULTATS.md`) | **pendant** | presque pas — c'est un journal daté |
+
+Le cahier dit ce qu'il **faut faire**, donc il est lu et exécuté ; les résultats disent ce qui **s'est passé**,
+donc ils sont lus une fois puis archivés. L'asymétrie est cruelle : le document qu'on exécute est celui qui
+vieillit le plus vite.
+
+Conséquence concrète, déjà payée deux fois : à la passe suivante, le testeur consigne comme **anomalie** ce qui
+est en réalité la **correction**. On rouvre un dossier clos, on refait une enquête faite, et personne ne sait
+plus qui a raison du cahier ou du code.
+
+> **La règle du dépôt existe pour ça** : « code + ses tests > registre > règles métier > synthèses ». Mais une
+> règle de précédence ne répare rien toute seule : elle dit qui gagne, pas qui va corriger le perdant.
+
+### 2. Aller chercher la vérité au bon endroit
+
+Le handoff annonçait **un** écart sur ce cahier. Il y en avait **douze**. Même schéma que sur le 02-ADMIN, où le
+handoff en annonçait trois pour quatorze.
+
+Ce n'est pas de la négligence : un handoff est un **résumé**, et un résumé retient ce qui était saillant le jour
+où on l'a écrit. Les écarts, eux, sont consignés **au fil des chapitres**, dans des phrases du genre « écart
+documentaire, à corriger dans le cahier » — une ligne perdue au milieu d'un constat de trois paragraphes.
+
+```sh
+# Le réflexe : ne PAS lire le résumé. Balayer le journal de campagne.
+grep -n -i 'écart' context/YAMBA-RECETTE-CRONS-RESULTATS.md
+grep -n -i '^#\{2,4\}.*écart' context/YAMBA-RECETTE-WEB-RESULTATS.md
+```
+
+Sur le 02-ADMIN les écarts avaient leur **section** par chapitre ; sur le 04-CRONS ils sont **en ligne**, au
+fil du texte. Deux campagnes, deux conventions — donc on balaye les deux formes.
+
+### 3. Trois façons pour un document d'instructions d'être nuisible
+
+C'est le cœur de ce chapitre. Un document périmé, au pire, fait perdre du temps. Ces trois-là font des dégâts.
+
+**(a) Il donne une commande qui casse la CI.** Le cahier demandait de créer `scripts/recette-secret-audit.ts`.
+Or le contrôle d'intégration continue refuse tout fichier **suivi** dont le chemin contient `secret` :
+
+```sh
+git ls-files | grep -iE '(^|/)\.env($|\.)|secret|\.pem$|\.key$' | grep -vE '\.(example|template)$'
+```
+
+Le testeur zélé qui suit le cahier **et** versionne son script casse la branche, avec un message d'erreur qui
+parle de fuite de secrets alors qu'il n'y en a aucune. La campagne avait contourné en nommant le fichier
+`audit-code-livraison.ts` — et, geste décisif, en écrivant **la raison dans l'en-tête du fichier** :
+
+```ts
+/**
+ * CRON-SEC-6 — le code de livraison ne quitte jamais la base.
+ * (Nom de fichier volontairement sans le mot « s-e-c-r-e-t » : le garde-fou anti-fuite de la CI
+ *  refuse tout fichier suivi dont le nom contient ce motif.)
+ */
+```
+
+Remarquez le détail : le commentaire lui-même **épèle** le mot pour ne pas le contenir. C'est exactement le
+bon réflexe — mais un contournement connu d'un seul développeur n'est pas un contournement. Tant qu'il n'est
+pas dans le document que les autres exécutent, il sera redécouvert.
+
+**(b) Il fabrique la panne qu'il prétend observer.** La fiche `CRON-CONSO-3` veut éprouver un poison de
+**contrat** : un message hors schéma doit être classé `FAILED` sans bloquer la partition. Sa commande :
+
+```sh
+docker exec -i yamba-redpanda rpk topic produce booking-events \
+  -H event-id=… -k test <<< '{"pas":"un evenement"}'
+```
+
+`rpk` compresse en **snappy** par défaut. kafkajs ne sait pas décompresser snappy et lève
+`KafkaJSNotImplemented` — une erreur **non retriable** : le consommateur s'arrête définitivement, le processus
+reste vivant, `/health` répond toujours `ok`, et plus une notification ni un email ne sort de la plateforme.
+
+C'est `ANO-CRON-08`, **bloquante**, et elle a été provoquée par la commande du cahier lui-même.
+
+Le défaut trouvé était réel et il est corrigé. Mais il faut tenir les deux idées à la fois :
+
+> Un poison de **transport** (l'octet qu'on ne sait pas décoder) et un poison de **contrat** (le message décodé
+> mais hors schéma) ne s'éprouvent pas avec la même fiche. Un outil de recette qui mélange les deux ne teste
+> plus rien de précis. En recette : `rpk topic produce -z none`, toujours.
+
+Et la leçon de méthode, plus large : **quand un outil de recette provoque un effondrement, vérifier d'abord ce
+que l'outil envoie vraiment.** Le premier suspect n'est pas le système.
+
+**(c) Il fait croire qu'on a mesuré ce qu'on n'a pas mesuré.** `CRON-TRAJETS-4` demandait de faire échouer un
+trajet sur trois pour prouver que la fournée continue. Les trois moyens envisageables échouent :
+
+```ts
+// apps/trip-service/src/cron/complete-trips.cron.ts
+const carrierPage = await prisma.carrierPage.findUnique({ where: { userId: trip.userId }, … });
+const valeurs = carrierPage && clampedCarrierStats(carrierPage, deltas);
+if (carrierPage && valeurs) { … }        // ← l'absence est TOLÉRÉE, pas une erreur
+```
+
+Supprimer la `CarrierPage` ne provoque rien. Pointer `userId` sur un identifiant inexistant non plus (même
+`null`). Écrire un `userId` **malformé** en Mongo brut casse Prisma **au scan**, avant la boucle — donc à un
+autre endroit que celui qu'on veut éprouver.
+
+Le remède n'est pas de trouver une provocation plus tordue, c'est de **dire la vérité sur le niveau de
+preuve** : la fiche fait maintenant vérifier la **forme** de la garde — `try/catch` autour du corps d'**un
+seul** trajet, `skipped++`, la ligne de journal, aucun `throw` qui remonte — et consigner que la propriété est
+**structurelle**, pas mesurée.
+
+> **Dire « vérifié par lecture » est honnête. Laisser une étape qui ne prouve rien ne l'est pas.** Une étape de
+> test qui passe toujours est pire qu'une étape absente : elle occupe la place d'une vraie preuve.
+
+Et l'amélioration qui la rendrait mesurable est écrite dans la fiche, avec son statut : rendre la boucle
+**injectable** (passer le client Prisma en argument, comme le font déjà `recipient-redaction` et
+`unread-reminder`). Tant qu'une tâche va chercher son client elle-même, sa gestion d'erreur est invérifiable de
+l'extérieur. C'est un argument de conception, pas de confort.
+
+### 4. Vérifier dans le code, jamais recopier
+
+La tentation, sur une passe documentaire, est de recopier les résultats dans le cahier. C'est exactement
+l'erreur : on propage alors l'état du **jour de la campagne**, pas l'état du code. Deux exemples de cette
+passe :
+
+- `DIV-3` disait « l'en-tête de `payout-bookings.cron.ts` annonce < 10 essais ». Ouvrir le fichier : l'en-tête
+  dit **l'inverse**, mot pour mot (« Le plafond de 10 essais a disparu avec D58 »). La divergence est
+  **refermée** — et c'est la liste des divergences qui avait vieilli.
+- `DIV-1` disait « le cron `onboarding-reminder` n'est jamais démarré ». Vérifier : il **est** démarré
+  (`main.ts`, l. 65-72). Mais en allant lire le livrable, on découvre qu'il se **contredit lui-même** —
+  « n'est appelé nulle part » à deux endroits, « Démarré depuis A148 » à un troisième, dans la même section.
+  La divergence n'est donc ni vraie ni fausse : elle est **à moitié vraie**, ce qui est une information qu'aucun
+  des deux documents ne portait.
+
+On ne trouve ça qu'en ouvrant les fichiers.
+
+```sh
+# Le périmètre annoncé se vérifie, lui aussi : « treize tâches planifiées »
+ls apps/*/src/cron/*.cron.ts | wc -l          # 13
+grep -h 'start[A-Za-z]*Cron(' apps/*/src/main.ts | wc -l   # toutes démarrées
+```
+
+### 5. Le journal de campagne, lui non plus, n'est pas au-dessus du soupçon
+
+Le fichier de résultats portait trois anomalies en **`ÉTAT : OUVERTE`** dans leur fiche et **`close`** dans le
+tableau de verdict final — le tableau ayant été mis à jour, pas les fiches. Et ce même tableau nommait **cinq
+fiches qui ne sont pas celles des chapitres**, dont une (`CRON-TRAJ-5`) qui n'existe dans aucun cahier : une
+table de synthèse écrite de mémoire, en fin de campagne.
+
+> **Une table de synthèse est une source secondaire.** Quand elle contredit le corps du document, c'est le
+> corps qui a raison : il a été écrit au moment des faits.
+
+### Pour aller plus loin
+
+- Le vocabulaire consacré pour ce chapitre, c'est la **documentation exécutable** : le seul remède durable à un
+  document d'instructions qui ment, c'est de le rendre exécutable — un test, un script versionné, un lien
+  vérifié par la CI. Ce cahier a fait un pas dans cette direction le jour où ses 45 scripts sont entrés dans le
+  dépôt ; il lui restait à **le dire**.
+- Le contrôle de liens morts est automatisable en une ligne (`grep -o 'RECETTE-0[0-9]-[A-Z]*' docs/recette/*.md`
+  croisé avec `ls`) — les deux renvois vers des fichiers inexistants trouvés sur le 02-ADMIN et celui trouvé
+  ici auraient été attrapés par la CI pour un coût nul. C'est une piste, pas une décision.
+- Sur la compression Kafka : `snappy`, `lz4` et `zstd` demandent un codec côté client. kafkajs n'embarque que
+  `gzip` ; les autres passent par `@kafkajs/*-compression`. Un producteur tiers qui compresse autrement suffit
+  à faire tomber un consommateur — c'est ce qui rend `ANO-CRON-08` intéressante bien au-delà de la recette.
