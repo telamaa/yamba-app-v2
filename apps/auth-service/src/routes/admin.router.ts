@@ -80,6 +80,7 @@ const adminUsers = makeAdminUsersController(makeAdminUsersService());
 router.get("/admin/users", isAdminAuthenticated, requireAdminPermission("users.read"), adminUsers.search);
 router.get("/admin/users/export", isAdminAuthenticated, requireAdminPermission("exports.personal"), adminUsers.exportCsv); // C-PR7a (D60 2A) — SUPER_ADMIN, motif, journal
 router.get("/admin/users/:id", isAdminAuthenticated, requireAdminPermission("users.read"), adminUsers.getFile);
+router.get("/admin/users/:id/communications", isAdminAuthenticated, requireAdminPermission("users.read"), adminUsers.communications); // D79 — notifications + emails du membre, jamais un contenu
 router.post("/admin/users/:id/suspension/propose", isAdminAuthenticated, requireAdminPermission("users.suspension.propose"), adminUsers.propose);
 router.post("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.apply);
 router.delete("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.lift);

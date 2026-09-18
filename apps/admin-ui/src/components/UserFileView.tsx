@@ -8,9 +8,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, auditDetail, REPORT_REASON_LABEL, SANCTION_CATEGORY_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
+import { ACTION_LABEL, HISTORY_STATUS_LABEL, auditDetail, REPORT_REASON_LABEL, SANCTION_CATEGORY_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
-import type { AdminMe, AdminUserFile, ErasureBlocker, SanctionCategory } from "@/lib/types";
+import type { AdminMe, AdminUserCommunicationsResponse, AdminUserFile, ErasureBlocker, SanctionCategory } from "@/lib/types";
 
 const MIN_REASON = 20;
 /** Recette § 5.5 — un motif inconnu (`UNKNOWN`) n'est plus affiché « rebond dur ». */
@@ -153,6 +153,7 @@ export default function UserFileView({ userId }: { userId: string }) {
           </table>
         )}
       </Card>
+      <CommunicationsCard userId={file.id} />
       <Card title="Actions admin sur ce compte" className="mt-5">
         {file.adminActions.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
           <ul className="space-y-1 text-[12.5px]">
@@ -163,6 +164,67 @@ export default function UserFileView({ userId }: { userId: string }) {
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * D79 — « ce membre dit ne rien recevoir » : ce que la plateforme lui a envoyé (notifications in-app, emails),
+ * types et statuts seulement — jamais un contenu ni le code de livraison. Chargée à la demande, comme la
+ * chronologie d'un deal ; la lecture écrit le même USER_VIEWED coalescé que la fiche.
+ */
+const EMAIL_ECHECS = ["FAILED", "BOUNCED", "COMPLAINED"];
+function CommunicationsCard({ userId }: { userId: string }) {
+  const [c, setC] = useState<AdminUserCommunicationsResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function load() {
+    setBusy(true); setErr(null);
+    try { setC(await apiFetch<AdminUserCommunicationsResponse>(`/admin/users/${userId}/communications`)); }
+    catch (e) { setErr(e instanceof ApiError && e.status === 404 ? "Ce compte n'existe plus." : "Chargement impossible : réessaie dans un instant."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Card title="Communications envoyées à ce membre" className="mt-5">
+      <p className="text-[12px] text-slate-500">Notifications in-app et emails : types et statuts seulement, jamais un contenu. Répond à « je ne reçois rien » — si la liste est vide, rien n&apos;a été émis pour lui, le problème est en amont (l&apos;événement attendu n&apos;a pas eu lieu).</p>
+      {!c && <button disabled={busy} onClick={load} className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] disabled:opacity-50">Charger les communications</button>}
+      {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
+      {c && (
+        <>
+          <p className="mt-2 text-[11.5px] text-slate-500">
+            {c.counts.notifications} notification(s) dont {c.counts.unreadNotifications} non lue(s) · {c.counts.emails} email(s)
+            {c.counts.failedEmails > 0 && <span className="ml-1 rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700">{c.counts.failedEmails} en échec</span>}
+            {(c.notifications.length < c.counts.notifications || c.emails.length < c.counts.emails) && <span className="ml-1">— les 30 plus récents affichés</span>}
+          </p>
+          <h3 className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Notifications in-app ({c.notifications.length})</h3>
+          {c.notifications.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
+            <ol className="mt-1 space-y-1 text-[12.5px]">
+              {c.notifications.map((n, i) => (
+                <li key={i} className="flex flex-wrap gap-x-2">
+                  <span className="w-32 shrink-0 text-slate-500">{dateTime(n.createdAt)}</span>
+                  <b>{n.type}</b>
+                  <span className={`text-[11px] ${n.readAt ? "text-slate-400" : "font-semibold text-amber-700"}`}>{n.readAt ? `lue le ${dateTime(n.readAt)}` : "non lue"}</span>
+                  {n.bookingId && <Link href={`/deals/${n.bookingId}`} className="text-[11px] underline">deal</Link>}
+                </li>
+              ))}
+            </ol>
+          )}
+          <h3 className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Emails ({c.emails.length})</h3>
+          {c.emails.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucun.</p> : (
+            <ol className="mt-1 space-y-1 text-[12.5px]">
+              {c.emails.map((e, i) => (
+                <li key={i} className="flex flex-wrap gap-x-2">
+                  <span className="w-32 shrink-0 text-slate-500">{dateTime(e.sentAt ?? e.claimedAt)}</span>
+                  <b>{e.template}</b>
+                  <span title={e.status} className={`text-[11px] ${EMAIL_ECHECS.includes(e.status) ? "font-semibold text-red-700" : "text-slate-400"}`}>{HISTORY_STATUS_LABEL[e.status] ?? e.status.toLowerCase()}</span>
+                  {e.bookingId && <Link href={`/deals/${e.bookingId}`} className="text-[11px] underline">deal</Link>}
+                  {e.lastError && <span className="text-[11px] text-red-700">{e.lastError}</span>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
+    </Card>
   );
 }
 

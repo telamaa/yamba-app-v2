@@ -324,3 +324,37 @@ export const AdminSessionItemSchema = z
   })
   .meta({ id: "AdminSessionItem" });
 export type AdminSessionItem = z.infer<typeof AdminSessionItemSchema>;
+
+/* ── D79 — fiche membre : ses communications (notifications in-app + emails), jamais leur contenu ── */
+export const AdminUserNotificationItemSchema = z
+  .object({
+    type: z.string().describe("Event key du contrat (ex. booking.requested) — jamais le corps affiché au membre"),
+    bookingId: ObjectIdSchema.nullable(),
+    createdAt: z.string().datetime(),
+    readAt: z.string().datetime().nullable(),
+  })
+  .meta({ id: "AdminUserNotificationItem" });
+export type AdminUserNotificationItem = z.infer<typeof AdminUserNotificationItemSchema>;
+
+export const AdminUserEmailItemSchema = z
+  .object({
+    template: z.string().describe("Nom du template (ex. booking/booking-requested-carrier) — jamais le corps"),
+    status: z.string().describe("PENDING / SENT / DELIVERED / FAILED / BOUNCED / COMPLAINED"),
+    bookingId: ObjectIdSchema.nullable().describe("Deal source via l'outbox — null pour un événement non-deal"),
+    claimedAt: z.string().datetime(),
+    sentAt: z.string().datetime().nullable(),
+    lastError: z.string().nullable().describe("Expurgée (redactContacts) et tronquée"),
+  })
+  .meta({ id: "AdminUserEmailItem" });
+export type AdminUserEmailItem = z.infer<typeof AdminUserEmailItemSchema>;
+
+export const AdminUserCommunicationsResponseSchema = z
+  .object({
+    userId: ObjectIdSchema,
+    notifications: z.array(AdminUserNotificationItemSchema).describe("Les 30 dernières, de la plus récente à la plus ancienne"),
+    emails: z.array(AdminUserEmailItemSchema).describe("Les 30 derniers, du plus récent au plus ancien"),
+    counts: z.object({ notifications: z.number().int(), unreadNotifications: z.number().int(), emails: z.number().int(), failedEmails: z.number().int().describe("FAILED + BOUNCED + COMPLAINED, tous envois confondus") }),
+    generatedAt: z.string().datetime(),
+  })
+  .meta({ id: "AdminUserCommunicationsResponse", description: "D79 — ce que la plateforme a envoyé à ce membre : types et statuts seulement, jamais un contenu ni le code de livraison" });
+export type AdminUserCommunicationsResponse = z.infer<typeof AdminUserCommunicationsResponseSchema>;

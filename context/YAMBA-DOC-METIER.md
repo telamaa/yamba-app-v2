@@ -6566,3 +6566,35 @@ la confiance — l'argument central d'une plateforme qui séquestre de l'argent 
 |---|---|---|
 | WEB323 | Menu utilisateur, nom long + profil Voyageur actif | Nom sur sa ligne (tronqué proprement si besoin), badge entier dessous, jamais sur deux lignes |
 | WEB323b | `/dashboard/profile` sur réseau lent | Skeleton aux emplacements exacts du contenu ; aucun « — » |
+
+# Le support répond à « je ne reçois rien » · `feat/admin-fiche-user-communications`
+
+## Le besoin
+
+Un membre écrit au support : « je ne reçois ni emails ni notifications ». Avant D79, instruire cette
+plainte exigeait un développeur et des requêtes en base ; la chronologie d'un deal (D59) ne servait à rien
+quand le problème était justement qu'AUCUN deal n'existait (cas réel du 18/09 : la réservation attendue
+avait eu lieu sur le trajet d'un autre voyageur). La fiche membre porte désormais une carte
+« Communications » : ce que la plateforme lui a réellement envoyé, et dans quel état.
+
+## Les règles
+
+- **RG-ADM-34** — La fiche membre expose ses **notifications in-app** (type d'événement, deal lié, date,
+  lue ou non) et ses **envois d'emails** (template, statut envoyé / remis / en échec / rebond / plainte,
+  deal lié, dates), limités aux 30 plus récents de chaque, avec les totaux en base.
+- **RG-ADM-35** — **Jamais un contenu** : ni corps de message, ni sujet rendu, ni code de livraison. Une
+  erreur d'envoi est expurgée (adresses et numéros masqués) avant d'être montrée.
+- **RG-ADM-36** — Lecture seule sous la permission `users.read` ; la consultation est journalisée par le
+  même `USER_VIEWED` coalescé que la fiche (une ligne, pas deux).
+- **RG-ADM-37** — Une liste **vide** est une information : rien n'a été émis pour ce membre — le problème
+  est en amont (l'événement attendu n'a pas eu lieu), pas dans l'acheminement. La carte le dit.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| ADM79a | Fiche d'un membre avec notifications et emails, « Charger les communications » | Totaux (dont non lues, en échec), deux listes datées, lien « deal » vers la fiche argent |
+| ADM79b | Email en échec avec une erreur SMTP citant l'adresse | Statut rouge, erreur affichée avec « [adresse masquée] » |
+| ADM79c | Membre sans aucune communication | « Aucune. » / « Aucun. » — et l'explication « le problème est en amont » |
+| ADM79d | Compte inexistant | « Ce compte n'existe plus. » |
+| ADM79e | Journal du compte après fiche + carte | UNE ligne USER_VIEWED (coalescée), pas deux |
