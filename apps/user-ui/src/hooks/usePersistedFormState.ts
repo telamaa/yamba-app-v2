@@ -162,42 +162,68 @@ export function usePersistedFormState<T extends object>(
   key: string,
   initialValue: T,
   options: Options<T> = {}
-): [T, React.Dispatch<React.SetStateAction<T>>, () => void] {
+): [T, React.Dispatch<React.SetStateAction<T>>, () => void, boolean] {
   const { exclude = [], version = 1 } = options;
   const storageKey = `${PREFIX}${key}`;
 
   const stateRef = useRef<T>(initialValue);
 
-  const [state, setState] = useState<T>(() => {
-    if (typeof window === "undefined") return initialValue;
+  /*
+   * LE PREMIER RENDU EST TOUJOURS `initialValue` — côté serveur COMME côté client.
+   *
+   * L'ancienne version lisait sessionStorage dans l'initialiseur du `useState`, derrière un
+   * `typeof window === "undefined"` : littéralement la « branche serveur/client » que le message
+   * d'erreur de React cite en premier. Dès qu'un brouillon existait, le premier rendu client
+   * différait du HTML serveur → « Hydration failed » → React RÉGÉNÈRE tout l'arbre côté client —
+   * et recrée au passage le <script> anti-flash du layout, d'où l'avertissement « script tag
+   * while rendering » vu en recette le 18/09 (l'erreur d'hydratation en était la cause, le
+   * script le symptôme).
+   *
+   * Le brouillon est donc rechargé APRÈS le montage, dans un effet : premier rendu identique au
+   * serveur, hydratation sans écart, puis l'état stocké reprend la main. Le drapeau `hydrated`
+   * (4e élément du retour) dit quand c'est fait : les requêtes dérivées d'un brouillon doivent
+   * l'attendre, sinon elles partent une première fois avec les valeurs par défaut pour repartir
+   * aussitôt avec le brouillon — double appel réseau, et double événement d'audience
+   * (`search_performed` s'émet dans la queryFn).
+   */
+  const [state, setState] = useState<T>(initialValue);
+  const [hydrated, setHydrated] = useState(false);
 
+  useEffect(() => {
     try {
       const raw = sessionStorage.getItem(storageKey);
       const stored = safeParse<T>(raw);
 
-      if (!stored) return initialValue;
-
-      // Si la version ne correspond plus, on ignore les données stockées
-      if (stored.version !== version) {
-        sessionStorage.removeItem(storageKey);
-        return initialValue;
+      if (stored) {
+        if (stored.version !== version) {
+          // Si la version ne correspond plus, on ignore les données stockées
+          sessionStorage.removeItem(storageKey);
+        } else {
+          // Merger avec l'état courant pour garder les champs exclus
+          // et récupérer les défauts pour les nouveaux champs
+          setState((courant) => ({ ...courant, ...stored.data }));
+        }
       }
-
-      // Merger avec initialValue pour garder les champs exclus
-      // et récupérer les défauts pour les nouveaux champs
-      return { ...initialValue, ...stored.data };
     } catch {
-      return initialValue;
+      /* stockage illisible : on reste sur l'état initial */
     }
-  });
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, version]);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  // Sauvegarder dans sessionStorage à chaque changement
+  // Sauvegarder dans sessionStorage à chaque changement — mais JAMAIS avant le COMMIT de la
+  // relecture ci-dessus. La garde est l'ÉTAT `hydrated`, pas une ref posée dans l'effet : une ref
+  // devient vraie dans la même passe d'effets, la sauvegarde s'exécutait donc juste après la
+  // relecture et écrasait le brouillon stocké avec l'état initial — et sous StrictMode (double
+  // montage des effets en dev), la SECONDE relecture retrouvait ce brouillon écrasé : perdu.
+  // Payé le 18/09, mesuré à la sonde (requête partie sans le brouillon).
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!hydrated) return;
 
     try {
       const toStore = stripExcluded(state, exclude);
@@ -207,7 +233,7 @@ export function usePersistedFormState<T extends object>(
       // sessionStorage peut échouer (mode privé, quota, etc.) — silencieux
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, storageKey, version]);
+  }, [state, storageKey, version, hydrated]);
 
   const clear = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -216,7 +242,7 @@ export function usePersistedFormState<T extends object>(
     setState(initialValue);
   }, [storageKey, initialValue]);
 
-  return [state, setState, clear];
+  return [state, setState, clear, hydrated];
 }
 
 /**

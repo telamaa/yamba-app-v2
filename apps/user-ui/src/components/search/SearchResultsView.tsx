@@ -317,7 +317,7 @@ export default function SearchResultsView() {
   // Recette 01-WEB 5.1 (WEB-ACC-9) : le brouillon INTERROGÉ est celui que la barre a mémorisé
   // (même clé de sessionStorage) — en arrivant depuis l'accueil, les résultats correspondent à
   // ce que le visiteur vient de saisir, sans avoir à cliquer « Rechercher » une seconde fois.
-  const [searchDraft, setSearchDraft] = usePersistedFormState<TripSearchValue>(
+  const [searchDraft, setSearchDraft, , draftHydrated] = usePersistedFormState<TripSearchValue>(
     TRIP_SEARCH_STORAGE_KEY,
     initialSearchDraft,
     { version: SEARCH_VERSION }
@@ -386,8 +386,9 @@ export default function SearchResultsView() {
     ]
   );
 
-  const tripsQuery = useTripsSearch(tripsParams);
-  const facetsQuery = useSearchFacets(facetsParams);
+  // Attendre le brouillon rechargé : une seule requête, un seul `search_performed`.
+  const tripsQuery = useTripsSearch(tripsParams, { enabled: draftHydrated });
+  const facetsQuery = useSearchFacets(facetsParams, { enabled: draftHydrated });
 
   const trips = useMemo(
     () => tripsQuery.data?.pages.flatMap((p) => p.trips) ?? [],

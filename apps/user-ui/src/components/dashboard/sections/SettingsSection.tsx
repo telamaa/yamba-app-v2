@@ -11,7 +11,7 @@
  *
  *   - « Langue » → la préférence du COMPTE (`PATCH /auth/me/locale`, D44 : c'est elle qui décide
  *     la langue des emails). On réutilise le sélecteur de l'en-tête, un seul geste dans le code ;
- *   - « Thème » → une préférence d'AFFICHAGE, sans effet serveur : next-themes, donc le
+ *   - « Thème » → une préférence d'AFFICHAGE, sans effet serveur : le provider de thème, donc le
  *     navigateur (`localStorage`), avec le choix « Automatique » que le libellé annonçait déjà ;
  *   - « Notifications email » → `messagingReminderEmails` (D61), la seule préférence email qui
  *     existe côté serveur. Les emails transactionnels d'un Deal en cours ne se coupent pas : on
@@ -21,7 +21,7 @@
  * Préférences email plus fines (par famille d'événement) et push : candidat au registre (D-next).
  */
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
@@ -44,7 +44,7 @@ export default function SettingsSection({ copy }: { copy: DashboardCopy }) {
   const [relances, setRelances] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  // next-themes ne connaît le thème qu'au montage (anti-flash) : avant, on n'affiche aucun choix
+  // le thème n'est connu qu'au montage (anti-flash) : avant, on n'affiche aucun choix
   // comme actif plutôt que d'en désigner un au hasard.
   useEffect(() => setMonte(true), []);
 

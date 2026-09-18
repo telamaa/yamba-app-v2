@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { Sun, Moon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { HEADER_COLORS } from "./header.constants";

@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import React from "react";
 import { getLocale } from "next-intl/server";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { themeInitScript } from "@/components/theme/theme";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -24,12 +25,18 @@ export const metadata = {
  * promise that the locale layout would update it — nothing ever did (recette 01-WEB 5.1,
  * WEB-ACC-2 : `/en` was served with `lang="fr"`).
  *
- * All providers and UI chrome are in app/[locale]/layout.tsx — SAUF le
- * ThemeProvider (next-themes) : il vit ICI, au-dessus du segment [locale].
- * Sinon, à chaque bascule FR/EN le layout de locale est remonté côté client,
- * React recrée le <script> anti-flash de next-themes et signale en dev
- * « Encountered a script tag while rendering React component » (React 19).
- * Le root layout, lui, ne se remonte jamais.
+ * All providers and UI chrome are in app/[locale]/layout.tsx — SAUF le thème, qui vit ICI :
+ *
+ * - le <script> anti-flash est rendu par CE layout (composant SERVEUR, premier enfant du <body>) :
+ *   son HTML est adopté à l'hydratation et échappe à tout REMONTAGE client — là où next-themes le
+ *   rendait DANS un composant client, recréé (et signalé par React 19 : « Encountered a script tag
+ *   while rendering React component ») au moindre remontage. UNE limite, apprise à l'écran le
+ *   18/09 : si l'HYDRATATION ÉCHOUE quelque part, React régénère l'arbre entier côté client et
+ *   recrée aussi ce script-ci — l'avertissement redevient possible, mais comme SYMPTÔME d'un vrai
+ *   bug (l'écart d'hydratation), qu'il faut corriger à sa source (cf. usePersistedFormState, qui
+ *   en portait un). La bibliothèque, elle, n'a pas de version corrigée (0.4.6, mars 2025).
+ * - le ThemeProvider (maison, `components/theme/`) reste au-dessus du segment [locale] pour que la
+ *   bascule FR/EN ne perde pas l'état du thème.
  */
 export default async function RootLayout({
                                      children,
@@ -40,6 +47,8 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={plusJakarta.variable} suppressHydrationWarning>
     <body className="min-h-screen bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+    {/* Anti-flash : s'exécute pendant le parse, avant tout contenu — voir theme.ts */}
+    <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
     <ThemeProvider>{children}</ThemeProvider>
     <Toaster
       position="top-right"
