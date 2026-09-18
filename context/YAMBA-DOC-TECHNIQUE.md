@@ -10800,3 +10800,123 @@ Rejoué après correction : **plus aucune fiche-script** dans le dépôt. Ce bal
 `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
 
 ---
+
+---
+
+# PR — Le mock de transaction devient un outil partagé (A200) · `feat/menage-mocks-transaction`
+
+## Pourquoi
+
+Dernier reste du handoff du 17/09 : « le patron `$transaction: (fn) => fn(prismaMock)` traîne encore
+ailleurs ; A197 l'a corrigé sur les deux écrivains qui portent les invariants, il ment partout où il
+subsiste, simplement sans conséquence connue ».
+
+L'inventaire a déplacé la question. Le patron est dans une vingtaine de fiches, mais **le risque
+n'est pas là** : il est dans les écrivains qui portent un invariant et n'ont aucune fiche exécutable.
+
+| Invariant | Écrivains | Couverts avant ce lot |
+|---|---|---|
+| **D2** — l'événement outbox dans la MÊME transaction que l'état | `booking-write.ts`, `conversation.service.ts`, **`deal-request.service.ts`**, **`deal-mediation.service.ts`** | **2 sur 4** |
+| **Journal admin** — la ligne d'audit dans la même transaction que le geste | 8 fichiers, ~50 appels | **0** |
+
+Les deux écrivains non couverts respectent D2 aujourd'hui — vérifié en lisant leur code. Ce qui
+manquait, c'est ce qui les empêchera de cesser de le faire.
+
+Sur le journal admin, les ~15 appels `recordAdminAction(prisma, …)` ont été ouverts **un par un** :
+**aucune violation**. Ceux qui n'ont pas de transaction n'en ont pas besoin — déconnexion, export,
+consultation, ou (pour `resendAdminInvite`) un geste qui n'écrit que dans **Redis**. La règle du
+dépôt le prévoit explicitement : « dans la MÊME transaction que le geste **quand il en a une** ».
+
+## Les trois gestes du lot
+
+### 1. Le patron devient une lib, et la lib se teste elle-même
+
+`packages/libs/test-prisma` — `creerPrismaJournalise({ modeles, retours })` rend un client dont chaque
+méthode **journalise sa provenance** :
+
+```ts
+const j = creerPrismaJournalise({ modeles: ["booking", "outboxEvent"] });
+jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: j.prisma }));
+…
+expect(j.horsTransaction("outboxEvent", "create")).toHaveLength(0);
+```
+
+`$transaction` incrémente un compteur avant d'appeler la fonction et le restaure après, **y compris
+si elle lève**. Tout appel fait pendant porte ce numéro ; tout appel fait avant ou après porte
+`null`. C'est cette seule différence qui rend « dedans » et « dehors » distinguables.
+
+`manquementsD2(appels, { modelesDEtat })` est la règle sous forme de fonction pure. Sa fiche
+(`apps/deal-service/src/services/test-prisma.spec.ts`, **17 cas**) la met au **ROUGE** sur cinq
+violations réelles avant de la voir verte : l'événement écrit dehors, l'état écrit dehors, l'état et
+l'événement dans **deux** transactions… Une garde qu'on n'a jamais vue échouer n'est pas une garde.
+
+**Deux décisions de conception, payées sur place :**
+
+- **Les méthodes sont de vrais espions jest.** Sans ça, adopter l'outil casserait chaque
+  `toHaveBeenCalledWith` des fiches existantes — et personne ne l'adopterait.
+- **`reinitialiser()` RÉINSTALLE l'implémentation journalisante**, il ne se contente pas de vider les
+  compteurs. J'ai introduit le défaut inverse et il m'a coûté deux tests rouges : un test posait
+  `findUnique.mockReset().mockImplementation(…)` sur une fermeture locale, l'écrasement survivait au
+  `beforeEach`, et **le test suivant héritait d'un secret périmé** → 401 au lieu de 200. C'est la
+  famille A199 : ce qui fuit **entre** les fiches, pas dans l'une d'elles. Deux cas le couvrent.
+
+Un troisième piège, payé aussi : `jest` est injecté par Jest dans la portée de **chaque module**,
+comme `require` — ce n'est **pas** une propriété de `globalThis`. Un contournement qui passait par
+`globalThis.jest` a fait tomber 16 tests d'un coup. La lib le déclare donc localement, au strict
+nécessaire, ce qui la rend typecheckable depuis un projet qui n'a pas chargé `@types/jest`.
+
+### 2. Le filet à mailles larges : une garde qui lit la source
+
+`apps/deal-service/src/services/d2-ecrivains-outbox.spec.ts` n'ouvre aucune base et ne pilote aucun
+service : il **balaie les sources des cinq services** et refuse tout `outboxEvent.create` posé sur le
+client **global**.
+
+C'est une propriété syntaxique, plus faible qu'un comportement mesuré. Elle a deux qualités que
+l'autre n'a pas : elle couvre **tout le dépôt**, et elle couvre **ce qui n'est pas encore écrit**.
+Même famille que les gardes déjà en place (`seed-integrity` lit le seed, `outbox-purge` lit la source
+du cron, `refusal-codes` lit les contrôleurs).
+
+**Resserrée après l'avoir vue trop large.** Écrite d'abord sur toutes les écritures, elle levait
+**dix signalements, tous légitimes** : le relais marque `publishedAt` et `attempts` sur le client
+global, le cron de conservation purge les lignes publiées. Ces écritures portent sur le **cycle de
+vie** d'un événement déjà produit, pas sur sa **naissance** — et n'accompagnent aucun changement
+d'état. D2 dit « aucun changement d'état sans son événement » : c'est la naissance qui doit être
+atomique. La règle ne retient donc que `create` / `createMany`.
+
+> **Un garde-fou qui crie à tort est un garde-fou qu'on désarme.** Le resserrement n'est pas une
+> concession, c'est la règle enfin dite juste.
+
+**Contre-épreuve, exigée par le dépôt** : le défaut réintroduit dans `deal-mediation.service.ts`
+(`tx.outboxEvent.create` → `prisma.outboxEvent.create`) fait tomber la fiche, qui **nomme le
+fichier** ; code restauré à l'identique (`git diff` vide).
+
+### 3. Les deux mocks auto-référents, et les 53 erreurs qu'ils cachaient
+
+`const prismaMock = { …, $transaction: jest.fn(async (fn) => fn(prismaMock)) }` se référence dans son
+propre initialiseur : TypeScript ne peut plus inférer son type (`TS7022` / `TS7024`).
+
+Les deux fiches concernées adoptent la lib. **`nx typecheck auth-service` : 53 erreurs → 0.**
+
+## Ce qui n'est pas fait, et pourquoi c'est écrit ici
+
+- **Les ~18 autres fiches qui portent le patron.** Coût mécanique élevé, risque de régression réel,
+  et l'invariant qu'elles pourraient cacher est désormais gardé **ailleurs**, globalement. Elles sont
+  consignées, pas oubliées — la lib existe pour que la prochaine fiche n'en ajoute pas une
+  dix-neuvième.
+- **Les fiches pilotées pour `deal-request` et `deal-mediation`.** Le filet à mailles larges ne
+  prouve pas qu'un `tx` passé en argument soit bien celui d'une transaction ouverte : c'est le
+  travail d'une fiche qui pilote le code réel, comme les deux d'A197. Ces services demandent un
+  échafaudage lourd (fournisseur de paiement, devis, plafonds) — à faire dans son propre lot.
+- **Le journal admin rendu exécutable.** Aucune violation trouvée par lecture ; la garde reste à
+  écrire. Sa forme syntaxique est plus difficile que celle de D2 : il faut savoir si le geste
+  englobant ouvre une transaction.
+
+## Tests
+
+deal-service **659 → 680** (+17 la lib, +4 le garde-fou). auth **395**, trip **308**, notification
+**122**, message **79** — inchangés. **1584 au total.** `nx typecheck` des **cinq** services à
+**0 erreur**, et le typecheck de la CI vert sur les huit projets.
+
+`YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge. Arbitrage **A200** au registre.
+
+---

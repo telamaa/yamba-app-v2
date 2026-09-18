@@ -40,6 +40,7 @@
       ],
       "@packages/totp": ["packages/libs/totp/src/index.ts"],
       "@packages/admin-audit": ["packages/libs/admin-audit/src/index.ts"],
+      "@packages/test-prisma": ["packages/libs/test-prisma/src/index.ts"],
       "@packages/*": [
         "packages/*"
       ]

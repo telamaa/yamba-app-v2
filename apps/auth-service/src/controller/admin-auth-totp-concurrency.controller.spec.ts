@@ -8,6 +8,7 @@
  * d'un code rejoué.
  */
 import jwt from "jsonwebtoken";
+import { creerPrismaJournalise } from "@packages/test-prisma";
 
 const store = new Map<string, string>();
 const redisMock = {
@@ -44,15 +45,26 @@ function matches(where: Where): boolean {
     return false;
   });
 }
-const updateMany = jest.fn(async ({ where, data }: { where: Where; data: Record<string, unknown> }) => {
-  if (!matches(where)) return { count: 0 };
-  etat = { ...etat, ...data, updatedAt: new Date(etat.updatedAt.getTime() + 1) } as Etat;
-  return { count: 1 };
+/** L'état lu par TOUTES les requêtes simultanées : elles ont lu AVANT la première écriture. */
+let lu: Etat;
+
+// Le client de test vient de `@packages/test-prisma`. Deux bénéfices ici : plus de `prismaMock` qui se
+// référence dans son propre initialiseur (TS7022 / TS7024 au `nx typecheck`), et les retours passent
+// par `retours` — donc chaque appel reste JOURNALISÉ, ce qu'un `mockImplementation` posé après coup
+// ferait silencieusement perdre.
+const journal = creerPrismaJournalise({
+  modeles: ["user"],
+  retours: {
+    "user.findUnique": async () => lu,
+    // Le verrou optimiste, simulé : l'écriture ne passe que si le `where` décrit encore l'état réel.
+    "user.updateMany": async ({ where, data }: { where: Where; data: Record<string, unknown> }) => {
+      if (!matches(where)) return { count: 0 };
+      etat = { ...etat, ...data, updatedAt: new Date(etat.updatedAt.getTime() + 1) } as Etat;
+      return { count: 1 };
+    },
+  },
 });
-const prismaMock = {
-  user: { findUnique: jest.fn(), updateMany },
-  $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
-};
+const prismaMock = journal.prisma as { user: Record<string, jest.Mock>; $transaction: jest.Mock };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => undefined) };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }));
 jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }));
@@ -86,9 +98,8 @@ beforeEach(() => {
   const base = { id: ID, updatedAt: new Date("2026-09-15T10:00:00Z"), firstName: "Fanta", email: "fanta@recette.test", preferredLocale: "fr", roles: ["ADMIN"], adminRole: "FINANCE", adminRoles: ["FINANCE"], isDeleted: false, totpSecretEncrypted: totp.encryptTotpSecret(secret) };
   etat = { ...base, totpEnabledAt: new Date("2026-09-01T10:00:00Z"), totpLastUsedStep: null, totpBackupCodeHashes: [] };
   // Les requêtes simultanées ont toutes lu l'état AVANT la première écriture.
-  const lu = { ...etat };
-  prismaMock.user.findUnique.mockReset().mockImplementation(async () => lu);
-  prismaMock.$transaction.mockReset().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock));
+  lu = { ...etat };
+  journal.reinitialiser();
 });
 
 const codes = (r: Array<{ status: number }>) => r.map((x) => x.status).sort();
