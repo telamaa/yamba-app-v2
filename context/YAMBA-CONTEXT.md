@@ -796,6 +796,30 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 18/09 (fin d'apres-midi) : **L'ACCUEIL REFONDU — UNE PAGE QUI NE DIT QUE DU VRAI (#357, 12 commits de revue iterative sur poste).**
+  SUPPRIMES : statistiques inventees (12k+ utilisateurs, 1200+ avis 4,8/5, 2,4T CO2, 45 trajets actifs), quatre
+  temoignages fictifs (risque juridique : avis fictifs = pratique commerciale trompeuse), carte Leaflet decorative aux
+  compteurs factices, photo iStock FILIGRANEE plein hero, grille de commission 85/15, trois repetitions du trio
+  24h/-73%/0CO2, cinq etapes melant tutoiement/vouvoiement dont une etape « Signez » inexistante dans le produit.
+  STRUCTURE FINALE (6 blocs, tous vrais) : hero CLAIR compact (degrade chaud, illustration SVG maison en bloc arrondi
+  facon Blablacar, moitie -> bord droit, pied au-dessus de la barre) -> barre de recherche STICKY PLEINE TAILLE sous le
+  header sur toute la page (enfant DIRECT du flux : sticky ne colle que dans les bornes de son parent — c'est pourquoi
+  elle n'avait jamais colle depuis le hero ; disableCompact au scroll) -> ligne de confiance par MECANISMES (sequestre
+  Stripe, code, verifications) -> corridors REELS derives des trajets PUBLISHED (puce -> /search preremplie via
+  seedPersistedFormState, section absente si zero trajet) -> comment ca marche a DEUX onglets (la face Voyageur enfin
+  visible, etapes du vrai parcours, tutoiement) -> confiance par les mecanismes + « le prix affiche est le prix paye »
+  -> CTA final CLAIR (meme degrade que le hero, cartes blanches, icones lucide, boutons ancres mt-auto).
+  LA VOIX : accroche definitive choisie parmi six candidates — « Il y a toujours quelqu'un qui part vers ta
+  destination. Confie-lui ton colis. » (l'hypothetique « Et si... ? » decrivait le mecanisme sans le benefice) ;
+  confiance « Ton colis est entre de bonnes mains. » ; CTA « Le prochain depart t'attend. » (les deux personas).
+  MECANIQUE ATTRAPEE EN ROUTE : seedPersistedFormState (l'enveloppe {version, data} reste chez son proprietaire — la
+  cle nue ne remplissait rien) ; CityAutocomplete n'ouvre plus ses suggestions sur une valeur HYDRATEE (focus/saisie
+  seulement) ; l'enveloppe mobile de TripSearchBar porte relative z-10 (le hero relative peignait dessus) ; un pt-0
+  residuel ecrasait le py-3 d'un bouton (ordre des utilitaires Tailwind). Diff net : ~-900 lignes, Leaflet ne charge
+  plus sur l'accueil. i18n home.json reecrits FR/EN (miroir verifie, zero cle morte, le controle refuse les valeurs
+  VIDES -> cle inutile SUPPRIMEE, jamais laissee a ""). RG-WEB-317 a 321, chapitre d'apprentissage 199. Tests
+  INCHANGES (1565 — front seul). 18 checks comptes sur CHACUN des huit runs de CI de la journee. AUCUNE attribution
+  Claude.
 - 18/09 (apres-midi) : **LE PAYS S'AFFICHE PARTOUT, DERIVE DU CODE ISO — ET LA HIERARCHIE MOBILE REMISE A L'ENDROIT (#355).**
   Constat de recette visuelle : la carte resultat de `/search` n'affichait pas le pays (l'autocompletion #353 dit
   pourtant « Ville, Pays »), et en mobile heures et prix criaient tous deux en 18px quand la ville (l'info de decision)
