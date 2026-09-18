@@ -10693,3 +10693,110 @@ Documentation seule. `YAMBA-DOC-METIER.md` n'est pas touché : aucune règle mé
 l'état du code.
 
 ---
+
+---
+
+# PR — Trois fiches de test redeviennent des modules · `chore/specs-export-vide`
+
+## Pourquoi
+
+Trouvé en vérifiant que `dev` était propre avant d'ouvrir un nouveau chantier, pas en le cherchant.
+`npx nx typecheck auth-service` échoue sur **53 erreurs**. La CI, elle, est verte — et les deux ont
+raison, parce qu'elles ne regardent pas les mêmes fichiers :
+
+| | Ce qui est typechecké | Les fiches de test ? |
+|---|---|---|
+| **CI** (`npx tsc --noEmit --project apps/auth-service/tsconfig.app.json`) | le code applicatif | **exclues** (`"exclude": ["src/**/*.spec.ts", …]`) |
+| **Cible Nx** (`tsc --build tsconfig.json --emitDeclarationOnly`) | tout le projet | **incluses** |
+
+Un défaut qui ne vit que dans les fiches de test est donc **structurellement invisible pour les 17
+checks**. Ce n'est pas un oubli de configuration : exclure les specs du typecheck applicatif est le
+bon choix (on ne veut pas qu'une fiche bloque un build). Mais il faut savoir que la conséquence est
+un angle mort, et que la seule chose qui le couvre est la cible Nx — qu'il faut donc faire tourner.
+
+## Le défaut, qui était déjà écrit
+
+C'est le piège consigné le 17/09 et enseigné au chapitre 188 de `YAMBA-APPRENTISSAGE-DEV.md` :
+
+> Une fiche de test qui n'a ni `import` ni `export` est un **script** pour TypeScript : ses
+> constantes de tête tombent dans la portée globale partagée et se heurtent à celles des autres
+> fiches (TS2451, rapporté sur le **fichier voisin**, invisible pour `nx test`).
+
+**Quatre** fiches étaient encore dans ce cas — trois trouvées par l'échec du typecheck, la quatrième
+par le balayage (voir plus bas) :
+
+```
+apps/auth-service/src/controller/admin-admins.controller.spec.ts
+apps/auth-service/src/controller/admin-users-concurrency.controller.spec.ts
+apps/auth-service/src/controller/privacy-requests.controller.spec.ts
+apps/message-service/src/services/report-doublon.service.spec.ts     ← latente
+```
+
+La quatrième ne faisait **rien tomber aujourd'hui** : `nx typecheck message-service` était à **0
+erreur**. C'est une bombe à retardement, pas une panne — elle expose `prismaMock`, `T0`, `CONV`,
+`BOOKING`, `SHIPPER`, `CARRIER`, `MESSAGE` à la portée globale du projet, et la première fiche
+voisine qui déclarera l'un de ces noms fera tomber le typecheck **sur elle**, pas sur celle-ci.
+C'est tout l'intérêt de balayer plutôt que d'attendre le symptôme.
+
+Elles déclarent toutes `prismaMock`, `tx`, `conflit`, `ctrl`… dans la portée globale. D'où les
+collisions — et, en cascade, des `TS7022` / `TS7024` sur des fiches **voisines** parfaitement
+correctes, dont l'inférence devenait circulaire.
+
+## Ce qui a été fait
+
+`export {};` en pied des trois fichiers, avec le commentaire qui dit pourquoi — pour que personne ne
+le retire en croyant nettoyer une ligne inutile.
+
+**53 erreurs → 4.** Les 22 erreurs restantes du premier décompte étaient des dommages collatéraux :
+elles ont disparu sans qu'on touche aux fichiers qui les portaient.
+
+## Les quatre erreurs qui restent, et pourquoi on n'y touche pas
+
+```
+admin-auth-sessions.controller.spec.ts:25         TS7022 / TS7024
+admin-auth-totp-concurrency.controller.spec.ts:52 TS7022 / TS7024
+```
+
+Ces deux fiches **sont** de vrais modules : le défaut est ailleurs.
+
+```ts
+const prismaMock = { …, $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)) };
+//    ^^^^^^^^^^                                                                                 ^^^^^^^^^^
+//    se référence dans son propre initialiseur → TypeScript ne peut pas inférer son type
+```
+
+C'est **exactement le patron `$transaction: (fn) => fn(prismaMock)`** qu'A197 a corrigé sur les deux
+écrivains qui portent les invariants, et dont le handoff du 17/09 dit qu'il « traîne encore
+ailleurs ; il ment partout où il subsiste ». L'annoter `: any` ferait taire le compilateur **en
+gardant le mock menteur** — un plâtre sur ce que le dépôt a justement décidé de retirer.
+
+**Ces deux fiches appartiennent donc au ménage des mocks `$transaction`, pas à cette PR.** Le
+corriger ici, c'est-à-dire écrire un client de transaction **distinct** du client de base, ferait
+tomber l'erreur de type comme effet secondaire — et pour la bonne raison.
+
+## Tests
+
+auth-service **395** (52 suites) et message-service **79**, tous **inchangés**. Le typecheck de la CI
+(`tsconfig.app.json`) reste vert, et `nx typecheck message-service` passe. Aucun comportement
+modifié : `export {};` ne change que la **nature du fichier** pour TypeScript, pas ce que Jest
+exécute.
+
+## Ce que ça apprend, au-delà des trois lignes
+
+Le piège était **écrit** — dans le handoff, dans le chapitre 188 — et il était **toujours là**. Une
+leçon consignée n'est pas une leçon appliquée : il manquait le balayage.
+
+```sh
+# Le balayage, en une ligne — il a trouvé la quatrième fiche, celle qui ne faisait encore rien tomber
+for f in $(git ls-files '*.spec.ts' '*.test.ts'); do
+  grep -qE '^\s*(import|export) ' "$f" || echo "$f"
+done
+```
+
+Rejoué après correction : **plus aucune fiche-script** dans le dépôt. Ce balayage est le candidat
+évident à un contrôle de CI — il coûte une seconde et n'a aucune exception à maintenir, contrairement
+à la piste « clé i18n orpheline » du 18/09. **Non engagé** : à arbitrer.
+
+`YAMBA-DOC-METIER.md` n'est pas touché : aucune règle métier ne bouge.
+
+---

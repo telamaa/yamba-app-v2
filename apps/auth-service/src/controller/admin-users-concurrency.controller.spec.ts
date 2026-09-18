@@ -126,3 +126,8 @@ describe("ANO-ADM-89 — sanctions simultanées : rejouées, un gagnant, 409 pou
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
   });
 });
+
+// Cette fiche n'a ni `import` ni `export` en tête : sans cette ligne, TypeScript la traite comme un
+// SCRIPT, ses constantes tombent dans la portée globale partagée et se heurtent à celles des fiches
+// voisines (TS2451, rapporté sur le fichier VOISIN, invisible pour `nx test`). Piège consigné le 17/09.
+export {};
