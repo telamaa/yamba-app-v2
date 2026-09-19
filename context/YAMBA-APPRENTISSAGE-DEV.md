@@ -2675,3 +2675,64 @@ badge est un ORNEMENT — sa panne vaut zéro, pas un écran rouge. Le rafraîch
   naturel d'un « suivi de livraison en cours » quand les parcours arriveront.
 - Le badge d'icône d'APP (le chiffre sur l'icône du téléphone) est un autre canal : il viendra avec
   les notifications push (`expo-notifications`), pas avec la barre.
+
+## Chapitre 205 — Le premier parcours : l'endpoint qu'on ne crée pas, l'id qu'on s'envoie, et le grep qui mentait
+
+### La théorie
+
+**1. Le meilleur endpoint mobile est celui qu'on ne crée pas.** La tentation d'un `/mobile/search` est
+réelle (payload « plus léger », champs « choisis pour l'app ») — et c'est presque toujours une dette :
+deux contrats qui dérivent, deux mappers, deux jeux de tests, pour économiser quelques octets que la
+pagination économise déjà. La bonne question n'est pas « que faut-il à l'app ? » mais « le contrat
+existant est-il déjà mobile-ready ? ». Ici oui, par construction (D36 l'exigeait) : filtres durs côté
+serveur, curseur, textes localisés par en-tête, prix déjà en unités d'affichage dans le DTO.
+
+**2. Un id de corrélation s'émet côté client quand on veut couvrir la panne réseau.** Si seul le
+serveur génère l'id (le gateway le fait), une requête qui n'aboutit jamais — timeout, avion, DNS — ne
+laisse RIEN côté app à donner au support. En générant l'id côté client et en laissant le gateway
+« n'en fabriquer un que s'il manque », on a le meilleur des deux : l'app connaît toujours son id, le
+serveur journalise le même. Détail qui compte : la RELANCE d'une requête (après refresh de session)
+garde l'id de la première — deux lignes de log qui racontent un seul geste utilisateur doivent se
+retrouver ensemble. Et pas besoin de crypto : un id de corrélation identifie, il n'authentifie pas.
+
+**3. Une preuve qui ne peut pas dire non ment par omission — même quand elle dit oui ailleurs.** Le
+grep de bundle du lot A203 « marchait » : six marqueurs, six fois ≥ 1. Ce lot-ci, « Ville de départ »
+sortait à 0 alors que « kg dispo » sortait à 1 — même fichier, même écran. Cause : Hermes stocke les
+chaînes ASCII sur un octet et les chaînes ACCENTUÉES en UTF-16 ; un grep UTF-8 ne voit que les
+premières. Les marqueurs d'A203 étaient sans accent PAR CHANCE — la preuve aurait compté 0 sur
+« Connecté » et on aurait cherché un bug d'i18n inexistant. Moralité : quand un témoin sort à 0,
+la première hypothèse est l'OUTIL de mesure, pas le code — et un témoin FAUX (attendu à 0) ne suffit
+pas, il faut aussi un témoin vrai dans chaque ENCODAGE possible.
+
+### La pratique dans Yamba
+
+`search.api.ts` transpose la couche API du web (`services/trip.api.ts`) au style du mobile : mêmes
+noms de paramètres, même type de page — un développeur qui connaît l'un lit l'autre. L'écran tient les
+quatre états dans une union discriminée (`idle | loading | error | results`) : pas de booléens qui se
+contredisent, l'état vide est un `results` à zéro trajet (c'est le SERVEUR qui dit « rien », l'écran ne
+fait que le répéter). La pagination garde l'acquis sur échec : `loadMore` qui échoue remet
+`loadingMore: false` et ne touche pas aux trajets déjà affichés — un scroll infini qui perd la liste au
+premier trou réseau est pire qu'une pagination à boutons.
+
+Les fenêtres de dates en puces (`windowBounds`) calculent des bornes ISO minuit-à-minuit côté client :
+quatre cas fixes, testables à l'œil, zéro dépendance — quand le wizard de réservation arrivera avec un
+vrai calendrier natif, les puces resteront le raccourci du premier geste.
+
+### Les pièges payés
+
+- Le narrowing TypeScript ne traverse pas une constante booléenne : `const perKg = x != null && x > 0`
+  puis `t('…', { price: x })` garde `x` nullable — capturer la VALEUR (`const perKgPrice = … ? x :
+  null`) plutôt que le verdict.
+- La contre-épreuve i18n de ce lot a MUTÉ un fichier après `git add` : la restauration est une
+  commande (`git checkout --` lit l'index) — la leçon A203 (fichier non suivi = réécriture manuelle)
+  appliquée en amont.
+
+### Pour aller plus loin
+
+- `viewerKey` (vues dédoublonnées de la page trajet) attend le lot page trajet : côté mobile il n'y a
+  ni cookie ni IP stable — le dédoublonnage par `userId`/IP/user-agent du serveur fonctionnera, mais
+  un visiteur mobile anonyme derrière CGNAT comptera plus large que sur le web. À instruire à ce
+  moment-là, pas avant.
+- L'`AbortController` sur la recherche (annuler la requête précédente quand on relance) : inutile tant
+  que l'écran remplace tout l'état à chaque réponse, nécessaire le jour où la recherche devient
+  « au fil de la frappe ».
