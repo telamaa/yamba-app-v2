@@ -796,6 +796,26 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 19/09 (suite 3) : **LES ONGLETS NATIFS — CINQ ENTREES, LA PORTE D'IDENTITE, LES BADGES SERVEUR, A203 (#374).**
+  La coquille navigable du mobile : `NativeTabs` d'expo-router (chemin SDK 57 `unstable-native-tabs`,
+  API verifiee dans le paquet INSTALLE) — la VRAIE barre de chaque OS (UITabBar/flou, Material 3),
+  theme sombre et tactile idiomatiques d'office ; icones SF Symbols + Material Symbols (pleines a la
+  selection), teinte #CC7A00 sur clair (la valeur de contraste de la barre web, promue Brand.mangoDark),
+  mangue pleine sur sombre. A203 : hierarchie PLEIN-APP (Accueil + Rechercher publics ; Trajets,
+  Messages, Profil derriere la porte d'identite A58/A63 — l'onglet reste VISIBLE et montre la porte,
+  connexion en MODALE, retour a l'ecran d'origine) — la barre du dashboard web (#355 : Accueil/
+  Activite/Messages/Finances/Plus) est celle d'un espace membre, la correspondance est au registre.
+  Session extraite en CONTEXTE partage (src/lib/session-context.tsx : un amorcage, un etat lu par la
+  porte, les badges, Profil) ; deconnexion demenagee vers Profil, sa cle i18n avec elle. Badges
+  SERVEUR : « a traiter » A44 sur Trajets (PENDING /me/deals + DRAFT/PAUSED /trips/my), totalUnread
+  /messages/conversations sur Messages, « 9+ », rafraichis a la session et au retour au premier plan,
+  panne = zero. Ecrans de coquille HONNETES (lecon #357) : les chiffres vrais des badges (pluriels
+  ICU) ou rien. PROUVE : typecheck 10/10 (commande CI), controle i18n vert + contre-epreuve rouge sur
+  le NOUVEL espace (cle EN retiree → cle manquante gate.cta), bundle Hermes --clear avec six marqueurs
+  embarques. Aucune dependance ajoutee, lockfile intouche, services intouches — tests plateforme
+  INCHANGES (1576). PIEGE paye : `git checkout --` ne restaure pas un fichier jamais commite (la
+  contre-epreuve sur en/tabs.json, non suivi, s'est reecrite a la main). RG-MOB-10..12, chapitre 204.
+  AUCUNE attribution Claude.
 - 19/09 (suite 2) : **L'I18N MOBILE — LE MOTEUR DU WEB, LA LANGUE DU COMPTE, A202 (#372).**
   Le socle affichait du FR en dur et client.ts portait le dernier `fr ? … : …` du depot (motif interdit
   par D44). Le lot le remplace par le MEME moteur que le web : use-intl 4.13.2 (le coeur de next-intl,
