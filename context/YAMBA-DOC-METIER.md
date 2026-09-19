@@ -6707,3 +6707,33 @@ les pastilles disent le vrai, comptées par le serveur.
 | MOB17 | 12 messages non lus | Pastille « 9+ » sur Messages |
 | MOB18 | Déconnexion depuis Profil | La porte réapparaît sur les trois onglets membres, plus aucune pastille |
 | MOB19 | Téléphone en mode sombre | Barre d'onglets sombre native, teinte mangue pleine ; en clair, mangue assombrie |
+
+# La recherche dans la poche · `feat/mobile-search`
+
+## Le besoin
+
+Depuis son téléphone, un visiteur — même sans compte — cherche un trajet comme sur le site : une ville
+de départ, une destination, une fenêtre de dates, et de VRAIS trajets en face, aux mêmes prix et dans
+sa langue. Une recherche depuis l'app compte dans la connaissance de la demande (corridors demandés,
+recherches sans résultat) exactement comme une recherche web : l'équipe pilote sur des chiffres
+complets. Et quand quelque chose échoue, l'écran donne au support la clé pour retrouver l'incident.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-13** | La recherche mobile interroge le même service que le web : mêmes trajets visibles (jamais un brouillon, un passé, un masqué ou le trajet d'un compte suspendu), mêmes prix, textes dans la langue de l'écran. Aucune règle de filtrage n'est décidée par l'app. |
+| **RG-MOB-14** | Toute recherche — avec ou sans résultat, connecté ou non — est comptée par le SERVEUR dans les statistiques de demande. L'app ne peut ni l'empêcher ni la fausser. |
+| **RG-MOB-15** | Chaque requête de l'app porte un identifiant de corrélation unique, le même que dans les journaux serveur ; un écran d'erreur l'affiche pour que le support retrouve l'incident sans deviner. |
+| **RG-MOB-16** | Les résultats disent le vrai : le prix au kilo avec les kilos restants pour les trajets au poids, « dès X € » pour les autres ; une liste vide le dit avec les mots du site ; la carte ne mène nulle part tant que la page trajet n'existe pas dans l'app. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB20 | Visiteur sans compte : recherche Paris → Brazzaville | Les trajets publiés du corridor, prix et dates dans la langue du téléphone |
+| MOB21 | Recherche d'un corridor sans offre | « Aucun trajet trouvé » + l'invite à modifier date ou destination — et la recherche est comptée côté serveur avec son sans-résultat |
+| MOB22 | Puce « Demain » | Seuls les départs de demain ; « Toutes les dates » rend l'offre entière à venir |
+| MOB23 | Plus de 20 résultats | La liste se complète en scrollant (curseur), le compte total est affiché |
+| MOB24 | Gateway coupé pendant la recherche | Écran d'erreur avec le message et un id `mob-…` ; « Réessayer » relance |
+| MOB25 | Trajet au poids (PER_KG) dans les résultats | « X €/kg » et « Y kg dispo » ; trajet legacy : « dès X € » |

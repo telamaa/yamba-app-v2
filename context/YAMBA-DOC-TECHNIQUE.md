@@ -11661,3 +11661,53 @@ idiomatique par OS.
   jamais commité — muter un fichier NON SUIVI pour une contre-épreuve, c'est le réécrire à la main.
 - Bundle Hermes Android (`expo export --clear`) : la porte FR ET EN, les pluriels ICU et les symboles
   d'onglets embarqués (six marqueurs comptés, chacun ≥ 1 — et une chaîne fausse rend 0).
+
+# La recherche mobile — le premier parcours réel · `feat/mobile-search`
+
+## Le déclencheur
+
+La coquille A203 avait un onglet Rechercher qui disait « la recherche arrive ». Le GO du 19/09 ouvre le
+lot avec deux axes : les recherches mobiles doivent peser dans les statistiques de demande comme celles
+du web, et le client mobile doit porter un id de corrélation pour le debug.
+
+## Ce qui a été fait
+
+- **Aucun endpoint nouveau** : `src/lib/api/search.api.ts` appelle `GET /trips/search` — le même que le
+  web, mêmes paramètres, même page `{ trips, nextCursor, totalCount }`. Le contrat était déjà
+  mobile-ready (D36) : filtres durs, tri, prix en euros du DTO, `travelDate` localisée par `x-locale` —
+  tout est serveur. La route est en authentification optionnelle : connecté, le Bearer part et
+  personnalise ; visiteur, rien.
+- **Axe 1 vérifié dans le code, zéro ligne client** : `recordSearch` (corridor + sans-résultat, Redis
+  `trip-stats`) est appelé DANS le contrôleur (`trip-search.controller.ts`) — une recherche mobile
+  compte d'office dans le pilotage. L'axe demandait de « brancher » les compteurs ; la bonne réponse
+  était de constater qu'ils l'étaient déjà, et de le consigner.
+- **Axe 2 — corrélation** (`src/lib/api/client.ts`) : un `x-correlation-id` par APPEL
+  (`mob-<horodatage36>-<aléa>`), envoyé par le client — le gateway n'en génère un que si la requête
+  n'en porte pas ; en l'émettant soi-même, l'app connaît l'id même quand la réponse ne revient jamais
+  (panne réseau). La relance après refresh porte le MÊME id : les deux lignes serveur racontent un
+  geste. `ApiError` l'expose, l'écran d'erreur l'affiche en petit (`type="code"`) pour le support.
+- **L'écran** (`(tabs)/search.tsx`) : deux champs villes en texte libre (le serveur réduit
+  « Ville, Pays » à la ville — `placeSearchTerm`, WEB-ACC-9), fenêtre de départ en quatre puces
+  (toutes / aujourd'hui / demain / 7 jours — bornes calculées client, `dateFrom`/`dateTo` ISO),
+  soumission au bouton ou au clavier. Résultats en `FlatList` paginée au curseur (`onEndReached`) ;
+  une page suivante qui échoue garde l'acquis et laisse le scroll retenter. Quatre états honnêtes :
+  invite, chargement, vide (les mots du web : « Aucun trajet trouvé… »), erreur (message du serveur,
+  `details.code` compris, + id de corrélation).
+- **La carte** (`src/components/trip-result-card.tsx`) : villes, date localisée serveur, horaires
+  (`+1` si arrivée le lendemain), prix — `{p} €/kg` + « {kg} kg dispo » pour le moteur PER_KG,
+  « dès {p} € » pour le legacy (les mots de la carte web) — Voyageur et note quand elle existe.
+  NON cliquable : la page trajet est le lot suivant.
+- **i18n** : nouvel espace `search` (`messages/{fr,en}/search.json`), libellés du web repris
+  (`emptyState`, `errorState`, « dès », « kg dispo ») ; le bloc `search` de `tabs.json` (coquille)
+  part avec l'écran qu'il décrivait — pas de clés mortes.
+
+## Vérifié
+
+- `nx run-many --target=typecheck --all --skip-sync` : 10/10.
+- Contrôle i18n vert + contre-épreuve rouge (`clé manquante : error.retry`) — fichier INDEXÉ avant la
+  mutation cette fois (leçon du lot A203 appliquée : `git checkout --` restaure depuis l'index).
+- Bundle Hermes Android `--clear` : `/trips/search`, `x-correlation-id`, chaînes FR et EN, témoin faux
+  à 0. **Piège trouvé** : Hermes stocke les chaînes ACCENTUÉES en UTF-16 — un `grep` UTF-8 les compte
+  0 (« Ville de départ » : 0, « kg dispo » : 1). Les marqueurs du lot A203 étaient sans accent par
+  chance. Toute preuve de bundle sur du texte français cherche désormais les DEUX encodages
+  (`data.count(s.encode('utf-16-le')) + data.count(s.encode('utf-8'))`).

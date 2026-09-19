@@ -24,13 +24,27 @@ import {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /** L'id de corrélation de la requête : le même que dans les logs serveur
+   *  et Sentry (le gateway propage `x-correlation-id` tel quel). */
+  readonly correlationId: string | null;
 
-  constructor(status: number, message: string, code: string | null) {
+  constructor(status: number, message: string, code: string | null, correlationId: string | null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.correlationId = correlationId;
   }
+}
+
+/**
+ * Id de corrélation généré CÔTÉ CLIENT : le gateway n'en fabrique un que si
+ * la requête n'en porte pas — en l'envoyant, l'app connaît l'id même quand la
+ * réponse ne revient jamais (panne réseau). Pas un besoin cryptographique :
+ * horodatage + aléa suffisent à corréler.
+ */
+function newCorrelationId(): string {
+  return `mob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 type SessionTokens = {
@@ -117,9 +131,14 @@ type ApiFetchOptions = {
   requireAuth?: boolean;
 };
 
-async function rawFetch(path: string, options: ApiFetchOptions): Promise<Response> {
+async function rawFetch(
+  path: string,
+  options: ApiFetchOptions,
+  correlationId: string
+): Promise<Response> {
   const headers: Record<string, string> = {
     'x-locale': currentLocale(),
+    'x-correlation-id': correlationId,
     ...options.headers,
   };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
@@ -134,7 +153,7 @@ async function rawFetch(path: string, options: ApiFetchOptions): Promise<Respons
   });
 }
 
-async function toApiError(response: Response): Promise<ApiError> {
+async function toApiError(response: Response, correlationId: string): Promise<ApiError> {
   let message = `HTTP ${response.status}`;
   let code: string | null = null;
   try {
@@ -147,22 +166,24 @@ async function toApiError(response: Response): Promise<ApiError> {
   } catch {
     // Corps non-JSON (504 du gateway…) : on garde le statut.
   }
-  return new ApiError(response.status, message, code);
+  return new ApiError(response.status, message, code, correlationId);
 }
 
 /**
  * Appel API. Sur un 401 d'une route authentifiée : UN refresh partagé, puis
- * une (seule) relance de la requête — jamais de boucle.
+ * une (seule) relance de la requête — jamais de boucle. La relance porte le
+ * MÊME id de corrélation : les deux lignes serveur racontent un seul geste.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  let response = await rawFetch(path, options);
+  const correlationId = newCorrelationId();
+  let response = await rawFetch(path, options, correlationId);
 
   if (response.status === 401 && options.requireAuth !== false) {
     const refreshed = await refreshSession();
-    if (!refreshed) throw await toApiError(response);
-    response = await rawFetch(path, options);
+    if (!refreshed) throw await toApiError(response, correlationId);
+    response = await rawFetch(path, options, correlationId);
   }
 
-  if (!response.ok) throw await toApiError(response);
+  if (!response.ok) throw await toApiError(response, correlationId);
   return (await response.json()) as T;
 }
