@@ -6598,3 +6598,30 @@ avait eu lieu sur le trajet d'un autre voyageur). La fiche membre porte désorma
 | ADM79c | Membre sans aucune communication | « Aucune. » / « Aucun. » — et l'explication « le problème est en amont » |
 | ADM79d | Compte inexistant | « Ce compte n'existe plus. » |
 | ADM79e | Journal du compte après fiche + carte | UNE ligne USER_VIEWED (coalescée), pas deux |
+
+# Un client mobile qui entre sans rien changer aux règles · `feat/mobile-socle`
+
+## Le besoin
+
+Le corridor France ↔ Afrique centrale vit sur téléphone : les Voyageurs et les destinataires sont
+massivement sur Android, une part importante des Expéditeurs sur iPhone (D73). Le site web mobile existe,
+mais une application installée apporte ce que le navigateur ne donne pas : notifications poussées, caméra
+pour les photos de pickup, paiement natif. Le jalon 4 ouvre ce chantier ; cette première livraison pose le
+socle — l'application existe, porte l'identité Yamba, et le reste de la plateforme n'a pas bougé.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-1** | Le mobile est **un client de plus des mêmes API** : aucune règle métier locale, aucun deuxième moteur de prix, aucun deuxième contrat. Le serveur décide (`allowedActions`), l'app reflète — la même règle que le front web. |
+| **RG-MOB-2** | L'écran **n'annonce que ce qui existe** (principe de l'accueil web #357) : pas de contenu de démonstration, pas de marque tierce, pas de promesse de parcours non livré. |
+| **RG-MOB-3** | L'identité visuelle est celle de la plateforme : mangue `#FF9900` + teal `#0F766E`, clair/sombre suivant le réglage du système. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB1 | `expo export --platform android` | Un bundle Hermes est produit, sans erreur |
+| MOB2 | Ouverture de l'app | « Yamba » et l'accroche de l'accueil web ; la mention explicite que les parcours arrivent |
+| MOB3 | Recherche de « Expo » dans les écrans et assets | Aucun écran ni visuel du template (logo, badges, tutoriels) |
+| MOB4 | Plateforme après intégration | 1570 tests verts, les six services démarrent (`smoke-services.sh` 6/6) |

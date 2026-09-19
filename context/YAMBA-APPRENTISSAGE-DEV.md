@@ -2437,3 +2437,42 @@ qu'elle prétend décrire, pas de mémoire. Le 3A a été corrigé avant d'écri
 avant même de brancher la route) est le complément naturel des specs à db injectée — la spec prouve la
 LOGIQUE, l'exécution réelle prouve que les filtres Prisma parlent bien au VRAI moteur (un `isSet` sur un
 champ requis, par exemple, serait refusé à l'exécution seulement).
+
+## Chapitre 201 — Un monorepo accueille Expo : le même mécanisme, deux verdicts opposés
+
+**Le contexte.** Premier code du jalon 4 (`feat/mobile-socle`) : une app `create-expo-app` (SDK 57) posée
+dans `apps/mobile`, que le glob workspaces `apps/*` intègre au premier `npm install`.
+
+**1. `react` niché : le piège des services… qui n'en est pas un ici.** Le dépôt a payé cher la règle « un
+`node_modules` niché sous `apps/<service>` est une dérive » (`imagekit` 1.5.0, A47) : Node remonte les
+`node_modules` depuis le fichier appelant, et une copie nichée MASQUE la copie racine. Ici, l'app épingle
+`react@19.2.3` exact quand la racine résout `^19.0.0` → 19.2.7 : npm niche donc 19.2.3 sous
+`apps/mobile/node_modules` — et c'est **voulu**. React Native exige la version exacte appariée à sa
+release, et Metro (le bundler RN) résout depuis le dossier de l'app : chaque projet voit SA version, aucun
+ne masque l'autre. La leçon n'est pas « le nichage est bon ou mauvais », c'est : **le verdict dépend de qui
+résout**. Un service Express et l'app Expo traversent le même mécanisme de résolution avec des attentes
+inverses — d'où la vérification qui reste : `npm ls imagekit` doit toujours dire `deduped` APRÈS
+l'installation qui a ajouté le workspace.
+
+**2. Le target que personne n'a écrit.** `nx run-many --target=typecheck --all` — la commande exacte de la
+CI — s'est mis à échouer sur `@yamba-app/mobile:typecheck`… un target qu'aucun fichier du dépôt ne déclare.
+Les plugins Nx (`nx.json` → `plugins`) INFÈRENT des targets depuis la présence de fichiers : un
+`tsconfig.json` suffit à `@nx/js/typescript` pour fabriquer un `typecheck` en mode composite
+(`--emitDeclarationOnly`), que le tsconfig Expo (`noEmit`, non composite) refuse avec TS5069. Le remède est
+un bloc `nx.targets.typecheck` dans le `package.json` de l'app (un `tsc --noEmit` simple) — la surcharge
+locale gagne sur l'inférence. La leçon : **ajouter un projet à un monorepo Nx, c'est hériter de targets
+implicites** ; la seule façon de les voir est de rejouer les commandes de la CI en local avant de pousser.
+
+**3. Prouver le build de la CIBLE, pas le build commode.** `tsc` vert ne prouve pas qu'une app RN se
+bundle (esModuleInterop l'a déjà enseigné côté services). La preuve de bout en bout la moins chère est
+`npx expo export --platform android` : Metro traverse réellement tous les imports et produit le bytecode
+Hermes. L'export **web**, lui, échoue sur un artefact de hoisting (`@expo/router-server`, hoisté à la
+racine, importe `@expo/metro-runtime`, niché dans l'app — deux dossiers `node_modules` qui ne se voient
+pas). Il aurait été tentant de « réparer » ce chemin ; mais le web n'est pas une cible du jalon (user-ui
+EST le client web) : **réparer un build hors cible est du travail hors périmètre déguisé en rigueur**. Le
+constat est consigné, pas corrigé.
+
+**4. Deux gestes d'hygiène au premier commit.** (a) Le template livre une LICENSE MIT : la commiter,
+c'est l'ACCORDER — l'historique git n'oublie pas ; elle part avant le premier commit, pas dans un
+nettoyage ultérieur. (b) Commiter le template PUR d'abord, l'identité ensuite : chaque choix Yamba se
+relit en diff contre l'original, au lieu d'un commit « scaffold + modifications » où l'un cache l'autre.
