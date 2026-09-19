@@ -24091,6 +24091,29 @@
         ],
         "additionalProperties": false
       },
+      "SessionTokens": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresInSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "accessTokenExpiresInSeconds"
+        ],
+        "additionalProperties": false,
+        "description": "Session tokens delivered in the body — only when the request carries `x-token-delivery: body` (A201, cookie-less clients such as the mobile app). No cookies are set in that mode; the refresh token rotates on every /auth/refresh"
+      },
       "MemberLoginResponse": {
         "type": "object",
         "properties": {
@@ -24099,6 +24122,9 @@
           },
           "user": {
             "$ref": "#/components/schemas/SessionUser"
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/SessionTokens"
           }
         },
         "required": [
@@ -24106,7 +24132,24 @@
           "user"
         ],
         "additionalProperties": false,
-        "description": "Cookies access_token / refresh_token are set on the response"
+        "description": "Cookies access_token / refresh_token are set on the response — unless `x-token-delivery: body` was sent, in which case `tokens` is returned instead (A201)"
+      },
+      "RefreshedSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/SessionTokens"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "description": "Session rotated. `tokens` present only with `x-token-delivery: body` (A201)"
       },
       "GoogleSignInRequest": {
         "type": "object",

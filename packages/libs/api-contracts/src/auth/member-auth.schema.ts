@@ -32,7 +32,11 @@ export const SuccessMessageResponseSchema = okMessage("SuccessMessageResponse", 
 /* ── Connexion / session ────────────────────────────────────────────────── */
 export const MemberLoginRequestSchema = z.object({ email: z.string().email(), password: z.string(), rememberMe: z.boolean().optional() }).meta({ id: "MemberLoginRequest", description: "rememberMe = 30-day refresh cookie (A62)" });
 export const SessionUserSchema = z.object({ id: ObjectIdSchema, email: z.string(), firstName: z.string(), lastName: z.string(), roles: z.array(z.string()) }).meta({ id: "SessionUser" });
-export const MemberLoginResponseSchema = z.object({ message: z.string(), user: SessionUserSchema }).meta({ id: "MemberLoginResponse", description: "Cookies access_token / refresh_token are set on the response" });
+export const SessionTokensSchema = z
+  .object({ accessToken: z.string(), refreshToken: z.string(), accessTokenExpiresInSeconds: z.number().int() })
+  .meta({ id: "SessionTokens", description: "Session tokens delivered in the body — only when the request carries `x-token-delivery: body` (A201, cookie-less clients such as the mobile app). No cookies are set in that mode; the refresh token rotates on every /auth/refresh" });
+export const MemberLoginResponseSchema = z.object({ message: z.string(), user: SessionUserSchema, tokens: SessionTokensSchema.optional() }).meta({ id: "MemberLoginResponse", description: "Cookies access_token / refresh_token are set on the response — unless `x-token-delivery: body` was sent, in which case `tokens` is returned instead (A201)" });
+export const RefreshedSessionResponseSchema = z.object({ success: z.literal(true), tokens: SessionTokensSchema.optional() }).meta({ id: "RefreshedSessionResponse", description: "Session rotated. `tokens` present only with `x-token-delivery: body` (A201)" });
 export const GoogleSignInRequestSchema = z
   .object({ credential: z.string().min(1), rememberMe: z.boolean().optional(), consent: z.object({ termsVersion: z.string(), privacyVersion: z.string() }).optional() })
   .meta({ id: "GoogleSignInRequest", description: "Google ID token (D47). A new account needs consent, otherwise CONSENT_REQUIRED" });
