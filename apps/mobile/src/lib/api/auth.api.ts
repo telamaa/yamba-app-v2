@@ -14,6 +14,8 @@ export type SessionUser = {
   firstName: string;
   lastName: string;
   roles: string[];
+  /** Langue du COMPTE (D44) — prime sur celle de l'appareil quand elle existe. */
+  preferredLocale?: string | null;
 };
 
 type LoginResponse = {

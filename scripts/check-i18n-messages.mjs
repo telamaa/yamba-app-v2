@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * ⭐ D10 — Vérification des messages i18n (apps/user-ui/messages).
+ * ⭐ D10 — Vérification des messages i18n (apps/user-ui/messages,
+ * et depuis le lot i18n mobile D36 : apps/mobile/messages, mêmes règles 1-6).
  *
  * 1. Chaque fichier de chaque locale doit être du JSON valide.
  * 2. Chaque locale doit avoir exactement les mêmes fichiers que la
@@ -308,6 +309,171 @@ function valeurs(obj, prefix = "") {
   }
 }
 
+/* ── Le MOBILE (lot i18n D36) : les règles 1 à 6 sur apps/mobile/messages ──
+ *
+ * Les dictionnaires du mobile vivent près de l'app, pas dans user-ui — mais ils obéissent aux
+ * mêmes règles : parse, miroir FR/EN, clés sans point, lexique, clés littérales. La carte des
+ * espaces de noms se lit dans `src/i18n/messages.ts` (imports STATIQUES : Metro ne sait pas
+ * composer `messages/${locale}/…` comme next-intl côté serveur) : une ligne d'import par fichier,
+ * une liaison `espace: variable` par entrée du bloc `fr`. La règle 7 (textes de notification)
+ * reste propre au web tant que le mobile n'a pas de centre de notifications.
+ */
+{
+  const DOSSIER = "apps/mobile/messages";
+  const SOURCES = "apps/mobile/src";
+  const CHARGEUR = "apps/mobile/src/i18n/messages.ts";
+
+  if (!existsSync(DOSSIER)) {
+    fail(`[mobile] dossier introuvable : ${DOSSIER} — le mobile a perdu ses messages`);
+  } else {
+    const localesMobiles = readdirSync(DOSSIER, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort();
+
+    /* Règles 1 à 4 : parse, mêmes fichiers, miroir de clés, clés sans point. */
+    const refDirMobile = join(DOSSIER, REFERENCE_LOCALE);
+    const refFichiers = existsSync(refDirMobile)
+      ? readdirSync(refDirMobile).filter((f) => f.endsWith(".json")).sort()
+      : [];
+    if (refFichiers.length === 0) fail(`[mobile] aucun fichier de messages en ${REFERENCE_LOCALE}`);
+
+    const refArbres = new Map();
+    for (const file of refFichiers) {
+      const p = join(refDirMobile, file);
+      try {
+        const tree = JSON.parse(readFileSync(p, "utf8"));
+        refArbres.set(file, tree);
+        for (const key of invalidKeys(tree)) fail(`Clé refusée (point ou vide) : ${p} → "${key}"`);
+      } catch (e) {
+        fail(`JSON invalide : ${p} — ${e.message}`);
+      }
+    }
+    for (const locale of localesMobiles) {
+      if (locale === REFERENCE_LOCALE) continue;
+      const dir = join(DOSSIER, locale);
+      const fichiers = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+      for (const f of refFichiers) {
+        if (!fichiers.includes(f)) fail(`[mobile ${locale}] fichier manquant : ${f} (présent en ${REFERENCE_LOCALE})`);
+      }
+      for (const f of fichiers) {
+        if (!refFichiers.includes(f)) fail(`[mobile ${locale}] fichier orphelin : ${f} (absent de ${REFERENCE_LOCALE})`);
+      }
+      for (const file of fichiers) {
+        if (!refArbres.has(file)) continue;
+        const p = join(dir, file);
+        let tree;
+        try {
+          tree = JSON.parse(readFileSync(p, "utf8"));
+        } catch (e) {
+          fail(`JSON invalide : ${p} — ${e.message}`);
+          continue;
+        }
+        for (const key of invalidKeys(tree)) fail(`Clé refusée (point ou vide) : ${p} → "${key}"`);
+        const refKeys = keyPaths(refArbres.get(file));
+        const locKeys = keyPaths(tree);
+        for (const k of refKeys) {
+          if (!locKeys.has(k)) fail(`[mobile ${locale}/${file}] clé manquante : ${k}`);
+        }
+        for (const k of locKeys) {
+          if (!refKeys.has(k)) fail(`[mobile ${locale}/${file}] clé orpheline : ${k} (absente de ${REFERENCE_LOCALE})`);
+        }
+      }
+    }
+
+    /* Règle 6 : le lexique s'applique aussi aux valeurs du mobile. */
+    let luesMobile = 0;
+    for (const locale of localesMobiles) {
+      const regles = VOCABULAIRE[locale] ?? [];
+      for (const file of readdirSync(join(DOSSIER, locale)).filter((f) => f.endsWith(".json"))) {
+        let tree;
+        try {
+          tree = JSON.parse(readFileSync(join(DOSSIER, locale, file), "utf8"));
+        } catch {
+          continue; // déjà signalé
+        }
+        for (const [chemin, texte] of valeurs(tree)) {
+          luesMobile += 1;
+          if (/^\s*[—–-]?\s*$/.test(texte)) fail(`[mobile ${locale}/${file}] texte vide ou « — » : ${chemin}`);
+          for (const { motif, raison, sauf } of regles) {
+            if (motif.test(texte) && !(sauf && sauf.test(texte))) fail(`[mobile ${locale}/${file}] ${raison} : ${chemin} = « ${texte.slice(0, 90)} »`);
+          }
+        }
+      }
+    }
+    if (luesMobile < 10) fail(`[mobile vocabulaire] seulement ${luesMobile} texte(s) lu(s) : le bloc mobile ne lit plus les messages`);
+
+    /* Règle 5 : chaque clé LITTÉRALE utilisée dans apps/mobile/src existe.
+     * Mêmes motifs que le web, guillemets simples compris (style de l'app). */
+    function carteMobile() {
+      if (!existsSync(CHARGEUR)) return null;
+      const code = readFileSync(CHARGEUR, "utf8");
+      const importsParVariable = new Map();
+      for (const m of code.matchAll(/import (\w+) from '\.\.\/\.\.\/messages\/fr\/([\w.-]+\.json)'/g)) {
+        importsParVariable.set(m[1], m[2]);
+      }
+      const blocFr = code.match(/\bfr:\s*\{([^}]*)\}/);
+      if (!blocFr) return null;
+      const carte = new Map();
+      for (const m of blocFr[1].matchAll(/(\w+):\s*(\w+)/g)) {
+        const fichier = importsParVariable.get(m[2]);
+        if (fichier) carte.set(fichier, m[1]);
+      }
+      return carte.size > 0 ? carte : null;
+    }
+    const carteM = carteMobile();
+    if (carteM === null) {
+      fail(`[mobile source] carte des espaces de noms illisible dans ${CHARGEUR} (règle 5 inopérante)`);
+    } else {
+      for (const file of refFichiers) {
+        if (!carteM.has(file)) fail(`[mobile source] ${file} n'est chargé par aucun espace de noms de ${CHARGEUR}`);
+      }
+      const connuesMobile = new Set();
+      for (const locale of localesMobiles) {
+        for (const f of readdirSync(join(DOSSIER, locale)).filter((x) => x.endsWith(".json"))) {
+          let tree;
+          try {
+            tree = JSON.parse(readFileSync(join(DOSSIER, locale, f), "utf8"));
+          } catch {
+            continue;
+          }
+          const ns = carteM.get(f) ?? f.replace(/\.json$/, "");
+          for (const k of keyPaths(tree)) connuesMobile.add(`${ns}.${k}`);
+        }
+      }
+      let verifieesMobile = 0;
+      for (const fichier of fichiersSources(SOURCES)) {
+        const code = readFileSync(fichier, "utf8");
+        const liaisons = new Map();
+        for (const m of code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*useTranslations\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+          if (liaisons.has(m[1])) {
+            liaisons.set(m[1], null);
+            continue;
+          }
+          liaisons.set(m[1], { ns: m[2], depuis: m.index });
+        }
+        const espaces = new Map([...liaisons].filter(([, v]) => v !== null));
+        if (espaces.size === 0) continue;
+        for (const [variable, { ns, depuis }] of espaces) {
+          const appel = new RegExp(`\\b${variable}(?:\\.rich)?\\(\\s*['"]([^'"]+)['"]`, "g");
+          for (const m of code.matchAll(appel)) {
+            if (m.index < depuis) continue;
+            if (m[1].endsWith(".")) continue;
+            const chemin = `${ns}.${m[1]}`;
+            verifieesMobile += 1;
+            if (!connuesMobile.has(chemin)) {
+              fail(`[mobile source] clé absente de toutes les locales : ${chemin} — ${fichier.replace(SOURCES + "/", "")}`);
+            }
+          }
+        }
+      }
+      if (verifieesMobile < 5) {
+        fail(`[mobile source] seulement ${verifieesMobile} clé(s) littérale(s) analysée(s) : le motif ne reconnaît plus les appels du mobile (règle 5 inopérante)`);
+      }
+    }
+  }
+}
+
 /* ── Rapport ── */
 if (errors.length > 0) {
   console.error(`✗ i18n check — ${errors.length} problème(s) :\n`);
@@ -318,5 +484,5 @@ if (errors.length > 0) {
 const totalFiles = refFiles.length * locales.length;
 console.log(
   `✓ i18n check — ${locales.length} locale(s) [${locales.join(", ")}], ` +
-  `${refFiles.length} namespace(s), ${totalFiles} fichiers : parse OK, miroir parfait.`
+  `${refFiles.length} namespace(s), ${totalFiles} fichiers (+ mobile) : parse OK, miroir parfait.`
 );

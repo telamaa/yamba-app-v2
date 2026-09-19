@@ -11538,3 +11538,74 @@ magasin de cookies ne pouvait donc jamais AMORCER de session : le trou était se
   Bearer → refresh Bearer avec rotation (rejeu de l'ancien → 401) → logout Bearer (refresh suivant → 401).
   Contrôle web INCHANGÉ : 4 Set-Cookie (2 purges + 2 poses), aucun `tokens` dans le corps.
 - Mobile : `tsc` vert, bundle Hermes Android produit.
+
+# L'i18n du mobile — le moteur du web, la résolution de Metro · `feat/mobile-i18n`
+
+## Le déclencheur
+
+Le socle (#368) et la session par jetons (#370) avaient laissé deux dettes explicites : l'écran de
+connexion en FR dur (« TODO lot i18n D36 ») et, dans `client.ts`, un `fr ? … : …` — le motif que D44
+interdit partout ailleurs dans le dépôt.
+
+## Ce qui a été fait
+
+- **Le moteur** : `use-intl` 4.13.2 — c'est le cœur de next-intl (même paquet, même version que celle que
+  next-intl embarque déjà à la racine, `npm ls` le dit « deduped »). Mêmes fichiers ICU, même
+  `useTranslations` : le mobile n'introduit pas un deuxième moteur de messages.
+- **Les dictionnaires** : `apps/mobile/messages/{fr,en}/{auth,home}.json`. Libellés du web repris à
+  l'identique quand l'écran existe déjà (accroche #357, « Connexion », « Se connecter », « Log in ») ;
+  seules les clés réellement RENDUES existent (leçon du 18/09 : une chaîne morte fabrique un cahier faux).
+  Chargement par imports STATIQUES dans `src/i18n/messages.ts` — Metro embarque les deux langues dans le
+  bundle, il ne sait pas composer `messages/${locale}/…` comme next-intl côté serveur.
+- **La langue affichée** (`src/i18n/provider.tsx`) : ordre D44 transposé — `preferredLocale` du compte
+  (posée au login et à `/auth/me` via `usePreferredLocaleSetter`, remise à null au logout) prime sur la
+  langue de l'appareil (`useLocales()` d'expo-localization, normalisée par `resolveLocale` du contrat
+  `@packages/api-contracts/locale`, consommé par l'alias dédié). `src/i18n/locale-state.ts` garde la
+  langue courante lisible HORS React : le client API y prend son `x-locale` — l'en-tête dit désormais la
+  langue de l'écran, et le ternaire interdit a disparu.
+- **Le contrôle CI** (`scripts/check-i18n-messages.mjs`) : un bloc mobile applique les règles 1 à 6 à
+  `apps/mobile/messages` — parse, miroir FR/EN, clés sans point, lexique (tutoiement, « Traveler »),
+  clés littérales (guillemets simples compris, le style de l'app). La carte des espaces de noms se lit
+  dans `src/i18n/messages.ts` ; chaque garde a son seuil plancher (« un contrôle qui ne peut pas échouer
+  n'a rien contrôlé »). La règle 7 (textes de notification) reste au web.
+- **Ce qui a été écrit puis SUPPRIMÉ** : un `metro.config.js` épinglant `react` vers la copie nichée de
+  l'app. Le danger était réel sur le papier — `use-intl` importe react, la remontée hiérarchique de Metro
+  depuis `node_modules` racine aurait trouvé le react 19.2.7 de la racine, et le bundle aurait porté DEUX
+  React. La contre-épreuve (`expo export --clear`, avec et sans le fichier) a produit un bundle identique
+  au bit près : le CLI Expo 57 porte une « sticky resolution » intégrée
+  (`@expo/cli/...//createExpoAutolinkingResolver.js` : react, react-dom, react-native… toujours résolus
+  vers la copie de l'app), et les `paths` du tsconfig suffisent à Metro pour l'alias `@packages`, y
+  compris hors de la racine de l'app. Une config redondante est une config morte : supprimée, le savoir
+  est ici et au chapitre 203.
+
+## Vérifié
+
+- `nx run-many --target=typecheck --all --skip-sync` : 10/10 (la commande exacte de la CI).
+- Contrôle i18n vert, puis TROIS contre-épreuves rouges : clé EN retirée → `clé manquante : logout` ;
+  `t('cleFantome')` dans une source → `clé absente de toutes les locales` ; vouvoiement dans une valeur
+  FR → refus lexique. État final vert.
+- Bundle Hermes Android : `19.2.3` présent UNE fois, `19.2.7` ZÉRO fois (un seul React) ; l'accroche FR
+  ET l'accroche EN embarquées ; les marqueurs du moteur (`MISSING_MESSAGE`, `IntlProvider`) présents.
+- `package-lock.json` strictement ADDITIF (expo-localization 57.0.2 + rtl-detect + la déclaration
+  use-intl) : rien de re-résolu, les services ne sont pas concernés — pas un changement de toolchain.
+- Piège payé pendant la preuve : `expo export` SERT SON CACHE même quand `metro.config.js` change — la
+  première contre-épreuve « sans épinglage » avait produit le même hash… parce que rien n'avait été
+  reconstruit. Toute contre-épreuve de bundle passe par `--clear`.
+
+## Corrigé dans la même PR — `expo start` mourait à froid (premier test réel sur téléphone)
+
+Découvert par la recette utilisateur du 19/09, au premier `expo start` réellement lancé depuis
+l'intégration workspace : `Error: Cannot find module 'expo-router/_ctx-shared'`, levée par la
+génération des types de routes (`experiments.typedRoutes`, actif depuis le scaffold). La cause est un
+artefact de hoisting DÉJÀ consigné par le socle sur l'export web, vu ici sous un autre angle :
+`@expo/router-server` est installé à la RACINE (dépendance de `@expo/cli`), mais `expo-router` est
+NICHÉ sous `apps/mobile` (npm le place à côté de ses pairs — react 19.2.3, expo) ; la remontée CJS
+depuis la racine ne redescend jamais dans une app. Personne ne l'avait vu : les preuves du socle et
+d'A201 passaient par `expo export`, qui ne lance PAS cette génération.
+
+Remède : `NODE_PATH=./node_modules` dans les quatre scripts npm de l'app — un REPLI de résolution CJS,
+consulté seulement quand la remontée normale a échoué, donc sans effet sur tout ce qui se résout déjà.
+Mesuré : sans, mort à froid (journal de recette) ; avec, Metro démarre, zéro erreur, et
+`.expo/types/router.d.ts` est généré. Les alternatives écartées : hisser `expo-router` à la racine
+(violerait ses pairs nichés), désactiver `typedRoutes` (perdre le typage des routes pour un problème
+de résolution serait soigner le thermomètre).

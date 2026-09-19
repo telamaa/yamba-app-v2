@@ -16,6 +16,12 @@ npm run android                     # simulateur / appareil Android
 npm run ios                         # simulateur iOS
 ```
 
+> Les scripts portent `NODE_PATH=./node_modules` : la génération des types de routes du CLI
+> (`@expo/router-server`, installé à la RACINE du workspace) fait un `require('expo-router/…')`
+> alors qu'`expo-router` est NICHÉ ici (ses pairs — react 19.2.3, expo — y vivent) ; sans ce
+> repli de résolution CJS, `expo start` meurt à froid en `MODULE_NOT_FOUND`. `expo export`
+> ne passe pas par cette génération — c'est pourquoi le défaut a survécu aux preuves du socle.
+
 Le poste (simulateurs, comptes, EAS) est décrit dans
 `docs/livrables/06-YAMBA-PREPARATION-MOBILE.md`.
 
@@ -24,8 +30,13 @@ Le poste (simulateurs, comptes, EAS) est décrit dans
 - Scaffold Expo 57 intégré au workspace npm (react est niché sous
   `apps/mobile/node_modules` — voulu : Metro résout depuis l'app).
 - Identité : nom, scheme `yamba`, thème mangue `#FF9900` / teal `#0F766E`, clair/sombre.
+- Client API par jetons (A201) : Bearer + refresh en SecureStore, base URL dérivée du
+  `hostUri` de Metro — téléphone et émulateur joignent le gateway sans config (`src/lib/api/`).
+- i18n (A202) : `use-intl` — le moteur de next-intl —, dictionnaires `messages/{fr,en}/`
+  vérifiés par LE MÊME contrôle CI que le web ; langue = préférence du compte sinon
+  l'appareil (D44), envoyée en `x-locale`. Pas de `metro.config.js` : la « sticky
+  resolution » d'Expo 57 dédoublonne react, les `paths` du tsconfig suffisent à Metro.
 - **Restent des placeholders** : icônes et splash (images du template Expo) — vrais
   assets à produire avant tout build de store ; identifiant applicatif
   (`android.package` / `ios.bundleIdentifier`) à trancher avant le premier `prebuild`.
-- À venir (socle) : client API tokens + stockage sécurisé, i18n (messages JSON partagés),
-  navigation par onglets natifs, `expo-dev-client` + EAS.
+- À venir (socle) : navigation par onglets natifs, `expo-dev-client` + EAS.

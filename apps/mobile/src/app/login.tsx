@@ -10,26 +10,28 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTranslations } from 'use-intl';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { usePreferredLocaleSetter } from '@/i18n/provider';
 import { ApiError } from '@/lib/api/client';
 import { login } from '@/lib/api/auth.api';
 import { useTheme } from '@/hooks/use-theme';
 
-// TODO (lot i18n D36) : dictionnaires partagés — textes FR en dur d'ici là.
-function messageOf(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.code === 'INVALID_CREDENTIALS') return 'Email ou mot de passe incorrect.';
-    if (error.code === 'TOO_MANY_ATTEMPTS') return 'Trop de tentatives. Réessaie dans quelques minutes.';
-    if (error.code === 'ACCOUNT_SUSPENDED') return 'Ce compte est suspendu.';
-    return error.message;
-  }
-  return 'Connexion impossible. Vérifie le réseau et réessaie.';
-}
+// Les refus dont l'écran porte un texte à lui ; tout autre `details.code`
+// affiche le message du serveur (RG-MOB-1 : le serveur décide).
+const TRANSLATED_ERROR_CODES = new Set([
+  'INVALID_CREDENTIALS',
+  'TOO_MANY_ATTEMPTS',
+  'ACCOUNT_SUSPENDED',
+]);
 
 export default function LoginScreen() {
   const theme = useTheme();
+  const t = useTranslations('auth');
+  const setPreferredLocale = usePreferredLocaleSetter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -37,12 +39,23 @@ export default function LoginScreen() {
 
   const canSubmit = email.trim().length > 0 && password.length > 0 && !pending;
 
+  const messageOf = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      if (err.code !== null && TRANSLATED_ERROR_CODES.has(err.code)) {
+        return t(`login.errors.${err.code}`);
+      }
+      return err.message;
+    }
+    return t('login.errors.network');
+  };
+
   const onSubmit = async () => {
     if (!canSubmit) return;
     setPending(true);
     setError(null);
     try {
-      await login(email.trim(), password);
+      const user = await login(email.trim(), password);
+      setPreferredLocale(user.preferredLocale ?? null);
       router.replace('/');
     } catch (err) {
       setError(messageOf(err));
@@ -62,11 +75,11 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.form}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ThemedText type="subtitle">Connexion</ThemedText>
+          <ThemedText type="subtitle">{t('login.title')}</ThemedText>
 
           <TextInput
             style={inputStyle}
-            placeholder="Email"
+            placeholder={t('login.emailPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoComplete="email"
@@ -76,7 +89,7 @@ export default function LoginScreen() {
           />
           <TextInput
             style={inputStyle}
-            placeholder="Mot de passe"
+            placeholder={t('login.passwordPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             secureTextEntry
             autoComplete="password"
@@ -101,7 +114,7 @@ export default function LoginScreen() {
             {pending ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <ThemedText style={styles.submitLabel}>Se connecter</ThemedText>
+              <ThemedText style={styles.submitLabel}>{t('login.submit')}</ThemedText>
             )}
           </Pressable>
         </KeyboardAvoidingView>

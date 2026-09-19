@@ -10,6 +10,8 @@
  * Le serveur décide de tout (RG-MOB-1) : un refus métier arrive avec son
  * `details.code`, exposé tel quel dans `ApiError.code`.
  */
+import { currentLocale } from '@/i18n/locale-state';
+
 import { apiBaseUrl } from './base-url';
 import {
   clearTokens,
@@ -28,16 +30,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
-  }
-}
-
-// TODO (lot i18n D36) : la langue de l'interface remplacera ce défaut.
-function currentLocale(): string {
-  try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-    return locale.toLowerCase().startsWith('en') ? 'en' : 'fr';
-  } catch {
-    return 'fr';
   }
 }
 

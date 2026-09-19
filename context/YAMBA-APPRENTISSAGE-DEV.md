@@ -2520,3 +2520,101 @@ pour les autres : le même arbitrage que le proxy D48 côté web.
 réel AVANT d'écrire l'écran : login body (0 cookie porteur), `/auth/me` en Bearer, refresh avec rotation
 (le rejeu de l'ancien → 401), logout par Bearer (le refresh suivant → 401), et le contrôle inverse — le
 web sans en-tête, inchangé. Quand l'app échouera, on saura que c'est l'app : le serveur a déjà sa preuve.
+
+## Chapitre 203 — Trois clients, une seule voix : use-intl, la résolution de Metro, et la config qui méritait de mourir
+
+### Le problème à résoudre
+
+Le mobile affichait du français en dur, et `client.ts` décidait la langue avec un ternaire
+`locale.startsWith('en') ? 'en' : 'fr'` — exactement le motif que D44 a banni du reste du dépôt. Il
+fallait des dictionnaires FR/EN, la préférence du compte, et la garantie CI que les deux langues disent
+la même chose. Sans réécrire un moteur : le web en a déjà un.
+
+### 1. next-intl est une poupée russe — et ça change tout pour le mobile
+
+next-intl (le web) n'implémente pas l'ICU lui-même : il enrobe **use-intl**, un paquet séparé du même
+auteur, sans rien de spécifique à Next. `npm ls use-intl` le montrait déjà à la racine, en 4.13.2, comme
+dépendance de next-intl. Déclarer `"use-intl": "^4.13.2"` dans `apps/mobile/package.json` n'installe donc
+RIEN de nouveau (« deduped ») : le mobile consomme le même code, la même version, le même format de
+messages que le web.
+
+```tsx
+// apps/mobile/src/app/login.tsx — la même API que le web, mot pour mot
+const t = useTranslations('auth');
+<ThemedText type="subtitle">{t('login.title')}</ThemedText>
+```
+
+La différence est au CHARGEMENT : next-intl lit `messages/${locale}/…` à la demande côté serveur ; Metro
+ne sait pas faire ça — un bundle est clos. D'où `src/i18n/messages.ts` et ses imports STATIQUES : les deux
+langues embarquent (quelques Ko), et ce fichier devient la carte que le contrôle CI lit.
+
+### 2. La langue est un ORDRE, pas une valeur
+
+`resolveViewerLocale` (le contrat serveur) classe les sources : surcharge explicite > compte > appareil >
+défaut. Le mobile transpose : `preferredLocale` du compte si connue, sinon l'appareil. Deux morceaux :
+
+```tsx
+// provider.tsx — l'état React
+const locale = preferred ?? resolveLocale(deviceTag);
+useEffect(() => { setCurrentLocale(locale); }, [locale]);
+```
+
+```ts
+// locale-state.ts — le miroir HORS React, pour le client API
+export function currentLocale(): SupportedLocale { return uiLocale ?? deviceLocale(); }
+```
+
+Pourquoi deux ? Parce que `client.ts` n'est pas un composant : il ne peut pas appeler un hook. Le provider
+POSE la langue affichée dans un module plat ; le client la LIT pour `x-locale`. L'invariant obtenu :
+l'en-tête dit toujours la langue que l'utilisateur regarde — pas une langue recalculée autrement.
+
+### 3. Metro : la remontée hiérarchique, et la contre-épreuve qui a tué une config
+
+Le vrai morceau d'apprentissage. `react` est niché sous `apps/mobile` (19.2.3, exigence Expo), la racine
+porte 19.2.7 (user-ui). Or `use-intl` — résolu à la RACINE — importe react. La résolution Node/Metro
+remonte les `node_modules` DEPUIS L'IMPORTEUR : depuis `node_modules/use-intl`, elle trouve le react de
+la racine. Conclusion sur le papier : DEUX React dans le bundle, et un `metro.config.js` a été écrit pour
+épingler `react` vers la copie de l'app.
+
+Puis la contre-épreuve, avant de livrer : exporter le bundle AVEC et SANS le fichier.
+
+```sh
+npx expo export --platform android --clear --output-dir /tmp/preuve
+strings entry-*.hbc | grep -c '19.2.7'   # 0 — le react racine n'y est pas
+strings entry-*.hbc | grep -c '19.2.3'   # 1 — un seul React, celui de l'app
+```
+
+Identique au bit près, dans les deux sens. Explication trouvée ENSUITE dans le CLI :
+`@expo/cli/build/src/start/server/metro/createExpoAutolinkingResolver.js` porte une liste
+`KNOWN_STICKY_DEPENDENCIES` — react, react-dom, react-native… — « must also be deduplicated in bundles » :
+Expo 57 force déjà ces modules vers la copie du projet, précisément pour les monorepos. Et l'alias
+`@packages/api-contracts/locale` ? Les `paths` du tsconfig suffisent : Expo les fait lire à Metro par
+défaut (`experiments.tsconfigPaths`), y compris vers un fichier HORS de la racine de l'app. Le
+`metro.config.js` était donc redondant des deux côtés : SUPPRIMÉ. Une config morte a un coût réel — le
+prochain lecteur croirait l'épinglage nécessaire et le maintiendrait pour rien.
+
+Deux pièges payés en route, à ne pas repayer :
+
+- **`expo export` sert son cache même quand `metro.config.js` change.** La première contre-épreuve « sans
+  épinglage » a rendu le MÊME hash… parce que rien n'avait été reconstruit. Un hash identique doit rendre
+  suspicieux avant de rendre content : toute contre-épreuve de bundle passe par `--clear`.
+- **La théorie de résolution était juste, et la conclusion fausse.** La remontée hiérarchique existe bien ;
+  c'est une COUCHE AU-DESSUS (le resolver Expo) qui la neutralise pour ces modules-là. Mesurer le bundle
+  tranche ; raisonner sur l'algorithme ne suffit pas.
+
+### 4. Étendre un garde-fou sans l'affaiblir
+
+Le bloc mobile de `check-i18n-messages.mjs` réutilise les aides (`invalidKeys`, `keyPaths`, `valeurs`,
+le lexique) mais duplique volontairement la boucle : refactorer la boucle du web pour la partager aurait
+touché un contrôle chargé — un garde-fou se modifie par ADDITION. Deux adaptations réelles : les motifs
+acceptent les guillemets simples (`useTranslations('auth')`, le style de l'app), et chaque garde a son
+seuil plancher (`verifieesMobile < 5`, `luesMobile < 10`) — le garde-fou du garde-fou, hérité de la
+règle 5 du web. Et comme toujours : trois défauts injectés (clé EN retirée, `t('cleFantome')`,
+vouvoiement), trois rouges constatés, restauration, vert final.
+
+### Pour aller plus loin
+
+- La PORTE d'A202 : au premier écran produit (recherche, réservation), les domaines de messages communs
+  au web et au mobile montent dans `packages/` — le miroir CI suivra le déménagement.
+- `useLocales()` est réactif : changer la langue du téléphone re-rend l'app sans redémarrage (Android le
+  permet à chaud). La préférence de COMPTE, elle, attend un état de session partagé — le lot des onglets.
