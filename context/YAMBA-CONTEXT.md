@@ -796,6 +796,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 19/09 : **LE CHANTIER MOBILE EST OUVERT — LE SOCLE EXPO ENTRE DANS LE DEPOT (#368).**
+  Scaffold create-expo-app SDK 57 (RN 0.86, React 19.2.3, nouvelle architecture) commite PUR d'abord, puis
+  identite Yamba (nom/slug/scheme `yamba`, splash mangue, theme mangue/teal clair/sombre, decorum Expo supprime,
+  accueil qui reprend l'accroche #357 et n'annonce que ce qui existe, LICENSE MIT retiree avant le premier commit).
+  Workspace `apps/*` integre : react 19.2.3 reste NICHE sous apps/mobile — VOULU (Metro resout depuis l'app),
+  l'inverse du piege « nested shadows » des services ; imagekit verifie deduped. Target Nx typecheck surcharge en
+  `tsc --noEmit` (l'inference @nx/js composite echouait TS5069 et cassait la commande exacte de la CI). Lockfile
+  re-resolu = traite en changement de toolchain : typecheck 10/10, smoke 6/6, 1570 tests verts, bundle Hermes
+  Android produit (l'export web statique bute sur un artefact de hoisting @expo/router-server → @expo/metro-runtime,
+  hors cible : user-ui est le client web — consigne, pas corrige). PIEGE paye : `expo-env.d.ts` est IGNORE par le
+  .gitignore du template (regenere par `expo start`) — le git add l'a saute en silence, vert local / TS2882 en CI ;
+  remede : reference `expo/types` SUIVIE dans src/env.d.ts, prouvee verte avec et sans le fichier genere.
+  RG-MOB-1..3, chapitre 201. D73 challengee le 19/09 (« publier iOS d'abord ? ») et CONFIRMEE : Android d'abord.
+  RESTE au socle : client API par tokens + expo-secure-store, i18n (messages JSON partages), onglets natifs,
+  expo-dev-client + EAS ; identifiant applicatif (android.package / ios.bundleIdentifier) et vrais assets a
+  trancher avant tout build de store. npm audit 18 → 21 (+3 moderees, arbre Expo). 18 checks comptes.
+  AUCUNE attribution Claude.
 - 18/09 (nuit, suite) : **LE NOM DU MENU MENE AU PROFIL (#365).** La carte utilisateur du menu (avatar + nom +
   email + badge) devient un lien vers /dashboard/profile, dropdown desktop ET bottom-sheet mobile (meme composant).
   Mergee APRES #366 : conflit attendu sur YAMBA-DOC-TECHNIQUE (deux ajouts en fin de fichier), resolu en gardant les
@@ -2011,10 +2028,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui RESTE — Jalon 4 (mobile : socle + Android)
 
-- D36 a graver : stack (React Native + Expo, TypeScript, Expo Router), code
-  partage (pricing, contrats, client OpenAPI genere, i18n JSON reutilises),
-  auth par tokens (refresh) au lieu des cookies web, push notifications
-  (Expo Notifications, branchees sur notification-service), deep links.
+- Socle ouvert le 19/09 (#368) : app Expo SDK 57 dans apps/mobile (D36 gravee
+  le 29/08, D73 confirmee le 19/09 — Android publie d'abord). Reste du socle :
+  client API par tokens (refresh + expo-secure-store) au lieu des cookies web,
+  code partage (pricing, contrats, client OpenAPI genere, i18n JSON reutilises),
+  onglets natifs, push notifications (Expo Notifications, branchees sur
+  notification-service), deep links, expo-dev-client + EAS ; identifiant
+  applicatif et vrais assets avant tout build de store.
 - Parcours Expediteur : recherche (poids, familles), page trajet, reservation
   4 etapes (Stripe Payment Sheet), suivi, code de livraison, notation.
 - Parcours Voyageur : creation de trajet (formulaire PER_KG), deals recus,

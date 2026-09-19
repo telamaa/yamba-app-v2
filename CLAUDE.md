@@ -35,6 +35,7 @@ Always run tasks through Nx (see also `AGENTS.md`):
 npm run dev                        # the SIX services only (nx run-many serve) — the two Next fronts start separately (below)
 npx nx dev user-ui                 # Next.js frontend only (port 3000)
 npx nx dev admin-ui                # back-office Next.js (port 3001, chantier C) — needs an ADMIN account: grant-admin.ts
+npx nx start @yamba-app/mobile     # app Expo SDK 57 (jalon 4, D36/D73) — apps/mobile, voir son README ; react 19.2.3 NICHÉ sous apps/mobile = voulu (Metro), et son target typecheck est surchargé (tsc --noEmit)
 npx nx serve api-gateway           # gateway (port 8080)
 npx nx serve auth-service          # port 6001
 npx nx serve trip-service          # port 6002
