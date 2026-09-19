@@ -37,5 +37,16 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
+  "nx": {
+    "targets": {
+      "typecheck": {
+        "command": "tsc --noEmit",
+        "options": {
+          "cwd": "apps/mobile"
+        },
+        "cache": true
+      }
+    }
+  },
   "private": true
 }
