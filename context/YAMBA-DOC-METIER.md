@@ -6652,3 +6652,29 @@ change pour le site web, et sans qu'un pirate du web y gagne quoi que ce soit.
 | MOB7 | Rejeu d'un refresh déjà utilisé | 401 (rotation : l'ancien jeton est mort) |
 | MOB8 | Refresh après déconnexion | 401 (la révocation par Bearer a tué la session) |
 | MOB9 | Mauvais mot de passe dans l'app | Le message d'erreur vient du code serveur (`INVALID_CREDENTIALS`), l'app ne décide rien |
+
+# L'app dans ta langue — l'i18n du mobile · `feat/mobile-i18n`
+
+## Le besoin
+
+Un membre francophone lit l'app en français, un anglophone en anglais — sans réglage : la langue du
+téléphone décide. Et si le compte a une préférence de langue (choisie sur le site), c'est ELLE qui gagne,
+comme pour les emails (D44) : un membre qui a choisi l'anglais lit l'anglais, même sur un téléphone en
+français. Les textes sont les mêmes mots que le site — une seule voix, « Voyageur » / « Traveler » compris.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-7** | La langue de l'interface suit l'ordre D44 : préférence du COMPTE si elle existe (apprise à la connexion, oubliée à la déconnexion), sinon langue de l'appareil, sinon français. Un visiteur sans compte lit la langue de son téléphone. |
+| **RG-MOB-8** | La liste des langues vit en UN endroit (`SUPPORTED_LOCALES`, la même que le web et les emails). Ajouter une langue au mobile = ajouter un dossier de messages — jamais un booléen `fr ? … : …`. Aucun texte d'écran en dur : tout passe par les dictionnaires, dont la CI garantit le miroir FR/EN, les clés et le lexique (tutoiement, jamais « carrier »). |
+| **RG-MOB-9** | Chaque requête du mobile porte la langue de l'ÉCRAN (`x-locale`) : le serveur répond — et écrit ses emails sans compte — dans la langue que l'utilisateur regarde, pas dans une langue devinée autrement. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB10 | Téléphone en anglais, sans compte | Accueil et connexion en anglais (« Log in », accroche EN) |
+| MOB11 | Compte `preferredLocale: en`, téléphone en français | Après login l'app passe en anglais ; au logout, retour au français |
+| MOB12 | Clé EN retirée · clé inexistante appelée · vouvoiement en FR | La CI échoue — trois contre-épreuves rejouées, trois rouges |
+| MOB13 | Bundle Android exporté | UNE copie de react (19.2.3) ; les textes FR et EN embarqués |
