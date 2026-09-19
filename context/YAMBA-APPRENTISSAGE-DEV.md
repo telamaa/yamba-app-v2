@@ -2476,3 +2476,47 @@ constat est consigné, pas corrigé.
 c'est l'ACCORDER — l'historique git n'oublie pas ; elle part avant le premier commit, pas dans un
 nettoyage ultérieur. (b) Commiter le template PUR d'abord, l'identité ensuite : chaque choix Yamba se
 relit en diff contre l'original, au lieu d'un commit « scaffold + modifications » où l'un cache l'autre.
+
+## Chapitre 202 — Une session sans cookies : l'opt-in strict, le vol unique et le pot à cookies caché de React Native
+
+**Le contexte.** Le client API du mobile (A201, `feat/mobile-api-tokens`). Le diagnostic d'abord : la
+LECTURE par Bearer existait déjà partout (`isAuthenticated`, le refresh) — seule l'ÉMISSION manquait, le
+login ne livrant ses jetons qu'en cookies httpOnly. Le trou était serveur ; le corriger côté app aurait
+été impossible, il n'y a rien à stocker.
+
+**1. Un opt-in de sécurité se conçoit comme un interrupteur qui retombe.** Renvoyer les jetons dans le
+corps PAR DÉFAUT aurait armé le web : un XSS lirait ce que le cookie httpOnly lui cache aujourd'hui. D'où
+l'en-tête `x-token-delivery: body`, et une fonction de résolution dont le contrat est asymétrique : seule
+la valeur EXACTE bascule, tout le reste — absent, vide, tableau, `body;q=1` — retombe sur cookies. La spec
+teste surtout le côté « retombe » : c'est lui qui protège. Même logique que les DTO stricts (whitelist,
+jamais spread) : en sécurité, le défaut est la position sûre, et l'exception se mérite explicitement.
+
+**2. Le refresh en vol unique : une promesse partagée vaut une file.** Le client web (`api-client.ts`)
+gère les 401 concurrents avec une file de `resolve`/`reject` rejouée après le refresh. La transposition
+mobile obtient le même contrat avec moins de pièces : une variable `refreshInFlight: Promise<boolean> |
+null` — le premier 401 crée la promesse, les suivants l'`await`ent, le `finally` la remet à null. Le
+circuit breaker (30 s après un échec) reste indispensable dans les deux mondes : sans lui, une session
+morte fait payer à chaque requête authentifiée son cycle « 401 → refresh → 401 ». Leçon d'altitude : ce
+qui doit être partagé entre clients, c'est le CONTRAT (un seul refresh en vol, un breaker), pas la
+structure de données qui l'implémente.
+
+**3. React Native a un pot à cookies qu'on ne voit pas.** `fetch` en RN passe par la couche réseau
+NATIVE (NSURLSession / OkHttp), qui a son propre magasin de cookies — invisible depuis JavaScript. Un
+`Set-Cookie` reçu par l'app y serait rangé et REJOUÉ silencieusement sur les requêtes suivantes, en
+parallèle du Bearer : deux sessions concurrentes, la pire base de bugs d'auth. C'est pourquoi le mode
+`body` ne pose AUCUN cookie porteur — et pourquoi les purges (`access_token=` expiré 1970) qui partent
+quand même sont un bénéfice, pas un défaut : elles nettoient ce pot caché. Au passage, la vérification
+`grep -c "set-cookie"` du premier essai comptait 0 partout… parce qu'Express écrit `Set-Cookie` : un
+contrôle qui ne peut pas échouer n'a encore rien contrôlé (`grep -ci`, et le contrôle web est passé à 4).
+
+**4. La base URL qui se découvre toute seule.** Sur téléphone, `localhost` c'est le téléphone ; sur
+émulateur Android, c'est l'émulateur. Plutôt qu'une IP LAN à recopier dans un `.env` (et à changer de
+réseau en réseau), le client lit `Constants.expoConfig.hostUri` — l'adresse que Metro publie pour se faire
+joindre, donc l'IP du poste de dev — et vise `http://<cette-ip>:8080/api`. L'env `EXPO_PUBLIC_API_BASE_URL`
+reste l'override (prod, staging). Zéro configuration pour le cas de tous les jours, un réglage explicite
+pour les autres : le même arbitrage que le proxy D48 côté web.
+
+**5. Prouver sur le bundle, pas dans sa tête.** Le parcours complet a été joué en curl contre le bundle
+réel AVANT d'écrire l'écran : login body (0 cookie porteur), `/auth/me` en Bearer, refresh avec rotation
+(le rejeu de l'ancien → 401), logout par Bearer (le refresh suivant → 401), et le contrôle inverse — le
+web sans en-tête, inchangé. Quand l'app échouera, on saura que c'est l'app : le serveur a déjà sa preuve.

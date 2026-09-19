@@ -11498,3 +11498,43 @@ l'identifiant applicatif (`android.package` / `ios.bundleIdentifier`) à tranche
   racine ne voit pas `@expo/metro-runtime` niché), hors cible : user-ui est le client web.
 - `npm audit` : 18 → **21** (+3 modérées, arrivées avec l'arbre Expo) — même consigne, jamais
   `npm audit fix --force`.
+
+# PR — Le client API par tokens (A201) · `feat/mobile-api-tokens`
+
+## Le déclencheur
+
+Premier vrai lot du chantier mobile après le socle (#368) : chaque écran à venir dépendra de la session.
+Diagnostic AVANT code : `isAuthenticated` et `refreshAuthTokens` acceptaient DÉJÀ un Bearer en lecture —
+mais ni le login ni le refresh ne renvoyaient les jetons ailleurs qu'en cookies httpOnly. Un client sans
+magasin de cookies ne pouvait donc jamais AMORCER de session : le trou était serveur, pas mobile.
+
+## Ce qui a été fait
+
+1. **Serveur (A201)** : l'en-tête `x-token-delivery: body` — opt-in STRICT (seule la valeur exacte
+   bascule, défaut toujours cookies : `resolveTokenDelivery`, `apps/auth-service/src/utils/token-delivery.ts`,
+   spec dédiée) — fait renvoyer `tokens { accessToken, refreshToken, accessTokenExpiresInSeconds }` dans le
+   corps de `/auth/login` et `/auth/refresh`, sans poser AUCUN cookie porteur (seules partent les purges
+   `clearAuthCookies` — bénéfiques : le réseau natif RN a son propre pot à cookies, un cookie parasite y est
+   nettoyé au lieu de doubler le Bearer). `/auth/logout` révoque aussi par Bearer. Le littéral `"15m"`
+   dupliqué devient `ACCESS_TOKEN_TTL_SECONDS`, une source pour `jwt.sign` ET pour le client. Google (D47)
+   reste cookies : le Google natif mobile sera son propre lot.
+2. **Contrats (A145)** : `SessionTokens`, `MemberLoginResponse.tokens?`, `RefreshedSessionResponse` — le
+   refresh ne se décrivait qu'en `SuccessMessageResponse` générique. Cinq `openapi.json` régénérés.
+3. **Client mobile** (`apps/mobile/src/lib/api/`) : `base-url` (env `EXPO_PUBLIC_API_BASE_URL`, sinon
+   dérivée du `hostUri` de Metro — le téléphone ET l'émulateur Android joignent le gateway du poste sans
+   configuration, localhost y étant l'émulateur lui-même), `token-store` (refresh dans le Keychain/Keystore
+   via `expo-secure-store`, accès en MÉMOIRE seulement — c'est le refresh qui rouvre la session), `client`
+   (Bearer, `x-locale`, **refresh en vol unique** partagé par les 401 concurrents via une promesse commune +
+   **circuit breaker 30 s** — les sémantiques de `apps/user-ui/src/lib/api-client.ts`, transposées ;
+   `ApiError` expose `details.code`), `auth.api` (login en mode body, `me`, `bootstrapSession`, logout qui
+   révoque par Bearer AVANT la purge locale). Écran `/login` minimal (textes FR en dur — TODO lot i18n),
+   accueil qui amorce la session au démarrage.
+
+## Vérifié
+
+- `nx test auth-service` : 400 → **406** (`token-delivery.spec.ts`) ; typecheck 10/10, les 1576 tests des
+  cinq services verts (les contrats partagés ont bougé).
+- **Parcours prouvé en curl sur le bundle réel** : login body → 0 cookie porteur (2 purges) → `/auth/me`
+  Bearer → refresh Bearer avec rotation (rejeu de l'ancien → 401) → logout Bearer (refresh suivant → 401).
+  Contrôle web INCHANGÉ : 4 Set-Cookie (2 purges + 2 poses), aucun `tokens` dans le corps.
+- Mobile : `tsc` vert, bundle Hermes Android produit.

@@ -6625,3 +6625,30 @@ socle — l'application existe, porte l'identité Yamba, et le reste de la plate
 | MOB2 | Ouverture de l'app | « Yamba » et l'accroche de l'accueil web ; la mention explicite que les parcours arrivent |
 | MOB3 | Recherche de « Expo » dans les écrans et assets | Aucun écran ni visuel du template (logo, badges, tutoriels) |
 | MOB4 | Plateforme après intégration | 1570 tests verts, les six services démarrent (`smoke-services.sh` 6/6) |
+
+# Se connecter depuis le téléphone — la session sans cookies · `feat/mobile-api-tokens`
+
+## Le besoin
+
+Un membre ouvre l'app et se connecte avec le compte qu'il a déjà sur le site : même email, même mot de
+passe, mêmes règles (verrou anti-force-brute, compte suspendu refusé). Le téléphone n'a pas le magasin de
+cookies du navigateur : il lui faut recevoir, garder et renouveler ses jetons lui-même — sans que rien ne
+change pour le site web, et sans qu'un pirate du web y gagne quoi que ce soit.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-4** | La livraison des jetons dans le corps est un **opt-in explicite** (`x-token-delivery: body`, A201). Par défaut — et pour tout le web — les jetons restent en cookies httpOnly, illisibles par un script. |
+| **RG-MOB-5** | En mode jetons, **aucun cookie porteur n'est posé** : la session mobile vit entièrement dans le stockage sécurisé du téléphone (Keychain iOS / Keystore Android) ; le jeton d'accès (15 min) ne survit pas à l'app, c'est le refresh qui rouvre la session. |
+| **RG-MOB-6** | Les règles de session sont LES MÊMES que le web : rotation du refresh à chaque renouvellement (l'ancien meurt), révocation à la déconnexion, suspension et verrous appliqués — le mobile n'a aucun privilège. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB5 | Login avec `x-token-delivery: body` | 200 avec `tokens` dans le corps, zéro cookie porteur posé |
+| MOB6 | Login SANS l'en-tête (contrôle web) | Cookies posés comme avant, jamais de `tokens` dans le corps |
+| MOB7 | Rejeu d'un refresh déjà utilisé | 401 (rotation : l'ancien jeton est mort) |
+| MOB8 | Refresh après déconnexion | 401 (la révocation par Bearer a tué la session) |
+| MOB9 | Mauvais mot de passe dans l'app | Le message d'erreur vient du code serveur (`INVALID_CREDENTIALS`), l'app ne décide rien |
