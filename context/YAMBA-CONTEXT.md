@@ -796,6 +796,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 19/09 (suite) : **LA SESSION MOBILE — CLIENT API PAR TOKENS, A201 (#370).**
+  Diagnostic avant code : la lecture Bearer existait deja partout, seule l'EMISSION manquait (login/refresh
+  ne livraient qu'en cookies httpOnly). A201 : en-tete `x-token-delivery: body`, opt-in STRICT (seule la
+  valeur exacte bascule, defaut toujours cookies — un XSS web ne doit rien gagner), tokens dans le corps
+  SANS cookie porteur (les purges partent — benefiques : RN a un pot a cookies natif invisible qui
+  doublerait le Bearer), logout revocable par Bearer, "15m" duplique → ACCESS_TOKEN_TTL_SECONDS, Google
+  reste cookies. Contrats SessionTokens / RefreshedSessionResponse, cinq openapi regeneres. Client
+  apps/mobile/src/lib/api/ : base URL derivee du hostUri Metro (telephone ET emulateur Android joignent le
+  gateway sans config), refresh dans SecureStore / acces en memoire, refresh en VOL UNIQUE (promesse
+  partagee) + circuit breaker 30 s (semantiques api-client web transposees), ApiError porte details.code ;
+  ecran /login FR en dur (TODO lot i18n), accueil qui amorce la session. PROUVE en curl sur le bundle :
+  login body 0 cookie porteur → /auth/me Bearer → refresh avec rotation (rejeu ancien 401) → logout
+  (refresh suivant 401) ; controle web INCHANGE (4 Set-Cookie, jamais de tokens) — premier grep en
+  minuscules comptait 0 partout, un controle qui ne peut pas echouer n'a rien controle (grep -ci). Tests
+  auth 400 → 406, plateforme 1576. RG-MOB-4..6, chapitre 202. AUCUNE attribution Claude.
 - 19/09 : **LE CHANTIER MOBILE EST OUVERT — LE SOCLE EXPO ENTRE DANS LE DEPOT (#368).**
   Scaffold create-expo-app SDK 57 (RN 0.86, React 19.2.3, nouvelle architecture) commite PUR d'abord, puis
   identite Yamba (nom/slug/scheme `yamba`, splash mangue, theme mangue/teal clair/sombre, decorum Expo supprime,
