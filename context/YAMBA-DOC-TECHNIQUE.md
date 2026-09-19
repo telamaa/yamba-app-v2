@@ -11451,3 +11451,50 @@ d'outillage, gravé en D79 : la question du support arrive PAR MEMBRE, pas par d
 - Exécution réelle sur la base de dev : le compte du 18/09 → 2 notifications (les 2 de sa cloche),
   marc.carrier → 81 notifications dont la `booking.requested` de 19:06 et son email SENT relié au bon
   deal ; id inconnu → 404 `USER_NOT_FOUND`.
+
+# PR — Le socle mobile entre dans le dépôt (D36/D73, jalon 4) · `feat/mobile-socle`
+
+## Le déclencheur
+
+Le jalon 4 était le prochain chantier du § 9 du suivi : D36 (stack Expo, exigences natives) et D73
+(construire pour les deux OS, publier Android d'abord) gravées, poste préparé (livrable 06). Cette PR est
+le **premier code** du chantier : faire entrer l'application dans le monorepo sans rien casser des huit
+projets existants, et lui donner son identité.
+
+## Ce qui a été fait
+
+1. **Scaffold brut, commité tel quel** (`create-expo-app`, Expo SDK 57 — RN 0.86, React 19.2.3, Expo
+   Router 6, nouvelle architecture par défaut). Un commit « template pur » d'abord : tous les diffs Yamba
+   qui suivent se relisent contre lui. Le glob workspaces `apps/*` intègre l'app au premier `npm install` ;
+   **react 19.2.3 reste niché** sous `apps/mobile/node_modules` (la racine résout 19.2.7) — c'est le
+   fonctionnement VOULU d'Expo en monorepo (Metro résout depuis l'app), à ne pas confondre avec le piège
+   « nested shadows » des services. `expo-env.d.ts` créé à la main (généré normalement au premier `start` ;
+   sans lui, les imports CSS du template font échouer `tsc`). La LICENSE MIT du template est retirée AVANT
+   le premier commit : une licence commitée est une licence accordée, même « par accident ».
+2. **Identité** : `app.json` (nom Yamba, slug/scheme `yamba`, splash et icône adaptative sur fond mangue
+   `#FF9900`), thème mangue/teal dans `src/constants/theme.ts` avec teinte d'accent par mode (teal `#0F766E`
+   en clair, éclairci `#2DD4BF` en sombre — le teal du web est illisible sur fond noir), écrans démo,
+   composants et assets Expo supprimés (explore, onglets, overlay de splash au logo Expo). `_layout` passe
+   sur une pile simple — les onglets natifs (Rechercher / Trajets / Messages / Profil) viendront avec les
+   parcours. L'accueil reprend l'accroche du web (#357) et n'annonce que ce qui existe. `package.json` →
+   `@yamba-app/mobile`, scripts `reset-project` et `lint` retirés (pas de linter dans le dépôt).
+3. **Target Nx `typecheck` surchargé** : le plugin `@nx/js/typescript` INFÈRE un typecheck en mode composite
+   (`--emitDeclarationOnly`) que le tsconfig Expo (`noEmit`) refuse (TS5069) — et
+   `nx run-many --target=typecheck --all`, la commande exacte de la CI, échouait sur un target que
+   personne n'avait écrit. Le bloc `nx` du `package.json` mobile le remplace par un `tsc --noEmit` simple.
+
+**Restent des placeholders, dits dans le README** : icônes et splash (images du template), et
+l'identifiant applicatif (`android.package` / `ios.bundleIdentifier`) à trancher avant le premier
+`prebuild` — c'est l'identité de l'app sur les stores, définitive une fois publiée.
+
+## Vérifié
+
+- Le `npm install` a **re-résolu le lockfile** (~13 000 lignes réécrites) : traité comme un changement de
+  toolchain — `nx run-many --target=typecheck --all --skip-sync` 10/10 (mobile inclus),
+  `bash scripts/smoke-services.sh` 6/6 `ok`, les **1570 tests** des cinq services verts, `imagekit` toujours
+  `deduped` en 6.0.0.
+- `npx expo export --platform android` produit le bundle Hermes (2,7 Mo) : le build qui compte est celui de
+  la CIBLE — l'export web statique bute sur un artefact de hoisting (`@expo/router-server` hoisté à la
+  racine ne voit pas `@expo/metro-runtime` niché), hors cible : user-ui est le client web.
+- `npm audit` : 18 → **21** (+3 modérées, arrivées avec l'arbre Expo) — même consigne, jamais
+  `npm audit fix --force`.
