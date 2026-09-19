@@ -796,6 +796,27 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 19/09 (suite 4) : **LA RECHERCHE MOBILE — MEME ENDPOINT QUE LE WEB, CORRELATION PAR REQUETE, A204 (#376).**
+  Premier parcours reel de l'app : l'onglet Rechercher appelle `GET /trips/search` — les parametres du
+  web, la meme page `{ trips, nextCursor, totalCount }`, AUCUN endpoint mobile (le contrat etait deja
+  mobile-ready D36 : filtres durs, tri, prix en euros du DTO, travelDate localisee par x-locale — tout
+  est serveur). Axe 1 regle en ZERO ligne client : recordSearch (corridor + sans-resultat) vit dans le
+  controleur trip-search — une recherche mobile pese dans les stats de pilotage comme une recherche
+  web (RG-MOB-14). Axe 2 : client.ts emet un `x-correlation-id` PAR APPEL (`mob-<ts36>-<alea>`, le
+  gateway n'en genere que s'il manque — l'app connait l'id meme quand la reponse ne revient jamais),
+  la relance post-refresh garde le MEME id, ApiError l'expose, l'ecran d'erreur l'affiche pour le
+  support. Ecran : villes en texte libre (placeSearchTerm serveur, WEB-ACC-9), dates en quatre puces
+  (toutes/aujourd'hui/demain/7 jours — calendrier natif ECARTE, viendra avec le wizard), FlatList au
+  curseur (un echec de page suivante garde l'acquis), quatre etats honnetes (invite, chargement, vide
+  — les mots du web —, erreur avec details.code + id de correlation). Carte NON cliquable : villes,
+  date localisee serveur, horaires (+1), « X €/kg » + « Y kg dispo » (PER_KG) ou « des X € » (legacy),
+  Voyageur + note — la page trajet est le lot suivant. PROUVE : typecheck 10/10, i18n vert +
+  contre-epreuve rouge (error.retry — fichier INDEXE avant mutation, lecon A203), bundle Hermes
+  --clear avec temoin faux a 0. PIEGE TROUVE : Hermes stocke les chaines ACCENTUEES en UTF-16 — un
+  grep UTF-8 les compte 0 (les marqueurs d'A203 etaient sans accent par chance) ; toute preuve de
+  bundle sur du texte FR cherche desormais LES DEUX encodages. Aucune dependance ajoutee, services
+  intouches, tests plateforme INCHANGES (1576). RG-MOB-13..16, chapitre 205. AUCUNE attribution
+  Claude.
 - 19/09 (suite 3) : **LES ONGLETS NATIFS — CINQ ENTREES, LA PORTE D'IDENTITE, LES BADGES SERVEUR, A203 (#374).**
   La coquille navigable du mobile : `NativeTabs` d'expo-router (chemin SDK 57 `unstable-native-tabs`,
   API verifiee dans le paquet INSTALLE) — la VRAIE barre de chaque OS (UITabBar/flou, Material 3),
