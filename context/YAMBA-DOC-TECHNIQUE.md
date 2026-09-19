@@ -11591,3 +11591,21 @@ interdit partout ailleurs dans le dépôt.
 - Piège payé pendant la preuve : `expo export` SERT SON CACHE même quand `metro.config.js` change — la
   première contre-épreuve « sans épinglage » avait produit le même hash… parce que rien n'avait été
   reconstruit. Toute contre-épreuve de bundle passe par `--clear`.
+
+## Corrigé dans la même PR — `expo start` mourait à froid (premier test réel sur téléphone)
+
+Découvert par la recette utilisateur du 19/09, au premier `expo start` réellement lancé depuis
+l'intégration workspace : `Error: Cannot find module 'expo-router/_ctx-shared'`, levée par la
+génération des types de routes (`experiments.typedRoutes`, actif depuis le scaffold). La cause est un
+artefact de hoisting DÉJÀ consigné par le socle sur l'export web, vu ici sous un autre angle :
+`@expo/router-server` est installé à la RACINE (dépendance de `@expo/cli`), mais `expo-router` est
+NICHÉ sous `apps/mobile` (npm le place à côté de ses pairs — react 19.2.3, expo) ; la remontée CJS
+depuis la racine ne redescend jamais dans une app. Personne ne l'avait vu : les preuves du socle et
+d'A201 passaient par `expo export`, qui ne lance PAS cette génération.
+
+Remède : `NODE_PATH=./node_modules` dans les quatre scripts npm de l'app — un REPLI de résolution CJS,
+consulté seulement quand la remontée normale a échoué, donc sans effet sur tout ce qui se résout déjà.
+Mesuré : sans, mort à froid (journal de recette) ; avec, Metro démarre, zéro erreur, et
+`.expo/types/router.d.ts` est généré. Les alternatives écartées : hisser `expo-router` à la racine
+(violerait ses pairs nichés), désactiver `typedRoutes` (perdre le typage des routes pour un problème
+de résolution serait soigner le thermomètre).

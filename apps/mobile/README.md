@@ -16,6 +16,12 @@ npm run android                     # simulateur / appareil Android
 npm run ios                         # simulateur iOS
 ```
 
+> Les scripts portent `NODE_PATH=./node_modules` : la génération des types de routes du CLI
+> (`@expo/router-server`, installé à la RACINE du workspace) fait un `require('expo-router/…')`
+> alors qu'`expo-router` est NICHÉ ici (ses pairs — react 19.2.3, expo — y vivent) ; sans ce
+> repli de résolution CJS, `expo start` meurt à froid en `MODULE_NOT_FOUND`. `expo export`
+> ne passe pas par cette génération — c'est pourquoi le défaut a survécu aux preuves du socle.
+
 Le poste (simulateurs, comptes, EAS) est décrit dans
 `docs/livrables/06-YAMBA-PREPARATION-MOBILE.md`.
 
