@@ -59,6 +59,13 @@ import { googleSignIn as googleSignInService } from "../services/google-auth.ser
 import { effectiveAccountStatus, type SanctionState } from "@packages/middleware/account-status";
 import { buildGoogleTokenVerifier } from "../services/google-token.verifier";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  bearerTokenOf,
+  resolveTokenDelivery,
+  sessionTokensBody,
+  type TokenDelivery,
+} from "../utils/token-delivery";
 import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 
@@ -398,8 +405,11 @@ async function issueSession(
   res: Response,
   user: { id: string; roles: string[] },
   shouldRemember: boolean,
-  meta: SessionMeta = {}
-): Promise<{ jti: string }> {
+  meta: SessionMeta = {},
+  // A201 — "cookies" (web, défaut) ou "body" (client sans cookies : mobile D36).
+  // En mode body, AUCUN cookie n'est posé : les jetons partent dans le corps.
+  delivery: TokenDelivery = "cookies"
+): Promise<{ jti: string; accessToken: string; refreshToken: string }> {
   clearAuthCookies(res);
 
   // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
@@ -412,7 +422,7 @@ async function issueSession(
   const accessToken = jwt.sign(
     { id: user.id, roles: user.roles, jti },
     process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: "15m" }
+    { expiresIn: ACCESS_TOKEN_TTL_SECONDS }
   );
 
   // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
@@ -426,9 +436,11 @@ async function issueSession(
     { expiresIn: refreshLifetimeSeconds }
   );
 
-  setCookie(res, "access_token", accessToken);
-  setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
-  return { jti };
+  if (delivery === "cookies") {
+    setCookie(res, "access_token", accessToken);
+    setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+  }
+  return { jti, accessToken, refreshToken };
 }
 
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -479,7 +491,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     await clearLoginFailures(emailKey); // D78 — succès : le compteur repart de zéro
     const shouldRemember = Boolean(rememberMe);
     const loginMeta = sessionMetaOf(req);
-    const { jti: loginJti } = await issueSession(res, user, shouldRemember, loginMeta); // D65 2A
+    const delivery = resolveTokenDelivery(req.headers["x-token-delivery"]); // A201
+    const { jti: loginJti, accessToken, refreshToken } = await issueSession(res, user, shouldRemember, loginMeta, delivery); // D65 2A
     // D78 — email de nouvelle connexion (nouvel appareil par défaut), en tâche de fond : aucune
     // latence sur la réponse, échec silencieux (SMTP, géo) sans casser la connexion.
     void notifyNewSignIn({
@@ -501,6 +514,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
         lastName: user.lastName,
         roles: user.roles,
       },
+      // A201 — jetons dans le corps SEULEMENT sur opt-in explicite (mobile).
+      ...(delivery === "body" ? { tokens: sessionTokensBody(accessToken, refreshToken) } : {}),
     });
   } catch (error) {
     return next(error);
@@ -522,10 +537,7 @@ export const refreshAuthTokens = async (
 ) => {
   try {
     const cookieToken = req.cookies?.["refresh_token"];
-    const headerToken =
-      req.headers.authorization?.startsWith("Bearer ")
-        ? req.headers.authorization.split(" ")[1]
-        : undefined;
+    const headerToken = bearerTokenOf(req.headers.authorization);
 
     const token = cookieToken || headerToken;
     if (!token) return next(new AuthError("Unauthorized! No refresh token.", { code: "REFRESH_TOKEN_MISSING" }));
@@ -606,7 +618,7 @@ export const refreshAuthTokens = async (
     const newAccessToken = jwt.sign(
       { id: user.id, roles: user.roles, jti: newJti },
       process.env.ACCESS_TOKEN_SECRET as string,
-      { expiresIn: "15m" }
+      { expiresIn: ACCESS_TOKEN_TTL_SECONDS }
     );
 
     // JWT refresh borné à la vie absolue restante (plus jamais 30d plein pot).
@@ -619,10 +631,18 @@ export const refreshAuthTokens = async (
       { expiresIn: refreshLifetimeSeconds }
     );
 
-    setCookie(res, "access_token", newAccessToken);
-    setCookie(res, "refresh_token", newRefreshToken, { rememberMe: shouldRemember });
+    // A201 — même opt-in qu'au login : un client mobile rafraîchit par Bearer
+    // et reçoit la paire tournée dans le corps, sans qu'aucun cookie soit posé.
+    const delivery = resolveTokenDelivery(req.headers["x-token-delivery"]);
+    if (delivery === "cookies") {
+      setCookie(res, "access_token", newAccessToken);
+      setCookie(res, "refresh_token", newRefreshToken, { rememberMe: shouldRemember });
+    }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({
+      success: true,
+      ...(delivery === "body" ? { tokens: sessionTokensBody(newAccessToken, newRefreshToken) } : {}),
+    });
   } catch (error) {
     return next(error);
   }
@@ -804,12 +824,14 @@ export const getMe = async (
 
 export const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cookieToken = req.cookies?.["refresh_token"];
+    // A201 — un client mobile n'a pas de cookie : sa déconnexion révoque la
+    // session via le refresh porté en Bearer (même règle de révocation).
+    const logoutToken = req.cookies?.["refresh_token"] ?? bearerTokenOf(req.headers.authorization);
 
-    if (cookieToken) {
+    if (logoutToken) {
       try {
         const decoded = jwt.verify(
-          cookieToken,
+          logoutToken,
           process.env.REFRESH_TOKEN_SECRET as string
         ) as RefreshPayload;
 

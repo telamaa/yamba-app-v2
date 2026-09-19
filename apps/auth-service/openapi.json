@@ -322,7 +322,7 @@
           "auth"
         ],
         "summary": "Login with email + password",
-        "description": "Sets access_token and refresh_token cookies; rememberMe = 30-day refresh (A62). A session record (device, ip, user agent) is written (D65). Suspended account → 401.",
+        "description": "Sets access_token and refresh_token cookies; rememberMe = 30-day refresh (A62). A session record (device, ip, user agent) is written (D65). Suspended account → 401. With `x-token-delivery: body` (A201, cookie-less clients), no cookies are set and the response carries `tokens` instead.",
         "operationId": "login",
         "requestBody": {
           "required": true,
@@ -445,16 +445,16 @@
         "tags": [
           "auth"
         ],
-        "summary": "Rotate the session (refresh cookie)",
-        "description": "Reads refresh_token, checks the jti in Redis, issues a new pair. The front replays queued requests after a 401 (api-client circuit breaker).",
+        "summary": "Rotate the session (refresh cookie or Bearer)",
+        "description": "Reads refresh_token from the cookie or from `Authorization: Bearer`, checks the jti in Redis, issues a new pair. The front replays queued requests after a 401 (api-client circuit breaker). With `x-token-delivery: body` (A201), no cookies are set and the rotated pair is returned in `tokens`.",
         "operationId": "refreshTokens",
         "responses": {
           "200": {
-            "description": "Done",
+            "description": "Session rotated",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessMessageResponse"
+                  "$ref": "#/components/schemas/RefreshedSessionResponse"
                 }
               }
             }
@@ -488,6 +488,7 @@
           "auth"
         ],
         "summary": "Logout — revokes the refresh jti and clears cookies",
+        "description": "The refresh token is read from the cookie or from `Authorization: Bearer` (A201, cookie-less clients).",
         "operationId": "logout",
         "responses": {
           "200": {
@@ -28435,6 +28436,29 @@
         ],
         "additionalProperties": false
       },
+      "SessionTokens": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresInSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "accessTokenExpiresInSeconds"
+        ],
+        "additionalProperties": false,
+        "description": "Session tokens delivered in the body — only when the request carries `x-token-delivery: body` (A201, cookie-less clients such as the mobile app). No cookies are set in that mode; the refresh token rotates on every /auth/refresh"
+      },
       "MemberLoginResponse": {
         "type": "object",
         "properties": {
@@ -28443,6 +28467,9 @@
           },
           "user": {
             "$ref": "#/components/schemas/SessionUser"
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/SessionTokens"
           }
         },
         "required": [
@@ -28450,7 +28477,24 @@
           "user"
         ],
         "additionalProperties": false,
-        "description": "Cookies access_token / refresh_token are set on the response"
+        "description": "Cookies access_token / refresh_token are set on the response — unless `x-token-delivery: body` was sent, in which case `tokens` is returned instead (A201)"
+      },
+      "RefreshedSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/SessionTokens"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "description": "Session rotated. `tokens` present only with `x-token-delivery: body` (A201)"
       },
       "GoogleSignInRequest": {
         "type": "object",
