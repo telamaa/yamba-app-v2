@@ -3,14 +3,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTranslations } from 'use-intl';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { usePreferredLocaleSetter } from '@/i18n/provider';
 import { bootstrapSession, logout, me, type SessionUser } from '@/lib/api/auth.api';
 
 // Écran d'attente du socle : il ne promet rien qui n'existe pas.
 // L'accroche est celle de l'accueil web (#357).
 export default function HomeScreen() {
+  const t = useTranslations('home');
+  const setPreferredLocale = usePreferredLocaleSetter();
   // null = amorçage en cours (refresh en réserve ?), ensuite user ou absent.
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -22,18 +27,20 @@ export default function HomeScreen() {
       const sessionUser = hasSession ? await me().catch(() => null) : null;
       if (!cancelled) {
         setUser(sessionUser);
+        setPreferredLocale(sessionUser?.preferredLocale ?? null);
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setPreferredLocale]);
 
   const onLogout = useCallback(async () => {
     await logout();
     setUser(null);
-  }, []);
+    setPreferredLocale(null);
+  }, [setPreferredLocale]);
 
   return (
     <ThemedView style={styles.container}>
@@ -43,8 +50,7 @@ export default function HomeScreen() {
             Yamba
           </ThemedText>
           <ThemedText type="subtitle" style={styles.tagline}>
-            Il y a toujours quelqu&apos;un qui part vers ta destination.
-            Confie-lui ton colis.
+            {t('tagline')}
           </ThemedText>
 
           {loading ? (
@@ -52,22 +58,22 @@ export default function HomeScreen() {
           ) : user !== null ? (
             <ThemedView style={styles.sessionBlock}>
               <ThemedText style={styles.tagline}>
-                Connecté : {user.firstName} {user.lastName}
+                {t('connectedAs', { firstName: user.firstName, lastName: user.lastName })}
               </ThemedText>
               <Pressable onPress={onLogout}>
-                <ThemedText type="linkPrimary">Se déconnecter</ThemedText>
+                <ThemedText type="linkPrimary">{t('logout')}</ThemedText>
               </Pressable>
             </ThemedView>
           ) : (
             <Link href="/login" asChild>
               <Pressable style={styles.cta}>
-                <ThemedText style={styles.ctaLabel}>Se connecter</ThemedText>
+                <ThemedText style={styles.ctaLabel}>{t('login')}</ThemedText>
               </Pressable>
             </Link>
           )}
 
           <ThemedText themeColor="textSecondary" style={styles.tagline}>
-            Socle mobile — les parcours arrivent écran par écran.
+            {t('socleNote')}
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
