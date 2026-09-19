@@ -2,6 +2,5 @@
   "tagline": "Il y a toujours quelqu'un qui part vers ta destination. Confie-lui ton colis.",
   "connectedAs": "Connecté : {firstName} {lastName}",
   "login": "Se connecter",
-  "logout": "Se déconnecter",
   "socleNote": "Socle mobile — les parcours arrivent écran par écran."
 }

@@ -1,0 +1,34 @@
+{
+  "bar": {
+    "home": "Home",
+    "search": "Search",
+    "trips": "Trips",
+    "messages": "Messages",
+    "profile": "Profile"
+  },
+  "gate": {
+    "title": "Log in to continue",
+    "body": "This area is for members: your trips, messages and profile are waiting behind the login.",
+    "cta": "Log in"
+  },
+  "search": {
+    "title": "Search for a trip",
+    "note": "Search arrives in an upcoming batch — the journeys are built screen by screen."
+  },
+  "trips": {
+    "title": "My trips",
+    "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",
+    "draftTrips": "{count, plural, =0 {No trips to finish} one {# trip to finish} other {# trips to finish}}",
+    "note": "Trip and request details arrive in an upcoming batch."
+  },
+  "messages": {
+    "title": "Messages",
+    "unread": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}",
+    "note": "Conversations arrive in an upcoming batch."
+  },
+  "profile": {
+    "title": "Profile",
+    "logout": "Log out",
+    "note": "Profile management arrives in an upcoming batch."
+  }
+}

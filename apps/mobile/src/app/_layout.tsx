@@ -3,10 +3,11 @@ import { useColorScheme } from 'react-native';
 
 import { Brand } from '@/constants/theme';
 import { AppIntlProvider } from '@/i18n/provider';
+import { SessionProvider } from '@/lib/session-context';
 
-// Socle : une pile simple. Les onglets natifs (Rechercher / Trajets /
-// Messages / Profil) arriveront avec les parcours — pas avant d'avoir
-// des écrans à mettre dedans.
+// La pile racine : le groupe d'onglets, et la connexion par-dessus en modale
+// (idiomatique iOS ; sur Android, une feuille pleine page). La session vit au
+// niveau racine : les onglets, la porte d'identité et les badges la partagent.
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -14,9 +15,14 @@ export default function RootLayout() {
 
   return (
     <AppIntlProvider>
-      <ThemeProvider value={theme}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </ThemeProvider>
+      <SessionProvider>
+        <ThemeProvider value={theme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </SessionProvider>
     </AppIntlProvider>
   );
 }

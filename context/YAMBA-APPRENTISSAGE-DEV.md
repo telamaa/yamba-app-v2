@@ -2618,3 +2618,60 @@ vouvoiement), trois rouges constatés, restauration, vert final.
   au web et au mobile montent dans `packages/` — le miroir CI suivra le déménagement.
 - `useLocales()` est réactif : changer la langue du téléphone re-rend l'app sans redémarrage (Android le
   permet à chaud). La préférence de COMPTE, elle, attend un état de session partagé — le lot des onglets.
+
+## Chapitre 204 — Des onglets qu'on n'a pas dessinés : le natif comme choix, la porte comme motif, le badge comme contrat
+
+### La théorie
+
+**1. Une barre d'onglets peut être imitée ou empruntée.** L'imitation (les `Tabs` JS d'expo-router,
+react-navigation) dessine une `View` en bas de l'écran : chaque détail — flou, thème sombre, tailles
+tactiles, lecteur d'écran, minimisation au scroll d'iOS 26 — est à ta charge, pour toujours. L'emprunt
+(`NativeTabs`) monte le VRAI `UITabBarController` / la vraie `BottomNavigationView` Material 3 : l'OS
+fait tout cela d'office, et continuera de le faire dans ses versions futures sans que tu recompiles.
+Le prix de l'emprunt : moins de liberté de style (une teinte, pas un design) — exactement le bon prix
+quand l'objectif est « idiomatique par OS » (D36).
+
+**2. Un composant « compound » se vérifie dans le paquet installé, pas dans la doc.** L'API
+`NativeTabs.Trigger` + `Icon`/`Label`/`Badge` est récente et bouge d'un SDK à l'autre (le chemin
+lui-même dit `unstable-`). Le réflexe du chapitre 201 s'applique aux types : ouvrir
+`node_modules/expo-router/build/native-tabs/*.d.ts` et lire les props réelles (`sf`, `md`, combinaisons
+autorisées, `badgeBackgroundColor`) coûte deux minutes et évite de coder contre la doc d'un autre SDK.
+
+**3. Un état partagé naît quand le deuxième consommateur arrive.** Le socle amorçait la session DANS
+l'écran d'accueil : correct tant qu'un seul écran la lisait. Cinq onglets, une porte et des badges plus
+tard, la même logique dupliquée ferait cinq amorçages concurrents (et cinq vérités). Le geste : un
+`Context` React (`SessionProvider`) qui amorce UNE fois et expose `status`/`user`/`signIn`/`signOut`.
+La règle de timing : on n'extrait pas l'état « au cas où », on l'extrait quand le besoin est là — le
+socle avait raison d'attendre, le lot des onglets avait raison d'extraire.
+
+### La pratique dans Yamba
+
+`src/app/(tabs)/_layout.tsx` : le groupe de routes `(tabs)` d'Expo Router — les parenthèses créent un
+layout sans segment d'URL ; `login` reste HORS du groupe, poussé en modale par-dessus la barre
+(`presentation: 'modal'` dans la pile racine). La porte (`identity-gate.tsx`) enveloppe le CONTENU de
+l'écran, pas la route : l'onglet reste visible et cliquable, c'est son contenu qui se déverrouille —
+le motif A58/A63 du web (« montre la porte, jamais un vide ») transposé tel quel. Au retour de
+connexion, `router.canGoBack() ? back() : replace('/')` : la modale se referme sur l'écran qui avait
+montré la porte.
+
+Les badges (`use-tab-badges.ts`) illustrent « le serveur décide » (RG-MOB-1) appliqué à un compteur :
+`totalUnread` arrive calculé du message-service, les demandes PENDING et brouillons sont comptés sur
+les réponses de `/me/deals` et `/trips/my` — les mêmes règles que le `useTripsBadge` du web (A44),
+mais jamais une déduction locale nouvelle. Chaque `apiFetch` est suivi de `.catch(() => null)` : un
+badge est un ORNEMENT — sa panne vaut zéro, pas un écran rouge. Le rafraîchissement écoute `AppState`
+(retour au premier plan) : pas de polling — la coquille n'a pas encore de rythme à justifier.
+
+### Les pièges payés
+
+- `ReactNode` s'importe de `react`, pas de `react-native` (TS2305) — l'auto-complétion des deux
+  espaces de noms se ressemble, le typecheck tranche.
+- `git checkout -- <fichier>` ne restaure pas un fichier JAMAIS commité : muter un fichier non suivi
+  pour une contre-épreuve CI, c'est s'engager à le réécrire à la main. Les contre-épreuves suivantes
+  du lot ont muté des fichiers déjà indexés — restauration en une commande.
+
+### Pour aller plus loin
+
+- `NativeTabs.BottomAccessory` (iOS 26) : une vue persistante au-dessus de la barre — le candidat
+  naturel d'un « suivi de livraison en cours » quand les parcours arriveront.
+- Le badge d'icône d'APP (le chiffre sur l'icône du téléphone) est un autre canal : il viendra avec
+  les notifications push (`expo-notifications`), pas avec la barre.
