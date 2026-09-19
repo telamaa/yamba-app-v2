@@ -10,6 +10,10 @@ import { Platform } from 'react-native';
 
 export const Brand = {
   mango: '#FF9900',
+  /** Mangue assombrie pour l'état actif sur fond clair — la valeur de la
+   *  barre mobile du web (`DashboardMobileNav`, #CC7A00) : le #FF9900 pur
+   *  manque de contraste sur blanc. */
+  mangoDark: '#CC7A00',
   teal: '#0F766E',
 } as const;
 

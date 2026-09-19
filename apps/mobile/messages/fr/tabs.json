@@ -1,0 +1,34 @@
+{
+  "bar": {
+    "home": "Accueil",
+    "search": "Rechercher",
+    "trips": "Trajets",
+    "messages": "Messages",
+    "profile": "Profil"
+  },
+  "gate": {
+    "title": "Connecte-toi pour continuer",
+    "body": "Cet espace est réservé aux membres : tes trajets, tes messages et ton profil t'attendent derrière la connexion.",
+    "cta": "Se connecter"
+  },
+  "search": {
+    "title": "Rechercher un trajet",
+    "note": "La recherche arrive dans un prochain lot — les parcours se construisent écran par écran."
+  },
+  "trips": {
+    "title": "Mes trajets",
+    "pendingDeals": "{count, plural, =0 {Aucune demande en attente} one {# demande en attente} other {# demandes en attente}}",
+    "draftTrips": "{count, plural, =0 {Aucun trajet à finaliser} one {# trajet à finaliser} other {# trajets à finaliser}}",
+    "note": "Le détail des trajets et des demandes arrive dans un prochain lot."
+  },
+  "messages": {
+    "title": "Messages",
+    "unread": "{count, plural, =0 {Aucun message non lu} one {# message non lu} other {# messages non lus}}",
+    "note": "Les conversations arrivent dans un prochain lot."
+  },
+  "profile": {
+    "title": "Profil",
+    "logout": "Se déconnecter",
+    "note": "La gestion du profil arrive dans un prochain lot."
+  }
+}

@@ -15,9 +15,8 @@ import { useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
-import { usePreferredLocaleSetter } from '@/i18n/provider';
 import { ApiError } from '@/lib/api/client';
-import { login } from '@/lib/api/auth.api';
+import { useSession } from '@/lib/session-context';
 import { useTheme } from '@/hooks/use-theme';
 
 // Les refus dont l'écran porte un texte à lui ; tout autre `details.code`
@@ -31,7 +30,7 @@ const TRANSLATED_ERROR_CODES = new Set([
 export default function LoginScreen() {
   const theme = useTheme();
   const t = useTranslations('auth');
-  const setPreferredLocale = usePreferredLocaleSetter();
+  const { signIn } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -54,9 +53,14 @@ export default function LoginScreen() {
     setPending(true);
     setError(null);
     try {
-      const user = await login(email.trim(), password);
-      setPreferredLocale(user.preferredLocale ?? null);
-      router.replace('/');
+      await signIn(email.trim(), password);
+      // Ouvert depuis une porte d'identité : on y retourne (la porte est
+      // devenue le contenu). Ouvert à froid : l'accueil.
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     } catch (err) {
       setError(messageOf(err));
     } finally {

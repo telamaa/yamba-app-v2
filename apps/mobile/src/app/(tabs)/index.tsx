@@ -1,5 +1,4 @@
 import { Link } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,39 +7,14 @@ import { useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
-import { usePreferredLocaleSetter } from '@/i18n/provider';
-import { bootstrapSession, logout, me, type SessionUser } from '@/lib/api/auth.api';
+import { useSession } from '@/lib/session-context';
 
-// Écran d'attente du socle : il ne promet rien qui n'existe pas.
-// L'accroche est celle de l'accueil web (#357).
+// Accueil : public, il ne promet rien qui n'existe pas. L'accroche est celle
+// de l'accueil web (#357). La session vient du contexte partagé (lot tabs) ;
+// la déconnexion vit désormais dans l'onglet Profil.
 export default function HomeScreen() {
   const t = useTranslations('home');
-  const setPreferredLocale = usePreferredLocaleSetter();
-  // null = amorçage en cours (refresh en réserve ?), ensuite user ou absent.
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<SessionUser | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const hasSession = await bootstrapSession();
-      const sessionUser = hasSession ? await me().catch(() => null) : null;
-      if (!cancelled) {
-        setUser(sessionUser);
-        setPreferredLocale(sessionUser?.preferredLocale ?? null);
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [setPreferredLocale]);
-
-  const onLogout = useCallback(async () => {
-    await logout();
-    setUser(null);
-    setPreferredLocale(null);
-  }, [setPreferredLocale]);
+  const { status, user } = useSession();
 
   return (
     <ThemedView style={styles.container}>
@@ -53,17 +27,12 @@ export default function HomeScreen() {
             {t('tagline')}
           </ThemedText>
 
-          {loading ? (
+          {status === 'loading' ? (
             <ActivityIndicator color={Brand.mango} />
           ) : user !== null ? (
-            <ThemedView style={styles.sessionBlock}>
-              <ThemedText style={styles.tagline}>
-                {t('connectedAs', { firstName: user.firstName, lastName: user.lastName })}
-              </ThemedText>
-              <Pressable onPress={onLogout}>
-                <ThemedText type="linkPrimary">{t('logout')}</ThemedText>
-              </Pressable>
-            </ThemedView>
+            <ThemedText style={styles.tagline}>
+              {t('connectedAs', { firstName: user.firstName, lastName: user.lastName })}
+            </ThemedText>
           ) : (
             <Link href="/login" asChild>
               <Pressable style={styles.cta}>
@@ -104,10 +73,6 @@ const styles = StyleSheet.create({
   },
   tagline: {
     textAlign: 'center',
-  },
-  sessionBlock: {
-    alignItems: 'center',
-    gap: Spacing.two,
   },
   cta: {
     backgroundColor: Brand.mango,
