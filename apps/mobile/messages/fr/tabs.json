@@ -11,10 +11,6 @@
     "body": "Cet espace est réservé aux membres : tes trajets, tes messages et ton profil t'attendent derrière la connexion.",
     "cta": "Se connecter"
   },
-  "search": {
-    "title": "Rechercher un trajet",
-    "note": "La recherche arrive dans un prochain lot — les parcours se construisent écran par écran."
-  },
   "trips": {
     "title": "Mes trajets",
     "pendingDeals": "{count, plural, =0 {Aucune demande en attente} one {# demande en attente} other {# demandes en attente}}",

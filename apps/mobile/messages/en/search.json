@@ -1,0 +1,29 @@
+{
+  "form": {
+    "fromPlaceholder": "Departure city",
+    "toPlaceholder": "Destination city",
+    "submit": "Search",
+    "dates": {
+      "any": "All dates",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "week": "Next 7 days"
+    }
+  },
+  "prompt": "Search for a trip: a departure city, a destination — or search with nothing to browse what's on offer.",
+  "results": "{count, plural, one {# trip} other {# trips}}",
+  "empty": {
+    "title": "No trips found",
+    "body": "No trips are available for this search. Try changing your date or destination."
+  },
+  "error": {
+    "network": "Could not load trips. Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "card": {
+    "fromPrice": "from {price} {currency}",
+    "perKg": "{price} {currency}/kg",
+    "remainingKg": "{kg} kg left",
+    "rating": "★ {rating} ({count})"
+  }
+}

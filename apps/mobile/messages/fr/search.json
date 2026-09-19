@@ -1,0 +1,29 @@
+{
+  "form": {
+    "fromPlaceholder": "Ville de départ",
+    "toPlaceholder": "Ville d'arrivée",
+    "submit": "Rechercher",
+    "dates": {
+      "any": "Toutes les dates",
+      "today": "Aujourd'hui",
+      "tomorrow": "Demain",
+      "week": "7 prochains jours"
+    }
+  },
+  "prompt": "Cherche un trajet : une ville de départ, une destination — ou lance sans rien pour parcourir l'offre.",
+  "results": "{count, plural, one {# trajet} other {# trajets}}",
+  "empty": {
+    "title": "Aucun trajet trouvé",
+    "body": "Aucun trajet n'est disponible pour cette recherche. Essaie de modifier ta date ou ta destination."
+  },
+  "error": {
+    "network": "Impossible de charger les trajets. Vérifie ta connexion et réessaie.",
+    "retry": "Réessayer"
+  },
+  "card": {
+    "fromPrice": "dès {price} {currency}",
+    "perKg": "{price} {currency}/kg",
+    "remainingKg": "{kg} kg dispo",
+    "rating": "★ {rating} ({count})"
+  }
+}

@@ -11,10 +11,6 @@
     "body": "This area is for members: your trips, messages and profile are waiting behind the login.",
     "cta": "Log in"
   },
-  "search": {
-    "title": "Search for a trip",
-    "note": "Search arrives in an upcoming batch — the journeys are built screen by screen."
-  },
   "trips": {
     "title": "My trips",
     "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",

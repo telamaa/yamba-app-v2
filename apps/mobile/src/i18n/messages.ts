@@ -12,20 +12,24 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import authEn from '../../messages/en/auth.json';
 import homeEn from '../../messages/en/home.json';
+import searchEn from '../../messages/en/search.json';
 import tabsEn from '../../messages/en/tabs.json';
 import authFr from '../../messages/fr/auth.json';
 import homeFr from '../../messages/fr/home.json';
+import searchFr from '../../messages/fr/search.json';
 import tabsFr from '../../messages/fr/tabs.json';
 
 export const MESSAGES = {
   fr: {
     auth: authFr,
     home: homeFr,
+    search: searchFr,
     tabs: tabsFr,
   },
   en: {
     auth: authEn,
     home: homeEn,
+    search: searchEn,
     tabs: tabsEn,
   },
 } satisfies Record<SupportedLocale, Record<string, unknown>>;
