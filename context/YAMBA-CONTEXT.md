@@ -796,6 +796,25 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 19/09 (suite 2) : **L'I18N MOBILE — LE MOTEUR DU WEB, LA LANGUE DU COMPTE, A202 (#372).**
+  Le socle affichait du FR en dur et client.ts portait le dernier `fr ? … : …` du depot (motif interdit
+  par D44). Le lot le remplace par le MEME moteur que le web : use-intl 4.13.2 (le coeur de next-intl,
+  deja a la racine, `npm ls` deduped) — memes fichiers ICU, meme useTranslations, pas de deuxieme moteur.
+  Dictionnaires apps/mobile/messages/{fr,en}/{auth,home}.json (libelles du web repris a l'identique,
+  seules les cles RENDUES existent — lecon des chaines mortes du 18/09), imports STATIQUES
+  (src/i18n/messages.ts : Metro ne compose pas `messages/${locale}`). Ordre D44 a l'ecran
+  (src/i18n/provider.tsx) : preferredLocale du compte (login, /auth/me ; oubliee au logout) > langue de
+  l'appareil (expo-localization → resolveLocale du contrat) ; locale-state.ts garde la langue lisible
+  HORS React, `x-locale` dit desormais la langue de l'ECRAN. Controle CI etendu : bloc mobile dans
+  check-i18n-messages.mjs (parse, miroir FR/EN, cles sans point, lexique, cles litterales — guillemets
+  simples, seuils planchers propres), vert + TROIS contre-epreuves rouges. A202 : un metro.config.js
+  epinglant react avait ete ecrit (use-intl importe react, racine 19.2.7 vs app 19.2.3) puis SUPPRIME
+  apres contre-epreuve — la « sticky resolution » d'Expo 57 dedoublonne deja, les paths tsconfig
+  suffisent a Metro ; bundle Hermes prouve UN react (19.2.3 ×1, 19.2.7 ×0), FR et EN embarques. PIEGE :
+  `expo export` sert son CACHE meme quand metro.config.js change — toute contre-epreuve passe par
+  `--clear`. Lockfile strictement ADDITIF, services intouches. Tests plateforme INCHANGES (1576).
+  RG-MOB-7..9, chapitre 203. Puis fix expo start mort a froid (NODE_PATH=./node_modules dans les
+  scripts). AUCUNE attribution Claude.
 - 19/09 (suite) : **LA SESSION MOBILE — CLIENT API PAR TOKENS, A201 (#370).**
   Diagnostic avant code : la lecture Bearer existait deja partout, seule l'EMISSION manquait (login/refresh
   ne livraient qu'en cookies httpOnly). A201 : en-tete `x-token-delivery: body`, opt-in STRICT (seule la
