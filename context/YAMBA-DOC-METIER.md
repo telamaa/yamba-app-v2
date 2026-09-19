@@ -6678,3 +6678,32 @@ français. Les textes sont les mêmes mots que le site — une seule voix, « Vo
 | MOB11 | Compte `preferredLocale: en`, téléphone en français | Après login l'app passe en anglais ; au logout, retour au français |
 | MOB12 | Clé EN retirée · clé inexistante appelée · vouvoiement en FR | La CI échoue — trois contre-épreuves rejouées, trois rouges |
 | MOB13 | Bundle Android exporté | UNE copie de react (19.2.3) ; les textes FR et EN embarqués |
+
+# La coquille à onglets — cinq portes d'entrée · `feat/mobile-tabs`
+
+## Le besoin
+
+L'app s'organise comme les apps que les membres connaissent : une barre d'onglets en bas, native, dans
+le thème du téléphone. Un visiteur sans compte peut arriver et regarder (Accueil, Rechercher) ; ce qui
+appartient au membre (Trajets, Messages, Profil) montre une porte claire — jamais un écran vide — et la
+connexion ramène exactement là où on était. Ce qui attend le Voyageur se voit sans ouvrir l'onglet :
+les pastilles disent le vrai, comptées par le serveur.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-10** | Cinq onglets : Accueil, Rechercher (publics), Trajets, Messages, Profil (membres). Un onglet réservé reste VISIBLE pour un visiteur : il montre la porte d'identité (motif A58/A63) — titre, explication, « Se connecter » — jamais un onglet caché ni un écran vide. Après connexion, retour à l'écran d'origine. |
+| **RG-MOB-11** | Les pastilles disent des comptes SERVEUR : sur Trajets, le « à traiter » du Voyageur (A44 — demandes en attente + trajets à finaliser) ; sur Messages, les non-lus comptés par le message-service. Au-delà de neuf : « 9+ ». Anonyme = aucune pastille ; un comptage qui échoue affiche zéro, jamais une erreur. |
+| **RG-MOB-12** | La barre est celle de l'OS (UITabBar / Material 3) : thème clair/sombre et gestes idiomatiques du téléphone, teinte mangue de la marque (assombrie sur fond clair, comme sur le web). Les écrans de coquille sont honnêtes : des chiffres vrais ou rien — aucune donnée simulée (leçon de l'accueil web #357). |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB14 | Visiteur sans compte ouvre Trajets / Messages / Profil | La porte : titre, explication, « Se connecter » — l'onglet n'est ni caché ni vide |
+| MOB15 | Depuis la porte de Trajets : connexion réussie | Retour sur Trajets, la porte a laissé place au contenu |
+| MOB16 | Voyageur avec 2 demandes en attente et 1 brouillon | Pastille « 3 » sur Trajets, et l'écran affiche les mêmes chiffres |
+| MOB17 | 12 messages non lus | Pastille « 9+ » sur Messages |
+| MOB18 | Déconnexion depuis Profil | La porte réapparaît sur les trois onglets membres, plus aucune pastille |
+| MOB19 | Téléphone en mode sombre | Barre d'onglets sombre native, teinte mangue pleine ; en clair, mangue assombrie |

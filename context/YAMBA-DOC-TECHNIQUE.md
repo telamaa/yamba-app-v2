@@ -11609,3 +11609,55 @@ Mesuré : sans, mort à froid (journal de recette) ; avec, Metro démarre, zéro
 `.expo/types/router.d.ts` est généré. Les alternatives écartées : hisser `expo-router` à la racine
 (violerait ses pairs nichés), désactiver `typedRoutes` (perdre le typage des routes pour un problème
 de résolution serait soigner le thermomètre).
+
+# Les onglets natifs — la coquille navigable de l'app · `feat/mobile-tabs`
+
+## Le déclencheur
+
+Le socle avait trois écrans empilés (accueil, connexion) et un commentaire qui promettait les onglets
+« pas avant d'avoir des écrans à mettre dedans ». Le GO du 19/09 ouvre le lot : la coquille cinq onglets,
+les portes d'identité, plus deux axes acceptés — les badges (deals / messages) et le thème sombre
+idiomatique par OS.
+
+## Ce qui a été fait
+
+- **La barre** (`src/app/(tabs)/_layout.tsx`) : `NativeTabs` d'expo-router (chemin SDK 57 :
+  `expo-router/unstable-native-tabs`, vérifié dans le paquet INSTALLÉ — `NativeTabs.Trigger` +
+  `Icon`/`Label`/`Badge`). C'est la vraie barre de chaque OS (UITabBar avec flou — liquid glass sur
+  iOS 26 —, Material 3 sur Android) : le thème sombre, le tactile et l'accessibilité sont idiomatiques
+  d'office, rien à imiter. Icônes SF Symbols (iOS) + Material Symbols (Android), variante pleine à la
+  sélection ; teinte `Brand.mangoDark` (#CC7A00, la valeur de contraste de la barre web) sur fond clair,
+  mangue pleine sur fond sombre ; le FOND reste celui de l'OS.
+- **La hiérarchie** (A203) : Accueil et Rechercher publics ; Trajets, Messages, Profil derrière la porte.
+  La barre du dashboard web (#355 : Accueil / Activité / Messages / Finances / Plus) est celle d'un
+  espace membre — l'app est le produit entier, un anonyme doit pouvoir y entrer. « Trajets » couvre
+  l'« Activité » du web ; Finances et « Plus » attendent leurs parcours derrière Profil.
+- **La session partagée** (`src/lib/session-context.tsx`) : l'amorçage sort de l'écran d'accueil — UN
+  `bootstrapSession()` + `/auth/me` au démarrage, un état `loading`/`anonymous`/`authenticated`, des
+  gestes `signIn`/`signOut` qui tiennent aussi la langue du compte (D44). La porte, les badges, Profil
+  et l'accueil lisent le même état.
+- **La porte d'identité** (`src/components/identity-gate.tsx`) : motif A58/A63 transposé — l'onglet
+  protégé reste visible et montre la porte (titre, explication, « Se connecter »), jamais un écran vide ;
+  pendant l'amorçage, un sablier (pas de flash de porte pour un membre déjà connecté). La connexion
+  s'ouvre en MODALE par-dessus les onglets (`presentation: 'modal'`) et revient d'où elle vient
+  (`router.canGoBack()` → `back()`) : la porte est devenue le contenu.
+- **Les badges** (`src/hooks/use-tab-badges.ts`) : Trajets = « à traiter » du Voyageur (A44 : demandes
+  PENDING de `/me/deals` — Voyageur seulement — + trajets DRAFT/PAUSED de `/trips/my`) ; Messages =
+  `totalUnread` de `/messages/conversations` (le serveur compte, jamais le client). Rafraîchis à
+  l'ouverture de session et au retour de l'app au premier plan (`AppState`) ; chaque appel est gardé —
+  un badge qui échoue vaut zéro et ne casse jamais la coquille. Affichage plafonné « 9+ » comme la
+  barre web. Les trois chemins passent le gateway (préfixes vérifiés dans `api-gateway/src/main.ts`).
+- **Les écrans de coquille** : honnêtes (leçon #357) — Trajets montre les chiffres VRAIS du badge
+  (pluriels ICU), Messages le compte serveur de non-lus, Profil l'identité du compte et la déconnexion
+  (déménagée d'Accueil — sa clé `home.logout` part avec elle, pas de clé morte) ; Rechercher est public
+  et dit que la recherche arrive. Rien de simulé, pas de maquette.
+
+## Vérifié
+
+- `nx run-many --target=typecheck --all --skip-sync` : 10/10 (la commande exacte de la CI).
+- Contrôle i18n vert, et une contre-épreuve rouge sur le NOUVEL espace `tabs` (clé EN retirée →
+  `clé manquante : gate.cta`) — le harnais avait été prouvé trois fois au lot i18n, ici on prouve
+  qu'il VOIT les nouvelles clés. Piège payé au passage : `git checkout --` ne restaure pas un fichier
+  jamais commité — muter un fichier NON SUIVI pour une contre-épreuve, c'est le réécrire à la main.
+- Bundle Hermes Android (`expo export --clear`) : la porte FR ET EN, les pluriels ICU et les symboles
+  d'onglets embarqués (six marqueurs comptés, chacun ≥ 1 — et une chaîne fausse rend 0).
