@@ -1,11 +1,17 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Jetons de thème du client mobile — même système que le web (mangue + teal,
+ * clair/sombre). Les couleurs de marque sont celles du design system
+ * (`apps/user-ui`) : mangue #FF9900, teal #0F766E.
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
+
+export const Brand = {
+  mango: '#FF9900',
+  teal: '#0F766E',
+} as const;
 
 export const Colors = {
   light: {
@@ -14,6 +20,8 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    // Teinte d'accent (liens, éléments actifs) : teal lisible sur fond clair…
+    tint: Brand.teal,
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +29,8 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    // …et teal éclairci sur fond sombre (le #0F766E y est illisible).
+    tint: '#2DD4BF',
   },
 } as const;
 

@@ -1,18 +1,19 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Brand } from '@/constants/theme';
 
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
+// Socle : une pile simple. Les onglets natifs (Rechercher / Trajets /
+// Messages / Profil) arriveront avec les parcours — pas avant d'avoir
+// des écrans à mettre dedans.
+export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const theme = { ...base, colors: { ...base.colors, primary: Brand.mango } };
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+    <ThemeProvider value={theme}>
+      <Stack screenOptions={{ headerShown: false }} />
     </ThemeProvider>
   );
 }
