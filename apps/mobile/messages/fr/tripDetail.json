@@ -1,0 +1,115 @@
+{
+  "back": "Retour",
+  "trippedBy": "Trajet proposé par {firstName} {lastInitial}.",
+  "views": "{count, plural, =1 {1 vue} other {# vues}}",
+  "badges": {
+    "popular": "Populaire",
+    "verifiedTicket": "Billet vérifié",
+    "superTripper": "Super Voyageur",
+    "profileVerified": "Profil vérifié"
+  },
+  "itinerary": {
+    "title": "Itinéraire",
+    "duration": "Durée : {duration}",
+    "layovers": "Escales : {cities}",
+    "stops": "Arrêts : {cities}"
+  },
+  "transport": {
+    "PLANE": "Avion",
+    "TRAIN": "Train",
+    "CAR": "Voiture",
+    "flightDirect": "Vol direct",
+    "flightWithLayover": "Avec escale",
+    "trainDirect": "Train direct",
+    "trainWithConnection": "Avec correspondance",
+    "trainWithIntermediateStops": "Avec arrêts intermédiaires",
+    "carDetour": "Détour possible"
+  },
+  "offer": {
+    "title": "Ce que tu peux envoyer avec {firstName}",
+    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifie ci-dessous que ton type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
+    "perKg": "Prix au kilo",
+    "available": "Disponible",
+    "estimateLabel": "Estimation pour un colis de {kg} kg",
+    "allIn": "tout compris (transport + service Yamba)",
+    "finalAtBooking": "Le prix définitif est fixé à la réservation.",
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids.",
+    "families": "Familles de colis",
+    "refused": "Refusé par le Voyageur",
+    "surcharge": "+{pct} %",
+    "family": {
+      "DOCUMENTS_PAPERS": "Documents & papiers",
+      "CLOTHES_TEXTILE": "Vêtements & textile",
+      "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+      "ELECTRONICS_DEVICES": "Électronique & appareils",
+      "COSMETICS_CARE": "Cosmétiques & soins",
+      "PARTS_TOOLS": "Pièces & outillage",
+      "TOYS_CHILDCARE": "Jouets & puériculture",
+      "MISC_ACCESSORIES": "Accessoires & divers"
+    },
+    "bags": "Bagage entier — forfait",
+    "checkedBag": "Bagage en soute 23 kg",
+    "cabinBag": "Bagage cabine 12 kg"
+  },
+  "categories": {
+    "title": "Ce que propose {firstName}",
+    "hint": "Une réservation = un colis d'une seule catégorie. Pour envoyer plusieurs colis, fais une réservation par colis.",
+    "label": {
+      "CLOTHES": "Vêtements",
+      "SHOES": "Chaussures",
+      "FASHION_ACCESSORIES": "Accessoires de mode",
+      "OTHER_ACCESSORIES": "Autres accessoires",
+      "BOOKS": "Livres",
+      "DOCUMENTS": "Documents",
+      "SMALL_TOYS": "Petits jouets",
+      "PHONE": "Téléphone",
+      "COMPUTER": "Ordinateur",
+      "OTHER_ELECTRONICS": "Autre électronique",
+      "CHECKED_BAG_23KG": "Bagage en soute 23 kg",
+      "CABIN_BAG_12KG": "Bagage cabine 12 kg"
+    }
+  },
+  "locations": {
+    "pickupTitle": "Lieux de remise",
+    "deliveryTitle": "Lieux de livraison",
+    "kind": {
+      "AIRPORT": "À l'aéroport",
+      "TRAIN_STATION": "À la gare",
+      "CITY_AREA": "Dans la ville"
+    },
+    "flex": {
+      "EXACT": "Lieu exact",
+      "CITY_WIDE": "Ville entière",
+      "RADIUS": "Rayon {km} km"
+    }
+  },
+  "conditions": {
+    "title": "Conditions",
+    "cancellationTitle": "Politique d'annulation",
+    "cancellationFull": "Remboursement intégral jusqu'à 48 h avant le départ",
+    "cancellationHalf": "Moins de 48 h avant le départ : remboursement partiel (une retenue est reversée au Voyageur)",
+    "cancellationNone": "Après la remise du colis : plus d'annulation possible, seul le litige",
+    "prohibitedTitle": "Objets interdits",
+    "prohibitedDescription": "Substances illicites, armes, espèces, animaux vivants, matières dangereuses ou inflammables, contrefaçons."
+  },
+  "tripper": {
+    "title": "Le Voyageur",
+    "memberSince": "Membre depuis {date}",
+    "newTripper": "Nouveau Voyageur",
+    "rating": "★ {rating} · {count, plural, =1 {# avis} other {# avis}}",
+    "tripsPublished": "{count, plural, one {# trajet publié} other {# trajets publiés}}",
+    "parcelsCarried": "{count, plural, one {# colis transporté} other {# colis transportés}}"
+  },
+  "notes": {
+    "title": "Notes du Voyageur"
+  },
+  "bookingSoon": "La réservation depuis l'app arrive bientôt. En attendant, ce trajet se réserve sur le site Yamba.",
+  "notFound": {
+    "title": "Trajet introuvable",
+    "body": "Ce trajet n'existe pas ou n'est plus disponible."
+  },
+  "error": {
+    "network": "Impossible de charger ce trajet. Vérifie ta connexion et réessaie.",
+    "retry": "Réessayer"
+  }
+}

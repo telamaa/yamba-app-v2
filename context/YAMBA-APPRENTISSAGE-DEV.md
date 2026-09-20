@@ -2736,3 +2736,90 @@ vrai calendrier natif, les puces resteront le raccourci du premier geste.
 - L'`AbortController` sur la recherche (annuler la requête précédente quand on relance) : inutile tant
   que l'écran remplace tout l'état à chaque réponse, nécessaire le jour où la recherche devient
   « au fil de la frappe ».
+
+## Chapitre 206 — La route dynamique : le fichier qui est une URL, les types qui naissent au `start`, et le compteur qui préfère se tromper en moins
+
+### Ce qu'on construisait
+
+La fiche trajet (`feat/mobile-trip-page`) : toucher une carte de résultat ouvre la fiche publique du
+trajet — la même que le site, servie par `GET /trips/:id/public` — et s'arrête AVANT la réservation.
+
+### La route dynamique d'expo-router : un fichier nommé `[id]`
+
+Sur le web Next, la page trajet vit dans `app/[locale]/trips/[tripId]/`. Expo-router applique la même
+idée au mobile : créer `src/app/trip/[id].tsx` SUFFIT à faire exister l'URL `/trip/<n'importe quoi>`
+dans l'app — pas de table de routes à tenir. L'écran lit son paramètre avec
+`useLocalSearchParams<{ id: string }>()`, et la carte navigue avec la FORME OBJET :
+
+```tsx
+router.push({ pathname: '/trip/[id]', params: { id: trip.id } });
+```
+
+Pourquoi pas le gabarit `` `/trip/${trip.id}` `` ? Les deux marchent au runtime, mais la forme objet
+est celle que les ROUTES TYPÉES vérifient le mieux : le `pathname` est un littéral connu du
+compilateur, les `params` sont à part. Ce qui mène au piège du jour.
+
+### Les routes typées naissent au `start`, pas à l'`export`
+
+`app.json` porte `experiments.typedRoutes: true` : Expo génère `.expo/types/router.d.ts`, un fichier
+qui augmente le module `expo-router` avec l'UNION des chemins existants (`"/login" | "/" | …`). Le
+`router.push` d'une route inconnue devient une erreur de compilation — exactement ce qu'on veut.
+
+Mais ce fichier est GÉNÉRÉ et GITIGNORÉ, et voilà le cycle de vie mesuré ce jour :
+
+- `expo start` le régénère (c'est Metro qui voit l'arborescence) ;
+- `expo export` ne le régénère PAS — la preuve de bundle passe, le typecheck reste rouge ;
+- un poste qui n'a JAMAIS lancé Expo n'a pas le fichier du tout → l'augmentation n'existe pas, `Href`
+  retombe sur sa forme permissive, et le typecheck PASSE.
+
+D'où la situation vécue : `tsc` local refusait `"/trip/[id]"` (TS2322 : l'union figée du 19/09 ne
+connaissait que `/` et `/login`) pendant que la CI, sans `.expo`, serait passée. Le remède est d'une
+ligne — lancer Metro quelques secondes pour régénérer — mais la leçon est générale : **un type généré
+a une date de naissance** ; quand un refus du compilateur contredit ce que tes yeux lisent dans
+l'arborescence, demande-toi QUI a généré le type et QUAND, avant de « corriger » le code.
+
+### Le miroir assumé : copier deux fichiers plutôt qu'inventer un paquet
+
+L'écran doit formater prix et dates et afficher l'estimation « 2 kg ≈ X € ». Le web a déjà tout :
+`public-trip.helpers.ts` (tables de mois SANS `Intl.DateTimeFormat` — indépendant du moteur JS) et
+`pricing-example.ts` (planchers D13/D16/D32, en CENTS entiers). Trois options :
+
+1. importer depuis `apps/user-ui` → un front qui dépend d'un autre front, interdit ;
+2. créer `packages/libs/trip-display` → un paquet partagé pour DEUX consommateurs, dont il faudrait
+   aussi câbler l'alias Metro — de l'architecture avant le besoin ;
+3. COPIER les deux fichiers dans `apps/mobile/src/lib/`, en écrivant « MIROIR de … » en tête.
+
+Choix : le miroir, CONSIGNÉ dans A205 avec sa condition de sortie (un troisième front les fera migrer
+en paquet). Une duplication documentée avec une porte de sortie vaut mieux qu'une abstraction
+prématurée — l'inverse exact d'une duplication silencieuse, qui elle dérive sans témoin.
+
+### A205 — le compteur qui préfère se tromper en moins
+
+`recordTripView` dédoublonne les vues par `viewerKey(userId, ip, user-agent)` : un membre compte par
+son id, un visiteur par l'empreinte tronquée de son IP + user-agent (jamais l'IP en clair). Le point
+noté au chapitre 205 : derrière le CGNAT d'un opérateur mobile, des MILLIERS d'appareils partagent la
+même IP publique, et l'user-agent d'une app est bien plus uniforme que celui d'un navigateur. Des
+visiteurs distincts tombent donc sous la MÊME clé : le compteur SOUS-estime.
+
+L'alternative technique existe : générer un identifiant d'appareil côté client et l'envoyer avec la
+requête. Elle a été refusée, et le POURQUOI est la leçon : ce serait un traceur de plus (à déclarer,
+à purger, à protéger) au service d'un compteur… de présentation. Les vues nourrissent un badge
+(« Populaire » à 20) et la connaissance interne de la demande — pas une règle métier, pas un paiement.
+Entre « se tromper en moins » gratuitement et « compter juste » au prix d'un traceur, le registre
+choisit l'erreur conservatrice. Un compteur qui ne peut que sous-estimer ne fabrique jamais un faux
+signal de popularité.
+
+### Deux pièges de la veille, payés une fois, appliqués à la relecture
+
+- `const ok = carrier !== null && …` puis `carrier.ratingsAvg` : le narrowing ne traverse pas la
+  constante booléenne. Capture la VALEUR : `const rated = carrier !== null && … ? carrier : null`.
+- `ReactNode` s'importe de `react` (`import { type ReactNode }`), jamais de `react-native`.
+
+### Pour aller plus loin
+
+- Le bouton « Réserver » viendra avec le wizard (Stripe Payment Sheet) — l'écran actuel n'a AUCUN CTA
+  mort : la ligne « la réservation arrive » renvoie vers le site, honnêteté du lot recherche continuée.
+- Les favoris (D46) attendent leur place dans l'app (pas d'onglet favoris) ; le signalement (D68)
+  attend la porte de connexion contextuelle ; les deux sont notés dans A205 comme écartés, pas oubliés.
+- Le deep link `yamba://trip/<id>` existe DÉJÀ à moitié : le `scheme` est dans `app.json` et la route
+  existe — le lot deep links n'aura qu'à brancher les liens universels.

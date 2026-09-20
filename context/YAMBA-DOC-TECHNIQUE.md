@@ -11711,3 +11711,55 @@ du web, et le client mobile doit porter un id de corrélation pour le debug.
   0 (« Ville de départ » : 0, « kg dispo » : 1). Les marqueurs du lot A203 étaient sans accent par
   chance. Toute preuve de bundle sur du texte français cherche désormais les DEUX encodages
   (`data.count(s.encode('utf-16-le')) + data.count(s.encode('utf-8'))`).
+
+# La page trajet mobile — la fiche publique dans la poche · `feat/mobile-trip-page`
+
+## Le déclencheur
+
+La carte de résultat du lot recherche s'arrêtait net — à dessein : on ne promet pas une navigation qui
+n'existe pas. Le GO page trajet (handoff du 19/09, § 3a) ouvre la fiche : navigation depuis la carte,
+fiche complète (itinéraire, tarifs, familles D14, lieux, conditions, profil du Voyageur), et STOP avant
+le wizard de réservation. Avec un point à instruire, noté au chapitre 205 : le comptage des vues d'un
+visiteur mobile anonyme derrière CGNAT (arbitrage A205).
+
+## Ce qui a été fait
+
+- **`src/lib/api/trip.api.ts`** — `getPublicTrip(id)` sur le MÊME endpoint que le web :
+  `GET /trips/:id/public` (gateway → trip-service, `isOptionallyAuthenticated` — connecté, le Bearer
+  personnalise `isFavorite`). Les types miroir champ à champ le DTO de `getPublicTrip`
+  (`trip.controller.ts`), comme `public-trip.types.ts` côté web : prix en CENTS (la conversion en euros
+  n'a lieu qu'à l'affichage), `familyConditions` D14, `pickupLocations`/`deliveryLocations`,
+  `tripper.carrier`. Aucun endpoint mobile : le contrat était déjà « mobile-ready » (D36).
+- **`src/app/trip/[id].tsx`** — l'écran, poussé PAR-DESSUS les onglets (`Stack.Screen "trip/[id]"`
+  dans la pile racine : le retour ramène aux résultats sans relancer la recherche). Machine d'états
+  `loading / notFound / error / loaded` — le 404 (introuvable OU masqué/dépublié, indiscernables par
+  construction, ANO-API-02) a son écran calme ; l'erreur affiche le message serveur et l'id de
+  corrélation `mob-…` avec « Réessayer ». Blocs : en-tête (vues + « Populaire » à 20, « Billet
+  vérifié »), itinéraire (date longue, horaires LOCAUX du billet — `departureTimeLocal` prime sur
+  l'ISO —, durée, mode + variante + escales), offre PER_KG (€/kg, kg restants, estimation 2 kg, les
+  8 familles ✓ / +X % / barrée, forfaits bagage), catégories legacy (quand pas de €/kg), lieux,
+  conditions, profil du Voyageur (avatar `expo-image` ou initiales, note ou « Nouveau Voyageur »,
+  badges, stats, bio), notes. AUCUN bouton « Réserver » : une ligne renvoie vers le site.
+- **`src/lib/trip-format.ts` + `src/lib/pricing-example.ts`** — MIROIRS assumés des fichiers web du
+  même nom (tables de mois sans `Intl.DateTimeFormat`, planchers D13/D16/D32, seuil « Populaire ») ;
+  consignés comme tels dans A205 — un troisième front les fera migrer en paquet partagé.
+- **`trip-result-card.tsx`** — la carte devient `Pressable` →
+  `router.push({ pathname: '/trip/[id]', params: { id } })` (la forme objet, compatible routes typées).
+- **i18n** : namespace `tripDetail` (`messages/{fr,en}/tripDetail.json` + liaison `messages.ts`), mots
+  de la fiche web (tutoiement FR, « Voyageur »/« Traveler ») ; les libellés de lieux, codés en dur en
+  bilingue dans le `LocationsCard` web (legacy), passent ici par le dictionnaire.
+
+## Vérifié
+
+- `npx nx typecheck @yamba-app/mobile` vert — **piège trouvé** : `expo export` ne régénère PAS
+  `.expo/types/router.d.ts` (routes typées, gitignoré) ; seul `expo start` le fait. Un poste au
+  `.expo` rassis refuse `router.push` vers la nouvelle route (TS2322 sur l'union des chemins) quand
+  la CI, sans `.expo`, passe — Metro lancé quelques secondes pour régénérer, puis typecheck vert.
+- Contrôle i18n vert : 30 espaces de noms, miroir FR/EN parfait.
+- Bundle Hermes Android `--clear` : marqueurs accentués FR (« Politique d'annulation », « Familles de
+  colis », « Lieux de remise », « Membre depuis ») et EN (« Cancellation policy », « Parcel
+  families ») cherchés dans LES DEUX encodages (UTF-16-LE + UTF-8, leçon A204) — tous à 1, témoin
+  faux à 0.
+- Pitfalls du 19/09 appliqués à la relecture : `ReactNode` importé de `react`, narrowing par CAPTURE
+  de valeur (`ratedCarrier`), teal remplacé par la teinte `tint` du thème (le #0F766E est illisible
+  en sombre).

@@ -6737,3 +6737,34 @@ complets. Et quand quelque chose échoue, l'écran donne au support la clé pour
 | MOB23 | Plus de 20 résultats | La liste se complète en scrollant (curseur), le compte total est affiché |
 | MOB24 | Gateway coupé pendant la recherche | Écran d'erreur avec le message et un id `mob-…` ; « Réessayer » relance |
 | MOB25 | Trajet au poids (PER_KG) dans les résultats | « X €/kg » et « Y kg dispo » ; trajet legacy : « dès X € » |
+
+# La fiche trajet dans la poche · `feat/mobile-trip-page`
+
+## Le besoin
+
+Un résultat de recherche ne suffit pas pour décider : avant de confier un colis, l'Expéditeur veut la
+fiche entière — l'itinéraire précis, ce que le Voyageur accepte et à quel prix, où se fait la remise,
+les conditions, et qui est ce Voyageur. Sur le site, cette fiche existe ; dans l'app, la carte de
+résultat s'arrêtait net. Ce lot ouvre la fiche au toucher — la MÊME fiche que le site, servie par le
+même serveur — et s'arrête volontairement AVANT la réservation : pas de bouton qui promet un parcours
+qui n'existe pas encore dans l'app.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-17** | La fiche trajet mobile est la fiche publique du site : même source, mêmes règles de visibilité. Un trajet masqué, dépublié ou supprimé est introuvable — indiscernable d'un trajet qui n'a jamais existé. |
+| **RG-MOB-18** | Chaque ouverture de fiche est comptée par le serveur : une vue par visiteur et par jour, jamais plus. Sur mobile, des visiteurs anonymes derrière le même réseau d'opérateur peuvent être confondus : le compteur peut sous-estimer, jamais gonfler (A205). |
+| **RG-MOB-19** | La fiche dit tout ce que le site dit — prix au kilo ou par catégorie, les 8 familles de colis (acceptée, supplément, refusée), forfaits bagage, lieux de remise et de livraison, conditions d'annulation, objets interdits, profil du Voyageur — et rien de plus : pas de « Réserver » tant que le parcours n'existe pas dans l'app ; une ligne renvoie honnêtement vers le site. |
+| **RG-MOB-20** | L'estimation « colis de 2 kg ≈ X € » applique les mêmes planchers que le site (8 € de transport minimum, service 12 % avec plancher 3 €) ; elle est indicative — le prix définitif est calculé et figé par le serveur à la réservation. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB26 | Toucher une carte de résultat | La fiche s'ouvre par-dessus les onglets ; « Retour » ramène aux résultats sans relancer la recherche |
+| MOB27 | Fiche d'un trajet au poids (PER_KG) | Prix au kilo, kilos disponibles, estimation 2 kg « tout compris », les 8 familles (✓ / +X % / barrée), forfaits bagage s'il y en a |
+| MOB28 | Fiche d'un trajet legacy | Les catégories acceptées et leurs prix ; aucun bloc « prix au kilo » |
+| MOB29 | Rouvrir la même fiche le même jour, même appareil | Le compteur de vues n'a augmenté que d'une unité (dédoublonnage serveur par visiteur et par jour) |
+| MOB30 | Le trajet est dépublié ou masqué, puis la fiche est rouverte | « Trajet introuvable », identique à un id inventé |
+| MOB31 | Coupure réseau à l'ouverture de la fiche | Écran d'erreur avec un id `mob-…` ; « Réessayer » recharge |
