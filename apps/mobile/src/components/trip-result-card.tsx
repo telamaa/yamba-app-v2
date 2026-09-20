@@ -3,11 +3,12 @@
  * ==========================================================================
  * Que du VRAI : villes, date localisée par le serveur, horaires, prix (€/kg
  * pour le moteur PER_KG avec les kilos restants, « dès X € » pour le legacy —
- * les mots de la carte web), Voyageur et sa note quand elle existe. La carte
- * n'est pas cliquable : la page trajet est le lot suivant, on ne promet pas
- * une navigation qui n'existe pas.
+ * les mots de la carte web), Voyageur et sa note quand elle existe. Depuis le
+ * lot page trajet, la carte OUVRE la fiche (`/trip/[id]`) — la vue y est
+ * comptée par le serveur, comme sur le web.
  */
-import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
@@ -25,7 +26,10 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   const perKg = perKgPrice !== null;
 
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
+    <Pressable
+      onPress={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
+      style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
+      <ThemedView type="backgroundElement" style={styles.card}>
       <View style={styles.row}>
         <ThemedText type="smallBold" style={styles.route} numberOfLines={1}>
           {trip.fromCity} → {trip.toCity}
@@ -56,7 +60,8 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
             ` · ${t('card.rating', { rating: trip.rating, count: trip.reviewCount ?? 0 })}`}
         </ThemedText>
       )}
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 }
 
@@ -75,5 +80,8 @@ const styles = StyleSheet.create({
   },
   route: {
     flexShrink: 1,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

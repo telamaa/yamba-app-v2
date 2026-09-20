@@ -20,6 +20,9 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+            {/* La fiche trajet se pousse PAR-DESSUS les onglets (pas dedans) :
+                le retour ramène aux résultats, la barre reste celle du groupe. */}
+            <Stack.Screen name="trip/[id]" />
           </Stack>
         </ThemeProvider>
       </SessionProvider>

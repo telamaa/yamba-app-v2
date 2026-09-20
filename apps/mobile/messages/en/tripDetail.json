@@ -1,0 +1,115 @@
+{
+  "back": "Back",
+  "trippedBy": "Trip offered by {firstName} {lastInitial}.",
+  "views": "{count, plural, =1 {1 view} other {# views}}",
+  "badges": {
+    "popular": "Popular",
+    "verifiedTicket": "Verified ticket",
+    "superTripper": "Super Traveler",
+    "profileVerified": "Verified profile"
+  },
+  "itinerary": {
+    "title": "Itinerary",
+    "duration": "Duration: {duration}",
+    "layovers": "Layovers: {cities}",
+    "stops": "Stops: {cities}"
+  },
+  "transport": {
+    "PLANE": "Plane",
+    "TRAIN": "Train",
+    "CAR": "Car",
+    "flightDirect": "Direct flight",
+    "flightWithLayover": "With layover",
+    "trainDirect": "Direct train",
+    "trainWithConnection": "With connection",
+    "trainWithIntermediateStops": "With intermediate stops",
+    "carDetour": "Detour possible"
+  },
+  "offer": {
+    "title": "What you can send with {firstName}",
+    "hint": "One price per kg, whatever the content. Check below that your parcel type is accepted: some carry a surcharge, some are refused.",
+    "perKg": "Price per kg",
+    "available": "Available",
+    "estimateLabel": "Estimate for a {kg} kg parcel",
+    "allIn": "all-in (transport + Yamba service)",
+    "finalAtBooking": "The final price is set at booking.",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum, whatever the weight.",
+    "families": "Parcel families",
+    "refused": "Refused by the Traveler",
+    "surcharge": "+{pct}%",
+    "family": {
+      "DOCUMENTS_PAPERS": "Documents & papers",
+      "CLOTHES_TEXTILE": "Clothes & textile",
+      "FOOD_DRY_SEALED": "Dry sealed food",
+      "ELECTRONICS_DEVICES": "Electronics & devices",
+      "COSMETICS_CARE": "Cosmetics & care",
+      "PARTS_TOOLS": "Parts & tools",
+      "TOYS_CHILDCARE": "Toys & childcare",
+      "MISC_ACCESSORIES": "Accessories & misc."
+    },
+    "bags": "Whole bag — flat rate",
+    "checkedBag": "Checked bag 23 kg",
+    "cabinBag": "Cabin bag 12 kg"
+  },
+  "categories": {
+    "title": "What {firstName} offers",
+    "hint": "One booking = one parcel from a single category. To send multiple parcels, make a booking per parcel.",
+    "label": {
+      "CLOTHES": "Clothes",
+      "SHOES": "Shoes",
+      "FASHION_ACCESSORIES": "Fashion accessories",
+      "OTHER_ACCESSORIES": "Other accessories",
+      "BOOKS": "Books",
+      "DOCUMENTS": "Documents",
+      "SMALL_TOYS": "Small toys",
+      "PHONE": "Phone",
+      "COMPUTER": "Computer",
+      "OTHER_ELECTRONICS": "Other electronics",
+      "CHECKED_BAG_23KG": "Checked bag 23 kg",
+      "CABIN_BAG_12KG": "Cabin bag 12 kg"
+    }
+  },
+  "locations": {
+    "pickupTitle": "Handover spots",
+    "deliveryTitle": "Delivery spots",
+    "kind": {
+      "AIRPORT": "At the airport",
+      "TRAIN_STATION": "At the train station",
+      "CITY_AREA": "In the city"
+    },
+    "flex": {
+      "EXACT": "Exact spot",
+      "CITY_WIDE": "Whole city",
+      "RADIUS": "Within {km} km"
+    }
+  },
+  "conditions": {
+    "title": "Conditions",
+    "cancellationTitle": "Cancellation policy",
+    "cancellationFull": "Full refund up to 48 h before departure",
+    "cancellationHalf": "Less than 48 h before departure: partial refund (a retention goes to the Traveler)",
+    "cancellationNone": "After the parcel handover: no cancellation, only a dispute",
+    "prohibitedTitle": "Prohibited items",
+    "prohibitedDescription": "Illicit substances, weapons, cash, live animals, hazardous or flammable materials, counterfeits."
+  },
+  "tripper": {
+    "title": "The Traveler",
+    "memberSince": "Member since {date}",
+    "newTripper": "New Traveler",
+    "rating": "★ {rating} · {count, plural, =1 {# review} other {# reviews}}",
+    "tripsPublished": "{count, plural, one {# trip published} other {# trips published}}",
+    "parcelsCarried": "{count, plural, one {# parcel carried} other {# parcels carried}}"
+  },
+  "notes": {
+    "title": "Traveler's notes"
+  },
+  "bookingSoon": "Booking from the app is coming soon. Until then, this trip can be booked on the Yamba website.",
+  "notFound": {
+    "title": "Trip not found",
+    "body": "This trip doesn't exist or is no longer available."
+  },
+  "error": {
+    "network": "We couldn't load this trip. Check your connection and try again.",
+    "retry": "Retry"
+  }
+}

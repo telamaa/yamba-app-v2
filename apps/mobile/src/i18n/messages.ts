@@ -14,10 +14,12 @@ import authEn from '../../messages/en/auth.json';
 import homeEn from '../../messages/en/home.json';
 import searchEn from '../../messages/en/search.json';
 import tabsEn from '../../messages/en/tabs.json';
+import tripDetailEn from '../../messages/en/tripDetail.json';
 import authFr from '../../messages/fr/auth.json';
 import homeFr from '../../messages/fr/home.json';
 import searchFr from '../../messages/fr/search.json';
 import tabsFr from '../../messages/fr/tabs.json';
+import tripDetailFr from '../../messages/fr/tripDetail.json';
 
 export const MESSAGES = {
   fr: {
@@ -25,11 +27,13 @@ export const MESSAGES = {
     home: homeFr,
     search: searchFr,
     tabs: tabsFr,
+    tripDetail: tripDetailFr,
   },
   en: {
     auth: authEn,
     home: homeEn,
     search: searchEn,
     tabs: tabsEn,
+    tripDetail: tripDetailEn,
   },
 } satisfies Record<SupportedLocale, Record<string, unknown>>;
