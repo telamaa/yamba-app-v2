@@ -9,7 +9,8 @@
  * dans les stats comme une recherche web). La carte s'arrête AVANT la page
  * trajet — lot suivant.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,7 +29,12 @@ import { TripResultCard } from '@/components/trip-result-card';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
-import { searchTrips, type SearchPage, type TripSearchResult } from '@/lib/api/search.api';
+import {
+  searchTrips,
+  type SearchPage,
+  type SearchParams,
+  type TripSearchResult,
+} from '@/lib/api/search.api';
 
 const PAGE_SIZE = 20;
 
@@ -77,19 +83,48 @@ export default function SearchScreen() {
     [from, to, dateWindow]
   );
 
-  const runSearch = useCallback(async () => {
-    setState({ kind: 'loading' });
-    try {
-      const page = await searchTrips(currentParams());
-      setState({ kind: 'results', page, loadingMore: false });
-    } catch (err) {
-      setState({
-        kind: 'error',
-        message: err instanceof ApiError ? err.message : t('error.network'),
-        correlationId: err instanceof ApiError ? err.correlationId : null,
-      });
-    }
-  }, [currentParams, t]);
+  const runSearchWith = useCallback(
+    async (params: SearchParams) => {
+      setState({ kind: 'loading' });
+      try {
+        const page = await searchTrips(params);
+        setState({ kind: 'results', page, loadingMore: false });
+      } catch (err) {
+        setState({
+          kind: 'error',
+          message: err instanceof ApiError ? err.message : t('error.network'),
+          correlationId: err instanceof ApiError ? err.correlationId : null,
+        });
+      }
+    },
+    [t]
+  );
+
+  const runSearch = useCallback(
+    () => runSearchWith(currentParams()),
+    [runSearchWith, currentParams]
+  );
+
+  // Préremplissage depuis l'accueil (lot accueil) : un corridor touché arrive
+  // en paramètres de route avec une GRAINE — rejouée seulement quand elle
+  // change, pour que retaper le même corridor relance bien la recherche sans
+  // qu'un simple retour sur l'onglet ne la rejoue.
+  const prefill = useLocalSearchParams<{ from?: string; to?: string; seed?: string }>();
+  const appliedSeed = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof prefill.seed !== 'string' || prefill.seed === appliedSeed.current) return;
+    appliedSeed.current = prefill.seed;
+    const nextFrom = typeof prefill.from === 'string' ? prefill.from : '';
+    const nextTo = typeof prefill.to === 'string' ? prefill.to : '';
+    setFrom(nextFrom);
+    setTo(nextTo);
+    setDateWindow('any');
+    void runSearchWith({
+      from: nextFrom.trim() || undefined,
+      to: nextTo.trim() || undefined,
+      limit: PAGE_SIZE,
+    });
+  }, [prefill.seed, prefill.from, prefill.to, runSearchWith]);
 
   const loadMore = useCallback(async () => {
     if (state.kind !== 'results' || state.loadingMore || state.page.nextCursor === null) return;

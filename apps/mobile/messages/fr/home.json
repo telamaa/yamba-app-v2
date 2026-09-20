@@ -1,6 +1,60 @@
 {
   "tagline": "Il y a toujours quelqu'un qui part vers ta destination. Confie-lui ton colis.",
-  "connectedAs": "Connecté : {firstName} {lastName}",
+  "subtitle": "Des Voyageurs vérifiés ont de la place dans leurs bagages : ton colis arrive plus vite, moins cher, et en main propre.",
+  "greeting": "Bonjour {firstName}",
   "login": "Se connecter",
-  "socleNote": "Socle mobile — les parcours arrivent écran par écran."
+  "searchCta": "Chercher un trajet",
+  "trust": {
+    "escrow": "Paiement bloqué jusqu'à la livraison (Stripe)",
+    "code": "Remise contre code confidentiel",
+    "verified": "Profils et billets vérifiés"
+  },
+  "corridors": {
+    "label": "En ce moment",
+    "title": "Des Voyageurs partent bientôt",
+    "tripCount": "{count, plural, one {# trajet} other {# trajets}}"
+  },
+  "how": {
+    "title": "Comment ça marche",
+    "faces": {
+      "send": "J'envoie un colis",
+      "travel": "Je voyage"
+    },
+    "send": {
+      "find": {
+        "title": "Trouve un trajet",
+        "description": "Cherche ta destination : les Voyageurs qui y partent affichent leur date, leurs kilos disponibles et leur prix."
+      },
+      "book": {
+        "title": "Réserve",
+        "description": "Tu paies à la réservation, mais l'argent reste bloqué chez Stripe jusqu'à la livraison."
+      },
+      "handoff": {
+        "title": "Remets ton colis",
+        "description": "Vous fixez le rendez-vous dans la messagerie Yamba, avant le départ du Voyageur."
+      },
+      "delivered": {
+        "title": "C'est livré",
+        "description": "Ton destinataire donne le code confidentiel à la remise — toi seul le connais. L'argent est alors débloqué."
+      }
+    },
+    "travel": {
+      "publish": {
+        "title": "Publie ton trajet",
+        "description": "Destination, date, kilos disponibles, ton prix au kilo : deux minutes suffisent."
+      },
+      "accept": {
+        "title": "Accepte les demandes",
+        "description": "Tu vois le contenu déclaré et tu choisis ce que tu transportes — rien ne t'est imposé."
+      },
+      "deliver": {
+        "title": "Transporte et livre",
+        "description": "Tu remets le colis contre le code de livraison : c'est ta preuve de remise."
+      },
+      "paid": {
+        "title": "Reçois ton gain",
+        "description": "Après la livraison, ton gain est versé sur ton compte — le paiement était sécurisé dès la réservation."
+      }
+    }
+  }
 }
