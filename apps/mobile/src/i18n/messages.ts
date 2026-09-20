@@ -15,11 +15,13 @@ import homeEn from '../../messages/en/home.json';
 import searchEn from '../../messages/en/search.json';
 import tabsEn from '../../messages/en/tabs.json';
 import tripDetailEn from '../../messages/en/tripDetail.json';
+import welcomeEn from '../../messages/en/welcome.json';
 import authFr from '../../messages/fr/auth.json';
 import homeFr from '../../messages/fr/home.json';
 import searchFr from '../../messages/fr/search.json';
 import tabsFr from '../../messages/fr/tabs.json';
 import tripDetailFr from '../../messages/fr/tripDetail.json';
+import welcomeFr from '../../messages/fr/welcome.json';
 
 export const MESSAGES = {
   fr: {
@@ -28,6 +30,7 @@ export const MESSAGES = {
     search: searchFr,
     tabs: tabsFr,
     tripDetail: tripDetailFr,
+    welcome: welcomeFr,
   },
   en: {
     auth: authEn,
@@ -35,5 +38,6 @@ export const MESSAGES = {
     search: searchEn,
     tabs: tabsEn,
     tripDetail: tripDetailEn,
+    welcome: welcomeEn,
   },
 } satisfies Record<SupportedLocale, Record<string, unknown>>;
