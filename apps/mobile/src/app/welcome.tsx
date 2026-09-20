@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: Spacing.six,
+    top: Spacing.three,
     bottom: 0,
   },
   close: {
@@ -137,15 +137,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 700,
   },
-  // La rangée chevauche la frontière visuel / feuille : hauteur nette nulle
-  // (marges négatives symétriques), peinte AU-DESSUS des deux voisins.
+  // La rangée flotte ENTIÈREMENT sur le visuel, juste au-dessus de la
+  // feuille (comme la référence) : à cheval, la moitié basse des cercles se
+  // fondait dans la feuille de même couleur et ils se lisaient en « bosses ».
   modes: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: Spacing.three,
     height: MODE_SIZE,
-    marginTop: -MODE_SIZE / 2,
-    marginBottom: -MODE_SIZE / 2,
+    marginTop: -(MODE_SIZE + Spacing.two),
+    marginBottom: Spacing.two,
     zIndex: 2,
   },
   modeCircle: {
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: SHEET,
   },
   sheetInner: {
-    paddingTop: MODE_SIZE / 2 + Spacing.three,
+    paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.three,
     gap: Spacing.three,
@@ -190,15 +191,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     alignItems: 'center',
   },
+  // Libellé SOMBRE sur mangue : blanc sur #FF9900 rend ~2:1 de contraste
+  // (le piège que le web a payé avec mangoDark) — l'inversion des pastilles.
   primaryLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 700,
+    color: SHEET,
+    fontSize: 15,
+    fontWeight: 600,
   },
   skipLabel: {
     color: Brand.mango,
-    fontSize: 15,
-    fontWeight: 600,
+    fontSize: 14,
+    fontWeight: 500,
   },
   pressed: {
     opacity: 0.7,
