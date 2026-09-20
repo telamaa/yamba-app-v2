@@ -6768,3 +6768,34 @@ qui n'existe pas encore dans l'app.
 | MOB29 | Rouvrir la même fiche le même jour, même appareil | Le compteur de vues n'a augmenté que d'une unité (dédoublonnage serveur par visiteur et par jour) |
 | MOB30 | Le trajet est dépublié ou masqué, puis la fiche est rouverte | « Trajet introuvable », identique à un id inventé |
 | MOB31 | Coupure réseau à l'ouverture de la fiche | Écran d'erreur avec un id `mob-…` ; « Réessayer » recharge |
+
+# L'accueil dans la poche · `feat/mobile-welcome`
+
+## Le besoin
+
+Un visiteur qui ouvre l'app pour la première fois doit comprendre en un écran ce que Yamba fait, voir
+que c'est VIVANT — des Voyageurs partent vraiment, vers de vraies destinations — et pouvoir agir en
+un toucher : chercher un trajet. L'accueil du site a été refondu autour d'un principe (« une page qui
+ne dit que du vrai ») ; l'accueil de l'app suit le même : aucune statistique inventée, aucune
+promesse d'écran qui n'existe pas, et la confiance annoncée par ses mécanismes, pas par des slogans.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-21** | L'accueil mobile ne montre que du vrai : les corridors affichés sont dérivés des trajets réellement publiés et réservables (les mêmes que la recherche montrerait). Aucun trajet — ou serveur injoignable — : la section disparaît, elle ne montre jamais un exemple ni un chiffre inventé. |
+| **RG-MOB-22** | Toucher un corridor ouvre la recherche PRÉREMPLIE (départ, destination) et l'exécute ; cette recherche est comptée par le serveur dans les statistiques de demande comme n'importe quelle autre (RG-MOB-14). |
+| **RG-MOB-23** | L'app n'a qu'UN formulaire de recherche : l'onglet Rechercher. L'accueil y mène (CTA, corridors), il ne le duplique pas. |
+| **RG-MOB-24** | La confiance est annoncée par ses mécanismes réels — paiement séquestré jusqu'à la livraison, remise contre code confidentiel, profils et billets vérifiés — jamais par des compteurs ou des avis. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB32 | Visiteur, premier lancement | Accroche du site, CTA « Chercher un trajet », ligne de confiance, « comment ça marche » ; aucune note de chantier |
+| MOB33 | Des trajets sont publiés | Jusqu'à six corridors, les plus fournis d'abord, chacun avec son nombre de trajets |
+| MOB34 | Toucher « Paris → Brazzaville » | L'onglet Rechercher s'ouvre, champs préremplis, résultats déjà en cours de chargement |
+| MOB35 | Revenir à l'accueil et retoucher le MÊME corridor | La recherche se relance ; en revanche, revenir sur l'onglet Rechercher sans passer par l'accueil ne la relance pas |
+| MOB36 | Gateway coupé au lancement | L'accueil s'affiche entier, simplement sans la section corridors — rien ne casse, aucune erreur affichée |
+| MOB37 | Basculer « J'envoie un colis » / « Je voyage » | Les quatre étapes de la face choisie ; les textes du site, dans la langue de l'écran |
+| MOB38 | Session ouverte | « Bonjour {prénom} » sous l'accroche ; le lien « Se connecter » a disparu |
