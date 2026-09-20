@@ -1,7 +1,7 @@
 {
   "bar": {
-    "home": "Accueil",
     "search": "Rechercher",
+    "publish": "Publier",
     "trips": "Trajets",
     "messages": "Messages",
     "profile": "Profil"
@@ -10,6 +10,11 @@
     "title": "Connecte-toi pour continuer",
     "body": "Cet espace est réservé aux membres : tes trajets, tes messages et ton profil t'attendent derrière la connexion.",
     "cta": "Se connecter"
+  },
+  "publish": {
+    "title": "Publie ton trajet",
+    "body": "Destination, date, kilos disponibles, ton prix au kilo : la publication arrive dans un prochain lot de l'app.",
+    "note": "En attendant, publie ton trajet depuis le site — il apparaîtra ici."
   },
   "trips": {
     "title": "Mes trajets",

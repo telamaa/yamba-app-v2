@@ -31,7 +31,9 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
       style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
       <ThemedView type="backgroundElement" style={styles.card}>
       <View style={styles.row}>
-        <ThemedText type="smallBold" style={styles.route} numberOfLines={1}>
+        {/* Villes EN ENTIER (revue sur captures) : la troncature « Bruxel… »
+            de la carte web n'est pas reproduite — le nom passe à la ligne. */}
+        <ThemedText type="smallBold" style={styles.route}>
           {trip.fromCity} → {trip.toCity}
         </ThemedText>
         <ThemedText type="smallBold">

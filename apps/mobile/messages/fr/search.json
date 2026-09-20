@@ -1,14 +1,25 @@
 {
   "form": {
+    "fromLabel": "Départ",
     "fromPlaceholder": "Ville de départ",
+    "toLabel": "Destination",
     "toPlaceholder": "Ville d'arrivée",
-    "submit": "Rechercher",
-    "dates": {
-      "any": "Toutes les dates",
-      "today": "Aujourd'hui",
-      "tomorrow": "Demain",
-      "week": "7 prochains jours"
-    }
+    "dateLabel": "Date",
+    "datePlaceholder": "Choisis une date",
+    "dateAny": "Toutes les dates",
+    "dateClear": "Effacer la date",
+    "dateConfirm": "OK",
+    "cancel": "Annuler",
+    "submit": "Rechercher"
+  },
+  "summary": {
+    "edit": "Modifier",
+    "everywhere": "Partout"
+  },
+  "corridors": {
+    "label": "En ce moment",
+    "title": "Des Voyageurs partent bientôt",
+    "tripCount": "{count, plural, one {# trajet} other {# trajets}}"
   },
   "prompt": "Cherche un trajet : une ville de départ, une destination — ou lance sans rien pour parcourir l'offre.",
   "results": "{count, plural, one {# trajet} other {# trajets}}",

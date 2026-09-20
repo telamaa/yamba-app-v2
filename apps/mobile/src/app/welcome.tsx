@@ -27,7 +27,7 @@ import { dismissWelcome } from '@/lib/welcome-state';
 
 const SHEET = '#151718';
 const WARM = '#FFF6EA';
-const MODE_SIZE = 52;
+const MODE_SIZE = 44;
 
 /** Les trois modes de transport du produit, et le colis qui voyage. */
 const MODES = [
@@ -80,7 +80,7 @@ export default function WelcomeScreen() {
           <View key={mode.key} style={styles.modeCircle}>
             <SymbolView
               name={mode.ios}
-              size={22}
+              size={19}
               tintColor={Brand.mango}
               fallback={<Text style={styles.modeEmoji}>{mode.emoji}</Text>}
             />
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modeEmoji: {
-    fontSize: 20,
+    fontSize: 17,
   },
   sheet: {
     backgroundColor: SHEET,
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     backgroundColor: Brand.mango,
     borderRadius: 999,
-    paddingVertical: Spacing.three,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   // Libellé SOMBRE sur mangue : blanc sur #FF9900 rend ~2:1 de contraste
