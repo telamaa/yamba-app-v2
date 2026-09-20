@@ -796,6 +796,32 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 20/09 : **LA PAGE TRAJET MOBILE — LA FICHE PUBLIQUE DU SITE, LA VUE COMPTEE SERVEUR, A205 (#379).**
+  La carte de resultat s'ouvre enfin : `app/trip/[id].tsx` pousse la fiche PAR-DESSUS les onglets (le
+  retour garde les resultats) et consomme le MEME endpoint que le web — `GET /trips/:id/public`,
+  authentification optionnelle, AUCUN endpoint mobile : visibilite (masque/depublie/supprime → 404
+  indiscernable, ANO-API-02), prix en CENTS convertis a l'affichage, familles D14, lieux, profil du
+  Voyageur — tout etait deja dans le DTO. ARBITRAGE A205 (instruit comme note au chapitre 205) : la
+  vue est comptee serveur (une par visiteur/jour via viewerKey) ; un visiteur mobile ANONYME derriere
+  le CGNAT d'un operateur partage IP et user-agent quasi uniforme → des visiteurs distincts confondus
+  sous une meme cle : le compteur SOUS-estime, jamais il ne gonfle — assume (signal de presentation,
+  « Populaire » a 20) ; l'identifiant d'appareil cote client (un traceur de plus pour un compteur
+  indicatif) est REFUSE. Ecran : en-tete (vues, Populaire, Billet verifie), itineraire (date longue,
+  horaires LOCAUX du billet, duree, mode + variante + escales), offre PER_KG (€/kg, kg restants,
+  estimation 2 kg aux planchers du site D13/D16/D32, 8 familles ✓ / +X % / barree, forfaits bagage),
+  categories legacy, lieux remise/livraison, conditions, Voyageur (avatar ou initiales, note ou
+  « Nouveau Voyageur », badges, stats, bio), notes. AUCUN bouton « Reserver » : une ligne honnete
+  renvoie vers le site (le wizard est le lot suivant). trip-format.ts + pricing-example.ts : MIROIRS
+  assumes des fichiers web du meme nom, consignes dans A205 avec leur porte de sortie (paquet partage
+  au troisieme front). i18n : namespace tripDetail FR/EN — les libelles de lieux, bilingues EN DUR
+  dans le LocationsCard web (legacy), passent ici par le dictionnaire. PROUVE : typecheck 10/10, i18n
+  vert (30 espaces), bundle Hermes --clear avec marqueurs FR accentues + EN dans LES DEUX encodages
+  (lecon A204), temoin faux a 0. PIEGE TROUVE : `expo export` ne regenere PAS `.expo/types/router.d.ts`
+  (routes typees, gitignore) — seul `expo start` le fait ; un poste au .expo rassis refuse la nouvelle
+  route (TS2322) quand la CI, sans .expo, passe. Pitfalls du 19/09 appliques a la relecture (ReactNode
+  de react, narrowing par capture de valeur, teinte tint au lieu du teal brut). Aucune dependance
+  ajoutee, services intouches, tests plateforme INCHANGES (1576). RG-MOB-17..20, MOB26-31, chapitre
+  206. AUCUNE attribution Claude.
 - 19/09 (suite 4) : **LA RECHERCHE MOBILE — MEME ENDPOINT QUE LE WEB, CORRELATION PAR REQUETE, A204 (#376).**
   Premier parcours reel de l'app : l'onglet Rechercher appelle `GET /trips/search` — les parametres du
   web, la meme page `{ trips, nextCursor, totalCount }`, AUCUN endpoint mobile (le contrat etait deja
