@@ -6,11 +6,13 @@
  * JS — le thème sombre et le tactile sont idiomatiques d'office. Icônes SF
  * Symbols (iOS) + Material Symbols (Android), variante pleine à la sélection.
  *
- * Cinq onglets plein-app : Accueil, Rechercher (publics), Trajets, Messages,
- * Profil (derrière la porte d'identité — la porte est DANS l'écran, l'onglet
- * reste visible : on montre la porte, jamais un onglet caché). La barre du
- * dashboard web (#355) est celle d'un espace membre ; la correspondance est
- * documentée au registre (A203).
+ * Cinq onglets plein-app, RECHERCHE-FIRST (lot recherche-first — l'onglet
+ * Accueil a disparu, Rechercher est l'atterrissage) : Rechercher (public),
+ * Publier (l'offre dans la barre, porte d'identité dans l'écran), Trajets,
+ * Messages, Profil (derrière la porte d'identité — la porte est DANS
+ * l'écran, l'onglet reste visible : on montre la porte, jamais un onglet
+ * caché). La correspondance avec la barre web est documentée au registre
+ * (A203, puis le lot recherche-first).
  *
  * Badges : « à traiter » du Voyageur (A44) sur Trajets, non-lus serveur sur
  * Messages — même plafond d'affichage « 9+ » que la barre web.
@@ -40,13 +42,16 @@ export default function TabsLayout() {
       tintColor={colorScheme === 'dark' ? Brand.mango : Brand.mangoDark}
       badgeBackgroundColor={Brand.mango}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
-        <NativeTabs.Trigger.Label>{t('bar.home')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="search">
         <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
         <NativeTabs.Trigger.Label>{t('bar.search')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="publish">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'plus.circle', selected: 'plus.circle.fill' }}
+          md="add_circle"
+        />
+        <NativeTabs.Trigger.Label>{t('bar.publish')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="trips">

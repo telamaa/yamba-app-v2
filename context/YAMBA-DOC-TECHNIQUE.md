@@ -11763,3 +11763,58 @@ visiteur mobile anonyme derrière CGNAT (arbitrage A205).
 - Pitfalls du 19/09 appliqués à la relecture : `ReactNode` importé de `react`, narrowing par CAPTURE
   de valeur (`ratedCarrier`), teal remplacé par la teinte `tint` du thème (le #0F766E est illisible
   en sombre).
+
+# L'accueil mobile — l'accueil web transposé · `feat/mobile-welcome`
+
+## Le déclencheur
+
+Depuis le lot onglets (A203), l'onglet Accueil était la coquille du socle : l'accroche, un bouton
+« Se connecter » et une note qui promettait la suite. Avec la recherche (A204) et la page trajet
+(A205) livrées, l'app avait un vrai parcours de découverte — mais son accueil ne l'annonçait pas et
+ne menait nulle part. Ce lot transpose l'accueil web refondu (#357, « une page qui ne dit que du
+vrai ») à l'écran de téléphone. GO du 20/09 — périmètre reproposé et reconfirmé après un
+redémarrage du poste (la branche existait, la conversation du GO était perdue).
+
+## Ce qui a été fait
+
+- **`app/(tabs)/index.tsx` réécrit** — un `ScrollView` en quatre blocs, tous VRAIS :
+  1. **Hero** : la marque, l'accroche et le sous-titre du web (mêmes phrases, namespace `home`),
+     salutation « Bonjour {prénom} » quand la session est ouverte (tutoiement, décisions 03/09),
+     CTA « Chercher un trajet » qui BASCULE d'onglet (`router.navigate('/(tabs)/search')`) — PAS de
+     barre de recherche dupliquée : la recherche EST un onglet, deux formulaires divergeraient.
+     Visiteur : le lien « Se connecter » (modale `/login`) reste, en secondaire.
+  2. **Ligne de confiance** : les trois mécanismes du hero web — séquestre Stripe, code
+     confidentiel, profils et billets vérifiés. Des mécanismes, jamais des chiffres.
+  3. **Corridors réels** : MÊME dérivation que `CorridorsSection` du web (miroir assumé, consigné
+     dans A206 comme `trip-format.ts` l'est dans A205) — échantillon `GET /trips/search` limit 50,
+     agrégation ville→ville à l'affichage, tri par volume, six au plus. Zéro trajet OU API en
+     panne → la section DISPARAÎT (état `null`), elle ne montre jamais du faux et n'affiche pas
+     d'erreur : une section de découverte en panne s'efface, elle n'inquiète pas.
+  4. **« Comment ça marche »** à deux faces (« J'envoie un colis » / « Je voyage ») : les quatre
+     étapes de chaque face du web, en puces + pastilles numérotées mangue.
+  La `socleNote` disparaît — et ses clés avec elle (`socleNote`, `connectedAs`) : pas de clé morte
+  (leçon A203).
+- **Le préremplissage** — la transposition mobile du brouillon `sessionStorage` du web (WEB-ACC-9) :
+  un corridor touché part en PARAMÈTRES DE ROUTE —
+  `router.navigate({ pathname: '/(tabs)/search', params: { from, to, seed } })`. Côté
+  `search.tsx` : `useLocalSearchParams` + une ref du dernier `seed` appliqué — le préremplissage ne
+  rejoue que quand la GRAINE change (retaper le même corridor relance la recherche ; revenir sur
+  l'onglet ne la rejoue pas), remplit les champs, remet la fenêtre « Toutes les dates » et LANCE la
+  recherche. Elle passe par `searchTrips` comme toutes les autres : le serveur la compte dans les
+  stats corridor (RG-MOB-14), zéro code dédié.
+- **`runSearch` refactorée en `runSearchWith(params)`** : le préremplissage cherche avec des valeurs
+  EXPLICITES — l'état React qu'il vient de poser n'est pas encore relu par `currentParams()` au
+  moment où la recherche part (le `setState` n'est pas synchrone).
+- **i18n** : namespace `home` refondu FR/EN (hero, confiance, corridors, deux faces × quatre
+  étapes) — les phrases du web reprises telles quelles, pluriel ICU sur `tripCount`.
+
+## Vérifié
+
+- Typecheck **10/10** (`npx nx run-many --target=typecheck --all --skip-sync`, la commande CI).
+- Contrôle i18n vert (miroir FR/EN, 30 espaces + mobile) + contre-épreuve ROUGE : `searchCta`
+  retirée du EN → `clé manquante : searchCta`, restaurée, revert au vert.
+- Bundle Hermes Android `expo export --clear` : six marqueurs FR accentués (« Des Voyageurs partent
+  bientôt », « Comment ça marche », « Paiement bloqué jusqu'à la livraison ») et EN (« Travelers are
+  leaving soon », « I'm sending a parcel ») cherchés dans LES DEUX encodages (UTF-16-LE + UTF-8,
+  leçon A204) — tous à 1, témoin faux à 0.
+- Aucune dépendance ajoutée, services intouchés, tests plateforme INCHANGÉS (1576).

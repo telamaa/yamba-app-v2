@@ -2823,3 +2823,96 @@ signal de popularité.
   attend la porte de connexion contextuelle ; les deux sont notés dans A205 comme écartés, pas oubliés.
 - Le deep link `yamba://trip/<id>` existe DÉJÀ à moitié : le `scheme` est dans `app.json` et la route
   existe — le lot deep links n'aura qu'à brancher les liens universels.
+
+## Chapitre 207 — Les paramètres de route comme messages : la graine qui fait l'événement, et l'état React qu'on ne relit pas trop tôt
+
+### Ce qu'on construisait
+
+L'accueil mobile (`feat/mobile-welcome`, A206) : transposer l'accueil web refondu (#357) dans
+l'onglet Accueil, avec des corridors réels qui, au toucher, ouvrent l'onglet Rechercher PRÉREMPLI et
+lancent la recherche. Tout le lot tient dans `apps/mobile/src/app/(tabs)/index.tsx` et deux retouches
+de `search.tsx` — mais il enseigne trois idées qui dépassent l'écran.
+
+### 1. Faire passer un message entre deux onglets : les paramètres de route… et leur piège
+
+Sur le web, le corridor touché sème un BROUILLON en `sessionStorage` et navigue ; `/search` le relit
+en arrivant (WEB-ACC-9). Le mobile n'a pas de `sessionStorage` partagé entre écrans — mais
+expo-router a mieux : les paramètres de route.
+
+```tsx
+// index.tsx — l'accueil envoie
+router.navigate({
+  pathname: '/(tabs)/search',
+  params: { from: corridor.fromCity, to: corridor.toCity, seed: Date.now().toString(36) },
+});
+
+// search.tsx — l'onglet reçoit
+const prefill = useLocalSearchParams<{ from?: string; to?: string; seed?: string }>();
+```
+
+Le piège : un paramètre de route est un ÉTAT, pas un ÉVÉNEMENT. Il reste accroché à l'écran — revenir
+sur l'onglet Rechercher trois jours plus tard le retrouve intact, et un `useEffect` naïf sur
+`[prefill.from, prefill.to]` rejouerait la recherche à chaque retour. Et l'inverse aussi : retaper le
+MÊME corridor produit les MÊMES paramètres — aucun changement, aucun effet, l'utilisateur touche et
+rien ne se passe.
+
+La solution tient en un mot : une GRAINE (`seed`). L'accueil en fabrique une NOUVELLE à chaque
+toucher (`Date.now().toString(36)`), et le récepteur ne rejoue le préremplissage que quand ELLE
+change :
+
+```tsx
+const appliedSeed = useRef<string | null>(null);
+useEffect(() => {
+  if (typeof prefill.seed !== 'string' || prefill.seed === appliedSeed.current) return;
+  appliedSeed.current = prefill.seed;
+  // …remplir les champs, lancer la recherche
+}, [prefill.seed, prefill.from, prefill.to, runSearchWith]);
+```
+
+La graine transforme un état en front montant : même corridor retapé → graine neuve → rejoué ;
+simple retour d'onglet → graine connue → silence. C'est le même motif qu'un `nonce` d'événement — et
+la `ref` (pas un `useState`) porte la mémoire SANS provoquer de re-rendu.
+
+### 2. `setState` n'est pas synchrone : chercher avec des valeurs EXPLICITES
+
+Le préremplissage pose `setFrom(nextFrom)` puis veut chercher. Or `runSearch()` lisait l'état via
+`currentParams()` — et l'état que React vient de recevoir n'est PAS encore visible dans la fermeture
+courante : la recherche serait partie avec les CHAMPS D'AVANT. D'où la refactorisation :
+
+```tsx
+const runSearchWith = useCallback(async (params: SearchParams) => { /* fetch + états */ }, [t]);
+const runSearch = useCallback(() => runSearchWith(currentParams()), [runSearchWith, currentParams]);
+```
+
+Le bouton « Rechercher » continue de lire l'état (le clavier a eu le temps de le poser) ; le
+préremplissage, lui, passe ses valeurs EN ARGUMENT — celles qu'il vient de calculer, pas celles que
+React finira par exposer. Règle générale : quand un même geste pose l'état ET s'en sert, il ne le
+relit pas — il le transmet.
+
+### 3. La section qui préfère disparaître : `null` comme état honnête
+
+Les corridors sont DÉRIVÉS à l'affichage (même algorithme que `CorridorsSection` web : Map
+ville→ville, tri par volume, six au plus — miroir assumé, consigné dans A206 comme `trip-format.ts`
+l'est dans A205). L'état est `Corridor[] | null` — et `null` couvre TROIS cas : pas encore chargé,
+serveur en panne, zéro trajet. Les trois donnent le même rendu : PAS de section. Ni spinner (une
+section de découverte qui « charge » promet quelque chose), ni écran d'erreur (une panne de
+découverte n'inquiète pas l'utilisateur : elle s'efface). C'est la leçon #357 poussée un cran plus
+loin : une page qui ne dit que du vrai a le droit de ne rien dire.
+
+### Pièges à retenir
+
+- Un paramètre de route persiste : sans graine, l'effet rejoue au retour d'onglet OU ne rejoue pas
+  au deuxième toucher — les deux bugs à la fois.
+- `setState` puis « relire l'état » dans la même fermeture lit l'ANCIEN : transmettre la valeur.
+- Supprimer un bloc d'écran, c'est aussi supprimer SES CLÉS de message (`socleNote`, `connectedAs`)
+  — le contrôle i18n ne voit pas une clé morte, seulement une clé manquante.
+- La preuve de bundle sur du texte FR cherche TOUJOURS les deux encodages (UTF-16-LE + UTF-8,
+  leçon A204) avec un témoin faux à 0.
+
+### Pour aller plus loin
+
+Si un troisième écran veut un jour semer une recherche (une notification « nouveau trajet sur ton
+corridor », un deep link), le motif graine + paramètres est déjà le bon canal — et le jour où les
+corridors méritent un VRAI endpoint serveur (agrégation Mongo plutôt qu'un échantillon de 50), les
+deux fronts basculeront ensemble : la dérivation à l'affichage est consignée comme provisoire dans
+A206.
