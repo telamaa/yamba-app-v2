@@ -11,9 +11,10 @@
  * n'existent pas, dessinées fonctionnelles), case à cocher carrée avec
  * aide, lien teal souligné. Palette : `auth-theme.ts`.
  */
-import type { ReactNode, Ref } from 'react';
+import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -69,6 +70,68 @@ export function AuthTextField(props: TextInputProps & { ref?: Ref<TextInput> }) 
 
 /* ── CTA mangue ──────────────────────────────────────────────────────────── */
 
+const DOT_COUNT = 3;
+const DOT_CYCLE_MS = 900;
+const DOT_STAGGER_MS = 150;
+
+/**
+ * L'attente des CTA : trois points qui respirent en VAGUE (le motif du
+ * « typing indicator ») à la place du spinner système — `Animated` natif
+ * (`useNativeDriver`), zéro dépendance. Chaque point monte, gonfle et
+ * s'éclaire avec un décalage d'un tiers de cycle.
+ */
+function LoadingDots({ color }: { color: string }) {
+  const values = useRef(
+    Array.from({ length: DOT_COUNT }, () => new Animated.Value(0))
+  ).current;
+
+  useEffect(() => {
+    const loops = values.map((value, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * DOT_STAGGER_MS),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: DOT_CYCLE_MS / 3,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(value, {
+            toValue: 0,
+            duration: DOT_CYCLE_MS / 3,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.delay((DOT_COUNT - 1 - i) * DOT_STAGGER_MS),
+        ])
+      )
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [values]);
+
+  return (
+    <View style={styles.dotsRow} accessibilityRole="progressbar">
+      {values.map((value, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.dot,
+            {
+              backgroundColor: color,
+              opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+              transform: [
+                { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) },
+                { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function AuthCta({
   label,
   onPressAction,
@@ -85,12 +148,9 @@ export function AuthCta({
     <Pressable
       onPress={onPressAction}
       disabled={disabled || pending}
-      style={({ pressed }) => [
-        styles.cta,
-        (disabled || pending || pressed) && styles.dimmed,
-      ]}>
+      style={({ pressed }) => [styles.cta, (disabled || pressed) && styles.dimmed]}>
       {pending ? (
-        <ActivityIndicator color={palette.ctaLabel} />
+        <LoadingDots color={palette.ctaLabel} />
       ) : (
         <Text style={[styles.ctaLabel, { color: palette.ctaLabel }]}>{label}</Text>
       )}
@@ -242,6 +302,19 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontSize: 17,
     fontWeight: 700,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    // La hauteur de la ligne du libellé : le bouton ne bouge pas d'un pixel
+    // quand le texte cède la place aux points.
+    height: 24,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   divider: {
     flexDirection: 'row',
