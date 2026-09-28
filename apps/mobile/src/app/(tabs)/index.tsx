@@ -7,13 +7,18 @@
  * Destination / Date empilés avec leurs libellés, la date par le VRAI
  * sélecteur de chaque OS (`NativeDateField`), un seul bouton. Après une
  * recherche, la carte se REPLIE en pilule récap (route · date · Modifier) —
- * l'écran respire pour les résultats. Au repos, les corridors réels
+ * l'écran respire pour les résultats. En mode résultats, la pilule et les
+ * pastilles transport RESTENT collées en haut sur un fond flouté (expo-blur :
+ * matériau chrome iOS ; Android passe par `BlurTargetView` + `blurMethod`,
+ * repli translucide avant Android 12) — la liste défile dessous, jusque sous
+ * la barre de statut (motif iOS/Airbnb). Au repos, les corridors réels
  * (« En ce moment ») rendent l'écran vivant : un toucher remplit les champs
  * et lance la recherche — même écran, zéro navigation. Le serveur décide de
  * tout (RG-MOB-13/14) : filtres, tri, textes localisés, comptage.
  */
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { BlurTargetView, BlurView } from 'expo-blur';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,7 +28,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
 
@@ -121,6 +126,13 @@ export default function SearchScreen() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   // null tant que rien de vrai à montrer (chargement, panne, zéro trajet).
   const [corridors, setCorridors] = useState<Corridor[] | null>(null);
+  // En-tête collant flouté (mode liste) : hauteur mesurée pour dégager le
+  // haut de la liste, encoche gérée à la main (le SafeAreaView ne pousse
+  // plus le haut — la liste doit passer SOUS la barre de statut).
+  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(0);
+  // La cible Android du flou (iOS floute nativement ce qui passe dessous).
+  const blurTargetRef = useRef<View | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,165 +287,294 @@ export default function SearchScreen() {
             : t('title.noFilter');
   const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
 
-  // Titre + sous-titre + pastilles transport : le haut de la page de
-  // résultats (réf. capture 17h08), partagé entre la liste et l'état vide.
-  const resultsHeader = (
+  // La barre du haut : pilule récap + bouton Filtres, ou le formulaire
+  // déplié — partagée entre le flux normal et l'en-tête collant du mode liste.
+  const searchBar = formCollapsed ? (
+    <View style={styles.summaryRow}>
+      {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres.
+          Les styles vivent SUR les Pressable (pas de ThemedView flex
+          dans un parent à hauteur auto : Yoga rendait la pilule vide). */}
+      <Pressable
+        onPress={() => setFormCollapsed(false)}
+        style={({ pressed }) => [
+          styles.summary,
+          { backgroundColor: theme.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <Ionicons name="search" size={18} color={theme.textSecondary} />
+        <View style={styles.summaryTexts}>
+          <ThemedText type="smallBold" numberOfLines={1}>
+            {summaryRoute}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+            {summaryDate}
+          </ThemedText>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={() => setFiltersOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('filters.title')}
+        style={({ pressed }) => [
+          styles.filtersButton,
+          { backgroundColor: theme.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <Ionicons name="options-outline" size={18} color={theme.text} />
+        <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
+      </Pressable>
+    </View>
+  ) : (
+    <ThemedView type="backgroundElement" style={styles.form}>
+      <Pressable style={styles.fieldRow} onPress={() => setCityPicker('from')}>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
+          {t('form.fromLabel')}
+        </ThemedText>
+        <ThemedText
+          style={styles.fieldValue}
+          themeColor={from ? undefined : 'textSecondary'}
+          numberOfLines={1}>
+          {from || t('form.fromPlaceholder')}
+        </ThemedText>
+      </Pressable>
+      <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
+      <Pressable style={styles.fieldRow} onPress={() => setCityPicker('to')}>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
+          {t('form.toLabel')}
+        </ThemedText>
+        <ThemedText
+          style={styles.fieldValue}
+          themeColor={to ? undefined : 'textSecondary'}
+          numberOfLines={1}>
+          {to || t('form.toPlaceholder')}
+        </ThemedText>
+      </Pressable>
+      <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
+      <View style={styles.dateRow}>
+        <Pressable style={styles.dateTouch} onPress={() => setPickerOpen(true)}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
+            {t('form.dateLabel')}
+          </ThemedText>
+          <ThemedText
+            style={styles.dateValue}
+            themeColor={date !== null ? undefined : 'textSecondary'}>
+            {date !== null
+              ? formatLongDate(date.toISOString(), locale)
+              : t('form.datePlaceholder')}
+          </ThemedText>
+        </Pressable>
+        {date !== null && (
+          <Pressable
+            onPress={() => setDate(null)}
+            hitSlop={Spacing.two}
+            accessibilityLabel={t('form.dateClear')}>
+            <ThemedText themeColor="textSecondary">✕</ThemedText>
+          </Pressable>
+        )}
+      </View>
+      <Pressable
+        onPress={runSearch}
+        disabled={state.kind === 'loading'}
+        style={({ pressed }) => [
+          styles.submit,
+          (state.kind === 'loading' || pressed) && styles.submitDimmed,
+        ]}>
+        <ThemedText style={styles.submitLabel}>{t('form.submit')}</ThemedText>
+      </Pressable>
+    </ThemedView>
+  );
+
+  // Pastilles transport : collées sous la barre récap en mode résultats —
+  // elles restent le chemin de sortie d'un filtre à zéro résultat.
+  const transportTabs = state.kind !== 'results' ? null : (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabsScroll}
+      contentContainerStyle={styles.tabs}>
+      {TRANSPORT_TABS.map((tab) => {
+        const active = mode === tab.key;
+        const activeText = dark ? '#FFB84D' : theme.text;
+        return (
+          <Pressable
+            key={tab.key}
+            onPress={() => pickMode(tab.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            style={[
+              styles.tab,
+              active
+                ? {
+                    backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
+                    borderColor: 'rgba(255,153,0,0.5)',
+                  }
+                : { backgroundColor: theme.backgroundElement, borderColor: 'transparent' },
+            ]}>
+            {tab.icon !== null && (
+              <Ionicons
+                name={tab.icon}
+                size={13}
+                color={active ? activeText : theme.textSecondary}
+              />
+            )}
+            <ThemedText
+              type="smallBold"
+              style={{ color: active ? activeText : theme.textSecondary }}>
+              {t(`tabs.${tab.key}`)}
+            </ThemedText>
+            <View
+              style={[
+                styles.tabCount,
+                { backgroundColor: active ? 'rgba(255,153,0,0.2)' : theme.backgroundSelected },
+              ]}>
+              <ThemedText
+                style={[
+                  styles.tabCountText,
+                  { color: active ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary },
+                ]}>
+                {modeCounts[tab.key]}
+              </ThemedText>
+            </View>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
+  // Titre + sous-titre : eux DÉFILENT avec la liste (seuls la barre récap et
+  // les pastilles collent) — réf. capture 17h08 pour les textes.
+  const resultsTitle = (
     <View style={styles.resultsHeader}>
       <ThemedText type="subtitle">{dynamicTitle}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {t('subtitleHint')}
       </ThemedText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabsScroll}
-        contentContainerStyle={styles.tabs}>
-        {TRANSPORT_TABS.map((tab) => {
-          const active = mode === tab.key;
-          const activeText = dark ? '#FFB84D' : theme.text;
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => pickMode(tab.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={[
-                styles.tab,
-                active
-                  ? {
-                      backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
-                      borderColor: 'rgba(255,153,0,0.5)',
-                    }
-                  : { backgroundColor: theme.backgroundElement, borderColor: 'transparent' },
-              ]}>
-              {tab.icon !== null && (
-                <Ionicons
-                  name={tab.icon}
-                  size={13}
-                  color={active ? activeText : theme.textSecondary}
-                />
-              )}
-              <ThemedText
-                type="smallBold"
-                style={{ color: active ? activeText : theme.textSecondary }}>
-                {t(`tabs.${tab.key}`)}
-              </ThemedText>
-              <View
-                style={[
-                  styles.tabCount,
-                  { backgroundColor: active ? 'rgba(255,153,0,0.2)' : theme.backgroundSelected },
-                ]}>
-                <ThemedText
-                  style={[
-                    styles.tabCountText,
-                    { color: active ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary },
-                  ]}>
-                  {modeCounts[tab.key]}
-                </ThemedText>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
     </View>
   );
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {formCollapsed ? (
-          <View style={styles.summaryRow}>
-            {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres.
-                Les styles vivent SUR les Pressable (pas de ThemedView flex
-                dans un parent à hauteur auto : Yoga rendait la pilule vide). */}
-            <Pressable
-              onPress={() => setFormCollapsed(false)}
-              style={({ pressed }) => [
-                styles.summary,
-                { backgroundColor: theme.backgroundElement },
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons name="search" size={18} color={theme.textSecondary} />
-              <View style={styles.summaryTexts}>
-                <ThemedText type="smallBold" numberOfLines={1}>
-                  {summaryRoute}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  {summaryDate}
-                </ThemedText>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        {state.kind === 'results' && state.page.trips.length > 0 ? (
+          <>
+            {/* La cible du flou Android : tout ce qui passe sous l'en-tête.
+                Sur iOS c'est un simple View, le flou est natif. */}
+            <BlurTargetView ref={blurTargetRef} style={styles.listArea}>
+              <FlatList<TripSearchResult>
+                data={state.page.trips}
+                keyExtractor={(trip) => trip.id}
+                renderItem={({ item }) => <TripResultCard trip={item} />}
+                ListHeaderComponent={
+                  <View>
+                    {resultsTitle}
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
+                      {t('results', { count: state.page.totalCount })}
+                    </ThemedText>
+                  </View>
+                }
+                ListFooterComponent={
+                  state.loadingMore ? (
+                    <ActivityIndicator color={Brand.mango} style={styles.spinner} />
+                  ) : null
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.4}
+                contentContainerStyle={[styles.list, { paddingTop: headerHeight }]}
+                scrollIndicatorInsets={{ top: Math.max(0, headerHeight - insets.top) }}
+                keyboardShouldPersistTaps="handled"
+              />
+            </BlurTargetView>
+            {/* L'en-tête collant : barre récap (ou formulaire rouvert) +
+                pastilles sur fond flouté, encoche comprise. Sa hauteur mesurée
+                dégage le haut de la liste (une frame de latence, invisible). */}
+            <View
+              style={styles.stickyHeader}
+              onLayout={(event) => setHeaderHeight(Math.round(event.nativeEvent.layout.height))}>
+              <BlurView
+                style={StyleSheet.absoluteFill}
+                tint={dark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+                intensity={90}
+                blurMethod="dimezisBlurViewSdk31Plus"
+                blurTarget={blurTargetRef}
+              />
+              <View style={[styles.stickyContent, { paddingTop: insets.top }]}>
+                {searchBar}
+                {transportTabs}
               </View>
-            </Pressable>
-            <Pressable
-              onPress={() => setFiltersOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel={t('filters.title')}
-              style={({ pressed }) => [
-                styles.filtersButton,
-                { backgroundColor: theme.backgroundElement },
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons name="options-outline" size={18} color={theme.text} />
-              <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <ThemedView type="backgroundElement" style={styles.form}>
-            <Pressable style={styles.fieldRow} onPress={() => setCityPicker('from')}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-                {t('form.fromLabel')}
-              </ThemedText>
-              <ThemedText
-                style={styles.fieldValue}
-                themeColor={from ? undefined : 'textSecondary'}
-                numberOfLines={1}>
-                {from || t('form.fromPlaceholder')}
-              </ThemedText>
-            </Pressable>
-            <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
-            <Pressable style={styles.fieldRow} onPress={() => setCityPicker('to')}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-                {t('form.toLabel')}
-              </ThemedText>
-              <ThemedText
-                style={styles.fieldValue}
-                themeColor={to ? undefined : 'textSecondary'}
-                numberOfLines={1}>
-                {to || t('form.toPlaceholder')}
-              </ThemedText>
-            </Pressable>
-            <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
-            <View style={styles.dateRow}>
-              <Pressable style={styles.dateTouch} onPress={() => setPickerOpen(true)}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-                  {t('form.dateLabel')}
-                </ThemedText>
-                <ThemedText
-                  style={styles.dateValue}
-                  themeColor={date !== null ? undefined : 'textSecondary'}>
-                  {date !== null
-                    ? formatLongDate(date.toISOString(), locale)
-                    : t('form.datePlaceholder')}
-                </ThemedText>
-              </Pressable>
-              {date !== null && (
-                <Pressable
-                  onPress={() => setDate(null)}
-                  hitSlop={Spacing.two}
-                  accessibilityLabel={t('form.dateClear')}>
-                  <ThemedText themeColor="textSecondary">✕</ThemedText>
-                </Pressable>
-              )}
             </View>
-            <Pressable
-              onPress={runSearch}
-              disabled={state.kind === 'loading'}
-              style={({ pressed }) => [
-                styles.submit,
-                (state.kind === 'loading' || pressed) && styles.submitDimmed,
-              ]}>
-              <ThemedText style={styles.submitLabel}>{t('form.submit')}</ThemedText>
-            </Pressable>
-          </ThemedView>
+          </>
+        ) : (
+          <View style={[styles.flowArea, { paddingTop: insets.top }]}>
+            {searchBar}
+            {transportTabs}
+
+            {state.kind === 'idle' && (
+              <View style={styles.idle}>
+                <ThemedText themeColor="textSecondary" style={styles.centered}>
+                  {t('prompt')}
+                </ThemedText>
+                {corridors !== null && (
+                  <View style={styles.corridors}>
+                    <ThemedText
+                      type="small"
+                      themeColor="textSecondary"
+                      style={styles.corridorsLabel}>
+                      {t('corridors.label')}
+                    </ThemedText>
+                    <ThemedText type="smallBold">{t('corridors.title')}</ThemedText>
+                    {corridors.map((corridor) => (
+                      <Pressable
+                        key={`${corridor.fromCity}→${corridor.toCity}`}
+                        onPress={() => openCorridor(corridor)}
+                        style={({ pressed }) => pressed && styles.pressed}>
+                        <ThemedView type="backgroundElement" style={styles.corridorChip}>
+                          <ThemedText type="smallBold" style={styles.corridorRoute}>
+                            {corridor.fromCity} <ThemedText style={styles.arrow}>→</ThemedText>{' '}
+                            {corridor.toCity}
+                          </ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            {t('corridors.tripCount', { count: corridor.count })}
+                          </ThemedText>
+                        </ThemedView>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {state.kind === 'loading' && (
+              <ActivityIndicator color={Brand.mango} style={styles.spinner} />
+            )}
+
+            {state.kind === 'error' && (
+              <View style={styles.stateBlock}>
+                <ThemedText style={styles.centered}>{state.message}</ThemedText>
+                {state.correlationId !== null && (
+                  <ThemedText type="code" themeColor="textSecondary" style={styles.centered}>
+                    {state.correlationId}
+                  </ThemedText>
+                )}
+                <Pressable onPress={runSearch}>
+                  <ThemedText type="linkPrimary">{t('error.retry')}</ThemedText>
+                </Pressable>
+              </View>
+            )}
+
+            {state.kind === 'results' && state.page.trips.length === 0 && (
+              <View>
+                {resultsTitle}
+                <View style={styles.stateBlock}>
+                  <ThemedText type="smallBold" style={styles.centered}>
+                    {t('empty.title')}
+                  </ThemedText>
+                  <ThemedText themeColor="textSecondary" style={styles.centered}>
+                    {t('empty.body')}
+                  </ThemedText>
+                </View>
+              </View>
+            )}
+          </View>
         )}
 
         <CityPicker
@@ -458,91 +599,6 @@ export default function SearchScreen() {
           }}
           onDismissAction={() => setPickerOpen(false)}
         />
-
-        {state.kind === 'idle' && (
-          <View style={styles.idle}>
-            <ThemedText themeColor="textSecondary" style={styles.centered}>
-              {t('prompt')}
-            </ThemedText>
-            {corridors !== null && (
-              <View style={styles.corridors}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.corridorsLabel}>
-                  {t('corridors.label')}
-                </ThemedText>
-                <ThemedText type="smallBold">{t('corridors.title')}</ThemedText>
-                {corridors.map((corridor) => (
-                  <Pressable
-                    key={`${corridor.fromCity}→${corridor.toCity}`}
-                    onPress={() => openCorridor(corridor)}
-                    style={({ pressed }) => pressed && styles.pressed}>
-                    <ThemedView type="backgroundElement" style={styles.corridorChip}>
-                      <ThemedText type="smallBold" style={styles.corridorRoute}>
-                        {corridor.fromCity} <ThemedText style={styles.arrow}>→</ThemedText>{' '}
-                        {corridor.toCity}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {t('corridors.tripCount', { count: corridor.count })}
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {state.kind === 'loading' && <ActivityIndicator color={Brand.mango} style={styles.spinner} />}
-
-        {state.kind === 'error' && (
-          <View style={styles.stateBlock}>
-            <ThemedText style={styles.centered}>{state.message}</ThemedText>
-            {state.correlationId !== null && (
-              <ThemedText type="code" themeColor="textSecondary" style={styles.centered}>
-                {state.correlationId}
-              </ThemedText>
-            )}
-            <Pressable onPress={runSearch}>
-              <ThemedText type="linkPrimary">{t('error.retry')}</ThemedText>
-            </Pressable>
-          </View>
-        )}
-
-        {state.kind === 'results' && state.page.trips.length === 0 && (
-          <View>
-            {resultsHeader}
-            <View style={styles.stateBlock}>
-              <ThemedText type="smallBold" style={styles.centered}>
-                {t('empty.title')}
-              </ThemedText>
-              <ThemedText themeColor="textSecondary" style={styles.centered}>
-                {t('empty.body')}
-              </ThemedText>
-            </View>
-          </View>
-        )}
-
-        {state.kind === 'results' && state.page.trips.length > 0 && (
-          <FlatList<TripSearchResult>
-            data={state.page.trips}
-            keyExtractor={(trip) => trip.id}
-            renderItem={({ item }) => <TripResultCard trip={item} />}
-            ListHeaderComponent={
-              <View>
-                {resultsHeader}
-                <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
-                  {t('results', { count: state.page.totalCount })}
-                </ThemedText>
-              </View>
-            }
-            ListFooterComponent={
-              state.loadingMore ? <ActivityIndicator color={Brand.mango} style={styles.spinner} /> : null
-            }
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.4}
-            contentContainerStyle={styles.list}
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
 
         {/* Feuille « Filtres » : le tri serveur pour l'instant — les familles,
             le poids et les horaires suivront avec le formulaire de filtres. */}
@@ -595,6 +651,25 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
+  },
+  // Le flux « sans liste » (repos, chargement, panne, zéro trajet) : le haut
+  // sûr y est un padding manuel — le SafeAreaView ne porte plus l'encoche,
+  // pour que la liste du mode résultats puisse passer dessous.
+  flowArea: {
+    flex: 1,
+  },
+  listArea: {
+    flex: 1,
+  },
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  stickyContent: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.one,
   },
   form: {
     borderRadius: Spacing.three,
@@ -798,7 +873,8 @@ const styles = StyleSheet.create({
   list: {
     gap: Spacing.two,
     // La barre d'onglets FLOTTE sur le contenu : sans cette marge, la
-    // dernière carte meurt dessous (capture du 28/09 au soir).
+    // dernière carte meurt dessous (capture du 28/09 au soir). Le haut est
+    // dégagé dynamiquement par la hauteur mesurée de l'en-tête collant.
     paddingBottom: BottomTabInset + Spacing.six,
   },
 });
