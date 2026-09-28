@@ -13,11 +13,29 @@
  */
 import { apiFetch } from './client';
 
+/** Catégories de colis (mêmes clés que le web, `search-results.types.ts`). */
+export type SearchParcelCategory =
+  | 'clothes'
+  | 'shoes'
+  | 'fashion-accessories'
+  | 'other-accessories'
+  | 'books'
+  | 'documents'
+  | 'small-toys'
+  | 'phone'
+  | 'computer'
+  | 'other-electronics'
+  | 'checked-bag-23kg'
+  | 'cabin-bag-12kg';
+
 export type TripSearchResult = {
   id: string;
   fromCity: string;
+  /** Texte figé dans la locale du créateur — préférer fromCountryCode. */
+  fromCountry?: string;
   fromCountryCode?: string;
   toCity: string;
+  toCountry?: string;
   toCountryCode?: string;
   /** Déjà localisée par le serveur (« 12 juin 2026 » / « June 12, 2026 »). */
   travelDate: string;
@@ -26,6 +44,8 @@ export type TripSearchResult = {
   arrivalTime?: string;
   nextDay?: boolean;
   durationMinutes?: number;
+  /** Nombre d'escales (0 = direct). */
+  stopovers?: number;
   transportMode: 'plane' | 'train' | 'car';
   /** Euros — minimum des tarifs par catégorie (moteur legacy). */
   minPrice: number;
@@ -34,10 +54,20 @@ export type TripSearchResult = {
   /** Kilos encore disponibles (CAP-02). */
   remainingKg?: number | null;
   currency?: string;
+  /** Catégories acceptées par le Voyageur (aperçu en pied de carte). */
+  allowedCategories?: SearchParcelCategory[];
+  /** Places restantes — alerte rouge quand ≤ 3, absent = capacité illimitée. */
+  remainingSlots?: number;
   superTripper?: boolean;
+  /** D5 / C-PR6 — vues dédoublonnées ; « Populaire » à partir de 20. */
+  viewsCount?: number;
   rating?: number;
   reviewCount?: number;
+  /** D46 — favori du membre connecté (absent pour un visiteur). */
+  isFavorite?: boolean;
   travelerFirstName?: string;
+  /** Toujours JUSTE l'initiale (privacy par défaut, côté serveur). */
+  travelerLastName?: string;
   travelerAvatarUrl?: string;
 };
 

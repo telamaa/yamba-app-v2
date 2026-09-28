@@ -32,11 +32,19 @@
     "retry": "Try again"
   },
   "card": {
-    "fromLabel": "From",
-    "price": "{price} {currency}",
-    "perKg": "{price} {currency}/kg",
+    "fromPrice": "from",
+    "perKgLabel": "price per kg",
     "remainingKg": "{kg} kg left",
-    "rating": "★ {rating} ({count})",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# stop} other {# stops}}",
+    "remainingSlots": "{count, plural, one {# slot} other {# slots}}",
+    "newTripper": "New Traveler",
+    "popular": "Popular",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites",
+    "favoriteOwnTrip": "You cannot favorite your own trip",
+    "favoriteNotFavoritable": "This trip is no longer available",
+    "favoriteError": "Unable to update the favorite, please retry",
     "mode": {
       "plane": "Plane",
       "train": "Train",

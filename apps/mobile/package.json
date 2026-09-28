@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.19",
+    "@expo/vector-icons": "^15.0.2",
     "@formatjs/intl-displaynames": "^7.3.15",
     "@formatjs/intl-getcanonicallocales": "^3.2.12",
     "@formatjs/intl-locale": "^5.3.12",

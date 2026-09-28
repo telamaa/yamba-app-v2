@@ -32,11 +32,19 @@
     "retry": "Réessayer"
   },
   "card": {
-    "fromLabel": "À partir de",
-    "price": "{price} {currency}",
-    "perKg": "{price} {currency}/kg",
+    "fromPrice": "dès",
+    "perKgLabel": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
-    "rating": "★ {rating} ({count})",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# escale} other {# escales}}",
+    "remainingSlots": "{count, plural, one {# place} other {# places}}",
+    "newTripper": "Nouveau Voyageur",
+    "popular": "Populaire",
+    "favoriteAdd": "Ajouter aux favoris",
+    "favoriteRemove": "Retirer des favoris",
+    "favoriteOwnTrip": "Tu ne peux pas mettre ton propre trajet en favori",
+    "favoriteNotFavoritable": "Ce trajet n'est plus disponible",
+    "favoriteError": "Impossible de modifier le favori, réessaie",
     "mode": {
       "plane": "Avion",
       "train": "Train",
