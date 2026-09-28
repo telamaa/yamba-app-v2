@@ -34,7 +34,7 @@ import { NativeDateField } from '@/components/native-date-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
@@ -343,28 +343,37 @@ export default function SearchScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {formCollapsed ? (
           <View style={styles.summaryRow}>
-            {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres. */}
-            <Pressable style={styles.summaryTouch} onPress={() => setFormCollapsed(false)}>
-              <ThemedView type="backgroundElement" style={styles.summary}>
-                <Ionicons name="search" size={18} color={theme.textSecondary} />
-                <View style={styles.summaryTexts}>
-                  <ThemedText type="smallBold" numberOfLines={1} style={styles.summaryRoute}>
-                    {summaryRoute}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                    {summaryDate}
-                  </ThemedText>
-                </View>
-              </ThemedView>
+            {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres.
+                Les styles vivent SUR les Pressable (pas de ThemedView flex
+                dans un parent à hauteur auto : Yoga rendait la pilule vide). */}
+            <Pressable
+              onPress={() => setFormCollapsed(false)}
+              style={({ pressed }) => [
+                styles.summary,
+                { backgroundColor: theme.backgroundElement },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="search" size={18} color={theme.textSecondary} />
+              <View style={styles.summaryTexts}>
+                <ThemedText type="smallBold" numberOfLines={1}>
+                  {summaryRoute}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                  {summaryDate}
+                </ThemedText>
+              </View>
             </Pressable>
             <Pressable
               onPress={() => setFiltersOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel={t('filters.title')}>
-              <ThemedView type="backgroundElement" style={styles.filtersButton}>
-                <Ionicons name="options-outline" size={18} color={theme.text} />
-                <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
-              </ThemedView>
+              accessibilityLabel={t('filters.title')}
+              style={({ pressed }) => [
+                styles.filtersButton,
+                { backgroundColor: theme.backgroundElement },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="options-outline" size={18} color={theme.text} />
+              <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
             </Pressable>
           </View>
         ) : (
@@ -647,28 +656,23 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     marginBottom: Spacing.three,
   },
-  summaryTouch: {
-    flex: 1,
-    minWidth: 0,
-  },
   summary: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderRadius: 22,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   summaryTexts: {
     flex: 1,
     gap: 1,
   },
-  summaryRoute: {
-    flexShrink: 1,
-  },
   filtersButton: {
-    flex: 1,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
@@ -692,10 +696,10 @@ const styles = StyleSheet.create({
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   tabCount: {
@@ -793,6 +797,8 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.two,
-    paddingBottom: Spacing.five,
+    // La barre d'onglets FLOTTE sur le contenu : sans cette marge, la
+    // dernière carte meurt dessous (capture du 28/09 au soir).
+    paddingBottom: BottomTabInset + Spacing.six,
   },
 });

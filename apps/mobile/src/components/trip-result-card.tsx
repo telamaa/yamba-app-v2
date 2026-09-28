@@ -485,7 +485,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   endpoint: {
-    flex: 1,
+    // Les villes d'abord (revue sur captures : « Brazzavi… » tronqué alors
+    // que la colonne durée gaspillait sa largeur) : 1.2 contre 0.7.
+    flex: 1.2,
     gap: 2,
   },
   endpointRight: {
@@ -521,7 +523,8 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   middle: {
-    flex: 1,
+    flex: 0.7,
+    minWidth: 64,
     alignItems: 'center',
     paddingTop: 4,
     gap: 4,
