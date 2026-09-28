@@ -2996,3 +2996,70 @@ android` — l'export se limite aux plateformes natives et `dist/` apparaît. Mo
 sous d'autres formes : une commande « toutes plateformes » échoue sur la plateforme qu'on n'a
 jamais construite ; nommer explicitement ce qu'on veut est plus robuste que laisser l'outil
 deviner.
+
+## Chapitre 209 — L'auth en feuille : la pile dans la modale, le champ OTP invisible, et l'horloge qui ne dort pas
+
+### Une modale qui contient une pile (le groupe comme frontière de présentation)
+
+Le web étale l'auth sur six pages ; une app la plie en UNE feuille. Le moyen expo-router : un
+groupe de routes `(auth)` — qui ne change PAS les chemins, `/login` reste `/login` — déclaré
+`presentation: 'modal'` au layout racine, avec à l'intérieur son PROPRE `<Stack>`. Résultat :
+`router.push('/register')` depuis la connexion pousse une étape DANS la feuille (transition
+native, geste de retour de l'OS), et `router.dismiss()` referme le tout d'où qu'on soit. C'est
+la structure de navigation qui exprime l'intention produit : l'auth est une parenthèse au-dessus
+de l'app, pas une destination. À retenir : quand plusieurs écrans forment UN geste, donnez-leur
+un navigateur à eux ; la présentation (modale, push) se décide à la frontière, pas écran par
+écran.
+
+### Le champ OTP : un `TextInput` invisible vaut mieux que six
+
+Le web gère six `<input>` d'un caractère avec flèches, backspace et `onPaste` répartiteur
+(RegisterVerifyForm, ~150 lignes de gestion de focus). En natif, le motif est inverse
+(`otp-input.tsx`) : UN `TextInput` invisible (1×1, `opacity: 0`, `caretHidden`) porte TOUTE la
+valeur, six `View` l'affichent, toucher les cases redonne le focus. Tout ce qui coûtait devient
+gratuit : le collage d'un code entier (c'est UN champ), le clavier numérique, et surtout
+l'AUTOFILL de l'OS — `textContentType="oneTimeCode"` (iOS) / `autoComplete="sms-otp"` (Android)
+ne fonctionnent que sur un champ unique. La leçon dépasse l'OTP : avant de transposer un widget
+web composite, demandez-vous si l'OS n'a pas déjà le geste — la moitié du composant disparaît.
+
+### Trois compteurs, une horloge : l'échéance absolue
+
+L'écran OTP tient trois temps : l'expiration du code (10 min — le TTL serveur, affiché jamais
+décidé), le cooldown de renvoi (60 s) et le verrou serveur (`details.lockUntilSeconds`). Le
+piège mobile : un `setInterval` qui décrémente (`s => s - 1`) est GELÉ quand l'app passe en
+arrière-plan — au retour, le compteur ment de tout le temps gelé. `use-countdown.ts` compte
+donc depuis une ÉCHÉANCE ABSOLUE (`deadline = Date.now() + n×1000`) et recalcule l'écart à
+chaque tic : l'interval peut geler, l'horloge non. Même famille que l'idempotence : ne stockez
+pas un état qui DÉRIVE du temps, stockez le point fixe et recalculez.
+
+### Le cooldown fantôme : quand le serveur se tait exprès
+
+`POST /auth/password/forgot` et `/resend` répondent TOUJOURS 200 — adresse connue ou pas,
+cooldown atteint ou pas (anti-énumération ANO-API-08 : toute différence de réponse est un
+oracle). Conséquence client contre-intuitive : le compte à rebours de renvoi de CE parcours est
+PUREMENT LOCAL — 60 s au poignet, sans jamais demander au serveur. À l'inverse, le parcours
+d'inscription (l'adresse n'est pas encore un compte) renvoie ses vrais codes (`OTP_COOLDOWN`,
+`OTP_TOO_MANY`). Deux parcours jumeaux, deux contrats d'erreur — parce que la donnée protégée
+n'est pas la même. Lire la politique de silence d'un endpoint AVANT d'écrire sa gestion
+d'erreur.
+
+### Le login chaîné : améliorer l'UX sans toucher au contrat
+
+Le serveur n'ouvre pas de session à la vérification du code d'inscription — le web fait donc
+un détour par `/login?verified=1`. L'app fait mieux SANS rien changer côté serveur : le mot de
+passe, encore en mémoire du parcours (`auth-flow-state.ts` — des variables de module, le
+`sessionStorage` du natif), permet d'enchaîner `signIn` au succès de l'OTP. Le point
+d'architecture : l'amélioration vit ENTIÈREMENT dans le client, le contrat reste identique, et
+chaque échec du chaînage retombe sur le chemin du web (connexion préremplie + bandeau). Quand
+une UX meilleure exige un contrat différent, c'est une décision de registre ; quand elle tient
+dans le client avec repli, c'est du design.
+
+### `NODE_PATH` et le `expo start` nu
+
+Vérification faite au passage : lancer `npx expo start` nu depuis `apps/mobile` PLANTE
+(`Cannot find module 'expo-router/_ctx-shared'`) — le target nx passe
+`NODE_PATH=./node_modules`, qui fait résoudre au CLI Expo (hissé à la racine) les paquets
+NICHÉS du projet mobile (le `react` sous `apps/mobile` est voulu, README). La commande
+officielle `npx nx start @yamba-app/mobile` n'est pas une coquetterie : c'est elle qui porte
+l'environnement de résolution. Un outil qui « marche presque » lancé autrement est un piège
+classique de monorepo.

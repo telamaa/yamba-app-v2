@@ -6848,3 +6848,40 @@ sans jamais promettre un geste qui n'existe pas dans l'app (« que du vrai »).
 | MOB45 | Lancer une recherche | La carte se replie en pilule récap (route · date · « Modifier ») au-dessus des résultats ; « Modifier » rouvre la carte avec les valeurs |
 | MOB46 | Écran au repos, des trajets publiés | Corridors « En ce moment » sous l'invite ; un toucher remplit Départ/Destination et lance la recherche sur le même écran |
 | MOB47 | Onglet Publier, anonyme | La porte d'identité (se connecter) ; connecté : l'écran dit que la publication se fait sur le site — aucun champ de formulaire |
+
+# L'authentification membre dans l'app · `feat/mobile-auth` (A208)
+
+## Le besoin
+
+Un visiteur doit pouvoir devenir membre SANS quitter l'app : créer son compte, prouver son
+adresse e-mail par un code, se connecter, et se dépanner d'un mot de passe oublié — les mêmes
+parcours que le site, avec les mêmes garanties (le serveur seul juge, aucune fuite sur
+l'existence d'un compte), dans les gestes natifs du téléphone (feuille qui se referme, code qui
+se colle, clavier qui ne cache rien).
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-31** | L'app n'invente aucun parcours d'authentification : mêmes endpoints, mêmes règles que le site (OTP 6 chiffres, 10 min, renvoi après 60 s, verrous par paliers, critères de mot de passe). Tout refus s'affiche à partir du code métier du serveur, jamais d'une interprétation locale. |
+| **RG-MOB-32** | L'inscription ne crée le compte qu'à la vérification du code, et n'ouvre JAMAIS de session côté serveur. La connexion enchaînée après le code est un geste du client ; si elle échoue, l'utilisateur retrouve l'écran de connexion prérempli avec « ton compte est activé » — un compte activé n'est jamais bloqué. |
+| **RG-MOB-33** | Le parcours « mot de passe oublié » ne révèle jamais si un compte existe : mêmes écrans, mêmes messages, mêmes délais pour une adresse connue ou inconnue ; le compte à rebours de renvoi est purement client. |
+| **RG-MOB-34** | Les jetons d'étape (vérification d'inscription, reset) vivent en mémoire de l'app uniquement : l'app fermée, le parcours recommence. Ils ne sont ni stockés durablement ni exposés dans une adresse d'écran. |
+| **RG-MOB-35** | Les huit critères de mot de passe de l'app sont ceux du site et du serveur (troisième miroir) ; la jauge locale guide la saisie, le serveur tranche. |
+| **RG-MOB-36** | Dès que l'inscription existe dans l'app, elle est le geste PRIMAIRE de l'écran de bienvenue (engagement A207) et chaque porte d'identité propose aussi « Créer un compte ». |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB48 | Bienvenue → « S'inscrire » | La feuille d'auth s'ouvre sur l'inscription ; « Se connecter » reste accessible en secondaire |
+| MOB49 | Inscription, mot de passe faible | La jauge affiche le niveau et les critères manquants ; la soumission est refusée LOCALEMENT sans appel serveur |
+| MOB50 | Inscription valide | Écran code : l'adresse s'affiche, le compte n'existe PAS encore (une connexion avec ces identifiants échoue tant que le code n'est pas vérifié) |
+| MOB51 | Code correct | Connecté directement, la feuille se referme — sans repasser par l'écran de connexion |
+| MOB52 | 5 codes faux d'affilée | Le code est annulé, la saisie bloquée 60 s avec compte à rebours ; à la 10e erreur cumulée, 30 min et un e-mail d'alerte |
+| MOB53 | « Renvoyer le code » | Refusé pendant 60 s (compte à rebours affiché) ; ensuite : nouveau code, l'expiration repart à 10 min |
+| MOB54 | App tuée entre l'inscription et le code | L'étape est perdue : l'écran le dit et propose de reprendre l'inscription — jamais un code d'erreur brut |
+| MOB55 | Oubli, adresse inconnue | Écrans et messages identiques à une adresse connue ; aucun indice sur l'existence du compte |
+| MOB56 | Code du reset correct → nouveau mot de passe valide | Retour à la connexion, adresse préremplie, bandeau « mot de passe changé » ; l'ancien mot de passe ne passe plus |
+| MOB57 | Jeton de reset expiré (15 min) | État « cette étape a expiré » avec « Redemander un code » — pas de code brut |
+| MOB58 | Connexion | Lien « Mot de passe oublié ? », pied « S'inscrire », œil afficher/masquer ; les refus (identifiants, verrou, suspension) ont leurs textes |
