@@ -92,14 +92,22 @@ export default function WelcomeScreen() {
         <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.sheetInner}>
           <Text style={styles.headline}>{t('headline')}</Text>
           <Text style={styles.subline}>{t('subline')}</Text>
+          {/* L'inscription existe depuis le lot auth : elle prend le primaire,
+              comme promis dans A207 — « Se connecter » passe en secondaire. */}
+          <Pressable
+            onPress={() => router.push('/register')}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
+            <Text style={styles.primaryLabel}>{t('register')}</Text>
+          </Pressable>
           <Pressable
             onPress={() => router.push('/login')}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-            <Text style={styles.primaryLabel}>{t('login')}</Text>
+            hitSlop={Spacing.two}>
+            <Text style={styles.skipLabel}>{t('login')}</Text>
           </Pressable>
           <Pressable onPress={skip} accessibilityRole="button" hitSlop={Spacing.two}>
-            <Text style={styles.skipLabel}>{t('skip')}</Text>
+            <Text style={styles.secondarySkipLabel}>{t('skip')}</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -201,6 +209,11 @@ const styles = StyleSheet.create({
   skipLabel: {
     color: Brand.mango,
     fontSize: 14,
+    fontWeight: 500,
+  },
+  secondarySkipLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
     fontWeight: 500,
   },
   pressed: {

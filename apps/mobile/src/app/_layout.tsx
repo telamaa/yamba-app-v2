@@ -68,7 +68,10 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-            <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+            {/* Toute l'auth (connexion, inscription, codes, mot de passe
+                oublié) vit dans UNE feuille modale avec sa pile interne :
+                les étapes se poussent dedans, la fermer rend l'app. */}
+            <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
             {/* La fiche trajet se pousse PAR-DESSUS les onglets (pas dedans) :
                 le retour ramène aux résultats, la barre reste celle du groupe. */}
             <Stack.Screen name="trip/[id]" />

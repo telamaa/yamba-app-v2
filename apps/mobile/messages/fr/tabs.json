@@ -9,7 +9,8 @@
   "gate": {
     "title": "Connecte-toi pour continuer",
     "body": "Cet espace est réservé aux membres : tes trajets, tes messages et ton profil t'attendent derrière la connexion.",
-    "cta": "Se connecter"
+    "cta": "Se connecter",
+    "registerLink": "Créer un compte"
   },
   "publish": {
     "title": "Publie ton trajet",

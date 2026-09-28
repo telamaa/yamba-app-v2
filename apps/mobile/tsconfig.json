@@ -11,6 +11,9 @@
       ],
       "@packages/api-contracts/locale": [
         "../../packages/libs/api-contracts/src/locale.ts"
+      ],
+      "@packages/legal/versions": [
+        "../../packages/libs/legal/versions.ts"
       ]
     }
   },
