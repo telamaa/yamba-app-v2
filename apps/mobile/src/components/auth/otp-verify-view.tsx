@@ -148,6 +148,20 @@ export function OtpVerifyView({
     }
   };
 
+  // CTA toujours actif hors verrou/envoi (passe UX) : au tap, le manquement
+  // est nommé — code incomplet ou expiré.
+  const onVerifyPressed = () => {
+    if (expired) {
+      setError(t('otp.errors.OTP_EXPIRED'));
+      return;
+    }
+    if (otp.length < OTP_LENGTH) {
+      setError(t('otp.errors.INCOMPLETE'));
+      return;
+    }
+    void verify(otp);
+  };
+
   const canResend = resendWait <= 0 && !locked && !pending;
   const mono = Platform.select({ ios: 'ui-monospace', default: 'monospace' });
 
@@ -190,8 +204,8 @@ export function OtpVerifyView({
 
       <AuthCta
         label={t('otp.verify')}
-        onPressAction={() => verify(otp)}
-        disabled={!canVerify}
+        onPressAction={onVerifyPressed}
+        disabled={locked}
         pending={pending}
       />
 

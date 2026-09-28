@@ -22,6 +22,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 
+import { Image } from 'expo-image';
 import { useTranslations } from 'use-intl';
 
 import { Spacing } from '@/constants/theme';
@@ -117,8 +118,10 @@ export function SocialLogosRow() {
   const palette = useAuthPalette();
   return (
     <View style={styles.socialRow}>
-      {/* Inertes tant que les flux natifs n'existent pas (Google : lot A201) —
-          dessinées fonctionnelles, le câblage viendra sans changer l'écran. */}
+      {/* Les VRAIS logos (SVG officiels, rendus par expo-image — le canal de
+          l'illustration de bienvenue) : le G quadricolore est obligatoire
+          dans la charte Google. Inertes tant que les flux natifs n'existent
+          pas (Google : lot A201) — le câblage viendra sans changer l'écran. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('social.google')}
@@ -127,7 +130,7 @@ export function SocialLogosRow() {
           { backgroundColor: palette.card, borderColor: palette.border },
           pressed && styles.dimmed,
         ]}>
-        <Text style={styles.googleG}>G</Text>
+        <Image source={require('@/assets/images/google-g.svg')} style={styles.socialLogo} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -137,9 +140,7 @@ export function SocialLogosRow() {
           { backgroundColor: palette.card, borderColor: palette.border },
           pressed && styles.dimmed,
         ]}>
-        <View style={styles.facebookDot}>
-          <Text style={styles.facebookF}>f</Text>
-        </View>
+        <Image source={require('@/assets/images/facebook-f.svg')} style={styles.socialLogo} />
       </Pressable>
     </View>
   );
@@ -270,23 +271,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  googleG: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#4285F4',
-  },
-  facebookDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#1877F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  facebookF: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 800,
+  socialLogo: {
+    width: 24,
+    height: 24,
   },
   checkboxRow: {
     flexDirection: 'row',

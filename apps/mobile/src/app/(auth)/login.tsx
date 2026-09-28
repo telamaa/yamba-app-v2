@@ -73,8 +73,6 @@ export default function LoginScreen() {
     }, [])
   );
 
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !pending;
-
   const messageOf = (err: unknown): string => {
     if (err instanceof ApiError) {
       if (err.code !== null && TRANSLATED_ERROR_CODES.has(err.code)) {
@@ -85,8 +83,18 @@ export default function LoginScreen() {
     return t('login.errors.network');
   };
 
+  // CTA toujours ACTIF (passe UX : un bouton grisé n'explique rien et rend
+  // boueux sur fond sombre) — au tap, le champ manquant est nommé.
   const onSubmit = async () => {
-    if (!canSubmit) return;
+    if (pending) return;
+    if (email.trim().length === 0) {
+      setError(t('common.errors.MISSING_EMAIL'));
+      return;
+    }
+    if (password.length === 0) {
+      setError(t('common.errors.MISSING_PASSWORD'));
+      return;
+    }
     setPending(true);
     setError(null);
     try {
@@ -153,12 +161,7 @@ export default function LoginScreen() {
 
       {error !== null && <AuthError message={error} />}
 
-      <AuthCta
-        label={t('login.submit')}
-        onPressAction={onSubmit}
-        disabled={!canSubmit}
-        pending={pending}
-      />
+      <AuthCta label={t('login.submit')} onPressAction={onSubmit} pending={pending} />
 
       <AuthDivider label={t('common.orContinueWith')} />
       <SocialLogosRow />

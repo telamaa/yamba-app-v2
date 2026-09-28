@@ -51,7 +51,6 @@ export default function PasswordResetScreen() {
   }
 
   const context = { email: pendingReset.email };
-  const canSubmit = password.length > 0 && !pending;
 
   const messageOf = (err: unknown): string => {
     if (!(err instanceof ApiError)) return t('common.errors.network');
@@ -65,8 +64,13 @@ export default function PasswordResetScreen() {
     }
   };
 
+  // CTA toujours actif (passe UX) : au tap, le manquement est nommé.
   const onSubmit = async () => {
-    if (!canSubmit) return;
+    if (pending) return;
+    if (password.length === 0) {
+      setError(t('common.errors.MISSING_PASSWORD'));
+      return;
+    }
     if (!isPasswordValid(getPasswordChecks(password, context))) {
       setError(t('register.errors.PASSWORD_INVALID'));
       return;
@@ -105,12 +109,7 @@ export default function PasswordResetScreen() {
 
       {error !== null && <AuthError message={error} />}
 
-      <AuthCta
-        label={t('reset.submit')}
-        onPressAction={onSubmit}
-        disabled={!canSubmit}
-        pending={pending}
-      />
+      <AuthCta label={t('reset.submit')} onPressAction={onSubmit} pending={pending} />
     </AuthScreen>
   );
 }

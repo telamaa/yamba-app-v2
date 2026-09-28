@@ -57,18 +57,18 @@ export default function RegisterScreen() {
   const normalizedEmail = email.trim().toLowerCase();
   const context = { firstName, lastName, email: normalizedEmail };
 
-  const filled =
-    firstName.trim().length > 0 &&
-    lastName.trim().length > 0 &&
-    normalizedEmail.length > 0 &&
-    password.length > 0 &&
-    terms;
-
+  // CTA toujours actif (passe UX) : au tap, le premier manquement est nommé.
   const localError = (): string | null => {
+    if (firstName.trim().length === 0 || lastName.trim().length === 0) {
+      return t('register.errors.MISSING_NAME');
+    }
+    if (normalizedEmail.length === 0) return t('common.errors.MISSING_EMAIL');
     if (!EMAIL_REGEX.test(normalizedEmail)) return t('register.errors.INVALID_EMAIL');
+    if (password.length === 0) return t('common.errors.MISSING_PASSWORD');
     if (!isPasswordValid(getPasswordChecks(password, context))) {
       return t('register.errors.PASSWORD_INVALID');
     }
+    if (!terms) return t('register.errors.TERMS_REQUIRED');
     return null;
   };
 
@@ -89,7 +89,7 @@ export default function RegisterScreen() {
   };
 
   const onSubmit = async () => {
-    if (!filled || pending) return;
+    if (pending) return;
     const invalid = localError();
     if (invalid !== null) {
       setError(invalid);
@@ -194,12 +194,7 @@ export default function RegisterScreen() {
 
       {error !== null && <AuthError message={error} />}
 
-      <AuthCta
-        label={t('register.submit')}
-        onPressAction={onSubmit}
-        disabled={!filled}
-        pending={pending}
-      />
+      <AuthCta label={t('register.submit')} onPressAction={onSubmit} pending={pending} />
 
       <AuthDivider label={t('common.orContinueWith')} />
       <SocialLogosRow />

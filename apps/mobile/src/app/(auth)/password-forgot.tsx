@@ -38,10 +38,14 @@ export default function PasswordForgotScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const normalized = email.trim().toLowerCase();
-  const canSubmit = normalized.length > 0 && !pending;
 
+  // CTA toujours actif (passe UX) : au tap, le manquement est nommé.
   const onSubmit = async () => {
-    if (!canSubmit) return;
+    if (pending) return;
+    if (normalized.length === 0) {
+      setError(t('common.errors.MISSING_EMAIL'));
+      return;
+    }
     if (!EMAIL_REGEX.test(normalized)) {
       setError(t('register.errors.INVALID_EMAIL'));
       return;
@@ -82,12 +86,7 @@ export default function PasswordForgotScreen() {
 
       {error !== null && <AuthError message={error} />}
 
-      <AuthCta
-        label={t('forgot.submit')}
-        onPressAction={onSubmit}
-        disabled={!canSubmit}
-        pending={pending}
-      />
+      <AuthCta label={t('forgot.submit')} onPressAction={onSubmit} pending={pending} />
 
       <TealLink label={t('forgot.backToLogin')} onPressAction={() => router.back()} arrow center />
     </AuthScreen>
