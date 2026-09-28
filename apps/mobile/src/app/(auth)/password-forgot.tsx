@@ -27,7 +27,7 @@ import { useAuthPalette } from '@/components/auth/auth-theme';
 import { forgotPassword } from '@/lib/api/auth.api';
 import { ApiError } from '@/lib/api/client';
 import { setPendingReset } from '@/lib/auth-flow-state';
-import { EMAIL_REGEX } from '@/lib/email';
+import { isValidEmail } from '@/lib/email';
 
 export default function PasswordForgotScreen() {
   const t = useTranslations('auth');
@@ -37,18 +37,12 @@ export default function PasswordForgotScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const normalized = email.trim().toLowerCase();
+  // UN champ à validité évidente en direct : le CTA grisé est permis
+  // (doctrine du désactivé — même règle que l'identifier-first).
+  const emailValid = isValidEmail(normalized);
 
-  // CTA toujours actif (passe UX) : au tap, le manquement est nommé.
   const onSubmit = async () => {
-    if (pending) return;
-    if (normalized.length === 0) {
-      setError(t('common.errors.MISSING_EMAIL'));
-      return;
-    }
-    if (!EMAIL_REGEX.test(normalized)) {
-      setError(t('register.errors.INVALID_EMAIL'));
-      return;
-    }
+    if (pending || !emailValid) return;
     setPending(true);
     setError(null);
     try {
@@ -85,7 +79,12 @@ export default function PasswordForgotScreen() {
 
       {error !== null && <AuthError message={error} />}
 
-      <AuthCta label={t('forgot.submit')} onPressAction={onSubmit} pending={pending} />
+      <AuthCta
+        label={t('forgot.submit')}
+        onPressAction={onSubmit}
+        disabled={!emailValid}
+        pending={pending}
+      />
 
       <TealLink label={t('forgot.backToLogin')} onPressAction={() => router.back()} arrow center />
     </AuthScreen>
