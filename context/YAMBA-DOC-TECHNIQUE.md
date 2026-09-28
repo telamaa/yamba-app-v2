@@ -12005,3 +12005,97 @@ natif de la référence.
 - **Piège confirmé** : un `expo start` NU plante sur `expo-router/_ctx-shared` — le target nx
   passe `NODE_PATH=./node_modules` ; la commande officielle reste `npx nx start @yamba-app/mobile`.
 - Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).
+
+# L'auth itérée sur captures — slate, passe UX, identifier-first · `feat/mobile-auth` (A209)
+
+## Note de caducité (supersession de la section précédente)
+
+La section A208 reste l'histoire de la MÉCANIQUE (endpoints, OTP, compteurs, login chaîné,
+`auth-flow-state` — tout cela survit tel quel), mais ses ÉCRANS ont été remplacés le jour même
+par quatre itérations sur captures utilisateur (`context/captures/auth/`, `/2`, `/3` — non
+versionnées, canal design) : le login mono-écran n'existe plus (identifier-first en deux
+étapes), la bienvenue illustrée de A207 non plus (atterrissage de marque), et la confirmation
+de mot de passe décrite « rétablie » a finalement été retirée. Cette section décrit l'état
+FINAL livré.
+
+## Itération 1 — l'identité visuelle du site (captures `auth/`)
+
+- **`components/auth/auth-theme.ts`** : la palette « slate » PROPRE aux écrans auth du site
+  (fond `#F8FAFC` clair / `#0B1120` sombre, cartes bordées, titres navy, teal, teinte lavande
+  du champ rempli), distincte du thème générique de l'app ; `AuthRadius = 12` (l'arrondi de
+  l'identité web — les pilules 999 de la référence Revolut ont été ramenées à 12 sur retour
+  utilisateur), `maskEmail()` (l'affichage `e******b@g***.com` de l'écran OTP).
+- **`components/auth/auth-kit.tsx`** : les briques partagées — `FieldLabel` (gras, action à
+  droite pour « Oublié ? »), `AuthTextField`, `AuthCta`, `AuthDivider`, `AuthCheckbox`,
+  `TealLink`, `AuthError`, puis (itérations suivantes) `MethodButton`, `SocialLogosRow`,
+  `AuthFailureView`, `LoadingDots`.
+- Chaque écran : badge pilule teal « … sécurisée » avec bouclier SF Symbol, gros titre, textes
+  EXACTS des captures (namespace `auth` refondu FR/EN).
+
+## Itération 2 — la passe UX d'expert
+
+- **L'e-mail d'abord, le social après le CTA** : les boutons sociaux pleine largeur du site
+  poussaient le premier champ sous le pli clavier levé — sur téléphone le chemin principal
+  reste visible, le social passe dessous.
+- **Chaînage clavier** : `returnKeyType="next"` + refs (la ref passe en PROP — React 19),
+  Prénom → Nom → E-mail → Mot de passe → envoi.
+- **La confirmation de mot de passe retirée** (inscription ET reset) : l'autofill iOS remplit
+  les deux champs d'un coup — la confirmation ne confirme rien — et l'œil couvre la faute de
+  frappe. Divergence mobile ASSUMÉE avec le formulaire web ; la preuve bundle a vérifié que le
+  libellé a DISPARU des deux binaires.
+- **La jauge à hauteur réservée** : les critères manquants en une ligne enveloppée (`minHeight`)
+  — la liste qui rétrécit ne fait plus danser le CTA sous le pouce ; tous remplis → ligne verte.
+- **Les vrais logos** : G QUADRICOLORE et f Facebook (SVG officiels dans `assets/images/`,
+  rendus par `expo-image` — le canal de l'illustration, zéro dépendance). La charte Google
+  EXIGE le G quadricolore sur un bouton de connexion.
+
+## Itération 3 — la doctrine du bouton désactivé (et les points en vague)
+
+Née d'un aller-retour sur device (le CTA désactivé rendait un BRUN BOUEUX — mangue à 60 %
+d'opacité sur fond sombre) puis d'un contre-exemple utilisateur (le « Continuer » grisé de
+Revolut) :
+- **`disabled` n'est permis que quand UN SEUL champ visible à validité ÉVIDENTE en direct
+  l'explique** (e-mail + regex live : identifier-first, mot de passe oublié) — le bouton
+  s'allume sous les yeux ;
+- **multi-champs et validités non binaires** (mot de passe à 8 critères, OTP) : CTA TOUJOURS
+  actif qui NOMME le manquement au tap (« Saisis ton adresse e-mail. », « Accepte les
+  conditions pour continuer. », « Saisis les 6 chiffres du code. »…) ;
+- l'état désactivé est un **gris neutre franc** (fond `border`, texte `muted`) ;
+- **pendant l'envoi** : CTA plein mangue + **trois points en vague** (`LoadingDots` —
+  `Animated.loop` natif `useNativeDriver`, translation/échelle/opacité décalées d'un tiers de
+  cycle, rangée à hauteur de la ligne du libellé : le bouton ne bouge pas d'un pixel).
+
+## Itération 4 — identifier-first et l'atterrissage (captures `auth/3`, réf. Revolut)
+
+- **`welcome.tsx` remplacé** : l'atterrissage de marque — fond `#0B1120`, wordmark mangue,
+  tagline, l'illustration, « Créer un compte » (primaire clair) / « Me connecter », X à
+  DROITE. Créneau A207 inchangé : à froid, anonyme seulement, non persisté.
+- **Le X → résultats DIRECTS** (arbitrage Blablacar vs Airbnb, tranché Airbnb) :
+  `requestBrowseOnLanding()` (drapeau une-fois dans `welcome-state.ts`) → l'onglet Rechercher
+  lance la recherche large à l'arrivée, pilule « Partout · Toutes les dates » — de vraies
+  cartes trajets comme preuve de vie ; l'onglet garde son état au repos le reste de la session.
+- **`(auth)/login.tsx` = identifier-first** : un champ e-mail (validation live via la nouvelle
+  source unique `lib/email.ts` — trois copies de la regex fusionnées), « Continuer » grisé
+  jusqu'à validité, **carte de CONFIRMATION d'adresse** (anti-typo : avec l'anti-énumération,
+  une faute de frappe serait un code qui ne vient jamais, en silence), « ou » + trois
+  `MethodButton` (🔑 e-mail et mot de passe, Google, Facebook).
+- **Le pont honnête** : « Continuer » confirmé → `(auth)/login-password.tsx` (adresse
+  verrouillée en chip + « Modifier », rememberMe, oublié) tant que le serveur du « code par
+  e-mail » n'existe pas — le point de bascule du futur lot est UNE navigation, commentée dans
+  `login.tsx`. L'adresse transite par `auth-flow-state.loginEmail`, jamais en paramètre.
+- **`AuthFailureView`** (les deux captures d'échec) : X en pastille, grand titre, CTA de
+  reprise en bas — branché sur les états terminaux réels (inscription expirée, étape perdue,
+  session de reset expirée), prêt pour les échecs Google/code.
+- **Écarté** : l'inscription par téléphone de la référence (SMS — rien au serveur, à instruire
+  avec le lot code) ; les passkeys (après) ; auto-lancer la recherche à chaque repos.
+
+## Vérifié (état final, validation visuelle iPhone clair + sombre le 28/09 au soir)
+
+- Typecheck **10/10** (commande CI) et contrôle i18n vert À CHAQUE itération ; clés mortes
+  purgées au fil de l'eau (`confirmLabel`, `PASSWORD_MISMATCH`, `orByEmail`, `googleSoon`,
+  les clés de la bienvenue illustrée).
+- Bundle Hermes `--platform ios android` par itération : marqueurs FR accentués (UTF-16-LE) et
+  EN (UTF-8) sur les DEUX binaires, témoins faux à 0 ; « Confirmer le mot de passe » prouvé
+  ABSENT ; les 3 SVG (hero + G + f) prouvés EMBARQUÉS.
+- Les routes typées ont suivi à chaud (le Metro du poste régénère `.expo/types` à la volée).
+- Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).

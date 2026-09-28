@@ -6885,3 +6885,45 @@ se colle, clavier qui ne cache rien).
 | MOB56 | Code du reset correct → nouveau mot de passe valide | Retour à la connexion, adresse préremplie, bandeau « mot de passe changé » ; l'ancien mot de passe ne passe plus |
 | MOB57 | Jeton de reset expiré (15 min) | État « cette étape a expiré » avec « Redemander un code » — pas de code brut |
 | MOB58 | Connexion | Lien « Mot de passe oublié ? », pied « S'inscrire », œil afficher/masquer ; les refus (identifiants, verrou, suspension) ont leurs textes |
+
+# L'entrée identifier-first et l'atterrissage · `feat/mobile-auth` (A209)
+
+## Note de caducité
+
+Les écrans décrits en A208 ont été remplacés le jour même sur captures utilisateur (réf.
+Revolut) ; les RÈGLES RG-MOB-31→35 SURVIVENT telles quelles (mêmes endpoints, OTP, jetons
+d'étape, miroir mot de passe). **RG-MOB-36 est caduque** (la bienvenue illustrée n'existe
+plus — l'atterrissage la remplace, RG-MOB-37). Fiches : **MOB39, MOB40 et MOB48 caduques**
+(bienvenue illustrée) ; **MOB58 remplacée** (la connexion est en deux étapes — MOB61→63) ;
+MOB49→57 se rejouent telles quelles, avec une nuance sur MOB49/MOB56 : plus de champ de
+confirmation, l'œil et la jauge portent la vérification.
+
+## Le besoin
+
+L'ouverture de l'app doit accueillir comme les meilleures apps du marché : une page de marque
+qui propose de créer un compte ou de se connecter — et qui n'emprisonne pas (le X mène à
+l'offre réelle). La connexion demande l'adresse D'ABORD puis la méthode : c'est l'architecture
+qui accueillera le « code par e-mail » (décision du 28/09 : les deux méthodes, le code en
+chemin principal quand son serveur existera) sans redessiner un seul écran.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-37** | À froid et en anonyme seulement, l'app s'ouvre sur l'atterrissage de marque (« Créer un compte » primaire, « Me connecter », X). Un membre connecté ne le voit jamais ; « passer » vaut la session. Le X mène à Rechercher avec l'offre RÉELLE affichée (recherche large lancée d'office, récapitulatif « Partout · Toutes les dates ») — la preuve de vie, jamais un formulaire vide. |
+| **RG-MOB-38** | La connexion est identifier-first : l'adresse d'abord, CONFIRMÉE avant de continuer (une faute de frappe ne part jamais en silence), la méthode ensuite. Tant que le « code par e-mail » n'a pas son serveur, continuer mène au mot de passe, adresse verrouillée et modifiable — aucun écran ne promet un code qui ne viendra pas. |
+| **RG-MOB-39** | Un bouton n'est désactivé que si UN SEUL champ visible, à validité évidente en direct, l'explique (une adresse e-mail qui s'allume en tapant). Partout ailleurs le bouton reste actif et NOMME le manquement au tap. Un bouton désactivé est gris neutre ; un bouton qui travaille reste plein mangue avec son animation d'attente. |
+| **RG-MOB-40** | Un échec TERMINAL (étape expirée, parcours perdu) s'affiche en écran d'échec dédié — symbole, explication, UN geste de reprise — jamais un code d'erreur brut ni un formulaire muet. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB59 | Lancement à froid, anonyme | Splash puis l'atterrissage : wordmark, illustration, « Créer un compte » primaire, « Me connecter », X à droite |
+| MOB60 | X de l'atterrissage | Rechercher avec les trajets réels DÉJÀ listés, pilule « Partout · Toutes les dates » ; « Modifier » rouvre le formulaire ; revenir sur l'onglet plus tard ne relance rien |
+| MOB61 | « Me connecter », adresse en cours de frappe | « Continuer » gris neutre ; il passe mangue dès que l'adresse est valide |
+| MOB62 | « Continuer » | La carte de confirmation montre l'adresse ; « Retour » corrige, « Confirmer » ouvre l'étape mot de passe avec l'adresse verrouillée et « Modifier » |
+| MOB63 | « Continuer avec e-mail et mot de passe » sans adresse saisie | L'étape mot de passe affiche AUSSI le champ e-mail |
+| MOB64 | Envoi en cours (connexion, code, envoi d'e-mail) | Le bouton reste plein mangue, trois points pulsent en vague ; l'écran ne bouge pas d'un pixel |
+| MOB65 | Inscription expirée / étape perdue / reset expiré | L'écran d'échec plein écran (X, titre, explication) avec le geste de reprise |
+| MOB66 | Mot de passe oublié | « Envoyer le code » gris tant que l'adresse n'est pas valide (même règle que MOB61) |
