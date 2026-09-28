@@ -6799,3 +6799,52 @@ promesse d'écran qui n'existe pas, et la confiance annoncée par ses mécanisme
 | MOB36 | Gateway coupé au lancement | L'accueil s'affiche entier, simplement sans la section corridors — rien ne casse, aucune erreur affichée |
 | MOB37 | Basculer « J'envoie un colis » / « Je voyage » | Les quatre étapes de la face choisie ; les textes du site, dans la langue de l'écran |
 | MOB38 | Session ouverte | « Bonjour {prénom} » sous l'accroche ; le lien « Se connecter » a disparu |
+
+# Recherche-first — l'app s'ouvre sur la recherche · `feat/mobile-welcome` (A207)
+
+## Note de caducité (supersession de la section précédente)
+
+L'onglet Accueil décrit ci-dessus a été SUPPRIMÉ le soir même de sa livraison (réorientation
+utilisateur sur les captures de la référence, A207) : l'app est recherche-first. Les règles
+survivent TRANSPOSÉES sur l'écran Rechercher : **RG-MOB-21** (corridors vrais ou rien) et
+**RG-MOB-22** (corridor → recherche préremplie, exécutée et comptée serveur) s'appliquent désormais
+aux corridors « En ce moment » de l'écran Rechercher au repos ; **RG-MOB-23** (un seul formulaire
+de recherche) est RENFORCÉE — il n'y a même plus d'écran qui pourrait le dupliquer ; **RG-MOB-24**
+(la confiance par ses mécanismes) reste vraie mais n'a plus d'écran porteur : elle attendra l'écran
+qui en aura l'usage. Les fiches **MOB32, MOB34, MOB35, MOB37 et MOB38 sont CADUQUES** (elles
+testaient l'onglet mort) ; MOB33 et MOB36 se rejouent telles quelles sur l'écran Rechercher au
+repos. Les fiches recette du formulaire A204 (puces de dates, champs texte libres) sont caduques
+aussi : le formulaire est désormais à sélecteurs (MOB41→MOB44).
+
+## Le besoin
+
+Ce que fait un visiteur qui ouvre l'app, dans l'écrasante majorité des cas, c'est CHERCHER. La
+référence du secteur l'a validé dix ans : l'écran d'atterrissage est le formulaire de recherche,
+l'offre (publier) est visible dans la barre, et le premier lancement accueille par un écran de
+bienvenue qui dit la promesse en une phrase et propose de se connecter — ou de passer. Le tout
+sans jamais promettre un geste qui n'existe pas dans l'app (« que du vrai »).
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-25** | Rechercher est l'écran d'atterrissage de l'app. L'écran de bienvenue n'apparaît qu'à un lancement à froid en anonyme — jamais à un membre connecté — et « passer » ne vaut que pour la session en cours : au prochain lancement à froid anonyme, il revient. |
+| **RG-MOB-26** | La bienvenue ne propose que des gestes qui existent : « Se connecter » (primaire tant que l'écran d'inscription n'existe pas dans l'app) et « Continuer sans compte ». Aucun bouton vers un écran inexistant. |
+| **RG-MOB-27** | Le splash couvre un chargement réel (l'amorçage de la session), avec une tenue minimale de 1,5 s pour ne pas clignoter — un plancher, jamais un plafond : il ne coupe pas un chargement en cours. |
+| **RG-MOB-28** | L'autocomplétion de villes est un confort, jamais un préalable : sans clé Google ou API muette, le champ reste une saisie libre et la recherche fonctionne à l'identique. Les suggestions parlent la langue de l'écran ; rien ne part vers Google sous 2 caractères. |
+| **RG-MOB-29** | La date de recherche se choisit par le sélecteur natif de l'OS du téléphone ; une date passée n'est pas sélectionnable ; la date reste optionnelle (« Toutes les dates »). |
+| **RG-MOB-30** | Publier est visible dans la barre pour tous (l'offre fait partie du produit) ; l'écran est derrière la porte d'identité, et tant que le parcours de publication n'existe pas dans l'app, il le dit et renvoie vers le site — aucun formulaire fantôme. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB39 | Lancement à froid, anonyme | Splash mangue (wordmark + arcs) tenu au moins 1,5 s, puis l'écran de bienvenue : illustration, pastilles des modes, « Se connecter » primaire, « Continuer sans compte », croix |
+| MOB40 | Croix ou « Continuer sans compte » | Atterrissage sur Rechercher ; relancer l'app à froid en anonyme → la bienvenue revient |
+| MOB41 | Lancement à froid, membre connecté | Jamais la bienvenue : splash puis Rechercher directement |
+| MOB42 | Toucher le champ Départ | Saisie plein écran, clavier levé ; taper « par » → suggestions de villes dans la langue de l'écran ; en choisir une → retour au formulaire, champ rempli de la ville seule |
+| MOB43 | Sans clé Google (ou API muette) | Aucune suggestion, aucun message d'erreur ; « OK » du clavier valide le texte tapé tel quel et la recherche part normalement |
+| MOB44 | Toucher le champ Date | Le calendrier NATIF de l'OS (feuille graphique iOS / boîte Material Android) ; les jours passés sont grisés ; valider affiche la date longue, la croix la remet à « Toutes les dates » |
+| MOB45 | Lancer une recherche | La carte se replie en pilule récap (route · date · « Modifier ») au-dessus des résultats ; « Modifier » rouvre la carte avec les valeurs |
+| MOB46 | Écran au repos, des trajets publiés | Corridors « En ce moment » sous l'invite ; un toucher remplit Départ/Destination et lance la recherche sur le même écran |
+| MOB47 | Onglet Publier, anonyme | La porte d'identité (se connecter) ; connecté : l'écran dit que la publication se fait sur le site — aucun champ de formulaire |

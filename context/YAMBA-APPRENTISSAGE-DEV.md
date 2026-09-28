@@ -2916,3 +2916,83 @@ corridor », un deep link), le motif graine + paramètres est déjà le bon cana
 corridors méritent un VRAI endpoint serveur (agrégation Mongo plutôt qu'un échantillon de 50), les
 deux fronts basculeront ensemble : la dérivation à l'affichage est consignée comme provisoire dans
 A206.
+
+## Chapitre 208 — Recherche-first : le motif qu'on supprime le soir même, le `require` qui attend sa plateforme, et le jeton qui groupe les frappes
+
+### La supersession comme méthode (et pourquoi le chapitre 207 reste)
+
+Le chapitre 207 racontait la graine de préremplissage entre l'onglet Accueil et l'onglet
+Rechercher. Ce mécanisme n'existe PLUS : le soir même de sa livraison, les captures de la référence
+(`context/captures/`) ont réorienté le lot — l'onglet Accueil doublonnait Rechercher, il est
+supprimé (A207). La leçon n'est pas « on a perdu une soirée » ; elle est double. D'abord une leçon
+de MÉTHODE : le registre et les docs ne se réécrivent pas — A206/chapitre 207 restent l'histoire,
+A207/ce chapitre les supplantent PAR AJOUT, avec une note de caducité côté métier. Un lecteur qui
+tombe sur le motif graine sait ainsi qu'il a existé, pourquoi, et pourquoi il est mort. Ensuite une
+leçon d'ARCHITECTURE : `router.navigate` + graine était le bon motif ENTRE onglets ; dès que
+corridors et formulaire vivent sur le MÊME écran, il devient du sur-place — `openCorridor` pose
+l'état et appelle `runSearchWith(params)` avec des valeurs EXPLICITES, zéro navigation. Un
+mécanisme se vérifie dans son contexte avant d'être transposé ; transposé hors contexte, il se
+supprime.
+
+### Le champ qui est un écran : le motif natif de saisie
+
+Sur le web, une autocomplétion est un dropdown sous le champ. Sur téléphone, le motif natif des
+deux OS est inverse : toucher le champ OUVRE UN ÉCRAN de saisie dédié — clavier levé d'office,
+grande zone de frappe, suggestions en liste pleine hauteur — et choisir referme. `city-picker.tsx`
+l'implémente avec les briques de base : un `Modal` en `presentationStyle="pageSheet"` (la feuille
+qui laisse voir l'écran d'origine derrière, iOS la rend native), `autoFocus` sur le `TextInput`,
+une `FlatList` avec `keyboardShouldPersistTaps="handled"` (sans quoi le premier toucher sur une
+suggestion ne fait que fermer le clavier). Deux détails d'asynchronie valent le voyage :
+le DÉBOUNCE (250 ms) évite une requête par frappe, et la ref `queryAt` jette les réponses EN
+RETARD — sans elle, taper « Paris » puis corriger en « Pointe-Noire » peut afficher les
+suggestions de Paris revenues après coup. C'est le même problème que le `AbortController` du web,
+résolu ici par comparaison de la frappe déclencheuse plutôt que par annulation.
+
+### Places (New) en REST : le même contrat, sans DOM
+
+Le site charge le SDK JS de Google Maps (il a un DOM). L'app n'en a pas : `places.api.ts` appelle
+l'API REST « Places (New) » (`POST places.googleapis.com/v1/places:autocomplete`) avec un simple
+`fetch`. Trois choses à savoir. 1) Le SDK et le REST exposent le MÊME service : mêmes types
+(`locality`, `airport`), même `languageCode`, même notion de session — le fichier mobile est un
+miroir de `CityAutocomplete` du web, réglage pour réglage. 2) Le **jeton de session** n'est pas de
+la sécurité : c'est de la FACTURATION. Google groupe toutes les frappes portant le même jeton en
+une seule « saisie » facturée ; le jeton se renouvelle à chaque OUVERTURE du picker, pas à chaque
+frappe. 3) La clé est PUBLIQUE des deux côtés (`NEXT_PUBLIC_*` / `EXPO_PUBLIC_*`) — elle part dans
+le bundle, c'est assumé : la protection est la RESTRICTION en console Google (referrer HTTP pour le
+web, empreinte du bundle pour une app). Corollaire opérationnel : une clé restreinte « referrer »
+refusera les appels REST d'une app — dégradation SILENCIEUSE voulue (tableau vide, saisie libre),
+mais il faut une clé « application » pour que les suggestions vivent.
+
+### `@expo/ui` : le `require` qui attend sa plateforme
+
+`native-date-field.tsx` présente le calendrier SwiftUI `graphical` sur iOS et le
+`DatePickerDialog` Material 3 sur Android — les VRAIS sélecteurs, pas une imitation JS. Le piège
+est dans l'import : `@expo/ui/swift-ui` et `@expo/ui/jetpack-compose` ENREGISTRENT des vues
+natives à l'import du module. Un `import` en tête de fichier chargerait les DEUX paquets sur
+chaque OS ; le fichier utilise donc `require(...)` DANS la branche `Platform.OS`, typé par
+`as typeof import(...)` pour garder l'autocomplétion et le typecheck. C'est le même geste que le
+code-splitting web (`dynamic import`), mais la raison n'est pas le poids : c'est l'effet de bord
+d'enregistrement natif. À retenir pour tout paquet Expo « par plateforme ».
+
+### Deux petites mécaniques d'état qui disent une philosophie
+
+`welcome-state.ts` tient en une variable de module (`let dismissed = false`) : le « passer » de la
+bienvenue ne SURVIT PAS au lancement — volontairement. Pas d'AsyncStorage, pas de flag persisté :
+la référence remontre sa bienvenue à chaque lancement à froid anonyme, et c'est la SESSION (le
+statut authentifié), pas le drapeau, qui décide qu'un membre ne la voit jamais. Quand ne rien
+persister est le comportement voulu, une variable de module est l'outil honnête — pas une dette.
+Même esprit pour le splash : `SPLASH_MIN_MS = 1500` est un PLANCHER (`Math.max(0, MIN - écoulé)`)
+posé sur un chargement RÉEL (l'amorçage de session), jamais un `setTimeout` sec — un splash qui
+clignote à 200 ms est aussi désagréable qu'un splash qui bloque une app déjà prête.
+
+### Le piège du jour : `expo export` veut aussi faire du web
+
+La preuve bundle du lot (marqueurs FR/EN dans les deux encodages, leçon A204) a buté sur un
+échec inattendu : `npx expo export --clear` réussit les bundles Hermes iOS ET Android… puis
+échoue sur le rendu web statique (`@expo/metro-runtime` introuvable depuis `@expo/router-server`)
+— et ne produit AUCUN `dist/`. Le projet a `web.output: static` dans sa config mais pas les
+dépendances du rendu web (l'app n'a pas de cible web). La sortie : `--platform ios --platform
+android` — l'export se limite aux plateformes natives et `dist/` apparaît. Moralité déjà croisée
+sous d'autres formes : une commande « toutes plateformes » échoue sur la plateforme qu'on n'a
+jamais construite ; nommer explicitement ce qu'on veut est plus robuste que laisser l'outil
+deviner.
