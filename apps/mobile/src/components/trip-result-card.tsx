@@ -1,22 +1,22 @@
 /**
  * trip-result-card.tsx — une carte de résultat de recherche (lot résultats).
  * ==========================================================================
- * Transposition NATIVE, à l'identique, de la carte du web mobile
- * (`apps/user-ui/src/components/search/TripResultCardMobile.tsx`, capture du
- * 28/09 à 17h08 — GO utilisateur, remplace la piste SNCF Connect) :
- * — en-tête : pastille transport (icône + libellé) · date · alerte places
- *   restantes (≤ 3) · CŒUR favori (D46) ;
- * — corps en quatre colonnes : départ (ville / pays / heure), durée sur un
- *   trait à deux points (gris → mangue) avec Direct/escales, arrivée alignée
- *   à droite (+1 le lendemain), bloc prix (« prix au kilo » + kg dispo, ou
- *   « dès » pour le moteur legacy) ;
- * — pied : avatar (photo ou initiales, anneau mangue superTripper) · prénom +
- *   initiale · note ★ ou « Nouveau Voyageur » · badge vues (« Populaire » à
- *   20, D5/C-PR6) · aperçu des catégories · chevron.
- * Que du VRAI (RG-MOB-1) : tout vient du DTO serveur — date localisée, prix
- * en euros, initiale seule (privacy). Le cœur bascule en OPTIMISTE puis
- * l'API tranche (miroir de useFavoriteMutations) ; visiteur → feuille de
- * connexion. La carte OUVRE la fiche (`/trip/[id]`), vue comptée serveur.
+ * Design ÉPURÉ « V2 drapeaux », validé sur maquette le 28/09 au soir
+ * (`context/captures/proposition-carte-epuree.png`) — supersède la
+ * transposition littérale de la carte web (trop chargée : 11 éléments) :
+ * — en-tête : pastille transport · date · alerte places (≤ 3) · CŒUR (D46) ;
+ * — la ROUTE en pleine largeur, en gras : « 🇫🇷 Paris → 🇨🇬 Brazzaville » —
+ *   le pays devient un DRAPEAU (zéro ligne consommée, lève Congo/RDC), les
+ *   villes longues passent à la ligne, jamais tronquées ;
+ * — UNE ligne d'horaires : « 01:51 → 07:51⁺¹ · 7 h · Direct » ;
+ * — le prix seul à droite, sans libellé (« /kg » suffit), les kg dispo en
+ *   teal dessous (info de décision, gardée sur demande) ;
+ * — pied : avatar (photo/initiales, anneau mangue superTripper), « Prénom N.
+ *   · ★ 4,8 (12) » ou « Nouveau Voyageur », badge vues (« Populaire » à 20,
+ *   D5/C-PR6), chevron. Les mini-catégories vivent sur la fiche.
+ * Que du VRAI (RG-MOB-1) : tout vient du DTO serveur. Le cœur bascule en
+ * OPTIMISTE puis l'API tranche ; visiteur → feuille de connexion. La carte
+ * OUVRE la fiche (`/trip/[id]`), vue comptée par le serveur.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -33,7 +33,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { ApiError } from '@/lib/api/client';
-import type { SearchParcelCategory, TripSearchResult } from '@/lib/api/search.api';
+import type { TripSearchResult } from '@/lib/api/search.api';
 import { countryName } from '@/lib/country-name';
 import { useSession } from '@/lib/session-context';
 import { getInitials, isPopular } from '@/lib/trip-format';
@@ -79,17 +79,25 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
     }
   };
 
-  // Pays localisé pour le visiteur (le texte stocké est figé dans la locale
-  // du créateur) — jamais le code brut.
-  const fromCountry = countryName(trip.fromCountryCode, locale);
-  const toCountry = countryName(trip.toCountryCode, locale);
+  const fromFlag = flagEmoji(trip.fromCountryCode);
+  const toFlag = flagEmoji(trip.toCountryCode);
+  // Les drapeaux sont muets pour VoiceOver : la route parlée nomme les pays.
+  const routeLabel = [
+    countryName(trip.fromCountryCode, locale),
+    trip.fromCity,
+    '→',
+    countryName(trip.toCountryCode, locale),
+    trip.toCity,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   const currency = trip.currency ?? '€';
   // La constante intermédiaire porte le narrowing pour TS.
   const perKgPrice = trip.pricePerKg != null && trip.pricePerKg > 0 ? trip.pricePerKg : null;
+  const duration =
+    typeof trip.durationMinutes === 'number' ? formatDuration(trip.durationMinutes) : null;
   const showRemainingAlert = typeof trip.remainingSlots === 'number' && trip.remainingSlots <= 3;
-  const categories = trip.allowedCategories ?? [];
-  const visibleCategories = categories.slice(0, 2);
-  const categoryOverflow = categories.length - visibleCategories.length;
 
   return (
     <Pressable
@@ -138,80 +146,44 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
           </View>
         </View>
 
-        {/* ── Corps : départ · durée · arrivée · prix ── */}
+        {/* ── Corps : route en pleine largeur + prix à droite ── */}
         <View style={styles.body}>
-          {/* Départ — la VILLE d'abord : c'est l'info de décision de
-              l'Expéditeur, l'heure est secondaire. */}
-          <View style={styles.endpoint}>
-            <ThemedText style={styles.city} numberOfLines={1}>
+          <View style={styles.routeBlock}>
+            <ThemedText style={styles.route} accessibilityLabel={routeLabel}>
+              {fromFlag !== null && <ThemedText style={styles.flag}>{fromFlag} </ThemedText>}
               {trip.fromCity}
+              <ThemedText style={[styles.route, { color: Brand.mango }]}> → </ThemedText>
+              {toFlag !== null && <ThemedText style={styles.flag}>{toFlag} </ThemedText>}
+              {trip.toCity}
             </ThemedText>
-            {fromCountry && (
-              <ThemedText
-                numberOfLines={1}
-                style={[styles.country, { color: theme.textSecondary }]}>
-                {fromCountry}
-              </ThemedText>
-            )}
-            <ThemedText style={[styles.time, { color: theme.textSecondary }]}>
+            <ThemedText style={[styles.meta, { color: theme.textSecondary }]}>
               {trip.departureTime}
-            </ThemedText>
-          </View>
-
-          {/* Durée sur le trait : point gris → point mangue, Direct/escales. */}
-          <View style={styles.middle}>
-            {typeof trip.durationMinutes === 'number' && (
-              <ThemedText style={[styles.duration, { color: theme.textSecondary }]}>
-                {formatDuration(trip.durationMinutes)}
-              </ThemedText>
-            )}
-            <View style={[styles.line, { backgroundColor: accents.line }]}>
-              <View style={[styles.lineDot, styles.lineDotLeft, { backgroundColor: accents.lineDot }]} />
-              <View style={[styles.lineDot, styles.lineDotRight, { backgroundColor: Brand.mango }]} />
-            </View>
-            <ThemedText style={[styles.stops, { color: theme.textSecondary }]}>
+              {trip.arrivalTime != null && (
+                <>
+                  {' → '}
+                  {trip.arrivalTime}
+                  {trip.nextDay === true && (
+                    <ThemedText style={[styles.plusOne, { color: accents.plusOne }]}>
+                      {' '}
+                      +1
+                    </ThemedText>
+                  )}
+                </>
+              )}
+              {duration !== null ? ` · ${duration}` : ''}
+              {' · '}
               {trip.stopovers && trip.stopovers > 0
                 ? t('card.stopovers', { count: trip.stopovers })
                 : t('card.direct')}
             </ThemedText>
           </View>
 
-          {/* Arrivée */}
-          <View style={[styles.endpoint, styles.endpointRight]}>
-            <ThemedText style={styles.city} numberOfLines={1}>
-              {trip.toCity}
-            </ThemedText>
-            {toCountry && (
-              <ThemedText
-                numberOfLines={1}
-                style={[styles.country, { color: theme.textSecondary }]}>
-                {toCountry}
-              </ThemedText>
-            )}
-            <View style={styles.arrivalRow}>
-              <ThemedText style={[styles.time, { color: theme.textSecondary }]}>
-                {trip.arrivalTime ?? ''}
-              </ThemedText>
-              {trip.arrivalTime != null && trip.nextDay === true && (
-                <View style={[styles.nextDay, { backgroundColor: accents.nextDayBg }]}>
-                  <ThemedText style={[styles.nextDayText, { color: accents.nextDayText }]}>
-                    +1
-                  </ThemedText>
-                </View>
-              )}
-            </View>
-          </View>
-
           {/* Prix — PER_KG (D13) ou legacy « dès ». Seul élément en 18. */}
           <View style={styles.priceBlock}>
             {perKgPrice !== null ? (
               <>
-                <ThemedText style={[styles.priceLabel, { color: theme.textSecondary }]}>
-                  {t('card.perKgLabel')}
-                </ThemedText>
                 <ThemedText style={styles.price}>
-                  {formatTwoDecimals(perKgPrice, locale)}
-                  {currency}
+                  {formatTwoDecimals(perKgPrice, locale)} {currency}
                   <ThemedText style={[styles.priceUnit, { color: theme.textSecondary }]}>
                     /kg
                   </ThemedText>
@@ -224,52 +196,43 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
               </>
             ) : (
               <>
-                <ThemedText style={[styles.priceLabel, { color: theme.textSecondary }]}>
+                <ThemedText style={[styles.fromLabel, { color: theme.textSecondary }]}>
                   {t('card.fromPrice')}
                 </ThemedText>
                 <ThemedText style={styles.price}>
-                  {trip.minPrice}
-                  {currency}
+                  {trip.minPrice} {currency}
                 </ThemedText>
               </>
             )}
           </View>
         </View>
 
-        {/* ── Pied : Voyageur + signaux + catégories + chevron ── */}
+        {/* ── Pied : Voyageur + vues + chevron ── */}
         <View
           style={[
             styles.footer,
             { borderTopColor: theme.backgroundSelected, backgroundColor: accents.footerBg },
           ]}>
-          <View style={styles.traveler}>
-            <TravelerAvatar trip={trip} dark={dark} />
-            <View style={styles.travelerTexts}>
-              <ThemedText style={styles.travelerName} numberOfLines={1}>
-                {trip.travelerFirstName}
-                {trip.travelerLastName ? ` ${trip.travelerLastName.charAt(0)}.` : ''}
-              </ThemedText>
-              {typeof trip.rating === 'number' ? (
-                <ThemedText
-                  type="small"
-                  themeColor="textSecondary"
-                  numberOfLines={1}
-                  style={styles.travelerMeta}>
-                  <ThemedText style={[styles.star, { color: Brand.mango }]}>★</ThemedText>{' '}
+          <TravelerAvatar trip={trip} dark={dark} />
+          <ThemedText style={styles.travelerName} numberOfLines={1}>
+            {trip.travelerFirstName}
+            {trip.travelerLastName ? ` ${trip.travelerLastName.charAt(0)}.` : ''}
+            <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}> · </ThemedText>
+            {typeof trip.rating === 'number' ? (
+              <>
+                <ThemedText style={[styles.travelerMeta, { color: Brand.mango }]}>★</ThemedText>
+                <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}>
+                  {' '}
                   {formatRating(trip.rating, locale)}
                   {typeof trip.reviewCount === 'number' ? ` (${trip.reviewCount})` : ''}
                 </ThemedText>
-              ) : (
-                <ThemedText
-                  type="small"
-                  themeColor="textSecondary"
-                  numberOfLines={1}
-                  style={styles.travelerMeta}>
-                  {t('card.newTripper')}
-                </ThemedText>
-              )}
-            </View>
-          </View>
+              </>
+            ) : (
+              <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}>
+                {t('card.newTripper')}
+              </ThemedText>
+            )}
+          </ThemedText>
 
           <View style={styles.footerRight}>
             {/* D5 / C-PR6 — pastille « n vues », « Populaire » à partir de 20. */}
@@ -292,16 +255,6 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                   {isPopular(trip.viewsCount) ? t('card.popular') : trip.viewsCount}
                 </ThemedText>
               </View>
-            )}
-            {visibleCategories.map((cat) => (
-              <View key={cat} style={[styles.categoryCircle, { backgroundColor: accents.viewsBg }]}>
-                <Ionicons name={categoryIcon(cat)} size={11} color={accents.categoryIcon} />
-              </View>
-            ))}
-            {categoryOverflow > 0 && (
-              <ThemedText style={[styles.categoryOverflow, { color: theme.textSecondary }]}>
-                +{categoryOverflow}
-              </ThemedText>
             )}
             <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
           </View>
@@ -336,20 +289,17 @@ function transportIcon(mode: TripSearchResult['transportMode']) {
   return 'car-outline' as const;
 }
 
-function categoryIcon(cat: SearchParcelCategory) {
-  switch (cat) {
-    case 'clothes':
-      return 'shirt-outline' as const;
-    case 'documents':
-      return 'document-text-outline' as const;
-    case 'books':
-      return 'book-outline' as const;
-    default:
-      return 'cube-outline' as const;
-  }
+/** Code ISO 3166-1 alpha-2 → drapeau émoji (indicateurs régionaux). */
+function flagEmoji(code: string | null | undefined): string | null {
+  if (!code || code.length !== 2) return null;
+  const upper = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return null;
+  return String.fromCodePoint(
+    ...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+  );
 }
 
-/** « 7 h », « 6 h 30 » — même forme que la carte web (formatDuration). */
+/** « 7 h », « 9 h 35 » — même forme que la carte web (formatDuration). */
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -376,23 +326,19 @@ function formatRating(rating: number, locale: string): string {
   return locale === 'fr' ? fixed.replace('.', ',') : fixed;
 }
 
-/** Accents hors jetons de thème — mêmes valeurs que les classes de la carte
- *  web (slate / red / orange Tailwind, mangue #FF9900). */
+/** Accents hors jetons de thème — mêmes valeurs que la maquette validée
+ *  (slate / red / orange Tailwind, mangue #FF9900). */
 const Accents = {
   light: {
     alertBg: '#FEF2F2',
     alertText: '#B91C1C',
-    nextDayBg: '#FFEDD5',
-    nextDayText: '#9A3412',
+    plusOne: '#9A3412',
     avatarBg: '#FFEDD5',
     avatarText: '#C2410C',
     popularBg: '#FFF6E8',
     popularText: '#B45309',
     viewsBg: '#E8EAEE',
     viewsText: '#475569',
-    categoryIcon: '#64748B',
-    line: '#D8DCE2',
-    lineDot: '#94A3B8',
     heartBg: 'rgba(255,255,255,0.9)',
     heartRing: '#E2E8F0',
     footerBg: 'rgba(248,250,252,0.4)',
@@ -400,17 +346,13 @@ const Accents = {
   dark: {
     alertBg: 'rgba(69,10,10,0.4)',
     alertText: '#F87171',
-    nextDayBg: 'rgba(255,153,0,0.2)',
-    nextDayText: '#FFB84D',
+    plusOne: '#FFB84D',
     avatarBg: 'rgba(124,45,18,0.4)',
     avatarText: '#FDBA74',
     popularBg: 'rgba(255,153,0,0.15)',
     popularText: '#FFB84D',
     viewsBg: '#2E3135',
     viewsText: '#CBD5E1',
-    categoryIcon: '#94A3B8',
-    line: '#3A3F45',
-    lineDot: '#94A3B8',
     heartBg: 'rgba(15,23,42,0.9)',
     heartRing: '#334155',
     footerBg: 'rgba(2,6,23,0.35)',
@@ -480,140 +422,82 @@ const styles = StyleSheet.create({
   body: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.two,
+    gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  endpoint: {
-    // Les villes d'abord (revue sur captures : « Brazzavi… » tronqué alors
-    // que la colonne durée gaspillait sa largeur) : 1.2 contre 0.7.
-    flex: 1.2,
-    gap: 2,
+  routeBlock: {
+    flex: 1,
+    minWidth: 0,
   },
-  endpointRight: {
-    alignItems: 'flex-end',
+  route: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: 600,
+    letterSpacing: -0.2,
   },
-  city: {
+  flag: {
     fontSize: 14,
+    lineHeight: 21,
+  },
+  meta: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+    fontVariant: ['tabular-nums'],
+  },
+  plusOne: {
+    fontSize: 10,
     lineHeight: 18,
     fontWeight: 600,
   },
-  country: {
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  time: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontVariant: ['tabular-nums'],
-  },
-  arrivalRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  nextDay: {
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  nextDayText: {
-    fontSize: 9,
-    lineHeight: 11,
-    fontWeight: 500,
-  },
-  middle: {
-    flex: 0.7,
-    minWidth: 64,
-    alignItems: 'center',
-    paddingTop: 4,
-    gap: 4,
-  },
-  duration: {
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  line: {
-    alignSelf: 'stretch',
-    height: 1,
-    marginHorizontal: 6,
-  },
-  lineDot: {
-    position: 'absolute',
-    top: -1.5,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  lineDotLeft: {
-    left: 0,
-  },
-  lineDotRight: {
-    right: 0,
-  },
-  stops: {
-    fontSize: 9,
-    lineHeight: 12,
-  },
   priceBlock: {
-    minWidth: 50,
     alignItems: 'flex-end',
     gap: 2,
+    flexShrink: 0,
   },
-  priceLabel: {
-    fontSize: 9,
-    lineHeight: 11,
+  fromLabel: {
+    fontSize: 11,
+    lineHeight: 13,
   },
   price: {
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: 600,
+    fontWeight: 700,
   },
   priceUnit: {
     fontSize: 11,
     fontWeight: 500,
   },
   remainingKg: {
-    fontSize: 9,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: 500,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     paddingVertical: Spacing.two,
   },
-  traveler: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
+  travelerName: {
     flex: 1,
     minWidth: 0,
-  },
-  travelerTexts: {
-    flex: 1,
-    gap: 1,
-  },
-  travelerName: {
     fontSize: 13,
-    lineHeight: 16,
+    lineHeight: 17,
     fontWeight: 600,
   },
   travelerMeta: {
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  star: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: 500,
   },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   avatarFallback: {
     alignItems: 'center',
@@ -626,7 +510,7 @@ const styles = StyleSheet.create({
   },
   superRing: {
     padding: 1.5,
-    borderRadius: 16,
+    borderRadius: 15,
     backgroundColor: Brand.mango,
   },
   footerRight: {
@@ -646,18 +530,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 13,
     fontWeight: 600,
-  },
-  categoryCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryOverflow: {
-    fontSize: 10,
-    fontWeight: 600,
-    paddingHorizontal: 2,
   },
   pressed: {
     opacity: 0.7,

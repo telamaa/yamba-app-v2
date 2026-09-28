@@ -50,7 +50,6 @@
   },
   "card": {
     "fromPrice": "from",
-    "perKgLabel": "price per kg",
     "remainingKg": "{kg} kg left",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
