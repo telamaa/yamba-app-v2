@@ -1,12 +1,11 @@
 /**
- * auth-screen.tsx — le gabarit des écrans d'auth (lot auth mobile).
- * =================================================================
- * Tous les écrans du groupe `(auth)` partagent la même coquille : feuille
- * modale (déclarée au layout racine), en-tête maison — retour à gauche,
- * titre centré, équilibre à droite (le motif du `city-picker`) —, contenu
- * défilable qui laisse la place au clavier. Le retour est `router.back()` :
- * dans la pile interne du groupe, il revient à l'étape précédente ; sur la
- * première, il referme la feuille.
+ * auth-screen.tsx — le gabarit des écrans d'auth (refonte sur captures, A208).
+ * ============================================================================
+ * La composition des pages auth du SITE, en feuille : fond slate, badge
+ * pilule teal « … sécurisée » avec bouclier, GROS titre navy, sous-titre
+ * gris — puis le formulaire de l'écran. La feuille garde un geste de
+ * fermeture discret en haut (chevron/croix), les retours d'étape sont des
+ * LIENS dans le contenu (« ← Retour à la connexion »), comme sur le site.
  */
 import type { ReactNode } from 'react';
 import {
@@ -15,43 +14,35 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
+import { SymbolView } from 'expo-symbols';
 import { useTranslations } from 'use-intl';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 type Props = {
+  /** Libellé du badge pilule (« Connexion sécurisée »…). */
+  badge: string;
   title: string;
-  /** Libellé du geste de gauche — défaut : « Retour ». */
-  backLabel?: string;
-  onBackAction?: () => void;
+  subtitle?: string;
+  /** Croix (premier écran de la feuille) ou chevron (étape poussée). */
+  dismissGlyph?: 'close' | 'back';
   children: ReactNode;
 };
 
-export function AuthScreen({ title, backLabel, onBackAction, children }: Props) {
+export function AuthScreen({ badge, title, subtitle, dismissGlyph = 'back', children }: Props) {
   const t = useTranslations('auth');
+  const palette = useAuthPalette();
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: palette.bg }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={onBackAction ?? (() => router.back())}
-            hitSlop={Spacing.two}
-            style={styles.headerSide}>
-            <ThemedText type="linkPrimary">{backLabel ?? t('common.back')}</ThemedText>
-          </Pressable>
-          <ThemedText type="smallBold" numberOfLines={1} style={styles.headerTitle}>
-            {title}
-          </ThemedText>
-          <View style={styles.headerSide} />
-        </View>
         <KeyboardAvoidingView
           style={styles.body}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -59,11 +50,38 @@ export function AuthScreen({ title, backLabel, onBackAction, children }: Props) 
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            {children}
+            <View style={styles.topRow}>
+              <View style={[styles.badge, { borderColor: palette.teal }]}>
+                <SymbolView
+                  name="checkmark.shield"
+                  size={14}
+                  tintColor={palette.teal}
+                  fallback={<Text style={[styles.badgeGlyph, { color: palette.teal }]}>✓</Text>}
+                />
+                <Text style={[styles.badgeLabel, { color: palette.teal }]}>{badge}</Text>
+              </View>
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={Spacing.two}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <Text style={[styles.dismiss, { color: palette.muted }]}>
+                  {dismissGlyph === 'close' ? '✕' : '‹'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.title, { color: palette.title }]}>{title}</Text>
+            {subtitle !== undefined && (
+              <Text style={[styles.subtitle, { color: palette.muted }]}>{subtitle}</Text>
+            )}
+
+            <View style={styles.content}>{children}</View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -76,25 +94,59 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.three,
-  },
-  headerSide: {
-    width: 72,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
   },
   body: {
     flex: 1,
   },
   scroll: {
-    gap: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
     paddingBottom: Spacing.five,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.three,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
+  },
+  badgeGlyph: {
+    fontSize: 12,
+    fontWeight: 700,
+  },
+  badgeLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  dismiss: {
+    fontSize: 22,
+    fontWeight: 500,
+    paddingHorizontal: Spacing.two,
+  },
+  title: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: 800,
+    marginBottom: Spacing.two,
+  },
+  subtitle: {
+    fontSize: 16,
+    lineHeight: 23,
+    fontWeight: 500,
+  },
+  content: {
+    marginTop: Spacing.four,
+    gap: Spacing.three,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

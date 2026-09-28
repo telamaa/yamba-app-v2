@@ -7,13 +7,12 @@
  * huit lignes cochées n'apprennent rien). Mêmes 8 critères, même barème de
  * niveau que le web et le serveur (`@/lib/password-rules`).
  */
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
-import { ThemedText } from '@/components/themed-text';
+import { useAuthPalette } from '@/components/auth/auth-theme';
 import { Brand, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import {
   getPasswordChecks,
   getPasswordLevel,
@@ -48,32 +47,30 @@ type Props = {
 
 export function PasswordStrengthMeter({ password, context }: Props) {
   const t = useTranslations('auth');
-  const theme = useTheme();
+  const palette = useAuthPalette();
 
   if (password.length === 0) return null;
 
   const checks = getPasswordChecks(password, context);
   const score = getPasswordScore(checks);
   const level = getPasswordLevel(password, score);
-  const color = LEVEL_COLOR[level] ?? theme.textSecondary;
+  const color = LEVEL_COLOR[level] ?? palette.muted;
   const missing = CHECK_ORDER.filter((key) => !checks[key]);
 
   return (
     <View style={styles.container}>
       <View style={styles.gaugeRow}>
-        <View style={[styles.gauge, { backgroundColor: theme.backgroundSelected }]}>
+        <View style={[styles.gauge, { backgroundColor: palette.border }]}>
           <View
             style={[styles.gaugeFill, { width: `${(score / 8) * 100}%`, backgroundColor: color }]}
           />
         </View>
-        <ThemedText type="small" style={{ color }}>
-          {t(`password.level.${level}`)}
-        </ThemedText>
+        <Text style={[styles.levelLabel, { color }]}>{t(`password.level.${level}`)}</Text>
       </View>
       {missing.map((key) => (
-        <ThemedText key={key} type="small" themeColor="textSecondary">
+        <Text key={key} style={[styles.missing, { color: palette.muted }]}>
           · {t(`password.checks.${key}`)}
-        </ThemedText>
+        </Text>
       ))}
     </View>
   );
@@ -97,5 +94,13 @@ const styles = StyleSheet.create({
   gaugeFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  levelLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  missing: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

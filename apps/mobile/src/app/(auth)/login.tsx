@@ -1,34 +1,37 @@
 /**
- * (auth)/login.tsx — la connexion (porte d'identité A58/A63, lot auth mobile).
- * ============================================================================
- * Premier écran de la feuille d'auth. Les refus parlent par `details.code`
- * (RG-MOB-1) ; « mot de passe oublié » et « créer un compte » poussent leurs
- * étapes DANS la feuille. Un bandeau de succès accueille les retours des
- * autres parcours (compte activé, mot de passe changé) via le préremplissage
- * consommé au focus — la transposition du `/login?verified=1` du web, sans
- * rien mettre dans une URL.
+ * (auth)/login.tsx — la connexion (A208, refonte sur captures).
+ * =============================================================
+ * La page « Connecte-toi » du site, en feuille : badge « Connexion
+ * sécurisée », social (Google à venir, Facebook inerte — comme le site),
+ * « OU PAR E-MAIL », labels en gras avec « Oublié ? » sur la ligne du mot
+ * de passe, « Rester connecté sur cet appareil » (le VRAI `rememberMe` du
+ * serveur : 7 jours sans activité coché, 60 min sinon — décoché par défaut,
+ * A62), CTA mangue, pied « Pas encore membre ? Inscris-toi ». Les refus
+ * parlent par `details.code` (RG-MOB-1). Le bandeau de succès accueille
+ * les retours des autres parcours (compte activé, mot de passe changé).
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
+import {
+  AuthCta,
+  AuthCheckbox,
+  AuthDivider,
+  AuthError,
+  AuthTextField,
+  FieldLabel,
+  SocialSignInBlock,
+} from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
+import { AuthBrand, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { PasswordInput } from '@/components/auth/password-input';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Brand, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { ApiError } from '@/lib/api/client';
 import { consumeLoginPrefill, type LoginNotice } from '@/lib/auth-flow-state';
 import { useSession } from '@/lib/session-context';
-import { useTheme } from '@/hooks/use-theme';
 
 // Les refus dont l'écran porte un texte à lui ; tout autre `details.code`
 // affiche le message du serveur (RG-MOB-1 : le serveur décide).
@@ -45,11 +48,12 @@ function closeAuthSheet() {
 }
 
 export default function LoginScreen() {
-  const theme = useTheme();
   const t = useTranslations('auth');
+  const palette = useAuthPalette();
   const { signIn } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<LoginNotice | null>(null);
@@ -85,7 +89,7 @@ export default function LoginScreen() {
     setPending(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      await signIn(email.trim(), password, remember);
       closeAuthSheet();
     } catch (err) {
       setError(messageOf(err));
@@ -95,25 +99,40 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthScreen title={t('login.title')} backLabel={t('common.close')}>
+    <AuthScreen
+      badge={t('login.badge')}
+      title={t('login.title')}
+      subtitle={t('login.subtitle')}
+      dismissGlyph="close">
       {notice !== null && (
-        <ThemedView type="backgroundElement" style={styles.notice}>
-          <ThemedText type="small" style={styles.noticeText}>
+        <View style={[styles.notice, { borderColor: palette.teal }]}>
+          <Text style={[styles.noticeText, { color: palette.teal }]}>
             {t(`login.notices.${notice}`)}
-          </ThemedText>
-        </ThemedView>
+          </Text>
+        </View>
       )}
 
-      <TextInput
-        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+      <SocialSignInBlock />
+      <AuthDivider label={t('common.orByEmail')} />
+
+      <FieldLabel>{t('login.emailLabel')}</FieldLabel>
+      <AuthTextField
         placeholder={t('login.emailPlaceholder')}
-        placeholderTextColor={theme.textSecondary}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
+
+      <FieldLabel
+        right={
+          <Pressable onPress={() => router.push('/password-forgot')} hitSlop={Spacing.one}>
+            <Text style={[styles.forgotLink, { color: palette.teal }]}>{t('login.forgot')}</Text>
+          </Pressable>
+        }>
+        {t('login.passwordLabel')}
+      </FieldLabel>
       <PasswordInput
         placeholder={t('login.passwordPlaceholder')}
         autoComplete="password"
@@ -122,36 +141,26 @@ export default function LoginScreen() {
         onSubmitEditing={onSubmit}
       />
 
-      <Pressable
-        onPress={() => router.push('/password-forgot')}
-        hitSlop={Spacing.one}
-        style={styles.forgot}>
-        <ThemedText type="linkPrimary">{t('login.forgot')}</ThemedText>
-      </Pressable>
+      <AuthCheckbox
+        checked={remember}
+        onToggleAction={() => setRemember((v) => !v)}
+        label={t('login.rememberLabel')}
+        helper={t('login.rememberHelper')}
+      />
 
-      {error !== null && (
-        <ThemedText type="small" style={styles.error}>
-          {error}
-        </ThemedText>
-      )}
+      {error !== null && <AuthError message={error} />}
 
-      <Pressable
-        onPress={onSubmit}
+      <AuthCta
+        label={t('login.submit')}
+        onPressAction={onSubmit}
         disabled={!canSubmit}
-        style={({ pressed }) => [styles.submit, (!canSubmit || pressed) && styles.submitDimmed]}>
-        {pending ? (
-          <ActivityIndicator color="#151718" />
-        ) : (
-          <ThemedText style={styles.submitLabel}>{t('login.submit')}</ThemedText>
-        )}
-      </Pressable>
+        pending={pending}
+      />
 
       <View style={styles.footer}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {t('login.noAccount')}
-        </ThemedText>
+        <Text style={[styles.footerText, { color: palette.text }]}>{t('login.noAccount')}</Text>
         <Pressable onPress={() => router.push('/register')} hitSlop={Spacing.one}>
-          <ThemedText type="linkPrimary">{t('login.registerLink')}</ThemedText>
+          <Text style={styles.footerLink}>{t('login.registerLink')}</Text>
         </Pressable>
       </View>
     </AuthScreen>
@@ -160,44 +169,33 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   notice: {
-    borderRadius: Spacing.two,
+    borderWidth: 1,
+    borderRadius: AuthRadius,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
   noticeText: {
-    color: '#16A34A',
-  },
-  input: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
-  },
-  forgot: {
-    alignSelf: 'flex-end',
-  },
-  error: {
-    color: '#DC2626',
-  },
-  submit: {
-    backgroundColor: Brand.mango,
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  submitDimmed: {
-    opacity: 0.6,
-  },
-  submitLabel: {
-    color: '#151718',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 600,
+  },
+  forgotLink: {
+    fontSize: 15,
+    fontWeight: 700,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    gap: Spacing.two,
+    gap: Spacing.one,
     paddingTop: Spacing.two,
+  },
+  footerText: {
+    fontSize: 15,
+    fontWeight: 500,
+  },
+  footerLink: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: AuthBrand.mango,
   },
 });

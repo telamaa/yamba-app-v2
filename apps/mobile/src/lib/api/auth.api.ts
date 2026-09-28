@@ -28,10 +28,14 @@ type LoginResponse = {
   };
 };
 
-export async function login(email: string, password: string): Promise<SessionUser> {
+export async function login(
+  email: string,
+  password: string,
+  rememberMe = false
+): Promise<SessionUser> {
   const body = await apiFetch<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: { email, password },
+    body: { email, password, rememberMe },
     headers: { 'x-token-delivery': 'body' },
     requireAuth: false,
   });

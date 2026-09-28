@@ -1,23 +1,31 @@
 /**
- * otp-verify-view.tsx — l'étape « saisis ton code » partagée (lot auth mobile).
- * =============================================================================
- * Les deux parcours OTP (inscription, mot de passe oublié) partagent la même
- * mécanique que leurs formulaires web (RegisterVerifyForm / ResetVerifyForm) :
- * TROIS compteurs simultanés — expiration du code (10 min, le TTL serveur),
- * cooldown de renvoi (60 s, purement client : le serveur ne révèle rien),
- * verrou serveur (`details.lockUntilSeconds` sur refus). Le code se vérifie
- * de LUI-MÊME à la sixième frappe (le bouton reste pour recommencer après un
- * refus). Les refus parlent par `details.code` (RG-MOB-1) ; les codes fatals
- * du parcours (session d'étape expirée…) remontent à l'écran appelant.
+ * otp-verify-view.tsx — l'étape « saisis ton code » partagée (A208, refonte
+ * sur captures).
+ * =========================================================================
+ * La composition de l'écran « Vérification du code » du site : l'adresse
+ * MASQUÉE dans une carte (police mono), la puce « Code valable mm:ss »,
+ * les six cases, l'astuce collage, le CTA « Valider mon code », puis le
+ * bloc renvoi (« Pas reçu le code ? Vérifie tes spams ou… ») et le lien
+ * « Recommencer ». La mécanique est inchangée : TROIS compteurs
+ * (expiration 10 min = TTL serveur, renvoi 60 s purement client —
+ * anti-énumération —, verrou serveur `details.lockUntilSeconds`),
+ * vérification d'office à la sixième frappe, refus par `details.code`
+ * (RG-MOB-1), codes fatals remontés à l'écran appelant.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
+import { SymbolView } from 'expo-symbols';
 import { useTranslations } from 'use-intl';
 
+import { AuthCta, AuthError, TealLink } from '@/components/auth/auth-kit';
 import { OtpInput, OTP_LENGTH } from '@/components/auth/otp-input';
-import { ThemedText } from '@/components/themed-text';
-import { Brand, Spacing } from '@/constants/theme';
+import {
+  AuthRadius,
+  maskEmail,
+  useAuthPalette,
+} from '@/components/auth/auth-theme';
+import { Spacing } from '@/constants/theme';
 import { formatMMSS, useCountdown } from '@/hooks/use-countdown';
 import { ApiError } from '@/lib/api/client';
 
@@ -26,28 +34,31 @@ const OTP_EXPIRY_SECONDS = 600;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 type Props = {
-  /** « Un code à 6 chiffres a été envoyé à … » — construit par l'appelant. */
-  subtitle: string;
+  /** L'adresse du parcours — affichée MASQUÉE, comme sur le site. */
+  email: string;
   onVerifyAction: (otp: string) => Promise<void>;
   /** Renvoie un code ; l'appelant fait son appel API et jette en cas d'échec. */
   onResendAction: () => Promise<void>;
   /** Un `details.code` que l'appelant prend en charge (étape expirée…) :
    *  retourner true court-circuite l'affichage générique. */
   onFatalCodeAction?: (code: string) => boolean;
-  /** Ligne d'action secondaire sous le renvoi (annuler, changer d'adresse). */
-  secondaryLabel?: string;
-  onSecondaryAction?: () => void;
+  /** « Trompé d'adresse e-mail ? » / « Recommencer » du bas d'écran. */
+  restartQuestion: string;
+  restartLabel: string;
+  onRestartAction: () => void;
 };
 
 export function OtpVerifyView({
-  subtitle,
+  email,
   onVerifyAction,
   onResendAction,
   onFatalCodeAction,
-  secondaryLabel,
-  onSecondaryAction,
+  restartQuestion,
+  restartLabel,
+  onRestartAction,
 }: Props) {
   const t = useTranslations('auth');
+  const palette = useAuthPalette();
   const [otp, setOtp] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,64 +148,72 @@ export function OtpVerifyView({
     }
   };
 
+  const canResend = resendWait <= 0 && !locked && !pending;
+  const mono = Platform.select({ ios: 'ui-monospace', default: 'monospace' });
+
   return (
     <View style={styles.container}>
-      <ThemedText themeColor="textSecondary">{subtitle}</ThemedText>
+      <View
+        style={[styles.emailCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+        <Text style={[styles.emailMasked, { color: palette.title, fontFamily: mono }]}>
+          {maskEmail(email)}
+        </Text>
+      </View>
+
+      <View style={[styles.validityChip, { borderColor: palette.border }]}>
+        <SymbolView
+          name="clock"
+          size={14}
+          tintColor={palette.muted}
+          fallback={<Text style={{ color: palette.muted, fontSize: 12 }}>◷</Text>}
+        />
+        <Text style={[styles.validityLabel, { color: palette.text }]}>
+          {expired ? (
+            t('otp.expired')
+          ) : (
+            <>
+              {t('otp.validFor')}{' '}
+              <Text style={[styles.validityTime, { fontFamily: mono }]}>{formatMMSS(expiry)}</Text>
+            </>
+          )}
+        </Text>
+      </View>
+
+      <Text style={[styles.enterCode, { color: palette.title }]}>{t('otp.enterCode')}</Text>
 
       <OtpInput value={otp} onChangeAction={setOtp} disabled={pending || locked} />
 
-      {locked ? (
-        <ThemedText type="small" style={styles.error}>
-          {t('otp.lockedFor', { time: formatMMSS(lock) })}
-        </ThemedText>
-      ) : expired ? (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-          {t('otp.expired')}
-        </ThemedText>
-      ) : (
-        <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-          {t('otp.expiresIn', { time: formatMMSS(expiry) })}
-        </ThemedText>
-      )}
+      <Text style={[styles.pasteHint, { color: palette.muted }]}>{t('otp.pasteHint')}</Text>
 
-      {error !== null && (
-        <ThemedText type="small" style={styles.error}>
-          {error}
-        </ThemedText>
-      )}
+      {locked && <AuthError message={t('otp.lockedFor', { time: formatMMSS(lock) })} />}
+      {error !== null && <AuthError message={error} />}
 
-      <Pressable
-        onPress={() => verify(otp)}
+      <AuthCta
+        label={t('otp.verify')}
+        onPressAction={() => verify(otp)}
         disabled={!canVerify}
-        style={({ pressed }) => [styles.submit, (!canVerify || pressed) && styles.submitDimmed]}>
-        {pending ? (
-          <ActivityIndicator color="#151718" />
+        pending={pending}
+      />
+
+      <View style={[styles.footerDivider, { backgroundColor: palette.border }]} />
+
+      <View style={styles.resendBlock}>
+        <Text style={[styles.resendQuestion, { color: palette.text }]}>
+          {t('otp.notReceived')}
+        </Text>
+        {canResend ? (
+          <TealLink label={t('otp.resend')} onPressAction={resend} center />
         ) : (
-          <ThemedText style={styles.submitLabel}>{t('otp.verify')}</ThemedText>
+          <Text style={[styles.resendWait, { color: palette.muted }]}>
+            {t('otp.resendIn', { time: formatMMSS(resendWait) })}
+          </Text>
         )}
-      </Pressable>
+      </View>
 
-      <Pressable
-        onPress={resend}
-        disabled={resendWait > 0 || locked || pending}
-        hitSlop={Spacing.one}
-        style={styles.inlineAction}>
-        <ThemedText
-          type="linkPrimary"
-          themeColor={resendWait > 0 || locked ? 'textSecondary' : undefined}>
-          {resendWait > 0
-            ? t('otp.resendIn', { time: formatMMSS(resendWait) })
-            : t('otp.resend')}
-        </ThemedText>
-      </Pressable>
-
-      {secondaryLabel !== undefined && onSecondaryAction !== undefined && (
-        <Pressable onPress={onSecondaryAction} hitSlop={Spacing.one} style={styles.inlineAction}>
-          <ThemedText type="link" themeColor="textSecondary">
-            {secondaryLabel}
-          </ThemedText>
-        </Pressable>
-      )}
+      <View style={styles.restartRow}>
+        <Text style={[styles.resendQuestion, { color: palette.text }]}>{restartQuestion}</Text>
+        <TealLink label={restartLabel} onPressAction={onRestartAction} />
+      </View>
     </View>
   );
 }
@@ -203,28 +222,64 @@ const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
   },
-  centered: {
-    textAlign: 'center',
+  emailCard: {
+    borderWidth: 1,
+    borderRadius: AuthRadius,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
   },
-  error: {
-    color: '#DC2626',
-    textAlign: 'center',
+  emailMasked: {
+    fontSize: 16,
+    fontWeight: 600,
   },
-  submit: {
-    backgroundColor: Brand.mango,
-    borderRadius: 999,
-    paddingVertical: 12,
+  validityChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
   },
-  submitDimmed: {
-    opacity: 0.6,
+  validityLabel: {
+    fontSize: 14,
+    fontWeight: 500,
   },
-  submitLabel: {
-    color: '#151718',
+  validityTime: {
+    fontWeight: 700,
+  },
+  enterCode: {
+    fontSize: 16,
+    fontWeight: 700,
+    textAlign: 'center',
+    marginTop: Spacing.two,
+  },
+  pasteHint: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  footerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: Spacing.two,
+  },
+  resendBlock: {
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  resendQuestion: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  resendWait: {
     fontSize: 15,
     fontWeight: 600,
   },
-  inlineAction: {
-    alignSelf: 'center',
+  restartRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    flexWrap: 'wrap',
   },
 });

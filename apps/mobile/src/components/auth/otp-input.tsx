@@ -9,11 +9,10 @@
  * l'autofill natifs gratuits.
  */
 import { useRef } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 export const OTP_LENGTH = 6;
 
@@ -24,7 +23,7 @@ type Props = {
 };
 
 export function OtpInput({ value, onChangeAction, disabled = false }: Props) {
-  const theme = useTheme();
+  const palette = useAuthPalette();
   const input = useRef<TextInput>(null);
 
   const onChange = (text: string) => {
@@ -41,11 +40,11 @@ export function OtpInput({ value, onChangeAction, disabled = false }: Props) {
               key={i}
               style={[
                 styles.cell,
-                { backgroundColor: theme.backgroundElement },
+                { backgroundColor: palette.card, borderColor: palette.border },
                 active && styles.cellActive,
                 disabled && styles.cellDisabled,
               ]}>
-              <ThemedText type="subtitle">{value[i] ?? ''}</ThemedText>
+              <Text style={[styles.digit, { color: palette.title }]}>{value[i] ?? ''}</Text>
             </View>
           );
         })}
@@ -74,19 +73,22 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   cell: {
-    width: 44,
-    height: 52,
-    borderRadius: Spacing.two,
+    width: 48,
+    height: 60,
+    borderRadius: AuthRadius,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
   cellActive: {
     borderColor: Brand.mango,
   },
   cellDisabled: {
     opacity: 0.5,
+  },
+  digit: {
+    fontSize: 24,
+    fontWeight: 700,
   },
   hidden: {
     position: 'absolute',

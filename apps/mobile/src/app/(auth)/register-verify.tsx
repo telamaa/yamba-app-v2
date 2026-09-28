@@ -1,25 +1,22 @@
 /**
- * (auth)/register-verify.tsx — le code d'inscription (lot auth mobile).
+ * (auth)/register-verify.tsx — le code d'inscription (A208, refonte sur
+ * captures).
  * =====================================================================
- * L'étape OTP du parcours d'inscription (RegisterVerifyForm du web). Le
- * serveur n'ouvre PAS de session à la vérification : le web renvoyait vers
- * `/login?verified=1` — ici, le mot de passe encore en mémoire du parcours
- * permet de CHAÎNER la connexion (un compte activé est un membre connecté,
- * le détour n'apprend rien) ; si le processus a redémarré entre-temps, on
- * retombe sur la connexion préremplie avec son bandeau « compte activé ».
+ * L'écran « Vérification du code » du site pour le parcours d'inscription.
+ * Le serveur n'ouvre PAS de session à la vérification : le mot de passe
+ * encore en mémoire du parcours permet de CHAÎNER la connexion ; tout
+ * échec du chaînage retombe sur la connexion préremplie « compte activé ».
  * Étape morte côté serveur (pending 30 min / jeton 15 min expirés) : un
  * état dédié propose de recommencer — jamais un code d'erreur brut.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
+import { AuthCta } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { OtpVerifyView } from '@/components/auth/otp-verify-view';
-import { ThemedText } from '@/components/themed-text';
-import { Brand, Spacing } from '@/constants/theme';
 import {
   cancelRegistration,
   resendRegistrationOtp,
@@ -45,30 +42,21 @@ export default function RegisterVerifyScreen() {
   const [expired, setExpired] = useState(false);
   const pendingRegistration = getPendingRegistration();
 
-  // Arrivée sans parcours en cours (processus relancé) : retour au départ.
-  if (pendingRegistration === null) {
+  // Arrivée sans parcours en cours (processus relancé) ou étape expirée :
+  // l'écran le dit et propose de reprendre.
+  if (pendingRegistration === null || expired) {
     return (
-      <AuthScreen title={t('otp.registerTitle')}>
-        <ThemedText themeColor="textSecondary">{t('otp.flowLost')}</ThemedText>
-        <Pressable onPress={() => router.navigate('/register')} style={styles.cta}>
-          <ThemedText style={styles.ctaLabel}>{t('otp.restartRegister')}</ThemedText>
-        </Pressable>
-      </AuthScreen>
-    );
-  }
-
-  if (expired) {
-    return (
-      <AuthScreen title={t('otp.registerTitle')}>
-        <ThemedText themeColor="textSecondary">{t('otp.registrationExpired')}</ThemedText>
-        <Pressable
-          onPress={() => {
+      <AuthScreen
+        badge={t('otp.badge')}
+        title={t('otp.title')}
+        subtitle={expired ? t('otp.registrationExpired') : t('otp.flowLost')}>
+        <AuthCta
+          label={t('otp.restartRegister')}
+          onPressAction={() => {
             setPendingRegistration(null);
             router.navigate('/register');
           }}
-          style={styles.cta}>
-          <ThemedText style={styles.ctaLabel}>{t('otp.restartRegister')}</ThemedText>
-        </Pressable>
+        />
       </AuthScreen>
     );
   }
@@ -99,7 +87,7 @@ export default function RegisterVerifyScreen() {
     setPendingRegistration({ ...pendingRegistration, verificationToken });
   };
 
-  const onCancel = () => {
+  const onRestart = () => {
     // Meilleur effort : le pending Redis expirera de lui-même.
     void cancelRegistration(pendingRegistration.verificationToken).catch(() => undefined);
     setPendingRegistration(null);
@@ -107,9 +95,9 @@ export default function RegisterVerifyScreen() {
   };
 
   return (
-    <AuthScreen title={t('otp.registerTitle')}>
+    <AuthScreen badge={t('otp.badge')} title={t('otp.title')} subtitle={t('otp.sentTo')}>
       <OtpVerifyView
-        subtitle={t('otp.sentTo', { email: pendingRegistration.email })}
+        email={pendingRegistration.email}
         onVerifyAction={onVerify}
         onResendAction={onResend}
         onFatalCodeAction={(code) => {
@@ -117,24 +105,10 @@ export default function RegisterVerifyScreen() {
           setExpired(true);
           return true;
         }}
-        secondaryLabel={t('otp.cancelRegister')}
-        onSecondaryAction={onCancel}
+        restartQuestion={t('otp.wrongEmail')}
+        restartLabel={t('otp.restart')}
+        onRestartAction={onRestart}
       />
     </AuthScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  cta: {
-    backgroundColor: Brand.mango,
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: Spacing.two,
-  },
-  ctaLabel: {
-    color: '#151718',
-    fontSize: 15,
-    fontWeight: 600,
-  },
-});

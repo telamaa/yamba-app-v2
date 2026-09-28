@@ -32,8 +32,9 @@ export type SessionStatus = 'loading' | 'anonymous' | 'authenticated';
 type SessionState = {
   status: SessionStatus;
   user: SessionUser | null;
-  /** Connexion : jette l'ApiError du serveur telle quelle (l'écran traduit). */
-  signIn: (email: string, password: string) => Promise<SessionUser>;
+  /** Connexion : jette l'ApiError du serveur telle quelle (l'écran traduit).
+   *  `rememberMe` = le contrat serveur (7 j sans activité, sinon 60 min). */
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<SessionUser>;
   signOut: () => Promise<void>;
 };
 
@@ -69,8 +70,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [setPreferredLocale]);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
-      const sessionUser = await login(email, password);
+    async (email: string, password: string, rememberMe = false) => {
+      const sessionUser = await login(email, password, rememberMe);
       setUser(sessionUser);
       setPreferredLocale(sessionUser.preferredLocale ?? null);
       setStatus('authenticated');

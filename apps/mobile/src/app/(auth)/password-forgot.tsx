@@ -1,22 +1,29 @@
 /**
- * (auth)/password-forgot.tsx — mot de passe oublié (lot auth mobile).
+ * (auth)/password-forgot.tsx — mot de passe oublié (A208, refonte sur
+ * captures).
  * ===================================================================
- * Le formulaire du web (ForgotPasswordForm) : une adresse, et le serveur
- * répond TOUJOURS oui (anti-énumération ANO-API-08) — l'écran annonce
- * « si un compte existe » et passe à l'étape code sans jamais savoir si
- * l'adresse est connue. L'e-mail du parcours part dans `auth-flow-state`,
- * jamais en paramètre de route.
+ * La page « Mot de passe oublié ? » du site : badge « Récupération
+ * sécurisée », une adresse, la note de sécurité (« le message est
+ * identique même si le compte n'existe pas » — anti-énumération
+ * ANO-API-08, le serveur répond TOUJOURS oui), CTA « Envoyer le code »,
+ * lien « ← Retour à la connexion ». L'e-mail du parcours part dans
+ * `auth-flow-state`, jamais en paramètre de route.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
+import {
+  AuthCta,
+  AuthError,
+  AuthTextField,
+  FieldLabel,
+  TealLink,
+} from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
-import { ThemedText } from '@/components/themed-text';
-import { Brand, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useAuthPalette } from '@/components/auth/auth-theme';
 import { forgotPassword } from '@/lib/api/auth.api';
 import { ApiError } from '@/lib/api/client';
 import { setPendingReset } from '@/lib/auth-flow-state';
@@ -25,7 +32,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function PasswordForgotScreen() {
   const t = useTranslations('auth');
-  const theme = useTheme();
+  const palette = useAuthPalette();
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +60,13 @@ export default function PasswordForgotScreen() {
   };
 
   return (
-    <AuthScreen title={t('forgot.title')}>
-      <ThemedText themeColor="textSecondary">{t('forgot.subtitle')}</ThemedText>
-
-      <TextInput
-        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+    <AuthScreen
+      badge={t('forgot.badge')}
+      title={t('forgot.title')}
+      subtitle={t('forgot.subtitle')}>
+      <FieldLabel>{t('forgot.emailLabel')}</FieldLabel>
+      <AuthTextField
         placeholder={t('login.emailPlaceholder')}
-        placeholderTextColor={theme.textSecondary}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -69,48 +76,27 @@ export default function PasswordForgotScreen() {
         onSubmitEditing={onSubmit}
       />
 
-      {error !== null && (
-        <ThemedText type="small" style={styles.error}>
-          {error}
-        </ThemedText>
-      )}
+      <Text style={[styles.securityNote, { color: palette.muted }]}>
+        {t('forgot.securityNote')}
+      </Text>
 
-      <Pressable
-        onPress={onSubmit}
+      {error !== null && <AuthError message={error} />}
+
+      <AuthCta
+        label={t('forgot.submit')}
+        onPressAction={onSubmit}
         disabled={!canSubmit}
-        style={({ pressed }) => [styles.submit, (!canSubmit || pressed) && styles.submitDimmed]}>
-        {pending ? (
-          <ActivityIndicator color="#151718" />
-        ) : (
-          <ThemedText style={styles.submitLabel}>{t('forgot.submit')}</ThemedText>
-        )}
-      </Pressable>
+        pending={pending}
+      />
+
+      <TealLink label={t('forgot.backToLogin')} onPressAction={() => router.back()} arrow center />
     </AuthScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  input: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
-  },
-  error: {
-    color: '#DC2626',
-  },
-  submit: {
-    backgroundColor: Brand.mango,
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  submitDimmed: {
-    opacity: 0.6,
-  },
-  submitLabel: {
-    color: '#151718',
-    fontSize: 15,
-    fontWeight: 600,
+  securityNote: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
