@@ -3,13 +3,15 @@
  * ==========================================================================
  * Les éléments récurrents des pages auth du site, en natif : label en gras
  * au-dessus du champ (avec action à droite optionnelle — « Oublié ? »),
- * champ bordé arrondi 12, CTA mangue à texte sombre, séparateur
- * « OU PAR E-MAIL », bloc social (Google « bientôt disponible » grisé —
- * le natif est son propre lot A201 — et Facebook INERTE, conservé comme
- * sur le site, décision du 03/09), case à cocher carrée avec aide, lien
- * teal souligné avec flèche optionnelle. Palette : `auth-theme.ts`.
+ * champ bordé arrondi 12 (la ref passe en PROP — React 19 — pour le
+ * chaînage clavier `returnKeyType="next"`), CTA mangue à texte sombre,
+ * séparateur, rangée sociale en LOGOS SEULS sous le CTA (itération UX du
+ * 28/09 : le mobile a moins de place que le web — les boutons pleine
+ * largeur du site deviennent deux pastilles ; inertes tant que les flux
+ * n'existent pas, dessinées fonctionnelles), case à cocher carrée avec
+ * aide, lien teal souligné. Palette : `auth-theme.ts`.
  */
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -44,7 +46,7 @@ export function FieldLabel({ children, right }: { children: ReactNode; right?: R
 
 /* ── Champ texte ─────────────────────────────────────────────────────────── */
 
-export function AuthTextField(props: TextInputProps) {
+export function AuthTextField(props: TextInputProps & { ref?: Ref<TextInput> }) {
   const palette = useAuthPalette();
   const { style, ...rest } = props;
   return (
@@ -108,37 +110,36 @@ export function AuthDivider({ label }: { label: string }) {
   );
 }
 
-/* ── Bloc social (Google à venir, Facebook inerte — comme le site) ───────── */
+/* ── Rangée sociale en logos seuls (sous le CTA — itération UX du 28/09) ── */
 
-export function SocialSignInBlock() {
+export function SocialLogosRow() {
   const t = useTranslations('auth');
   const palette = useAuthPalette();
   return (
-    <View style={styles.social}>
-      <View
-        style={[
-          styles.socialButton,
-          styles.dimmedSocial,
+    <View style={styles.socialRow}>
+      {/* Inertes tant que les flux natifs n'existent pas (Google : lot A201) —
+          dessinées fonctionnelles, le câblage viendra sans changer l'écran. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('social.google')}
+        style={({ pressed }) => [
+          styles.socialDot,
           { backgroundColor: palette.card, borderColor: palette.border },
+          pressed && styles.dimmed,
         ]}>
         <Text style={styles.googleG}>G</Text>
-        <Text style={[styles.socialLabel, { color: palette.muted }]}>
-          {t('social.googleSoon')}
-        </Text>
-      </View>
-      {/* Inerte à dessein : identique au site (décision du 03/09). */}
+      </Pressable>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('social.facebook')}
         style={({ pressed }) => [
-          styles.socialButton,
+          styles.socialDot,
           { backgroundColor: palette.card, borderColor: palette.border },
           pressed && styles.dimmed,
         ]}>
         <View style={styles.facebookDot}>
           <Text style={styles.facebookF}>f</Text>
         </View>
-        <Text style={[styles.socialLabel, { color: palette.title }]}>
-          {t('social.facebook')}
-        </Text>
       </Pressable>
     </View>
   );
@@ -256,23 +257,21 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     letterSpacing: 1.5,
   },
-  social: {
-    gap: Spacing.two,
-  },
-  socialButton: {
+  socialRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.three,
+  },
+  socialDot: {
+    width: AuthFieldHeight,
+    height: AuthFieldHeight,
+    borderRadius: AuthFieldHeight / 2,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.two,
-    height: AuthFieldHeight,
-    borderWidth: 1,
-    borderRadius: AuthRadius,
-  },
-  dimmedSocial: {
-    opacity: 0.75,
   },
   googleG: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 700,
     color: '#4285F4',
   },
@@ -288,10 +287,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: 800,
-  },
-  socialLabel: {
-    fontSize: 16,
-    fontWeight: 600,
   },
   checkboxRow: {
     flexDirection: 'row',

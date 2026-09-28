@@ -5,7 +5,7 @@
  * droite, et la teinte lavande quand le champ est REMPLI — le repère visuel
  * des captures. 16 px minimum : sous ce seuil, iOS zoome au focus (A60).
  */
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { SymbolView } from 'expo-symbols';
@@ -14,7 +14,9 @@ import { useTranslations } from 'use-intl';
 import { Spacing } from '@/constants/theme';
 import { AuthFieldHeight, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
-type Props = Omit<TextInputProps, 'secureTextEntry'>;
+// La ref passe en PROP (React 19) : le chaînage clavier des écrans
+// (`returnKeyType="next"` → focus du champ suivant) en a besoin.
+type Props = Omit<TextInputProps, 'secureTextEntry'> & { ref?: Ref<TextInput> };
 
 export function PasswordInput({ style, value, ...rest }: Props) {
   const t = useTranslations('auth');

@@ -1,18 +1,18 @@
 /**
- * (auth)/register.tsx — l'inscription (A208, refonte sur captures).
- * =================================================================
- * La page « Deviens Voyageur » du site, en feuille : badge « Inscription
- * sécurisée », social (mêmes états que le site), « OU PAR E-MAIL »,
- * Prénom/Nom sur une rangée, e-mail, mot de passe AVEC confirmation (le
- * miroir du formulaire web) et jauge des 8 critères, CGU cochées (les
- * intitulés des documents soulignés comme sur le site — le lien viendra
- * avec une URL publique). Le serveur reste seul juge (RG-MOB-1) ; la
- * pré-validation locale évite l'aller-retour. Succès → l'étape code,
- * l'état du parcours dans `auth-flow-state` (jamais en URL).
+ * (auth)/register.tsx — l'inscription (A208, refonte sur captures + passe UX).
+ * ============================================================================
+ * « Deviens Voyageur », réordonné pour le téléphone (passe expert du
+ * 28/09) : les champs d'abord, chaînage clavier Prénom → Nom → E-mail →
+ * Mot de passe → envoi, le social en logos seuls sous le CTA. PAS de champ
+ * « Confirmer le mot de passe » : l'œil + l'autofill (le trousseau remplit
+ * les deux champs d'un coup, la confirmation ne confirme rien) le rendent
+ * inutile sur mobile — divergence UX ASSUMÉE avec le formulaire web,
+ * consignée dans A208. Le serveur reste seul juge (RG-MOB-1). Succès →
+ * l'étape code, l'état du parcours dans `auth-flow-state` (jamais en URL).
  */
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
@@ -25,7 +25,7 @@ import {
   AuthError,
   AuthTextField,
   FieldLabel,
-  SocialSignInBlock,
+  SocialLogosRow,
 } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, useAuthPalette } from '@/components/auth/auth-theme';
@@ -43,11 +43,13 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function RegisterScreen() {
   const t = useTranslations('auth');
   const palette = useAuthPalette();
+  const lastNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [terms, setTerms] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,6 @@ export default function RegisterScreen() {
     lastName.trim().length > 0 &&
     normalizedEmail.length > 0 &&
     password.length > 0 &&
-    confirm.length > 0 &&
     terms;
 
   const localError = (): string | null => {
@@ -68,7 +69,6 @@ export default function RegisterScreen() {
     if (!isPasswordValid(getPasswordChecks(password, context))) {
       return t('register.errors.PASSWORD_INVALID');
     }
-    if (confirm !== password) return t('register.errors.PASSWORD_MISMATCH');
     return null;
   };
 
@@ -121,9 +121,6 @@ export default function RegisterScreen() {
       badge={t('register.badge')}
       title={t('register.title')}
       subtitle={t('register.subtitle')}>
-      <SocialSignInBlock />
-      <AuthDivider label={t('common.orByEmail')} />
-
       <View style={styles.nameRow}>
         <View style={styles.nameCol}>
           <FieldLabel>{t('register.firstNameLabel')}</FieldLabel>
@@ -131,6 +128,9 @@ export default function RegisterScreen() {
             placeholder={t('register.firstNamePlaceholder')}
             autoComplete="given-name"
             autoCapitalize="words"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => lastNameRef.current?.focus()}
             value={firstName}
             onChangeText={setFirstName}
           />
@@ -138,9 +138,13 @@ export default function RegisterScreen() {
         <View style={styles.nameCol}>
           <FieldLabel>{t('register.lastNameLabel')}</FieldLabel>
           <AuthTextField
+            ref={lastNameRef}
             placeholder={t('register.lastNamePlaceholder')}
             autoComplete="family-name"
             autoCapitalize="words"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => emailRef.current?.focus()}
             value={lastName}
             onChangeText={setLastName}
           />
@@ -149,20 +153,28 @@ export default function RegisterScreen() {
 
       <FieldLabel>{t('login.emailLabel')}</FieldLabel>
       <AuthTextField
+        ref={emailRef}
         placeholder={t('login.emailPlaceholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
         value={email}
         onChangeText={setEmail}
       />
 
       <FieldLabel>{t('login.passwordLabel')}</FieldLabel>
-      <PasswordInput autoComplete="new-password" value={password} onChangeText={setPassword} />
+      <PasswordInput
+        ref={passwordRef}
+        autoComplete="new-password"
+        returnKeyType="done"
+        value={password}
+        onChangeText={setPassword}
+        onSubmitEditing={onSubmit}
+      />
       <PasswordStrengthMeter password={password} context={context} />
-
-      <FieldLabel>{t('register.confirmLabel')}</FieldLabel>
-      <PasswordInput autoComplete="new-password" value={confirm} onChangeText={setConfirm} />
 
       <AuthCheckbox
         checked={terms}
@@ -188,6 +200,9 @@ export default function RegisterScreen() {
         disabled={!filled}
         pending={pending}
       />
+
+      <AuthDivider label={t('common.orContinueWith')} />
+      <SocialLogosRow />
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('register.hasAccount')}</Text>

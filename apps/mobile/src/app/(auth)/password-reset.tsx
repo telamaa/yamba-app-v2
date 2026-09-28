@@ -3,8 +3,10 @@
  * captures).
  * ======================================================================
  * La dernière étape du parcours oublié, dans la composition du site :
- * badge « Récupération sécurisée », mot de passe + confirmation (les deux
- * yeux du web), jauge des 8 critères, CTA mangue. Jeton absent ou expiré
+ * badge « Récupération sécurisée », UN champ avec œil et jauge des 8
+ * critères (pas de confirmation — même divergence mobile assumée que
+ * l'inscription : l'œil + l'autofill la rendent inutile), CTA mangue.
+ * Jeton absent ou expiré
  * (`RESET_SESSION_EXPIRED`, 15 min, consommé au premier essai transformé) :
  * un état dédié propose de recommencer. Succès → la connexion, préremplie,
  * bandeau « mot de passe changé » — un reset n'ouvre pas de session.
@@ -26,7 +28,6 @@ import { getPasswordChecks, isPasswordValid } from '@/lib/password-rules';
 export default function PasswordResetScreen() {
   const t = useTranslations('auth');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -50,7 +51,7 @@ export default function PasswordResetScreen() {
   }
 
   const context = { email: pendingReset.email };
-  const canSubmit = password.length > 0 && confirm.length > 0 && !pending;
+  const canSubmit = password.length > 0 && !pending;
 
   const messageOf = (err: unknown): string => {
     if (!(err instanceof ApiError)) return t('common.errors.network');
@@ -68,10 +69,6 @@ export default function PasswordResetScreen() {
     if (!canSubmit) return;
     if (!isPasswordValid(getPasswordChecks(password, context))) {
       setError(t('register.errors.PASSWORD_INVALID'));
-      return;
-    }
-    if (confirm !== password) {
-      setError(t('register.errors.PASSWORD_MISMATCH'));
       return;
     }
     setPending(true);
@@ -99,18 +96,12 @@ export default function PasswordResetScreen() {
       <PasswordInput
         autoComplete="new-password"
         autoFocus
+        returnKeyType="done"
         value={password}
         onChangeText={setPassword}
-      />
-      <PasswordStrengthMeter password={password} context={context} />
-
-      <FieldLabel>{t('register.confirmLabel')}</FieldLabel>
-      <PasswordInput
-        autoComplete="new-password"
-        value={confirm}
-        onChangeText={setConfirm}
         onSubmitEditing={onSubmit}
       />
+      <PasswordStrengthMeter password={password} context={context} />
 
       {error !== null && <AuthError message={error} />}
 

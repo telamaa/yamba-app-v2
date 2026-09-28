@@ -11,6 +11,8 @@
 import { useRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useTranslations } from 'use-intl';
+
 import { Brand, Spacing } from '@/constants/theme';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
@@ -23,6 +25,7 @@ type Props = {
 };
 
 export function OtpInput({ value, onChangeAction, disabled = false }: Props) {
+  const t = useTranslations('auth');
   const palette = useAuthPalette();
   const input = useRef<TextInput>(null);
 
@@ -55,6 +58,7 @@ export function OtpInput({ value, onChangeAction, disabled = false }: Props) {
         value={value}
         onChangeText={onChange}
         editable={!disabled}
+        accessibilityLabel={t('otp.enterCode')}
         autoFocus
         keyboardType="number-pad"
         textContentType={Platform.OS === 'ios' ? 'oneTimeCode' : undefined}

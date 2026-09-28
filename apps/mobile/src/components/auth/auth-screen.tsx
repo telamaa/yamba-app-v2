@@ -65,10 +65,17 @@ export function AuthScreen({ badge, title, subtitle, dismissGlyph = 'back', chil
                 hitSlop={Spacing.two}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.back')}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <Text style={[styles.dismiss, { color: palette.muted }]}>
-                  {dismissGlyph === 'close' ? '✕' : '‹'}
-                </Text>
+                style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}>
+                <SymbolView
+                  name={dismissGlyph === 'close' ? 'xmark' : 'chevron.left'}
+                  size={17}
+                  tintColor={palette.muted}
+                  fallback={
+                    <Text style={[styles.dismissFallback, { color: palette.muted }]}>
+                      {dismissGlyph === 'close' ? '✕' : '‹'}
+                    </Text>
+                  }
+                />
               </Pressable>
             </View>
 
@@ -127,9 +134,11 @@ const styles = StyleSheet.create({
     fontWeight: 600,
   },
   dismiss: {
+    paddingHorizontal: Spacing.two,
+  },
+  dismissFallback: {
     fontSize: 22,
     fontWeight: 500,
-    paddingHorizontal: Spacing.two,
   },
   title: {
     fontSize: 28,

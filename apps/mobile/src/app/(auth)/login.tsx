@@ -1,18 +1,18 @@
 /**
- * (auth)/login.tsx — la connexion (A208, refonte sur captures).
- * =============================================================
- * La page « Connecte-toi » du site, en feuille : badge « Connexion
- * sécurisée », social (Google à venir, Facebook inerte — comme le site),
- * « OU PAR E-MAIL », labels en gras avec « Oublié ? » sur la ligne du mot
- * de passe, « Rester connecté sur cet appareil » (le VRAI `rememberMe` du
- * serveur : 7 jours sans activité coché, 60 min sinon — décoché par défaut,
- * A62), CTA mangue, pied « Pas encore membre ? Inscris-toi ». Les refus
- * parlent par `details.code` (RG-MOB-1). Le bandeau de succès accueille
- * les retours des autres parcours (compte activé, mot de passe changé).
+ * (auth)/login.tsx — la connexion (A208, refonte sur captures + passe UX).
+ * ========================================================================
+ * L'identité de la page « Connecte-toi » du site, RÉORDONNÉE pour le
+ * téléphone (passe expert du 28/09) : l'e-mail d'abord — le chemin
+ * principal reste au-dessus du pli clavier levé —, le social en LOGOS
+ * SEULS sous le CTA (« ou continue avec »), chaînage clavier
+ * e-mail → mot de passe → envoi. « Rester connecté » = le VRAI
+ * `rememberMe` serveur (7 j / 60 min, décoché par défaut — A62). Les
+ * refus parlent par `details.code` (RG-MOB-1) ; le bandeau de succès
+ * accueille les retours des autres parcours.
  */
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 
 import { useTranslations } from 'use-intl';
 
@@ -23,7 +23,7 @@ import {
   AuthError,
   AuthTextField,
   FieldLabel,
-  SocialSignInBlock,
+  SocialLogosRow,
 } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
@@ -51,6 +51,7 @@ export default function LoginScreen() {
   const t = useTranslations('auth');
   const palette = useAuthPalette();
   const { signIn } = useSession();
+  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -112,15 +113,15 @@ export default function LoginScreen() {
         </View>
       )}
 
-      <SocialSignInBlock />
-      <AuthDivider label={t('common.orByEmail')} />
-
       <FieldLabel>{t('login.emailLabel')}</FieldLabel>
       <AuthTextField
         placeholder={t('login.emailPlaceholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
         value={email}
         onChangeText={setEmail}
       />
@@ -134,8 +135,10 @@ export default function LoginScreen() {
         {t('login.passwordLabel')}
       </FieldLabel>
       <PasswordInput
+        ref={passwordRef}
         placeholder={t('login.passwordPlaceholder')}
         autoComplete="password"
+        returnKeyType="done"
         value={password}
         onChangeText={setPassword}
         onSubmitEditing={onSubmit}
@@ -156,6 +159,9 @@ export default function LoginScreen() {
         disabled={!canSubmit}
         pending={pending}
       />
+
+      <AuthDivider label={t('common.orContinueWith')} />
+      <SocialLogosRow />
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('login.noAccount')}</Text>

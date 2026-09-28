@@ -58,6 +58,8 @@ export function PasswordStrengthMeter({ password, context }: Props) {
   const missing = CHECK_ORDER.filter((key) => !checks[key]);
 
   return (
+    // Hauteur RÉSERVÉE (jauge + deux lignes) : la liste qui rétrécit à
+    // chaque frappe ne fait plus danser le CTA sous le pouce.
     <View style={styles.container}>
       <View style={styles.gaugeRow}>
         <View style={[styles.gauge, { backgroundColor: palette.border }]}>
@@ -67,11 +69,13 @@ export function PasswordStrengthMeter({ password, context }: Props) {
         </View>
         <Text style={[styles.levelLabel, { color }]}>{t(`password.level.${level}`)}</Text>
       </View>
-      {missing.map((key) => (
-        <Text key={key} style={[styles.missing, { color: palette.muted }]}>
-          · {t(`password.checks.${key}`)}
+      {missing.length > 0 ? (
+        <Text style={[styles.missing, { color: palette.muted }]} numberOfLines={2}>
+          {missing.map((key) => t(`password.checks.${key}`)).join(' · ')}
         </Text>
-      ))}
+      ) : (
+        <Text style={[styles.missing, { color: '#16A34A' }]}>{t('password.allGood')}</Text>
+      )}
     </View>
   );
 }
@@ -79,6 +83,7 @@ export function PasswordStrengthMeter({ password, context }: Props) {
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.one,
+    minHeight: 50,
   },
   gaugeRow: {
     flexDirection: 'row',
