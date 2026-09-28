@@ -14,7 +14,7 @@ import { useState } from 'react';
 
 import { useTranslations } from 'use-intl';
 
-import { AuthCta } from '@/components/auth/auth-kit';
+import { AuthFailureView } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { OtpVerifyView } from '@/components/auth/otp-verify-view';
 import {
@@ -46,13 +46,12 @@ export default function RegisterVerifyScreen() {
   // l'écran le dit et propose de reprendre.
   if (pendingRegistration === null || expired) {
     return (
-      <AuthScreen
-        badge={t('otp.badge')}
-        title={t('otp.title')}
-        subtitle={expired ? t('otp.registrationExpired') : t('otp.flowLost')}>
-        <AuthCta
-          label={t('otp.restartRegister')}
-          onPressAction={() => {
+      <AuthScreen badge={t('otp.badge')} title="">
+        <AuthFailureView
+          title={t('failure.title')}
+          body={expired ? t('otp.registrationExpired') : t('otp.flowLost')}
+          ctaLabel={t('otp.restartRegister')}
+          onRetryAction={() => {
             setPendingRegistration(null);
             router.navigate('/register');
           }}

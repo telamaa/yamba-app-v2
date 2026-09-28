@@ -35,6 +35,7 @@ import {
   type TripSearchResult,
 } from '@/lib/api/search.api';
 import { formatLongDate } from '@/lib/trip-format';
+import { consumeBrowseOnLanding } from '@/lib/welcome-state';
 
 const PAGE_SIZE = 20;
 
@@ -134,6 +135,17 @@ export default function SearchScreen() {
     () => runSearchWith(paramsFor(from, to, date)),
     [runSearchWith, paramsFor, from, to, date]
   );
+
+  // Le X de l'atterrissage → résultats DIRECTS (motif Airbnb, cf.
+  // welcome-state) : la recherche large part d'elle-même, la pilule lit
+  // « Partout · Toutes les dates ». Une seule fois, à l'arrivée.
+  useEffect(() => {
+    if (consumeBrowseOnLanding()) {
+      void runSearchWith(paramsFor('', '', null));
+    }
+    // Au montage uniquement : le drapeau est un geste d'atterrissage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openCorridor = useCallback(
     (corridor: Corridor) => {

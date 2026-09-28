@@ -1,62 +1,47 @@
 /**
- * (auth)/login.tsx — la connexion (A208, refonte sur captures + passe UX).
- * ========================================================================
- * L'identité de la page « Connecte-toi » du site, RÉORDONNÉE pour le
- * téléphone (passe expert du 28/09) : l'e-mail d'abord — le chemin
- * principal reste au-dessus du pli clavier levé —, le social en LOGOS
- * SEULS sous le CTA (« ou continue avec »), chaînage clavier
- * e-mail → mot de passe → envoi. « Rester connecté » = le VRAI
- * `rememberMe` serveur (7 j / 60 min, décoché par défaut — A62). Les
- * refus parlent par `details.code` (RG-MOB-1) ; le bandeau de succès
- * accueille les retours des autres parcours.
+ * (auth)/login.tsx — la connexion, IDENTIFIER-FIRST (itération Revolut, A208).
+ * ============================================================================
+ * L'adresse d'abord, la méthode ensuite (réf. captures/auth/3) : UN champ
+ * e-mail, « Continuer » grisé tant que l'adresse n'est pas valide (doctrine :
+ * le désactivé n'est permis que quand UN SEUL champ visible l'explique —
+ * validation live), puis une CONFIRMATION de l'adresse (avec l'anti-
+ * énumération, une faute de frappe = un code qui ne viendrait jamais, en
+ * silence) — et « ou » : e-mail + mot de passe, Google, Facebook.
+ *
+ * TANT QUE le lot serveur « code par e-mail » n'existe pas (décision du
+ * 28/09 : UI d'abord, serveur ensuite), « Continuer » confirmé mène à
+ * l'étape MOT DE PASSE, adresse verrouillée — zéro écran fantôme (A203) ;
+ * le jour du lot, cette navigation bascule vers le parcours code.
  */
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { useTranslations } from 'use-intl';
 
 import {
   AuthCta,
-  AuthCheckbox,
   AuthDivider,
-  AuthError,
   AuthTextField,
-  FieldLabel,
-  SocialLogosRow,
+  MethodButton,
 } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
-import { PasswordInput } from '@/components/auth/password-input';
 import { Spacing } from '@/constants/theme';
-import { ApiError } from '@/lib/api/client';
-import { consumeLoginPrefill, type LoginNotice } from '@/lib/auth-flow-state';
-import { useSession } from '@/lib/session-context';
-
-// Les refus dont l'écran porte un texte à lui ; tout autre `details.code`
-// affiche le message du serveur (RG-MOB-1 : le serveur décide).
-const TRANSLATED_ERROR_CODES = new Set([
-  'INVALID_CREDENTIALS',
-  'TOO_MANY_ATTEMPTS',
-  'ACCOUNT_SUSPENDED',
-]);
-
-function closeAuthSheet() {
-  // Ouvert depuis une porte d'identité : la porte est devenue le contenu.
-  if (router.canDismiss()) router.dismiss();
-  else router.replace('/');
-}
+import {
+  consumeLoginPrefill,
+  setLoginEmail,
+  type LoginNotice,
+} from '@/lib/auth-flow-state';
+import { isValidEmail } from '@/lib/email';
 
 export default function LoginScreen() {
   const t = useTranslations('auth');
   const palette = useAuthPalette();
-  const { signIn } = useSession();
-  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState<LoginNotice | null>(null);
 
   // Un parcours voisin (OTP vérifié, mot de passe changé) ramène ici avec
@@ -67,44 +52,24 @@ export default function LoginScreen() {
       if (prefill !== null) {
         setEmail(prefill.email);
         setNotice(prefill.notice);
-        setPassword('');
-        setError(null);
       }
     }, [])
   );
 
-  const messageOf = (err: unknown): string => {
-    if (err instanceof ApiError) {
-      if (err.code !== null && TRANSLATED_ERROR_CODES.has(err.code)) {
-        return t(`login.errors.${err.code}`);
-      }
-      return err.message;
-    }
-    return t('login.errors.network');
+  const normalized = email.trim().toLowerCase();
+  const emailValid = isValidEmail(normalized);
+
+  const proceedWithEmail = () => {
+    setConfirming(false);
+    setLoginEmail(normalized);
+    // Étape MOT DE PASSE tant que le parcours « code par e-mail » n'a pas
+    // son serveur — le point de bascule du futur lot est ICI.
+    router.push('/login-password');
   };
 
-  // CTA toujours ACTIF (passe UX : un bouton grisé n'explique rien et rend
-  // boueux sur fond sombre) — au tap, le champ manquant est nommé.
-  const onSubmit = async () => {
-    if (pending) return;
-    if (email.trim().length === 0) {
-      setError(t('common.errors.MISSING_EMAIL'));
-      return;
-    }
-    if (password.length === 0) {
-      setError(t('common.errors.MISSING_PASSWORD'));
-      return;
-    }
-    setPending(true);
-    setError(null);
-    try {
-      await signIn(email.trim(), password, remember);
-      closeAuthSheet();
-    } catch (err) {
-      setError(messageOf(err));
-    } finally {
-      setPending(false);
-    }
+  const openPasswordMethod = () => {
+    setLoginEmail(emailValid ? normalized : null);
+    router.push('/login-password');
   };
 
   return (
@@ -121,50 +86,47 @@ export default function LoginScreen() {
         </View>
       )}
 
-      <FieldLabel>{t('login.emailLabel')}</FieldLabel>
       <AuthTextField
         placeholder={t('login.emailPlaceholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
-        returnKeyType="next"
-        submitBehavior="submit"
-        onSubmitEditing={() => passwordRef.current?.focus()}
+        autoFocus
+        returnKeyType="done"
         value={email}
         onChangeText={setEmail}
+        onSubmitEditing={() => emailValid && setConfirming(true)}
       />
 
-      <FieldLabel
-        right={
-          <Pressable onPress={() => router.push('/password-forgot')} hitSlop={Spacing.one}>
-            <Text style={[styles.forgotLink, { color: palette.teal }]}>{t('login.forgot')}</Text>
-          </Pressable>
-        }>
-        {t('login.passwordLabel')}
-      </FieldLabel>
-      <PasswordInput
-        ref={passwordRef}
-        placeholder={t('login.passwordPlaceholder')}
-        autoComplete="password"
-        returnKeyType="done"
-        value={password}
-        onChangeText={setPassword}
-        onSubmitEditing={onSubmit}
+      <AuthCta
+        label={t('login.continue')}
+        onPressAction={() => setConfirming(true)}
+        disabled={!emailValid}
       />
 
-      <AuthCheckbox
-        checked={remember}
-        onToggleAction={() => setRemember((v) => !v)}
-        label={t('login.rememberLabel')}
-        helper={t('login.rememberHelper')}
+      <AuthDivider label={t('common.or')} />
+
+      <MethodButton
+        icon={
+          <SymbolView
+            name="key.fill"
+            size={18}
+            tintColor={palette.title}
+            fallback={<Text style={{ fontSize: 15 }}>🔑</Text>}
+          />
+        }
+        label={t('login.methodPassword')}
+        onPressAction={openPasswordMethod}
       />
-
-      {error !== null && <AuthError message={error} />}
-
-      <AuthCta label={t('login.submit')} onPressAction={onSubmit} pending={pending} />
-
-      <AuthDivider label={t('common.orContinueWith')} />
-      <SocialLogosRow />
+      {/* Inertes tant que les flux natifs n'existent pas (Google : lot A201). */}
+      <MethodButton
+        icon={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} />}
+        label={t('social.google')}
+      />
+      <MethodButton
+        icon={<Image source={require('@/assets/images/facebook-f.svg')} style={styles.logo} />}
+        label={t('social.facebook')}
+      />
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('login.noAccount')}</Text>
@@ -172,6 +134,32 @@ export default function LoginScreen() {
           <Text style={styles.footerLink}>{t('login.registerLink')}</Text>
         </Pressable>
       </View>
+
+      {/* La confirmation d'adresse (réf. capture 16.16.43) : une carte au
+          centre, l'adresse en gras, Confirmer / Retour. */}
+      <Modal
+        visible={confirming}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirming(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setConfirming(false)}>
+          <Pressable style={[styles.confirmCard, { backgroundColor: palette.card }]}>
+            <Text style={[styles.confirmEmail, { color: palette.title }]}>{normalized}</Text>
+            <Text style={[styles.confirmBody, { color: palette.muted }]}>
+              {t('login.confirmBody')}
+            </Text>
+            <AuthCta label={t('login.confirmYes')} onPressAction={proceedWithEmail} />
+            <Pressable
+              onPress={() => setConfirming(false)}
+              hitSlop={Spacing.one}
+              style={styles.confirmBack}>
+              <Text style={[styles.confirmBackLabel, { color: palette.text }]}>
+                {t('login.confirmBack')}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </AuthScreen>
   );
 }
@@ -187,9 +175,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 600,
   },
-  forgotLink: {
-    fontSize: 15,
-    fontWeight: 700,
+  logo: {
+    width: 20,
+    height: 20,
   },
   footer: {
     flexDirection: 'row',
@@ -206,5 +194,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 700,
     color: AuthBrand.mango,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+  },
+  confirmCard: {
+    borderRadius: Spacing.three,
+    padding: Spacing.four,
+    gap: Spacing.three,
+  },
+  confirmEmail: {
+    fontSize: 18,
+    fontWeight: 700,
+    textAlign: 'center',
+  },
+  confirmBody: {
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  confirmBack: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.one,
+  },
+  confirmBackLabel: {
+    fontSize: 15,
+    fontWeight: 600,
   },
 });

@@ -33,6 +33,13 @@ export type LoginPrefill = {
 let pendingRegistration: PendingRegistration | null = null;
 let pendingReset: PendingReset | null = null;
 let loginPrefill: LoginPrefill | null = null;
+/** L'adresse confirmée à l'étape identifier-first, lue par l'étape méthode. */
+let loginEmail: string | null = null;
+
+export const getLoginEmail = () => loginEmail;
+export const setLoginEmail = (value: string | null) => {
+  loginEmail = value;
+};
 
 export const getPendingRegistration = () => pendingRegistration;
 export const setPendingRegistration = (value: PendingRegistration | null) => {

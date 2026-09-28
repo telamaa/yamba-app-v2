@@ -16,7 +16,7 @@ import { useState } from 'react';
 
 import { useTranslations } from 'use-intl';
 
-import { AuthCta, AuthError, FieldLabel } from '@/components/auth/auth-kit';
+import { AuthCta, AuthError, AuthFailureView, FieldLabel } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { PasswordInput } from '@/components/auth/password-input';
 import { PasswordStrengthMeter } from '@/components/auth/password-strength-meter';
@@ -35,13 +35,12 @@ export default function PasswordResetScreen() {
 
   if (pendingReset === null || pendingReset.passwordResetToken === null || sessionExpired) {
     return (
-      <AuthScreen
-        badge={t('forgot.badge')}
-        title={t('reset.title')}
-        subtitle={t('reset.sessionExpired')}>
-        <AuthCta
-          label={t('otp.restartForgot')}
-          onPressAction={() => {
+      <AuthScreen badge={t('forgot.badge')} title="">
+        <AuthFailureView
+          title={t('failure.title')}
+          body={t('reset.sessionExpired')}
+          ctaLabel={t('otp.restartForgot')}
+          onRetryAction={() => {
             setPendingReset(null);
             router.navigate('/password-forgot');
           }}

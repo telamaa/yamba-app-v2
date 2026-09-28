@@ -132,6 +132,13 @@ function LoadingDots({ color }: { color: string }) {
   );
 }
 
+/**
+ * Doctrine du désactivé (passes UX des 28/09) : `disabled` n'est permis que
+ * quand UN SEUL champ visible l'explique (validation live — le bouton
+ * s'allume sous les yeux) ; les formulaires multi-champs restent toujours
+ * actifs et NOMMENT le manquement au tap. L'état désactivé est un GRIS
+ * NEUTRE franc (le motif Revolut) — jamais de la mangue délavée.
+ */
 export function AuthCta({
   label,
   onPressAction,
@@ -148,13 +155,78 @@ export function AuthCta({
     <Pressable
       onPress={onPressAction}
       disabled={disabled || pending}
-      style={({ pressed }) => [styles.cta, (disabled || pressed) && styles.dimmed]}>
+      style={({ pressed }) => [
+        styles.cta,
+        disabled && !pending && { backgroundColor: palette.border },
+        pressed && styles.dimmed,
+      ]}>
       {pending ? (
         <LoadingDots color={palette.ctaLabel} />
       ) : (
-        <Text style={[styles.ctaLabel, { color: palette.ctaLabel }]}>{label}</Text>
+        <Text
+          style={[
+            styles.ctaLabel,
+            { color: disabled ? palette.muted : palette.ctaLabel },
+          ]}>
+          {label}
+        </Text>
       )}
     </Pressable>
+  );
+}
+
+/* ── Bouton de méthode (« Continuer avec … », écran identifier-first) ────── */
+
+export function MethodButton({
+  icon,
+  label,
+  onPressAction,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPressAction?: () => void;
+}) {
+  const palette = useAuthPalette();
+  return (
+    <Pressable
+      onPress={onPressAction}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.methodButton,
+        { backgroundColor: palette.card, borderColor: palette.border },
+        pressed && styles.dimmed,
+      ]}>
+      <View style={styles.methodIcon}>{icon}</View>
+      <Text style={[styles.methodLabel, { color: palette.title }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/* ── Échec plein écran (X, titre, sous-titre, CTA bas — réf. captures/3) ── */
+
+export function AuthFailureView({
+  title,
+  body,
+  ctaLabel,
+  onRetryAction,
+}: {
+  title: string;
+  body: string;
+  ctaLabel: string;
+  onRetryAction: () => void;
+}) {
+  const palette = useAuthPalette();
+  return (
+    <View style={styles.failure}>
+      <View style={[styles.failureBadge, { backgroundColor: palette.card }]}>
+        <Text style={[styles.failureGlyph, { color: palette.title }]}>✕</Text>
+      </View>
+      <View style={styles.failureTexts}>
+        <Text style={[styles.failureTitle, { color: palette.title }]}>{title}</Text>
+        <Text style={[styles.failureBody, { color: palette.muted }]}>{body}</Text>
+      </View>
+      <AuthCta label={ctaLabel} onPressAction={onRetryAction} />
+    </View>
   );
 }
 
@@ -347,6 +419,55 @@ const styles = StyleSheet.create({
   socialLogo: {
     width: 24,
     height: 24,
+  },
+  methodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    height: AuthFieldHeight,
+    borderWidth: 1,
+    borderRadius: AuthRadius,
+  },
+  methodIcon: {
+    width: 24,
+    alignItems: 'center',
+  },
+  methodLabel: {
+    fontSize: 16,
+    fontWeight: 600,
+  },
+  failure: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: Spacing.five,
+    paddingVertical: Spacing.six,
+  },
+  failureBadge: {
+    alignSelf: 'center',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  failureGlyph: {
+    fontSize: 36,
+    fontWeight: 700,
+  },
+  failureTexts: {
+    gap: Spacing.two,
+  },
+  failureTitle: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: 800,
+    textAlign: 'center',
+  },
+  failureBody: {
+    fontSize: 16,
+    lineHeight: 23,
+    textAlign: 'center',
   },
   checkboxRow: {
     flexDirection: 'row',

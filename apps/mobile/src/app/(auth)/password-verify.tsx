@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 
 import { useTranslations } from 'use-intl';
 
-import { AuthCta } from '@/components/auth/auth-kit';
+import { AuthFailureView } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { OtpVerifyView } from '@/components/auth/otp-verify-view';
 import { resendPasswordOtp, verifyPasswordOtp } from '@/lib/api/auth.api';
@@ -24,10 +24,12 @@ export default function PasswordVerifyScreen() {
 
   if (pendingReset === null) {
     return (
-      <AuthScreen badge={t('otp.badge')} title={t('otp.title')} subtitle={t('otp.flowLost')}>
-        <AuthCta
-          label={t('otp.restartForgot')}
-          onPressAction={() => router.navigate('/password-forgot')}
+      <AuthScreen badge={t('otp.badge')} title="">
+        <AuthFailureView
+          title={t('failure.title')}
+          body={t('otp.flowLost')}
+          ctaLabel={t('otp.restartForgot')}
+          onRetryAction={() => router.navigate('/password-forgot')}
         />
       </AuthScreen>
     );

@@ -27,8 +27,7 @@ import { useAuthPalette } from '@/components/auth/auth-theme';
 import { forgotPassword } from '@/lib/api/auth.api';
 import { ApiError } from '@/lib/api/client';
 import { setPendingReset } from '@/lib/auth-flow-state';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL_REGEX } from '@/lib/email';
 
 export default function PasswordForgotScreen() {
   const t = useTranslations('auth');

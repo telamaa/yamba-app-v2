@@ -35,10 +35,8 @@ import { Spacing } from '@/constants/theme';
 import { register } from '@/lib/api/auth.api';
 import { ApiError } from '@/lib/api/client';
 import { setPendingRegistration } from '@/lib/auth-flow-state';
+import { EMAIL_REGEX } from '@/lib/email';
 import { getPasswordChecks, isPasswordValid } from '@/lib/password-rules';
-
-// Le miroir de la regex serveur (auth.controller) et du web.
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
   const t = useTranslations('auth');
