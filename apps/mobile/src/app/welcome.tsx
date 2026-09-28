@@ -141,9 +141,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingBottom: Spacing.two,
   },
+  // Même rayon que les boutons des écrans auth (l'identité web, arrondi 12)
+  // — les pilules 999 de la référence juraient avec le reste du parcours.
   primary: {
     backgroundColor: '#ffffff',
-    borderRadius: 999,
+    borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
   },
@@ -154,7 +156,7 @@ const styles = StyleSheet.create({
   },
   secondary: {
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
-    borderRadius: 999,
+    borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
   },
