@@ -12,8 +12,17 @@
  * et lance la recherche — même écran, zéro navigation. Le serveur décide de
  * tout (RG-MOB-13/14) : filtres, tri, textes localisés, comptage.
  */
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -26,12 +35,17 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
 import {
+  getSearchFacets,
   searchTrips,
+  type SearchFacets,
   type SearchPage,
   type SearchParams,
+  type SearchSort,
+  type SearchTransportFilter,
   type TripSearchResult,
 } from '@/lib/api/search.api';
 import { formatLongDate } from '@/lib/trip-format';
@@ -72,9 +86,23 @@ type SearchState =
   | { kind: 'error'; message: string; correlationId: string | null }
   | { kind: 'results'; page: SearchPage; loadingMore: boolean };
 
+/** Les quatre pastilles transport, dans l'ordre du web (TransportModeTabs). */
+const TRANSPORT_TABS: Array<{
+  key: SearchTransportFilter;
+  icon: 'airplane-outline' | 'train-outline' | 'car-outline' | null;
+}> = [
+  { key: 'all', icon: null },
+  { key: 'plane', icon: 'airplane-outline' },
+  { key: 'train', icon: 'train-outline' },
+  { key: 'car', icon: 'car-outline' },
+];
+
+const SORT_OPTIONS: SearchSort[] = ['earliest', 'lowestPrice', 'bestRated'];
+
 export default function SearchScreen() {
   const t = useTranslations('search');
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -84,6 +112,13 @@ export default function SearchScreen() {
   const [cityPicker, setCityPicker] = useState<'from' | 'to' | null>(null);
   const [formCollapsed, setFormCollapsed] = useState(false);
   const [state, setState] = useState<SearchState>({ kind: 'idle' });
+  // Pastille transport active + tri (serveur) — persistent d'une recherche à l'autre.
+  const [mode, setMode] = useState<SearchTransportFilter>('all');
+  const [sort, setSort] = useState<SearchSort>('earliest');
+  // Comptes par transport (facettes serveur) : rafraîchis sur les recherches
+  // STRUCTURANTES (villes/date), jamais au toucher d'une pastille.
+  const [facets, setFacets] = useState<SearchFacets | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // null tant que rien de vrai à montrer (chargement, panne, zéro trajet).
   const [corridors, setCorridors] = useState<Corridor[] | null>(null);
 
@@ -104,19 +139,39 @@ export default function SearchScreen() {
   }, []);
 
   const paramsFor = useCallback(
-    (nextFrom: string, nextTo: string, nextDate: Date | null): SearchParams => ({
+    (
+      nextFrom: string,
+      nextTo: string,
+      nextDate: Date | null,
+      nextMode: SearchTransportFilter,
+      nextSort: SearchSort
+    ): SearchParams => ({
       from: nextFrom.trim() || undefined,
       to: nextTo.trim() || undefined,
       ...(nextDate !== null ? dayBounds(nextDate) : {}),
+      mode: nextMode,
+      sort: nextSort,
       limit: PAGE_SIZE,
     }),
     []
   );
 
   const runSearchWith = useCallback(
-    async (params: SearchParams) => {
+    async (params: SearchParams, refreshFacets: boolean) => {
       setState({ kind: 'loading' });
       setFormCollapsed(true);
+      if (refreshFacets) {
+        // Fire-and-forget : en panne, on garde les derniers comptes plutôt
+        // que de casser la recherche (miroir de useSearchFacets).
+        getSearchFacets({
+          from: params.from,
+          to: params.to,
+          dateFrom: params.dateFrom,
+          dateTo: params.dateTo,
+        })
+          .then(setFacets)
+          .catch(() => {});
+      }
       try {
         const page = await searchTrips(params);
         setState({ kind: 'results', page, loadingMore: false });
@@ -132,8 +187,28 @@ export default function SearchScreen() {
   );
 
   const runSearch = useCallback(
-    () => runSearchWith(paramsFor(from, to, date)),
-    [runSearchWith, paramsFor, from, to, date]
+    () => runSearchWith(paramsFor(from, to, date, mode, sort), true),
+    [runSearchWith, paramsFor, from, to, date, mode, sort]
+  );
+
+  // Une pastille = la MÊME recherche, filtrée par transport côté serveur.
+  const pickMode = useCallback(
+    (next: SearchTransportFilter) => {
+      if (next === mode) return;
+      setMode(next);
+      void runSearchWith(paramsFor(from, to, date, next, sort), false);
+    },
+    [mode, runSearchWith, paramsFor, from, to, date, sort]
+  );
+
+  const pickSort = useCallback(
+    (next: SearchSort) => {
+      setFiltersOpen(false);
+      if (next === sort) return;
+      setSort(next);
+      void runSearchWith(paramsFor(from, to, date, mode, next), false);
+    },
+    [sort, runSearchWith, paramsFor, from, to, date, mode]
   );
 
   // Le X de l'atterrissage → résultats DIRECTS (motif Airbnb, cf.
@@ -141,7 +216,7 @@ export default function SearchScreen() {
   // « Partout · Toutes les dates ». Une seule fois, à l'arrivée.
   useEffect(() => {
     if (consumeBrowseOnLanding()) {
-      void runSearchWith(paramsFor('', '', null));
+      void runSearchWith(paramsFor('', '', null, 'all', 'earliest'), true);
     }
     // Au montage uniquement : le drapeau est un geste d'atterrissage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,9 +227,9 @@ export default function SearchScreen() {
       setFrom(corridor.fromCity);
       setTo(corridor.toCity);
       setDate(null);
-      void runSearchWith(paramsFor(corridor.fromCity, corridor.toCity, null));
+      void runSearchWith(paramsFor(corridor.fromCity, corridor.toCity, null, mode, sort), true);
     },
-    [runSearchWith, paramsFor]
+    [runSearchWith, paramsFor, mode, sort]
   );
 
   const loadMore = useCallback(async () => {
@@ -162,7 +237,7 @@ export default function SearchScreen() {
     setState({ ...state, loadingMore: true });
     try {
       const next = await searchTrips({
-        ...paramsFor(from, to, date),
+        ...paramsFor(from, to, date, mode, sort),
         cursor: state.page.nextCursor,
       });
       setState({
@@ -178,30 +253,120 @@ export default function SearchScreen() {
       // La page suivante a échoué : on garde ce qu'on a, le scroll retentera.
       setState({ ...state, loadingMore: false });
     }
-  }, [state, paramsFor, from, to, date]);
+  }, [state, paramsFor, from, to, date, mode, sort]);
 
-  const summaryRoute =
-    from.trim() && to.trim()
-      ? `${from.trim()} → ${to.trim()}`
-      : from.trim() || to.trim() || t('summary.everywhere');
+  const hasFrom = from.trim().length > 0;
+  const hasTo = to.trim().length > 0;
+  // Barre récap (miroir web, MobileSearchExperience mode « summary ») : les
+  // libellés Départ/Destination servent de placeholders dans la route.
+  const summaryRoute = `${from.trim() || t('form.fromLabel')} → ${to.trim() || t('form.toLabel')}`;
+  const summaryDate =
+    date !== null ? formatLongDate(date.toISOString(), locale) : t('form.datePlaceholder');
+  // Titre dynamique de la page de résultats (miroir de SearchResultsView).
+  const dynamicTitle =
+    hasFrom && hasTo
+      ? t('title.fromTo', { from: from.trim(), to: to.trim() })
+      : hasFrom
+        ? t('title.fromOnly', { from: from.trim() })
+        : hasTo
+          ? t('title.toOnly', { to: to.trim() })
+          : date !== null
+            ? t('title.dateOnly', { date: formatLongDate(date.toISOString(), locale) })
+            : t('title.noFilter');
+  const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
+
+  // Titre + sous-titre + pastilles transport : le haut de la page de
+  // résultats (réf. capture 17h08), partagé entre la liste et l'état vide.
+  const resultsHeader = (
+    <View style={styles.resultsHeader}>
+      <ThemedText type="subtitle">{dynamicTitle}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        {t('subtitleHint')}
+      </ThemedText>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabs}>
+        {TRANSPORT_TABS.map((tab) => {
+          const active = mode === tab.key;
+          const activeText = dark ? '#FFB84D' : theme.text;
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => pickMode(tab.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={[
+                styles.tab,
+                active
+                  ? {
+                      backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
+                      borderColor: 'rgba(255,153,0,0.5)',
+                    }
+                  : { backgroundColor: theme.backgroundElement, borderColor: 'transparent' },
+              ]}>
+              {tab.icon !== null && (
+                <Ionicons
+                  name={tab.icon}
+                  size={13}
+                  color={active ? activeText : theme.textSecondary}
+                />
+              )}
+              <ThemedText
+                type="smallBold"
+                style={{ color: active ? activeText : theme.textSecondary }}>
+                {t(`tabs.${tab.key}`)}
+              </ThemedText>
+              <View
+                style={[
+                  styles.tabCount,
+                  { backgroundColor: active ? 'rgba(255,153,0,0.2)' : theme.backgroundSelected },
+                ]}>
+                <ThemedText
+                  style={[
+                    styles.tabCountText,
+                    { color: active ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary },
+                  ]}>
+                  {modeCounts[tab.key]}
+                </ThemedText>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {formCollapsed ? (
-          <Pressable onPress={() => setFormCollapsed(false)}>
-            <ThemedView type="backgroundElement" style={styles.summary}>
-              <View style={styles.summaryTexts}>
-                <ThemedText type="smallBold" numberOfLines={1} style={styles.summaryRoute}>
-                  {summaryRoute}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {date !== null ? formatLongDate(date.toISOString(), locale) : t('form.dateAny')}
-                </ThemedText>
-              </View>
-              <ThemedText type="linkPrimary">{t('summary.edit')}</ThemedText>
-            </ThemedView>
-          </Pressable>
+          <View style={styles.summaryRow}>
+            {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres. */}
+            <Pressable style={styles.summaryTouch} onPress={() => setFormCollapsed(false)}>
+              <ThemedView type="backgroundElement" style={styles.summary}>
+                <Ionicons name="search" size={18} color={theme.textSecondary} />
+                <View style={styles.summaryTexts}>
+                  <ThemedText type="smallBold" numberOfLines={1} style={styles.summaryRoute}>
+                    {summaryRoute}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {summaryDate}
+                  </ThemedText>
+                </View>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              onPress={() => setFiltersOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('filters.title')}>
+              <ThemedView type="backgroundElement" style={styles.filtersButton}>
+                <Ionicons name="options-outline" size={18} color={theme.text} />
+                <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </View>
         ) : (
           <ThemedView type="backgroundElement" style={styles.form}>
             <Pressable style={styles.fieldRow} onPress={() => setCityPicker('from')}>
@@ -334,13 +499,16 @@ export default function SearchScreen() {
         )}
 
         {state.kind === 'results' && state.page.trips.length === 0 && (
-          <View style={styles.stateBlock}>
-            <ThemedText type="smallBold" style={styles.centered}>
-              {t('empty.title')}
-            </ThemedText>
-            <ThemedText themeColor="textSecondary" style={styles.centered}>
-              {t('empty.body')}
-            </ThemedText>
+          <View>
+            {resultsHeader}
+            <View style={styles.stateBlock}>
+              <ThemedText type="smallBold" style={styles.centered}>
+                {t('empty.title')}
+              </ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.centered}>
+                {t('empty.body')}
+              </ThemedText>
+            </View>
           </View>
         )}
 
@@ -350,9 +518,12 @@ export default function SearchScreen() {
             keyExtractor={(trip) => trip.id}
             renderItem={({ item }) => <TripResultCard trip={item} />}
             ListHeaderComponent={
-              <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
-                {t('results', { count: state.page.totalCount })}
-              </ThemedText>
+              <View>
+                {resultsHeader}
+                <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
+                  {t('results', { count: state.page.totalCount })}
+                </ThemedText>
+              </View>
             }
             ListFooterComponent={
               state.loadingMore ? <ActivityIndicator color={Brand.mango} style={styles.spinner} /> : null
@@ -363,6 +534,43 @@ export default function SearchScreen() {
             keyboardShouldPersistTaps="handled"
           />
         )}
+
+        {/* Feuille « Filtres » : le tri serveur pour l'instant — les familles,
+            le poids et les horaires suivront avec le formulaire de filtres. */}
+        <Modal
+          visible={filtersOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setFiltersOpen(false)}>
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={() => setFiltersOpen(false)}
+            accessibilityRole="button"
+          />
+          <ThemedView style={styles.sheet}>
+            <View style={[styles.sheetHandle, { backgroundColor: theme.backgroundSelected }]} />
+            <ThemedText type="smallBold" style={styles.sheetTitle}>
+              {t('filters.title')}
+            </ThemedText>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.sheetSection}>
+              {t('filters.sortBy')}
+            </ThemedText>
+            {SORT_OPTIONS.map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => pickSort(option)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sort === option }}
+                style={({ pressed }) => [styles.sortRow, pressed && styles.pressed]}>
+                <ThemedText>{t(`filters.${option}`)}</ThemedText>
+                {sort === option && <Ionicons name="checkmark" size={18} color={Brand.mango} />}
+              </Pressable>
+            ))}
+          </ThemedView>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -432,15 +640,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 600,
   },
-  summary: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: Spacing.two,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
     marginTop: Spacing.two,
     marginBottom: Spacing.three,
+  },
+  summaryTouch: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 22,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
   },
   summaryTexts: {
     flex: 1,
@@ -448,6 +666,86 @@ const styles = StyleSheet.create({
   },
   summaryRoute: {
     flexShrink: 1,
+  },
+  filtersButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderRadius: 22,
+    paddingHorizontal: Spacing.three,
+  },
+  resultsHeader: {
+    gap: Spacing.one,
+    paddingBottom: Spacing.two,
+  },
+  tabsScroll: {
+    marginTop: Spacing.two,
+    marginHorizontal: -Spacing.four,
+  },
+  tabs: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.one,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  tabCount: {
+    minWidth: 20,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  tabCountText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 700,
+    fontVariant: ['tabular-nums'],
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(2,6,23,0.55)',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.five,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: Spacing.two,
+  },
+  sheetTitle: {
+    textAlign: 'center',
+    fontSize: 15,
+    marginBottom: Spacing.three,
+  },
+  sheetSection: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: Spacing.one,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
   },
   idle: {
     gap: Spacing.four,

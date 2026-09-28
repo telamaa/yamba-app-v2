@@ -77,24 +77,57 @@ export type SearchPage = {
   totalCount: number;
 };
 
+/** Filtre transport des pastilles (« Tout » = pas de paramètre serveur). */
+export type SearchTransportFilter = 'all' | 'plane' | 'train' | 'car';
+
+/** Tris serveur (mêmes clés que le web ; « earliest » = défaut, omis). */
+export type SearchSort = 'earliest' | 'lowestPrice' | 'bestRated';
+
 export type SearchParams = {
   from?: string;
   to?: string;
   /** ISO — bornes de la fenêtre de départ. */
   dateFrom?: string;
   dateTo?: string;
+  mode?: SearchTransportFilter;
+  sort?: SearchSort;
   cursor?: string | null;
   limit?: number;
 };
 
-export async function searchTrips(params: SearchParams): Promise<SearchPage> {
+function baseQuery(params: SearchParams): URLSearchParams {
   const query = new URLSearchParams();
   if (params.from) query.set('from', params.from);
   if (params.to) query.set('to', params.to);
   if (params.dateFrom) query.set('dateFrom', params.dateFrom);
   if (params.dateTo) query.set('dateTo', params.dateTo);
+  return query;
+}
+
+export async function searchTrips(params: SearchParams): Promise<SearchPage> {
+  const query = baseQuery(params);
+  if (params.mode && params.mode !== 'all') query.set('mode', params.mode);
+  if (params.sort && params.sort !== 'earliest') query.set('sort', params.sort);
   if (params.cursor) query.set('cursor', params.cursor);
   if (params.limit) query.set('limit', String(params.limit));
   const qs = query.toString();
   return apiFetch<SearchPage>(`/trips/search${qs ? `?${qs}` : ''}`);
+}
+
+/** Comptes des pastilles transport — sous-ensemble utile du DTO web. */
+export type SearchFacets = {
+  totalCount: number;
+  modeCount: { all: number; plane: number; train: number; car: number };
+};
+
+export type SearchFacetsParams = Pick<SearchParams, 'from' | 'to' | 'dateFrom' | 'dateTo'>;
+
+/**
+ * GET /trips/search/facets — mêmes paramètres STRUCTURANTS que la recherche,
+ * SANS le mode : les pastilles comptent « combien par transport » parmi les
+ * filtres actifs (miroir de useSearchFacets côté web).
+ */
+export async function getSearchFacets(params: SearchFacetsParams): Promise<SearchFacets> {
+  const qs = baseQuery(params).toString();
+  return apiFetch<SearchFacets>(`/trips/search/facets${qs ? `?${qs}` : ''}`);
 }

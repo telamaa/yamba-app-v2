@@ -12,9 +12,26 @@
     "cancel": "Cancel",
     "submit": "Search"
   },
-  "summary": {
-    "edit": "Edit",
-    "everywhere": "Anywhere"
+  "title": {
+    "noFilter": "All available trips",
+    "fromTo": "Trips for {from} → {to}",
+    "fromOnly": "Trips departing from {from}",
+    "toOnly": "Trips to {to}",
+    "dateOnly": "Trips on {date}"
+  },
+  "subtitleHint": "Refine with origin and destination, or browse current offers",
+  "tabs": {
+    "all": "All",
+    "plane": "Plane",
+    "train": "Train",
+    "car": "Car"
+  },
+  "filters": {
+    "title": "Filters",
+    "sortBy": "Sort by",
+    "earliest": "Earliest departure",
+    "lowestPrice": "Lowest price",
+    "bestRated": "Best rated"
   },
   "corridors": {
     "label": "Right now",

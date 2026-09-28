@@ -12,9 +12,26 @@
     "cancel": "Annuler",
     "submit": "Rechercher"
   },
-  "summary": {
-    "edit": "Modifier",
-    "everywhere": "Partout"
+  "title": {
+    "noFilter": "Tous les trajets disponibles",
+    "fromTo": "Trajets pour {from} → {to}",
+    "fromOnly": "Trajets au départ de {from}",
+    "toOnly": "Trajets à destination de {to}",
+    "dateOnly": "Trajets le {date}"
+  },
+  "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle",
+  "tabs": {
+    "all": "Tout",
+    "plane": "Avion",
+    "train": "Train",
+    "car": "Voiture"
+  },
+  "filters": {
+    "title": "Filtres",
+    "sortBy": "Trier par",
+    "earliest": "Départ le plus tôt",
+    "lowestPrice": "Prix le plus bas",
+    "bestRated": "Mieux notés"
   },
   "corridors": {
     "label": "En ce moment",
