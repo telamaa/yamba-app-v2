@@ -14,18 +14,24 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { TripSearchResult } from '@/lib/api/search.api';
+import { countryName } from '@/lib/country-name';
 import { formatMinutesDuration } from '@/lib/trip-format';
 
 export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   const t = useTranslations('search');
+  const locale = useLocale();
   const theme = useTheme();
+  // Pays localisé pour le visiteur, comme sur le web (le corridor est souvent
+  // international — « Brazzaville » seul ne dit pas Congo ou RDC).
+  const fromCountry = countryName(trip.fromCountryCode, locale);
+  const toCountry = countryName(trip.toCountryCode, locale);
   const currency = trip.currency ?? '€';
   // La constante intermédiaire porte le narrowing : `perKg && trip.pricePerKg`
   // ne suffit pas à TS dans l'appel de traduction.
@@ -46,7 +52,14 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
               <View style={styles.glyph}>
                 <View style={[styles.ring, { borderColor: theme.text }]} />
               </View>
-              <ThemedText style={styles.city}>{trip.fromCity}</ThemedText>
+              <View style={styles.cityBlock}>
+                <ThemedText style={styles.city}>{trip.fromCity}</ThemedText>
+                {fromCountry && (
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {fromCountry}
+                  </ThemedText>
+                )}
+              </View>
             </View>
             {/* Durée le long des pointillés */}
             <View style={styles.legMiddle}>
@@ -73,7 +86,14 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
               <View style={styles.glyph}>
                 <View style={[styles.ring, { borderColor: theme.text }]} />
               </View>
-              <ThemedText style={styles.city}>{trip.toCity}</ThemedText>
+              <View style={styles.cityBlock}>
+                <ThemedText style={styles.city}>{trip.toCity}</ThemedText>
+                {toCountry && (
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {toCountry}
+                  </ThemedText>
+                )}
+              </View>
             </View>
           </View>
 
@@ -193,8 +213,10 @@ const styles = StyleSheet.create({
     height: 2.5,
     borderRadius: 1.5,
   },
-  city: {
+  cityBlock: {
     flex: 1,
+  },
+  city: {
     fontSize: 15,
     lineHeight: 20,
   },
