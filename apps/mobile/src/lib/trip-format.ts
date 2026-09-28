@@ -108,6 +108,11 @@ export function formatTripDuration(dates: TripDates): string | null {
   const diffMin = Math.round(
     (new Date(dates.arrivalAt).getTime() - new Date(dates.departureAt).getTime()) / 60000
   );
+  return formatMinutesDuration(diffMin);
+}
+
+/** « 2h37 », « 1j 4h », « 45min » — aussi pour `durationMinutes` du DTO de recherche. */
+export function formatMinutesDuration(diffMin: number): string | null {
   if (diffMin < 0) return null;
 
   const days = Math.floor(diffMin / (60 * 24));

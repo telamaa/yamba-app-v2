@@ -32,9 +32,15 @@
     "retry": "Réessayer"
   },
   "card": {
-    "fromPrice": "dès {price} {currency}",
+    "fromLabel": "À partir de",
+    "price": "{price} {currency}",
     "perKg": "{price} {currency}/kg",
     "remainingKg": "{kg} kg dispo",
-    "rating": "★ {rating} ({count})"
+    "rating": "★ {rating} ({count})",
+    "mode": {
+      "plane": "Avion",
+      "train": "Train",
+      "car": "Voiture"
+    }
   }
 }

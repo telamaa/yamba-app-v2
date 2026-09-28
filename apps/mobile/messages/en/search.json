@@ -32,9 +32,15 @@
     "retry": "Try again"
   },
   "card": {
-    "fromPrice": "from {price} {currency}",
+    "fromLabel": "From",
+    "price": "{price} {currency}",
     "perKg": "{price} {currency}/kg",
     "remainingKg": "{kg} kg left",
-    "rating": "★ {rating} ({count})"
+    "rating": "★ {rating} ({count})",
+    "mode": {
+      "plane": "Plane",
+      "train": "Train",
+      "car": "Car"
+    }
   }
 }

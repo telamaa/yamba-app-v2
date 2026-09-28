@@ -9,9 +9,12 @@
  * dépendance (getcanonicallocales ← Locale ← PluralRules), pas un style.
  * Une langue de plus dans SUPPORTED_LOCALES (locale.ts) = sa ligne
  * `locale-data` ICI — sans elle, le pluriel de cette langue retombe en panne.
+ * L'extension `.js` est OBLIGATOIRE : l'exports map de @formatjs n'expose que
+ * les chemins avec extension, et `moduleResolution: bundler` (tsconfig Expo)
+ * l'honore strictement — sans elle, TS2882.
  */
-import '@formatjs/intl-getcanonicallocales/polyfill';
-import '@formatjs/intl-locale/polyfill';
-import '@formatjs/intl-pluralrules/polyfill';
-import '@formatjs/intl-pluralrules/locale-data/fr';
-import '@formatjs/intl-pluralrules/locale-data/en';
+import '@formatjs/intl-getcanonicallocales/polyfill.js';
+import '@formatjs/intl-locale/polyfill.js';
+import '@formatjs/intl-pluralrules/polyfill.js';
+import '@formatjs/intl-pluralrules/locale-data/fr.js';
+import '@formatjs/intl-pluralrules/locale-data/en.js';
