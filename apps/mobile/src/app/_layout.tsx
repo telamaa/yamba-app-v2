@@ -1,3 +1,6 @@
+// AVANT tout : Hermes sans `Intl.PluralRules`, les clés ICU plural cassent.
+import '@/i18n/intl-polyfills';
+
 import { useEffect, useRef, useState } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import { Animated, useColorScheme } from 'react-native';

@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.19",
+    "@formatjs/intl-getcanonicallocales": "^3.2.12",
+    "@formatjs/intl-locale": "^5.3.12",
+    "@formatjs/intl-pluralrules": "^6.3.15",
     "expo": "~57.0.24",
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",
