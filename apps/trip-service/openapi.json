@@ -180,7 +180,39 @@
             "schema": {
               "$ref": "#/components/schemas/SortOption"
             },
-            "description": "Tri (défaut : earliest). lowestPrice exclut les trips sans minPriceCents"
+            "description": "Tri (défaut : relevance — D80, flux d'atterrissage localisé). Un tri inconnu dégrade sur le défaut"
+          },
+          {
+            "name": "nearLat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "description": "D80 — latitude de l'ancrage du client (adresse du membre, geste « Autour de moi », dernière recherche). Les DEUX coordonnées ou rien : une moitié d'ancrage est ignorée. Jamais journalisée"
+          },
+          {
+            "name": "nearLng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "description": "D80 — longitude de l'ancrage du client (voir nearLat)"
+          },
+          {
+            "name": "nearCountry",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z]{2}$"
+            },
+            "description": "D80 — pays de l'ancrage (ISO 3166-1 alpha-2, casse libre). Sans lui, un trajet sans coordonnées ne peut ringuer que ELSEWHERE face à un ancrage `near`. Une valeur mal formée est ignorée"
           },
           {
             "name": "superTripper",
@@ -239,9 +271,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^([0-9a-fA-F]{24}|o:\\d{1,6})$"
             },
-            "description": "Curseur de pagination : le nextCursor de la page précédente"
+            "description": "Curseur de pagination : le nextCursor de la page précédente — ObjectId 24 hex (tris indexés) ou offset o:<n> (relevance, lowestPrice+weightKg). ANO-API-24 : la forme o:<n> était refusée 400"
           },
           {
             "name": "limit",
@@ -5966,11 +5999,23 @@
       "SortOption": {
         "type": "string",
         "enum": [
+          "relevance",
           "earliest",
           "lowestPrice",
           "bestRated"
         ],
-        "description": "Tri des résultats. lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg) et exclut les trips sans valeur."
+        "description": "Tri des résultats — DÉFAUT : relevance (D80, flux d'atterrissage localisé : anneaux de proximité à l'ancrage + score qualité ; qualité seule quand `from` est saisi). lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg). Un tri inconnu dégrade sur relevance."
+      },
+      "ProximityRing": {
+        "type": "string",
+        "enum": [
+          "SAME_CITY",
+          "NEARBY",
+          "REGION",
+          "COUNTRY",
+          "ELSEWHERE"
+        ],
+        "description": "D80 — anneau de proximité du départ du trajet à l'ancrage de l'utilisateur : SAME_CITY < 25 km · NEARBY < 100 km · REGION < 300 km même pays · COUNTRY même pays · ELSEWHERE. Les fronts en font les en-têtes de sections."
       },
       "UiParcelCategory": {
         "type": "string",
@@ -6240,6 +6285,17 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "ring": {
+            "description": "D80 — présent sur le tri relevance AVEC ancrage ; null/absent sinon (le front ne rend alors aucune section)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProximityRing"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -6279,12 +6335,62 @@
                 "type": "null"
               }
             ],
-            "description": "id du dernier trip de la page — null si dernière page (pagination cursor-based)"
+            "description": "null si dernière page. Deux formes : id du dernier trip de la page (tris indexés), ou offset `o:<n>` (tris calculés en mémoire : relevance D80, lowestPrice+weightKg D33) — à renvoyer tel quel dans `cursor`"
           },
           "totalCount": {
             "type": "integer",
             "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Sur les tris calculés en mémoire, borné à la fenêtre de calcul (200) — le count exact vit dans /trips/search/facets"
+          },
+          "anchor": {
+            "description": "D80 — l'ancrage du classement (chip « Autour de : X » côté front). Présent sur le tri relevance ; null = flux découverte (aucun ancrage résolu) ; jamais l'IP ni des coordonnées",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "query",
+                      "ip"
+                    ],
+                    "description": "query = position envoyée par le client · ip = résolue hors-ligne par le serveur"
+                  },
+                  "city": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Ville approximative — présente seulement quand la source est ip (le client connaît déjà son libellé sinon)"
+                  },
+                  "countryCode": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "ISO 3166-1 alpha-2, null si inconnu"
+                  }
+                },
+                "required": [
+                  "source",
+                  "city",
+                  "countryCode"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

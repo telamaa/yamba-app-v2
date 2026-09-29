@@ -78,6 +78,9 @@ export type YambaTripResultDto = {
   reviewCount?: number;
   /** D46 — posé par le controller après mapping (jamais par le mapper) */
   isFavorite?: boolean;
+  /** D80 — anneau de proximité à l'ancrage, posé par le controller (tri `relevance` AVEC
+   *  ancrage seulement) ; les fronts en font les en-têtes de sections. */
+  ring?: "SAME_CITY" | "NEARBY" | "REGION" | "COUNTRY" | "ELSEWHERE" | null;
   travelerFirstName?: string;
   travelerLastName?: string;     // toujours juste l'initiale (privacy)
   travelerAvatarUrl?: string;

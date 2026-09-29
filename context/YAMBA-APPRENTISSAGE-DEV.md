@@ -3132,3 +3132,73 @@ comme un faux billet. Les deux SVG officiels pèsent 1 Ko, s'embarquent dans
 `assets/images/` et se rendent par `expo-image` comme n'importe quelle illustration. Vérifier
 la charte d'un tiers AVANT de dessiner son bouton : c'est du droit des marques autant que de
 l'UX.
+
+## Chapitre 211 — Le feed à la Airbnb : les anneaux qui dominent, le percentile sans médiane, et la géoloc qui ne sort jamais
+
+**Le lot** : `feat/feed-relevance-server` (D80) — le tri par défaut de la recherche devient un
+classement localisé, calculé en lecture côté serveur.
+
+### 1. Une clé de tri à étages vaut mieux qu'une somme pondérée
+
+L'intuition de départ est toujours « un grand score qui mélange tout ». On a fait l'inverse
+(`feed-ranking.ts`) : un COMPARATEUR à quatre niveaux stricts — plein, anneau, score, id.
+Pourquoi : les niveaux portent des SENS différents. « Ce trajet est plein » n'est pas « ce
+trajet vaut 40 points de moins » : c'est une vérité qui doit dominer QUEL QUE SOIT le reste.
+Mélanger dans une somme, c'est accepter qu'un 5★ à 2 € batte un trajet réservable — un bug de
+produit indétectable en test unitaire. Les sommes pondérées restent DANS un étage (le score
+qualité), où les facteurs sont commensurables. Leçon : quand deux critères ne se compensent
+pas, c'est un tuple lexicographique, pas une addition.
+
+### 2. Le percentile de fenêtre : un classement sans état
+
+Pour juger un prix « compétitif », la tentation est une médiane par corridor — une table de
+plus, un cron de plus, une péremption de plus. Le percentile DANS LA FENÊTRE (les 200 trajets
+qu'on classe de toute façon) donne la même information sans AUCUN état : on trie les prix
+comparables, le rang normalisé est le score, les ex-aequo partagent le rang du PREMIER
+(déterminisme A199 — sinon deux appels rendent deux ordres). Zéro infra, autopurgé, et le
+« compétitif » est relatif à ce que l'utilisateur VOIT, pas à une moyenne nationale abstraite.
+
+### 3. La diversité stable : démouvoir, jamais retirer
+
+Le flux découverte cape un corridor à 3 cartes. L'algo naïf FILTRE — et viole ANO-API-11 (le
+nombre change). Le nôtre DÉMEUT : une passe stable, les débordements vont en queue de leur
+bucket dans leur ordre relatif. Propriété testée : `ranked.length === input.length`, toujours.
+Et un piège de composition attrapé en écrivant le test : la diversité ne doit jamais repêcher
+un PLEIN — elle s'applique PAR bucket, pas sur la liste entière.
+
+### 4. `.catch()` de Zod : l'entrée géographique qui ne casse rien
+
+`nearLat: z.coerce.number().min(-90).max(90).optional().catch(undefined)` — la doctrine
+ANO-API-10 poussée un cran plus loin : une COORDONNÉE invalide ne vaut pas un 400, elle vaut
+« pas d'ancrage ». Un lien partagé avec `?nearLat=abc` cherche quand même. Même geste sur le
+tri (`catch("relevance")`) et le pays (`catch(undefined)`). La règle qui se dégage : tout
+paramètre qui AMÉLIORE la réponse sans en conditionner le sens doit dégrader en silence ;
+seuls les paramètres qui changent le SENS (un curseur, un id) refusent.
+
+### 5. La géoloc RGPD-propre : une base locale et trois couches testables
+
+Résoudre une IP semble exiger un tiers (ip-api) ou un SDK. `packages/libs/geoip` fait tout en
+local : `maxmind` (lecteur .mmdb pur JS) + la base GeoLite2 sur le disque, gitignorée,
+téléchargée par script. Le découpage qui rend ça testable SANS le binaire de 60 Mo :
+`isPrivateIp` (pur), `interpretCity` (pur : réponse → ancrage), `makeIpAnchorResolver(openDb)`
+(l'effet de bord injecté). Le résolveur mémorise la PROMESSE d'ouverture (`??=`), échec
+compris : pas de tempête d'ouvertures sur une base corrompue. Et chaque chemin d'erreur rend
+`null` — la propriété du module entier tient en une phrase : « une géoloc ne vaut jamais un
+500 ».
+
+### 6. Le proxy qui ne dit pas qui appelle
+
+Mesuré : `express-http-proxy` transmet les en-têtes mais n'ajoute PAS `x-forwarded-for`. Le
+service derrière voyait l'IP… du gateway (privée → géoloc muette, silencieusement). Le correctif
+est aussi la mesure de sécurité : le gateway POSE `x-client-ip` en l'ÉCRASANT — un client qui
+l'enverrait lui-même est réécrit. Leçon : un en-tête de confiance se pose au point de
+confiance, jamais en aval ; et une sonde réelle (le bundle + curl) attrape ce que tsc et jest
+ne voient pas — c'est aussi la sonde qui a sorti ANO-API-24 (le curseur `o:<n>` de D33 refusé
+par sa propre regex : la page 2 du tri prix-au-poids était inatteignable depuis sa naissance).
+
+### Pour aller plus loin
+
+- Le passage à l'échelle : champ GeoJSON + index 2dsphere + `$geoNear` quand la fenêtre de 200
+  débordera (porte 🚪↔ de D80).
+- La théorie derrière l'étage 2 : les « learning to rank » pointwise — notre score en est un,
+  écrit à la main ; PostHog (D66) fournira les données du jour où on voudra l'apprendre.

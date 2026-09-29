@@ -155,7 +155,30 @@ const searchTripsParams = [
     required: false,
     schema: ref("SortOption"),
     description:
-      "Tri (défaut : earliest). lowestPrice exclut les trips sans minPriceCents",
+      "Tri (défaut : relevance — D80, flux d'atterrissage localisé). Un tri inconnu dégrade sur le défaut",
+  },
+  {
+    name: "nearLat",
+    in: "query",
+    required: false,
+    schema: { type: "number", minimum: -90, maximum: 90 },
+    description:
+      "D80 — latitude de l'ancrage du client (adresse du membre, geste « Autour de moi », dernière recherche). Les DEUX coordonnées ou rien : une moitié d'ancrage est ignorée. Jamais journalisée",
+  },
+  {
+    name: "nearLng",
+    in: "query",
+    required: false,
+    schema: { type: "number", minimum: -180, maximum: 180 },
+    description: "D80 — longitude de l'ancrage du client (voir nearLat)",
+  },
+  {
+    name: "nearCountry",
+    in: "query",
+    required: false,
+    schema: { type: "string", pattern: "^[a-zA-Z]{2}$" },
+    description:
+      "D80 — pays de l'ancrage (ISO 3166-1 alpha-2, casse libre). Sans lui, un trajet sans coordonnées ne peut ringuer que ELSEWHERE face à un ancrage `near`. Une valeur mal formée est ignorée",
   },
   boolQueryParam("superTripper", "Uniquement les Super Trippers"),
   boolQueryParam("profileVerified", "Uniquement les profils vérifiés"),
@@ -165,8 +188,9 @@ const searchTripsParams = [
     name: "cursor",
     in: "query",
     required: false,
-    schema: { type: "string" },
-    description: "Curseur de pagination : le nextCursor de la page précédente",
+    schema: { type: "string", pattern: "^([0-9a-fA-F]{24}|o:\\d{1,6})$" },
+    description:
+      "Curseur de pagination : le nextCursor de la page précédente — ObjectId 24 hex (tris indexés) ou offset o:<n> (relevance, lowestPrice+weightKg). ANO-API-24 : la forme o:<n> était refusée 400",
   },
   {
     name: "limit",
