@@ -2823,3 +2823,176 @@ signal de popularité.
   attend la porte de connexion contextuelle ; les deux sont notés dans A205 comme écartés, pas oubliés.
 - Le deep link `yamba://trip/<id>` existe DÉJÀ à moitié : le `scheme` est dans `app.json` et la route
   existe — le lot deep links n'aura qu'à brancher les liens universels.
+
+## Chapitre 207 — Les paramètres de route comme messages : la graine qui fait l'événement, et l'état React qu'on ne relit pas trop tôt
+
+### Ce qu'on construisait
+
+L'accueil mobile (`feat/mobile-welcome`, A206) : transposer l'accueil web refondu (#357) dans
+l'onglet Accueil, avec des corridors réels qui, au toucher, ouvrent l'onglet Rechercher PRÉREMPLI et
+lancent la recherche. Tout le lot tient dans `apps/mobile/src/app/(tabs)/index.tsx` et deux retouches
+de `search.tsx` — mais il enseigne trois idées qui dépassent l'écran.
+
+### 1. Faire passer un message entre deux onglets : les paramètres de route… et leur piège
+
+Sur le web, le corridor touché sème un BROUILLON en `sessionStorage` et navigue ; `/search` le relit
+en arrivant (WEB-ACC-9). Le mobile n'a pas de `sessionStorage` partagé entre écrans — mais
+expo-router a mieux : les paramètres de route.
+
+```tsx
+// index.tsx — l'accueil envoie
+router.navigate({
+  pathname: '/(tabs)/search',
+  params: { from: corridor.fromCity, to: corridor.toCity, seed: Date.now().toString(36) },
+});
+
+// search.tsx — l'onglet reçoit
+const prefill = useLocalSearchParams<{ from?: string; to?: string; seed?: string }>();
+```
+
+Le piège : un paramètre de route est un ÉTAT, pas un ÉVÉNEMENT. Il reste accroché à l'écran — revenir
+sur l'onglet Rechercher trois jours plus tard le retrouve intact, et un `useEffect` naïf sur
+`[prefill.from, prefill.to]` rejouerait la recherche à chaque retour. Et l'inverse aussi : retaper le
+MÊME corridor produit les MÊMES paramètres — aucun changement, aucun effet, l'utilisateur touche et
+rien ne se passe.
+
+La solution tient en un mot : une GRAINE (`seed`). L'accueil en fabrique une NOUVELLE à chaque
+toucher (`Date.now().toString(36)`), et le récepteur ne rejoue le préremplissage que quand ELLE
+change :
+
+```tsx
+const appliedSeed = useRef<string | null>(null);
+useEffect(() => {
+  if (typeof prefill.seed !== 'string' || prefill.seed === appliedSeed.current) return;
+  appliedSeed.current = prefill.seed;
+  // …remplir les champs, lancer la recherche
+}, [prefill.seed, prefill.from, prefill.to, runSearchWith]);
+```
+
+La graine transforme un état en front montant : même corridor retapé → graine neuve → rejoué ;
+simple retour d'onglet → graine connue → silence. C'est le même motif qu'un `nonce` d'événement — et
+la `ref` (pas un `useState`) porte la mémoire SANS provoquer de re-rendu.
+
+### 2. `setState` n'est pas synchrone : chercher avec des valeurs EXPLICITES
+
+Le préremplissage pose `setFrom(nextFrom)` puis veut chercher. Or `runSearch()` lisait l'état via
+`currentParams()` — et l'état que React vient de recevoir n'est PAS encore visible dans la fermeture
+courante : la recherche serait partie avec les CHAMPS D'AVANT. D'où la refactorisation :
+
+```tsx
+const runSearchWith = useCallback(async (params: SearchParams) => { /* fetch + états */ }, [t]);
+const runSearch = useCallback(() => runSearchWith(currentParams()), [runSearchWith, currentParams]);
+```
+
+Le bouton « Rechercher » continue de lire l'état (le clavier a eu le temps de le poser) ; le
+préremplissage, lui, passe ses valeurs EN ARGUMENT — celles qu'il vient de calculer, pas celles que
+React finira par exposer. Règle générale : quand un même geste pose l'état ET s'en sert, il ne le
+relit pas — il le transmet.
+
+### 3. La section qui préfère disparaître : `null` comme état honnête
+
+Les corridors sont DÉRIVÉS à l'affichage (même algorithme que `CorridorsSection` web : Map
+ville→ville, tri par volume, six au plus — miroir assumé, consigné dans A206 comme `trip-format.ts`
+l'est dans A205). L'état est `Corridor[] | null` — et `null` couvre TROIS cas : pas encore chargé,
+serveur en panne, zéro trajet. Les trois donnent le même rendu : PAS de section. Ni spinner (une
+section de découverte qui « charge » promet quelque chose), ni écran d'erreur (une panne de
+découverte n'inquiète pas l'utilisateur : elle s'efface). C'est la leçon #357 poussée un cran plus
+loin : une page qui ne dit que du vrai a le droit de ne rien dire.
+
+### Pièges à retenir
+
+- Un paramètre de route persiste : sans graine, l'effet rejoue au retour d'onglet OU ne rejoue pas
+  au deuxième toucher — les deux bugs à la fois.
+- `setState` puis « relire l'état » dans la même fermeture lit l'ANCIEN : transmettre la valeur.
+- Supprimer un bloc d'écran, c'est aussi supprimer SES CLÉS de message (`socleNote`, `connectedAs`)
+  — le contrôle i18n ne voit pas une clé morte, seulement une clé manquante.
+- La preuve de bundle sur du texte FR cherche TOUJOURS les deux encodages (UTF-16-LE + UTF-8,
+  leçon A204) avec un témoin faux à 0.
+
+### Pour aller plus loin
+
+Si un troisième écran veut un jour semer une recherche (une notification « nouveau trajet sur ton
+corridor », un deep link), le motif graine + paramètres est déjà le bon canal — et le jour où les
+corridors méritent un VRAI endpoint serveur (agrégation Mongo plutôt qu'un échantillon de 50), les
+deux fronts basculeront ensemble : la dérivation à l'affichage est consignée comme provisoire dans
+A206.
+
+## Chapitre 208 — Recherche-first : le motif qu'on supprime le soir même, le `require` qui attend sa plateforme, et le jeton qui groupe les frappes
+
+### La supersession comme méthode (et pourquoi le chapitre 207 reste)
+
+Le chapitre 207 racontait la graine de préremplissage entre l'onglet Accueil et l'onglet
+Rechercher. Ce mécanisme n'existe PLUS : le soir même de sa livraison, les captures de la référence
+(`context/captures/`) ont réorienté le lot — l'onglet Accueil doublonnait Rechercher, il est
+supprimé (A207). La leçon n'est pas « on a perdu une soirée » ; elle est double. D'abord une leçon
+de MÉTHODE : le registre et les docs ne se réécrivent pas — A206/chapitre 207 restent l'histoire,
+A207/ce chapitre les supplantent PAR AJOUT, avec une note de caducité côté métier. Un lecteur qui
+tombe sur le motif graine sait ainsi qu'il a existé, pourquoi, et pourquoi il est mort. Ensuite une
+leçon d'ARCHITECTURE : `router.navigate` + graine était le bon motif ENTRE onglets ; dès que
+corridors et formulaire vivent sur le MÊME écran, il devient du sur-place — `openCorridor` pose
+l'état et appelle `runSearchWith(params)` avec des valeurs EXPLICITES, zéro navigation. Un
+mécanisme se vérifie dans son contexte avant d'être transposé ; transposé hors contexte, il se
+supprime.
+
+### Le champ qui est un écran : le motif natif de saisie
+
+Sur le web, une autocomplétion est un dropdown sous le champ. Sur téléphone, le motif natif des
+deux OS est inverse : toucher le champ OUVRE UN ÉCRAN de saisie dédié — clavier levé d'office,
+grande zone de frappe, suggestions en liste pleine hauteur — et choisir referme. `city-picker.tsx`
+l'implémente avec les briques de base : un `Modal` en `presentationStyle="pageSheet"` (la feuille
+qui laisse voir l'écran d'origine derrière, iOS la rend native), `autoFocus` sur le `TextInput`,
+une `FlatList` avec `keyboardShouldPersistTaps="handled"` (sans quoi le premier toucher sur une
+suggestion ne fait que fermer le clavier). Deux détails d'asynchronie valent le voyage :
+le DÉBOUNCE (250 ms) évite une requête par frappe, et la ref `queryAt` jette les réponses EN
+RETARD — sans elle, taper « Paris » puis corriger en « Pointe-Noire » peut afficher les
+suggestions de Paris revenues après coup. C'est le même problème que le `AbortController` du web,
+résolu ici par comparaison de la frappe déclencheuse plutôt que par annulation.
+
+### Places (New) en REST : le même contrat, sans DOM
+
+Le site charge le SDK JS de Google Maps (il a un DOM). L'app n'en a pas : `places.api.ts` appelle
+l'API REST « Places (New) » (`POST places.googleapis.com/v1/places:autocomplete`) avec un simple
+`fetch`. Trois choses à savoir. 1) Le SDK et le REST exposent le MÊME service : mêmes types
+(`locality`, `airport`), même `languageCode`, même notion de session — le fichier mobile est un
+miroir de `CityAutocomplete` du web, réglage pour réglage. 2) Le **jeton de session** n'est pas de
+la sécurité : c'est de la FACTURATION. Google groupe toutes les frappes portant le même jeton en
+une seule « saisie » facturée ; le jeton se renouvelle à chaque OUVERTURE du picker, pas à chaque
+frappe. 3) La clé est PUBLIQUE des deux côtés (`NEXT_PUBLIC_*` / `EXPO_PUBLIC_*`) — elle part dans
+le bundle, c'est assumé : la protection est la RESTRICTION en console Google (referrer HTTP pour le
+web, empreinte du bundle pour une app). Corollaire opérationnel : une clé restreinte « referrer »
+refusera les appels REST d'une app — dégradation SILENCIEUSE voulue (tableau vide, saisie libre),
+mais il faut une clé « application » pour que les suggestions vivent.
+
+### `@expo/ui` : le `require` qui attend sa plateforme
+
+`native-date-field.tsx` présente le calendrier SwiftUI `graphical` sur iOS et le
+`DatePickerDialog` Material 3 sur Android — les VRAIS sélecteurs, pas une imitation JS. Le piège
+est dans l'import : `@expo/ui/swift-ui` et `@expo/ui/jetpack-compose` ENREGISTRENT des vues
+natives à l'import du module. Un `import` en tête de fichier chargerait les DEUX paquets sur
+chaque OS ; le fichier utilise donc `require(...)` DANS la branche `Platform.OS`, typé par
+`as typeof import(...)` pour garder l'autocomplétion et le typecheck. C'est le même geste que le
+code-splitting web (`dynamic import`), mais la raison n'est pas le poids : c'est l'effet de bord
+d'enregistrement natif. À retenir pour tout paquet Expo « par plateforme ».
+
+### Deux petites mécaniques d'état qui disent une philosophie
+
+`welcome-state.ts` tient en une variable de module (`let dismissed = false`) : le « passer » de la
+bienvenue ne SURVIT PAS au lancement — volontairement. Pas d'AsyncStorage, pas de flag persisté :
+la référence remontre sa bienvenue à chaque lancement à froid anonyme, et c'est la SESSION (le
+statut authentifié), pas le drapeau, qui décide qu'un membre ne la voit jamais. Quand ne rien
+persister est le comportement voulu, une variable de module est l'outil honnête — pas une dette.
+Même esprit pour le splash : `SPLASH_MIN_MS = 1500` est un PLANCHER (`Math.max(0, MIN - écoulé)`)
+posé sur un chargement RÉEL (l'amorçage de session), jamais un `setTimeout` sec — un splash qui
+clignote à 200 ms est aussi désagréable qu'un splash qui bloque une app déjà prête.
+
+### Le piège du jour : `expo export` veut aussi faire du web
+
+La preuve bundle du lot (marqueurs FR/EN dans les deux encodages, leçon A204) a buté sur un
+échec inattendu : `npx expo export --clear` réussit les bundles Hermes iOS ET Android… puis
+échoue sur le rendu web statique (`@expo/metro-runtime` introuvable depuis `@expo/router-server`)
+— et ne produit AUCUN `dist/`. Le projet a `web.output: static` dans sa config mais pas les
+dépendances du rendu web (l'app n'a pas de cible web). La sortie : `--platform ios --platform
+android` — l'export se limite aux plateformes natives et `dist/` apparaît. Moralité déjà croisée
+sous d'autres formes : une commande « toutes plateformes » échoue sur la plateforme qu'on n'a
+jamais construite ; nommer explicitement ce qu'on veut est plus robuste que laisser l'outil
+deviner.

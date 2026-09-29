@@ -11763,3 +11763,142 @@ visiteur mobile anonyme derrière CGNAT (arbitrage A205).
 - Pitfalls du 19/09 appliqués à la relecture : `ReactNode` importé de `react`, narrowing par CAPTURE
   de valeur (`ratedCarrier`), teal remplacé par la teinte `tint` du thème (le #0F766E est illisible
   en sombre).
+
+# L'accueil mobile — l'accueil web transposé · `feat/mobile-welcome`
+
+## Le déclencheur
+
+Depuis le lot onglets (A203), l'onglet Accueil était la coquille du socle : l'accroche, un bouton
+« Se connecter » et une note qui promettait la suite. Avec la recherche (A204) et la page trajet
+(A205) livrées, l'app avait un vrai parcours de découverte — mais son accueil ne l'annonçait pas et
+ne menait nulle part. Ce lot transpose l'accueil web refondu (#357, « une page qui ne dit que du
+vrai ») à l'écran de téléphone. GO du 20/09 — périmètre reproposé et reconfirmé après un
+redémarrage du poste (la branche existait, la conversation du GO était perdue).
+
+## Ce qui a été fait
+
+- **`app/(tabs)/index.tsx` réécrit** — un `ScrollView` en quatre blocs, tous VRAIS :
+  1. **Hero** : la marque, l'accroche et le sous-titre du web (mêmes phrases, namespace `home`),
+     salutation « Bonjour {prénom} » quand la session est ouverte (tutoiement, décisions 03/09),
+     CTA « Chercher un trajet » qui BASCULE d'onglet (`router.navigate('/(tabs)/search')`) — PAS de
+     barre de recherche dupliquée : la recherche EST un onglet, deux formulaires divergeraient.
+     Visiteur : le lien « Se connecter » (modale `/login`) reste, en secondaire.
+  2. **Ligne de confiance** : les trois mécanismes du hero web — séquestre Stripe, code
+     confidentiel, profils et billets vérifiés. Des mécanismes, jamais des chiffres.
+  3. **Corridors réels** : MÊME dérivation que `CorridorsSection` du web (miroir assumé, consigné
+     dans A206 comme `trip-format.ts` l'est dans A205) — échantillon `GET /trips/search` limit 50,
+     agrégation ville→ville à l'affichage, tri par volume, six au plus. Zéro trajet OU API en
+     panne → la section DISPARAÎT (état `null`), elle ne montre jamais du faux et n'affiche pas
+     d'erreur : une section de découverte en panne s'efface, elle n'inquiète pas.
+  4. **« Comment ça marche »** à deux faces (« J'envoie un colis » / « Je voyage ») : les quatre
+     étapes de chaque face du web, en puces + pastilles numérotées mangue.
+  La `socleNote` disparaît — et ses clés avec elle (`socleNote`, `connectedAs`) : pas de clé morte
+  (leçon A203).
+- **Le préremplissage** — la transposition mobile du brouillon `sessionStorage` du web (WEB-ACC-9) :
+  un corridor touché part en PARAMÈTRES DE ROUTE —
+  `router.navigate({ pathname: '/(tabs)/search', params: { from, to, seed } })`. Côté
+  `search.tsx` : `useLocalSearchParams` + une ref du dernier `seed` appliqué — le préremplissage ne
+  rejoue que quand la GRAINE change (retaper le même corridor relance la recherche ; revenir sur
+  l'onglet ne la rejoue pas), remplit les champs, remet la fenêtre « Toutes les dates » et LANCE la
+  recherche. Elle passe par `searchTrips` comme toutes les autres : le serveur la compte dans les
+  stats corridor (RG-MOB-14), zéro code dédié.
+- **`runSearch` refactorée en `runSearchWith(params)`** : le préremplissage cherche avec des valeurs
+  EXPLICITES — l'état React qu'il vient de poser n'est pas encore relu par `currentParams()` au
+  moment où la recherche part (le `setState` n'est pas synchrone).
+- **i18n** : namespace `home` refondu FR/EN (hero, confiance, corridors, deux faces × quatre
+  étapes) — les phrases du web reprises telles quelles, pluriel ICU sur `tripCount`.
+
+## Vérifié
+
+- Typecheck **10/10** (`npx nx run-many --target=typecheck --all --skip-sync`, la commande CI).
+- Contrôle i18n vert (miroir FR/EN, 30 espaces + mobile) + contre-épreuve ROUGE : `searchCta`
+  retirée du EN → `clé manquante : searchCta`, restaurée, revert au vert.
+- Bundle Hermes Android `expo export --clear` : six marqueurs FR accentués (« Des Voyageurs partent
+  bientôt », « Comment ça marche », « Paiement bloqué jusqu'à la livraison ») et EN (« Travelers are
+  leaving soon », « I'm sending a parcel ») cherchés dans LES DEUX encodages (UTF-16-LE + UTF-8,
+  leçon A204) — tous à 1, témoin faux à 0.
+- Aucune dépendance ajoutée, services intouchés, tests plateforme INCHANGÉS (1576).
+
+# Recherche-first — splash, bienvenue et le formulaire natif · `feat/mobile-welcome` (A207)
+
+## Le déclencheur
+
+Le soir même de la livraison de l'accueil transposé (section précédente), l'utilisateur a montré le
+VRAI sens du lot, perdu dans le redémarrage du poste : les captures de la référence dans
+`context/captures/` (non versionnées — le canal design). Le verdict : un onglet Accueil qui pousse
+vers Rechercher DOUBLONNE Rechercher (« on a déjà Rechercher »). L'app devient recherche-first —
+la référence l'a validé dix ans. La section précédente reste l'histoire ; celle-ci la SUPPLANTE.
+Validation visuelle sur iPhone (Expo Go) donnée le 28/09, itérations commitées une à une (leçon du
+redémarrage : le disque survit, la conversation non).
+
+## Ce qui a été fait
+
+- **La barre passe à cinq onglets, Rechercher en atterrissage** (`(tabs)/_layout.tsx`) : l'onglet
+  Accueil est SUPPRIMÉ, `index.tsx` est désormais Rechercher ; **Publier** entre dans la barre (le
+  « + » de la référence — icône `plus.circle`/`add_circle`) : porte d'identité (A58/A63) DANS
+  l'écran et coquille HONNÊTE (`publish.tsx`) qui dit que le parcours n'existe pas encore dans
+  l'app et renvoie vers le site — aucun formulaire fantôme (leçon A203).
+- **Splash JS** (`app-splash.tsx` + tenue dans `app/_layout.tsx`) : fond mangue plein, wordmark,
+  deux arcs immenses en pures `View` (zéro asset, zéro dépendance) ; il PROLONGE le splash natif
+  pendant l'amorçage réel de la session — tenue **1,5 s PLANCHER** (`SPLASH_MIN_MS`), jamais un
+  plafond : si l'amorçage dure plus, le splash reste ; fondu de 350 ms à la fin.
+- **Écran de bienvenue** (`welcome.tsx`) : montré à froid quand la session amorce en ANONYME,
+  jamais à un membre connecté. Composition de la référence, identité Yamba : l'illustration du hero
+  du site en haut (`expo-image`, le SVG du repo), la rangée des quatre modes (avion, train, voiture,
+  colis — SF Symbols avec repli emoji) flottant ENTIÈREMENT sur le visuel (à cheval sur la feuille
+  de même couleur, les cercles se lisaient en « bosses »), feuille SOMBRE en bas avec l'accroche.
+  Couleurs FIXES hors thème (comme une photo). « **Se connecter** » est le bouton PRIMAIRE — pas
+  d'« Inscription » : l'écran n'existe pas dans l'app, on ne promet rien (il cédera le primaire au
+  lot inscription). Libellé SOMBRE sur mangue : blanc sur `#FF9900` rend ~2:1 de contraste (le
+  piège déjà payé par le web). La croix et « Continuer sans compte » atterrissent sur Rechercher ;
+  le « passer » vit dans `welcome-state.ts` — une variable de module, VOLONTAIREMENT non
+  persistée : la bienvenue revient à chaque lancement à froid anonyme, c'est la session qui décide.
+- **Le formulaire de recherche devient la carte du site en natif** (`(tabs)/index.tsx`) : Départ /
+  Destination / Date empilés avec libellés en petites capitales, un seul bouton. Après une
+  recherche, la carte se REPLIE en **pilule récap** (route · date · « Modifier ») — l'écran respire
+  pour les résultats ; « Modifier » rouvre la carte. Les corridors (« En ce moment ») vivent AU
+  REPOS sur le même écran : un toucher remplit les champs et lance la recherche — ZÉRO navigation,
+  le motif `router.navigate`+graine de la section précédente disparaît avec l'onglet. La recherche
+  au toucher passe par `runSearchWith(params)` avec des valeurs EXPLICITES (l'état React posé à
+  l'instant n'est pas encore relu — même leçon que le préremplissage). Villes en ENTIER dans les
+  cartes de résultat (décision utilisateur).
+- **Saisie de ville PLEIN ÉCRAN** (`city-picker.tsx`) : le motif natif des deux OS — toucher le
+  champ ouvre un `Modal` `pageSheet` dédié, clavier levé d'office (`autoFocus`), suggestions en
+  `FlatList`, choisir referme. Débounce 250 ms, la réponse en retard est JETÉE (ref de la frappe
+  déclencheuse). « OK » du clavier valide le texte tapé tel quel : la saisie LIBRE reste le socle.
+- **Autocomplétion Google — le canal REST miroir du web** (`places.api.ts`) : le site charge le
+  SDK JS dans le navigateur avec `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` ; l'app, sans DOM, appelle
+  l'API REST « Places (New) » (`places.googleapis.com/v1/places:autocomplete`) avec
+  `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` — même modèle de confiance (clé publique restreinte en console
+  Google : referrer pour le web, bundle/empreinte pour l'app). Mêmes réglages que
+  `CityAutocomplete` du site : 2 caractères minimum, types `locality`+`airport`, langue de
+  l'écran, **jeton de session par OUVERTURE** du picker (la convention de facturation Google :
+  un jeton groupe les frappes d'une saisie). Sans clé, réponse non-2xx ou réseau mort :
+  TABLEAU VIDE — l'autocomplétion est un confort, jamais un préalable.
+- **La date par le VRAI sélecteur de chaque OS** (`native-date-field.tsx`) : iOS = `DatePicker`
+  SwiftUI en style `graphical` (le calendrier d'Apple) présenté dans une feuille ; Android =
+  `DatePickerDialog` Material 3. Les deux viennent d'`@expo/ui`, DÉJÀ dans les dépendances — zéro
+  dépendance nouvelle. Modules chargés PARESSEUSEMENT par plateforme (`require` dans la branche
+  `Platform.OS`) : importer le paquet jetpack-compose sur iOS enregistrerait des vues natives de
+  l'autre OS. Borne `start: new Date()` — pas de date passée. Les puces de dates (toutes /
+  aujourd'hui / demain / 7 jours) de la recherche A204 disparaissent : le jour choisi part en
+  bornes serveur `dayBounds` (minuit local → minuit suivant).
+- **i18n** : namespaces `search` (formulaire, pilule, corridors), `welcome`, `tabs.publish`
+  refondus FR/EN ; le namespace `home` disparaît avec l'onglet — pas de clé morte (leçon A203).
+
+## Vérifié (sur l'état final, 28/09)
+
+- Typecheck **10/10** (`npx nx run-many --target=typecheck --all --skip-sync`, la commande CI).
+- Contrôle i18n vert (miroir FR/EN, 30 espaces + mobile).
+- Bundle Hermes `expo export --clear --platform ios --platform android` : SIX marqueurs — 3 FR
+  accentués (« Ville de départ », « Ville d'arrivée », « Des Voyageurs partent bientôt ») et 3 EN
+  (« Someone is always heading your way. », « Departure city », « Pick a date » via « Choisis une
+  date ») — cherchés dans LES DEUX encodages sur les DEUX bundles : FR accentués trouvés en
+  UTF-16-LE uniquement (leçon A204 reconfirmée), EN en UTF-8, témoin faux (`marqueur-faux-a207`)
+  à 0 partout. **Piège trouvé** : `expo export` SANS `--platform` tente aussi le rendu web statique
+  et échoue (`@expo/metro-runtime` introuvable depuis `@expo/router-server`) APRÈS avoir réussi les
+  deux bundles natifs — limiter l'export aux plateformes natives.
+- CI de la PR #381 : **18/18 verte** sur le dernier commit, recomptée.
+- Aucune dépendance ajoutée, services intouchés, tests plateforme INCHANGÉS (1576).
+- Android non vu à l'écran (D73 : Android publié d'abord — la boîte de date Material et le repli
+  emoji des symboles restent à valider visuellement au premier poste Android).

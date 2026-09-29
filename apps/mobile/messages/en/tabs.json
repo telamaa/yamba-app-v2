@@ -1,7 +1,7 @@
 {
   "bar": {
-    "home": "Home",
     "search": "Search",
+    "publish": "Publish",
     "trips": "Trips",
     "messages": "Messages",
     "profile": "Profile"
@@ -10,6 +10,11 @@
     "title": "Log in to continue",
     "body": "This area is for members: your trips, messages and profile are waiting behind the login.",
     "cta": "Log in"
+  },
+  "publish": {
+    "title": "Publish your trip",
+    "body": "Destination, date, available kilos, your price per kilo: publishing arrives in an upcoming batch of the app.",
+    "note": "In the meantime, publish your trip from the website — it will appear here."
   },
   "trips": {
     "title": "My trips",

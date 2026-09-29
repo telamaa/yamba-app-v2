@@ -1,20 +1,31 @@
 {
   "form": {
+    "fromLabel": "From",
     "fromPlaceholder": "Departure city",
-    "toPlaceholder": "Destination city",
-    "submit": "Search",
-    "dates": {
-      "any": "All dates",
-      "today": "Today",
-      "tomorrow": "Tomorrow",
-      "week": "Next 7 days"
-    }
+    "toLabel": "Destination",
+    "toPlaceholder": "Arrival city",
+    "dateLabel": "Date",
+    "datePlaceholder": "Pick a date",
+    "dateAny": "Any date",
+    "dateClear": "Clear the date",
+    "dateConfirm": "OK",
+    "cancel": "Cancel",
+    "submit": "Search"
   },
-  "prompt": "Search for a trip: a departure city, a destination — or search with nothing to browse what's on offer.",
+  "summary": {
+    "edit": "Edit",
+    "everywhere": "Anywhere"
+  },
+  "corridors": {
+    "label": "Right now",
+    "title": "Travelers are leaving soon",
+    "tripCount": "{count, plural, one {# trip} other {# trips}}"
+  },
+  "prompt": "Search for a trip: a departure city, a destination — or search with nothing to browse the offer.",
   "results": "{count, plural, one {# trip} other {# trips}}",
   "empty": {
     "title": "No trips found",
-    "body": "No trips are available for this search. Try changing your date or destination."
+    "body": "No trip is available for this search. Try changing your date or destination."
   },
   "error": {
     "network": "Could not load trips. Check your connection and try again.",
