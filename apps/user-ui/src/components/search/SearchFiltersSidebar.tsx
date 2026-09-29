@@ -193,6 +193,13 @@ export default function SearchFiltersSidebar({
     hint?: string;
     icon: React.ReactNode;
   }> = [
+    // D80 — la pertinence est le DÉFAUT (flux localisé : proches de toi d'abord)
+    {
+      value: "relevance",
+      label: t("filters.relevance"),
+      hint: t("filters.relevanceHint"),
+      icon: <Sparkles size={18} />,
+    },
     {
       value: "earliest",
       label: t("filters.earliest"),
@@ -259,7 +266,7 @@ export default function SearchFiltersSidebar({
 
   // ── Detect if any filter is active (to show "Clear all") ──
   const hasActiveFilters =
-    sort !== "earliest" ||
+    sort !== "relevance" || // D80 — le défaut est la pertinence
     superTripperOnly ||
     profileVerifiedOnly ||
     instantBookingOnly ||
