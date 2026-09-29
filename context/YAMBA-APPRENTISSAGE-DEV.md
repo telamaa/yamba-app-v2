@@ -2996,3 +2996,139 @@ android` — l'export se limite aux plateformes natives et `dist/` apparaît. Mo
 sous d'autres formes : une commande « toutes plateformes » échoue sur la plateforme qu'on n'a
 jamais construite ; nommer explicitement ce qu'on veut est plus robuste que laisser l'outil
 deviner.
+
+## Chapitre 209 — L'auth en feuille : la pile dans la modale, le champ OTP invisible, et l'horloge qui ne dort pas
+
+### Une modale qui contient une pile (le groupe comme frontière de présentation)
+
+Le web étale l'auth sur six pages ; une app la plie en UNE feuille. Le moyen expo-router : un
+groupe de routes `(auth)` — qui ne change PAS les chemins, `/login` reste `/login` — déclaré
+`presentation: 'modal'` au layout racine, avec à l'intérieur son PROPRE `<Stack>`. Résultat :
+`router.push('/register')` depuis la connexion pousse une étape DANS la feuille (transition
+native, geste de retour de l'OS), et `router.dismiss()` referme le tout d'où qu'on soit. C'est
+la structure de navigation qui exprime l'intention produit : l'auth est une parenthèse au-dessus
+de l'app, pas une destination. À retenir : quand plusieurs écrans forment UN geste, donnez-leur
+un navigateur à eux ; la présentation (modale, push) se décide à la frontière, pas écran par
+écran.
+
+### Le champ OTP : un `TextInput` invisible vaut mieux que six
+
+Le web gère six `<input>` d'un caractère avec flèches, backspace et `onPaste` répartiteur
+(RegisterVerifyForm, ~150 lignes de gestion de focus). En natif, le motif est inverse
+(`otp-input.tsx`) : UN `TextInput` invisible (1×1, `opacity: 0`, `caretHidden`) porte TOUTE la
+valeur, six `View` l'affichent, toucher les cases redonne le focus. Tout ce qui coûtait devient
+gratuit : le collage d'un code entier (c'est UN champ), le clavier numérique, et surtout
+l'AUTOFILL de l'OS — `textContentType="oneTimeCode"` (iOS) / `autoComplete="sms-otp"` (Android)
+ne fonctionnent que sur un champ unique. La leçon dépasse l'OTP : avant de transposer un widget
+web composite, demandez-vous si l'OS n'a pas déjà le geste — la moitié du composant disparaît.
+
+### Trois compteurs, une horloge : l'échéance absolue
+
+L'écran OTP tient trois temps : l'expiration du code (10 min — le TTL serveur, affiché jamais
+décidé), le cooldown de renvoi (60 s) et le verrou serveur (`details.lockUntilSeconds`). Le
+piège mobile : un `setInterval` qui décrémente (`s => s - 1`) est GELÉ quand l'app passe en
+arrière-plan — au retour, le compteur ment de tout le temps gelé. `use-countdown.ts` compte
+donc depuis une ÉCHÉANCE ABSOLUE (`deadline = Date.now() + n×1000`) et recalcule l'écart à
+chaque tic : l'interval peut geler, l'horloge non. Même famille que l'idempotence : ne stockez
+pas un état qui DÉRIVE du temps, stockez le point fixe et recalculez.
+
+### Le cooldown fantôme : quand le serveur se tait exprès
+
+`POST /auth/password/forgot` et `/resend` répondent TOUJOURS 200 — adresse connue ou pas,
+cooldown atteint ou pas (anti-énumération ANO-API-08 : toute différence de réponse est un
+oracle). Conséquence client contre-intuitive : le compte à rebours de renvoi de CE parcours est
+PUREMENT LOCAL — 60 s au poignet, sans jamais demander au serveur. À l'inverse, le parcours
+d'inscription (l'adresse n'est pas encore un compte) renvoie ses vrais codes (`OTP_COOLDOWN`,
+`OTP_TOO_MANY`). Deux parcours jumeaux, deux contrats d'erreur — parce que la donnée protégée
+n'est pas la même. Lire la politique de silence d'un endpoint AVANT d'écrire sa gestion
+d'erreur.
+
+### Le login chaîné : améliorer l'UX sans toucher au contrat
+
+Le serveur n'ouvre pas de session à la vérification du code d'inscription — le web fait donc
+un détour par `/login?verified=1`. L'app fait mieux SANS rien changer côté serveur : le mot de
+passe, encore en mémoire du parcours (`auth-flow-state.ts` — des variables de module, le
+`sessionStorage` du natif), permet d'enchaîner `signIn` au succès de l'OTP. Le point
+d'architecture : l'amélioration vit ENTIÈREMENT dans le client, le contrat reste identique, et
+chaque échec du chaînage retombe sur le chemin du web (connexion préremplie + bandeau). Quand
+une UX meilleure exige un contrat différent, c'est une décision de registre ; quand elle tient
+dans le client avec repli, c'est du design.
+
+### `NODE_PATH` et le `expo start` nu
+
+Vérification faite au passage : lancer `npx expo start` nu depuis `apps/mobile` PLANTE
+(`Cannot find module 'expo-router/_ctx-shared'`) — le target nx passe
+`NODE_PATH=./node_modules`, qui fait résoudre au CLI Expo (hissé à la racine) les paquets
+NICHÉS du projet mobile (le `react` sous `apps/mobile` est voulu, README). La commande
+officielle `npx nx start @yamba-app/mobile` n'est pas une coquetterie : c'est elle qui porte
+l'environnement de résolution. Un outil qui « marche presque » lancé autrement est un piège
+classique de monorepo.
+
+## Chapitre 210 — Itérer sur captures : l'identifier-first, la doctrine du bouton gris, et le pont qui ne ment pas
+
+### L'identifier-first : une architecture, pas un écran
+
+La journée a fini sur une refonte que la matinée n'imaginait pas : la connexion en DEUX
+étapes — l'adresse d'abord (« Heureux de te revoir », un champ, Continuer), la méthode
+ensuite. Pourquoi c'est plus qu'un restyling : dans un écran classique, la MÉTHODE
+d'authentification (mot de passe) est câblée dans le formulaire ; en identifier-first, elle
+devient un AIGUILLAGE derrière l'adresse. Le jour où le « code par e-mail » aura son serveur
+(décision du 28/09 : les deux méthodes, le code en principal), la bascule est UNE navigation
+— `login.tsx` porte le commentaire « le point de bascule du futur lot est ICI ». Quand un
+produit sait qu'une variante arrive, la bonne dépense n'est pas de la construire en avance
+(écran fantôme) ni de l'ignorer (refonte future), mais de placer la FRONTIÈRE au bon endroit.
+
+### La doctrine du bouton désactivé (écrite en trois allers-retours)
+
+Le matin : CTA désactivés tant que les champs sont vides — et sur device, la mangue à 60 %
+d'opacité rend un BRUN BOUEUX, et un bouton muet n'explique jamais son refus. Correction :
+tout actif, le tap NOMME le manquement. L'après-midi : la référence Revolut grise pourtant
+son « Continuer »… et c'est LÉGITIME. La synthèse, devenue doctrine (RG-MOB-39) : `disabled`
+n'est permis que quand UN SEUL champ visible, à validité ÉVIDENTE en direct, l'explique — une
+adresse e-mail qui allume le bouton pendant qu'on la tape est sa propre explication ; un
+formulaire multi-champs ou un mot de passe à huit critères ne le sont pas. Et un désactivé se
+dessine en GRIS NEUTRE assumé, jamais en couleur primaire délavée. La leçon de méthode vaut
+plus que la règle : deux principes UX en apparence contradictoires (jamais de bouton mort /
+le bouton grisé de Revolut) se réconcilient en cherchant la CONDITION qui sépare leurs
+domaines de validité.
+
+### Le pont honnête : préparer une UI sans serveur, sans mentir
+
+Le piège du « UI d'abord, serveur ensuite » : livrer un bouton « Recevoir un code » qui
+n'enverra jamais rien (interdit ici — « que du vrai », A203). La sortie : le parcours
+identifier-first COMPLET (adresse → confirmation → méthode) est construit, mais sa sortie
+pointe vers la méthode QUI EXISTE (le mot de passe, adresse verrouillée en chip). Rien ne
+ment, l'architecture est prête, et la dette est un commentaire de bascule — pas un écran
+mort. À généraliser : quand le serveur est en retard sur le produit, on prépare la FORME du
+parcours, jamais sa PROMESSE.
+
+### `Animated.loop` : les trois points qui ne coûtent rien
+
+Le spinner système dit « ça mouline » ; trois points en vague disent « on y est presque » —
+et surtout ils se font avec l'`Animated` DE BASE : trois `Animated.Value`, une séquence
+delay → montée → descente → delay en `Animated.loop`, décalées d'un tiers de cycle, le tout
+en `useNativeDriver: true` (translation, échelle, opacité : les transformations qui restent
+sur le thread UI — l'animation ne gèle pas pendant l'appel réseau qu'elle habille). Deux
+détails de métier : la rangée de points a la HAUTEUR EXACTE de la ligne du libellé (le bouton
+ne bouge pas d'un pixel à la transition), et le bouton reste PLEIN mangue pendant l'attente —
+travailler n'est pas être désactivé.
+
+### Les drapeaux une-fois : `consumeX()` comme contrat
+
+Le X de l'atterrissage doit produire un effet SUR UN AUTRE ÉCRAN (Rechercher lance la
+recherche large — l'arbitrage Airbnb : de vraies cartes comme preuve de vie). Le canal :
+`requestBrowseOnLanding()` / `consumeBrowseOnLanding()` — une variable de module et un
+accesseur qui LA CONSOMME (lecture destructrice). Le même motif que `consumeLoginPrefill` :
+quand un écran doit réagir UNE fois à un geste passé, le drapeau consommable dit son contrat
+dans sa signature — pas de `useEffect` qui se demande s'il a déjà réagi, pas d'état global
+qui traîne. Et comme `welcome-state`, il meurt avec le processus : c'est un geste, pas une
+préférence.
+
+### Les logos officiels : la charte fait partie du contrat
+
+Un « G » bleu maison sur un bouton Google VIOLE les guidelines de marque Google (le G
+quadricolore est obligatoire sur un bouton de connexion) — et un logo hors charte se voit
+comme un faux billet. Les deux SVG officiels pèsent 1 Ko, s'embarquent dans
+`assets/images/` et se rendent par `expo-image` comme n'importe quelle illustration. Vérifier
+la charte d'un tiers AVANT de dessiner son bouton : c'est du droit des marques autant que de
+l'UX.

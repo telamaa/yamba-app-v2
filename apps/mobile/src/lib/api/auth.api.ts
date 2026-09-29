@@ -28,10 +28,14 @@ type LoginResponse = {
   };
 };
 
-export async function login(email: string, password: string): Promise<SessionUser> {
+export async function login(
+  email: string,
+  password: string,
+  rememberMe = false
+): Promise<SessionUser> {
   const body = await apiFetch<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: { email, password },
+    body: { email, password, rememberMe },
     headers: { 'x-token-delivery': 'body' },
     requireAuth: false,
   });
@@ -54,6 +58,97 @@ export async function bootstrapSession(): Promise<boolean> {
   if (getAccessToken() !== null) return true;
   if ((await getRefreshToken()) === null) return false;
   return refreshSession();
+}
+
+/* ── Inscription (miroir des endpoints du web : pending Redis + OTP 6 chiffres,
+      AUCUNE session ouverte à la vérification — le login se chaîne après) ─── */
+
+export type RegisterPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  termsAccepted: true;
+  termsVersion: string;
+  privacyVersion: string;
+};
+
+export async function register(payload: RegisterPayload): Promise<{ verificationToken: string }> {
+  return apiFetch<{ message: string; verificationToken: string }>('/auth/register', {
+    method: 'POST',
+    body: payload,
+    requireAuth: false,
+  });
+}
+
+export async function verifyRegistrationOtp(
+  verificationToken: string,
+  otp: string
+): Promise<void> {
+  await apiFetch<{ success: boolean }>('/auth/register/verify', {
+    method: 'POST',
+    body: { verificationToken, otp },
+    requireAuth: false,
+  });
+}
+
+export async function resendRegistrationOtp(
+  verificationToken: string
+): Promise<{ verificationToken: string }> {
+  return apiFetch<{ message: string; verificationToken: string }>('/auth/register/resend', {
+    method: 'POST',
+    body: { verificationToken },
+    requireAuth: false,
+  });
+}
+
+export async function cancelRegistration(verificationToken: string): Promise<void> {
+  await apiFetch<{ success: boolean }>('/auth/register/cancel', {
+    method: 'POST',
+    body: { verificationToken },
+    requireAuth: false,
+  });
+}
+
+/* ── Mot de passe oublié (anti-énumération ANO-API-08 : forgot et resend
+      répondent TOUJOURS 200 — les compteurs d'attente sont purement client) ── */
+
+export async function forgotPassword(email: string): Promise<void> {
+  await apiFetch<{ message: string }>('/auth/password/forgot', {
+    method: 'POST',
+    body: { email },
+    requireAuth: false,
+  });
+}
+
+export async function resendPasswordOtp(email: string): Promise<void> {
+  await apiFetch<{ message: string }>('/auth/password/resend', {
+    method: 'POST',
+    body: { email },
+    requireAuth: false,
+  });
+}
+
+export async function verifyPasswordOtp(
+  email: string,
+  otp: string
+): Promise<{ passwordResetToken: string }> {
+  return apiFetch<{ message: string; passwordResetToken: string }>('/auth/password/verify', {
+    method: 'POST',
+    body: { email, otp },
+    requireAuth: false,
+  });
+}
+
+export async function resetPassword(
+  passwordResetToken: string,
+  newPassword: string
+): Promise<void> {
+  await apiFetch<{ message: string }>('/auth/password/reset', {
+    method: 'POST',
+    body: { passwordResetToken, newPassword },
+    requireAuth: false,
+  });
 }
 
 export async function logout(): Promise<void> {

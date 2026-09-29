@@ -1,7 +1,6 @@
 {
-  "headline": "Il y a toujours quelqu'un qui part vers ta destination.",
-  "subline": "Confie-lui ton colis.",
-  "login": "Se connecter",
-  "skip": "Continuer sans compte",
-  "close": "Passer l'écran de bienvenue"
+  "tagline": "Le colis voyage avec quelqu'un qui part déjà.",
+  "createAccount": "Créer un compte",
+  "login": "Me connecter",
+  "close": "Passer et parcourir les trajets"
 }

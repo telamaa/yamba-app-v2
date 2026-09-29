@@ -11902,3 +11902,200 @@ redémarrage : le disque survit, la conversation non).
 - Aucune dépendance ajoutée, services intouchés, tests plateforme INCHANGÉS (1576).
 - Android non vu à l'écran (D73 : Android publié d'abord — la boîte de date Material et le repli
   emoji des symboles restent à valider visuellement au premier poste Android).
+
+# L'authentification membre en natif · `feat/mobile-auth` (A208)
+
+## Le déclencheur
+
+GO utilisateur du 28/09, à la validation du lot recherche-first : « on attaque les écrans Auth —
+login, register, forget password, les différents écrans OTP — en s'inspirant de mes pages
+actuelles mais en natif iOS et Android ». L'app avait UNE modale de connexion minimale (A58) ;
+le web a six formulaires complets (`apps/user-ui/src/components/auth/forms/`). Le lot transpose
+les PARCOURS (endpoints, règles, enchaînements), pas les pixels : chaque écran reprend le motif
+natif de la référence.
+
+## Ce qui a été fait
+
+- **La feuille d'auth** — `src/app/(auth)/_layout.tsx` : le groupe `(auth)` contient TOUTE l'auth
+  (connexion, inscription, code d'inscription, oubli, code du reset, nouveau mot de passe) et le
+  layout racine le présente en UNE modale (`presentation: 'modal'`) avec sa pile native interne :
+  les étapes se poussent DANS la feuille (retour natif de chaque OS), la fermer rend l'app.
+  Un groupe ne change pas les chemins : `/login` reste `/login`, les `router.push('/login')`
+  existants (bienvenue, portes) n'ont pas bougé. Gabarit commun `components/auth/auth-screen.tsx`
+  (en-tête maison retour/titre/équilibre — le motif du `city-picker` —, `KeyboardAvoidingView`,
+  contenu défilable).
+- **API** — `lib/api/auth.api.ts` : huit fonctions nouvelles, MÊMES endpoints que le web
+  (`/auth/register`, `/register/verify`, `/register/resend`, `/register/cancel`,
+  `/auth/password/forgot`, `/password/resend`, `/password/verify`, `/password/reset`), toutes
+  `requireAuth: false`. `lib/api/client.ts` : `ApiError` expose désormais le `details` COMPLET du
+  refus (A146 le destine au client) — les écrans OTP y lisent `attemptsLeft`, `locked`,
+  `lockUntilSeconds`.
+- **L'état d'étape** — `lib/auth-flow-state.ts` : la transposition du `sessionStorage` du web
+  (`register_verification_token`, `pwd_reset_email`, `pwd_reset_token`). Variables de module, EN
+  MÉMOIRE : les jetons d'étape (15 min de TTL serveur) ne vont ni en SecureStore ni en paramètre
+  de route ; l'app tuée = le parcours recommence, comme un onglet fermé. Le mot de passe
+  d'inscription y transite UNIQUEMENT pour le login chaîné, purgé à la première utilisation.
+  `loginPrefill` porte les retours vers la connexion (e-mail + bandeau « compte activé » /
+  « mot de passe changé »), CONSOMMÉ au focus de l'écran (`useFocusEffect`) — l'équivalent du
+  `/login?verified=1&email=…` du web, sans rien mettre dans une URL.
+- **Connexion** — `(auth)/login.tsx` : l'écran A58 enrichi — bandeau de succès, œil sur le mot de
+  passe (`components/auth/password-input.tsx`, 16 px minimum contre le zoom iOS, leçon A60),
+  lien « Mot de passe oublié ? », pied « Pas encore de compte ? S'inscrire ». Fermeture par
+  `router.canDismiss() ? router.dismiss() : router.replace('/')`.
+- **Inscription** — `(auth)/register.tsx` : prénom/nom (une rangée), e-mail, UN champ mot de passe
+  avec jauge (PAS de confirmation : l'œil rend la double saisie redondante sur téléphone —
+  divergence UX assumée avec le web, consignée dans A208), CGU par `Switch`. Pré-validation
+  locale (regex e-mail serveur + 8 critères) pour éviter l'aller-retour — le serveur reste seul
+  juge. Versions légales : `@packages/legal/versions` (nouvel alias tsconfig — Metro résout les
+  `paths` du tsconfig via Expo, même canal que `@packages/api-contracts/locale`). Succès →
+  `setPendingRegistration({ email, password, verificationToken })` + push `/register-verify`.
+- **Les règles de mot de passe** — `lib/password-rules.ts` : TROISIÈME miroir assumé (serveur
+  `password-rules.ts` juge, web `password-strength.ts` pré-valide, app idem) — mêmes 8 critères,
+  même ordre, mention d'alignement dans les trois en-têtes. Jauge compacte
+  `components/auth/password-strength-meter.tsx` : niveau (faible→excellent, même barème) + la
+  liste des critères ENCORE MANQUANTS seulement.
+- **L'OTP natif** — `components/auth/otp-input.tsx` : UN `TextInput` invisible porte la valeur
+  (clavier numérique, collage d'un code entier, autofill `textContentType="oneTimeCode"` iOS /
+  `autoComplete="sms-otp"` Android — gratuits avec un champ unique, impossibles avec les six
+  `<input>` du web), six cases l'affichent, toucher redonne le focus.
+  `components/auth/otp-verify-view.tsx` (partagé par les deux parcours) : vérification D'OFFICE
+  à la sixième frappe, TROIS compteurs — expiration 600 s (le TTL serveur), cooldown de renvoi
+  60 s (purement client : `password/forgot` et `resend` répondent TOUJOURS 200, anti-énumération
+  ANO-API-08), verrou serveur (`details.lockUntilSeconds`, `OTP_INVALIDATED` vide les cases) —
+  via `hooks/use-countdown.ts` : échéance ABSOLUE (`Date.now()` cible), pas des décréments — un
+  passage en arrière-plan gèle les `setInterval`, pas l'horloge. Les codes fatals du parcours
+  (`REGISTRATION_EXPIRED`, `VERIFICATION_EXPIRED`) remontent à l'écran appelant qui affiche un
+  état dédié « reprendre » — jamais un code brut.
+- **Le code d'inscription** — `(auth)/register-verify.tsx` : le serveur n'ouvre PAS de session à
+  la vérification (contrat inchangé) ; le mot de passe encore en mémoire permet de CHAÎNER
+  `signIn` au succès — connecté direct, feuille fermée. Échec du chaînage (processus relancé,
+  réseau) → connexion préremplie, bandeau « compte activé ». Renvoi (le jeton réécrit au store),
+  annulation (`register/cancel`, meilleur effort).
+- **Le parcours oublié** — `(auth)/password-forgot.tsx` (une adresse, « si un compte existe » —
+  l'écran ne sait jamais si l'adresse est connue), `(auth)/password-verify.tsx` (OTP partagé,
+  renvoi par `/password/resend`, « changer d'adresse »), `(auth)/password-reset.tsx` (un champ +
+  jauge avec contexte e-mail, `RESET_SESSION_EXPIRED` → état « recommencer », succès → connexion
+  préremplie « mot de passe changé » — un reset n'ouvre pas de session).
+- **La bienvenue tient la promesse A207** : « S'inscrire » prend le PRIMAIRE (`welcome.tsx`),
+  « Se connecter » passe en secondaire mangue, « Continuer sans compte » en tertiaire discret.
+  La porte d'identité (`identity-gate.tsx`) gagne le lien « Créer un compte ».
+- **i18n** : namespace `auth` refondu FR/EN (common, login enrichi, register, password
+  niveaux/critères, otp, forgot, reset — tous les `details.code` du serveur y ont leur texte),
+  `welcome.register`, `tabs.gate.registerLink`.
+
+## Écarté (et pourquoi)
+
+- **Google natif** : `/auth/google` est cookies-only (`issueSession` sans `delivery`) — A201
+  l'annonçait, ce sera son propre lot (SDK natif + arbitrage endpoint).
+- **« Rester connecté »** : la session mobile A201 reste standard ; un défaut différent du web
+  serait une décision de registre à part entière.
+- **Lien vers les pages CGU** : rien n'est déployé, pas d'URL publique — le libellé nomme les
+  documents, le lien viendra avec une URL.
+
+## Vérifié
+
+- Typecheck **10/10** (`npx nx run-many --target=typecheck --all --skip-sync`, la commande CI) —
+  routes typées régénérées (`.expo/types`, piège A205).
+- Contrôle i18n vert — contre-épreuve OFFERTE par le contrôle : il a refusé la clé VIDE
+  `password.level.empty` (le niveau « empty » n'est jamais rendu — clé retirée).
+- Bundle Hermes `expo export --clear --platform ios --platform android` : six marqueurs
+  (« Mot de passe oublié ? », « Vérifie ton adresse », « Créer mon compte » / « Forgot your
+  password? », « Create my account », « Verify your address ») dans LES DEUX encodages sur les
+  DEUX bundles — FR accentués en UTF-16-LE, EN en UTF-8, témoin faux à 0.
+- **Piège confirmé** : un `expo start` NU plante sur `expo-router/_ctx-shared` — le target nx
+  passe `NODE_PATH=./node_modules` ; la commande officielle reste `npx nx start @yamba-app/mobile`.
+- Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).
+
+# L'auth itérée sur captures — slate, passe UX, identifier-first · `feat/mobile-auth` (A209)
+
+## Note de caducité (supersession de la section précédente)
+
+La section A208 reste l'histoire de la MÉCANIQUE (endpoints, OTP, compteurs, login chaîné,
+`auth-flow-state` — tout cela survit tel quel), mais ses ÉCRANS ont été remplacés le jour même
+par quatre itérations sur captures utilisateur (`context/captures/auth/`, `/2`, `/3` — non
+versionnées, canal design) : le login mono-écran n'existe plus (identifier-first en deux
+étapes), la bienvenue illustrée de A207 non plus (atterrissage de marque), et la confirmation
+de mot de passe décrite « rétablie » a finalement été retirée. Cette section décrit l'état
+FINAL livré.
+
+## Itération 1 — l'identité visuelle du site (captures `auth/`)
+
+- **`components/auth/auth-theme.ts`** : la palette « slate » PROPRE aux écrans auth du site
+  (fond `#F8FAFC` clair / `#0B1120` sombre, cartes bordées, titres navy, teal, teinte lavande
+  du champ rempli), distincte du thème générique de l'app ; `AuthRadius = 12` (l'arrondi de
+  l'identité web — les pilules 999 de la référence Revolut ont été ramenées à 12 sur retour
+  utilisateur), `maskEmail()` (l'affichage `e******b@g***.com` de l'écran OTP).
+- **`components/auth/auth-kit.tsx`** : les briques partagées — `FieldLabel` (gras, action à
+  droite pour « Oublié ? »), `AuthTextField`, `AuthCta`, `AuthDivider`, `AuthCheckbox`,
+  `TealLink`, `AuthError`, puis (itérations suivantes) `MethodButton`, `SocialLogosRow`,
+  `AuthFailureView`, `LoadingDots`.
+- Chaque écran : badge pilule teal « … sécurisée » avec bouclier SF Symbol, gros titre, textes
+  EXACTS des captures (namespace `auth` refondu FR/EN).
+
+## Itération 2 — la passe UX d'expert
+
+- **L'e-mail d'abord, le social après le CTA** : les boutons sociaux pleine largeur du site
+  poussaient le premier champ sous le pli clavier levé — sur téléphone le chemin principal
+  reste visible, le social passe dessous.
+- **Chaînage clavier** : `returnKeyType="next"` + refs (la ref passe en PROP — React 19),
+  Prénom → Nom → E-mail → Mot de passe → envoi.
+- **La confirmation de mot de passe retirée** (inscription ET reset) : l'autofill iOS remplit
+  les deux champs d'un coup — la confirmation ne confirme rien — et l'œil couvre la faute de
+  frappe. Divergence mobile ASSUMÉE avec le formulaire web ; la preuve bundle a vérifié que le
+  libellé a DISPARU des deux binaires.
+- **La jauge à hauteur réservée** : les critères manquants en une ligne enveloppée (`minHeight`)
+  — la liste qui rétrécit ne fait plus danser le CTA sous le pouce ; tous remplis → ligne verte.
+- **Les vrais logos** : G QUADRICOLORE et f Facebook (SVG officiels dans `assets/images/`,
+  rendus par `expo-image` — le canal de l'illustration, zéro dépendance). La charte Google
+  EXIGE le G quadricolore sur un bouton de connexion.
+
+## Itération 3 — la doctrine du bouton désactivé (et les points en vague)
+
+Née d'un aller-retour sur device (le CTA désactivé rendait un BRUN BOUEUX — mangue à 60 %
+d'opacité sur fond sombre) puis d'un contre-exemple utilisateur (le « Continuer » grisé de
+Revolut) :
+- **`disabled` n'est permis que quand UN SEUL champ visible à validité ÉVIDENTE en direct
+  l'explique** (e-mail + regex live : identifier-first, mot de passe oublié) — le bouton
+  s'allume sous les yeux ;
+- **multi-champs et validités non binaires** (mot de passe à 8 critères, OTP) : CTA TOUJOURS
+  actif qui NOMME le manquement au tap (« Saisis ton adresse e-mail. », « Accepte les
+  conditions pour continuer. », « Saisis les 6 chiffres du code. »…) ;
+- l'état désactivé est un **gris neutre franc** (fond `border`, texte `muted`) ;
+- **pendant l'envoi** : CTA plein mangue + **trois points en vague** (`LoadingDots` —
+  `Animated.loop` natif `useNativeDriver`, translation/échelle/opacité décalées d'un tiers de
+  cycle, rangée à hauteur de la ligne du libellé : le bouton ne bouge pas d'un pixel).
+
+## Itération 4 — identifier-first et l'atterrissage (captures `auth/3`, réf. Revolut)
+
+- **`welcome.tsx` remplacé** : l'atterrissage de marque — fond `#0B1120`, wordmark mangue,
+  tagline, l'illustration, « Créer un compte » (primaire clair) / « Me connecter », X à
+  DROITE. Créneau A207 inchangé : à froid, anonyme seulement, non persisté.
+- **Le X → résultats DIRECTS** (arbitrage Blablacar vs Airbnb, tranché Airbnb) :
+  `requestBrowseOnLanding()` (drapeau une-fois dans `welcome-state.ts`) → l'onglet Rechercher
+  lance la recherche large à l'arrivée, pilule « Partout · Toutes les dates » — de vraies
+  cartes trajets comme preuve de vie ; l'onglet garde son état au repos le reste de la session.
+- **`(auth)/login.tsx` = identifier-first** : un champ e-mail (validation live via la nouvelle
+  source unique `lib/email.ts` — trois copies de la regex fusionnées), « Continuer » grisé
+  jusqu'à validité, **carte de CONFIRMATION d'adresse** (anti-typo : avec l'anti-énumération,
+  une faute de frappe serait un code qui ne vient jamais, en silence), « ou » + trois
+  `MethodButton` (🔑 e-mail et mot de passe, Google, Facebook).
+- **Le pont honnête** : « Continuer » confirmé → `(auth)/login-password.tsx` (adresse
+  verrouillée en chip + « Modifier », rememberMe, oublié) tant que le serveur du « code par
+  e-mail » n'existe pas — le point de bascule du futur lot est UNE navigation, commentée dans
+  `login.tsx`. L'adresse transite par `auth-flow-state.loginEmail`, jamais en paramètre.
+- **`AuthFailureView`** (les deux captures d'échec) : X en pastille, grand titre, CTA de
+  reprise en bas — branché sur les états terminaux réels (inscription expirée, étape perdue,
+  session de reset expirée), prêt pour les échecs Google/code.
+- **Écarté** : l'inscription par téléphone de la référence (SMS — rien au serveur, à instruire
+  avec le lot code) ; les passkeys (après) ; auto-lancer la recherche à chaque repos.
+
+## Vérifié (état final, validation visuelle iPhone clair + sombre le 28/09 au soir)
+
+- Typecheck **10/10** (commande CI) et contrôle i18n vert À CHAQUE itération ; clés mortes
+  purgées au fil de l'eau (`confirmLabel`, `PASSWORD_MISMATCH`, `orByEmail`, `googleSoon`,
+  les clés de la bienvenue illustrée).
+- Bundle Hermes `--platform ios android` par itération : marqueurs FR accentués (UTF-16-LE) et
+  EN (UTF-8) sur les DEUX binaires, témoins faux à 0 ; « Confirmer le mot de passe » prouvé
+  ABSENT ; les 3 SVG (hero + G + f) prouvés EMBARQUÉS.
+- Les routes typées ont suivi à chaud (le Metro du poste régénère `.expo/types` à la volée).
+- Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).

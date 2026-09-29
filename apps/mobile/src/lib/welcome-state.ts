@@ -14,3 +14,22 @@ export const isWelcomeDismissed = () => dismissed;
 export const dismissWelcome = () => {
   dismissed = true;
 };
+
+/**
+ * Le X de l'atterrissage → RÉSULTATS directs (motif Airbnb, arbitrage
+ * expert du 28/09) : une jeune place de marché prouve la vie par de vrais
+ * trajets, pas par un formulaire vide. Drapeau une-fois : l'onglet
+ * Rechercher lance la recherche large À L'ARRIVÉE seulement — il garde son
+ * état au repos le reste de la session.
+ */
+let browseOnLanding = false;
+
+export const requestBrowseOnLanding = () => {
+  browseOnLanding = true;
+};
+
+export const consumeBrowseOnLanding = (): boolean => {
+  const value = browseOnLanding;
+  browseOnLanding = false;
+  return value;
+};

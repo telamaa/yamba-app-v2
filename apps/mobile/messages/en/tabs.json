@@ -9,7 +9,8 @@
   "gate": {
     "title": "Log in to continue",
     "body": "This area is for members: your trips, messages and profile are waiting behind the login.",
-    "cta": "Log in"
+    "cta": "Log in",
+    "registerLink": "Create an account"
   },
   "publish": {
     "title": "Publish your trip",

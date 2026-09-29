@@ -27,13 +27,23 @@ export class ApiError extends Error {
   /** L'id de corrélation de la requête : le même que dans les logs serveur
    *  et Sentry (le gateway propage `x-correlation-id` tel quel). */
   readonly correlationId: string | null;
+  /** Le `details` COMPLET du refus (A146 : destiné au client) — les parcours
+   *  OTP y lisent `attemptsLeft`, `locked`, `lockUntilSeconds`. */
+  readonly details: Record<string, unknown> | null;
 
-  constructor(status: number, message: string, code: string | null, correlationId: string | null) {
+  constructor(
+    status: number,
+    message: string,
+    code: string | null,
+    correlationId: string | null,
+    details: Record<string, unknown> | null = null
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.correlationId = correlationId;
+    this.details = details;
   }
 }
 
@@ -156,17 +166,21 @@ async function rawFetch(
 async function toApiError(response: Response, correlationId: string): Promise<ApiError> {
   let message = `HTTP ${response.status}`;
   let code: string | null = null;
+  let details: Record<string, unknown> | null = null;
   try {
     const body = (await response.json()) as {
       message?: string;
-      details?: { code?: unknown };
+      details?: Record<string, unknown>;
     };
     if (typeof body.message === 'string') message = body.message;
-    if (typeof body.details?.code === 'string') code = body.details.code;
+    if (body.details !== null && typeof body.details === 'object') {
+      details = body.details;
+      if (typeof body.details.code === 'string') code = body.details.code;
+    }
   } catch {
     // Corps non-JSON (504 du gateway…) : on garde le statut.
   }
-  return new ApiError(response.status, message, code, correlationId);
+  return new ApiError(response.status, message, code, correlationId, details);
 }
 
 /**

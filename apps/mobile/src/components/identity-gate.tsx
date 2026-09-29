@@ -42,6 +42,11 @@ export function IdentityGate({ children }: { children: ReactNode }) {
                 <ThemedText style={styles.ctaLabel}>{t('gate.cta')}</ThemedText>
               </Pressable>
             </Link>
+            <Link href="/register" asChild>
+              <Pressable hitSlop={Spacing.one}>
+                <ThemedText type="linkPrimary">{t('gate.registerLink')}</ThemedText>
+              </Pressable>
+            </Link>
           </ThemedView>
         )}
       </SafeAreaView>
