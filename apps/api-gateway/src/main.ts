@@ -104,6 +104,14 @@ app.use(
   "/api/trips",
   proxy("http://localhost:6002", {
     proxyReqPathResolver: (req) => `/trips${req.url}`,
+    // D80 — express-http-proxy n'ajoute PAS l'IP du client aux requêtes proxifiées : le
+    // gateway la pose (et ÉCRASE ce qu'un client aurait mis — l'en-tête est infalsifiable
+    // à travers nous). `req.ip` honore le `trust proxy` posé plus haut (proxy Next D48).
+    // trip-service s'en sert UNIQUEMENT pour l'ancrage hors-ligne du flux (jamais journalisée).
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers = { ...proxyReqOpts.headers, "x-client-ip": srcReq.ip ?? "" };
+      return proxyReqOpts;
+    },
   })
 );
 
