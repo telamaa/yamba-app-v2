@@ -29,6 +29,8 @@
     "title": "Filters",
     "sortBy": "Sort by",
     "clearAll": "Clear all",
+    "relevance": "Relevance",
+    "relevanceHint": "Closest to you first",
     "earliest": "Earliest departure",
     "lowestPrice": "Lowest price",
     "bestRated": "Best rated",
@@ -108,6 +110,16 @@
     "dateOnly": "Trips on {date}"
   },
   "subtitleHint": "Refine with origin and destination, or browse current offers",
+  "anchoredHint": "Departures near {city} first — refine with a destination",
+  "sections": {
+    "sameCity": "Departing from {city}",
+    "sameCityUnknown": "Departing near you",
+    "nearby": "Nearby",
+    "region": "In your region",
+    "country": "Elsewhere · {country}",
+    "countryUnknown": "Elsewhere in the country",
+    "elsewhere": "Further afield"
+  },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",
     "CLOTHES_TEXTILE": "Clothes & textile",

@@ -3202,3 +3202,22 @@ par sa propre regex : la page 2 du tri prix-au-poids était inatteignable depuis
   débordera (porte 🚪↔ de D80).
 - La théorie derrière l'étage 2 : les « learning to rank » pointwise — notre score en est un,
   écrit à la main ; PostHog (D66) fournira les données du jour où on voudra l'apprendre.
+
+## Chapitre 212 — Dérendre un ordre serveur : les sections qui n'inventent rien
+
+**Le lot** : `feat/feed-relevance-web` (D80, empilée sur le serveur).
+
+Le piège classique : le front reçoit une liste classée et la RE-classe pour l'afficher en
+groupes (`groupBy(ring)`) — deux vérités, et le jour où le serveur change sa clé de tri, le
+front ment. Ici le front DÉRENDE : il parcourt la liste DANS L'ORDRE REÇU et pose un en-tête à
+la première apparition de chaque anneau (`Set` des anneaux vus). Conséquences gratuites : la
+pagination prolonge les sections sans les dupliquer (le `Set` survit au `flatMap` des pages),
+et les trajets pleins — que le serveur met en queue, HORS de l'ordre des anneaux — ne rouvrent
+rien grâce à une garde locale (`remainingKg ≤ 0`), lisible parce que le serveur expose déjà la
+donnée. Leçon : quand le serveur détient l'ordre, le front n'a le droit que d'un parcours
+LINÉAIRE ; tout regroupement est une re-décision.
+
+Deux détails de métier du front : `sort=relevance` n'est JAMAIS envoyé (le défaut vit au
+serveur — envoyer le défaut, c'est le figer chez tous les clients le jour où il change), et la
+transparence de l'IP (« Les départs proches de Douala d'abord ») coûte une ligne mais change le
+statut de la géoloc : dite, elle est un service ; tue, elle est une surveillance.

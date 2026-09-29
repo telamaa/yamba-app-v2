@@ -29,6 +29,8 @@
     "title": "Filtres",
     "sortBy": "Trier par",
     "clearAll": "Tout effacer",
+    "relevance": "Pertinence",
+    "relevanceHint": "Les plus proches de toi d'abord",
     "earliest": "Départ le plus tôt",
     "lowestPrice": "Prix le plus bas",
     "bestRated": "Mieux notés",
@@ -108,6 +110,16 @@
     "dateOnly": "Trajets le {date}"
   },
   "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle",
+  "anchoredHint": "Les départs proches de {city} d'abord — affinez avec une destination",
+  "sections": {
+    "sameCity": "Au départ de {city}",
+    "sameCityUnknown": "Au départ de chez toi",
+    "nearby": "À proximité",
+    "region": "Dans ta région",
+    "country": "Ailleurs · {country}",
+    "countryUnknown": "Ailleurs dans le pays",
+    "elsewhere": "Plus loin dans le monde"
+  },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",
     "CLOTHES_TEXTILE": "Vêtements & textile",

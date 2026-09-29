@@ -12213,3 +12213,38 @@ La cascade d'ancrage : `near*` de la query → `x-client-ip` via `resolveIpAncho
 3. **Migration douce** : `isPrivateIp` d'auth-service (D78) vers `@packages/libs/geoip`
    (duplication assumée pour ne pas toucher la baseline auth dans cette PR).
 4. **Mobile** : mêmes contrats, sur la page résultats de `feat/mobile-results` une fois mergée.
+
+# Le flux d'atterrissage localisé — côté web · `feat/feed-relevance-web` (D80, empilée)
+
+## Ce que le visiteur voit
+
+Le classement serveur devient VISIBLE : la liste de résultats se découpe en SECTIONS par
+anneau — « Au départ de Douala », « À proximité », « Dans ta région », « Ailleurs · Cameroun »,
+« Plus loin dans le monde » — et le sous-titre dit la vérité quand l'ancrage vient de l'IP
+(« Les départs proches de {city} d'abord — affinez avec une destination »). Sans ancrage
+(pas de base géo, IP privée, recherche avec départ saisi) : la liste d'aujourd'hui, inchangée.
+
+## Les choix d'implémentation
+
+- **Le front ne décide toujours rien** : le tri « Pertinence » (première option, icône
+  Sparkles, sélectionnée par défaut) n'est JAMAIS envoyé — `trip.api.ts` n'émet `sort` que
+  s'il diffère du défaut serveur. `SortOption` gagne `"relevance"`, les trois états
+  (`useState`, `clearAll`, `hasActiveFilters` ×2) basculent dessus.
+- **Les sections dérendent l'ordre serveur, elles ne re-trient pas** : `rows` (useMemo) pose
+  un en-tête à la PREMIÈRE apparition de chaque anneau, dans l'ordre reçu. Deux gardes :
+  un trajet PLEIN (`remainingKg ≤ 0` — en queue de liste, hors de l'ordre des anneaux) ne
+  rouvre jamais de section, et un anneau déjà titré ne se répète pas — la pagination
+  (`fetchNextPage`) prolonge les sections sans les dupliquer.
+- **`anchor`** est lu sur la PREMIÈRE page (`pages[0].anchor`), le nom de pays localisé vient
+  de `lib/country-name` (Intl.DisplayNames), jamais un code brut.
+- i18n : `filters.relevance(+Hint)`, `sections.*` (nested, jamais de point dans une clé),
+  `anchoredHint` — FR/EN miroir (contrôle CI vert).
+
+## Épreuves et restes
+
+`tsc --noEmit --project apps/user-ui` (la commande de la CI) vert, `next build` vert
+(`next-env.d.ts` réécrit par le build de prod — restauré, piège connu), miroir i18n parfait.
+Restes : l'envoi de `near*` par le front (adresse du membre / dernière recherche — aujourd'hui
+l'ancrage web vient de l'IP seule), la chip « Autour de : X ✕ » interactive, et la recette
+navigateur sur le poste (les sections ne s'affichent qu'avec la base GeoLite2 téléchargée OU
+un `near*` simulé).

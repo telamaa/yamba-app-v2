@@ -1,6 +1,7 @@
 import axiosInstance from "@/lib/api-client";
 import type {
   ParcelCategory,
+  SearchAnchor,
   SortOption,
   TransportMode,
   DepartureTimeBucket,
@@ -36,6 +37,8 @@ export type SearchTripsPage = {
   trips: YambaTripResult[];
   nextCursor: string | null;
   totalCount: number;
+  /** D80 — l'ancrage du classement (tri relevance) : null = flux découverte, absent = autre tri */
+  anchor?: SearchAnchor | null;
 };
 
 export type SearchFacetsParams = {
@@ -76,7 +79,8 @@ function buildQueryString(params: SearchTripsParams): string {
   if (params.to) qs.set("to", params.to);
   if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
   if (params.dateTo) qs.set("dateTo", params.dateTo);
-  if (params.sort && params.sort !== "earliest") qs.set("sort", params.sort);
+  // D80 — `relevance` est le défaut SERVEUR : on ne l'envoie pas (le serveur décide, le front reflète)
+  if (params.sort && params.sort !== "relevance") qs.set("sort", params.sort);
 
   if (params.superTripper) qs.set("superTripper", "true");
   if (params.profileVerified) qs.set("profileVerified", "true");
