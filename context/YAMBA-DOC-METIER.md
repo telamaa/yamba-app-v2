@@ -6961,3 +6961,26 @@ doit être le mieux servi : c'est lui qu'on accueille.
 | FEED05 | Recherche « Paris → tout » | Plus d'anneaux : la qualité seule ordonne les départs de Paris |
 | FEED06 | Page 2 du flux (curseur `o:10`) | La page suit, ordre STABLE entre les deux appels ; le même curseur sur le tri prix-au-poids fonctionne aussi (ANO-API-24 close) |
 | FEED07 | `sort=nimporte` dans l'URL (lien partagé cassé) | 200, classement par pertinence — jamais un 400 |
+
+# Le flux d'atterrissage localisé — côté web · `feat/feed-relevance-web` (D80, empilée)
+
+## Le besoin
+
+Le serveur classe ; encore faut-il que ça se VOIE. Une liste réordonnée sans explication est
+indiscernable du hasard — les sections nommées sont ce qui fait dire « cette app me comprend ».
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-FEED-08** | Quand le classement a un ancrage, la liste est découpée en sections nommées (« Au départ de {ville} », « À proximité », « Dans ta région », « Ailleurs · {pays} », « Plus loin dans le monde ») — chaque section apparaît UNE fois, les trajets pleins en fin de liste n'en rouvrent jamais. Sans ancrage, aucune section. |
+| **RG-FEED-09** | Quand l'ancrage vient de l'adresse IP, l'interface le DIT (« Les départs proches de {ville} d'abord ») — jamais de localisation silencieuse. |
+| **RG-FEED-10** | « Pertinence » est le premier choix de tri et le choix par défaut ; il ne part jamais dans la requête (le serveur décide). Choisir un autre tri, c'est quitter la pertinence — et « Tout effacer » y revient. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| FEED08 | Flux ancré (base géo présente ou `near` simulé) | Sections dans l'ordre des anneaux, une seule fois chacune ; « Charger plus » les prolonge sans les répéter |
+| FEED09 | Ancrage IP résolu | Le sous-titre nomme la ville ; en flux découverte il garde l'invite générique |
+| FEED10 | Ouvrir « Trier par » | « Pertinence » première et cochée ; en choisir un autre allume « Tout effacer », qui ramène à « Pertinence » |
