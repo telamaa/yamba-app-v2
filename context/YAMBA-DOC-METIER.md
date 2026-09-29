@@ -6927,3 +6927,37 @@ chemin principal quand son serveur existera) sans redessiner un seul écran.
 | MOB64 | Envoi en cours (connexion, code, envoi d'e-mail) | Le bouton reste plein mangue, trois points pulsent en vague ; l'écran ne bouge pas d'un pixel |
 | MOB65 | Inscription expirée / étape perdue / reset expiré | L'écran d'échec plein écran (X, titre, explication) avec le geste de reprise |
 | MOB66 | Mot de passe oublié | « Envoyer le code » gris tant que l'adresse n'est pas valide (même règle que MOB61) |
+
+# Le flux d'atterrissage localisé — côté serveur · `feat/feed-relevance-server` (D80)
+
+## Le besoin
+
+Quand quelqu'un ouvre Yamba, il voit « tous les trajets disponibles » — triés par date de
+départ, bêtement. Le besoin validé (dans les mots du fondateur) : « afficher ces résultats
+intelligemment comme fait Airbnb — des trajets au départ de sa ville, sinon à proximité, et
+ainsi de suite ; jamais une version MVP ». Et le cas du NOUVEAU, sans compte ni historique,
+doit être le mieux servi : c'est lui qu'on accueille.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-FEED-01** | Sans tri choisi, les résultats arrivent par PERTINENCE — décidée par le serveur, jamais par l'application. Les trois tris existants (plus tôt, prix, mieux notés) restent au choix. |
+| **RG-FEED-02** | La position de l'utilisateur se devine en cascade et se dégrade sans jamais bloquer : position envoyée par l'app (adresse du membre, geste, dernière recherche) → adresse IP résolue CHEZ NOUS (jamais transmise à un tiers, jamais enregistrée) → rien. Aucune demande de GPS à l'ouverture. |
+| **RG-FEED-03** | Avec une position : les trajets au départ de la même ville d'abord (< 25 km), puis à proximité (< 100 km, frontières comprises), puis la région (< 300 km, même pays), puis le pays, puis le reste du monde. À distance égale, la qualité départage. |
+| **RG-FEED-04** | La qualité d'un trajet : un départ JOUABLE (idéal entre demain et J+7 — pas dans deux heures), de la place restante, la confiance (note, Super Voyageur, vérifications, réservation instantanée — un Voyageur SANS note reçoit un a priori neutre, jamais un zéro), un prix compétitif, la fraîcheur de l'annonce. Les VUES ne comptent jamais (sinon les vus resteraient les vus). |
+| **RG-FEED-05** | Un trajet PLEIN descend en fin de liste mais N'EST JAMAIS retiré : un classement change l'ordre, jamais le nombre (ANO-API-11). Le compte affiché ne ment pas. |
+| **RG-FEED-06** | Sans aucune position : flux DÉCOUVERTE — les meilleurs trajets, avec au plus 3 d'un même corridor en tête de liste, pour montrer l'étendue de l'offre au nouveau venu. |
+| **RG-FEED-07** | Quand l'utilisateur a saisi une ville de départ, sa propre position ne joue plus : la pertinence redevient la qualité seule. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| FEED01 | Ouverture sans compte, sans position, base géo absente | Des résultats classés par qualité, variés (≤ 3 par corridor en tête), aucun écran vide |
+| FEED02 | Position « Douala » envoyée par l'app | Les départs de Douala d'abord, puis Édéa (~55 km), puis Yaoundé (~210 km), puis le reste du Cameroun, puis l'international |
+| FEED03 | Un trajet plein au départ de la ville de l'utilisateur | Il apparaît en FIN de liste, jamais absent ; le total affiché est inchangé |
+| FEED04 | Un Voyageur tout neuf (aucune note) publie un bon trajet | Sa carte n'est pas enterrée : a priori neutre + bonus fraîcheur |
+| FEED05 | Recherche « Paris → tout » | Plus d'anneaux : la qualité seule ordonne les départs de Paris |
+| FEED06 | Page 2 du flux (curseur `o:10`) | La page suit, ordre STABLE entre les deux appels ; le même curseur sur le tri prix-au-poids fonctionne aussi (ANO-API-24 close) |
+| FEED07 | `sort=nimporte` dans l'URL (lien partagé cassé) | 200, classement par pertinence — jamais un 400 |

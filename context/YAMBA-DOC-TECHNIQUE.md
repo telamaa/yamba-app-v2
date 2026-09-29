@@ -12099,3 +12099,117 @@ Revolut) :
   ABSENT ; les 3 SVG (hero + G + f) prouvés EMBARQUÉS.
 - Les routes typées ont suivi à chaud (le Metro du poste régénère `.expo/types` à la volée).
 - Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).
+
+# Le flux d'atterrissage localisé — côté serveur · `feat/feed-relevance-server` (D80)
+
+## Le besoin et la décision
+
+Le tri par défaut de `GET /trips/search` était `departureAt asc`, point : l'atterrissage
+(recherche-first A207) montrait un annuaire brut — un trajet plein partant dans 40 minutes
+devant un Super Voyageur vérifié à bon prix partant dans 4 jours. D80 (gravée avant le code,
+re-instruite après le redémarrage du Mac du 29/09) : le flux est LOCALISÉ à la Airbnb — au
+départ de chez l'utilisateur, sinon on élargit anneau par anneau, et jamais un écran vide ni
+bête. Cette PR livre le SERVEUR ; le front web (sections + chip d'ancrage) est la PR suivante,
+le mobile vient après (ordre acté).
+
+## L'architecture en quatre étages
+
+1. **L'ancrage** (`FeedAnchor`) — d'où l'utilisateur « regarde » : la position envoyée par le
+   client (`nearLat`/`nearLng` + `nearCountry` ISO-2), sinon l'IP résolue HORS-LIGNE, sinon
+   rien. Résolu par requête, jamais stocké, jamais journalisé.
+2. **Les anneaux** (`ringFor`) — `SAME_CITY` (< 25 km) → `NEARBY` (< 100 km, purement
+   métrique : 80 km transfrontaliers SONT à proximité) → `REGION` (< 300 km ET même pays) →
+   `COUNTRY` (même pays) → `ELSEWHERE`. Un trajet sans coordonnées dégrade sur son
+   `originCountryCode` — jamais un trou.
+3. **Le score qualité** (`qualityScore`, 0..100) — départage DANS un anneau, et classement
+   entier quand il n'y a pas d'ancrage : départ jouable (plateau J+1..J+7, plancher 0.25),
+   confiance (note snapshot avec PRIOR NEUTRE 3.9 pour le sans-note + bonus Super Voyageur 5,
+   vérifié 3, billet vérifié 2, instantané 2), prix en PERCENTILE de la fenêtre (aucune
+   médiane à maintenir), fraîcheur (pleine 48 h, éteinte J+14), malus « presque plein »
+   (< 2 kg restants). Les VUES n'y entrent jamais : boucle de rétroaction.
+4. **La clé de tri** (`rankFeedWindow`) — quatre niveaux stricts : le PLEIN
+   (`capacityKg − reservedKg ≤ 0`) coule sous TOUT mais n'est JAMAIS exclu (ANO-API-11) ;
+   l'anneau ; le score ; l'`id` (déterminisme A199). Sans ancrage, une passe de DIVERSITÉ
+   stable démeut le 4e trajet d'un même corridor en queue de son bucket — le flux découverte
+   montre l'étendue de l'offre, il ne retire rien.
+
+Tout est PUR dans `apps/trip-service/src/lib/feed-ranking.ts` (haversine réutilisée de
+`utils/geo.helper.ts`, celle des SavedRoutes) ; les pondérations sont des ARGUMENTS PAR
+DÉFAUT (`FEED_PARAMS`, règle D62 : pas de clé PlatformSettings sans consommateur).
+
+## La brique géo — `packages/libs/geoip`
+
+Lecteur MaxMind GeoLite2-City LOCAL (`maxmind`, pur JS, ~60 Mo de base gitignorée dans
+`data/geoip/`), doctrine D78 étendue : l'IP ne sort JAMAIS de chez nous. Trois couches
+testables sans le binaire : `isPrivateIp` (jamais de géoloc sur du non-routable — le poste de
+dev inclus), `interpretCity` (pure : réponse GeoLite2 → `{lat, lng, city, countryCode}`, nom
+de ville fr → en → premier), `makeIpAnchorResolver(openDb)` (l'ouverture est mémorisée, échec
+compris — pas de tempête d'ouvertures ; tout chemin d'erreur rend `null`, une géoloc ne vaut
+jamais un 500). Le chemin de base : `GEOIP_DB_PATH` (root `.env` UNIQUEMENT — piège des .env
+par projet), sinon `data/geoip/GeoLite2-City.mmdb` essayé depuis le cwd PUIS deux crans
+au-dessus (bundle lancé depuis `apps/<service>`). Téléchargement :
+`bash scripts/download-geolite2.sh` (clé MaxMind gratuite, `MAXMIND_LICENSE_KEY`). Sans base :
+un warn UNE fois, ancrage IP inactif, flux découverte — le service ne casse pas.
+
+## Le gateway — `x-client-ip`
+
+`express-http-proxy` transmet les en-têtes mais N'AJOUTE PAS l'IP du client. Le proxy
+`/api/trips` pose désormais `x-client-ip: req.ip` en ÉCRASANT ce qu'un client aurait mis :
+l'en-tête est infalsifiable à travers le gateway (`req.ip` honore le `trust proxy` déjà posé
+pour le proxy Next D48). trip-service le lit UNIQUEMENT pour l'ancrage (avec repli `req.ip`,
+que `isPrivateIp` neutralise de toute façon en local).
+
+## Le contrat — DTO, réponse, OpenAPI
+
+- `sort` : `relevance` entre dans l'enum et devient LE DÉFAUT (`.default("relevance").catch("relevance")`
+  — un tri inconnu DÉGRADE comme `mode`, doctrine ANO-API-10). Le front web n'envoyant `sort`
+  que s'il diffère du défaut historique, il bascule sans changement obligé.
+- `nearLat` / `nearLng` (coercés, bornés, `catch(undefined)` : une géoloc invalide est ignorée,
+  jamais un 400) + `nearCountry` (ISO-2, normalisé majuscules — mesuré sur le seed : sans lui,
+  un trajet SANS coordonnées ne peut ringuer que `ELSEWHERE` face à un ancrage `near`).
+- **ANO-API-24** (mesurée pendant le lot) : la regex du `cursor` ne connaissait que la forme
+  ObjectId 24-hex — le `nextCursor` `o:<n>` rendu par le tri prix-au-poids (D33) était REFUSÉ
+  400 au retour : la page 2 de ce tri était INATTEIGNABLE depuis toujours. La forme
+  `o:\d{1,6}` est désormais un curseur légitime, pour D33 comme pour la pertinence.
+- Réponse : chaque carte porte son `ring` (posé par le CONTRÔLEUR, comme `isFavorite` — jamais
+  par le mapper ; `null` sans ancrage), et la réponse porte `anchor`
+  (`{source: query|ip, city, countryCode}` — la ville seulement quand l'IP l'a résolue ;
+  JAMAIS l'IP ni des coordonnées). `totalCount` est borné à la fenêtre sur les tris en mémoire
+  (comme D33) — le count exact vit dans `/facets`.
+- Miroirs à jour : `packages/libs/api-contracts/src/trip/trip-search.schema.ts`
+  (`ProximityRingSchema`, `anchor` dans `SearchTripsResponse`), `build-openapi.ts` (3 nouveaux
+  paramètres, pattern du curseur), les cinq `openapi.json` régénérés (`npm run generate:openapi`).
+
+## Le contrôleur — la branche `relevance`
+
+Même patron que le tri prix-au-poids D33 (même fichier, juste au-dessus) : fenêtre bornée
+`FEED_PARAMS.windowSize = 200` lue en une requête + count, classement en mémoire, curseur-offset
+`o:<n>`. Les anneaux ne s'appliquent QUE sans critère `from` (D80 4A : quand l'Expéditeur a dit
+d'où part le colis, la proximité de SA position n'a plus de sens — pertinence = qualité seule).
+La cascade d'ancrage : `near*` de la query → `x-client-ip` via `resolveIpAnchor` → null
+(découverte). `markFavorites` et `markViewsAndCountSearch` inchangés.
+
+## Les épreuves
+
+- **392 tests** trip-service (310 → 392, +82) : vecteurs par facteur (`feed-ranking.spec.ts` —
+  villes réelles du Cameroun pour les anneaux), propriétés (« le plein coule mais n'est jamais
+  exclu », « l'anneau domine le score », « la diversité démeut sans retirer », stabilité sur
+  entrée renversée), la brique géo sans binaire (`geoip.spec.ts`), le contrat
+  (`trip-search.dto.spec.ts` : défaut, dégradation, bornes, ANO-API-24).
+- **Sondes réelles** sur le bundle (`PORT=6902 node --env-file=../../.env dist/main.js`) contre
+  la base de dev : flux découverte (anchor null, `o:3`), ancrage query Paris (SAME_CITY),
+  `nearCountry=fr` (les sans-coordonnées passent ELSEWHERE → COUNTRY), page 2 via `o:3`,
+  tri inconnu → 200.
+- `scripts/smoke-services.sh` : les SIX bundles bootent (nouvelle dépendance `maxmind` dans
+  les bundles webpack — `import()` dynamique validé par le build, pas seulement par tsc).
+
+## Les restes du lot (PR suivantes)
+
+1. **Front web** : sections par anneau (« Au départ de X », « À proximité »…), chip
+   « Autour de : X ✕ », envoi de `near*` (adresse du membre / dernière recherche), chip de tri
+   « Pertinence » par défaut.
+2. **Une minute hors dépôt** : créer la clé MaxMind et lancer `download-geolite2.sh` sur le
+   poste (et en prod le jour venu).
+3. **Migration douce** : `isPrivateIp` d'auth-service (D78) vers `@packages/libs/geoip`
+   (duplication assumée pour ne pas toucher la baseline auth dans cette PR).
+4. **Mobile** : mêmes contrats, sur la page résultats de `feat/mobile-results` une fois mergée.
