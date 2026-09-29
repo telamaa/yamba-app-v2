@@ -74,3 +74,5 @@ packages/libs/prisma/scripts/seed-admins-output.json
 context/**/captures/
 
 .nx/migrate-runs
+# Base GeoLite2 (D80) : locale, telechargee par scripts/download-geolite2.sh, jamais versionnee
+data/geoip/
