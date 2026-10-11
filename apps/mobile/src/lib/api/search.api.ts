@@ -39,6 +39,10 @@ export type TripSearchResult = {
   toCountryCode?: string;
   /** Déjà localisée par le serveur (« 12 juin 2026 » / « June 12, 2026 »). */
   travelDate: string;
+  /** ISO 8601 — le SEUL champ datable côté client (`travelDate` est du texte).
+   *  Envoyé par le serveur depuis ANO-WEB-30, pour séparer les favoris encore
+   *  en ligne des trajets passés. Optionnel : un trajet sans date reste actif. */
+  departureAt?: string;
   departureTime: string;
   /** Absente quand le trajet n'a pas d'heure d'arrivée. */
   arrivalTime?: string;

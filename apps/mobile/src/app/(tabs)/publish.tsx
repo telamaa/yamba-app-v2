@@ -1,11 +1,18 @@
 /**
- * publish.tsx — l'onglet Publier (lot recherche-first).
- * =====================================================
- * L'offre a sa place dans la barre (le « + » de la référence) : un Voyageur
- * doit voir dès l'arrivée qu'ici, on publie aussi. Derrière la porte
- * d'identité (A58/A63) — et une COQUILLE HONNÊTE (leçon A203) : le parcours
- * de publication n'existe pas encore dans l'app, l'écran le dit et renvoie
- * vers le site ; aucun formulaire fantôme.
+ * publish.tsx — l'écran « Publier », HORS de la barre d'onglets (A210).
+ * =====================================================================
+ * Il n'est plus un onglet : un onglet permanent pour un écran qui ne fait
+ * rien ne se justifiait pas. La route VIT toujours et reste atteignable par
+ * `router.push('/publish')` (doc Expo v57 : une route sans Trigger quitte la
+ * barre sans cesser d'être navigable) ; sa porte est la carte CTA en tête
+ * d'Activité. Il reviendra en « + » central avec le lot de publication
+ * NATIVE.
+ *
+ * Coquille HONNÊTE (A203) : elle dit que le parcours arrive, et ne renvoie
+ * NULLE PART — l'app est full mobile et native (A210 b). L'ancienne ligne
+ * « publie ton trajet depuis le site » a été supprimée, comme le commentaire
+ * qui prétendait ici que l'écran « renvoyait vers le site » alors qu'il n'a
+ * jamais porté ni lien ni WebView.
  */
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,9 +35,6 @@ function PublishContent() {
         </ThemedText>
         <ThemedText themeColor="textSecondary" style={styles.centered}>
           {t('publish.body')}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-          {t('publish.note')}
         </ThemedText>
       </SafeAreaView>
     </ThemedView>

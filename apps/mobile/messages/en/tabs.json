@@ -1,10 +1,10 @@
 {
   "bar": {
-    "search": "Search",
+    "search": "Explore",
+    "favorites": "Saved",
     "publish": "Publish",
-    "trips": "Trips",
-    "messages": "Messages",
-    "profile": "Profile"
+    "activity": "Activity",
+    "messages": "Messages"
   },
   "gate": {
     "title": "Log in to continue",
@@ -14,14 +14,7 @@
   },
   "publish": {
     "title": "Publish your trip",
-    "body": "Destination, date, available kilos, your price per kilo: publishing arrives in an upcoming batch of the app.",
-    "note": "In the meantime, publish your trip from the website — it will appear here."
-  },
-  "trips": {
-    "title": "My trips",
-    "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",
-    "draftTrips": "{count, plural, =0 {No trips to finish} one {# trip to finish} other {# trips to finish}}",
-    "note": "Trip and request details arrive in an upcoming batch."
+    "body": "Destination, date, available kilos, your price per kilo: publishing arrives in an upcoming batch of the app."
   },
   "messages": {
     "title": "Messages",
@@ -31,6 +24,16 @@
   "profile": {
     "title": "Profile",
     "logout": "Log out",
-    "note": "Profile management arrives in an upcoming batch."
+    "note": "Profile management arrives in an upcoming batch.",
+    "back": "Back"
+  },
+  "activity": {
+    "title": "Activity",
+    "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",
+    "draftTrips": "{count, plural, =0 {No trips to finish} one {# trip to finish} other {# trips to finish}}",
+    "note": "Trip and request details arrive in an upcoming batch.",
+    "publishTitle": "Publish your trip",
+    "publishBody": "Your spare kilos can earn. Announce your next journey and receive requests.",
+    "publishSoon": "Publishing arrives in an upcoming batch of the app."
   }
 }

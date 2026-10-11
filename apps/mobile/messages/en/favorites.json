@@ -1,0 +1,33 @@
+{
+  "title": "Saved",
+  "segments": {
+    "trips": "Trips",
+    "wishes": "Alerts",
+    "carriers": "Travelers"
+  },
+  "past": "{count, plural, one {# past trip} other {# past trips}}",
+  "trips": {
+    "emptyTitle": "No saved trips",
+    "emptyBody": "Tap the heart on a trip to find it here."
+  },
+  "wishes": {
+    "emptyTitle": "No alerts",
+    "emptyBody": "Create an alert to be notified as soon as a Traveler departs on your route.",
+    "anyDate": "Any date",
+    "nearby": "Nearby cities included",
+    "expires": "Expires on {date}",
+    "paused": "Paused"
+  },
+  "carriers": {
+    "emptyTitle": "No Travelers followed",
+    "emptyBody": "Follow a Traveler to know when they publish a new trip.",
+    "nextTrip": "Next trip: {route}",
+    "noNextTrip": "No trip published yet",
+    "trips": "{count, plural, one {# trip published} other {# trips published}}",
+    "newCarrier": "New Traveler"
+  },
+  "error": {
+    "body": "Could not load your saved items. Check your connection and try again.",
+    "retry": "Try again"
+  }
+}

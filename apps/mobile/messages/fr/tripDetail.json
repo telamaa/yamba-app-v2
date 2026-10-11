@@ -103,7 +103,7 @@
   "notes": {
     "title": "Notes du Voyageur"
   },
-  "bookingSoon": "La réservation depuis l'app arrive bientôt. En attendant, ce trajet se réserve sur le site Yamba.",
+  "bookingSoon": "La réservation depuis l’app arrive dans un prochain lot.",
   "notFound": {
     "title": "Trajet introuvable",
     "body": "Ce trajet n'existe pas ou n'est plus disponible."

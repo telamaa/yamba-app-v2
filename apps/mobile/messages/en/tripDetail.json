@@ -103,7 +103,7 @@
   "notes": {
     "title": "Traveler's notes"
   },
-  "bookingSoon": "Booking from the app is coming soon. Until then, this trip can be booked on the Yamba website.",
+  "bookingSoon": "Booking from the app arrives in an upcoming batch.",
   "notFound": {
     "title": "Trip not found",
     "body": "This trip doesn't exist or is no longer available."

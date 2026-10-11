@@ -18,10 +18,13 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { BlurTargetView, BlurView } from 'expo-blur';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Animated,
+  Dimensions,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -36,6 +39,7 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { CityPicker } from '@/components/city-picker';
 import { NativeDateField } from '@/components/native-date-field';
+import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
@@ -89,7 +93,14 @@ type SearchState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string; correlationId: string | null }
-  | { kind: 'results'; page: SearchPage; loadingMore: boolean };
+  | {
+      kind: 'results';
+      page: SearchPage;
+      loadingMore: boolean;
+      /** Une pastille ou un tri qu'on rejoue : la liste RESTE montée et
+       *  se fond, au lieu de démonter l'écran pour un spinner nu. */
+      refreshing: boolean;
+    };
 
 /** Les quatre pastilles transport, dans l'ordre du web (TransportModeTabs). */
 const TRANSPORT_TABS: Array<{
@@ -168,9 +179,67 @@ export default function SearchScreen() {
     []
   );
 
+  // ── Le filtrage ne doit pas se SENTIR ──────────────────────────────
+  // Trois gestes, tous en `useNativeDriver` (le moteur déjà éprouvé ici,
+  // cf. les points pulsés A209) : la liste se fond au lieu de disparaître,
+  // une barre balaie sous les pastilles pour dire « ça travaille », et la
+  // liste remonte en haut PENDANT qu'elle est estompée — donc sans saut
+  // visible. Reanimated est installé mais jamais importé dans l'app : on
+  // n'inaugure pas un moteur non éprouvé pour un fondu.
+  const listRef = useRef<FlatList<TripSearchResult>>(null);
+  const pendingScrollTop = useRef(false);
+  const listOpacity = useRef(new Animated.Value(1)).current;
+  const sweep = useRef(new Animated.Value(0)).current;
+  const sweepWidth = useMemo(() => Dimensions.get('window').width, []);
+  const refreshing = state.kind === 'results' && state.refreshing;
+
+  useEffect(() => {
+    Animated.timing(listOpacity, {
+      toValue: refreshing ? 0.32 : 1,
+      // Sortie franche, retour plus doux : l'arrivée des résultats se
+      // remarque, leur départ non.
+      duration: refreshing ? 120 : 260,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [refreshing, listOpacity]);
+
+  useEffect(() => {
+    if (!refreshing) return;
+    sweep.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(sweep, {
+        toValue: 1,
+        duration: 850,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [refreshing, sweep]);
+
+  // Nouveaux résultats après un re-filtrage : on remonte en haut tant que la
+  // liste est estompée — le saut est invisible.
+  useEffect(() => {
+    if (state.kind !== 'results' || state.refreshing || !pendingScrollTop.current) return;
+    pendingScrollTop.current = false;
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [state]);
+
   const runSearchWith = useCallback(
-    async (params: SearchParams, refreshFacets: boolean) => {
-      setState({ kind: 'loading' });
+    async (params: SearchParams, refreshFacets: boolean, keepResults = false) => {
+      // Changer de pastille n'est pas une nouvelle recherche : la liste reste
+      // à l'écran et se fond pendant l'aller-retour. Repasser par `loading`
+      // démontait l'en-tête collant ET la liste — le clignotement du 11/10.
+      if (keepResults) {
+        setState((prev) =>
+          prev.kind === 'results' ? { ...prev, refreshing: true } : { kind: 'loading' }
+        );
+        pendingScrollTop.current = true;
+      } else {
+        setState({ kind: 'loading' });
+      }
       setFormCollapsed(true);
       if (refreshFacets) {
         // Fire-and-forget : en panne, on garde les derniers comptes plutôt
@@ -186,7 +255,7 @@ export default function SearchScreen() {
       }
       try {
         const page = await searchTrips(params);
-        setState({ kind: 'results', page, loadingMore: false });
+        setState({ kind: 'results', page, loadingMore: false, refreshing: false });
       } catch (err) {
         setState({
           kind: 'error',
@@ -208,7 +277,7 @@ export default function SearchScreen() {
     (next: SearchTransportFilter) => {
       if (next === mode) return;
       setMode(next);
-      void runSearchWith(paramsFor(from, to, date, next, sort), false);
+      void runSearchWith(paramsFor(from, to, date, next, sort), false, true);
     },
     [mode, runSearchWith, paramsFor, from, to, date, sort]
   );
@@ -218,7 +287,7 @@ export default function SearchScreen() {
       setFiltersOpen(false);
       if (next === sort) return;
       setSort(next);
-      void runSearchWith(paramsFor(from, to, date, mode, next), false);
+      void runSearchWith(paramsFor(from, to, date, mode, next), false, true);
     },
     [sort, runSearchWith, paramsFor, from, to, date, mode]
   );
@@ -260,6 +329,7 @@ export default function SearchScreen() {
           totalCount: next.totalCount,
         },
         loadingMore: false,
+        refreshing: false,
       });
     } catch {
       // La page suivante a échoué : on garde ce qu'on a, le scroll retentera.
@@ -311,18 +381,7 @@ export default function SearchScreen() {
           </ThemedText>
         </View>
       </Pressable>
-      <Pressable
-        onPress={() => setFiltersOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel={t('filters.title')}
-        style={({ pressed }) => [
-          styles.filtersButton,
-          { backgroundColor: theme.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        <Ionicons name="options-outline" size={18} color={theme.text} />
-        <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
-      </Pressable>
+      <ProfileAvatarButton />
     </View>
   ) : (
     <ThemedView type="backgroundElement" style={styles.form}>
@@ -384,14 +443,17 @@ export default function SearchScreen() {
     </ThemedView>
   );
 
-  // Pastilles transport : collées sous la barre récap en mode résultats —
-  // elles restent le chemin de sortie d'un filtre à zéro résultat.
-  const transportTabs = state.kind !== 'results' ? null : (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.tabsScroll}
-      contentContainerStyle={styles.tabs}>
+  // Pastilles transport : collées sous la barre récap, DANS l'en-tête collant
+  // et nulle part ailleurs — elles restent le chemin de sortie d'un filtre à
+  // zéro résultat. Le mode résultats est le seul à les monter (l'en-tête
+  // collant n'existe que là), d'où l'absence de garde sur `state.kind`.
+  const transportTabs = (
+    <View style={styles.tabsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabs}>
       {TRANSPORT_TABS.map((tab) => {
         const active = mode === tab.key;
         const activeText = dark ? '#FFB84D' : theme.text;
@@ -401,8 +463,9 @@ export default function SearchScreen() {
             onPress={() => pickMode(tab.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            style={[
+            style={({ pressed }) => [
               styles.tab,
+              pressed && styles.pressed,
               active
                 ? {
                     backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
@@ -438,7 +501,23 @@ export default function SearchScreen() {
           </Pressable>
         );
       })}
-    </ScrollView>
+      </ScrollView>
+      {/* « Filtres » vit avec les filtres, épinglé HORS du défilement —
+          il ne disparaît jamais sous la droite de l'écran. */}
+      <View style={[styles.filtersDivider, { backgroundColor: theme.backgroundSelected }]} />
+      <Pressable
+        onPress={() => setFiltersOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('filters.title')}
+        style={({ pressed }) => [
+          styles.filtersButton,
+          { backgroundColor: theme.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <Ionicons name="options-outline" size={13} color={theme.text} />
+        <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
+      </Pressable>
+    </View>
   );
 
   // Titre + sous-titre : eux DÉFILENT avec la liste (seuls la barre récap et
@@ -455,20 +534,38 @@ export default function SearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-        {state.kind === 'results' && state.page.trips.length > 0 ? (
+        {state.kind === 'results' ? (
           <>
             {/* La cible du flou Android : tout ce qui passe sous l'en-tête.
                 Sur iOS c'est un simple View, le flou est natif. */}
             <BlurTargetView ref={blurTargetRef} style={styles.listArea}>
+              <Animated.View style={[styles.listArea, { opacity: listOpacity }]}>
               <FlatList<TripSearchResult>
+                ref={listRef}
                 data={state.page.trips}
                 keyExtractor={(trip) => trip.id}
                 renderItem={({ item }) => <TripResultCard trip={item} />}
                 ListHeaderComponent={
-                  <View>
-                    {resultsTitle}
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
-                      {t('results', { count: state.page.totalCount })}
+                  state.page.trips.length > 0 ? (
+                    <View>
+                      {resultsTitle}
+                      <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
+                        {t('results', { count: state.page.totalCount })}
+                      </ThemedText>
+                    </View>
+                  ) : null
+                }
+                ListEmptyComponent={
+                  <View style={styles.empty}>
+                    <View
+                      style={[styles.emptyIcon, { backgroundColor: theme.backgroundElement }]}>
+                      <Ionicons name="search-outline" size={26} color={theme.textSecondary} />
+                    </View>
+                    <ThemedText type="smallBold" style={styles.centered}>
+                      {t('empty.title')}
+                    </ThemedText>
+                    <ThemedText themeColor="textSecondary" style={styles.centered}>
+                      {t('empty.body')}
                     </ThemedText>
                   </View>
                 }
@@ -479,10 +576,18 @@ export default function SearchScreen() {
                 }
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.4}
-                contentContainerStyle={[styles.list, { paddingTop: headerHeight }]}
+                contentContainerStyle={[
+                  styles.list,
+                  { paddingTop: headerHeight },
+                  // Centrer l'état vide sur la zone RÉELLEMENT visible : sans
+                  // cela, le padding de l'en-tête collant décale le bloc vers
+                  // le bas et il n'est plus au milieu de l'écran.
+                  state.page.trips.length === 0 && { paddingBottom: headerHeight },
+                ]}
                 scrollIndicatorInsets={{ top: Math.max(0, headerHeight - insets.top) }}
                 keyboardShouldPersistTaps="handled"
               />
+              </Animated.View>
             </BlurTargetView>
             {/* L'en-tête collant : barre récap (ou formulaire rouvert) +
                 pastilles sur fond flouté, encoche comprise. Sa hauteur mesurée
@@ -500,13 +605,34 @@ export default function SearchScreen() {
               <View style={[styles.stickyContent, { paddingTop: insets.top }]}>
                 {searchBar}
                 {transportTabs}
+                {/* 2 px qui balaient : l'app DIT qu'elle travaille sans rien
+                    masquer. Invisible (hauteur réservée) au repos. */}
+                <View style={styles.sweepTrack}>
+                  {refreshing && (
+                    <Animated.View
+                      style={[
+                        styles.sweepBar,
+                        {
+                          width: sweepWidth * 0.34,
+                          transform: [
+                            {
+                              translateX: sweep.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [-sweepWidth * 0.34, sweepWidth],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  )}
+                </View>
               </View>
             </View>
           </>
         ) : (
           <View style={[styles.flowArea, { paddingTop: insets.top }]}>
             {searchBar}
-            {transportTabs}
 
             {state.kind === 'idle' && (
               <View style={styles.idle}>
@@ -558,20 +684,6 @@ export default function SearchScreen() {
                 <Pressable onPress={runSearch}>
                   <ThemedText type="linkPrimary">{t('error.retry')}</ThemedText>
                 </Pressable>
-              </View>
-            )}
-
-            {state.kind === 'results' && state.page.trips.length === 0 && (
-              <View>
-                {resultsTitle}
-                <View style={styles.stateBlock}>
-                  <ThemedText type="smallBold" style={styles.centered}>
-                    {t('empty.title')}
-                  </ThemedText>
-                  <ThemedText themeColor="textSecondary" style={styles.centered}>
-                    {t('empty.body')}
-                  </ThemedText>
-                </View>
               </View>
             )}
           </View>
@@ -726,7 +838,10 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    // 'center' et non 'stretch' : la pastille Profil a une hauteur FIXE,
+    // en 'stretch' elle se collait en haut de la rangée (décalée de ~13 px
+    // sur la capture du 11/10 22h19). `summary` garde son minHeight.
+    alignItems: 'center',
     gap: Spacing.two,
     marginTop: Spacing.two,
     marginBottom: Spacing.three,
@@ -746,27 +861,56 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 1,
   },
+  // Même gabarit que `tab` — hauteur, rayon, espacement : il vit dans la
+  // rangée des pastilles, il en parle la langue. Il faisait 52 px de haut
+  // et un rayon de 22 contre ~34 px et 999 pour les pastilles : deux
+  // langages visuels dans une même rangée (capture du 11/10 22h19).
   filtersButton: {
-    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: 22,
-    paddingHorizontal: Spacing.three,
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: Spacing.one,
   },
   resultsHeader: {
     gap: Spacing.one,
     paddingBottom: Spacing.two,
   },
-  tabsScroll: {
+  tabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     marginTop: Spacing.two,
-    marginHorizontal: -Spacing.four,
+  },
+  tabsScroll: {
+    flexGrow: 1,
+    flexShrink: 1,
+    // Débord à GAUCHE seulement : les pastilles touchent le bord de l'écran
+    // quand on défile, mais la zone s'ARRÊTE avant « Filtres ». Le débord à
+    // droite les faisait glisser SOUS le bouton (« Train » coupé, capture
+    // du 11/10 22h19).
+    marginLeft: -Spacing.four,
   },
   tabs: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    paddingHorizontal: Spacing.four,
+    paddingLeft: Spacing.four,
+    paddingRight: Spacing.two,
     paddingBottom: Spacing.one,
+  },
+  // Le séparateur qui dit « ce qui suit n'est pas une pastille » (motif
+  // Airbnb : catégories qui défilent, bouton Filtres épinglé derrière un
+  // trait).
+  filtersDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    marginVertical: Spacing.one,
+    marginBottom: Spacing.two,
   },
   tab: {
     flexDirection: 'row',
@@ -784,6 +928,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
+  },
+  sweepTrack: {
+    height: 2,
+    overflow: 'hidden',
+    marginHorizontal: -Spacing.four,
+  },
+  sweepBar: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: Brand.mango,
   },
   tabCountText: {
     fontSize: 11,
@@ -864,6 +1018,22 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingTop: Spacing.four,
   },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.six,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
   spinner: {
     paddingTop: Spacing.four,
   },
@@ -872,6 +1042,9 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.two,
+    // Occupe la fenêtre même vide : c'est ce qui permet à l'état vide de se
+    // centrer au lieu de se tasser sous l'en-tête.
+    flexGrow: 1,
     // La barre d'onglets FLOTTE sur le contenu : sans cette marge, la
     // dernière carte meurt dessous (capture du 28/09 au soir). Le haut est
     // dégagé dynamiquement par la hauteur mesurée de l'en-tête collant.

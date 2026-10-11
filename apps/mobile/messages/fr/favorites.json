@@ -1,0 +1,33 @@
+{
+  "title": "Favoris",
+  "segments": {
+    "trips": "Trajets",
+    "wishes": "Souhaits",
+    "carriers": "Voyageurs"
+  },
+  "past": "{count, plural, one {# trajet passé} other {# trajets passés}}",
+  "trips": {
+    "emptyTitle": "Aucun trajet mis de côté",
+    "emptyBody": "Touche le cœur sur un trajet pour le retrouver ici."
+  },
+  "wishes": {
+    "emptyTitle": "Aucun souhait",
+    "emptyBody": "Crée un souhait pour être prévenu dès qu’un Voyageur part sur ton trajet.",
+    "anyDate": "Toutes les dates",
+    "nearby": "Villes proches incluses",
+    "expires": "Expire le {date}",
+    "paused": "En pause"
+  },
+  "carriers": {
+    "emptyTitle": "Aucun Voyageur suivi",
+    "emptyBody": "Suis un Voyageur pour savoir quand il publie un nouveau trajet.",
+    "nextTrip": "Prochain trajet : {route}",
+    "noNextTrip": "Aucun trajet publié pour l’instant",
+    "trips": "{count, plural, one {# trajet publié} other {# trajets publiés}}",
+    "newCarrier": "Nouveau Voyageur"
+  },
+  "error": {
+    "body": "Impossible de charger tes favoris. Vérifie ta connexion et réessaie.",
+    "retry": "Réessayer"
+  }
+}
