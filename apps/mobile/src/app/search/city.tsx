@@ -1,11 +1,11 @@
 /**
  * search/city.tsx — choisir le départ ou la destination, en PAGE DÉDIÉE.
  * ======================================================================
- * Une vraie page poussée qui glisse depuis la droite, pas une feuille
- * modale : c'est ce que font les applications natives, et c'est ce que le
- * web lui-même imite (`MobileFieldFullScreen` : « sub-screen mobile plein
- * écran qui slide depuis la droite, pattern iOS natif »). Ici on ne l'imite
- * pas, on l'a.
+ * Réf. capture 13/10 21h23 : une page pleine qui glisse depuis la droite,
+ * un en-tête « ‹ Départ » aligné à gauche, puis la saisie NUE (une épingle,
+ * un champ, rien autour) et les suggestions dessous. Pas de pilule, pas de
+ * loupe : l'écran entier EST le champ, le clavier est déjà levé — c'est la
+ * sobriété des écrans de recherche natifs (Maps, Uber, Booking).
  *
  * Le champ visé arrive en paramètre de route (`field=from|to`) ; le choix
  * repart par le brouillon partagé (`search-draft.ts`) — une page poussée ne
@@ -23,7 +23,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -96,17 +96,23 @@ export default function CitySearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-            <Ionicons name="chevron-back" size={24} color={theme.text} />
+        {/* En-tête de page poussée : la flèche, puis le titre — aligné à
+            gauche, pas centré : c'est le titre de l'ÉTAPE, pas d'une modale. */}
+        <View style={[styles.header, { borderBottomColor: theme.backgroundElement }]}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            style={styles.back}>
+            <Ionicons name="chevron-back" size={26} color={theme.text} />
           </Pressable>
-          <ThemedText type="smallBold">{label}</ThemedText>
-          {/* Équilibre la flèche pour que le titre soit vraiment centré. */}
-          <View style={styles.back} />
+          <ThemedText type="subtitle" style={styles.title}>
+            {label}
+          </ThemedText>
         </View>
 
-        <View style={[styles.inputRow, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="search" size={18} color={theme.textSecondary} />
+        <View style={styles.inputRow}>
+          <Ionicons name="location-outline" size={18} color={theme.textSecondary} />
           <TextInput
             style={[styles.input, { color: theme.text }]}
             placeholder={placeholder}
@@ -116,20 +122,35 @@ export default function CitySearchScreen() {
             autoCorrect={false}
             value={query}
             onChangeText={onChange}
-            returnKeyType="done"
+            returnKeyType="search"
             onSubmitEditing={() => commit(query)}
             clearButtonMode="while-editing"
+            accessibilityLabel={label}
           />
+          {/* iOS fournit sa croix d'effacement (`clearButtonMode`), Android
+              non : sans celle-ci, corriger une ville se ferait touche par
+              touche. */}
+          {Platform.OS !== 'ios' && query.length > 0 && (
+            <Pressable
+              onPress={() => onChange('')}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('edit.clearAll')}>
+              <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+            </Pressable>
+          )}
         </View>
 
         <FlatList<CitySuggestion>
           data={suggestions}
           keyExtractor={(s) => `${s.main}·${s.secondary}`}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => commit(item.main)}
+              accessibilityRole="button"
               style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
               <View style={[styles.pin, { backgroundColor: theme.backgroundElement }]}>
                 <Ionicons name="location-outline" size={16} color={theme.textSecondary} />
@@ -159,25 +180,28 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.three,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   back: {
-    width: 32,
+    marginLeft: -Spacing.one,
+  },
+  title: {
+    fontSize: 20,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: 22,
-    paddingHorizontal: Spacing.three,
-    minHeight: 52,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
   },
   input: {
     flex: 1,
@@ -185,7 +209,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   list: {
-    paddingTop: Spacing.three,
+    paddingHorizontal: Spacing.four,
   },
   suggestion: {
     flexDirection: 'row',

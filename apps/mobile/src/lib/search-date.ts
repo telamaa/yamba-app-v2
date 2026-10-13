@@ -145,3 +145,45 @@ export function rangeLabel(value: SearchDate, locale: SupportedLocale): string |
   if (value.mode !== 'flex' || !value.rangeStart || !value.rangeEnd) return null;
   return `${formatDayMonth(value.rangeStart, locale)} – ${formatDayMonth(value.rangeEnd, locale)}`;
 }
+
+/* ── La grille du calendrier (le web délègue à react-day-picker ; ici,
+      vingt lignes de pur calcul — aucune dépendance à embarquer) ──────── */
+
+/** Les `count` premiers jours de mois à partir du mois de `from` inclus. */
+export function monthsFrom(from: Date, count: number): Date[] {
+  const first = new Date(from.getFullYear(), from.getMonth(), 1);
+  return Array.from({ length: count }, (_, i) => new Date(first.getFullYear(), first.getMonth() + i, 1));
+}
+
+/**
+ * Les semaines d'un mois, alignées sur le premier jour de la semaine locale.
+ * Les cases hors du mois valent `null` : le calendrier n'affiche QUE les
+ * jours du mois (le web masque aussi les jours voisins), une case vide se
+ * lit mieux qu'un chiffre grisé appartenant à un autre mois.
+ */
+export function monthMatrix(month: Date, weekStartsOn: 0 | 1): (Date | null)[][] {
+  const year = month.getFullYear();
+  const index = month.getMonth();
+  const daysInMonth = new Date(year, index + 1, 0).getDate();
+  const lead = (new Date(year, index, 1).getDay() - weekStartsOn + 7) % 7;
+
+  const cells: (Date | null)[] = Array.from({ length: lead }, () => null);
+  for (let day = 1; day <= daysInMonth; day += 1) cells.push(new Date(year, index, day));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  );
+}
+
+/** Bornes INCLUSES (la fenêtre flexible se peint jusqu'à son dernier jour). */
+export function isWithin(day: Date, start: Date, end: Date): boolean {
+  const value = startOfDay(day).getTime();
+  return value >= startOfDay(start).getTime() && value <= startOfDay(end).getTime();
+}

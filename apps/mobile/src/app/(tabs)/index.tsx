@@ -3,13 +3,13 @@
  * =============================================================================
  * L'app est recherche-first (la référence l'a validé dix ans) : l'onglet
  * Accueil a disparu, la croix de l'écran de bienvenue et la connexion
- * atterrissent ICI. Le formulaire est la carte du site en natif : Départ /
- * Destination / Date empilés avec leurs libellés, la date par le VRAI
- * sélecteur de chaque OS, un seul bouton. Les trois champs s'ouvrent en
- * PAGES poussées (`/search/city?field=…`, `/search/date`) — le motif natif
- * des deux OS, pas une feuille modale. Après une
- * recherche, la carte se REPLIE en pilule récap (route · date · Modifier) —
- * l'écran respire pour les résultats. En mode résultats, la pilule et les
+ * atterrissent ICI. L'écran n'ÉDITE plus la recherche lui-même : il porte
+ * la pilule récap (route · date) et les résultats ; tout l'ajustement vit
+ * dans l'éditeur `/search/*` — la feuille « Modifier la recherche », puis
+ * une page pleine par champ (réf. captures 13/10 21h22-21h23). Il reste
+ * seul maître de l'appel serveur : la feuille lève un signal
+ * (`requestSearch()`), l'écran lance la recherche avec ses pastilles, son
+ * tri et sa pagination. En mode résultats, la pilule et les
  * pastilles transport RESTENT collées en haut sur un fond flouté (expo-blur :
  * matériau chrome iOS ; Android passe par `BlurTargetView` + `blurMethod`,
  * repli translucide avant Android 12) — la liste défile dessous, jusque sous
@@ -121,11 +121,6 @@ export default function SearchScreen() {
   // elle écrit dans le brouillon partagé et cet écran s'y abonne.
   const draft = useSyncExternalStore(subscribeSearchDraft, getSearchDraft, getSearchDraft);
   const { from, to, date } = draft;
-  const setFrom = useCallback((value: string) => setSearchDraft({ from: value }), []);
-  const setTo = useCallback((value: string) => setSearchDraft({ to: value }), []);
-  const setDate = useCallback((value: SearchDate | null) => setSearchDraft({ date: value }), []);
-  // Quel champ ville est en saisie plein écran (motif natif, réf. captures).
-  const [formCollapsed, setFormCollapsed] = useState(false);
   const [state, setState] = useState<SearchState>({ kind: 'idle' });
   // Pastille transport active + tri (serveur) — persistent d'une recherche à l'autre.
   const [mode, setMode] = useState<SearchTransportFilter>('all');
@@ -239,7 +234,6 @@ export default function SearchScreen() {
       } else {
         setState({ kind: 'loading' });
       }
-      setFormCollapsed(true);
       if (refreshFacets) {
         // Fire-and-forget : en panne, on garde les derniers comptes plutôt
         // que de casser la recherche (miroir de useSearchFacets).
@@ -270,6 +264,19 @@ export default function SearchScreen() {
     () => runSearchWith(paramsFor(from, to, date, mode, sort), true),
     [runSearchWith, paramsFor, from, to, date, mode, sort]
   );
+
+  // « Rechercher » dans la feuille : elle ne connaît pas cet écran, elle
+  // incrémente un compteur dans le brouillon. On sert chaque valeur UNE fois
+  // — la référence évite de redéclencher la recherche à chaque rendu de la
+  // fonction `runSearch` (dont l'identité change à chaque frappe du draft).
+  const runSearchRef = useRef(runSearch);
+  runSearchRef.current = runSearch;
+  const servedNonce = useRef(draft.submitNonce);
+  useEffect(() => {
+    if (draft.submitNonce === servedNonce.current) return;
+    servedNonce.current = draft.submitNonce;
+    void runSearchRef.current();
+  }, [draft.submitNonce]);
 
   // Une pastille = la MÊME recherche, filtrée par transport côté serveur.
   const pickMode = useCallback(
@@ -304,9 +311,7 @@ export default function SearchScreen() {
 
   const openCorridor = useCallback(
     (corridor: Corridor) => {
-      setFrom(corridor.fromCity);
-      setTo(corridor.toCity);
-      setDate(null);
+      setSearchDraft({ from: corridor.fromCity, to: corridor.toCity, date: null });
       void runSearchWith(paramsFor(corridor.fromCity, corridor.toCity, null, mode, sort), true);
     },
     [runSearchWith, paramsFor, mode, sort]
@@ -364,15 +369,18 @@ export default function SearchScreen() {
             : t('title.noFilter');
   const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
 
-  // La barre du haut : pilule récap + bouton Filtres, ou le formulaire
-  // déplié — partagée entre le flux normal et l'en-tête collant du mode liste.
-  const searchBar = formCollapsed ? (
+  // La barre du haut : la pilule récap (elle OUVRE l'éditeur) et la pastille
+  // de profil — partagée entre le flux normal et l'en-tête collant du mode
+  // liste. L'écran ne contient plus de formulaire : éditer, c'est ouvrir
+  // `/search/edit` (réf. capture 13/10 21h22).
+  const searchBar = (
     <View style={styles.summaryRow}>
-      {/* La pilule rouvre le formulaire ; le bouton ouvre les filtres.
-          Les styles vivent SUR les Pressable (pas de ThemedView flex
-          dans un parent à hauteur auto : Yoga rendait la pilule vide). */}
+      {/* Les styles vivent SUR le Pressable (pas de ThemedView flex dans un
+          parent à hauteur auto : Yoga rendait la pilule vide). */}
       <Pressable
-        onPress={() => setFormCollapsed(false)}
+        onPress={() => router.push('/search/edit')}
+        accessibilityRole="button"
+        accessibilityLabel={t('edit.title')}
         style={({ pressed }) => [
           styles.summary,
           { backgroundColor: theme.backgroundElement },
@@ -390,62 +398,6 @@ export default function SearchScreen() {
       </Pressable>
       <ProfileAvatarButton />
     </View>
-  ) : (
-    <ThemedView type="backgroundElement" style={styles.form}>
-      <Pressable style={styles.fieldRow} onPress={() => router.push('/search/city?field=from')}>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-          {t('form.fromLabel')}
-        </ThemedText>
-        <ThemedText
-          style={styles.fieldValue}
-          themeColor={from ? undefined : 'textSecondary'}
-          numberOfLines={1}>
-          {from || t('form.fromPlaceholder')}
-        </ThemedText>
-      </Pressable>
-      <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
-      <Pressable style={styles.fieldRow} onPress={() => router.push('/search/city?field=to')}>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-          {t('form.toLabel')}
-        </ThemedText>
-        <ThemedText
-          style={styles.fieldValue}
-          themeColor={to ? undefined : 'textSecondary'}
-          numberOfLines={1}>
-          {to || t('form.toPlaceholder')}
-        </ThemedText>
-      </Pressable>
-      <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
-      <View style={styles.dateRow}>
-        <Pressable style={styles.dateTouch} onPress={() => router.push('/search/date')}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-            {t('form.dateLabel')}
-          </ThemedText>
-          <ThemedText
-            style={styles.dateValue}
-            themeColor={date !== null ? undefined : 'textSecondary'}>
-            {summaryDate}
-          </ThemedText>
-        </Pressable>
-        {date !== null && (
-          <Pressable
-            onPress={() => setDate(null)}
-            hitSlop={Spacing.two}
-            accessibilityLabel={t('form.dateClear')}>
-            <ThemedText themeColor="textSecondary">✕</ThemedText>
-          </Pressable>
-        )}
-      </View>
-      <Pressable
-        onPress={runSearch}
-        disabled={state.kind === 'loading'}
-        style={({ pressed }) => [
-          styles.submit,
-          (state.kind === 'loading' || pressed) && styles.submitDimmed,
-        ]}>
-        <ThemedText style={styles.submitLabel}>{t('form.submit')}</ThemedText>
-      </Pressable>
-    </ThemedView>
   );
 
   // Pastilles transport : collées sous la barre récap, DANS l'en-tête collant
@@ -764,59 +716,6 @@ const styles = StyleSheet.create({
   stickyContent: {
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.one,
-  },
-  form: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.three,
-    marginTop: Spacing.two,
-    marginBottom: Spacing.three,
-    gap: Spacing.two,
-  },
-  fieldRow: {
-    gap: 2,
-    paddingVertical: 2,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  fieldValue: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  dateTouch: {
-    flex: 1,
-    gap: 2,
-  },
-  dateValue: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  submit: {
-    backgroundColor: Brand.mango,
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: Spacing.one,
-  },
-  submitDimmed: {
-    opacity: 0.6,
-  },
-  submitLabel: {
-    color: '#151718',
-    fontSize: 15,
-    fontWeight: 600,
   },
   summaryRow: {
     flexDirection: 'row',

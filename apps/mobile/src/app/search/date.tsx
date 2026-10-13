@@ -1,47 +1,43 @@
 /**
  * search/date.tsx — choisir QUAND, en page dédiée.
  * ================================================
- * Les options sont celles du calendrier du site (`SmartDatePicker` /
- * `MobileSmartDatePicker`), à l'identique : deux modes — « Date précise » et
- * « Je suis flexible » — et trois raccourcis — « Cette semaine », « Ce
- * mois », « 3 prochains mois ». Les règles de fenêtre vivent dans
- * `search-date.ts` (miroir assumé du web) ; cet écran ne fait que les
- * présenter.
+ * Réf. capture 13/10 21h23 : « ‹ Quand pars-tu ? », le sélecteur segmenté
+ * « Date précise » / « Je suis flexible », le calendrier, et « Appliquer »
+ * épinglé en bas. Mêmes options que le site (`SmartDatePicker` /
+ * `MobileSmartDatePicker`), mêmes fenêtres, mêmes libellés : une recherche
+ * lancée du téléphone et la même lancée du navigateur trouvent les mêmes
+ * trajets. Les règles vivent dans `search-date.ts`, cet écran les présente.
  *
- * Divergence mobile ASSUMÉE sur le rendu : le web surligne la fenêtre en
- * orange clair dans son calendrier. Ici, le mode précis utilise le VRAI
- * calendrier de l'OS (`DatePicker` SwiftUI `graphical` sur iOS, Material 3
- * sur Android, via `@expo/ui` — doctrine A207), qu'on ne peut pas repeindre.
- * Le mode flexible affiche donc la fenêtre EN TOUTES LETTRES sous les
- * raccourcis : un raccourci qui ne dit pas ce qu'il couvre demande à
- * l'utilisateur de deviner. On y gagne un calendrier natif plutôt qu'une
- * grille maison.
+ * Le calendrier reste AFFICHÉ dans les deux modes (comme le site) : en
+ * flexible, les raccourcis s'ajoutent au-dessus et la fenêtre choisie se
+ * PEINT dans la grille — c'est ce qui rend « 3 prochains mois » concret.
+ * Toucher un jour repasse en mode précis : le geste parle plus fort que
+ * l'onglet.
  *
- * Les modules par plateforme sont chargés PARESSEUSEMENT (`require` dans la
- * branche) : importer le paquet jetpack-compose sur iOS, et inversement,
- * enregistrerait les vues natives de l'autre OS.
+ * Le `DatePicker` de `@expo/ui` (doctrine A207) est abandonné ici — voir
+ * l'en-tête de `components/search-calendar.tsx` pour les trois raisons.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
 
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
+import { SearchCalendar } from '@/components/search-calendar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDayMonth } from '@/lib/trip-format';
 import {
   FLEX_TYPES,
   makeExact,
   makeFlex,
   rangeLabel,
-  startOfDay,
   type DateMode,
   type FlexType,
   type SearchDate,
@@ -51,9 +47,10 @@ import { getSearchDraft, setSearchDraft } from '@/lib/search-draft';
 export default function DateSearchScreen() {
   const t = useTranslations('search');
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
 
-  const initial = getSearchDraft().date;
+  const [initial] = useState(() => getSearchDraft().date);
   const [mode, setMode] = useState<DateMode>(initial?.mode ?? 'exact');
   const [value, setValue] = useState<SearchDate | null>(initial);
 
@@ -65,14 +62,16 @@ export default function DateSearchScreen() {
     [locale]
   );
 
-  const pickExact = useCallback((day: Date) => {
+  // Toucher un jour, c'est choisir une date précise — même quand on venait
+  // de l'onglet flexible (le geste du site, à l'identique).
+  const pickDay = useCallback((day: Date) => {
     setMode('exact');
     setValue(makeExact(day));
   }, []);
 
-  /** Revenir au mode précis OUBLIE la fenêtre flexible : sans cela, l'écran
-   *  montrerait un calendrier vide et « Appliquer » enverrait quand même
-   *  « Cette semaine » — l'écran doit dire ce qu'il va faire. */
+  /** Revenir au mode précis OUBLIE la fenêtre flexible : sans cela, le
+   *  calendrier n'afficherait plus rien de sélectionné alors qu'« Appliquer »
+   *  enverrait encore « Cette semaine ». */
   const backToExact = useCallback(() => {
     setMode('exact');
     setValue((current) => (current?.mode === 'flex' ? null : current));
@@ -83,26 +82,28 @@ export default function DateSearchScreen() {
     router.back();
   }, [value]);
 
-  const clear = useCallback(() => {
-    setSearchDraft({ date: null });
-    router.back();
-  }, []);
-
   const window = value !== null ? rangeLabel(value, locale) : null;
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-            <Ionicons name="chevron-back" size={24} color={theme.text} />
+      {/* Bord BAS compris : « Appliquer » ne doit pas toucher la barre
+          gestuelle (iPhone) ni la barre de navigation (Android). */}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+        <View style={[styles.header, { borderBottomColor: theme.backgroundElement }]}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            style={styles.back}>
+            <Ionicons name="chevron-back" size={26} color={theme.text} />
           </Pressable>
-          <ThemedText type="smallBold">{t('date.title')}</ThemedText>
-          <View style={styles.back} />
+          <ThemedText type="subtitle" style={styles.title}>
+            {t('date.title')}
+          </ThemedText>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* Les deux modes du web, en sélecteur segmenté. */}
+        <View style={styles.body}>
+          {/* Les deux modes du site, en sélecteur segmenté. */}
           <View style={[styles.segments, { backgroundColor: theme.backgroundElement }]}>
             {(['exact', 'flex'] as const).map((key) => {
               const active = key === mode;
@@ -121,7 +122,7 @@ export default function DateSearchScreen() {
             })}
           </View>
 
-          {mode === 'flex' ? (
+          {mode === 'flex' && (
             <View style={styles.flexBlock}>
               <View style={styles.chips}>
                 {FLEX_TYPES.map((flexType) => {
@@ -136,15 +137,16 @@ export default function DateSearchScreen() {
                         styles.chip,
                         pressed && styles.pressed,
                         active
-                          ? {
-                              backgroundColor: 'rgba(255,153,0,0.15)',
-                              borderColor: 'rgba(255,153,0,0.5)',
-                            }
-                          : { backgroundColor: theme.backgroundElement, borderColor: 'transparent' },
+                          ? { backgroundColor: Brand.mango, borderColor: Brand.mango }
+                          : {
+                              backgroundColor: theme.backgroundElement,
+                              borderColor: 'transparent',
+                            },
                       ]}>
                       <ThemedText
                         type="smallBold"
-                        themeColor={active ? 'text' : 'textSecondary'}>
+                        style={active ? styles.chipActiveLabel : undefined}
+                        themeColor={active ? undefined : 'textSecondary'}>
                         {t(`date.${flexType}`)}
                       </ThemedText>
                     </Pressable>
@@ -152,32 +154,26 @@ export default function DateSearchScreen() {
                 })}
               </View>
               {window !== null && (
-                <ThemedText type="small" themeColor="textSecondary" style={styles.window}>
+                <ThemedText
+                  type="small"
+                  style={[styles.window, { color: dark ? '#FFB84D' : '#B45309' }]}>
                   {window}
                 </ThemedText>
               )}
             </View>
-          ) : (
-            <NativeCalendar
-              initial={value?.mode === 'exact' ? value.date : null}
-              onPickAction={pickExact}
-            />
           )}
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <Pressable onPress={clear} hitSlop={8} accessibilityRole="button">
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('date.clear')}
-            </ThemedText>
-          </Pressable>
+          <SearchCalendar value={value} onPickDayAction={pickDay} locale={locale} />
+        </View>
+
+        <View style={[styles.footer, { borderTopColor: theme.backgroundElement }]}>
           {/* Toujours ACTIF : la doctrine A209 réserve `disabled` au champ
-              unique à validité évidente — ici, « appliquer sans date » est un
+              unique à validité évidente — « appliquer sans date » est un
               geste légitime (toutes les dates). */}
           <Pressable
             onPress={apply}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.apply, pressed && styles.pressed]}>
+            style={({ pressed }) => [styles.apply, pressed && styles.applyPressed]}>
             <ThemedText type="smallBold" style={styles.applyLabel}>
               {t('date.apply')}
             </ThemedText>
@@ -185,96 +181,6 @@ export default function DateSearchScreen() {
         </View>
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-/* ── Le calendrier de l'OS, en ligne (pas en feuille) ────────────────────── */
-
-function NativeCalendar({
-  initial,
-  onPickAction,
-}: {
-  initial: Date | null;
-  onPickAction: (day: Date) => void;
-}) {
-  const t = useTranslations('search');
-  const theme = useTheme();
-  const locale = useLocale() as SupportedLocale;
-
-  if (Platform.OS === 'ios') {
-    const { Host, DatePicker } = require('@expo/ui/swift-ui') as typeof import('@expo/ui/swift-ui');
-    const { datePickerStyle } =
-      require('@expo/ui/swift-ui/modifiers') as typeof import('@expo/ui/swift-ui/modifiers');
-    return (
-      <View style={styles.calendar}>
-        <Host matchContents>
-          <DatePicker
-            selection={initial ?? new Date()}
-            displayedComponents={['date']}
-            range={{ start: startOfDay(new Date()) }}
-            onDateChange={onPickAction}
-            modifiers={[datePickerStyle('graphical')]}
-          />
-        </Host>
-      </View>
-    );
-  }
-
-  // Android : le dialogue Material 3 ne s'intègre pas en ligne — un bouton
-  // l'ouvre, et la date choisie s'affiche sous lui.
-  return (
-    <AndroidCalendar
-      initial={initial}
-      onPickAction={onPickAction}
-      t={t}
-      theme={theme}
-      locale={locale}
-    />
-  );
-}
-
-function AndroidCalendar({
-  initial,
-  onPickAction,
-  t,
-  theme,
-  locale,
-}: {
-  initial: Date | null;
-  onPickAction: (day: Date) => void;
-  t: ReturnType<typeof useTranslations<'search'>>;
-  theme: ReturnType<typeof useTheme>;
-  locale: SupportedLocale;
-}) {
-  const [open, setOpen] = useState(false);
-  const { DateTimePicker } = require('@expo/ui/jetpack-compose') as typeof import('@expo/ui/jetpack-compose');
-
-  return (
-    <View style={styles.calendar}>
-      <Pressable
-        onPress={() => setOpen(true)}
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.androidTrigger,
-          { backgroundColor: theme.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        <ThemedText>
-          {initial !== null ? formatDayMonth(initial, locale) : t('form.datePlaceholder')}
-        </ThemedText>
-      </Pressable>
-      {open && (
-        <DateTimePicker
-          initialDate={(initial ?? new Date()).toISOString()}
-          onDateSelected={(date: Date) => {
-            onPickAction(date);
-            setOpen(false);
-          }}
-          displayedComponents="date"
-          variant="picker"
-        />
-      )}
-    </View>
   );
 }
 
@@ -287,21 +193,26 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.three,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   back: {
-    width: 32,
+    marginLeft: -Spacing.one,
   },
-  scroll: {
-    gap: Spacing.four,
-    paddingBottom: Spacing.four,
+  title: {
+    fontSize: 20,
+  },
+  body: {
+    flex: 1,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
   },
   segments: {
     flexDirection: 'row',
@@ -312,54 +223,52 @@ const styles = StyleSheet.create({
   segment: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.one,
+    justifyContent: 'center',
+    paddingVertical: 10,
     borderRadius: 999,
   },
   flexBlock: {
+    paddingTop: Spacing.three,
     gap: Spacing.two,
   },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  window: {
-    paddingLeft: Spacing.one,
-  },
-  calendar: {
-    alignItems: 'center',
-  },
-  androidTrigger: {
-    borderRadius: 22,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    alignSelf: 'stretch',
-    alignItems: 'center',
+  },
+  chipActiveLabel: {
+    color: '#0B0B0C',
+  },
+  window: {
+    paddingLeft: 2,
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   apply: {
-    flex: 1,
-    backgroundColor: Brand.mango,
-    borderRadius: Spacing.two,
-    paddingVertical: Spacing.two,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.mango,
+  },
+  applyPressed: {
+    backgroundColor: '#F08700',
   },
   applyLabel: {
-    color: '#1A1205',
+    color: '#0B0B0C',
+    fontSize: 15,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
 });

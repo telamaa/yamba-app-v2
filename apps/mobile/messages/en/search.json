@@ -6,7 +6,6 @@
     "toPlaceholder": "Arrival city",
     "dateLabel": "Date",
     "datePlaceholder": "Pick a date",
-    "dateClear": "Clear the date",
     "submit": "Search"
   },
   "title": {
@@ -73,5 +72,11 @@
     "next3Months": "Next 3 months",
     "apply": "Apply",
     "clear": "Clear"
+  },
+  "edit": {
+    "title": "Edit search",
+    "cancel": "Cancel",
+    "clearAll": "Clear all",
+    "swap": "Swap origin and destination"
   }
 }

@@ -94,6 +94,22 @@ export function formatDayMonth(date: Date, locale: SupportedLocale = 'fr'): stri
   return locale === 'fr' ? `${date.getDate()} ${month}` : `${month} ${date.getDate()}`;
 }
 
+/** « Octobre 2026 » / « October 2026 » — le titre d'un mois de calendrier. */
+export function formatMonthYear(date: Date, locale: SupportedLocale = 'fr'): string {
+  const month = locale === 'fr' ? FR_MONTHS[date.getMonth()] : EN_MONTHS[date.getMonth()];
+  const capitalised = month.charAt(0).toUpperCase() + month.slice(1);
+  return `${capitalised} ${date.getFullYear()}`;
+}
+
+/** L'en-tête des colonnes d'un calendrier, dans l'ordre de la semaine locale
+ *  (`weekStartsOn` : lundi en FR, dimanche en EN). Deux lettres, comme le web. */
+export function weekdayLabels(weekStartsOn: 0 | 1, locale: SupportedLocale = 'fr'): string[] {
+  const source = locale === 'fr' ? FR_DAYS : EN_DAYS;
+  return Array.from({ length: 7 }, (_, index) =>
+    source[(index + weekStartsOn) % 7].slice(0, 2).toUpperCase()
+  );
+}
+
 export function formatMemberSince(iso: string | null, locale: SupportedLocale = 'fr'): string {
   if (!iso) return '';
   const d = new Date(iso);

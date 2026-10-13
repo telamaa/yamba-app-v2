@@ -78,10 +78,14 @@ export default function RootLayout() {
             {/* La fiche trajet se pousse PAR-DESSUS les onglets (pas dedans) :
                 le retour ramène aux résultats, la barre reste celle du groupe. */}
             <Stack.Screen name="trip/[id]" />
-            {/* Poussées depuis Explorer : le motif natif des deux OS — une
-                page dédiée par champ, pas une feuille modale (A210 bis). */}
-            <Stack.Screen name="search/city" />
-            <Stack.Screen name="search/date" />
+            {/* L'éditeur de recherche (feuille « Modifier la recherche » +
+                ses pages ville/date) : UNE pile par-dessus les résultats,
+                en modale TRANSPARENTE — la feuille laisse voir la liste
+                dessous, ses étapes suivantes sont des pages pleines. */}
+            <Stack.Screen
+              name="search"
+              options={{ presentation: 'transparentModal', animation: 'none' }}
+            />
             {/* Profil n'est plus un onglet (A210) : il se pousse par-dessus. */}
             <Stack.Screen name="profile" />
           </Stack>
