@@ -145,6 +145,7 @@ export default function DateSearchScreen() {
                       ]}>
                       <ThemedText
                         type="smallBold"
+                        numberOfLines={1}
                         style={active ? styles.chipActiveLabel : undefined}
                         themeColor={active ? undefined : 'textSecondary'}>
                         {t(`date.${flexType}`)}
@@ -231,15 +232,20 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     gap: Spacing.two,
   },
+  // LES TROIS SUR UNE LIGNE (réf. capture 13/10 22h24) : pas de `flexWrap`
+  // — « 3 prochains mois » repassait dessous. Largeurs NATURELLES (comme le
+  // site) et non un tiers chacune : « Ce mois » n'a pas besoin de la place
+  // de « 3 prochains mois ». Le `flexShrink` + `numberOfLines` sont le
+  // garde-fou des très petits écrans et des grandes tailles de texte.
   chips: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   chip: {
+    flexShrink: 1,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: 10,
     paddingVertical: Spacing.two,
   },
   chipActiveLabel: {

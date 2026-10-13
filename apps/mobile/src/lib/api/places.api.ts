@@ -1,96 +1,65 @@
 /**
- * places.api.ts — l'autocomplétion de villes (lot recherche-first).
- * =================================================================
- * Le MIROIR du canal web : le site charge le SDK JS Google dans le
- * navigateur avec la clé publique `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` ; ici,
- * pas de DOM, donc l'API REST « Places (New) » avec la clé publique
- * `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` — même modèle de confiance (clé
- * restreinte côté console Google : referrer pour le web, bundle/empreinte
- * pour l'app). Mêmes réglages que `CityAutocomplete` du site : 2 caractères
- * minimum, types `locality` + `airport`, jeton de session (la facturation
- * Google groupe les frappes d'une même saisie), langue de l'écran.
- * Sans clé ou en cas d'échec, le champ reste une saisie LIBRE —
- * l'autocomplétion est un confort, jamais un préalable. Mais le résultat
- * DISTINGUE « zéro ville ne correspond » de « le service ne répond pas » :
- * un tableau vide dans les deux cas faisait dire « Aucune ville trouvée »
- * à un écran qui n'avait tout simplement pas pu demander (diagnostic du
- * 13/10 : la clé de la racine appartient à un projet Google SANS
- * FACTURATION, toutes les API répondent 403 — l'écran accusait la ville).
- * Et toute panne est TRACÉE en développement : une erreur avalée en
- * silence est une erreur qu'on ne corrige jamais.
+ * places.api.ts — l'autocomplétion de villes, par NOTRE API (A211).
+ * ==================================================================
+ * `GET /places/autocomplete` (gateway → trip-service). L'app n'appelle plus
+ * Google directement et n'embarque plus aucune clé.
+ *
+ * Pourquoi ce virage (diagnostic du 13/10) : une clé Google utilisable par
+ * une app mobile devrait voyager DANS le bundle, donc être extractible et
+ * facturable par n'importe qui — et une clé restreinte par referer, comme
+ * celle du site, est de toute façon REFUSÉE à un `fetch` natif, qui n'envoie
+ * pas de referer (`API_KEY_HTTP_REFERRER_BLOCKED`). La clé vit maintenant
+ * côté serveur, la limitation de débit est la nôtre, et le serveur met les
+ * frappes populaires en cache 5 minutes.
+ *
+ * Le `sessionToken` reste fabriqué ICI et relayé tel quel : seul le client
+ * sait quand une saisie commence et finit, et c'est ce jeton qui groupe la
+ * facturation Google.
+ *
+ * Le résultat DISTINGUE « zéro ville ne correspond » (200, liste vide) de
+ * « le service ne répond pas » (503 `PLACES_UNAVAILABLE`, ou réseau mort) :
+ * sans cette distinction, l'écran accusait la saisie d'une panne de service.
  */
+import { ApiError, apiFetch } from './client';
+
 export type CitySuggestion = {
   /** La ville seule (« Paris ») — ce qui part dans la recherche. */
   main: string;
-  /** Le contexte (« France ») — affiché en second. */
+  /** Le contexte (« France », « Texas, États-Unis ») — affiché en second. */
   secondary: string;
 };
 
-const ENDPOINT = 'https://places.googleapis.com/v1/places:autocomplete';
-// Huit, comme le site (`CityAutocomplete`, `preds.slice(0, 8)`).
-const MAX_SUGGESTIONS = 8;
-
-type AutocompleteResponse = {
-  suggestions?: {
-    placePrediction?: {
-      text?: { text?: string };
-      structuredFormat?: {
-        mainText?: { text?: string };
-        secondaryText?: { text?: string };
-      };
-    };
-  }[];
-};
-
-/** `unavailable` : pas de clé, réseau coupé, ou refus de Google. */
+/** `unavailable` : réseau coupé, relais muet, ou Google en refus. */
 export type CitySuggestResult =
   | { status: 'ok'; items: CitySuggestion[] }
   | { status: 'unavailable' };
 
-function unavailable(reason: string, detail?: unknown): CitySuggestResult {
-  if (__DEV__) console.warn('[places] suggestions indisponibles :', reason, detail ?? '');
-  return { status: 'unavailable' };
-}
+const MIN_CHARS = 2;
 
 export async function suggestCities(
   input: string,
   locale: string,
   sessionToken: string
 ): Promise<CitySuggestResult> {
-  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const term = input.trim();
-  if (!apiKey) return unavailable('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY absente du bundle');
-  if (term.length < 2) return { status: 'ok', items: [] };
+  if (term.length < MIN_CHARS) return { status: 'ok', items: [] };
+
+  const query = new URLSearchParams({ input: term, language: locale, sessionToken });
   try {
-    const response = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
-      body: JSON.stringify({
-        input: term,
-        includedPrimaryTypes: ['locality', 'airport'],
-        languageCode: locale,
-        sessionToken,
-      }),
-    });
-    if (!response.ok) {
-      // Le corps porte le VRAI motif (clé restreinte par referer, facturation
-      // désactivée, API non activée) : sans lui, le défaut est indiagnosticable.
-      return unavailable(`HTTP ${response.status}`, await response.text().catch(() => ''));
-    }
-    const data = (await response.json()) as AutocompleteResponse;
-    const items = (data.suggestions ?? [])
-      .map((s) => ({
-        main:
-          s.placePrediction?.structuredFormat?.mainText?.text ??
-          s.placePrediction?.text?.text ??
-          '',
-        secondary: s.placePrediction?.structuredFormat?.secondaryText?.text ?? '',
-      }))
-      .filter((s) => s.main.length > 0)
-      .slice(0, MAX_SUGGESTIONS);
-    return { status: 'ok', items };
+    const page = await apiFetch<{ suggestions: CitySuggestion[] }>(
+      `/places/autocomplete?${query.toString()}`,
+      // Visiteur comme membre : la recherche est publique, un 401 ne doit
+      // pas déclencher de cycle de rafraîchissement pour une suggestion.
+      { requireAuth: false }
+    );
+    return { status: 'ok', items: page.suggestions };
   } catch (error) {
-    return unavailable('réseau', error);
+    if (__DEV__) {
+      const detail =
+        error instanceof ApiError ? `${error.status} ${error.code ?? ''}` : String(error);
+      console.warn('[places] suggestions indisponibles :', detail);
+    }
+    return { status: 'unavailable' };
   }
 }
 
@@ -104,8 +73,8 @@ export async function suggestCities(
  * Le contexte de Google peut porter plusieurs segments (« Route de
  * l'Aéroport, Tillé ») : seul le DERNIER est un pays, c'est la règle du
  * site. Divergence assumée : le site replie sur « France » quand le pays
- * est omis (son SDK est chargé avec `region=FR`) ; l'API REST d'ici n'a pas
- * ce biais, un contexte vide reste donc vide plutôt que d'inventer un pays.
+ * est omis (son SDK est chargé avec `region=FR`) ; notre relais n'a pas ce
+ * biais, un contexte vide reste donc vide plutôt que d'inventer un pays.
  */
 export function placeLabel(suggestion: CitySuggestion): string {
   const country = suggestion.secondary
