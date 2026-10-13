@@ -78,5 +78,9 @@
     "cancel": "Annuler",
     "clearAll": "Tout effacer",
     "swap": "Inverser le départ et la destination"
+  },
+  "city": {
+    "clear": "Effacer la saisie",
+    "noResult": "Aucune ville trouvée"
   }
 }

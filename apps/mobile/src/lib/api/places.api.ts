@@ -20,7 +20,8 @@ export type CitySuggestion = {
 };
 
 const ENDPOINT = 'https://places.googleapis.com/v1/places:autocomplete';
-const MAX_SUGGESTIONS = 5;
+// Huit, comme le site (`CityAutocomplete`, `preds.slice(0, 8)`).
+const MAX_SUGGESTIONS = 8;
 
 type AutocompleteResponse = {
   suggestions?: {
@@ -68,4 +69,27 @@ export async function suggestCities(
   } catch {
     return [];
   }
+}
+
+/**
+ * « Paris » + « France » → « Paris, France ». Le libellé NORMALISÉ que le
+ * serveur attend : `placeSearchTerm` (trip-service) ne garde que le premier
+ * segment avant la virgule, le pays n'est qu'une aide à la lecture
+ * (WEB-ACC-9 — sans cette règle, toute ville étrangère choisie dans la
+ * liste rendait zéro résultat).
+ *
+ * Le contexte de Google peut porter plusieurs segments (« Route de
+ * l'Aéroport, Tillé ») : seul le DERNIER est un pays, c'est la règle du
+ * site. Divergence assumée : le site replie sur « France » quand le pays
+ * est omis (son SDK est chargé avec `region=FR`) ; l'API REST d'ici n'a pas
+ * ce biais, un contexte vide reste donc vide plutôt que d'inventer un pays.
+ */
+export function placeLabel(suggestion: CitySuggestion): string {
+  const country = suggestion.secondary
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .pop();
+  if (!country || country === suggestion.main) return suggestion.main;
+  return `${suggestion.main}, ${country}`;
 }

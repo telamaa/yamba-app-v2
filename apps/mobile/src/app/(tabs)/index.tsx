@@ -48,6 +48,7 @@ import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/the
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { dateBounds, summaryLabel, type SearchDate } from '@/lib/search-date';
+import { cityLabel } from '@/lib/trip-format';
 import { getSearchDraft, setSearchDraft, subscribeSearchDraft } from '@/lib/search-draft';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -345,7 +346,11 @@ export default function SearchScreen() {
   const hasTo = to.trim().length > 0;
   // Barre récap (miroir web, MobileSearchExperience mode « summary ») : les
   // libellés Départ/Destination servent de placeholders dans la route.
-  const summaryRoute = `${from.trim() || t('form.fromLabel')} → ${to.trim() || t('form.toLabel')}`;
+  // Ville SEULE dans le résumé : l'autocomplétion enregistre « Paris,
+  // France » (ce que le serveur attend), illisible dans une pilule.
+  const summaryRoute = `${from.trim() ? cityLabel(from) : t('form.fromLabel')} → ${
+    to.trim() ? cityLabel(to) : t('form.toLabel')
+  }`;
   // « Cette semaine » plutôt que « 13 – 19 octobre » : un raccourci se nomme
   // par l'intention choisie, pas par ses bornes.
   const summaryDate = summaryLabel(date, locale, {
@@ -359,11 +364,11 @@ export default function SearchScreen() {
   // Titre dynamique de la page de résultats (miroir de SearchResultsView).
   const dynamicTitle =
     hasFrom && hasTo
-      ? t('title.fromTo', { from: from.trim(), to: to.trim() })
+      ? t('title.fromTo', { from: cityLabel(from), to: cityLabel(to) })
       : hasFrom
-        ? t('title.fromOnly', { from: from.trim() })
+        ? t('title.fromOnly', { from: cityLabel(from) })
         : hasTo
-          ? t('title.toOnly', { to: to.trim() })
+          ? t('title.toOnly', { to: cityLabel(to) })
           : date !== null
             ? t('title.dateOnly', { date: summaryDate })
             : t('title.noFilter');

@@ -22,6 +22,7 @@
  * l'appel serveur (il porte les pastilles, le tri et la pagination).
  */
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import {
@@ -30,6 +31,7 @@ import {
   Dimensions,
   Easing,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -54,6 +56,16 @@ import {
   swapSearchDraft,
 } from '@/lib/search-draft';
 
+/** Le FOND derrière la feuille. iOS floute vraiment ce qui est dessous
+ *  (`UIVisualEffectView` traverse une modale transparente) : matériau
+ *  « thick », le plus opaque de la famille — la liste doit devenir une
+ *  texture, pas rester lisible. Android ne sait pas flouter à travers une
+ *  fenêtre (le `blurTarget` d'expo-blur vit dans UNE hiérarchie de vues,
+ *  l'en-tête collant d'Explorer en est la preuve) : il reçoit un voile plus
+ *  dense, qui obtient le même RÉSULTAT — l'arrière-plan s'efface. */
+const BLUR_INTENSITY = Platform.OS === 'ios' ? 72 : 0;
+const VEIL_OPACITY = Platform.OS === 'ios' ? 0.35 : 0.62;
+
 const OPEN_MS = 320;
 const CLOSE_MS = 220;
 /** Au-delà, le geste est une FERMETURE (la moitié de la feuille, ou un jeté
@@ -64,6 +76,7 @@ const DISMISS_VELOCITY = 0.8;
 export default function SearchEditSheet() {
   const t = useTranslations('search');
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
   const insets = useSafeAreaInsets();
 
@@ -166,8 +179,21 @@ export default function SearchEditSheet() {
 
   return (
     <View style={styles.root}>
-      {/* Le voile : il ferme au toucher, comme toute feuille native. */}
-      <Animated.View style={[StyleSheet.absoluteFill, styles.veil, { opacity: veil }]}>
+      {/* Le fond : flou + voile, et il ferme au toucher comme toute feuille
+          native. L'opacité (pilotée par le driver natif) anime l'ensemble —
+          l'`intensity` d'expo-blur, elle, n'est pas animable nativement. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: veil }]}>
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          intensity={BLUR_INTENSITY}
+          tint={dark ? 'systemThickMaterialDark' : 'systemThickMaterialLight'}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: `rgba(2,6,23,${VEIL_OPACITY})` },
+          ]}
+        />
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
@@ -341,9 +367,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
-  },
-  veil: {
-    backgroundColor: 'rgba(2,6,23,0.55)',
   },
   sheetWrapper: {
     width: '100%',

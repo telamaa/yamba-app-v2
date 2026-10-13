@@ -7,23 +7,32 @@
  * loupe : l'écran entier EST le champ, le clavier est déjà levé — c'est la
  * sobriété des écrans de recherche natifs (Maps, Uber, Booking).
  *
- * Le champ visé arrive en paramètre de route (`field=from|to`) ; le choix
- * repart par le brouillon partagé (`search-draft.ts`) — une page poussée ne
- * retourne pas de valeur.
+ * L'autocomplétion est celle du site, RÈGLE POUR RÈGLE
+ * (`components/search/CityAutocomplete.tsx`) :
+ *   • 2 caractères minimum, anti-rebond de 220 ms, 8 propositions au plus ;
+ *   • jeton de session neuf PAR OUVERTURE (facturation Google) ;
+ *   • une réponse en retard est jetée (la frappe qui l'a demandée est
+ *     comparée à la frappe courante) ;
+ *   • chaque ligne montre le nom en gras et son contexte en second ;
+ *   • le choix est normalisé en « **Ville, Pays** » — c'est CE libellé que
+ *     le serveur attend : `placeSearchTerm` (trip-service) ne garde que le
+ *     premier segment avant la virgule, le pays n'est qu'une aide à la
+ *     lecture (WEB-ACC-9 : sans cette règle, toute ville étrangère choisie
+ *     dans la liste rendait zéro résultat).
  *
- * Les suggestions viennent de l'API REST Places (`places.api.ts`, le canal
- * miroir du web) : 2 caractères minimum, anti-rebond de 250 ms, une réponse
- * en retard est jetée, et un jeton de session neuf PAR OUVERTURE (la
- * convention de facturation de Google).
+ * Seule divergence assumée avec le site : lui replie sur « France » quand
+ * Google omet le pays, parce que son SDK est chargé avec `region=FR` ;
+ * l'API REST d'ici n'a pas ce biais, donc un contexte vide reste vide
+ * plutôt que d'inventer un pays.
  *
- * Sans clé ou API muette, la page reste une saisie LIBRE : « OK » au clavier
- * valide le texte tapé. L'autocomplétion est un confort, jamais un préalable
- * (A207).
+ * Sans clé ou API muette, la page reste une saisie LIBRE : la touche de
+ * recherche du clavier valide le texte tapé. L'autocomplétion est un
+ * confort, jamais un préalable (A207).
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -32,10 +41,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { suggestCities, type CitySuggestion } from '@/lib/api/places.api';
+import { placeLabel, suggestCities, type CitySuggestion } from '@/lib/api/places.api';
 import { getSearchDraft, setSearchDraft } from '@/lib/search-draft';
 
-const DEBOUNCE_MS = 250;
+const DEBOUNCE_MS = 220;
 const MIN_CHARS = 2;
 
 function newSessionToken(): string {
@@ -52,6 +61,7 @@ export default function CitySearchScreen() {
 
   const [query, setQuery] = useState(() => getSearchDraft()[target]);
   const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
   const sessionToken = useRef(newSessionToken());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // La frappe qui a déclenché la requête : une réponse en retard est jetée.
@@ -71,11 +81,15 @@ export default function CitySearchScreen() {
       if (timer.current !== null) clearTimeout(timer.current);
       if (text.trim().length < MIN_CHARS) {
         setSuggestions([]);
+        setLoading(false);
         return;
       }
+      setLoading(true);
       timer.current = setTimeout(() => {
         void suggestCities(text, locale, sessionToken.current).then((items) => {
-          if (queryAt.current === text) setSuggestions(items);
+          if (queryAt.current !== text) return;
+          setSuggestions(items);
+          setLoading(false);
         });
       }, DEBOUNCE_MS);
     },
@@ -92,6 +106,7 @@ export default function CitySearchScreen() {
 
   const label = target === 'to' ? t('form.toLabel') : t('form.fromLabel');
   const placeholder = target === 'to' ? t('form.toPlaceholder') : t('form.fromPlaceholder');
+  const typing = query.trim().length >= MIN_CHARS;
 
   return (
     <ThemedView style={styles.container}>
@@ -124,19 +139,20 @@ export default function CitySearchScreen() {
             onChangeText={onChange}
             returnKeyType="search"
             onSubmitEditing={() => commit(query)}
-            clearButtonMode="while-editing"
             accessibilityLabel={label}
           />
-          {/* iOS fournit sa croix d'effacement (`clearButtonMode`), Android
-              non : sans celle-ci, corriger une ville se ferait touche par
-              touche. */}
-          {Platform.OS !== 'ios' && query.length > 0 && (
+          {/* Le site montre un rouage de chargement puis une croix : une
+              croix NATIVE (`clearButtonMode`) n'existerait que sur iOS. */}
+          {loading && <ActivityIndicator size="small" color={theme.textSecondary} />}
+          {!loading && query.length > 0 && (
             <Pressable
               onPress={() => onChange('')}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel={t('edit.clearAll')}>
-              <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+              accessibilityLabel={t('city.clear')}>
+              <View style={[styles.clear, { backgroundColor: theme.backgroundElement }]}>
+                <Ionicons name="close" size={12} color={theme.textSecondary} />
+              </View>
             </Pressable>
           )}
         </View>
@@ -147,22 +163,38 @@ export default function CitySearchScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => (
+            <View style={[styles.rowSeparator, { backgroundColor: theme.backgroundElement }]} />
+          )}
+          ListEmptyComponent={
+            // Rien tant qu'on n'a pas assez tapé : un écran vide invite à
+            // écrire, un message d'erreur accuserait l'utilisateur.
+            typing && !loading ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.noResult}>
+                {t('city.noResult')}
+              </ThemedText>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => commit(item.main)}
+              onPress={() => commit(placeLabel(item))}
               accessibilityRole="button"
+              accessibilityLabel={placeLabel(item)}
               style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
               <View style={[styles.pin, { backgroundColor: theme.backgroundElement }]}>
                 <Ionicons name="location-outline" size={16} color={theme.textSecondary} />
               </View>
               <View style={styles.suggestionTexts}>
-                <ThemedText numberOfLines={1}>{item.main}</ThemedText>
+                <ThemedText type="smallBold" style={styles.suggestionMain} numberOfLines={1}>
+                  {item.main}
+                </ThemedText>
                 {item.secondary.length > 0 && (
                   <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                     {item.secondary}
                   </ThemedText>
                 )}
               </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.backgroundSelected} />
             </Pressable>
           )}
         />
@@ -208,14 +240,28 @@ const styles = StyleSheet.create({
     fontSize: 17,
     paddingVertical: 0,
   },
+  clear: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   list: {
     paddingHorizontal: Spacing.four,
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 36 + Spacing.three,
+  },
+  noResult: {
+    paddingTop: Spacing.three,
   },
   suggestion: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.three,
   },
   pin: {
     width: 36,
@@ -227,6 +273,10 @@ const styles = StyleSheet.create({
   suggestionTexts: {
     flex: 1,
     gap: 1,
+  },
+  suggestionMain: {
+    fontSize: 15,
+    lineHeight: 20,
   },
   pressed: {
     opacity: 0.6,

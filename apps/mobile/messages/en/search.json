@@ -78,5 +78,9 @@
     "cancel": "Cancel",
     "clearAll": "Clear all",
     "swap": "Swap origin and destination"
+  },
+  "city": {
+    "clear": "Clear the field",
+    "noResult": "No city found"
   }
 }

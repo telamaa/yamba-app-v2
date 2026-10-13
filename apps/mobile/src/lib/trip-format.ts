@@ -94,6 +94,17 @@ export function formatDayMonth(date: Date, locale: SupportedLocale = 'fr'): stri
   return locale === 'fr' ? `${date.getDate()} ${month}` : `${month} ${date.getDate()}`;
 }
 
+/**
+ * « Paris, France » → « Paris ». L'autocomplétion enregistre « Ville, Pays »
+ * (ce que le serveur attend, cf. `place-text.ts`), mais un RÉSUMÉ — la
+ * pilule de recherche, le titre des résultats — n'a de place que pour la
+ * ville. La précision reste visible dans les champs de l'éditeur.
+ */
+export function cityLabel(value: string): string {
+  const first = value.split(',')[0]?.trim() ?? '';
+  return first.length > 0 ? first : value.trim();
+}
+
 /** « Octobre 2026 » / « October 2026 » — le titre d'un mois de calendrier. */
 export function formatMonthYear(date: Date, locale: SupportedLocale = 'fr'): string {
   const month = locale === 'fr' ? FR_MONTHS[date.getMonth()] : EN_MONTHS[date.getMonth()];
