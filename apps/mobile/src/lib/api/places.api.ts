@@ -9,8 +9,15 @@
  * pour l'app). Mêmes réglages que `CityAutocomplete` du site : 2 caractères
  * minimum, types `locality` + `airport`, jeton de session (la facturation
  * Google groupe les frappes d'une même saisie), langue de l'écran.
- * Sans clé ou en cas d'échec : TABLEAU VIDE — le champ reste une saisie
- * libre, l'autocomplétion est un confort, jamais un préalable.
+ * Sans clé ou en cas d'échec, le champ reste une saisie LIBRE —
+ * l'autocomplétion est un confort, jamais un préalable. Mais le résultat
+ * DISTINGUE « zéro ville ne correspond » de « le service ne répond pas » :
+ * un tableau vide dans les deux cas faisait dire « Aucune ville trouvée »
+ * à un écran qui n'avait tout simplement pas pu demander (diagnostic du
+ * 13/10 : la clé de la racine appartient à un projet Google SANS
+ * FACTURATION, toutes les API répondent 403 — l'écran accusait la ville).
+ * Et toute panne est TRACÉE en développement : une erreur avalée en
+ * silence est une erreur qu'on ne corrige jamais.
  */
 export type CitySuggestion = {
   /** La ville seule (« Paris ») — ce qui part dans la recherche. */
@@ -35,14 +42,25 @@ type AutocompleteResponse = {
   }[];
 };
 
+/** `unavailable` : pas de clé, réseau coupé, ou refus de Google. */
+export type CitySuggestResult =
+  | { status: 'ok'; items: CitySuggestion[] }
+  | { status: 'unavailable' };
+
+function unavailable(reason: string, detail?: unknown): CitySuggestResult {
+  if (__DEV__) console.warn('[places] suggestions indisponibles :', reason, detail ?? '');
+  return { status: 'unavailable' };
+}
+
 export async function suggestCities(
   input: string,
   locale: string,
   sessionToken: string
-): Promise<CitySuggestion[]> {
+): Promise<CitySuggestResult> {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   const term = input.trim();
-  if (!apiKey || term.length < 2) return [];
+  if (!apiKey) return unavailable('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY absente du bundle');
+  if (term.length < 2) return { status: 'ok', items: [] };
   try {
     const response = await fetch(ENDPOINT, {
       method: 'POST',
@@ -54,9 +72,13 @@ export async function suggestCities(
         sessionToken,
       }),
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      // Le corps porte le VRAI motif (clé restreinte par referer, facturation
+      // désactivée, API non activée) : sans lui, le défaut est indiagnosticable.
+      return unavailable(`HTTP ${response.status}`, await response.text().catch(() => ''));
+    }
     const data = (await response.json()) as AutocompleteResponse;
-    return (data.suggestions ?? [])
+    const items = (data.suggestions ?? [])
       .map((s) => ({
         main:
           s.placePrediction?.structuredFormat?.mainText?.text ??
@@ -66,8 +88,9 @@ export async function suggestCities(
       }))
       .filter((s) => s.main.length > 0)
       .slice(0, MAX_SUGGESTIONS);
-  } catch {
-    return [];
+    return { status: 'ok', items };
+  } catch (error) {
+    return unavailable('réseau', error);
   }
 }
 

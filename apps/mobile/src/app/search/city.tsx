@@ -27,7 +27,9 @@
  *
  * Sans clé ou API muette, la page reste une saisie LIBRE : la touche de
  * recherche du clavier valide le texte tapé. L'autocomplétion est un
- * confort, jamais un préalable (A207).
+ * confort, jamais un préalable (A207) — et l'écran le DIT (« suggestions
+ * indisponibles »), au lieu de prétendre qu'aucune ville ne correspond :
+ * accuser la saisie d'une panne de service est un mensonge d'interface.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -62,6 +64,7 @@ export default function CitySearchScreen() {
   const [query, setQuery] = useState(() => getSearchDraft()[target]);
   const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [available, setAvailable] = useState(true);
   const sessionToken = useRef(newSessionToken());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // La frappe qui a déclenché la requête : une réponse en retard est jetée.
@@ -86,9 +89,10 @@ export default function CitySearchScreen() {
       }
       setLoading(true);
       timer.current = setTimeout(() => {
-        void suggestCities(text, locale, sessionToken.current).then((items) => {
+        void suggestCities(text, locale, sessionToken.current).then((result) => {
           if (queryAt.current !== text) return;
-          setSuggestions(items);
+          setAvailable(result.status === 'ok');
+          setSuggestions(result.status === 'ok' ? result.items : []);
           setLoading(false);
         });
       }, DEBOUNCE_MS);
@@ -168,10 +172,12 @@ export default function CitySearchScreen() {
           )}
           ListEmptyComponent={
             // Rien tant qu'on n'a pas assez tapé : un écran vide invite à
-            // écrire, un message d'erreur accuserait l'utilisateur.
+            // écrire. Ensuite, DEUX messages distincts — « aucune ville »
+            // parle de la saisie, « indisponibles » parle du service, et
+            // rappelle que la recherche marche quand même au texte tapé.
             typing && !loading ? (
               <ThemedText type="small" themeColor="textSecondary" style={styles.noResult}>
-                {t('city.noResult')}
+                {available ? t('city.noResult') : t('city.unavailable')}
               </ThemedText>
             ) : null
           }

@@ -81,6 +81,7 @@
   },
   "city": {
     "clear": "Clear the field",
-    "noResult": "No city found"
+    "noResult": "No city found",
+    "unavailable": "Suggestions unavailable — type the city, search still works"
   }
 }

@@ -81,6 +81,7 @@
   },
   "city": {
     "clear": "Effacer la saisie",
-    "noResult": "Aucune ville trouvée"
+    "noResult": "Aucune ville trouvée",
+    "unavailable": "Suggestions indisponibles — tape la ville, la recherche fonctionne quand même"
   }
 }
