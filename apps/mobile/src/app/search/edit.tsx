@@ -56,15 +56,18 @@ import {
   swapSearchDraft,
 } from '@/lib/search-draft';
 
-/** Le FOND derrière la feuille. iOS floute vraiment ce qui est dessous
+/** Le FOND derrière la feuille — DOSÉ : les résultats doivent rester
+ *  reconnaissables (on ajuste une recherche qu'on a sous les yeux), juste
+ *  repoussés au second plan. iOS floute vraiment ce qui est dessous
  *  (`UIVisualEffectView` traverse une modale transparente) : matériau
- *  « thick », le plus opaque de la famille — la liste doit devenir une
- *  texture, pas rester lisible. Android ne sait pas flouter à travers une
- *  fenêtre (le `blurTarget` d'expo-blur vit dans UNE hiérarchie de vues,
- *  l'en-tête collant d'Explorer en est la preuve) : il reçoit un voile plus
- *  dense, qui obtient le même RÉSULTAT — l'arrière-plan s'efface. */
-const BLUR_INTENSITY = Platform.OS === 'ios' ? 72 : 0;
-const VEIL_OPACITY = Platform.OS === 'ios' ? 0.35 : 0.62;
+ *  « thin », le plus léger qui tienne encore, à intensité moyenne et sous
+ *  un voile discret. Un matériau « thick » à 72 effaçait la liste — trop.
+ *  Android ne sait pas flouter à travers une fenêtre (le `blurTarget`
+ *  d'expo-blur vit dans UNE hiérarchie de vues, l'en-tête collant
+ *  d'Explorer en est la preuve) : seul son voile recule l'arrière-plan,
+ *  donc il est un peu plus dense — sans jamais le masquer. */
+const BLUR_INTENSITY = Platform.OS === 'ios' ? 32 : 0;
+const VEIL_OPACITY = Platform.OS === 'ios' ? 0.18 : 0.42;
 
 const OPEN_MS = 320;
 const CLOSE_MS = 220;
@@ -186,7 +189,7 @@ export default function SearchEditSheet() {
         <BlurView
           style={StyleSheet.absoluteFill}
           intensity={BLUR_INTENSITY}
-          tint={dark ? 'systemThickMaterialDark' : 'systemThickMaterialLight'}
+          tint={dark ? 'systemThinMaterialDark' : 'systemThinMaterialLight'}
         />
         <View
           style={[
