@@ -53,6 +53,53 @@ export function formatPriceShort(
   }
 }
 
+/* ── Empreinte évitée (miroir de `public-trip.helpers.ts`) ──────────────── */
+
+/** Distance à vol d'oiseau, en kilomètres (Haversine). */
+export function calculateDistanceKm(
+  lat1: number | null,
+  lng1: number | null,
+  lat2: number | null,
+  lng2: number | null
+): number | null {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  const R = 6371;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Grammes de CO₂ par kilo transporté et par kilomètre, en FRET EXPRESS —
+ *  la référence que l'envoi par Voyageur évite. Mêmes valeurs que le site. */
+const FREIGHT_EMISSION_G_PER_KG_PER_KM: Record<string, number> = {
+  PLANE: 600,
+  TRAIN: 30,
+  CAR: 80,
+};
+
+/**
+ * CO₂ évité vs fret express POUR UN COLIS de `weightKg` (2 kg par défaut,
+ * la référence de la recherche). Le facteur étant en g/kg/km, oublier le
+ * poids annoncerait l'émission d'UN kilo comme celle du colis.
+ */
+export function calculateCO2SavedKg(
+  transportMode: string | null,
+  origin: { lat: number | null; lng: number | null },
+  destination: { lat: number | null; lng: number | null },
+  weightKg = 2
+): number | null {
+  if (!transportMode) return null;
+  const factor = FREIGHT_EMISSION_G_PER_KG_PER_KM[transportMode];
+  if (factor === undefined) return null;
+  const distanceKm = calculateDistanceKm(origin.lat, origin.lng, destination.lat, destination.lng);
+  if (distanceKm === null) return null;
+  return (factor * distanceKm * Math.max(weightKg, 0.5)) / 1000;
+}
+
 /* ── Dates ───────────────────────────────────────────────────────────────── */
 
 const FR_MONTHS = [

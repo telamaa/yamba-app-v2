@@ -70,8 +70,8 @@
     }
   },
   "locations": {
-    "pickupTitle": "Handover spots",
-    "deliveryTitle": "Delivery spots",
+    "pickupTitle": "Pickup",
+    "deliveryTitle": "Delivery",
     "kind": {
       "AIRPORT": "At the airport",
       "TRAIN_STATION": "At the train station",
@@ -81,7 +81,9 @@
       "EXACT": "Exact spot",
       "CITY_WIDE": "Whole city",
       "RADIUS": "Within {km} km"
-    }
+    },
+    "title": "Pickup & delivery places",
+    "subtitle": "Where to meet the Traveler for pickup and delivery"
   },
   "conditions": {
     "title": "Conditions",
@@ -103,7 +105,6 @@
   "notes": {
     "title": "Traveler's notes"
   },
-  "bookingSoon": "Booking from the app arrives in an upcoming batch.",
   "notFound": {
     "title": "Trip not found",
     "body": "This trip doesn't exist or is no longer available."
@@ -111,5 +112,55 @@
   "error": {
     "network": "We couldn't load this trip. Check your connection and try again.",
     "retry": "Retry"
+  },
+  "favorite": {
+    "add": "Add to favourites",
+    "remove": "Remove from favourites",
+    "ownTrip": "This is your own trip: you can't add it to favourites.",
+    "notFavoritable": "This trip can no longer be added to favourites.",
+    "error": "The favourite couldn't be saved. Please try again."
+  },
+  "co2": {
+    "prefix": "Shipping with no extra footprint ·",
+    "amount": "{kg} kg of CO₂ saved vs express freight",
+    "suffix": "for a {weight} kg parcel"
+  },
+  "chat": {
+    "cta": "Chat with {firstName}",
+    "soon": "Coming soon"
+  },
+  "bar": {
+    "from": "From",
+    "soon": "Booking coming soon"
+  },
+  "report": {
+    "title": {
+      "TRIP": "Report this listing",
+      "USER": "Report this profile"
+    },
+    "intro": "Tell us what's wrong. Our team reviews every report; the person concerned will never know who reported them.",
+    "reason": "Reason",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Illegal or prohibited content",
+      "SCAM": "Suspected scam",
+      "INAPPROPRIATE": "Inappropriate behaviour",
+      "IMPERSONATION": "Impersonation",
+      "OTHER": "Other"
+    },
+    "reasonMissing": "Pick a reason first.",
+    "details": "Details (optional)",
+    "detailsPlaceholder": "What you saw, when…",
+    "submit": "Send the report",
+    "cancel": "Cancel",
+    "back": "Close",
+    "done": "Thank you, your report has been received.",
+    "doneHint": "A confirmation email has been sent. We don't share the outcome.",
+    "already": "You already reported this; our team is on it.",
+    "ownTarget": "You can't report your own content.",
+    "failed": "The report couldn't be sent. Please try again.",
+    "notFound": "This item cannot be found: it no longer exists or is no longer visible.",
+    "gateTitle": "Sign in to report",
+    "gateSubtitle": "A report is always signed: it protects everyone from abuse.",
+    "signIn": "Sign in"
   }
 }

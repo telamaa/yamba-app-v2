@@ -70,8 +70,8 @@
     }
   },
   "locations": {
-    "pickupTitle": "Lieux de remise",
-    "deliveryTitle": "Lieux de livraison",
+    "pickupTitle": "Remise",
+    "deliveryTitle": "Livraison",
     "kind": {
       "AIRPORT": "À l'aéroport",
       "TRAIN_STATION": "À la gare",
@@ -81,7 +81,9 @@
       "EXACT": "Lieu exact",
       "CITY_WIDE": "Ville entière",
       "RADIUS": "Rayon {km} km"
-    }
+    },
+    "title": "Lieux de remise & livraison",
+    "subtitle": "Où retrouver le Voyageur pour la remise et la livraison"
   },
   "conditions": {
     "title": "Conditions",
@@ -103,7 +105,6 @@
   "notes": {
     "title": "Notes du Voyageur"
   },
-  "bookingSoon": "La réservation depuis l’app arrive dans un prochain lot.",
   "notFound": {
     "title": "Trajet introuvable",
     "body": "Ce trajet n'existe pas ou n'est plus disponible."
@@ -111,5 +112,55 @@
   "error": {
     "network": "Impossible de charger ce trajet. Vérifie ta connexion et réessaie.",
     "retry": "Réessayer"
+  },
+  "favorite": {
+    "add": "Ajouter aux favoris",
+    "remove": "Retirer des favoris",
+    "ownTrip": "C'est ton trajet : tu ne peux pas le mettre en favori.",
+    "notFavoritable": "Ce trajet ne peut plus être mis en favori.",
+    "error": "Le favori n'a pas pu être enregistré. Réessaie."
+  },
+  "co2": {
+    "prefix": "Envoi sans empreinte additionnelle ·",
+    "amount": "{kg} kg de CO₂ évités vs fret express",
+    "suffix": "pour un colis de {weight} kg"
+  },
+  "chat": {
+    "cta": "Discuter avec {firstName}",
+    "soon": "Bientôt disponible"
+  },
+  "bar": {
+    "from": "À partir de",
+    "soon": "Bientôt réservable"
+  },
+  "report": {
+    "title": {
+      "TRIP": "Signaler cette annonce",
+      "USER": "Signaler ce profil"
+    },
+    "intro": "Dis-nous ce qui ne va pas. Notre équipe regarde chaque signalement ; la personne concernée ne saura jamais qui l'a signalée.",
+    "reason": "Motif",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Contenu illicite ou interdit",
+      "SCAM": "Arnaque suspectée",
+      "INAPPROPRIATE": "Comportement inapproprié",
+      "IMPERSONATION": "Usurpation d'identité",
+      "OTHER": "Autre"
+    },
+    "reasonMissing": "Choisis d'abord un motif.",
+    "details": "Précisions (facultatif)",
+    "detailsPlaceholder": "Ce que tu as vu, quand…",
+    "submit": "Envoyer le signalement",
+    "cancel": "Annuler",
+    "back": "Fermer",
+    "done": "Merci, ton signalement est bien reçu.",
+    "doneHint": "Un email de confirmation t'a été envoyé. Nous ne communiquons pas la suite donnée.",
+    "already": "Tu as déjà signalé cet élément, notre équipe s'en occupe.",
+    "ownTarget": "Tu ne peux pas signaler ton propre contenu.",
+    "failed": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "notFound": "Cet élément est introuvable : il n'existe plus ou n'est plus visible.",
+    "gateTitle": "Connecte-toi pour signaler",
+    "gateSubtitle": "Un signalement est toujours signé : cela protège tout le monde des abus.",
+    "signIn": "Se connecter"
   }
 }
