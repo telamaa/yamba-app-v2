@@ -27,15 +27,10 @@
   },
   "offer": {
     "title": "Ce que tu peux envoyer avec {firstName}",
-    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifie ci-dessous que ton type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
     "perKg": "Prix au kilo",
     "available": "Disponible",
-    "estimateLabel": "Estimation pour un colis de {kg} kg",
-    "allIn": "tout compris (transport + service Yamba)",
     "finalAtBooking": "Le prix définitif est fixé à la réservation.",
     "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids.",
-    "families": "Familles de colis",
-    "refused": "Refusé par le Voyageur",
     "surcharge": "+{pct} %",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papiers",
@@ -47,13 +42,14 @@
       "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires & divers"
     },
-    "bags": "Bagage entier — forfait",
     "checkedBag": "Bagage en soute 23 kg",
-    "cabinBag": "Bagage cabine 12 kg"
+    "cabinBag": "Bagage cabine 12 kg",
+    "estimateShort": "≈ {price} pour un colis de {kg} kg, tout compris",
+    "priceDetails": "Détails du prix",
+    "refusedFamilies": "Familles refusées"
   },
   "categories": {
     "title": "Ce que propose {firstName}",
-    "hint": "Une réservation = un colis d'une seule catégorie. Pour envoyer plusieurs colis, fais une réservation par colis.",
     "label": {
       "CLOTHES": "Vêtements",
       "SHOES": "Chaussures",
@@ -82,8 +78,7 @@
       "CITY_WIDE": "Ville entière",
       "RADIUS": "Rayon {km} km"
     },
-    "title": "Lieux de remise & livraison",
-    "subtitle": "Où retrouver le Voyageur pour la remise et la livraison"
+    "title": "Lieux de remise & livraison"
   },
   "conditions": {
     "title": "Conditions",
@@ -124,10 +119,6 @@
     "prefix": "Envoi sans empreinte additionnelle ·",
     "amount": "{kg} kg de CO₂ évités vs fret express",
     "suffix": "pour un colis de {weight} kg"
-  },
-  "chat": {
-    "cta": "Discuter avec {firstName}",
-    "soon": "Bientôt disponible"
   },
   "bar": {
     "from": "À partir de",

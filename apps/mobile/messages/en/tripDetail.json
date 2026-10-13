@@ -27,15 +27,10 @@
   },
   "offer": {
     "title": "What you can send with {firstName}",
-    "hint": "One price per kg, whatever the content. Check below that your parcel type is accepted: some carry a surcharge, some are refused.",
     "perKg": "Price per kg",
     "available": "Available",
-    "estimateLabel": "Estimate for a {kg} kg parcel",
-    "allIn": "all-in (transport + Yamba service)",
     "finalAtBooking": "The final price is set at booking.",
     "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum, whatever the weight.",
-    "families": "Parcel families",
-    "refused": "Refused by the Traveler",
     "surcharge": "+{pct}%",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papers",
@@ -47,13 +42,14 @@
       "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Accessories & misc."
     },
-    "bags": "Whole bag — flat rate",
     "checkedBag": "Checked bag 23 kg",
-    "cabinBag": "Cabin bag 12 kg"
+    "cabinBag": "Cabin bag 12 kg",
+    "estimateShort": "≈ {price} for a {kg} kg parcel, all in",
+    "priceDetails": "Price details",
+    "refusedFamilies": "Refused families"
   },
   "categories": {
     "title": "What {firstName} offers",
-    "hint": "One booking = one parcel from a single category. To send multiple parcels, make a booking per parcel.",
     "label": {
       "CLOTHES": "Clothes",
       "SHOES": "Shoes",
@@ -82,8 +78,7 @@
       "CITY_WIDE": "Whole city",
       "RADIUS": "Within {km} km"
     },
-    "title": "Pickup & delivery places",
-    "subtitle": "Where to meet the Traveler for pickup and delivery"
+    "title": "Pickup & delivery places"
   },
   "conditions": {
     "title": "Conditions",
@@ -124,10 +119,6 @@
     "prefix": "Shipping with no extra footprint ·",
     "amount": "{kg} kg of CO₂ saved vs express freight",
     "suffix": "for a {weight} kg parcel"
-  },
-  "chat": {
-    "cta": "Chat with {firstName}",
-    "soon": "Coming soon"
   },
   "bar": {
     "from": "From",
