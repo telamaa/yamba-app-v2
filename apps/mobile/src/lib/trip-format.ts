@@ -83,6 +83,17 @@ export function formatLongDate(iso: string | null, locale: SupportedLocale = 'fr
     : `${weekday} ${month} ${day}, ${year}`;
 }
 
+/**
+ * « 13 octobre » / « October 13 » — le jour sans l'année, pour les bornes de
+ * recherche. MÊMES tables que le reste du fichier : jamais `toLocaleDateString`,
+ * dont les données dépendent du moteur (Hermes) et de l'OS.
+ */
+export function formatDayMonth(date: Date, locale: SupportedLocale = 'fr'): string {
+  if (isNaN(date.getTime())) return '';
+  const month = locale === 'fr' ? FR_MONTHS[date.getMonth()] : EN_MONTHS[date.getMonth()];
+  return locale === 'fr' ? `${date.getDate()} ${month}` : `${month} ${date.getDate()}`;
+}
+
 export function formatMemberSince(iso: string | null, locale: SupportedLocale = 'fr'): string {
   if (!iso) return '';
   const d = new Date(iso);

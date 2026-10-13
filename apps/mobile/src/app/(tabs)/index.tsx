@@ -5,7 +5,9 @@
  * Accueil a disparu, la croix de l'écran de bienvenue et la connexion
  * atterrissent ICI. Le formulaire est la carte du site en natif : Départ /
  * Destination / Date empilés avec leurs libellés, la date par le VRAI
- * sélecteur de chaque OS (`NativeDateField`), un seul bouton. Après une
+ * sélecteur de chaque OS, un seul bouton. Les trois champs s'ouvrent en
+ * PAGES poussées (`/search/city?field=…`, `/search/date`) — le motif natif
+ * des deux OS, pas une feuille modale. Après une
  * recherche, la carte se REPLIE en pilule récap (route · date · Modifier) —
  * l'écran respire pour les résultats. En mode résultats, la pilule et les
  * pastilles transport RESTENT collées en haut sur un fond flouté (expo-blur :
@@ -18,7 +20,8 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { BlurTargetView, BlurView } from 'expo-blur';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -37,8 +40,6 @@ import { useLocale, useTranslations } from 'use-intl';
 
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
-import { CityPicker } from '@/components/city-picker';
-import { NativeDateField } from '@/components/native-date-field';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -46,6 +47,8 @@ import { TripResultCard } from '@/components/trip-result-card';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { dateBounds, summaryLabel, type SearchDate } from '@/lib/search-date';
+import { getSearchDraft, setSearchDraft, subscribeSearchDraft } from '@/lib/search-draft';
 import { ApiError } from '@/lib/api/client';
 import {
   getSearchFacets,
@@ -57,7 +60,6 @@ import {
   type SearchTransportFilter,
   type TripSearchResult,
 } from '@/lib/api/search.api';
-import { formatLongDate } from '@/lib/trip-format';
 import { consumeBrowseOnLanding } from '@/lib/welcome-state';
 
 const PAGE_SIZE = 20;
@@ -83,12 +85,6 @@ function deriveCorridors(trips: TripSearchResult[]): Corridor[] {
 }
 
 /** Le jour choisi, en bornes serveur : du minuit local au minuit suivant. */
-function dayBounds(day: Date): { dateFrom: string; dateTo: string } {
-  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-}
-
 type SearchState =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -120,12 +116,15 @@ export default function SearchScreen() {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [date, setDate] = useState<Date | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Départ, destination et date se choisissent dans des PAGES poussées
+  // (`/search/city`, `/search/date`) : une page ne retourne pas de valeur,
+  // elle écrit dans le brouillon partagé et cet écran s'y abonne.
+  const draft = useSyncExternalStore(subscribeSearchDraft, getSearchDraft, getSearchDraft);
+  const { from, to, date } = draft;
+  const setFrom = useCallback((value: string) => setSearchDraft({ from: value }), []);
+  const setTo = useCallback((value: string) => setSearchDraft({ to: value }), []);
+  const setDate = useCallback((value: SearchDate | null) => setSearchDraft({ date: value }), []);
   // Quel champ ville est en saisie plein écran (motif natif, réf. captures).
-  const [cityPicker, setCityPicker] = useState<'from' | 'to' | null>(null);
   const [formCollapsed, setFormCollapsed] = useState(false);
   const [state, setState] = useState<SearchState>({ kind: 'idle' });
   // Pastille transport active + tri (serveur) — persistent d'une recherche à l'autre.
@@ -165,13 +164,13 @@ export default function SearchScreen() {
     (
       nextFrom: string,
       nextTo: string,
-      nextDate: Date | null,
+      nextDate: SearchDate | null,
       nextMode: SearchTransportFilter,
       nextSort: SearchSort
     ): SearchParams => ({
       from: nextFrom.trim() || undefined,
       to: nextTo.trim() || undefined,
-      ...(nextDate !== null ? dayBounds(nextDate) : {}),
+      ...(nextDate !== null ? dateBounds(nextDate) : {}),
       mode: nextMode,
       sort: nextSort,
       limit: PAGE_SIZE,
@@ -342,8 +341,16 @@ export default function SearchScreen() {
   // Barre récap (miroir web, MobileSearchExperience mode « summary ») : les
   // libellés Départ/Destination servent de placeholders dans la route.
   const summaryRoute = `${from.trim() || t('form.fromLabel')} → ${to.trim() || t('form.toLabel')}`;
-  const summaryDate =
-    date !== null ? formatLongDate(date.toISOString(), locale) : t('form.datePlaceholder');
+  // « Cette semaine » plutôt que « 13 – 19 octobre » : un raccourci se nomme
+  // par l'intention choisie, pas par ses bornes.
+  const summaryDate = summaryLabel(date, locale, {
+    any: t('form.datePlaceholder'),
+    flex: {
+      thisWeek: t('date.thisWeek'),
+      thisMonth: t('date.thisMonth'),
+      next3Months: t('date.next3Months'),
+    },
+  });
   // Titre dynamique de la page de résultats (miroir de SearchResultsView).
   const dynamicTitle =
     hasFrom && hasTo
@@ -353,7 +360,7 @@ export default function SearchScreen() {
         : hasTo
           ? t('title.toOnly', { to: to.trim() })
           : date !== null
-            ? t('title.dateOnly', { date: formatLongDate(date.toISOString(), locale) })
+            ? t('title.dateOnly', { date: summaryDate })
             : t('title.noFilter');
   const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
 
@@ -385,7 +392,7 @@ export default function SearchScreen() {
     </View>
   ) : (
     <ThemedView type="backgroundElement" style={styles.form}>
-      <Pressable style={styles.fieldRow} onPress={() => setCityPicker('from')}>
+      <Pressable style={styles.fieldRow} onPress={() => router.push('/search/city?field=from')}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
           {t('form.fromLabel')}
         </ThemedText>
@@ -397,7 +404,7 @@ export default function SearchScreen() {
         </ThemedText>
       </Pressable>
       <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
-      <Pressable style={styles.fieldRow} onPress={() => setCityPicker('to')}>
+      <Pressable style={styles.fieldRow} onPress={() => router.push('/search/city?field=to')}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
           {t('form.toLabel')}
         </ThemedText>
@@ -410,16 +417,14 @@ export default function SearchScreen() {
       </Pressable>
       <View style={[styles.separator, { backgroundColor: theme.backgroundSelected }]} />
       <View style={styles.dateRow}>
-        <Pressable style={styles.dateTouch} onPress={() => setPickerOpen(true)}>
+        <Pressable style={styles.dateTouch} onPress={() => router.push('/search/date')}>
           <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
             {t('form.dateLabel')}
           </ThemedText>
           <ThemedText
             style={styles.dateValue}
             themeColor={date !== null ? undefined : 'textSecondary'}>
-            {date !== null
-              ? formatLongDate(date.toISOString(), locale)
-              : t('form.datePlaceholder')}
+            {summaryDate}
           </ThemedText>
         </Pressable>
         {date !== null && (
@@ -688,29 +693,6 @@ export default function SearchScreen() {
             )}
           </View>
         )}
-
-        <CityPicker
-          visible={cityPicker !== null}
-          label={cityPicker === 'to' ? t('form.toLabel') : t('form.fromLabel')}
-          placeholder={cityPicker === 'to' ? t('form.toPlaceholder') : t('form.fromPlaceholder')}
-          initialValue={cityPicker === 'to' ? to : from}
-          onPickAction={(city) => {
-            if (cityPicker === 'to') setTo(city);
-            else setFrom(city);
-            setCityPicker(null);
-          }}
-          onCloseAction={() => setCityPicker(null)}
-        />
-
-        <NativeDateField
-          visible={pickerOpen}
-          initialDate={date}
-          onPickAction={(picked) => {
-            setDate(picked);
-            setPickerOpen(false);
-          }}
-          onDismissAction={() => setPickerOpen(false)}
-        />
 
         {/* Feuille « Filtres » : le tri serveur pour l'instant — les familles,
             le poids et les horaires suivront avec le formulaire de filtres. */}

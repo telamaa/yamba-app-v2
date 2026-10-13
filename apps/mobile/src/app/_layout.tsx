@@ -78,6 +78,12 @@ export default function RootLayout() {
             {/* La fiche trajet se pousse PAR-DESSUS les onglets (pas dedans) :
                 le retour ramène aux résultats, la barre reste celle du groupe. */}
             <Stack.Screen name="trip/[id]" />
+            {/* Poussées depuis Explorer : le motif natif des deux OS — une
+                page dédiée par champ, pas une feuille modale (A210 bis). */}
+            <Stack.Screen name="search/city" />
+            <Stack.Screen name="search/date" />
+            {/* Profil n'est plus un onglet (A210) : il se pousse par-dessus. */}
+            <Stack.Screen name="profile" />
           </Stack>
           {/* Après la pile : le splash peint PAR-DESSUS pendant l'amorçage. */}
           <LaunchGate />

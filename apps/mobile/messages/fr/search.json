@@ -6,10 +6,7 @@
     "toPlaceholder": "Ville d'arrivée",
     "dateLabel": "Date",
     "datePlaceholder": "Choisis une date",
-    "dateAny": "Toutes les dates",
     "dateClear": "Effacer la date",
-    "dateConfirm": "OK",
-    "cancel": "Annuler",
     "submit": "Rechercher"
   },
   "title": {
@@ -66,5 +63,15 @@
       "train": "Train",
       "car": "Voiture"
     }
+  },
+  "date": {
+    "title": "Quand pars-tu ?",
+    "exact": "Date précise",
+    "flex": "Je suis flexible",
+    "thisWeek": "Cette semaine",
+    "thisMonth": "Ce mois",
+    "next3Months": "3 prochains mois",
+    "apply": "Appliquer",
+    "clear": "Effacer"
   }
 }
