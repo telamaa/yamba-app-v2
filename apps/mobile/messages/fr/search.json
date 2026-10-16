@@ -9,13 +9,15 @@
     "submit": "Rechercher"
   },
   "title": {
-    "noFilter": "Tous les trajets disponibles",
     "fromTo": "Trajets pour {from} → {to}",
     "fromOnly": "Trajets au départ de {from}",
     "toOnly": "Trajets à destination de {to}",
     "dateOnly": "Trajets le {date}"
   },
-  "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle",
+  "recap": {
+    "anywhere": "Partout",
+    "anyDate": "Toutes les dates"
+  },
   "tabs": {
     "all": "Tout",
     "plane": "Avion",
@@ -24,6 +26,7 @@
   },
   "filters": {
     "title": "Filtres",
+    "active": "Filtres (actifs)",
     "sortBy": "Trier par",
     "earliest": "Départ le plus tôt",
     "lowestPrice": "Prix le plus bas",
@@ -47,6 +50,7 @@
   "card": {
     "fromPrice": "dès",
     "remainingKg": "{kg} kg dispo",
+    "exampleParcel": "≈ {price} pour {kg} kg",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
     "remainingSlots": "{count, plural, one {# place} other {# places}}",

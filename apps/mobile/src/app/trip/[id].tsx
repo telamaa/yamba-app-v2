@@ -59,6 +59,7 @@ import {
   formatTripDuration,
   getInitials,
   isPopular,
+  showsViews,
 } from '@/lib/trip-format';
 
 /** Les 8 familles D14, dans l'ordre du site, avec le pictogramme qui les
@@ -392,7 +393,9 @@ function Hero({ trip }: { trip: PublicTrip }) {
   const t = useTranslations('tripDetail');
   const theme = useTheme();
 
-  const views = typeof trip.viewsCount === 'number' && trip.viewsCount > 0 ? trip.viewsCount : null;
+  // Même seuil que la carte de résultat : un compteur ne s'allume que
+  // lorsqu'il rassure (cf. `showsViews`).
+  const views = showsViews(trip.viewsCount) ? trip.viewsCount : null;
 
   return (
     <View style={styles.hero}>

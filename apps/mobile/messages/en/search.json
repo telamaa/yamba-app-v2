@@ -9,13 +9,15 @@
     "submit": "Search"
   },
   "title": {
-    "noFilter": "All available trips",
     "fromTo": "Trips for {from} → {to}",
     "fromOnly": "Trips departing from {from}",
     "toOnly": "Trips to {to}",
     "dateOnly": "Trips on {date}"
   },
-  "subtitleHint": "Refine with origin and destination, or browse current offers",
+  "recap": {
+    "anywhere": "Anywhere",
+    "anyDate": "Any date"
+  },
   "tabs": {
     "all": "All",
     "plane": "Plane",
@@ -24,6 +26,7 @@
   },
   "filters": {
     "title": "Filters",
+    "active": "Filters (active)",
     "sortBy": "Sort by",
     "earliest": "Earliest departure",
     "lowestPrice": "Lowest price",
@@ -47,6 +50,7 @@
   "card": {
     "fromPrice": "from",
     "remainingKg": "{kg} kg left",
+    "exampleParcel": "≈ {price} for {kg} kg",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
     "remainingSlots": "{count, plural, one {# slot} other {# slots}}",

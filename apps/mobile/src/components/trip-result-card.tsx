@@ -6,14 +6,19 @@
  * transposition littérale de la carte web (trop chargée : 11 éléments) :
  * — en-tête : pastille transport · date · alerte places (≤ 3) · CŒUR (D46) ;
  * — la ROUTE en pleine largeur, en gras : « 🇫🇷 Paris → 🇨🇬 Brazzaville » —
- *   le pays devient un DRAPEAU (zéro ligne consommée, lève Congo/RDC), les
- *   villes longues passent à la ligne, jamais tronquées ;
- * — UNE ligne d'horaires : « 01:51 → 07:51⁺¹ · 7 h · Direct » ;
- * — le prix seul à droite, sans libellé (« /kg » suffit), les kg dispo en
- *   teal dessous (info de décision, gardée sur demande) ;
+ *   le pays devient un DRAPEAU (zéro ligne consommée, lève Congo/RDC) mais
+ *   SEULEMENT à l'international (16/10 : deux fois le même drapeau sur un
+ *   trajet intérieur n'apprend rien), les villes longues passent à la
+ *   ligne, jamais tronquées ;
+ * — DEUX lignes de trajet (16/10) : « 01:51 → 07:51⁺¹ », puis « 7 h ·
+ *   Direct » — quand, puis combien de temps ;
+ * — à droite : le prix au kilo, l'EXEMPLE honnête dessous (« ≈ 11 € pour
+ *   2 kg » — les planchers D32/D16 font qu'un petit colis ne coûte PAS son
+ *   poids × le kilo), les kg dispo en teal (info de décision) ;
  * — pied : avatar (photo/initiales, anneau mangue superTripper), « Prénom N.
- *   · ★ 4,8 (12) » ou « Nouveau Voyageur », badge vues (« Populaire » à 20,
- *   D5/C-PR6), chevron. Les mini-catégories vivent sur la fiche.
+ *   · ★ 4,8 (12) » ou « Nouveau Voyageur », badge vues (allumé à 15 vues,
+ *   « Populaire » à 20, D5/C-PR6), chevron. Les mini-catégories vivent sur
+ *   la fiche.
  * Que du VRAI (RG-MOB-1) : tout vient du DTO serveur. Le cœur bascule en
  * OPTIMISTE puis l'API tranche ; visiteur → feuille de connexion. La carte
  * OUVRE la fiche (`/trip/[id]`), vue comptée par le serveur.
@@ -35,8 +40,12 @@ import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { ApiError } from '@/lib/api/client';
 import type { TripSearchResult } from '@/lib/api/search.api';
 import { countryName } from '@/lib/country-name';
+import {
+  estimateShipperTotalCents,
+  PRICING_EXAMPLE_PARAMS,
+} from '@/lib/pricing-example';
 import { useSession } from '@/lib/session-context';
-import { getInitials, isPopular } from '@/lib/trip-format';
+import { getInitials, isPopular, showsViews } from '@/lib/trip-format';
 
 export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   const t = useTranslations('search');
@@ -79,8 +88,16 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
     }
   };
 
-  const fromFlag = flagEmoji(trip.fromCountryCode);
-  const toFlag = flagEmoji(trip.toCountryCode);
+  // Un drapeau gagne sa place quand il DISTINGUE (Paris → Brazzaville, où il
+  // lève en plus Congo/RDC). Sur un trajet intérieur, deux fois le même
+  // drapeau n'apprend rien et pousse les villes : on ne les montre qu'à
+  // l'international.
+  const international =
+    trip.fromCountryCode != null &&
+    trip.toCountryCode != null &&
+    trip.fromCountryCode.toUpperCase() !== trip.toCountryCode.toUpperCase();
+  const fromFlag = international ? flagEmoji(trip.fromCountryCode) : null;
+  const toFlag = international ? flagEmoji(trip.toCountryCode) : null;
   // Les drapeaux sont muets pour VoiceOver : la route parlée nomme les pays.
   const routeLabel = [
     countryName(trip.fromCountryCode, locale),
@@ -97,6 +114,18 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   const perKgPrice = trip.pricePerKg != null && trip.pricePerKg > 0 ? trip.pricePerKg : null;
   const duration =
     typeof trip.durationMinutes === 'number' ? formatDuration(trip.durationMinutes) : null;
+  // « 3,50 €/kg » n'est PAS ce que l'Expéditeur paie : sous le plancher de
+  // transport (8 €, D32) et avec le plancher de commission (3 €, D16), un
+  // colis de 2 kg coûte 11 € — le kilo ne devient vrai qu'au-delà de 2,29 kg.
+  // La fiche trajet montrait déjà l'exemple honnête ; la carte annonçait un
+  // prix sous-évalué de 57 %, et l'écart se découvrait juste avant de
+  // réserver. MÊME miroir que la fiche, projection INDICATIVE : le prix réel
+  // reste calculé et figé par le serveur (snapshot D17).
+  const exampleKg = PRICING_EXAMPLE_PARAMS.exampleWeightKg;
+  const exampleCents =
+    perKgPrice !== null
+      ? estimateShipperTotalCents(Math.round(perKgPrice * 100), exampleKg).totalCents
+      : null;
   const showRemainingAlert = typeof trip.remainingSlots === 'number' && trip.remainingSlots <= 3;
 
   return (
@@ -140,7 +169,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
               <Ionicons
                 name={favorite ? 'heart' : 'heart-outline'}
                 size={16}
-                color={favorite ? Brand.mango : theme.textSecondary}
+                color={favorite ? Brand.mango : accents.heartIcon}
               />
             </Pressable>
           </View>
@@ -156,6 +185,12 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
               {toFlag !== null && <ThemedText style={styles.flag}>{toFlag} </ThemedText>}
               {trip.toCity}
             </ThemedText>
+            {/* Les horaires d'abord, la QUALIFICATION du trajet ensuite :
+                « 17:00 → 18:15 · 1 h 15 · Direct » sur une seule ligne, c'est
+                trois informations de nature différente collées par des points
+                médians — l'œil ne sait plus où s'arrêter (retour du 16/10).
+                Deux lignes, deux questions : « quand ? » puis « combien de
+                temps, et direct ? » */}
             <ThemedText style={[styles.meta, { color: theme.textSecondary }]}>
               {trip.departureTime}
               {trip.arrivalTime != null && (
@@ -170,8 +205,9 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                   )}
                 </>
               )}
-              {duration !== null ? ` · ${duration}` : ''}
-              {' · '}
+            </ThemedText>
+            <ThemedText style={[styles.metaSecond, { color: theme.textSecondary }]}>
+              {duration !== null ? `${duration} · ` : ''}
               {trip.stopovers && trip.stopovers > 0
                 ? t('card.stopovers', { count: trip.stopovers })
                 : t('card.direct')}
@@ -188,6 +224,14 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                     /kg
                   </ThemedText>
                 </ThemedText>
+                {exampleCents !== null && (
+                  <ThemedText style={[styles.example, { color: theme.textSecondary }]}>
+                    {t('card.exampleParcel', {
+                      price: `${formatCents(exampleCents, locale)} ${currency}`,
+                      kg: exampleKg,
+                    })}
+                  </ThemedText>
+                )}
                 {trip.remainingKg != null && (
                   <ThemedText style={[styles.remainingKg, { color: theme.tint }]}>
                     {t('card.remainingKg', { kg: trip.remainingKg })}
@@ -236,7 +280,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
 
           <View style={styles.footerRight}>
             {/* D5 / C-PR6 — pastille « n vues », « Populaire » à partir de 20. */}
-            {typeof trip.viewsCount === 'number' && trip.viewsCount > 0 && (
+            {showsViews(trip.viewsCount) && (
               <View
                 style={[
                   styles.viewsPill,
@@ -320,6 +364,21 @@ function formatTwoDecimals(value: number, locale: string): string {
   }
 }
 
+/** Cents → « 11 » / « 20,50 » : les centimes ne s'écrivent que s'il y en a
+ *  (« 11,00 € » sous un prix au kilo fait du bruit pour rien). */
+function formatCents(cents: number, locale: string): string {
+  const value = cents / 100;
+  try {
+    return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    const fixed = cents % 100 === 0 ? String(value) : value.toFixed(2);
+    return locale === 'fr' ? fixed.replace('.', ',') : fixed;
+  }
+}
+
 /** « 4,8 » en français, "4.8" ailleurs. */
 function formatRating(rating: number, locale: string): string {
   const fixed = rating.toFixed(1);
@@ -341,20 +400,27 @@ const Accents = {
     viewsText: '#475569',
     heartBg: 'rgba(255,255,255,0.9)',
     heartRing: '#E2E8F0',
+    heartIcon: '#475569',
     footerBg: 'rgba(248,250,252,0.4)',
   },
   dark: {
     alertBg: 'rgba(69,10,10,0.4)',
     alertText: '#F87171',
     plusOne: '#FFB84D',
-    avatarBg: 'rgba(124,45,18,0.4)',
-    avatarText: '#FDBA74',
+    // 0,4 d'opacité sur fond de carte sombre donnait un brun éteint où les
+    // initiales se devinaient : la pastille doit se détacher de la carte.
+    avatarBg: 'rgba(154,52,18,0.85)',
+    avatarText: '#FFE3C4',
     popularBg: 'rgba(255,153,0,0.15)',
     popularText: '#FFB84D',
     viewsBg: '#2E3135',
     viewsText: '#CBD5E1',
-    heartBg: 'rgba(15,23,42,0.9)',
-    heartRing: '#334155',
+    // Idem : un contour fin gris sur un cercle plus sombre que la carte,
+    // c'est un geste qu'on ne voit pas. Le cercle s'éclaircit, l'anneau et
+    // le trait montent d'un cran.
+    heartBg: 'rgba(51,65,85,0.9)',
+    heartRing: '#64748B',
+    heartIcon: '#E2E8F0',
     footerBg: 'rgba(2,6,23,0.35)',
   },
 } as const;
@@ -446,6 +512,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontVariant: ['tabular-nums'],
   },
+  metaSecond: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 1,
+  },
   plusOne: {
     fontSize: 10,
     lineHeight: 18,
@@ -460,10 +531,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 13,
   },
+  // Le prix et la route portaient deux foyers concurrents sur la même ligne
+  // (18/700 contre 16/600) : c'est la ROUTE qui décide, le prix la qualifie.
+  // Même corps, plus de graisse — il reste le premier chiffre lu.
   price: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: 700,
+  },
+  example: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 500,
   },
   priceUnit: {
     fontSize: 11,

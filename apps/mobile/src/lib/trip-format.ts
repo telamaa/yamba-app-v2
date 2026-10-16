@@ -216,6 +216,15 @@ export const POPULAR_VIEWS = 20;
 export const isPopular = (viewsCount: number | null | undefined): boolean =>
   typeof viewsCount === 'number' && viewsCount >= POPULAR_VIEWS;
 
+/** Seuil d'ALLUMAGE du compteur de vues — pas une règle métier non plus.
+ *  Une pastille « 5 vues » ne rassure personne : elle dit « personne ne
+ *  regarde ça ». L'absence de badge est NEUTRE, un petit chiffre est
+ *  NÉGATIF — donc on ne l'allume qu'une fois le signal crédible, et il
+ *  devient « Populaire » à 20. */
+export const MIN_SHOWN_VIEWS = 15;
+export const showsViews = (viewsCount: number | null | undefined): viewsCount is number =>
+  typeof viewsCount === 'number' && viewsCount >= MIN_SHOWN_VIEWS;
+
 export function getInitials(firstName: string, lastInitial: string): string {
   const first = firstName?.charAt(0).toUpperCase() ?? '';
   return `${first}${lastInitial}`.trim() || '?';

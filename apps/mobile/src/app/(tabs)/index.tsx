@@ -100,15 +100,12 @@ type SearchState =
     };
 
 /** Les quatre pastilles transport, dans l'ordre du web (TransportModeTabs). */
-const TRANSPORT_TABS: Array<{
-  key: SearchTransportFilter;
-  icon: 'airplane-outline' | 'train-outline' | 'car-outline' | null;
-}> = [
-  { key: 'all', icon: null },
-  { key: 'plane', icon: 'airplane-outline' },
-  { key: 'train', icon: 'train-outline' },
-  { key: 'car', icon: 'car-outline' },
-];
+// Les pastilles ne portent plus d'icône de transport : le MOT la dit déjà
+// (« Avion », « Train », « Voiture »), et l'icône coûtait ~19 pt par pastille.
+// C'est ce qui faisait déborder la rangée et COUPER un mot au ras du bouton
+// « Filtres » (capture du 16/10 23h51 : « Tr »). Les icônes restent sur la
+// carte de résultat et la fiche, où elles ne sont pas redondantes.
+const TRANSPORT_TABS: SearchTransportFilter[] = ['all', 'plane', 'train', 'car'];
 
 const SORT_OPTIONS: SearchSort[] = ['earliest', 'lowestPrice', 'bestRated'];
 
@@ -344,24 +341,32 @@ export default function SearchScreen() {
 
   const hasFrom = from.trim().length > 0;
   const hasTo = to.trim().length > 0;
-  // Barre récap (miroir web, MobileSearchExperience mode « summary ») : les
-  // libellés Départ/Destination servent de placeholders dans la route.
+  // Barre récap : elle décrit un ÉTAT, jamais des libellés de champ. La
+  // version précédente empruntait « Départ → Destination » au formulaire —
+  // en gras, ça se lisait comme une route CHOISIE, et « Choisis une date »
+  // donnait un ORDRE dans un résumé. La recherche large se NOMME, comme
+  // A209/A210 l'ont gravé : « Partout · Toutes les dates ».
   // Ville SEULE dans le résumé : l'autocomplétion enregistre « Paris,
   // France » (ce que le serveur attend), illisible dans une pilule.
-  const summaryRoute = `${from.trim() ? cityLabel(from) : t('form.fromLabel')} → ${
-    to.trim() ? cityLabel(to) : t('form.toLabel')
-  }`;
+  const anywhere = t('recap.anywhere');
+  const summaryRoute =
+    hasFrom || hasTo
+      ? `${hasFrom ? cityLabel(from) : anywhere} → ${hasTo ? cityLabel(to) : anywhere}`
+      : anywhere;
   // « Cette semaine » plutôt que « 13 – 19 octobre » : un raccourci se nomme
   // par l'intention choisie, pas par ses bornes.
   const summaryDate = summaryLabel(date, locale, {
-    any: t('form.datePlaceholder'),
+    any: t('recap.anyDate'),
     flex: {
       thisWeek: t('date.thisWeek'),
       thisMonth: t('date.thisMonth'),
       next3Months: t('date.next3Months'),
     },
   });
-  // Titre dynamique de la page de résultats (miroir de SearchResultsView).
+  // Titre de la page de résultats : il NOMME la recherche, ou il n'existe
+  // pas. Le titre générique (« Tous les trajets disponibles ») a été purgé
+  // le 16/10 — la pastille « Tout » et la pilule « Partout » le disaient
+  // déjà, et il coûtait une ligne de 24 pt à chaque recherche large.
   const dynamicTitle =
     hasFrom && hasTo
       ? t('title.fromTo', { from: cityLabel(from), to: cityLabel(to) })
@@ -371,8 +376,11 @@ export default function SearchScreen() {
           ? t('title.toOnly', { to: cityLabel(to) })
           : date !== null
             ? t('title.dateOnly', { date: summaryDate })
-            : t('title.noFilter');
+            : null;
   const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
+  // Le bouton « Filtres » n'a plus de mot pour s'expliquer : il doit donc
+  // DIRE quand un filtre est posé — sinon un tri actif devient invisible.
+  const filtersActive = sort !== 'earliest';
 
   // La barre du haut : la pilule récap (elle OUVRE l'éditeur) et la pastille
   // de profil — partagée entre le flux normal et l'en-tête collant du mode
@@ -416,18 +424,23 @@ export default function SearchScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.tabsScroll}
         contentContainerStyle={styles.tabs}>
-      {TRANSPORT_TABS.map((tab) => {
-        const active = mode === tab.key;
+      {TRANSPORT_TABS.map((key) => {
+        const active = mode === key;
         const activeText = dark ? '#FFB84D' : theme.text;
+        const count = modeCounts[key];
         return (
           <Pressable
-            key={tab.key}
-            onPress={() => pickMode(tab.key)}
+            key={key}
+            onPress={() => pickMode(key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             style={({ pressed }) => [
               styles.tab,
               pressed && styles.pressed,
+              // Un mode SANS trajet reste tapable (c'est le chemin de sortie
+              // d'un filtre à zéro) mais s'efface : il ne doit pas avoir le
+              // même poids qu'un mode qui a de l'offre.
+              count === 0 && !active && styles.tabEmpty,
               active
                 ? {
                     backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
@@ -435,61 +448,41 @@ export default function SearchScreen() {
                   }
                 : { backgroundColor: theme.backgroundElement, borderColor: 'transparent' },
             ]}>
-            {tab.icon !== null && (
-              <Ionicons
-                name={tab.icon}
-                size={13}
-                color={active ? activeText : theme.textSecondary}
-              />
-            )}
             <ThemedText
               type="smallBold"
               style={{ color: active ? activeText : theme.textSecondary }}>
-              {t(`tabs.${tab.key}`)}
+              {t(`tabs.${key}`)}
             </ThemedText>
-            <View
+            {/* Le compte en TEXTE, plus en pastille dans la pastille : même
+                information, ~16 pt de moins par pastille. */}
+            <ThemedText
               style={[
                 styles.tabCount,
-                { backgroundColor: active ? 'rgba(255,153,0,0.2)' : theme.backgroundSelected },
+                { color: active ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary },
               ]}>
-              <ThemedText
-                style={[
-                  styles.tabCountText,
-                  { color: active ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary },
-                ]}>
-                {modeCounts[tab.key]}
-              </ThemedText>
-            </View>
+              {count}
+            </ThemedText>
           </Pressable>
         );
       })}
       </ScrollView>
-      {/* « Filtres » vit avec les filtres, épinglé HORS du défilement —
-          il ne disparaît jamais sous la droite de l'écran. */}
+      {/* « Filtres » vit avec les filtres, épinglé HORS du défilement — et
+          réduit à son ICÔNE : le mot coûtait ~50 pt sur une rangée qui
+          débordait déjà. Le point mangue dit qu'un filtre est posé, ce que
+          le mot ne disait pas davantage. */}
       <View style={[styles.filtersDivider, { backgroundColor: theme.backgroundSelected }]} />
       <Pressable
         onPress={() => setFiltersOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={t('filters.title')}
+        accessibilityLabel={filtersActive ? t('filters.active') : t('filters.title')}
         style={({ pressed }) => [
           styles.filtersButton,
           { backgroundColor: theme.backgroundElement },
           pressed && styles.pressed,
         ]}>
-        <Ionicons name="options-outline" size={13} color={theme.text} />
-        <ThemedText type="smallBold">{t('filters.title')}</ThemedText>
+        <Ionicons name="options-outline" size={18} color={theme.text} />
+        {filtersActive && <View style={[styles.filtersDot, { borderColor: theme.backgroundElement }]} />}
       </Pressable>
-    </View>
-  );
-
-  // Titre + sous-titre : eux DÉFILENT avec la liste (seuls la barre récap et
-  // les pastilles collent) — réf. capture 17h08 pour les textes.
-  const resultsTitle = (
-    <View style={styles.resultsHeader}>
-      <ThemedText type="subtitle">{dynamicTitle}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        {t('subtitleHint')}
-      </ThemedText>
     </View>
   );
 
@@ -507,11 +500,22 @@ export default function SearchScreen() {
                 data={state.page.trips}
                 keyExtractor={(trip) => trip.id}
                 renderItem={({ item }) => <TripResultCard trip={item} />}
+                // Le titre et le compte DÉFILENT avec la liste (seuls la
+                // barre récap et les pastilles collent). Deux coupes du
+                // 16/10, ~60 pt récupérés en haut d'un écran de 844 :
+                // le sous-titre « Affinez avec un départ… » (il expliquait
+                // UNE fois et coûtait deux lignes à CHAQUE recherche — et
+                // c'était le seul vouvoiement de l'app), et le titre
+                // générique, que la pastille « Tout » et la pilule
+                // « Partout » disaient déjà. Un titre qui NOMME la
+                // recherche reste : lui porte une information.
                 ListHeaderComponent={
                   state.page.trips.length > 0 ? (
-                    <View>
-                      {resultsTitle}
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.count}>
+                    <View style={styles.resultsHeader}>
+                      {dynamicTitle !== null && (
+                        <ThemedText type="subtitle">{dynamicTitle}</ThemedText>
+                      )}
+                      <ThemedText type="small" themeColor="textSecondary">
                         {t('results', { count: state.page.totalCount })}
                       </ThemedText>
                     </View>
@@ -752,18 +756,28 @@ const styles = StyleSheet.create({
   // et un rayon de 22 contre ~34 px et 999 pour les pastilles : deux
   // langages visuels dans une même rangée (capture du 11/10 22h19).
   filtersButton: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: Spacing.one,
+    justifyContent: 'center',
+    // Le carré de 36 est 3 pt plus haut qu'une pastille : la marge basse
+    // passe de 4 à 2 pour que la rangée garde exactement sa hauteur.
+    marginBottom: Spacing.half,
+  },
+  // Le point qui remplace le mot : un filtre posé doit se voir sans être lu.
+  filtersDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    backgroundColor: Brand.mango,
   },
   resultsHeader: {
-    gap: Spacing.one,
+    gap: Spacing.half,
     paddingBottom: Spacing.two,
   },
   tabsRow: {
@@ -784,7 +798,7 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingLeft: Spacing.four,
     paddingRight: Spacing.two,
     paddingBottom: Spacing.one,
@@ -801,19 +815,20 @@ const styles = StyleSheet.create({
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
   },
+  tabEmpty: {
+    opacity: 0.5,
+  },
   tabCount: {
-    minWidth: 20,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 700,
+    fontVariant: ['tabular-nums'],
   },
   sweepTrack: {
     height: 2,
@@ -824,12 +839,6 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: Brand.mango,
-  },
-  tabCountText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: 700,
-    fontVariant: ['tabular-nums'],
   },
   sheetBackdrop: {
     flex: 1,
@@ -922,9 +931,6 @@ const styles = StyleSheet.create({
   },
   spinner: {
     paddingTop: Spacing.four,
-  },
-  count: {
-    paddingBottom: Spacing.two,
   },
   list: {
     gap: Spacing.two,
