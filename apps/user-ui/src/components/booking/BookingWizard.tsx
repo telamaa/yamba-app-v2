@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
+import BookingExitDialog from "./BookingExitDialog";
+import { useBookingExit } from "./useBookingExit";
 // ANO-WEB-34 (recette 5.12) — le brouillon de départ dépend du TRAJET (poids 2 kg ou mémorisé, lieux pré-sélectionnés) : `buildInitialDraft` existait mais n'était jamais appelée.
 import { buildInitialDraft } from "./booking.state";
 import { useBookingCheckout } from "./useBookingCheckout";
@@ -45,7 +47,15 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   const locale = useLocale();
   const isFr = locale === "fr";
 
-  const { draft, setDraft, step, setStep, clear } = useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]));
+  const initialDraft = useMemo(() => buildInitialDraft(trip), [trip]);
+  const { draft, setDraft, step, setStep, clear } = useBookingDraft(initialDraft, trip.tripId);
+  const exit = useBookingExit({
+    trip,
+    draft,
+    initialDraft,
+    clearAction: clear,
+    onCloseAction,
+  });
   const [showErrors, setShowErrors] = useState(false);
   const checkout = useBookingCheckout({ draft, trip, step, clear });
   const isSubmitting = checkout.isSubmitting;
@@ -103,10 +113,11 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <BookingExitDialog {...exit.dialog} />
       {/* Back link */}
       <button
         type="button"
-        onClick={onCloseAction}
+        onClick={exit.requestExit}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
       >
         <ArrowLeft size={14} />

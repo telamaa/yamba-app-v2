@@ -61,6 +61,35 @@ export function computeTotal(draft: Draft, trip: TripContext, params: PricingPar
   return { transport, serviceFee, insurance, total: round2(transport + serviceFee + insurance), currency: "EUR", quote: null, quoteError: null };
 }
 
+/**
+ * Le brouillon porte-t-il une saisie à perdre ?
+ *
+ * On ne demande pas confirmation pour rien : à l'ouverture, le brouillon porte
+ * déjà une famille acceptée, un poids (2 kg par défaut, D33) et les lieux
+ * pré-sélectionnés — sortir là n'efface RIEN de ce que l'utilisateur a tapé.
+ * Ne comptent que les gestes qui lui appartiennent.
+ */
+export function hasUserInput(draft: Draft, initial: Draft): boolean {
+  return (
+    draft.description.trim() !== "" ||
+    draft.declaredValueEur.trim() !== "" ||
+    draft.photos.length > 0 ||
+    draft.insurance !== initial.insurance ||
+    draft.weightKg !== initial.weightKg ||
+    draft.family !== initial.family ||
+    draft.product !== initial.product ||
+    draft.sizeClass !== initial.sizeClass ||
+    draft.pickupLocationId !== initial.pickupLocationId ||
+    draft.deliveryLocationId !== initial.deliveryLocationId ||
+    draft.recipient.firstName.trim() !== "" ||
+    draft.recipient.lastName.trim() !== "" ||
+    draft.recipient.phoneE164.trim() !== "" ||
+    draft.recipient.email.trim() !== "" ||
+    draft.charterAccepted ||
+    draft.termsAccepted
+  );
+}
+
 export function isPerKgTrip(trip: TripContext): boolean {
   return typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
 }

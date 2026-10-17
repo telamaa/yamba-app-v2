@@ -256,5 +256,14 @@
     "deliveryBlockTitle": "The recipient collects the parcel",
     "singleHint": "Place agreed with the Traveler",
     "missing": "The Traveler did not specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted."
+  },
+  "exit": {
+    "title": "Leave this booking?",
+    "body": "What you entered will be lost: coming back, you will start from a blank page.",
+    "resume": "Keep going",
+    "leave": "Leave",
+    "favorite": "Keep this trip in my favourites",
+    "favoriteHint": "You will find it in one click, on any device.",
+    "favoriteAlready": "This trip is already in your favourites."
   }
 }

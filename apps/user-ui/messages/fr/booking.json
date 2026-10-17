@@ -256,5 +256,14 @@
     "deliveryBlockTitle": "Le destinataire récupère le colis",
     "singleHint": "Lieu convenu avec le Voyageur",
     "missing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée."
+  },
+  "exit": {
+    "title": "Quitter la réservation ?",
+    "body": "Ce que tu as saisi sera perdu : en revenant, tu repartiras d'une page vierge.",
+    "resume": "Reprendre",
+    "leave": "Quitter",
+    "favorite": "Garder ce trajet dans mes favoris",
+    "favoriteHint": "Tu le retrouveras d'un clic, sur n'importe quel appareil.",
+    "favoriteAlready": "Ce trajet est déjà dans tes favoris."
   }
 }

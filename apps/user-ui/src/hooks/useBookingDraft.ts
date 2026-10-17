@@ -8,6 +8,13 @@
  *
  * Note: `photos` is excluded from persistence because File objects
  * are not JSON-serializable.
+ *
+ * ⚠️ La clé est portée par le TRAJET. Sans ça (défaut trouvé le 17/10), un
+ * brouillon commencé sur le trajet A était restauré tel quel sur le trajet B
+ * dans le même onglet : poids, description, destinataire, garantie — et
+ * surtout `pickupLocationId` / `deliveryLocationId`, dont les identifiants
+ * sont des rangs (`TRAIN_STATION-0`) et « correspondaient » donc à un lieu
+ * d'un AUTRE trajet, sans la moindre erreur visible.
  */
 
 "use client";
@@ -22,9 +29,10 @@ const STEP_KEY = "booking-wizard-step";
 
 /** `initial` : brouillon de départ pour CE trajet (famille acceptée, poids
  *  mémorisé) — voir `buildInitialDraft`. Défaut : le brouillon vierge. */
-export function useBookingDraft(initial: Draft = initialDraft) {
+export function useBookingDraft(initial: Draft = initialDraft, tripId?: string) {
+  const scope = tripId ? `${DRAFT_KEY}:${tripId}` : DRAFT_KEY;
   const [draft, setDraft, clearDraftRaw] = usePersistedFormState<Draft>(
-    DRAFT_KEY,
+    scope,
     initial,
     {
       exclude: ["photos"] as (keyof Draft)[],
@@ -32,7 +40,10 @@ export function useBookingDraft(initial: Draft = initialDraft) {
     }
   );
 
-  const [step, setStep, clearStep] = usePersistedStep(STEP_KEY, 1);
+  const [step, setStep, clearStep] = usePersistedStep(
+    tripId ? `${STEP_KEY}:${tripId}` : STEP_KEY,
+    1
+  );
 
   const clear = useCallback(() => {
     clearDraftRaw();
