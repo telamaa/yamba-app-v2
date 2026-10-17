@@ -9,7 +9,7 @@
   "close": "Close",
   "steps": {
     "parcel": "Parcel",
-    "recipient": "Recipient",
+    "recipient": "Delivery",
     "charter": "Commitment",
     "payment": "Payment",
     "indicator": "step {current} of {total}"
@@ -17,11 +17,6 @@
   "step1": {
     "title": "Describe your parcel",
     "subtitle": "The more precise you are, the fewer surprises at handover.",
-    "locationsTitle": "Meeting locations",
-    "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
-    "deliveryBlockTitle": "The recipient picks up the parcel",
-    "locationSingleHint": "Set by the Traveler",
-    "locationMissing": "The Traveler didn't specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted.",
     "goldenRules": {
       "title": "Golden rules for a smooth shipment",
       "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",
@@ -52,25 +47,25 @@
       "remove": "Remove this photo"
     },
     "product": {
-      "label": "What do you want to send?",
+      "label": "A parcel, or a whole bag?",
       "parcel": "A parcel (per kg)",
       "checkedBag": "A checked bag 23 kg",
       "cabinBag": "A cabin bag 12 kg"
     },
     "family": {
-      "label": "What is inside the parcel?",
-      "hint": "It tells the Traveler whether they can take it. The price only moves if a surcharge is shown.",
+      "label": "What are you sending?",
+      "hint": "The Traveler chooses what they agree to carry.",
       "refused": "{carrierFirstName} does not take this family on this trip",
       "refusedToggle": "{count, plural, =1 {# family refused} other {# families refused}} by {carrierFirstName}",
       "noneAccepted": "{carrierFirstName} accepts no parcel family on this trip."
     },
     "size": {
       "label": "Size: no need to measure",
-      "hint": "Pick it by eye. The price difference is shown under each size.",
-      "S": "envelope → shoe box",
-      "M": "fits in a cabin bag",
-      "L": "takes half a suitcase",
-      "hintPending": "Pick it by eye. Enter the weight to see the price difference.",
+      "hint": "Judge by eye. Only the size that costs more is marked.",
+      "S": "a shoe box",
+      "M": "a backpack",
+      "L": "half a suitcase",
+      "hintPending": "Judge by eye. Enter the weight to see what each size costs.",
       "hintFlat": "At this weight the per-parcel minimum applies: size does not change the price.",
       "extra": "+{amount}"
     },
@@ -81,14 +76,14 @@
     "basic": {
       "title": "Basic protection",
       "price": "Included",
-      "description": "You''re covered against non-delivery. Payment is held until the parcel reaches the recipient."
+      "description": "Your money is held until delivery. If the parcel is not handed over, you are refunded."
     },
     "extended": {
-      "title": "Yamba Guarantee €500",
-      "price": "+€6",
-      "description": "Loss, theft, damage during transport. Exclusions shown before confirmation (including customs seizure of a non-compliant parcel).",
-      "ipidLink": "See the terms",
-      "ipidText": "Covers loss, theft and damage during transport, up to €500 and within the declared value. Excluded: prohibited items, a parcel that does not match its description, customs seizure, and damage caused by insufficient packaging. Photos of the parcel are required."
+      "title": "Yamba Guarantee {cap}",
+      "price": "+{amount}",
+      "description": "Loss, theft or damage on the way: you are refunded up to {cap}.",
+      "ipidLink": "What is not covered",
+      "ipidText": "Excluded: prohibited items, a parcel that does not match its description, customs seizure, and damage caused by insufficient packaging. The refund never exceeds the content value you declared. Photos of the parcel are required."
     }
   },
   "categories": {
@@ -106,8 +101,8 @@
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
   "step2": {
-    "title": "Who is the recipient?",
-    "subtitle": "The recipient doesn''t need a Yamba account. You''ll share the code with them.",
+    "title": "Where, and to whom?",
+    "subtitle": "The meeting point first, then the person who collects the parcel. They do not need a Yamba account.",
     "deliveryFlow": {
       "title": "How the delivery will work",
       "codeGiven": "**A 6-digit code** will be given to you after payment.",
@@ -198,7 +193,7 @@
     "transport": "Transport",
     "serviceYamba": "Service & protection",
     "insurance": "Yamba Guarantee",
-    "insurance500": "Yamba Guarantee €500",
+    "insurance500": "Yamba Guarantee",
     "total": "Total",
     "totalNote": "Charged when the Traveler accepts",
     "totalNoteLong": "The amount is authorized now and only charged when the Traveler accepts.",
@@ -254,5 +249,12 @@
     "login": "Sign in",
     "register": "Create an account"
   },
-  "previousStep": "Previous step"
+  "previousStep": "Previous step",
+  "locations": {
+    "title": "Meeting points",
+    "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
+    "deliveryBlockTitle": "The recipient collects the parcel",
+    "singleHint": "Place agreed with the Traveler",
+    "missing": "The Traveler did not specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted."
+  }
 }

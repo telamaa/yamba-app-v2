@@ -94,11 +94,6 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   const handleSubmit = checkout.submit;
 
-  const subtitle = `${trip.originCity} → ${trip.destinationCity} · ${formatDate(
-    trip.departureDate,
-    locale
-  )}`;
-
   const ctaLabel =
     step === 4
       ? t("pay", { amount: formatPrice(price.total, locale) })
@@ -121,10 +116,12 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
       {/* Titre + stepper sur UNE ligne (gain vertical : le formulaire remonte) */}
       <header className="mb-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-b border-slate-200 pb-4 dark:border-slate-800">
         <div className="min-w-0">
+          {/* Le trajet était écrit TROIS fois à l'écran (ici, dans la carte
+              « Trajet sélectionné » et dans le détail du prix) — la carte le dit
+              en entier, cette ligne ne faisait que répéter (revue UX 17/10). */}
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
             {t("title")}
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
         </div>
         <div className="min-w-0 flex-1 lg:max-w-2xl">
           <BookingStepperDesktop current={step} onStepClickAction={goToStep} />
@@ -140,11 +137,11 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
               draft={draft}
               setDraftAction={setDraft}
               errors={errors}
-              hideInsurance
             />
           )}
           {step === 2 && (
             <StepRecipient
+              trip={trip}
               draft={draft}
               setDraftAction={setDraft}
               errors={errors}
@@ -189,14 +186,6 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
       </div>
     </div>
   );
-}
-
-function formatDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(iso));
 }
 
 function formatPrice(amount: number, locale: string): string {

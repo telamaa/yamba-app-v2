@@ -9,11 +9,13 @@
 import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { FormField, FormInput, TipBlock } from "../BookingFormUi";
+import MeetingPoints from "../MeetingPoints";
 import { PHONE_PREFIXES } from "../booking.config";
 import { useLocale } from "next-intl";
-import type { Draft, ValidationErrors } from "../booking.types";
+import type { Draft, TripContext, ValidationErrors } from "../booking.types";
 
 type Props = {
+  trip: TripContext;
   draft: Draft;
   setDraftAction: (updater: (prev: Draft) => Draft) => void;
   errors: ValidationErrors;
@@ -22,6 +24,7 @@ type Props = {
 const DELIVERY_FLOW_KEYS = ["codeGiven", "shareIt", "handToTraveler"] as const;
 
 export default function StepRecipient({
+                                        trip,
                                         draft,
                                         setDraftAction,
                                         errors,
@@ -47,6 +50,11 @@ export default function StepRecipient({
       <p className="mb-5 text-[13px] text-slate-500 dark:text-slate-400 md:text-[14px] md:mb-6">
         {t("step2.subtitle")}
       </p>
+
+      {/* Le rendez-vous d'abord : « où » avant « à qui ». Il vivait en tête de
+          l'étape 1, sur une page intitulée « Décris ton colis » — un lieu n'est
+          pas une propriété du colis (revue UX 17/10). */}
+      <MeetingPoints trip={trip} draft={draft} setDraftAction={setDraftAction} errors={errors} />
 
       <TipBlock
         icon={<Lightbulb size={16} />}

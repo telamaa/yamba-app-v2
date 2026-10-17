@@ -15,10 +15,6 @@ import {
   FormTextarea,
   InfoTooltip,
   InsuranceOption,
-  LocationDisplay,
-  LocationList,
-  LocationMissing,
-  LocationOption,
   PhotoGrid,
   RequiredBadge,
   RenderBoldText,
@@ -81,7 +77,6 @@ type Props = {
   draft: Draft;
   setDraftAction: (updater: (prev: Draft) => Draft) => void;
   errors: ValidationErrors;
-  hideInsurance?: boolean;
 };
 
 const GOLDEN_RULES_KEYS = ["pack", "weigh", "describe", "prohibited"] as const;
@@ -91,7 +86,6 @@ export default function StepParcel({
                                      draft,
                                      setDraftAction,
                                      errors,
-                                     hideInsurance,
                                    }: Props) {
   const pricingParams = usePricingParams(); // D62 7A
   const t = useTranslations("booking");
@@ -105,18 +99,6 @@ export default function StepParcel({
   // Le lien « Voir les conditions » n'écrivait que dans la console : une promesse
   // d'interface qui ne menait nulle part (même défaut que les objets interdits).
   const [showIpid, setShowIpid] = useState(false);
-
-  const hasMultiplePickup = trip.pickupOptions.length > 1;
-  const hasMultipleDelivery = trip.deliveryOptions.length > 1;
-
-  const onSelectPickup = useCallback(
-    (id: string) => setDraftAction((prev) => ({ ...prev, pickupLocationId: id })),
-    [setDraftAction]
-  );
-  const onSelectDelivery = useCallback(
-    (id: string) => setDraftAction((prev) => ({ ...prev, deliveryLocationId: id })),
-    [setDraftAction]
-  );
 
   const photoTagContent = t("step1.photos.tagContent");
   const photoTagPackaged = t("step1.photos.tagPackaged");
@@ -227,6 +209,13 @@ export default function StepParcel({
       return null;
     }
   }, [perKg, draft.product, draft.weightKg, draft.family, draft.insurance, trip.familyStances, trip.pricePerKgCents, pricingParams]);
+
+  // « +6 € » et « 500 € » étaient écrits en dur dans les traductions : un admin
+  // qui change le paramètre (D62) faisait mentir la page. Ils viennent du moteur.
+  const guaranteeCap = formatEur(pricingParams.protectionExtendedCapCents / 100, locale);
+  const guaranteePremium = t("insurance.extended.price", {
+    amount: formatEur(pricingParams.protectionExtendedPremiumCents / 100, locale),
+  });
 
   const sizeIsFlat =
     sizeDeltaCents !== null &&
@@ -385,50 +374,30 @@ export default function StepParcel({
     </div>
   );
 
-  /** PRC-03 — à l'œil, jamais de dimensions. Trois rectangles bordés pesaient
-   *  autant que le reste de la page pour un choix à trois options : un segmenté,
-   *  d'un seul tenant, et SEULE la taille qui coûte plus cher est marquée (revue
-   *  du 17/10 — on ne décore pas ce qui ne change rien). */
+  /** PRC-03 — à l'œil, jamais de dimensions, et plus AUCUN rectangle : les mêmes
+   *  pastilles que la question juste au-dessus. Deux questions voisines répondues
+   *  de la même façon, c'est une chose de moins à comprendre (revue du 17/10).
+   *  Seule la taille qui coûte plus cher porte son prix. */
   const sizeBlock = (
     <FormField label={t("step1.size.label")} hint={sizeHint} error={errors.sizeClass}>
-      <div
-        role="radiogroup"
-        className="flex w-full items-stretch gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/60"
-      >
+      <div className="flex flex-wrap gap-2" role="radiogroup">
         {(["S", "M", "L"] as SizeClass[]).map((sz) => {
           const active = draft.sizeClass === sz;
           const delta = sizeDeltaCents?.[sz] ?? 0;
           return (
-            <button
+            <ChoiceChip
               key={sz}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
-              className={[
-                "flex-1 rounded-lg px-2 py-1.5 text-center transition-colors",
-                active
-                  ? "bg-white shadow-sm ring-1 ring-[#FF9900]/50 dark:bg-slate-800"
-                  : "hover:bg-white/70 dark:hover:bg-slate-800/50",
-              ].join(" ")}
+              active={active}
+              onClickAction={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
             >
-              <span
-                className={[
-                  "block text-[13px] font-bold",
-                  active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-700 dark:text-slate-200",
-                ].join(" ")}
-              >
-                {sz}
-              </span>
-              <span className="mt-0.5 block text-[10.5px] leading-tight text-slate-500 dark:text-slate-400">
-                {t(`step1.size.${sz}`)}
-              </span>
+              <span className="font-bold">{sz}</span>
+              <span className="ml-1.5 opacity-80">{t(`step1.size.${sz}`)}</span>
               {!sizeIsFlat && delta > 0 && (
-                <span className="mt-0.5 block text-[10.5px] font-semibold text-[#B45309] dark:text-[#FFB84D]">
+                <span className="ml-1.5 font-bold text-[#B45309] dark:text-[#FFB84D]">
                   {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
                 </span>
               )}
-            </button>
+            </ChoiceChip>
           );
         })}
       </div>
@@ -469,8 +438,10 @@ export default function StepParcel({
 
   /* D22 — la garantie AVANT les photos : c'est elle qui les rend obligatoires.
      Posée après, l'expéditeur lisait « facultatif » sur un champ qui ne l'était
-     plus deux décisions plus bas (revue UX 17/10). Desktop : colonne de droite. */
-  const insuranceBlock = hideInsurance ? null : (
+     plus deux décisions plus bas. Et elle vit DANS le formulaire, y compris sur
+     desktop : rangée dans la colonne « récapitulatif », une décision à +6 € est
+     une décision qu'on ne prend pas (revue UX 17/10). */
+  const insuranceBlock = (
     <>
       <SectionTitle>{t("insurance.title")}</SectionTitle>
       <InsuranceOption
@@ -484,9 +455,9 @@ export default function StepParcel({
       <InsuranceOption
         selected={draft.insurance === "EXTENDED_500"}
         onSelectAction={() => setDraftAction((prev) => ({ ...prev, insurance: "EXTENDED_500" }))}
-        title={t("insurance.extended.title")}
-        price={t("insurance.extended.price")}
-        description={t("insurance.extended.description")}
+        title={t("insurance.extended.title", { cap: guaranteeCap })}
+        price={guaranteePremium}
+        description={t("insurance.extended.description", { cap: guaranteeCap })}
         extraLink={{
           label: t("insurance.extended.ipidLink"),
           onClickAction: () => setShowIpid((v) => !v),
@@ -530,78 +501,9 @@ export default function StepParcel({
         onRemoveAction={handleRemovePhoto}
         addLabel={t("step1.photos.add")}
         removeAriaLabel={t("step1.photos.remove")}
+        cols={3}
       />
     </FormField>
-  );
-
-  /** Les lieux : une liste à plat, deux colonnes sur large écran, aucun cadre */
-  const locationsBlock = (
-    <>
-      <SectionTitle>{t("step1.locationsTitle")}</SectionTitle>
-      <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-4 md:grid-cols-2">
-        <div className="min-w-0">
-          <div className="mb-1 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
-            {t("step1.pickupBlockTitle", { carrierFirstName: trip.carrier.firstName })}
-          </div>
-          {hasMultiplePickup ? (
-            <>
-              <LocationList>
-                {trip.pickupOptions.map((loc) => (
-                  <LocationOption
-                    key={loc.id}
-                    location={loc}
-                    selected={draft.pickupLocationId === loc.id}
-                    onSelectAction={() => onSelectPickup(loc.id)}
-                    hasError={Boolean(errors.pickupLocationId)}
-                  />
-                ))}
-              </LocationList>
-              {errors.pickupLocationId && (
-                <div className="mt-1 text-[12px] font-medium" style={{ color: "#FF9900" }}>
-                  {errors.pickupLocationId}
-                </div>
-              )}
-            </>
-          ) : trip.pickupOptions.length > 0 ? (
-            <LocationDisplay location={trip.pickupOptions[0]} hint={t("step1.locationSingleHint")} />
-          ) : (
-            // Un trajet publié sans lieu de remise faisait planter l'écran (lecture de
-            // `pickupOptions[0].kind`). Le lieu n'est pas exigé par la réservation : on le dit.
-            <LocationMissing text={t("step1.locationMissing")} />
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="mb-1 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
-            {t("step1.deliveryBlockTitle")}
-          </div>
-          {hasMultipleDelivery ? (
-            <>
-              <LocationList>
-                {trip.deliveryOptions.map((loc) => (
-                  <LocationOption
-                    key={loc.id}
-                    location={loc}
-                    selected={draft.deliveryLocationId === loc.id}
-                    onSelectAction={() => onSelectDelivery(loc.id)}
-                    hasError={Boolean(errors.deliveryLocationId)}
-                  />
-                ))}
-              </LocationList>
-              {errors.deliveryLocationId && (
-                <div className="mt-1 text-[12px] font-medium" style={{ color: "#FF9900" }}>
-                  {errors.deliveryLocationId}
-                </div>
-              )}
-            </>
-          ) : trip.deliveryOptions.length > 0 ? (
-            <LocationDisplay location={trip.deliveryOptions[0]} hint={t("step1.locationSingleHint")} />
-          ) : (
-            <LocationMissing text={t("step1.locationMissing")} />
-          )}
-        </div>
-      </div>
-    </>
   );
 
   /** Les règles d'or : repliées, à plat. Trois défauts payés d'un coup (captures
@@ -678,7 +580,6 @@ export default function StepParcel({
       {insuranceBlock}
       {descriptionBlock}
       {photosBlock}
-      {locationsBlock}
       {goldenRulesBlock}
     </div>
   );

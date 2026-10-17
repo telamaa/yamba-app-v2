@@ -129,16 +129,6 @@ export function validateStep1(
 ): ValidationErrors {
   const errors: ValidationErrors = {};
 
-  if (trip.pickupOptions.length > 1 && !draft.pickupLocationId) {
-    errors.pickupLocationId = isFr
-      ? "Choisis un lieu de remise"
-      : "Pick a handover location";
-  }
-  if (trip.deliveryOptions.length > 1 && !draft.deliveryLocationId) {
-    errors.deliveryLocationId = isFr
-      ? "Choisis un lieu de retrait"
-      : "Pick a pickup location for the recipient";
-  }
   if (isPerKgTrip(trip)) {
     // D14 — famille refusée par le Voyageur
     if (draft.product === "PARCEL" && trip.familyStances[draft.family]?.mode === "REFUSE") {
@@ -196,8 +186,22 @@ export function validateStep1(
   return errors;
 }
 
-export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
+export function validateStep2(draft: Draft, trip: TripContext, isFr: boolean): ValidationErrors {
   const errors: ValidationErrors = {};
+
+  // Les lieux de rendez-vous sont passés de l'étape 1 à l'étape 2 avec leur bloc
+  // (revue UX 17/10) : la validation suit, sinon on bloque « Continuer » sur une
+  // erreur invisible à l'écran.
+  if (trip.pickupOptions.length > 1 && !draft.pickupLocationId) {
+    errors.pickupLocationId = isFr
+      ? "Choisis un lieu de remise"
+      : "Pick a handover location";
+  }
+  if (trip.deliveryOptions.length > 1 && !draft.deliveryLocationId) {
+    errors.deliveryLocationId = isFr
+      ? "Choisis un lieu de retrait"
+      : "Pick a pickup location for the recipient";
+  }
 
   if (draft.recipient.firstName.trim() === "") {
     errors.recipientFirstName = isFr ? "Prénom requis" : "First name required";
@@ -242,7 +246,7 @@ export function validateStep(
     case 1:
       return validateStep1(draft, trip, isFr);
     case 2:
-      return validateStep2(draft, isFr);
+      return validateStep2(draft, trip, isFr);
     case 3:
       return validateStep3(draft, isFr);
     case 4:

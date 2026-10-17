@@ -102,6 +102,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
         )}
         {step === 2 && (
           <StepRecipient
+            trip={trip}
             draft={draft}
             setDraftAction={setDraft}
             errors={errors}
