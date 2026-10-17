@@ -29,6 +29,8 @@ import {
   PARCEL_FAMILIES,
   type ParcelFamily,
 } from "../dto/trip-search.dto";
+import { FEED_PARAMS, rankFeedWindow, type FeedAnchor } from "../lib/feed-ranking";
+import { resolveIpAnchor } from "@packages/libs/geoip";
 
 /**
  * La langue d'une réponse de recherche (dette D-1, règle commune D44) : la surcharge explicite
@@ -300,6 +302,56 @@ export const searchTrips = async (
     // sur une fenêtre bornée (WEIGHT_SORT_WINDOW) avec un curseur-offset
     // « o:<n> ». Assumé v1 (volumes faibles) ; documenté dans la fiche.
     const pricing = weightPricingFromSettings(await platformSettings().get()); // D62
+
+    // ⭐ D80 — le DÉFAUT du contrat : flux d'atterrissage localisé. Anneaux de proximité à
+    // l'ancrage + score qualité, calculés en LECTURE sur la même fenêtre bornée que le tri
+    // prix-au-poids ci-dessous (patron D33, curseur-offset `o:<n>`). L'ancrage : la position
+    // envoyée par le client (`nearLat`/`nearLng`), sinon l'IP posée par le gateway
+    // (`x-client-ip`) résolue HORS-LIGNE par GeoLite2 — sans base ni ancrage, flux découverte
+    // (score qualité + diversité par corridor). Quand `from` est saisi, la proximité de la
+    // POSITION de l'utilisateur n'a plus de sens : pertinence = qualité seule, sans anneaux.
+    if (params.sort === "relevance") {
+      let anchor: FeedAnchor | null = null;
+      if (!placeSearchTerm(params.from)) {
+        if (typeof params.nearLat === "number" && typeof params.nearLng === "number") {
+          anchor = { lat: params.nearLat, lng: params.nearLng, city: null, countryCode: params.nearCountry ?? null, source: "query" };
+        } else {
+          const clientIp = (req.headers["x-client-ip"] as string | undefined) ?? req.ip;
+          const ipAnchor = await resolveIpAnchor(clientIp, params.locale);
+          if (ipAnchor) anchor = { ...ipAnchor, source: "ip" };
+        }
+      }
+      const offset = params.cursor?.startsWith("o:") ? Number(params.cursor.slice(2)) || 0 : 0;
+      const [all, totalCount] = await Promise.all([
+        prisma.trip.findMany({ where, take: FEED_PARAMS.windowSize, include: TRIP_SEARCH_INCLUDE }),
+        prisma.trip.count({ where }),
+      ]);
+      const ranked = rankFeedWindow(all, anchor, new Date());
+      const page = ranked.slice(offset, offset + params.limit);
+      const nextCursor = offset + params.limit < ranked.length ? `o:${offset + params.limit}` : null;
+      const mapped: YambaTripResultDto[] = [];
+      for (const r of page) {
+        try {
+          const dto = mapTripToYambaResult(r.trip as any, params.locale);
+          const enriched = params.weightKg ? enrichForWeight(dto, r.trip, params.weightKg, pricing) : dto;
+          enriched.ring = r.ring; // null sans ancrage — le front ne rend alors aucune section
+          mapped.push(enriched);
+        } catch (err) {
+          console.warn(`[search] Skipping invalid trip ${r.trip.id}: ${(err as Error).message}`);
+        }
+      }
+      await markFavorites((req as { user?: { id?: string } }).user?.id, mapped); // D46
+      await markViewsAndCountSearch(mapped, params, totalCount); // D5 / C-PR6
+      return res.status(200).json({
+        trips: mapped,
+        nextCursor,
+        totalCount: Math.min(totalCount, ranked.length),
+        // L'ancrage rendu au client : sa source et, quand l'IP l'a résolue, la ville — jamais
+        // les coordonnées, jamais l'IP. Le front en fait la chip « Autour de : X ».
+        anchor: anchor ? { source: anchor.source, city: anchor.city, countryCode: anchor.countryCode } : null,
+      });
+    }
+
     if (params.sort === "lowestPrice" && params.weightKg) {
       const WEIGHT_SORT_WINDOW = 200;
       const offset = params.cursor?.startsWith("o:") ? Number(params.cursor.slice(2)) || 0 : 0;

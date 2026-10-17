@@ -24,10 +24,19 @@ export const TransportModeFilterSchema = z
   .meta({ id: "TransportModeFilter", description: "Filtre mode de la recherche (all = tous)" });
 
 export const SortOptionSchema = z
-  .enum(["earliest", "lowestPrice", "bestRated"])
+  .enum(["relevance", "earliest", "lowestPrice", "bestRated"])
   .meta({
     id: "SortOption",
-    description: "Tri des résultats. lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg) et exclut les trips sans valeur.",
+    description:
+      "Tri des résultats — DÉFAUT : relevance (D80, flux d'atterrissage localisé : anneaux de proximité à l'ancrage + score qualité ; qualité seule quand `from` est saisi). lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg). Un tri inconnu dégrade sur relevance.",
+  });
+
+export const ProximityRingSchema = z
+  .enum(["SAME_CITY", "NEARBY", "REGION", "COUNTRY", "ELSEWHERE"])
+  .meta({
+    id: "ProximityRing",
+    description:
+      "D80 — anneau de proximité du départ du trajet à l'ancrage de l'utilisateur : SAME_CITY < 25 km · NEARBY < 100 km · REGION < 300 km même pays · COUNTRY même pays · ELSEWHERE. Les fronts en font les en-têtes de sections.",
   });
 
 export const UiParcelCategorySchema = z
@@ -114,6 +123,7 @@ export const YambaTripResultSchema = z
     travelerAvatarUrl: z.string().optional(),
     isFavorite: z.boolean().optional().meta({ description: "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)" }),
     viewsCount: z.number().int().optional().meta({ description: "D5 / C-PR6 — vues de la page publique, dédoublonnées par visiteur et par jour (Redis) ; absent si Redis indisponible" }),
+    ring: ProximityRingSchema.nullish().meta({ description: "D80 — présent sur le tri relevance AVEC ancrage ; null/absent sinon (le front ne rend alors aucune section)" }),
   })
   .meta({ id: "YambaTripResult", description: "Carte résultat de recherche (DTO UI)" });
 export type YambaTripResult = z.infer<typeof YambaTripResultSchema>;
@@ -125,9 +135,23 @@ export const SearchTripsResponseSchema = z
   .object({
     trips: z.array(YambaTripResultSchema),
     nextCursor: z.string().nullable().meta({
-      description: "id du dernier trip de la page — null si dernière page (pagination cursor-based)",
+      description:
+        "null si dernière page. Deux formes : id du dernier trip de la page (tris indexés), ou offset `o:<n>` (tris calculés en mémoire : relevance D80, lowestPrice+weightKg D33) — à renvoyer tel quel dans `cursor`",
     }),
-    totalCount: z.number().int(),
+    totalCount: z.number().int().meta({
+      description: "Sur les tris calculés en mémoire, borné à la fenêtre de calcul (200) — le count exact vit dans /trips/search/facets",
+    }),
+    anchor: z
+      .object({
+        source: z.enum(["query", "ip"]).meta({ description: "query = position envoyée par le client · ip = résolue hors-ligne par le serveur" }),
+        city: z.string().nullable().meta({ description: "Ville approximative — présente seulement quand la source est ip (le client connaît déjà son libellé sinon)" }),
+        countryCode: z.string().nullable().meta({ description: "ISO 3166-1 alpha-2, null si inconnu" }),
+      })
+      .nullish()
+      .meta({
+        description:
+          "D80 — l'ancrage du classement (chip « Autour de : X » côté front). Présent sur le tri relevance ; null = flux découverte (aucun ancrage résolu) ; jamais l'IP ni des coordonnées",
+      }),
   })
   .meta({ id: "SearchTripsResponse" });
 

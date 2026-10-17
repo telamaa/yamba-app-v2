@@ -4,7 +4,10 @@ import { z } from "zod";
 
 export const TRANSPORT_MODES = ["all", "plane", "train", "car"] as const;
 
-export const SORT_OPTIONS = ["earliest", "lowestPrice", "bestRated"] as const;
+// D80 — `relevance` est le DÉFAUT du contrat : le flux d'atterrissage localisé (anneaux de
+// proximité à l'ancrage + score qualité), et pertinence = qualité seule quand `from` est saisi.
+// Le front ne décide pas : un client qui n'envoie rien reçoit la pertinence.
+export const SORT_OPTIONS = ["relevance", "earliest", "lowestPrice", "bestRated"] as const;
 
 export const PARCEL_CATEGORIES = [
   "clothes",
@@ -94,7 +97,23 @@ export const searchTripsQuerySchema = z.object({
   to: z.string().trim().min(1).max(100).optional(),
   dateFrom: isoDate,
   dateTo: isoDate,
-  sort: z.enum(SORT_OPTIONS).optional().default("earliest"),
+  // D80 — défaut `relevance` ; un tri inconnu DÉGRADE sur le défaut (même doctrine que `mode`,
+  // ANO-API-10 : un lien partagé portant un tri retiré du catalogue ne casse pas la recherche).
+  sort: z.enum(SORT_OPTIONS).optional().default("relevance").catch("relevance"),
+
+  // D80 1A — l'ancrage envoyé par le client (adresse du membre, geste « Autour de moi »,
+  // dernière recherche mémorisée côté client). Les DEUX coordonnées ou rien : une moitié
+  // d'ancrage est ignorée par le contrôleur (dégrade, ne casse pas). Jamais journalisé.
+  nearLat: z.coerce.number().min(-90).max(90).optional().catch(undefined),
+  nearLng: z.coerce.number().min(-180).max(180).optional().catch(undefined),
+  // Le pays de l'ancrage (ISO 3166-1 alpha-2) : sans lui, un trajet SANS coordonnées ne peut
+  // jamais ringuer COUNTRY/REGION face à un ancrage `near` (mesuré sur le seed le 29/09).
+  nearCountry: z
+    .string()
+    .regex(/^[a-zA-Z]{2}$/)
+    .transform((s) => s.toUpperCase())
+    .optional()
+    .catch(undefined),
 
   // Soft toggles (n'affectent pas les counts de facets de leur propre catégorie)
   superTripper: boolFromQuery,
@@ -118,9 +137,13 @@ export const searchTripsQuerySchema = z.object({
   // est donc validé ici, comme `limit` juste en dessous : le refus est un 400.
   // Une chaîne VIDE vaut « pas de curseur » : un client qui envoie toujours le
   // paramètre (`?cursor=`) demande la première page, il ne se trompe pas.
+  // Deux formes : l'id du dernier trip de la page (tri indexé), OU le curseur-offset `o:<n>`
+  // des tris calculés en mémoire (D33 prix-au-poids, D80 pertinence). ANO-API-24 (mesuré le
+  // 29/09/2026) : la regex ne connaissait QUE la forme 24-hex — le `nextCursor` `o:<n>` rendu
+  // par le tri prix-au-poids était refusé 400 au retour, la page 2 de ce tri était inatteignable.
   cursor: z
     .string()
-    .regex(/^[0-9a-fA-F]{24}$/, "Identifiant MongoDB invalide (24 hex attendus)")
+    .regex(/^([0-9a-fA-F]{24}|o:\d{1,6})$/, "Curseur invalide (ObjectId 24 hex ou offset o:<n>)")
     .optional()
     .or(z.literal("").transform(() => undefined)),
   limit: z.coerce.number().int().min(1).max(50).optional().default(10),
