@@ -324,7 +324,7 @@ export default function StepParcel({
   );
 
   const weightValueBlock = (
-    <div className="grid grid-cols-2 gap-3.5 md:max-w-md">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5 sm:grid-cols-2 md:max-w-md">
       <FormFieldWithTooltip
         label={t("step1.parcelDetails.weightLabel")}
         tooltip={t("step1.parcelDetails.weightTooltip", { min: 0.5, floor: 8 })}
@@ -602,8 +602,10 @@ function FormFieldWithTooltip({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-4">
-      <label className="mb-1.5 flex items-center text-[13px] font-medium text-slate-600 dark:text-slate-300">
+    <div className="mb-4 min-w-0">
+      {/* `relative` : c'est le LABEL qui ancre l'infobulle (pleine largeur du
+          champ), pas l'icône — voir InfoTooltip dans BookingFormUi. */}
+      <label className="relative mb-1.5 flex items-center text-[13px] font-medium text-slate-600 dark:text-slate-300">
         <span>{label}</span>
         <InfoTooltip content={tooltip} />
       </label>
