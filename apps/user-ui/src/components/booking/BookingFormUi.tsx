@@ -580,21 +580,8 @@ export function LocationOption({
       role="radio"
       aria-checked={selected}
       onClick={onSelectAction}
-      className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity hover:opacity-80"
+      className="flex w-full items-center gap-3 py-4 text-left transition-opacity hover:opacity-80"
     >
-      <span
-        className={[
-          "inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2",
-          selected
-            ? "border-[#FF9900]"
-            : hasError
-              ? "border-[#FF9900]/60"
-              : "border-slate-300 dark:border-slate-600",
-        ].join(" ")}
-        aria-hidden="true"
-      >
-        {selected && <span className="h-[8px] w-[8px] rounded-full" style={{ backgroundColor: MANGO }} />}
-      </span>
       <Icon
         size={17}
         strokeWidth={1.75}
@@ -625,16 +612,36 @@ export function LocationOption({
           {location.addressShort}
         </span>
       )}
+      {/* La pastille à DROITE — même grammaire que « Ton colis » et
+          « Protection du colis » : le libellé se lit d'abord, le choix se pose
+          au bout de la ligne, toujours au même endroit d'un bloc à l'autre. */}
+      <span
+        className={[
+          "inline-flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px]",
+          selected
+            ? "border-[#FF9900]"
+            : hasError
+              ? "border-[#FF9900]/60"
+              : "border-slate-300 dark:border-slate-600",
+        ].join(" ")}
+        aria-hidden="true"
+      >
+        {selected && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: MANGO }} />}
+      </span>
     </button>
   );
 }
 
-/** Le conteneur des lignes de lieu : un filet entre elles, aucune bordure autour. */
+/**
+ * Le conteneur des lignes de lieu : une CARTE bordée, un filet entre les lignes.
+ * Même objet que « Ton colis » — un bloc de choix se reconnaît à sa forme, pas
+ * à sa place dans la page.
+ */
 export function LocationList({ children }: { children: ReactNode }) {
   return (
     <div
       role="radiogroup"
-      className="divide-y divide-slate-200/80 dark:divide-slate-800"
+      className="divide-y divide-slate-100 rounded-2xl border border-slate-200 px-4 dark:divide-slate-800/70 dark:border-slate-800"
     >
       {children}
     </div>
@@ -662,7 +669,9 @@ export function LocationDisplay({ location, hint }: LocationDisplayProps) {
   if (!location) return null;
   const Icon = getLocationIcon(location.kind);
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    // Un seul lieu : pas de choix, donc pas de pastille — mais la même carte,
+    // pour que la page ne change pas de grammaire selon le trajet.
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-4 dark:border-slate-800">
       <Icon size={17} strokeWidth={1.75} className="flex-shrink-0 text-slate-400 dark:text-slate-500" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13.5px] font-medium text-slate-800 dark:text-slate-100">
