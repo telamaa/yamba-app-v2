@@ -66,12 +66,11 @@ export const SETTINGS_CATALOG = [
   /* ── Prix et commission ── */
   { key: "pricing.commissionPct", group: "pricing", label: "Commission Yamba", description: "Pourcentage prélevé sur le transport, payé par l'Expéditeur ; les frais Stripe sont absorbés dedans." + NEW_BOOKINGS, rule: "D16 · COM-01", unit: "percent", default: 12, min: 5, max: 20, step: 0.5, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"], example: "Transport 20 € → commission 2,40 € (12 %)." },
   { key: "pricing.commissionFloorCents", group: "pricing", label: "Plancher de commission", description: "La commission ne descend jamais sous ce montant, même sur un petit colis." + NEW_BOOKINGS, rule: "D16 · COM-02", unit: "cents", default: 300, min: 100, max: 1000, step: 50, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"], example: "Transport 8 € → 12 % = 0,96 €, plancher 3 € appliqué." },
-  { key: "pricing.minBillableKg", group: "pricing", label: "Poids facturable minimum", description: "Un colis plus léger est facturé comme s'il pesait ce poids (standard courrier / express).", rule: "D32 · PRC-06", unit: "kg", default: 0.5, min: 0.1, max: 2, step: 0.1, scope: "BUSINESS", consumers: ["deal-service", "trip-service", "user-ui"], example: "Colis de 0,2 kg à 10 €/kg → facturé 0,5 kg = 5 €." },
-  { key: "pricing.minTransportCents", group: "pricing", label: "Prix minimum par colis", description: "Le transport d'un colis ne descend jamais sous ce montant : le coût réel du Voyageur est le temps, pas le poids." + NEW_BOOKINGS, rule: "D32 · PRC-06", unit: "cents", default: 800, min: 100, max: 3000, step: 50, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"], example: "0,5 kg à 10 €/kg = 5 € → 8 € appliqués." },
+  { key: "pricing.billingFloorKg", group: "pricing", label: "Plancher de facturation", description: "Un colis est toujours facturé au moins ce poids. En kilos et non en euros : le plancher suit alors le tarif du Voyageur, donc le corridor." + NEW_BOOKINGS, rule: "D81 · PRC-06", unit: "kg", default: 2.3, min: 0.5, max: 5, step: 0.1, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"], example: "2,3 kg à 3,50 €/kg → 8,05 € minimum ; le même plancher à 12 €/kg → 27,60 €." },
+  { key: "pricing.sizeMinKgS", group: "pricing", label: "Poids minimum — taille S", description: "Poids facturé minimum d'un petit colis. Vaut 0 par choix : S est le gabarit de référence, il ne paie que le poids et le plancher — sinon les petits objets de valeur seraient surtaxés." + NEW_BOOKINGS, rule: "D81 · PRC-03", unit: "kg", default: 0, min: 0, max: 10, step: 0.5, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"] },
+  { key: "pricing.sizeMinKgM", group: "pricing", label: "Poids minimum — taille M", description: "Poids facturé minimum d'un colis moyen — la place qu'il prend dans le bagage, pré-calculée pour ne jamais demander de mesures." + NEW_BOOKINGS, rule: "D81 · PRC-03", unit: "kg", default: 3, min: 0, max: 10, step: 0.5, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"] },
+  { key: "pricing.sizeMinKgL", group: "pricing", label: "Poids minimum — taille L", description: "Poids facturé minimum d'un grand colis. Doit rester ≥ M ≥ S." + NEW_BOOKINGS, rule: "D81 · PRC-03", unit: "kg", default: 6, min: 0, max: 10, step: 0.5, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "trip-service", "user-ui"], example: "Un colis L d'1 kg est facturé 6 kg — et en réserve 6 dans le bagage (CAP-01)." },
   { key: "pricing.referenceKg", group: "pricing", label: "Colis de référence (comparabilité)", description: "Poids du colis de référence qui rend les offres comparables dans la recherche (tri par prix). Les trajets déjà publiés gardent leur valeur jusqu'au script de recalcul.", rule: "D33", unit: "kg", default: 2, min: 1, max: 10, step: 0.5, scope: "BUSINESS", consumers: ["trip-service"], example: "12 €/kg → prix comparable 24 €." },
-  { key: "pricing.sizeCoefS", group: "pricing", label: "Coefficient taille S", description: "Multiplicateur du transport pour un petit colis. Doit rester ≤ M ≤ L.", rule: "PRC-03", unit: "coef", default: 1, min: 0.5, max: 2, step: 0.05, scope: "BUSINESS", consumers: ["deal-service", "user-ui"] },
-  { key: "pricing.sizeCoefM", group: "pricing", label: "Coefficient taille M", description: "Multiplicateur du transport pour un colis moyen.", rule: "PRC-03", unit: "coef", default: 1.1, min: 0.5, max: 2, step: 0.05, scope: "BUSINESS", consumers: ["deal-service", "user-ui"] },
-  { key: "pricing.sizeCoefL", group: "pricing", label: "Coefficient taille L", description: "Multiplicateur du transport pour un grand colis.", rule: "PRC-03", unit: "coef", default: 1.25, min: 0.5, max: 2, step: 0.05, scope: "BUSINESS", consumers: ["deal-service", "user-ui"], example: "Transport 20 € en L → 25 €." },
   /* ── Garantie Yamba ── */
   { key: "protection.extendedPremiumCents", group: "protection", label: "Prime Garantie étendue", description: "Prix payé par l'Expéditeur pour la Garantie étendue, ajouté au total." + NEW_BOOKINGS, rule: "D22 · GAR-06", unit: "cents", default: 600, min: 0, max: 5000, step: 50, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "user-ui"] },
   { key: "protection.extendedCapCents", group: "protection", label: "Plafond Garantie étendue", description: "Valeur maximale couverte par la Garantie étendue. Figure dans les CGU.", rule: "D22 · GAR-03", unit: "cents", default: 50000, min: 10000, max: 200000, step: 1000, scope: "BUSINESS", contractual: true, consumers: ["deal-service", "user-ui"] },
@@ -170,7 +169,7 @@ export const PlatformSettingsValuesSchema = z
 /** Règles de cohérence entre clés (D62 5A) — refusées côté serveur quel que soit le rôle. */
 export function settingsCoherenceIssues(v: PlatformSettingsValues): string[] {
   const issues: string[] = [];
-  if (!(v["pricing.sizeCoefS"] <= v["pricing.sizeCoefM"] && v["pricing.sizeCoefM"] <= v["pricing.sizeCoefL"])) issues.push("Les coefficients de taille doivent respecter S ≤ M ≤ L.");
+  if (!(v["pricing.sizeMinKgS"] <= v["pricing.sizeMinKgM"] && v["pricing.sizeMinKgM"] <= v["pricing.sizeMinKgL"])) issues.push("Les poids minimum de taille doivent respecter S ≤ M ≤ L.");
   // Invariant défensif (arbitrage du 15/09) : avec les bornes actuelles (prime ≤ plafond minimal) il ne peut pas se déclencher,
   // mais les bornes du catalogue évolueront — la règle reste, testée directement sur cette fonction pure.
   if (v["protection.extendedCapCents"] < v["protection.extendedPremiumCents"]) issues.push("Le plafond de la Garantie étendue doit être supérieur à sa prime.");
@@ -205,9 +204,8 @@ export function mergeSettingsValues(stored: Record<string, unknown> | null | und
 
 export function pricingParamsFromSettings(v: PlatformSettingsValues) {
   return {
-    sizeCoef: { S: v["pricing.sizeCoefS"], M: v["pricing.sizeCoefM"], L: v["pricing.sizeCoefL"] },
-    minBillableKg: v["pricing.minBillableKg"],
-    minTransportCents: v["pricing.minTransportCents"],
+    billingFloorKg: v["pricing.billingFloorKg"],
+    sizeMinKg: { S: v["pricing.sizeMinKgS"], M: v["pricing.sizeMinKgM"], L: v["pricing.sizeMinKgL"] },
     commissionPct: v["pricing.commissionPct"],
     commissionFloorCents: v["pricing.commissionFloorCents"],
     protectionExtendedPremiumCents: v["protection.extendedPremiumCents"],
@@ -315,9 +313,10 @@ export type SettingsWriteResponse = z.infer<typeof SettingsWriteResponseSchema>;
 /** Public (D62 7A) — les paramètres de prix lus par le wizard. */
 export const PricingParamsResponseSchema = z
   .object({
-    sizeCoef: z.object({ S: z.number(), M: z.number(), L: z.number() }),
-    minBillableKg: z.number(),
-    minTransportCents: z.number().int(),
+    /** D81 — plancher de facturation EN KILOS (il remplace minTransportCents). */
+    billingFloorKg: z.number(),
+    /** D81 — poids facturé minimum par taille (il remplace sizeCoef). */
+    sizeMinKg: z.object({ S: z.number(), M: z.number(), L: z.number() }),
     commissionPct: z.number(),
     commissionFloorCents: z.number().int(),
     protectionExtendedPremiumCents: z.number().int(),

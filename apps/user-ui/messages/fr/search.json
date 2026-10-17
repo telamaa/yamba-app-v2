@@ -44,7 +44,7 @@
     "weightHint": "Indique le poids : chaque trajet affichera son prix pour ton colis.",
     "weightHintActive": "Prix et tri calculés pour {kg} kg · trajets sans assez de place exclus",
     "lowestPriceHintWeight": "pour ton colis de {kg} kg",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum."
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum."
   },
   "departureTimes": {
     "morning": "Matin",

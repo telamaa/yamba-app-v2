@@ -30,7 +30,7 @@
     "perKg": "Price per kg",
     "available": "Available",
     "finalAtBooking": "The final price is set at booking.",
-    "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum, whatever the weight.",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum, whatever its weight.",
     "surcharge": "+{pct}%",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papers",

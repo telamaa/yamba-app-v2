@@ -8,7 +8,7 @@
 
 ## Trois classes (D62 2A)
 
-- **A — réglable en ligne** : 49 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
+- **A — réglable en ligne** : 48 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
 - **B — modifiable par déploiement seulement** : les invariants de sécurité (liste en fin de document).
 - **C — prévue, pas encore lue par le code** : nommée au §13 des règles métier, absente de la page tant qu'aucun consommateur n'existe.
 
@@ -20,21 +20,19 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 |---|---|---|---|---|---|---|
 | `pricing.commissionPct` | Commission Yamba *(CGU)* | **12 %** | 5 % → 20 % | métier | D16 · COM-01 | deal-service, trip-service, user-ui |
 | `pricing.commissionFloorCents` | Plancher de commission *(CGU)* | **3,00 €** | 1,00 € → 10,00 € | métier | D16 · COM-02 | deal-service, trip-service, user-ui |
-| `pricing.minBillableKg` | Poids facturable minimum | **0.5 kg** | 0.1 kg → 2 kg | métier | D32 · PRC-06 | deal-service, trip-service, user-ui |
-| `pricing.minTransportCents` | Prix minimum par colis *(CGU)* | **8,00 €** | 1,00 € → 30,00 € | métier | D32 · PRC-06 | deal-service, trip-service, user-ui |
+| `pricing.billingFloorKg` | Plancher de facturation *(CGU)* | **2.3 kg** | 0.5 kg → 5 kg | métier | D81 · PRC-06 | deal-service, trip-service, user-ui |
+| `pricing.sizeMinKgS` | Poids minimum — taille S *(CGU)* | **0 kg** | 0 kg → 10 kg | métier | D81 · PRC-03 | deal-service, trip-service, user-ui |
+| `pricing.sizeMinKgM` | Poids minimum — taille M *(CGU)* | **3 kg** | 0 kg → 10 kg | métier | D81 · PRC-03 | deal-service, trip-service, user-ui |
+| `pricing.sizeMinKgL` | Poids minimum — taille L *(CGU)* | **6 kg** | 0 kg → 10 kg | métier | D81 · PRC-03 | deal-service, trip-service, user-ui |
 | `pricing.referenceKg` | Colis de référence (comparabilité) | **2 kg** | 1 kg → 10 kg | métier | D33 | trip-service |
-| `pricing.sizeCoefS` | Coefficient taille S | **× 1** | × 0.5 → × 2 | métier | PRC-03 | deal-service, user-ui |
-| `pricing.sizeCoefM` | Coefficient taille M | **× 1.1** | × 0.5 → × 2 | métier | PRC-03 | deal-service, user-ui |
-| `pricing.sizeCoefL` | Coefficient taille L | **× 1.25** | × 0.5 → × 2 | métier | PRC-03 | deal-service, user-ui |
 
 - **Commission Yamba** (`pricing.commissionPct`) — Pourcentage prélevé sur le transport, payé par l'Expéditeur ; les frais Stripe sont absorbés dedans. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08). *Exemple : Transport 20 € → commission 2,40 € (12 %).*
 - **Plancher de commission** (`pricing.commissionFloorCents`) — La commission ne descend jamais sous ce montant, même sur un petit colis. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08). *Exemple : Transport 8 € → 12 % = 0,96 €, plancher 3 € appliqué.*
-- **Poids facturable minimum** (`pricing.minBillableKg`) — Un colis plus léger est facturé comme s'il pesait ce poids (standard courrier / express). *Exemple : Colis de 0,2 kg à 10 €/kg → facturé 0,5 kg = 5 €.*
-- **Prix minimum par colis** (`pricing.minTransportCents`) — Le transport d'un colis ne descend jamais sous ce montant : le coût réel du Voyageur est le temps, pas le poids. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08). *Exemple : 0,5 kg à 10 €/kg = 5 € → 8 € appliqués.*
+- **Plancher de facturation** (`pricing.billingFloorKg`) — Un colis est toujours facturé au moins ce poids. En kilos et non en euros : le plancher suit alors le tarif du Voyageur, donc le corridor. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08). *Exemple : 2,3 kg à 3,50 €/kg → 8,05 € minimum ; le même plancher à 12 €/kg → 27,60 €.*
+- **Poids minimum — taille S** (`pricing.sizeMinKgS`) — Poids facturé minimum d'un petit colis. Vaut 0 par choix : S est le gabarit de référence, il ne paie que le poids et le plancher — sinon les petits objets de valeur seraient surtaxés. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08).
+- **Poids minimum — taille M** (`pricing.sizeMinKgM`) — Poids facturé minimum d'un colis moyen — la place qu'il prend dans le bagage, pré-calculée pour ne jamais demander de mesures. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08).
+- **Poids minimum — taille L** (`pricing.sizeMinKgL`) — Poids facturé minimum d'un grand colis. Doit rester ≥ M ≥ S. Ne change rien aux réservations déjà faites : leur prix est figé (COM-04, PRC-08). *Exemple : Un colis L d'1 kg est facturé 6 kg — et en réserve 6 dans le bagage (CAP-01).*
 - **Colis de référence (comparabilité)** (`pricing.referenceKg`) — Poids du colis de référence qui rend les offres comparables dans la recherche (tri par prix). Les trajets déjà publiés gardent leur valeur jusqu'au script de recalcul. *Exemple : 12 €/kg → prix comparable 24 €.*
-- **Coefficient taille S** (`pricing.sizeCoefS`) — Multiplicateur du transport pour un petit colis. Doit rester ≤ M ≤ L.
-- **Coefficient taille M** (`pricing.sizeCoefM`) — Multiplicateur du transport pour un colis moyen.
-- **Coefficient taille L** (`pricing.sizeCoefL`) — Multiplicateur du transport pour un grand colis. *Exemple : Transport 20 € en L → 25 €.*
 
 ## Garantie Yamba
 

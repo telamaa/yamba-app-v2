@@ -3826,3 +3826,295 @@ commentaire périmé est un piège ; un commentaire **historié** est une protec
 - La CSS Anchor Positioning API (`anchor-name` / `position-anchor`), qui résoudra nativement
   l'ancrage des bulles le jour où son support sera généralisé.
 - Le bloc Unicode *Enclosed Alphanumeric Supplement* et la construction des drapeaux.
+
+---
+
+## Chapitre 215 — Le poids volumétrique, le plancher qui se multiplie, et le catalogue qui évite une migration
+
+Une refonte de moteur de prix est l'exercice le plus délicat d'une plateforme : le calcul
+est partagé entre le front (qui projette) et le serveur (qui fige), il touche de l'argent
+réel, et il laisse derrière lui un historique qu'on n'a pas le droit de réécrire. Ce
+chapitre raconte comment D81 a été menée.
+
+### 1. Mesurer avant de décider — le point de bascule se calcule
+
+Le signalement était : « poids ET taille, pour 0,75 € d'écart ? ». La tentation est de
+corriger le symptôme (durcir le coefficient). La bonne démarche est de **chercher le point
+de bascule**.
+
+L'ancienne formule :
+
+```
+transport = max(round(€/kg × max(poids, 0,5) × coefTaille × (1 + surcharge)), 800)
+```
+
+Le coefficient ne devient visible que si le produit **dépasse** le plancher. On pose donc
+l'inéquation, sur un trajet à 3,50 €/kg et en L (`coef = 1,25`) :
+
+```
+3,50 × poids × 1,25 > 8   ⟺   poids > 8 / (3,50 × 1,25) = 1,83 kg
+```
+
+**1,83 kg.** Sous ce poids, S, M et L donnent tous 8 € de transport — donc 11 € au total,
+commission comprise. Le chiffre transforme l'anecdote en fait : *sur le colis le plus
+courant, la question de la taille est décorative*.
+
+> La leçon de méthode : un défaut de prix se démontre par une inéquation, pas par un
+> ressenti. Le seuil calculé est ce qui donne le droit — et l'obligation — de changer la
+> règle.
+
+### 2. Le poids volumétrique, et pourquoi on ne le copie pas tel quel
+
+Les transporteurs express facturent le plus grand du poids réel et du **poids
+volumétrique** : `L × l × h / 5000` (le diviseur encode une densité de référence — 200
+kg/m³, soit un carton de vêtements). Un colis léger mais encombrant paie sa place.
+
+Yamba ne peut pas l'appliquer littéralement : sa promesse produit est « **pas besoin de
+mesurer** ». Demander trois dimensions à quelqu'un qui envoie un pull ferait fuir le
+parcours bien avant d'améliorer le prix.
+
+**L'adaptation est une pré-tabulation.** On fait le calcul de l'express une fois pour
+toutes, sur les trois gabarits qu'on affiche déjà :
+
+| Classe | Gabarit annoncé | Dimensions typiques | Poids volumétrique |
+|---|---|---|---|
+| S | une boîte à chaussures | 33 × 23 × 14 cm | 2,1 kg |
+| M | un sac à dos | 45 × 30 × 20 cm | 5,4 kg |
+| L | une demi-valise | 55 × 40 × 20 cm | 8,8 kg |
+
+C'est un motif général et réutilisable : **quand une mesure exacte coûte trop cher à
+l'utilisateur, on tabule la mesure sur des classes qu'il sait reconnaître.** On perd en
+précision ce qu'on gagne en adoption — et on garde la possibilité de raffiner les classes
+plus tard sans changer la formule.
+
+La grille retenue est volontairement **plus douce** que l'express (M 3 / L 6 au lieu de
+5,4 / 8,8) pour une raison de confiance : durcir un prix est facile, le baisser après coup
+abîme durablement la relation. On garde de la marge dans le bon sens.
+
+### 3. Un plancher en kilos se dérive ; un plancher en euros se maintient
+
+L'ancien plancher valait **8 €**, tous corridors confondus. Problème : sur Paris–Libreville
+à 12 €/kg, 8 € ne protège rien du tout ; sur Paris–Orléans à 3,50 €/kg, il est juste. Un
+plancher en euros est donc **faux partout sauf sur un corridor**, et le corriger
+demanderait un réglage par corridor — une table à maintenir, à faire vivre, à expliquer.
+
+Le changement d'unité résout le problème sans rien ajouter :
+
+```
+plancher = 2,3 kg        →  2,3 × 3,50 =  8,05 €   (Paris–Orléans)
+                            2,3 × 12   = 27,60 €   (Paris–Libreville)
+```
+
+Le plancher **multiplie le tarif du Voyageur**, donc il hérite gratuitement de toute la
+variabilité des corridors. Un seul paramètre, juste partout.
+
+Et le choix de **2,3** plutôt que 2 n'est pas esthétique : `2,3 × 3,50 = 8,05 €` reproduit
+l'économie d'avant **au centime près**. Une refonte de prix qui ne change rien là où le
+prix était juste, c'est une refonte qu'on peut déployer sans prévenir personne.
+
+> Le réflexe à garder : quand une constante métier « ne marche que dans un cas »,
+> interrogez son **unité** avant d'ajouter une table de cas particuliers. Changer l'unité
+> fait parfois disparaître le problème au lieu de le paramétrer.
+
+### 4. Un booléen ne sait pas dire pourquoi
+
+L'ancien devis portait :
+
+```ts
+minimumApplied: boolean;
+```
+
+L'interface pouvait donc écrire « Minimum par colis appliqué », et rien d'autre. Avec trois
+candidats au maximum (`poids réel`, `plancher`, `minimum de taille`), le booléen devient
+franchement insuffisant : l'Expéditeur ne sait pas s'il doit **baisser le poids** ou
+**changer de taille**.
+
+```ts
+billableWeightKg = Math.max(input.weightKg, billingFloorKg, sizeMinKg);
+billableReason =
+  billableWeightKg === input.weightKg
+    ? "ACTUAL"
+    : billableWeightKg === sizeMinKg
+      ? "SIZE_MIN"
+      : "FLOOR";
+```
+
+Deux détails valent d'être relevés :
+
+- **l'ordre des comparaisons est une décision de produit**, pas un hasard : en cas
+  d'égalité entre le plancher et le minimum de taille, on attribue la cause à la **taille**,
+  parce que c'est la seule des deux sur laquelle l'Expéditeur peut agir ;
+- `Math.max` à trois arguments remplace une cascade de `if` — la structure de données
+  (`max`) porte la règle, et le `switch` n'existe que pour **nommer** le gagnant.
+
+C'est une application directe de la règle maison « une règle métier rend un **code**, jamais
+une phrase » : `billableReason` traverse l'API, le snapshot et les deux fronts ; chacun le
+traduit dans sa langue et son format.
+
+### 5. Un catalogue bien placé supprime la migration
+
+Changer les paramètres de prix voulait dire, a priori : modifier le moteur, la page admin,
+les infobulles, le contrat OpenAPI, la documentation des paramètres, **et migrer le document
+Mongo qui porte les valeurs**. Il n'y a eu à toucher que le premier et le catalogue.
+
+```ts
+// packages/libs/api-contracts/src/admin/platform-settings.schema.ts
+export function mergeSettingsValues(stored: Record<string, unknown> | null | undefined) {
+  const out = { ...SETTINGS_DEFAULTS };
+  if (stored && typeof stored === "object") {
+    for (const key of SETTING_KEYS) {          // ← LE catalogue, pas le document
+      const raw = (stored as Record<string, unknown>)[key];
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        const def = settingDefinition(key)!;
+        out[key] = Math.min(def.max, Math.max(def.min, raw));
+      }
+    }
+  }
+  return out;
+}
+```
+
+La boucle itère sur **les clés connues du code**, et va chercher la valeur stockée. Par
+construction :
+
+- une clé **retirée** du catalogue n'est jamais relue, même si elle traîne encore en base ;
+- une clé **ajoutée** tombe sur son défaut jusqu'à ce qu'un admin l'enregistre ;
+- une valeur stockée **hors des bornes** actuelles est ramenée dans ses bornes.
+
+C'est l'inverse exact du réflexe naturel (itérer sur le document stocké), et c'est ce
+renversement qui rend le schéma de configuration **évolutif sans migration**. Le principe
+porte un nom dans d'autres contextes : *tolerant reader* — lire ce qu'on comprend, ignorer
+le reste.
+
+La propriété étant trop précieuse pour être supposée, elle est **prouvée** :
+
+```ts
+it("D81 — une clé RETIRÉE du catalogue est ignorée, même si le document la porte encore", async () => {
+  const snap = await loadPlatformSettings(
+    dbWith({ values: { "pricing.sizeCoefL": 1.25, "pricing.minTransportCents": 800 }, version: 9 }).db
+  );
+  expect((snap.values as Record<string, unknown>)["pricing.sizeCoefL"]).toBeUndefined();
+  expect(snap.values["pricing.billingFloorKg"]).toBe(2.3);
+});
+```
+
+Et comme le catalogue est aussi la source de la page admin, de ses infobulles, de l'OpenAPI
+et du document `YAMBA-PARAMETRES.md`, deux commandes (`npm run settings-doc`,
+`npm run generate:openapi`) ont suffi à mettre tout l'admin à jour. **Zéro écran touché à la
+main.** C'est le retour sur investissement d'une source unique : le jour où la règle change,
+on ne paie qu'une fois.
+
+### 6. On n'écrit plus un champ historique, on ne le réinterprète jamais
+
+Le `Booking` porte une **photographie immuable** du prix (D17). Elle contenait `sizeCoef` et
+`minimumApplied`. Deux tentations, toutes deux mauvaises :
+
+1. **supprimer les champs** — les réservations passées deviennent illisibles ;
+2. **réutiliser `minimumApplied` avec le nouveau sens** (« le poids facturé a été relevé ») —
+   les lignes anciennes et nouvelles porteraient le même nom pour deux faits différents.
+   C'est le pire des deux mondes : la donnée semble homogène et ne l'est pas.
+
+La règle appliquée : **on cesse d'écrire, on ne réinterprète jamais.**
+
+```prisma
+// D81 — le poids FACTURÉ remplace le coefficient de taille.
+billingFloorKg Float?
+sizeMinKg      Float?
+billableReason String?  // "ACTUAL" | "FLOOR" | "SIZE_MIN"
+
+// LEGACY — plus jamais écrits depuis D81, conservés pour les réservations
+// antérieures : on ne réinterprète jamais un champ historique.
+sizeCoef       Float?
+minimumApplied Boolean?
+```
+
+Deux régimes de prix cohabitent dans l'historique, chacun lisible avec ses propres champs.
+Le test le verrouille en vérifiant une **absence** :
+
+```ts
+expect(s.pricing).not.toHaveProperty("sizeCoef");
+expect(s.pricing).not.toHaveProperty("minimumApplied");
+```
+
+Affirmer qu'un champ **n'est pas écrit** est aussi important qu'affirmer la valeur de ceux
+qui le sont — et c'est le genre d'assertion qu'on oublie systématiquement.
+
+### 7. Trouver les consommateurs par le compilateur
+
+Une question revient dans toute refonte : *qu'est-ce que je casse ?* La réponse la moins
+coûteuse a été de **retirer les champs du type et de laisser `tsc` énumérer**.
+
+```sh
+npx nx run-many --target=typecheck --all --skip-sync
+```
+
+Six points d'impact, nommés avec fichier et ligne, en une passe. Dont deux qu'une recherche
+textuelle sur `sizeCoef` aurait **manqués** : `trip.controller.ts` et
+`trip-search.controller.ts` ne citaient aucun nom de champ — ils passaient un objet de
+paramètres dont la **forme** ne correspondait plus.
+
+> Un type bien placé est un moteur de recherche sur les conséquences. Supprimez d'abord le
+> champ, laissez le compilateur dresser la liste, corrigez ensuite.
+
+Attention à un angle mort du dépôt : `nx run-many --target=typecheck --all` ne couvre **pas**
+`user-ui` ni `admin-ui`, qui ont leurs propres jobs CI (`tsc --noEmit --project apps/<app>`).
+Les lancer à part fait partie de la vérification.
+
+### 8. Un prix annoncé ne doit jamais être plus bas que le prix facturé
+
+La recherche connaît le **poids** saisi, jamais la **taille** (elle n'est demandée que dans
+le tunnel). Deux options :
+
+- appliquer un minimum de taille moyen → la recherche annoncerait parfois **plus cher** que
+  le devis, ce qui fait fuir ;
+- n'appliquer **aucun** minimum de taille → la recherche annonce le prix d'un colis **S**,
+  le plus bas possible.
+
+La seconde a été retenue, et la raison est une règle d'honnêteté commerciale : **une
+annonce peut être dépassée par un choix de l'utilisateur, elle ne doit jamais se révéler
+mensongère par construction.** Le commentaire du fichier le dit, pour que personne ne
+« corrige » ça plus tard :
+
+```ts
+// D81 — la recherche connaît le POIDS, jamais la taille : elle n'applique donc
+// aucun minimum de taille. Le prix affiché est celui d'un colis S, c'est-à-dire
+// le PLUS BAS possible pour ce poids — il ne promet jamais moins cher que la
+// réalité du devis, il peut seulement être dépassé si l'Expéditeur choisit M ou L.
+```
+
+### 9. Un effet de bord bénéfique sur le tri par prix
+
+`comparable-price.ts` calcule le prix du colis de référence (2 kg) qui sert à **trier** les
+trajets. Il valait `max(2 × €/kg, 800)`. Conséquence invisible jusqu'ici : **tous** les
+corridors sous 4 €/kg étaient ramenés à 8 € — donc **indiscernables** dans le tri par prix.
+Un trajet à 2 €/kg et un à 3,50 €/kg se valaient à l'écran.
+
+Avec le plancher en kilos, la formule devient `round(€/kg × max(2 ; 2,3))` et les deux se
+séparent (4,60 € contre 8,05 €). La correction d'un défaut de **facturation** a réparé au
+passage un défaut de **classement** — ce qui arrive souvent quand on supprime un écrasement
+de valeurs.
+
+### Les pièges payés dans ce lot
+
+- Une constante métier en euros est fausse dès qu'il existe plusieurs corridors : interroger
+  l'**unité** avant d'ajouter des cas particuliers.
+- Un booléen « un minimum s'est appliqué » devient inexploitable dès qu'il y a plus d'un
+  minimum possible.
+- Réutiliser un champ historique avec un sens neuf rend l'historique **silencieusement**
+  hétérogène.
+- `nx run-many --target=typecheck --all` ne couvre pas les deux applications Next : les
+  vérifier séparément.
+- Une référence de tests écrite à la main se périme : celle de `deal-service` disait 659, la
+  mesure sur `dev` donnait **684**. Mesurer, toujours — et dater la mesure.
+
+### Aller plus loin
+
+- Le poids volumétrique et le diviseur 5000 (IATA, et ses variantes 6000 / 139 selon les
+  transporteurs et les unités).
+- Le motif *tolerant reader* de Martin Fowler, dont `mergeSettingsValues` est une
+  application exacte.
+- Le livrable `docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE.md` : la formule
+  complète, la comparaison express / postal, et le modèle de rentabilité avec ses six
+  hypothèses nommées.
+- **PRC-05** (suggestion de prix par corridor) et **PRC-09** (forfait bagage), spécifiés et
+  non codés : les deux leviers que le livrable 12 désigne comme décisifs.

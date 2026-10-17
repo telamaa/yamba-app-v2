@@ -12731,3 +12731,172 @@ chaussures », et coûtait une ligne de hauteur.
 @yamba-app/mobile` vert, contrôle i18n **miroir parfait** (30 namespaces, 60 fichiers), la
 clé `progress` purgée avec son dernier appelant. Registre : **A215** et **A216**, tranchées
 avant le code. **18/18 contrôles CI comptés.**
+
+---
+
+# Le prix se fait au poids FACTURÉ — le coefficient de taille disparaît, la place prise est réservée (PR #388, D81)
+
+Refonte du moteur de prix, décidée en **D81** et gravée au registre *avant* la première
+ligne de code. Elle part de deux défauts **mesurés**, pas supposés, remontés par la recette
+de la page ① du tunnel : « poids ET taille, pour 0,75 € d'écart ? »
+
+## Défaut 1 — sous 1,83 kg, la taille n'avait aucun effet
+
+L'ancienne formule :
+
+```
+billableKg = max(poids, 0,5)
+transport  = max(round(€/kg × billableKg × coefTaille × (1 + surcharge)), 800)
+```
+
+Sur un trajet à 3,50 €/kg, un colis d'1 kg donne `3,50 × 1 × 1` = 3,50 € en S, `× 1,1` =
+3,85 € en M, `× 1,25` = 4,38 € en L. **Les trois sont sous le plancher de 8 €** — donc les
+trois valent 8 €, et le total affiché est 11 € quelle que soit la taille. Le point de
+bascule se calcule : `8 / 3,50 = 2,29 kg` en S, et le coefficient ne produit un écart
+visible qu'au-delà de **1,83 kg** en L.
+
+Or le colis le plus courant — documents, vêtements, petite électronique — pèse **moins de
+2 kg**. Conclusion : on posait à l'Expéditeur une question dont la réponse ne changeait rien
+au prix, et un colis d'1 kg « demi-valise » coûtait le prix d'une enveloppe alors qu'il
+occupe la moitié du bagage du Voyageur.
+
+## Défaut 2 — le volume était facturé, jamais réservé
+
+`CAP-01` décomptait `remainingKg` sur le **poids déclaré**. Le commentaire du code le disait
+explicitement : *« le plancher 0,5 kg est une règle de prix, pas de place »*. Conséquence :
+un Voyageur pouvait accepter dix colis « demi-valise » d'1 kg — soit 10 kg au compteur, et
+plus aucune place réelle — sans qu'aucune règle ne s'en aperçoive.
+
+## La correction : le poids volumétrique, pré-calculé
+
+Les transporteurs express résolvent exactement ce problème avec le **poids volumétrique** :
+on facture le plus grand du poids réel et du volume converti en kilos (`L × l × h / 5000`).
+Yamba ne peut pas l'appliquer littéralement — sa promesse produit est « **pas besoin de
+mesurer** » (PRC-03), et demander trois dimensions à quelqu'un qui envoie un pull n'est pas
+une option.
+
+**L'adaptation consiste à pré-calculer le poids volumétrique par classe de taille.** C'est
+le même calcul, fait une fois pour toutes au lieu d'être demandé au client.
+
+```
+poidsFacturé = max( poidsRéel , plancherKg , minimumDeLaTaille )
+transport    = round(€/kg × poidsFacturé × (1 + surchargeFamille))
+```
+
+| Décision | Valeur retenue | Pourquoi |
+|---|---|---|
+| **Plancher de facturation** | **2,3 kg**, remplace les 8 € | À 3,50 €/kg il vaut 8,05 € — l'économie d'hier au centime près. À 12 €/kg il vaut 27,60 €, **sans aucun paramètre supplémentaire** : il multiplie le tarif du Voyageur, donc il suit le corridor tout seul |
+| **Minimums de taille** | **S 0 · M 3 · L 6** | Grille volontairement plus douce que l'express (qui donnerait M 5,4 / L 8,8). Durcir un prix est facile ; le baisser après coup abîme la confiance |
+| **S sans minimum** | assumé | S est le gabarit de référence. Un minimum sur S renchérirait **précisément les petits objets de valeur** — téléphone, lunettes, bague, enveloppe — que le plancher est censé protéger sans les surtaxer |
+| **Capacité** | sur le poids **facturé** | On réserve ce qu'on facture. Un colis L d'1 kg prend 6 kg dans le bagage |
+
+Le coefficient de taille **disparaît** : il n'y a plus de multiplicateur à expliquer. Une
+seule phrase suffit à l'Expéditeur :
+
+> **On facture le plus grand des trois : ce que ça pèse, la place que ça prend, ou le
+> minimum du trajet.**
+
+## `billableReason` — dire *pourquoi*, pas seulement *que*
+
+L'ancien devis portait `minimumApplied: boolean`. Un booléen ne dit pas **lequel** des
+minimums a gagné, donc l'interface ne pouvait pas expliquer quoi faire : baisser le poids ?
+changer de taille ? Le nouveau devis porte :
+
+```ts
+billableReason: "ACTUAL" | "FLOOR" | "SIZE_MIN" | null;
+billingFloorKg: number | null;
+sizeMinKg: number | null;
+```
+
+L'ordre des comparaisons porte la hiérarchie des explications : le poids réel d'abord (le
+cas normal), puis la taille (le plus parlant quand elle décide), le plancher en dernier.
+Le récapitulatif du tunnel affiche selon le cas « Taille M : facturée 3 kg minimum — c'est
+la place qu'elle prend » ou « Facturé au minimum du trajet : 2,3 kg ».
+
+`rawTransportCents` change de sens : il vaut désormais ce que coûterait le **poids réel**,
+sans plancher ni minimum. La différence avec `transportCents` est donc exactement ce que
+l'Expéditeur paie **pour la place**.
+
+## Les impacts dans l'admin — et pourquoi il n'y a rien eu à coder
+
+Le catalogue `packages/libs/api-contracts/src/admin/platform-settings.schema.ts` est la
+source **unique** de la page admin, de ses infobulles, de l'OpenAPI et du document généré
+`context/YAMBA-PARAMETRES.md`. Modifier le catalogue a donc suffi :
+
+| | Clés |
+|---|---|
+| **Retirées** | `pricing.sizeCoefS/M/L`, `pricing.minTransportCents` (remplacée), `pricing.minBillableKg` (absorbée : toujours ≤ au plancher) |
+| **Ajoutées** | `pricing.billingFloorKg`, `pricing.sizeMinKg{S,M,L}` |
+| **Invariant** | « coefficients S ≤ M ≤ L » → « **minimums** S ≤ M ≤ L » |
+
+`npm run settings-doc` a régénéré `YAMBA-PARAMETRES.md` (48 clés de classe A), et
+`npm run generate:openapi` les cinq contrats. **Aucun écran admin n'a été touché à la main.**
+
+**Et aucune migration de données n'est nécessaire.** `mergeSettingsValues` n'itère que sur
+`SETTING_KEYS`, c'est-à-dire le catalogue :
+
+```ts
+const out = { ...SETTINGS_DEFAULTS };
+for (const key of SETTING_KEYS) { /* lit la valeur stockée si elle est numérique */ }
+```
+
+Une clé **retirée** du catalogue n'est donc jamais relue, même si le document Mongo la
+porte encore ; une clé **ajoutée** prend son défaut. C'est prouvé par une contre-épreuve
+dédiée (`platform-settings-reader.spec.ts`) plutôt qu'affirmé.
+
+## Le snapshot ne ment pas sur le passé (D17)
+
+`sizeCoef` et `minimumApplied` **ne sont plus écrits**, mais restent au schéma Prisma avec
+un commentaire `LEGACY` : on ne réinterprète jamais un champ historique, on **cesse de
+l'alimenter**. Les réservations antérieures gardent leur sens exact. Arrivent
+`billingFloorKg`, `sizeMinKg`, `billableReason` — tous optionnels, comme l'exige la
+cohabitation de deux régimes de prix dans un même historique.
+
+## Les consommateurs — un seul point de décompte, deux helpers de recherche
+
+La capacité n'a demandé qu'une ligne : `quote.capacityKgConsumed` passe du poids déclaré au
+poids facturé, et `kgToReserve()` (`booking-request.ts`) était déjà **le** point unique de
+décompte. L'architecture avait isolé CAP-01 avant qu'on en ait besoin.
+
+Côté recherche, deux helpers purs de trip-service adoptent le plancher en kilos :
+
+- **`comparable-price.ts`** (D33) : `round(€/kg × max(referenceKg, billingFloorKg))`. Le
+  colis de référence n'a pas de taille — c'est un étalon de comparabilité — donc aucun
+  minimum de taille ne s'y applique. Effet de bord bénéfique : un plancher en **euros**
+  écrasait tous les corridors bon marché à 8 €, les rendant indiscernables dans le tri par
+  prix. Ils se distinguent enfin.
+- **`price-for-weight.ts`** : la recherche connaît le **poids**, jamais la taille. Elle
+  n'applique donc aucun minimum de taille et annonce le prix d'un colis **S** — le plus bas
+  possible. Elle ne promet jamais moins cher que le devis du tunnel ; elle peut seulement
+  être dépassée si l'Expéditeur choisit M ou L.
+
+## Les fronts
+
+« {min} € minimum » n'était vrai **que sur un corridor**. Les libellés « colis léger » des
+deux fronts parlent désormais du **plancher en kilos**, qui est vrai partout : « Colis léger
+(enveloppe, passeport, lunettes…) : facturé 2,3 kg minimum. » Côté Voyageur, la page de
+création de trajet dit « aucun envoi ne te rapporte moins de **2,3 kg × ton tarif** ».
+
+Les deux `pricing-example.ts` (miroirs assumés, web et mobile) suivent, et leur en-tête
+documente désormais qu'ils projettent le prix d'un **S**.
+
+## Les contrôles
+
+**Tests : trip 409 · deal 687 · notification 122 · message 79 · auth 407** — tout vert.
+D81 ajoute 5 tests : deal **+3** (les deux défauts en non-régression, le plancher qui suit
+le corridor, S sans minimum), trip **+1** (la recherche n'applique aucun minimum de taille),
+auth **+1** (une clé retirée du catalogue est ignorée sans migration).
+
+Typecheck **10/10** + `user-ui` + `admin-ui`, i18n **miroir parfait**, cinq `openapi.json`
+et `YAMBA-PARAMETRES.md` régénérés.
+
+> **Correction de référence** : `CLAUDE.md` notait deal-service à **659**. Mesuré à **684**
+> sur `dev` (`fa3db13`, 48 suites) *avant* toute modification de D81 — 25 tests jamais
+> reportés, et un total « 1268 » faux d'autant. La ligne porte désormais les chiffres
+> mesurés, avec la date et le commit de mesure.
+
+## Ce qui reste spécifié et NON codé
+
+**PRC-05** (suggestion de prix par corridor) et **PRC-09** (forfait bagage) restent décrits
+au livrable 12 sans implémentation : ce sont les deux leviers décisifs de rentabilité, et ils
+méritent leur propre décision.

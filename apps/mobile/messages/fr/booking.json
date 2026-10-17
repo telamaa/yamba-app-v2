@@ -66,7 +66,7 @@
     },
     "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
     "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
-    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
+    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {name}",
     "subtitle": "Plus c'est précis, moins il y a de surprises à la remise."

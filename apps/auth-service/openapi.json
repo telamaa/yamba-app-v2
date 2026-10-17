@@ -25961,41 +25961,35 @@
             "maximum": 1000,
             "description": "Plancher de commission (cents) — D16 · COM-02"
           },
-          "pricing.minBillableKg": {
+          "pricing.billingFloorKg": {
             "type": "number",
-            "minimum": 0.1,
-            "maximum": 2,
-            "description": "Poids facturable minimum (kg) — D32 · PRC-06"
+            "minimum": 0.5,
+            "maximum": 5,
+            "description": "Plancher de facturation (kg) — D81 · PRC-06"
           },
-          "pricing.minTransportCents": {
+          "pricing.sizeMinKgS": {
             "type": "number",
-            "minimum": 100,
-            "maximum": 3000,
-            "description": "Prix minimum par colis (cents) — D32 · PRC-06"
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Poids minimum — taille S (kg) — D81 · PRC-03"
+          },
+          "pricing.sizeMinKgM": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Poids minimum — taille M (kg) — D81 · PRC-03"
+          },
+          "pricing.sizeMinKgL": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Poids minimum — taille L (kg) — D81 · PRC-03"
           },
           "pricing.referenceKg": {
             "type": "number",
             "minimum": 1,
             "maximum": 10,
             "description": "Colis de référence (comparabilité) (kg) — D33"
-          },
-          "pricing.sizeCoefS": {
-            "type": "number",
-            "minimum": 0.5,
-            "maximum": 2,
-            "description": "Coefficient taille S (coef) — PRC-03"
-          },
-          "pricing.sizeCoefM": {
-            "type": "number",
-            "minimum": 0.5,
-            "maximum": 2,
-            "description": "Coefficient taille M (coef) — PRC-03"
-          },
-          "pricing.sizeCoefL": {
-            "type": "number",
-            "minimum": 0.5,
-            "maximum": 2,
-            "description": "Coefficient taille L (coef) — PRC-03"
           },
           "protection.extendedPremiumCents": {
             "type": "number",
@@ -26247,12 +26241,11 @@
         "required": [
           "pricing.commissionPct",
           "pricing.commissionFloorCents",
-          "pricing.minBillableKg",
-          "pricing.minTransportCents",
+          "pricing.billingFloorKg",
+          "pricing.sizeMinKgS",
+          "pricing.sizeMinKgM",
+          "pricing.sizeMinKgL",
           "pricing.referenceKg",
-          "pricing.sizeCoefS",
-          "pricing.sizeCoefM",
-          "pricing.sizeCoefL",
           "protection.extendedPremiumCents",
           "protection.extendedCapCents",
           "cancellation.fullRefundUntilHours",
@@ -26653,7 +26646,10 @@
       "PricingParamsResponse": {
         "type": "object",
         "properties": {
-          "sizeCoef": {
+          "billingFloorKg": {
+            "type": "number"
+          },
+          "sizeMinKg": {
             "type": "object",
             "properties": {
               "S": {
@@ -26672,14 +26668,6 @@
               "L"
             ],
             "additionalProperties": false
-          },
-          "minBillableKg": {
-            "type": "number"
-          },
-          "minTransportCents": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
           },
           "commissionPct": {
             "type": "number"
@@ -26712,9 +26700,8 @@
           }
         },
         "required": [
-          "sizeCoef",
-          "minBillableKg",
-          "minTransportCents",
+          "billingFloorKg",
+          "sizeMinKg",
           "commissionPct",
           "commissionFloorCents",
           "protectionExtendedPremiumCents",

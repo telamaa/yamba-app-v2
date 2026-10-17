@@ -705,12 +705,20 @@ type BookingPricingSnapshot {
   // D34 (B2) — devis figé tel quel depuis @packages/pricing ; optionnels
   // car les snapshots antérieurs (seed PER_CATEGORY) ne les portent pas.
   product            String? // "PARCEL" | "CHECKED_BAG_23KG" | "CABIN_BAG_12KG"
-  billableWeightKg   Float? // max(poids, 0,5) — D32
-  sizeCoef           Float? // 1 / 1,1 / 1,25
+  billableWeightKg   Float? // D81 : max(poids, plancher kg, minimum de taille) — avant : max(poids, 0,5)
   familySurchargePct Float? // supplément Voyageur de la famille (CAT-03)
-  rawTransportCents  Int? // avant plancher 8 €
-  minimumApplied     Boolean? // plancher D32 appliqué
+  rawTransportCents  Int? // D81 : au poids RÉEL, sans plancher — avant : avant le plancher de 8 €
   serviceCents       Int? // commission + prime (COM-03, 2e ligne)
+
+  // D81 (17/10/2026) — le poids FACTURÉ remplace le coefficient de taille.
+  billingFloorKg  Float? // le plancher du trajet, en kilos (2,3 par défaut)
+  sizeMinKg       Float? // le minimum de la taille choisie (S 0 / M 3 / L 6)
+  billableReason  String? // "ACTUAL" | "FLOOR" | "SIZE_MIN" — QUI a fixé le poids facturé
+
+  // LEGACY — plus jamais écrits depuis D81, conservés pour les réservations
+  // antérieures : on ne réinterprète jamais un champ historique.
+  sizeCoef       Float? // 1 / 1,1 / 1,25 (régime pré-D81)
+  minimumApplied Boolean? // plancher de 8 € appliqué (régime pré-D81)
 }
 
 // B2 — lieu de remise / de retrait choisi par l'Expéditeur parmi les

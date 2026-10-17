@@ -279,7 +279,7 @@ export type CreateTripCopy = {
   domesticLabel: string;
   factorDirectFlight: string;
   factorDepartureSoon: string;
-  minParcelPrice: (min: number) => string;
+  minParcelPrice: (kg: number) => string;
   priceHint: string;
   capacityHint: string;
   familiesHint: string;

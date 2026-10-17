@@ -66,7 +66,7 @@
       "M": "un sac à dos",
       "L": "une demi-valise",
       "hintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
-      "hintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
+      "hintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
       "extra": "+{amount}"
     },
     "requiredBadge": "Obligatoire"
@@ -221,7 +221,6 @@
     "durationNeutral": "{hours} h de trajet",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
-    "minimumApplied": "Minimum par colis appliqué : {min}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {
       "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
@@ -229,7 +228,9 @@
       "MISSING_PRICE_PER_KG": "Ce trajet n'a pas de prix au kilo.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
       "UNKNOWN": "Prix indisponible."
-    }
+    },
+    "billableFloor": "Facturé au minimum du trajet : {kg} kg.",
+    "billableSizeMin": "Taille {size} : facturée {kg} kg minimum — c'est la place qu'elle prend."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

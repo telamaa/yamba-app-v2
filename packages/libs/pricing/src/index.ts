@@ -7,23 +7,47 @@
  * Les paramètres sont ceux du tableau §13 des règles métier ; ils seront
  * servis par l'API (`GET /pricing/params`) sans changer les formules.
  *
- *   billableKg = max(poids, MIN_BILLABLE_KG)                       (D32)
- *   transport  = max(round(€/kg × billableKg × coefTaille × (1 + surcharge)), MIN_TRANSPORT)
+ *   billableKg = max(poids, PLANCHER_KG, MIN_TAILLE_KG)             (D81)
+ *   transport  = round(€/kg × billableKg × (1 + surcharge))
  *   commission = max(round(transport × COMMISSION_PCT), COMMISSION_FLOOR)   (D16)
  *   premium    = EXTENDED_500 → PROTECTION_EXTENDED_PREMIUM, sinon 0        (D22)
  *   total      = transport + commission + premium
  *   net Voyageur = transport (COM-03)
  *
  * Bagage entier (PRC-04) : transport = forfait du Voyageur, ni poids ni taille.
+ *
+ * D81 (17/10/2026) — LE POIDS FACTURÉ REMPLACE LE COEFFICIENT DE TAILLE.
+ * ---------------------------------------------------------------------
+ * On facture **le plus grand des trois : ce que ça pèse, la place que ça prend,
+ * ou le minimum du trajet**. Ce qui a changé, et pourquoi :
+ *   • le COEFFICIENT de taille (×1 / ×1,1 / ×1,25) disparaît. Mesuré : sous
+ *     1,83 kg à 3,50 €/kg, S, M et L donnaient EXACTEMENT le même total, parce
+ *     que le plancher de 8 € avalait le coefficient. On posait une question qui
+ *     ne changeait rien ;
+ *   • le PLANCHER passe en KILOS (2,3 kg) et remplace le minimum de 8 €. À
+ *     3,50 €/kg il vaut 8,05 € — l'économie d'hier au centime près ; à 12 €/kg
+ *     il vaut 27,60 €. Il devient proportionnel au corridor SANS paramètre
+ *     supplémentaire, puisqu'il multiplie le tarif du Voyageur ;
+ *   • chaque TAILLE porte un minimum de poids facturé (S aucun, M 3, L 6) —
+ *     le poids volumétrique de l'express, pré-calculé une fois pour toutes,
+ *     pour ne jamais demander trois dimensions (PRC-03 « pas besoin de
+ *     mesurer »). S est le gabarit de référence : un minimum sur S
+ *     renchérirait les petits objets de valeur que le plancher protège ;
+ *   • la CAPACITÉ se décompte sur le poids FACTURÉ (CAP-01) : un colis L d'1 kg
+ *     réserve 6 kg, c'est-à-dire la place qu'il prend. Avant, le volume était
+ *     facturé sans jamais être réservé.
+ * `billableReason` dit POURQUOI le poids facturé diffère du réel — un booléen
+ * « minimum appliqué » ne permettait pas de l'expliquer.
  */
 
 export type SizeClass = "S" | "M" | "L";
 
 /** Forme des paramètres du moteur — servis par les paramètres de la plateforme (D62), `PRICING_PARAMS` n'est que le défaut. */
 export type PricingParams = {
-  sizeCoef: Record<SizeClass, number>;
-  minBillableKg: number;
-  minTransportCents: number;
+  /** D81 — plancher de facturation EN KILOS (il remplace l'ancien minimum en euros). */
+  billingFloorKg: number;
+  /** D81 — poids facturé minimum par classe de taille ; S vaut 0, par choix. */
+  sizeMinKg: Record<SizeClass, number>;
   commissionPct: number;
   commissionFloorCents: number;
   protectionExtendedPremiumCents: number;
@@ -33,11 +57,10 @@ export type PricingParams = {
 };
 
 export const PRICING_PARAMS: PricingParams = {
-  /** PRC-03 — classes de taille visuelles */
-  sizeCoef: { S: 1, M: 1.1, L: 1.25 },
-  /** D32 */
-  minBillableKg: 0.5,
-  minTransportCents: 800,
+  /** D81 — 2,3 kg : à 3,50 €/kg cela vaut 8,05 €, l'économie d'avant au centime près */
+  billingFloorKg: 2.3,
+  /** D81 — PRC-03 sans coefficient : la taille impose un poids facturé minimum */
+  sizeMinKg: { S: 0, M: 3, L: 6 },
   /** D16 (acté mockup) */
   commissionPct: 12,
   commissionFloorCents: 300,
@@ -79,12 +102,19 @@ export type ShipperQuote = {
   weightKg: number | null;
   billableWeightKg: number | null;
   sizeClass: SizeClass | null;
-  sizeCoef: number | null;
+  /** D81 — le plancher du trajet, en kilos, tel qu'appliqué (null : bagage entier) */
+  billingFloorKg: number | null;
+  /** D81 — le minimum de la taille choisie, en kilos (0 pour S) */
+  sizeMinKg: number | null;
+  /**
+   * D81 — ce qui a DÉTERMINÉ le poids facturé. Un booléen « minimum appliqué »
+   * ne disait pas lequel des trois avait gagné : on ne pouvait pas l'expliquer.
+   */
+  billableReason: "ACTUAL" | "FLOOR" | "SIZE_MIN" | null;
   pricePerKgCents: number | null;
   familySurchargePct: number;
-  /** transport « brut » avant plancher — pour expliquer « minimum appliqué » */
+  /** Ce que coûterait le POIDS RÉEL, sans plancher ni minimum de taille (D81). */
   rawTransportCents: number;
-  minimumApplied: boolean;
   transportCents: number;
   commissionPct: number;
   commissionCents: number;
@@ -112,11 +142,14 @@ export function quoteShipperPrice(input: QuoteInput, p: PricingParams = PRICING_
   const premiumCents = protection === "EXTENDED_500" ? p.protectionExtendedPremiumCents : 0;
 
   let rawTransportCents: number;
+  let transportCents: number;
   let pricingModel: ShipperQuote["pricingModel"];
   let weightKg: number | null = null;
   let billableWeightKg: number | null = null;
   let sizeClass: SizeClass | null = null;
-  let sizeCoef: number | null = null;
+  let billingFloorKg: number | null = null;
+  let sizeMinKg: number | null = null;
+  let billableReason: ShipperQuote["billableReason"] = null;
   let pricePerKgCents: number | null = null;
   let familySurchargePct = 0;
   let capacityKgConsumed: number;
@@ -134,12 +167,29 @@ export function quoteShipperPrice(input: QuoteInput, p: PricingParams = PRICING_
     pricingModel = "PER_KG";
     pricePerKgCents = input.pricePerKgCents;
     weightKg = input.weightKg;
-    billableWeightKg = Math.max(input.weightKg, p.minBillableKg);
     sizeClass = input.sizeClass;
-    sizeCoef = p.sizeCoef[input.sizeClass];
+    billingFloorKg = p.billingFloorKg;
+    sizeMinKg = p.sizeMinKg[input.sizeClass];
     familySurchargePct = Math.max(0, input.familySurchargePct ?? 0);
-    rawTransportCents = Math.round(pricePerKgCents * billableWeightKg * sizeCoef * (1 + familySurchargePct / 100));
-    capacityKgConsumed = input.weightKg;
+
+    // D81 — le plus grand des trois, et on RETIENT lequel a gagné. L'ordre des
+    // comparaisons porte la hiérarchie des explications : le poids réel d'abord
+    // (le cas normal), puis la taille (le plus parlant quand elle décide), le
+    // plancher du trajet en dernier.
+    billableWeightKg = Math.max(input.weightKg, billingFloorKg, sizeMinKg);
+    billableReason =
+      billableWeightKg === input.weightKg
+        ? "ACTUAL"
+        : billableWeightKg === sizeMinKg
+          ? "SIZE_MIN"
+          : "FLOOR";
+
+    const surcharge = 1 + familySurchargePct / 100;
+    rawTransportCents = Math.round(pricePerKgCents * input.weightKg * surcharge);
+    transportCents = Math.round(pricePerKgCents * billableWeightKg * surcharge);
+    // CAP-01 (D81) — la place RÉSERVÉE est celle qu'on facture : un colis L d'1 kg
+    // prend 6 kg dans le bagage, et le trajet doit le savoir.
+    capacityKgConsumed = billableWeightKg;
   } else {
     const flat = input.product === "CHECKED_BAG_23KG" ? input.checkedBag23PriceCents : input.cabinBag12PriceCents;
     if (!(typeof flat === "number" && flat > 0)) {
@@ -147,11 +197,10 @@ export function quoteShipperPrice(input: QuoteInput, p: PricingParams = PRICING_
     }
     pricingModel = "FLAT_BAG";
     rawTransportCents = flat;
+    transportCents = flat;
     capacityKgConsumed = BAG_KG[input.product];
   }
 
-  const minimumApplied = rawTransportCents < p.minTransportCents;
-  const transportCents = Math.max(rawTransportCents, p.minTransportCents);
   const rawCommission = Math.round((transportCents * p.commissionPct) / 100);
   const commissionFloorApplied = rawCommission < p.commissionFloorCents;
   const commissionCents = Math.max(rawCommission, p.commissionFloorCents);
@@ -163,11 +212,12 @@ export function quoteShipperPrice(input: QuoteInput, p: PricingParams = PRICING_
     weightKg,
     billableWeightKg,
     sizeClass,
-    sizeCoef,
+    billingFloorKg,
+    sizeMinKg,
+    billableReason,
     pricePerKgCents,
     familySurchargePct,
     rawTransportCents,
-    minimumApplied,
     transportCents,
     commissionPct: p.commissionPct,
     commissionCents,
