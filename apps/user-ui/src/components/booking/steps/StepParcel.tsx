@@ -463,7 +463,12 @@ export default function StepParcel({
           onClickAction: () => setShowIpid((v) => !v),
         }}
       />
-      {showIpid && (
+      {/* GAR-05 — « les exclusions sont présentées à l'Expéditeur AVANT le choix
+          du niveau de protection » : un lien à cliquer ne présente rien. Choisir
+          la Garantie les ouvre d'office (la saisie douanière d'un colis non
+          conforme en fait partie), et le lien reste pour qui veut les lire sans
+          avoir choisi. */}
+      {(showIpid || draft.insurance === "EXTENDED_500") && (
         <p className="-mt-2 mb-5 text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
           {t("insurance.extended.ipidText")}
         </p>
@@ -501,7 +506,7 @@ export default function StepParcel({
         onRemoveAction={handleRemovePhoto}
         addLabel={t("step1.photos.add")}
         removeAriaLabel={t("step1.photos.remove")}
-        cols={3}
+        cols={5}
       />
     </FormField>
   );

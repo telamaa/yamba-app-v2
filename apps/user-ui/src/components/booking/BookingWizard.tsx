@@ -130,7 +130,7 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
       {/* Body: 2 cols */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950 sm:p-7">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950 sm:p-7">
           {step === 1 && (
             <StepParcel
               trip={trip}

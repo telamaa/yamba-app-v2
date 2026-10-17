@@ -132,9 +132,12 @@ export function InfoTooltip({ content }: { content: string }) {
       >
         <Info size={13} />
       </button>
+      {/* Elle s'ouvrait VERS LE HAUT : sur le premier champ d'une carte, elle
+          sortait par le bord supérieur et se faisait rogner (capture du 17/10).
+          Vers le bas, elle se pose sur le champ — jamais hors du cadre. */}
       <span
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-60 -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-normal leading-[1.5] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-100 dark:text-slate-900"
+        className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 w-[min(16rem,calc(100vw-2.5rem))] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-normal leading-[1.5] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-100 dark:text-slate-900"
       >
         {content}
       </span>
@@ -798,8 +801,11 @@ export function PhotoGrid({
         ? "grid-cols-5"
         : "grid-cols-3 md:grid-cols-5";
 
+  // Cinq emplacements sur UNE ligne, et des vignettes qui ne mangent plus le
+  // tiers de la colonne quand il n'y en a qu'une (capture du 17/10) : la grille
+  // est plafonnée, pas étirée sur toute la largeur disponible.
   return (
-    <div className={`mt-2 grid gap-2.5 ${gridCols}`}>
+    <div className={`mt-2 grid max-w-[520px] gap-2.5 ${gridCols}`}>
       {photos.map((p) => (
         <PhotoSlot
           key={p.id}
