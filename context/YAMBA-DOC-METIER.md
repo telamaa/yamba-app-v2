@@ -7058,3 +7058,48 @@ son colis et voir son prix : on ne demande pas de compte pour regarder un prix.
 | MOB95 | Web — choisir la Garantie étendue | Les exclusions s'affichent **immédiatement**, sans clic supplémentaire |
 | MOB96 | Web — lire le récapitulatif de prix | Une ligne « Service Yamba » (commission seule) et, si choisie, une ligne de garantie distincte ; le total est juste |
 | MOB97 | Web — pendant tout le tunnel | L'en-tête ne propose ni cloche, ni messagerie, ni « Partager un trajet » |
+
+---
+
+# La recette de la page ① — lisibilité, vérité du trajet, et la longueur du tunnel (PR #387)
+
+## Le besoin
+
+Trois retours d'utilisation sur la première page de réservation : une aide contextuelle
+illisible sur téléphone, un récapitulatif de trajet qui **affirme du faux** (un avion sur un
+voyage en train), et une barre de progression qui annonce sept étapes — assez pour faire
+renoncer avant d'avoir commencé.
+
+Derrière le troisième, une question de fond posée par l'utilisateur : *« 7 étapes c'est pas
+trop long visuellement ? »* La réponse retenue sépare ce qu'on **découpe** de ce qu'on
+**annonce**.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-63** | Une aide contextuelle ne dépasse JAMAIS la largeur du champ qu'elle explique. Elle reste lisible en entier quel que soit l'écran, et aucune zone de défilement ne peut la couper. |
+| **RG-MOB-64** | Le récapitulatif du trajet affiche le mode de transport RÉEL : l'icône et la durée disent « train » pour un train, « bus » pour un bus. Un trajet dont le mode n'est pas renseigné n'en reçoit AUCUN par défaut — il affiche une icône neutre et « {n} h de trajet ». |
+| **RG-MOB-65** | Les villes d'un trajet portent le drapeau de leur pays, **partout et toujours** — y compris quand les deux drapeaux sont identiques. Un trajet intérieur se reconnaît alors d'un coup d'œil, et l'Expéditeur qui ne vit pas dans ce pays sait de quel pays on parle. |
+| **RG-MOB-66** | Les drapeaux sont décoratifs : un lecteur d'écran annonce les villes et les pays en toutes lettres, jamais « drapeau de… ». |
+| **RG-MOB-67** | Le tunnel de réservation annonce QUATRE phases — Colis, Livraison, Engagement, Paiement — les mêmes mots que sur le site. Le nombre d'écrans réels n'est jamais affiché. La barre de progression avance malgré tout à chaque écran. |
+| **RG-MOB-68** | Un écran du tunnel pose une seule question ou un seul groupe de questions. On ne fusionne pas deux écrans pour « faire moins d'étapes » : c'est l'annonce qu'on raccourcit, pas le confort. |
+| **RG-MOB-69** | La protection du colis est demandée AVANT les photos et les lieux : c'est elle qui rend les photos obligatoires. L'ordre est le même sur le site et dans l'application. |
+| **RG-MOB-70** | Deux questions voisines se répondent de la même façon : le contenu et la taille du colis se choisissent par les mêmes pastilles. Aucune illustration ne remplace les mots (« une boîte à chaussures » se lit, ne se devine pas). |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB98 | Téléphone — étape 1, toucher le « ⓘ » du champ Poids | L'aide s'affiche **en entier**, sous le champ, sans être coupée à gauche ni à droite |
+| MOB99 | Téléphone — étape 1 | Les champs Poids et Valeur occupent chacun **toute la largeur** ; les raccourcis de poids tiennent sur la ligne |
+| MOB100 | Réserver sur un trajet en TRAIN, lire « Trajet sélectionné » | Une icône de train, et « Direct, 1 h **de train** » — jamais « de vol » |
+| MOB101 | Réserver sur un trajet dont le mode n'est pas renseigné | Une icône neutre et « 1 h **de trajet** » : aucun mode n'est inventé |
+| MOB102 | Réserver sur Paris → Orléans (trajet intérieur) | « 🇫🇷 Paris → 🇫🇷 Orléans » : les deux drapeaux sont affichés |
+| MOB103 | Lire le récapitulatif avec un lecteur d'écran | Les villes et pays sont annoncés en toutes lettres ; aucun « drapeau de la France » |
+| MOB104 | Application — ouvrir la réservation | L'en-tête annonce « Colis · Livraison · Engagement · Paiement », la phase en cours en mangue. **Nulle part** le chiffre 7 |
+| MOB105 | Application — passer d'un écran au suivant | La barre de progression avance visiblement, alors que la phase annoncée n'a pas changé |
+| MOB106 | Application — lecteur d'écran sur la barre de progression | « Colis, étape 1 **sur 4** » |
+| MOB107 | Application — étape ① | Le titre « Décris ton colis » et son sous-titre sont dans le contenu, pas dans la barre du haut |
+| MOB108 | Application — étape ①, section Taille | Trois pastilles « S une boîte à chaussures / M un sac à dos / L une demi-valise », sans icône ni cadre ; seule celle qui coûte plus cher porte un prix |
+| MOB109 | Application — les familles refusées | La ligne repliée **nomme le Voyageur** : « 6 familles refusées par Marven » |
