@@ -34,7 +34,8 @@
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
       "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
-      "remainingKg": "{kg} kg still available on this trip"
+      "remainingKg": "{kg} kg still available on this trip",
+      "valueHint": "It sets the compensation cap in case of a dispute — state the purchase price."
     },
     "photos": {
       "label": "Parcel photos",

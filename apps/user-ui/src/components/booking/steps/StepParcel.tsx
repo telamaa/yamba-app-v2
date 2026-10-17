@@ -503,24 +503,53 @@ export default function StepParcel({
     </div>
   );
 
-  /** La valeur du contenu ne fait pas le prix du transport : elle fixe le plafond
-   *  d'indemnisation. Elle a donc quitté la ligne du poids pour se coller à la
-   *  protection, qu'elle commande. */
+  /**
+   * LA VALEUR DU CONTENU — même grammaire que « Ton colis » et « Protection du
+   * colis » : un titre, une carte, une ligne « libellé gras · ligne grise ·
+   * contrôle à droite ». Une seule grammaire sur toute l'étape.
+   *
+   * Elle ne fait PAS le prix du transport : elle fixe le plafond
+   * d'indemnisation. Elle est donc posée juste avant la protection, qu'elle
+   * commande — et non à côté du poids, où elle laissait croire qu'elle entrait
+   * dans le calcul. L'explication passe en ligne grise plutôt qu'en infobulle :
+   * une phrase visible vaut mieux qu'une phrase à découvrir.
+   */
   const valueBlock = (
-    <div className="md:max-w-md">
-      <FormFieldWithTooltip
-        label={t("step1.parcelDetails.valueLabel")}
-        tooltip={t("step1.parcelDetails.declaredValueTooltip")}
-        error={errors.declaredValueEur}
-      >
-        <FormInput
-          value={draft.declaredValueEur}
-          onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))}
-          hasError={Boolean(errors.declaredValueEur)}
-          inputMode="numeric"
-          placeholder="150"
-        />
-      </FormFieldWithTooltip>
+    <div className="mb-4">
+      <SectionTitle>{t("step1.parcelDetails.valueLabel")}</SectionTitle>
+      <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
+        <div className="flex items-center gap-3 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">
+              {t("step1.parcelDetails.valueLabel")}
+            </div>
+            <div className="text-[12px] text-slate-500 dark:text-slate-400">
+              {t("step1.parcelDetails.valueHint")}
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-baseline gap-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={draft.declaredValueEur}
+              onChange={(e) => setDraftAction((prev) => ({ ...prev, declaredValueEur: e.target.value }))}
+              placeholder="150"
+              aria-label={t("step1.parcelDetails.valueLabel")}
+              className={`w-16 border-b bg-transparent pb-0.5 text-right text-[17px] font-bold outline-none ${
+                errors.declaredValueEur
+                  ? "border-[#FF9900] text-[#B45309] dark:text-[#FFB84D]"
+                  : "border-slate-200 text-slate-900 focus:border-slate-400 dark:border-slate-700 dark:text-white dark:focus:border-slate-500"
+              }`}
+            />
+            <span className="text-[13px] text-slate-500 dark:text-slate-400">€</span>
+          </div>
+        </div>
+      </div>
+      {errors.declaredValueEur && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.declaredValueEur}
+        </div>
+      )}
     </div>
   );
 
@@ -542,7 +571,22 @@ export default function StepParcel({
           placeholder={locale === "fr" ? "2,5" : "2.5"}
         />
       </FormFieldWithTooltip>
-      {valueBlock}
+      {/* Le legacy garde un champ simple : la carte pleine largeur de la valeur
+          n'a pas sa place dans une grille à deux colonnes, et ce moteur est
+          déprécié — on ne lui refait pas une mise en page. */}
+      <FormFieldWithTooltip
+        label={t("step1.parcelDetails.valueLabel")}
+        tooltip={t("step1.parcelDetails.declaredValueTooltip")}
+        error={errors.declaredValueEur}
+      >
+        <FormInput
+          value={draft.declaredValueEur}
+          onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))}
+          hasError={Boolean(errors.declaredValueEur)}
+          inputMode="numeric"
+          placeholder="150"
+        />
+      </FormFieldWithTooltip>
     </div>
   );
 

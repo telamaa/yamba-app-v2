@@ -34,7 +34,8 @@
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
       "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
-      "remainingKg": "{kg} kg encore disponibles sur ce trajet"
+      "remainingKg": "{kg} kg encore disponibles sur ce trajet",
+      "valueHint": "Elle fixe le plafond d'indemnisation en cas de litige — indique le prix d'achat."
     },
     "photos": {
       "label": "Photos du colis",

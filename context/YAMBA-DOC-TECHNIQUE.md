@@ -13178,3 +13178,28 @@ Il reste : `S · une boîte à chaussures` en gras, la conséquence en gris, la 
 > La leçon : une illustration se justifie par ce qu'elle **ajoute dans la disposition où elle
 > vit**. Changer la disposition peut lui retirer sa raison d'être, même si elle était juste
 > avant. Une décision graphique n'est jamais valable « en soi ».
+
+### La valeur du contenu rejoint la grammaire
+
+Dernier bloc de l'étape à garder une mise en forme à part : un champ étroit (`md:max-w-md`)
+coincé entre deux cartes pleine largeur. Il paraissait orphelin.
+
+Il adopte la même grammaire : `SectionTitle`, carte pleine largeur, une ligne
+« libellé gras · ligne grise · contrôle à droite » — exactement la ligne « Poids ». La valeur
+est, comme le poids, **un nombre qu'on pose**.
+
+Deux conséquences qui valent mieux que la mise en page :
+
+- **l'explication quitte l'infobulle pour la ligne grise** (« Elle fixe le plafond
+  d'indemnisation en cas de litige — indique le prix d'achat »). Une phrase **visible** vaut
+  mieux qu'une phrase à découvrir, surtout quand elle commande le bloc suivant (la Garantie) ;
+- **le champ reste étroit à l'intérieur de la carte** : un `input` qui s'étire sur toute une
+  colonne large est inconfortable à lire et à remplir, l'œil perd la ligne. La carte porte la
+  largeur, le champ garde sa mesure.
+
+L'étape ① a désormais **une seule grammaire** : familles en pastilles (une question à huit
+réponses courtes s'y prête), puis trois cartes jumelles — **Ton colis**, **Valeur du
+contenu**, **Protection du colis** — titre + lignes pleine largeur à contrôle droit.
+
+Le legacy PER_CATEGORY garde ses champs simples : la carte n'a pas sa place dans une grille à
+deux colonnes, et ce moteur est déprécié — on ne lui refait pas une mise en page.
