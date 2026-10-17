@@ -18,11 +18,13 @@ import { useTripsSearch } from "@/hooks/useTripsSearch";
 import { useSearchFacets } from "@/hooks/useSearchFacets";
 import type {
   DepartureTimeBucket,
+  ProximityRing,
   SearchFamily,
   SortOption,
   TransportMode,
 } from "./search-results.types";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { countryName } from "@/lib/country-name";
 
 type FilterMode = "all" | TransportMode;
 
@@ -266,7 +268,8 @@ export default function SearchResultsView() {
   const locale = useLocale() as "fr" | "en";
 
   const [activeMode, setActiveMode] = useState<FilterMode>("all");
-  const [sort, setSort] = useState<SortOption>("earliest");
+  // D80 — la pertinence est le défaut (décidé par le SERVEUR ; l'état ne sert qu'à l'UI)
+  const [sort, setSort] = useState<SortOption>("relevance");
 
   const [superTripperOnly, setSuperTripperOnly] = useState(false);
   const [profileVerifiedOnly, setProfileVerifiedOnly] = useState(false);
@@ -395,6 +398,43 @@ export default function SearchResultsView() {
     [tripsQuery.data]
   );
   const totalCount = tripsQuery.data?.pages[0]?.totalCount ?? 0;
+  // D80 — l'ancrage du classement (présent sur le tri relevance ; null = flux découverte)
+  const anchor = tripsQuery.data?.pages[0]?.anchor ?? null;
+
+  // D80 — les SECTIONS du flux localisé : un en-tête à la première apparition de chaque
+  // anneau, dans l'ordre serveur. Deux gardes : un trajet PLEIN (queue de liste, hors de
+  // l'ordre des anneaux) ne rouvre jamais de section, et un anneau déjà titré ne se répète
+  // pas. Sans ancrage, aucune section — la liste d'aujourd'hui, inchangée.
+  const rows = useMemo(() => {
+    const seen = new Set<ProximityRing>();
+    return trips.map((item) => {
+      const full = typeof item.remainingKg === "number" && item.remainingKg <= 0;
+      const ring = anchor && !full ? item.ring ?? null : null;
+      let header: ProximityRing | null = null;
+      if (ring && !seen.has(ring)) {
+        seen.add(ring);
+        header = ring;
+      }
+      return { item, header };
+    });
+  }, [trips, anchor]);
+
+  const sectionLabel = (ring: ProximityRing): string => {
+    switch (ring) {
+      case "SAME_CITY":
+        return anchor?.city ? t("sections.sameCity", { city: anchor.city }) : t("sections.sameCityUnknown");
+      case "NEARBY":
+        return t("sections.nearby");
+      case "REGION":
+        return t("sections.region");
+      case "COUNTRY": {
+        const pays = countryName(anchor?.countryCode, locale);
+        return pays ? t("sections.country", { country: pays }) : t("sections.countryUnknown");
+      }
+      case "ELSEWHERE":
+        return t("sections.elsewhere");
+    }
+  };
 
   const isPageLoading = tripsQuery.isLoading;
   const isLoadingMore = tripsQuery.isFetchingNextPage;
@@ -442,7 +482,7 @@ export default function SearchResultsView() {
   };
 
   const clearAll = () => {
-    setSort("earliest");
+    setSort("relevance"); // D80 — le défaut
     setSuperTripperOnly(false);
     setProfileVerifiedOnly(false);
     setInstantBookingOnly(false);
@@ -463,7 +503,7 @@ export default function SearchResultsView() {
   };
 
   const hasActiveFilters =
-    sort !== "earliest" ||
+    sort !== "relevance" || // D80 — le défaut est la pertinence
     activeMode !== "all" ||
     superTripperOnly ||
     profileVerifiedOnly ||
@@ -558,7 +598,8 @@ export default function SearchResultsView() {
             </h1>
             {showHint && (
               <p className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400">
-                {t("subtitleHint")}
+                {/* D80 — ancré par l'IP : on le DIT (transparence), sinon l'invite générique */}
+                {anchor?.city ? t("anchoredHint", { city: anchor.city }) : t("subtitleHint")}
               </p>
             )}
           </div>
@@ -625,24 +666,36 @@ export default function SearchResultsView() {
                   ) : (
                     <>
                       <div className="md:hidden space-y-3">
-                        {trips.map((item) => (
-                          <TripResultCardMobile
-                            key={item.id}
-                            item={item}
-                            highlightedFamilies={selectedFamilies}
-                            weightKg={weightKg}
-                          />
+                        {rows.map(({ item, header }) => (
+                          <div key={item.id} className="space-y-3">
+                            {header && (
+                              <h2 className="pt-3 text-[15px] font-bold tracking-tight text-slate-900 first:pt-0 dark:text-white">
+                                {sectionLabel(header)}
+                              </h2>
+                            )}
+                            <TripResultCardMobile
+                              item={item}
+                              highlightedFamilies={selectedFamilies}
+                              weightKg={weightKg}
+                            />
+                          </div>
                         ))}
                       </div>
 
                       <div className="hidden md:block space-y-3">
-                        {trips.map((item) => (
-                          <TripResultCard
-                            key={item.id}
-                            item={item}
-                            highlightedFamilies={selectedFamilies}
-                            weightKg={weightKg}
-                          />
+                        {rows.map(({ item, header }) => (
+                          <div key={item.id} className="space-y-3">
+                            {header && (
+                              <h2 className="pt-3 text-[15px] font-bold tracking-tight text-slate-900 first:pt-0 dark:text-white">
+                                {sectionLabel(header)}
+                              </h2>
+                            )}
+                            <TripResultCard
+                              item={item}
+                              highlightedFamilies={selectedFamilies}
+                              weightKg={weightKg}
+                            />
+                          </div>
                         ))}
                       </div>
 

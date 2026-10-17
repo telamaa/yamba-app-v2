@@ -32,7 +32,18 @@ export type SearchFamilyCondition = {
   mode: "SURCHARGE" | "REFUSE";
   surchargePct?: number | null;
 };
-export type SortOption = "earliest" | "lowestPrice" | "bestRated";
+// D80 — `relevance` est le DÉFAUT (décidé par le serveur : le front ne l'envoie même pas).
+export type SortOption = "relevance" | "earliest" | "lowestPrice" | "bestRated";
+
+/** D80 — anneau de proximité à l'ancrage, du plus proche au plus lointain. */
+export type ProximityRing = "SAME_CITY" | "NEARBY" | "REGION" | "COUNTRY" | "ELSEWHERE";
+
+/** D80 — l'ancrage du classement, rendu par le serveur (jamais l'IP ni des coordonnées). */
+export type SearchAnchor = {
+  source: "query" | "ip";
+  city: string | null;
+  countryCode: string | null;
+};
 
 export type DepartureTimeBucket =
   | "earlyMorning" // 04:00 - 09:00
@@ -108,6 +119,8 @@ export type YambaTripResult = {
   reviewCount?: number;
   /** D46 — favori de l'utilisateur connecté (false / absent pour un visiteur) */
   isFavorite?: boolean;
+  /** D80 — anneau de proximité (tri relevance AVEC ancrage seulement) — les en-têtes de sections */
+  ring?: ProximityRing | null;
 
   travelerFirstName?: string;
   travelerLastName?: string;
