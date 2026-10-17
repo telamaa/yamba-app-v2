@@ -9,33 +9,28 @@
   "close": "Close",
   "steps": {
     "parcel": "Parcel",
-    "recipient": "Recipient",
+    "recipient": "Delivery",
     "charter": "Commitment",
     "payment": "Payment",
     "indicator": "step {current} of {total}"
   },
   "step1": {
     "title": "Describe your parcel",
-    "subtitle": "Accuracy and photos protect everyone",
-    "locationsTitle": "Meeting locations",
-    "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
-    "deliveryBlockTitle": "The recipient picks up the parcel",
-    "locationSingleHint": "Set by the Traveler",
-    "locationMissing": "The Traveler didn't specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted.",
+    "subtitle": "The more precise you are, the fewer surprises at handover.",
     "goldenRules": {
       "title": "Golden rules for a smooth shipment",
       "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",
       "weigh": "**Weigh precisely.** Declared weight must match actual weight at handover.",
       "describe": "**Describe accurately.** {carrierFirstName} will inspect the content before accepting.",
       "prohibited": "**No prohibited items.**",
-      "linkProhibited": "See the full list",
-      "open": "Show"
+      "linkProhibited": "See the full list"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Weight (kg)",
-      "valueLabel": "Declared value (€)",
+      "valueLabel": "Content value (€)",
       "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
@@ -45,43 +40,50 @@
     "photos": {
       "label": "Parcel photos",
       "requiredBadge": "Required with extended protection",
-      "hint": "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
+      "hint": "One photo of the unpacked contents, one of the sealed parcel. Up to {max} photos, JPEG or PNG, 10 MB each at most.",
       "add": "Add",
       "tagContent": "Content",
       "tagPackaged": "Packed",
       "remove": "Remove this photo"
     },
     "product": {
-      "label": "What do you want to send?",
+      "label": "A parcel, or a whole bag?",
       "parcel": "A parcel (per kg)",
       "checkedBag": "A checked bag 23 kg",
       "cabinBag": "A cabin bag 12 kg"
     },
     "family": {
-      "label": "Parcel family",
-      "hint": "The family tells whether the Traveler accepts it — it never changes the price per kg, except a displayed surcharge.",
-      "refused": "{carrierFirstName} does not take this family on this trip"
+      "label": "What are you sending?",
+      "hint": "The Traveler chooses what they agree to carry.",
+      "refused": "{carrierFirstName} does not take this family on this trip",
+      "refusedToggle": "{count, plural, =1 {# family refused} other {# families refused}} by {carrierFirstName}",
+      "noneAccepted": "{carrierFirstName} accepts no parcel family on this trip."
     },
     "size": {
-      "label": "Size — no need to measure",
-      "hint": "By eye: the coefficient applies to the price per kg.",
-      "S": "envelope → shoe box",
-      "M": "fits in a cabin bag",
-      "L": "takes half a suitcase"
-    }
+      "label": "Size: no need to measure",
+      "hint": "It tells the Traveler whether your parcel fits in their bag. Only the one that costs more is marked.",
+      "S": "a shoe box",
+      "M": "a backpack",
+      "L": "half a suitcase",
+      "hintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
+      "hintFlat": "At this weight, size does not change the price — the per-parcel minimum applies. It tells the Traveler whether your parcel fits in their bag.",
+      "extra": "+{amount}"
+    },
+    "requiredBadge": "Required"
   },
   "insurance": {
     "title": "Parcel protection",
     "basic": {
       "title": "Basic protection",
       "price": "Included",
-      "description": "You''re covered against non-delivery. Payment is held until the parcel reaches the recipient."
+      "description": "Your money is held until delivery. If the parcel is not handed over, you are refunded."
     },
     "extended": {
-      "title": "Yamba Guarantee €500",
-      "price": "+€6",
-      "description": "Loss, theft, damage during transport. Exclusions shown before confirmation (including customs seizure of a non-compliant parcel).",
-      "ipidLink": "See the terms"
+      "title": "Yamba Guarantee {cap}",
+      "price": "+{amount}",
+      "description": "Loss, theft or damage on the way: you are refunded up to {cap}.",
+      "ipidLink": "What is not covered",
+      "ipidText": "Excluded: prohibited items, a parcel that does not match its description, customs seizure, and damage caused by insufficient packaging. The refund never exceeds the content value you declared. Photos of the parcel are required."
     }
   },
   "categories": {
@@ -99,8 +101,8 @@
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
   "step2": {
-    "title": "Who is the recipient?",
-    "subtitle": "The recipient doesn''t need a Yamba account. You''ll share the code with them.",
+    "title": "Where, and to whom?",
+    "subtitle": "The meeting point first, then the person who collects the parcel. They do not need a Yamba account.",
     "deliveryFlow": {
       "title": "How the delivery will work",
       "codeGiven": "**A 6-digit code** will be given to you after payment.",
@@ -189,9 +191,9 @@
     "compactTitle": "Summary",
     "toPayTitle": "You pay",
     "transport": "Transport",
-    "serviceYamba": "Service & protection",
+    "serviceYamba": "Yamba service",
     "insurance": "Yamba Guarantee",
-    "insurance500": "Yamba Guarantee €500",
+    "insurance500": "Yamba Guarantee",
     "total": "Total",
     "totalNote": "Charged when the Traveler accepts",
     "totalNoteLong": "The amount is authorized now and only charged when the Traveler accepts.",
@@ -212,7 +214,7 @@
     "directFlight": "Direct",
     "duration": "{hours}h flight",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
     "minimumApplied": "Per-parcel minimum applied: {min}",
     "newTripper": "New Traveler",
     "quoteHint": {
@@ -247,5 +249,21 @@
     "login": "Sign in",
     "register": "Create an account"
   },
-  "previousStep": "Previous step"
+  "previousStep": "Previous step",
+  "locations": {
+    "title": "Meeting points",
+    "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
+    "deliveryBlockTitle": "The recipient collects the parcel",
+    "singleHint": "Place agreed with the Traveler",
+    "missing": "The Traveler did not specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted."
+  },
+  "exit": {
+    "title": "Leave this booking?",
+    "body": "What you entered will be lost: coming back, you will start from a blank page.",
+    "resume": "Keep going",
+    "leave": "Leave",
+    "favorite": "Keep this trip in my favourites",
+    "favoriteHint": "You will find it in one click, on any device.",
+    "favoriteAlready": "This trip is already in your favourites."
+  }
 }

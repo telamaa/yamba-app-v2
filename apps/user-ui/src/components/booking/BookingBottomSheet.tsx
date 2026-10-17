@@ -68,6 +68,14 @@ export default function BookingBottomSheet({
                 formatPrice(price.total, locale)
               )}
             </div>
+            {/* La phrase qui porte tout le modèle n'existait que dans la colonne
+                desktop : sur téléphone, le total s'affichait sans dire QUAND il
+                serait débité (revue UX 17/10). */}
+            {price.quote !== null && (
+              <div className="mt-0.5 text-[10.5px] leading-tight text-slate-500 dark:text-slate-400">
+                {t("summary.totalNote")}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -148,10 +156,12 @@ export default function BookingBottomSheet({
           </>)}
           {currentStep < 4 && (
             <div className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+              {/* Un champ vide ne produit PAS de ligne : « Colis · 2 kg · — € » se lisait
+                  comme un prix, juste sous le total (revue UX 17/10). */}
               {draft.weightKg && (
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {t("summary.parcel")} · {draft.weightKg} kg ·{" "}
-                  {draft.declaredValueEur || "—"} €
+                  {t("summary.parcel")} · {draft.weightKg} kg
+                  {draft.declaredValueEur ? ` · ${draft.declaredValueEur} €` : ""}
                 </div>
               )}
             </div>

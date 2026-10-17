@@ -61,6 +61,35 @@ export function computeTotal(draft: Draft, trip: TripContext, params: PricingPar
   return { transport, serviceFee, insurance, total: round2(transport + serviceFee + insurance), currency: "EUR", quote: null, quoteError: null };
 }
 
+/**
+ * Le brouillon porte-t-il une saisie à perdre ?
+ *
+ * On ne demande pas confirmation pour rien : à l'ouverture, le brouillon porte
+ * déjà une famille acceptée, un poids (2 kg par défaut, D33) et les lieux
+ * pré-sélectionnés — sortir là n'efface RIEN de ce que l'utilisateur a tapé.
+ * Ne comptent que les gestes qui lui appartiennent.
+ */
+export function hasUserInput(draft: Draft, initial: Draft): boolean {
+  return (
+    draft.description.trim() !== "" ||
+    draft.declaredValueEur.trim() !== "" ||
+    draft.photos.length > 0 ||
+    draft.insurance !== initial.insurance ||
+    draft.weightKg !== initial.weightKg ||
+    draft.family !== initial.family ||
+    draft.product !== initial.product ||
+    draft.sizeClass !== initial.sizeClass ||
+    draft.pickupLocationId !== initial.pickupLocationId ||
+    draft.deliveryLocationId !== initial.deliveryLocationId ||
+    draft.recipient.firstName.trim() !== "" ||
+    draft.recipient.lastName.trim() !== "" ||
+    draft.recipient.phoneE164.trim() !== "" ||
+    draft.recipient.email.trim() !== "" ||
+    draft.charterAccepted ||
+    draft.termsAccepted
+  );
+}
+
 export function isPerKgTrip(trip: TripContext): boolean {
   return typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
 }
@@ -129,16 +158,6 @@ export function validateStep1(
 ): ValidationErrors {
   const errors: ValidationErrors = {};
 
-  if (trip.pickupOptions.length > 1 && !draft.pickupLocationId) {
-    errors.pickupLocationId = isFr
-      ? "Choisis un lieu de remise"
-      : "Pick a handover location";
-  }
-  if (trip.deliveryOptions.length > 1 && !draft.deliveryLocationId) {
-    errors.deliveryLocationId = isFr
-      ? "Choisis un lieu de retrait"
-      : "Pick a pickup location for the recipient";
-  }
   if (isPerKgTrip(trip)) {
     // D14 — famille refusée par le Voyageur
     if (draft.product === "PARCEL" && trip.familyStances[draft.family]?.mode === "REFUSE") {
@@ -196,8 +215,22 @@ export function validateStep1(
   return errors;
 }
 
-export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
+export function validateStep2(draft: Draft, trip: TripContext, isFr: boolean): ValidationErrors {
   const errors: ValidationErrors = {};
+
+  // Les lieux de rendez-vous sont passés de l'étape 1 à l'étape 2 avec leur bloc
+  // (revue UX 17/10) : la validation suit, sinon on bloque « Continuer » sur une
+  // erreur invisible à l'écran.
+  if (trip.pickupOptions.length > 1 && !draft.pickupLocationId) {
+    errors.pickupLocationId = isFr
+      ? "Choisis un lieu de remise"
+      : "Pick a handover location";
+  }
+  if (trip.deliveryOptions.length > 1 && !draft.deliveryLocationId) {
+    errors.deliveryLocationId = isFr
+      ? "Choisis un lieu de retrait"
+      : "Pick a pickup location for the recipient";
+  }
 
   if (draft.recipient.firstName.trim() === "") {
     errors.recipientFirstName = isFr ? "Prénom requis" : "First name required";
@@ -242,7 +275,7 @@ export function validateStep(
     case 1:
       return validateStep1(draft, trip, isFr);
     case 2:
-      return validateStep2(draft, isFr);
+      return validateStep2(draft, trip, isFr);
     case 3:
       return validateStep3(draft, isFr);
     case 4:

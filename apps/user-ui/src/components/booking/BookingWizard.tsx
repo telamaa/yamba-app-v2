@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
+import BookingExitDialog from "./BookingExitDialog";
+import { useBookingExit } from "./useBookingExit";
 // ANO-WEB-34 (recette 5.12) — le brouillon de départ dépend du TRAJET (poids 2 kg ou mémorisé, lieux pré-sélectionnés) : `buildInitialDraft` existait mais n'était jamais appelée.
 import { buildInitialDraft } from "./booking.state";
 import { useBookingCheckout } from "./useBookingCheckout";
@@ -45,7 +47,15 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   const locale = useLocale();
   const isFr = locale === "fr";
 
-  const { draft, setDraft, step, setStep, clear } = useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]));
+  const initialDraft = useMemo(() => buildInitialDraft(trip), [trip]);
+  const { draft, setDraft, step, setStep, clear } = useBookingDraft(initialDraft, trip.tripId);
+  const exit = useBookingExit({
+    trip,
+    draft,
+    initialDraft,
+    clearAction: clear,
+    onCloseAction,
+  });
   const [showErrors, setShowErrors] = useState(false);
   const checkout = useBookingCheckout({ draft, trip, step, clear });
   const isSubmitting = checkout.isSubmitting;
@@ -94,11 +104,6 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   const handleSubmit = checkout.submit;
 
-  const subtitle = `${trip.originCity} → ${trip.destinationCity} · ${formatDate(
-    trip.departureDate,
-    locale
-  )}`;
-
   const ctaLabel =
     step === 4
       ? t("pay", { amount: formatPrice(price.total, locale) })
@@ -108,10 +113,11 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <BookingExitDialog {...exit.dialog} />
       {/* Back link */}
       <button
         type="button"
-        onClick={onCloseAction}
+        onClick={exit.requestExit}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
       >
         <ArrowLeft size={14} />
@@ -121,10 +127,12 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
       {/* Titre + stepper sur UNE ligne (gain vertical : le formulaire remonte) */}
       <header className="mb-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-b border-slate-200 pb-4 dark:border-slate-800">
         <div className="min-w-0">
+          {/* Le trajet était écrit TROIS fois à l'écran (ici, dans la carte
+              « Trajet sélectionné » et dans le détail du prix) — la carte le dit
+              en entier, cette ligne ne faisait que répéter (revue UX 17/10). */}
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
             {t("title")}
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
         </div>
         <div className="min-w-0 flex-1 lg:max-w-2xl">
           <BookingStepperDesktop current={step} onStepClickAction={goToStep} />
@@ -133,18 +141,18 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
       {/* Body: 2 cols */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950 sm:p-7">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950 sm:p-7">
           {step === 1 && (
             <StepParcel
               trip={trip}
               draft={draft}
               setDraftAction={setDraft}
               errors={errors}
-              hideInsurance
             />
           )}
           {step === 2 && (
             <StepRecipient
+              trip={trip}
               draft={draft}
               setDraftAction={setDraft}
               errors={errors}
@@ -189,14 +197,6 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
       </div>
     </div>
   );
-}
-
-function formatDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(iso));
 }
 
 function formatPrice(amount: number, locale: string): string {

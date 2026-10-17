@@ -7006,3 +7006,55 @@ doit être le mieux servi : c'est lui qu'on accueille.
 | FEED05 | Recherche « Paris → tout » | Plus d'anneaux : la qualité seule ordonne les départs de Paris |
 | FEED06 | Page 2 du flux (curseur `o:10`) | La page suit, ordre STABLE entre les deux appels ; le même curseur sur le tri prix-au-poids fonctionne aussi (ANO-API-24 close) |
 | FEED07 | `sort=nimporte` dans l'URL (lien partagé cassé) | 200, classement par pertinence — jamais un 400 |
+
+# La réservation, page ① — « Le colis » · `feat/mobile-booking-colis` (A214)
+
+## Le besoin
+
+L'Expéditeur doit pouvoir réserver depuis l'app, nativement — ni WebView, ni redirection vers
+le site. Le parcours de réservation est le moment où Yamba demande de l'argent : c'est donc
+celui où rien ne doit surprendre. Deux exigences portent tout le lot : **on ne découvre jamais
+un prix après coup** (le total est visible en permanence, et chaque option annonce ce qu'elle
+coûte en euros), et **on ne perd jamais une saisie sans l'avoir demandé**.
+
+La page ① répond à une seule question — *qu'est-ce que tu envoies ?* — parce que le parcours
+est découpé en sept pages, une décision par page. Un visiteur sans compte doit pouvoir composer
+son colis et voir son prix : on ne demande pas de compte pour regarder un prix.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-50** | Le parcours de réservation natif compte **sept pages, une décision par page**. La barre du bas est la même partout : le prix à gauche, le geste à droite — de la première page au paiement, elle ne bouge pas. |
+| **RG-MOB-51** | Toute option qui change le prix annonce son écart **en euros**, jamais en coefficient interne. Quand une option ne change pas le prix (le plancher l'absorbe), l'interface le **dit** au lieu d'afficher un écart faux. |
+| **RG-MOB-52** | La taille sert aussi à dire au Voyageur si le colis **tient dans son bagage** : l'indice l'explique même quand elle ne change rien au prix. |
+| **RG-MOB-53** | Le poids se demande **avant** la taille : sans poids, aucun écart de prix n'est calculable. |
+| **RG-MOB-54** | Un visiteur anonyme compose son colis et voit son prix. La porte d'identité tombe à l'étape du **destinataire**, pas avant. |
+| **RG-MOB-55** | Aucune limite n'est inventée par l'app : familles refusées, forfaits non proposés, kilos restants et plafond par colis (30 kg, CAP-01) viennent du trajet et sont **revérifiés par le serveur** à la création de la réservation. Un trajet qui ne déclare aucune condition **accepte tout** (l'absence n'est pas un refus). |
+| **RG-MOB-56** | Le prix affiché est une **projection** : le prix qui engage est celui que le serveur calcule et fige au paiement (snapshot). Une divergence est refusée côté serveur, et rien n'est débité. |
+| **RG-MOB-57** | La ligne de frais porte la **commission seule** et s'appelle « Service Yamba ». La prime de garantie est une ligne distincte : prime et commission ne se mélangent jamais (GAR-04). |
+| **RG-MOB-58** | Choisir la garantie étendue **ouvre d'office les exclusions** — un lien à cliquer ne « présente » pas des exclusions (GAR-05). |
+| **RG-MOB-59** | Le choix des **lieux de rendez-vous** appartient à l'étape « Livraison », pas à la description du colis : un lieu n'est pas une propriété du colis, c'est un rendez-vous avec quelqu'un. |
+| **RG-MOB-60** | Quitter le tunnel avec une saisie en cours **demande confirmation** (« Reprendre » par défaut), puis **efface tout** — on repart toujours de zéro — et **propose de garder le trajet en favori**, coché. Si rien n'a été saisi, on sort sans rien demander. |
+| **RG-MOB-61** | Un brouillon de réservation appartient à **UN** trajet : ouvrir la réservation d'un autre trajet repart d'un brouillon neuf. |
+| **RG-MOB-62** | Dans le tunnel, l'en-tête se tait : pas de notifications, pas de messagerie, pas de CTA concurrent (« Partager un trajet ») — un entonnoir n'a qu'une sortie utile. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB83 | Depuis la fiche trajet, taper « Réserver » | La page ① s'ouvre sur « Le colis » ; la barre du bas affiche déjà un total réel (colis de référence 2 kg), jamais « 0 € » |
+| MOB84 | Un trajet à 3,50 €/kg, poids 1 kg, essayer S puis M puis L | Les trois annoncent le **même** total ; l'indice explique que la taille sert à dire si le colis tient dans le bagage |
+| MOB85 | Même trajet, poids 10 kg, essayer S puis M puis L | Chaque taille annonce son écart en **euros** ; seule celle qui coûte plus cher est marquée |
+| MOB86 | Trajet dont le Voyageur refuse « Électronique » | La famille est affichée comme refusée et ne peut pas être choisie ; les familles refusées sont repliées derrière une ligne qui les compte |
+| MOB87 | Saisir un poids supérieur aux kilos restants du trajet | « Continuer » reste actif, le tap **nomme** ce qui bloque ; aucune réservation n'est tentée |
+| MOB88 | Saisir 35 kg | Refusé (plafond 30 kg par colis), message explicite |
+| MOB89 | Trajet qui ne propose pas le bagage en soute | Le forfait n'apparaît pas comme une option |
+| MOB90 | Visiteur non connecté sur la page ① | Il compose son colis et voit son prix ; aucune demande de connexion |
+| MOB91 | Modifier le poids, puis quitter par la croix | Confirmation « Reprendre / Quitter », « Reprendre » par défaut ; si on quitte, la saisie est effacée et le trajet est proposé en favori (coché) |
+| MOB92 | Ouvrir la réservation puis ressortir immédiatement sans rien toucher | Aucune confirmation : on sort directement |
+| MOB93 | Web — commencer un brouillon sur le trajet A, ouvrir le trajet B dans le même onglet | La réservation du trajet B part **vierge** ; aucun lieu « hérité » du trajet A |
+| MOB94 | Web — étape 1 | Elle commence par le colis ; les lieux de rendez-vous sont à l'étape 2 « Livraison », et « Continuer » n'est jamais bloqué par une erreur hors écran |
+| MOB95 | Web — choisir la Garantie étendue | Les exclusions s'affichent **immédiatement**, sans clic supplémentaire |
+| MOB96 | Web — lire le récapitulatif de prix | Une ligne « Service Yamba » (commission seule) et, si choisie, une ligne de garantie distincte ; le total est juste |
+| MOB97 | Web — pendant tout le tunnel | L'en-tête ne propose ni cloche, ni messagerie, ni « Partager un trajet » |

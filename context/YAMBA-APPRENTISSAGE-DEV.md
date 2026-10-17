@@ -3362,3 +3362,220 @@ par sa propre regex : la page 2 du tri prix-au-poids était inatteignable depuis
   débordera (porte 🚪↔ de D80).
 - La théorie derrière l'étage 2 : les « learning to rank » pointwise — notre score en est un,
   écrit à la main ; PostHog (D66) fournira les données du jour où on voudra l'apprendre.
+
+## Chapitre 213 — Une décision par page : le brouillon qui vit dans le module, le prix qui parle en euros, et la sortie qu'on n'avait pas écrite
+
+### Le décor
+
+La fiche trajet native (chapitre précédent) se terminait sur une pastille grise. Ce chapitre
+ouvre le tunnel de réservation, **page ① : le colis** — et uniquement elle. La méthode compte
+autant que le code : une page à la fois, mobile puis web jumeau puis documents, et plus de code
+à l'aveugle — on part des **captures** fournies par la recette. Cette page a vécu quatre passes.
+
+### Un état partagé entre des pages poussées : `useSyncExternalStore`
+
+Un tunnel mobile n'est pas un formulaire : c'est une **pile de pages**. Et une page poussée ne
+retourne pas de valeur à celle qui l'a poussée (contrairement à une modale, qui se ferme *avec*
+un résultat). Il faut donc un état qui vive **à côté** de la navigation.
+
+Trois solutions existent, et le choix mérite d'être compris :
+
+| Solution | Pourquoi pas ici |
+|---|---|
+| Passer les valeurs en **paramètres de route** | Une URL n'est pas un formulaire : tout y devient chaîne, les photos n'y entrent pas, et chaque retour arrière réécrit l'historique |
+| Un **contexte React** au-dessus de la pile | Il faut un provider qui englobe toutes les routes, et chaque écriture re-rend tous les écrans montés de la pile |
+| Un **objet de module + abonnés** | L'état est un singleton, les écrans s'y abonnent individuellement, et il meurt avec le processus |
+
+C'est la troisième, déjà employée deux fois dans l'app (`auth-flow-state.ts`, `search-draft.ts`).
+Le hook officiel de React pour s'abonner à un état **externe** est `useSyncExternalStore` :
+
+```ts
+// apps/mobile/src/lib/booking-draft.ts
+let draft: BookingDraft = EMPTY;
+const listeners = new Set<() => void>();
+
+export function getBookingDraft(): BookingDraft { return draft; }          // snapshot
+export function subscribeBookingDraft(l: () => void) {                      // abonnement
+  listeners.add(l);
+  return () => { listeners.delete(l); };
+}
+export function setBookingDraft(patch: Partial<BookingDraft>) {
+  draft = { ...draft, ...patch };                                           // NOUVELLE référence
+  listeners.forEach((l) => l());
+}
+
+export function useBookingDraft(): BookingDraft {
+  return useSyncExternalStore(subscribeBookingDraft, getBookingDraft, getBookingDraft);
+}
+```
+
+Le contrat à ne pas rater : **`getSnapshot` doit rendre la MÊME référence tant que rien n'a
+changé**. Si on rendait `{ ...draft }`, React verrait un objet neuf à chaque rendu et la
+boucle serait infinie. D'où `draft = { ...draft, ...patch }` dans l'écriture (référence neuve
+*uniquement* quand on écrit) et un simple `return draft` dans la lecture.
+
+Le troisième argument (`getServerSnapshot`) sert au rendu serveur ; sur mobile il n'y en a pas,
+on repasse la même fonction.
+
+### Un état qui MEURT est un choix de conception, pas un oubli
+
+Le brouillon mobile ne survit pas à la fermeture de l'app, et le brouillon web est effacé à la
+sortie. Ce n'est pas de la paresse : **on a écrit pourquoi**, et on a parqué l'alternative au
+registre (§ 7.6) plutôt que de la laisser se perdre.
+
+Restaurer un brouillon de réservation oblige à rouvrir, au retour, tout ce qui a pu changer :
+le trajet peut être parti, annulé, masqué par un admin ou complet ; les kilos restants, le prix
+au kilo du Voyageur et les paramètres de plateforme ont pu bouger. **La règle qu'on en tire** :
+on peut restaurer une *saisie*, jamais un *calcul* — un prix se recalcule toujours. Et dès
+l'étape 2, le brouillon porterait les données personnelles d'un **tiers** (le destinataire) :
+un objet RGPD à part entière (export, effacement, rétention) pour une saisie abandonnée.
+
+À la place, on garde la seule chose qui ait besoin de survivre : **retrouver le trajet**. D'où
+le favori proposé coché à la sortie — il est côté serveur, donc il suit le compte sur tous les
+appareils, là où un brouillon de navigateur ne sort pas de son onglet.
+
+### Ne demander confirmation que lorsqu'il y a quelque chose à perdre
+
+Une boîte « êtes-vous sûr ? » sur un formulaire vierge n'est que de la friction. Mais un
+brouillon n'est jamais vierge chez nous : à l'ouverture il porte déjà une famille acceptée, 2 kg
+par défaut et les lieux pré-sélectionnés quand il n'y a qu'un choix. La comparaison se fait donc
+**contre le brouillon initial de CE trajet**, pas contre un objet vide :
+
+```ts
+// apps/user-ui/src/components/booking/booking.config.ts
+export function hasUserInput(draft: Draft, initial: Draft): boolean {
+  return (
+    draft.description.trim() !== "" ||
+    draft.photos.length > 0 ||
+    draft.weightKg !== initial.weightKg ||
+    draft.family   !== initial.family   || /* … */
+    draft.charterAccepted
+  );
+}
+```
+
+Le motif général : **« modifié » se mesure par rapport à un point de référence explicite**, et
+ce point de référence doit être celui que l'utilisateur a réellement vu à l'écran.
+
+### Le bug le plus instructif du lot : une clé de stockage sans portée
+
+Le brouillon web était persisté sous une clé fixe :
+
+```ts
+const DRAFT_KEY = "booking-wizard";        // avant
+const scope = tripId ? `${DRAFT_KEY}:${tripId}` : DRAFT_KEY;   // après
+```
+
+Conséquence : un brouillon commencé sur le trajet A était restauré **tel quel** sur le trajet B
+dans le même onglet. Et ce qui rend ce défaut vicieux, c'est que rien ne cassait : les
+identifiants de lieux sont des **rangs** (`TRAIN_STATION-0`), donc le lieu « correspondait » à
+un lieu d'un autre trajet, sans erreur, sans message — juste un mauvais rendez-vous.
+
+Deux leçons, et la seconde vaut pour tout le dépôt :
+
+1. **Une clé de stockage doit porter la portée de ce qu'elle stocke.** Un brouillon lié à une
+   ressource se range sous l'identifiant de cette ressource.
+2. **Un identifiant positionnel n'est pas un identifiant.** `TRAIN_STATION-0` est stable
+   *dans* un trajet et collisionne *entre* trajets. C'est le même piège que les index de liste
+   comme `key` React, mais avec des conséquences métier.
+
+### Le coefficient est une vérité de moteur, pas une vérité d'écran
+
+Sous S / M / L, l'interface affichait « ×1 / ×1,1 / ×1,25 ». C'est exactement le facteur
+qu'applique le moteur de prix — donc *vrai*, et pourtant **inutilisable** : personne ne
+multiplie mentalement un total par 1,1 ; et surtout, sous le plancher de transport, multiplier
+ne change rien du tout.
+
+La règle qu'on en tire, et qui vaut pour toute interface tarifaire : **on affiche la différence
+que l'utilisateur verra sur sa facture, calculée pour ses valeurs à lui.** Concrètement, on
+demande au moteur deux devis et on montre l'écart :
+
+```ts
+// apps/mobile/src/app/booking/parcel.tsx — l'écran appelle le MOTEUR trois fois,
+// il ne réimplémente aucune formule.
+if (!parseWeight(draft.weightKg)) return null;        // pas de poids ⇒ pas d'écart inventé
+const totals = SIZE_CLASSES.map((size) => quoteDraft({ ...draft, sizeClass: size }, trip, params));
+const cheapest = Math.min(...totals);
+return { S: totals[0] - cheapest, M: totals[1] - cheapest, L: totals[2] - cheapest };
+// les trois écarts à 0 ⇒ `sizeIsFlat` : on le DIT au lieu d'afficher « +0 € »
+```
+
+Et quand l'écart est nul, on ne masque pas la question : on explique à quoi la taille sert
+**quand même** (dire au Voyageur si le colis tient dans son bagage). Une option qui n'a pas
+d'effet sur le prix peut avoir un effet sur l'acceptation.
+
+Corollaire trouvé dans la même passe : « +6 € » et « 500 € » étaient **écrits en dur dans les
+fichiers de traduction** alors que la plateforme les rend paramétrables. Une valeur qui a un
+administrateur n'a rien à faire dans un dictionnaire i18n — un dictionnaire traduit des mots,
+il ne détient pas de politique.
+
+### Projeter, ce n'est pas décider : le front et le moteur partagé
+
+L'app calcule un prix. Le serveur, lui, en calcule un autre et le **fige** dans la réservation.
+Comment éviter qu'ils divergent ? En ne les écrivant **qu'une fois** : `@packages/pricing` est
+importé par les deux (alias ajouté à `apps/mobile/tsconfig.json`), et les *paramètres* sont
+servis par l'API (`GET /trips/pricing/params`).
+
+Le client de ces paramètres est un bon exemple de cache minimal — pas de react-query pour une
+valeur qui bouge trois fois par an :
+
+```ts
+let cached: PricingParams | null = null;
+let inFlight: Promise<PricingParams> | null = null;   // deux écrans ⇒ UN appel
+
+export function currentPricingParams() { return cached ?? PRICING_PARAMS; }  // jamais d'attente
+export async function loadPricingParams() {
+  if (cached) return cached;
+  if (inFlight) return inFlight;
+  inFlight = apiFetch(...).then(/* … */).catch(() => PRICING_PARAMS).finally(() => { inFlight = null; });
+  return inFlight;
+}
+```
+
+Trois idées à retenir : **la déduplication par promesse en vol**, le **repli qui ne jette
+jamais** (un écran de prix ne doit pas s'effondrer parce qu'une requête a échoué), et le fait
+que le repli soit *sûr* — si les paramètres affichés étaient périmés, le serveur refuse au
+paiement et rien n'est débité. Un repli n'est acceptable que si quelqu'un, en aval, tient la
+vérité.
+
+### Des règles qui rendent des CODES, pas des phrases
+
+Côté mobile, les validations ne connaissent pas un mot de français :
+
+```ts
+export type ParcelErrorCode =
+  | 'FAMILY_REFUSED' | 'BAG_NOT_OFFERED' | 'NOT_ENOUGH_CAPACITY'
+  | 'WEIGHT_REQUIRED' | 'WEIGHT_MAX' | 'WEIGHT_REMAINING';
+```
+
+L'écran traduit. Trois bénéfices : les règles se testent sans i18n, la règle du dépôt (« jamais
+un `fr ? … : …` ») est tenue par construction, et le jour où une règle part côté serveur, c'est
+le même vocabulaire qui voyage — un `details.code`, exactement comme les refus métier de l'API.
+
+Dans le même fichier, un détail de modélisation qui revient souvent : **l'absence n'est pas un
+refus**. Un trajet qui ne déclare aucune condition de famille accepte tout. Écrire
+`conditions.find(...) ?? ACCEPTED` au lieu de traiter le `undefined` comme un `REFUSE` par
+prudence, c'est la différence entre un produit utilisable et un produit qui bloque sur ses
+propres valeurs par défaut.
+
+### Les pièges payés dans ce lot
+
+- **Déplacer un bloc, c'est déplacer sa validation.** Les lieux sont passés de l'étape 1 à
+  l'étape 2 ; tant que `validateStep1` les contrôlait encore, « Continuer » se bloquait sur une
+  erreur **invisible à l'écran**. Une règle de validation appartient à l'écran qui affiche le
+  champ, jamais à l'étape où il se trouvait avant.
+- **Les routes typées d'expo-router sont un fichier GÉNÉRÉ** (`apps/mobile/.expo/types/router.d.ts`),
+  produit par Metro. Après un aller-retour sur une autre branche, il ne contenait plus les routes
+  `booking/` et le typecheck échouait sur un `router.push` pourtant correct. On le répare en
+  lançant Metro une fois, pas en touchant au code — et surtout pas en élargissant un type.
+- **Une infobulle vit dans le flux, pas au-dessus de lui** : la nôtre s'ouvrait vers le haut et
+  se faisait rogner par un `overflow-hidden` parent. Soit on retire le rognage, soit on ouvre
+  dans l'autre sens ; ici, les deux.
+
+### Aller plus loin
+
+- `useSyncExternalStore` — la doc React explique le contrat du snapshot ; le piège de la
+  référence instable est le premier de la liste.
+- Le livrable `docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE.md` prolonge la section sur
+  les planchers : pourquoi, sous ~1,8 kg, la taille n'a *aucun* effet sur le prix, et ce qu'un
+  poids volumétrique (la logique des transporteurs express) changerait.

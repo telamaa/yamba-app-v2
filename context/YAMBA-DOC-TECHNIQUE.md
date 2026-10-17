@@ -12443,3 +12443,159 @@ La cascade d'ancrage : `near*` de la query → `x-client-ip` via `resolveIpAncho
 3. **Migration douce** : `isPrivateIp` d'auth-service (D78) vers `@packages/libs/geoip`
    (duplication assumée pour ne pas toucher la baseline auth dans cette PR).
 4. **Mobile** : mêmes contrats, sur la page résultats de `feat/mobile-results` une fois mergée.
+
+# La page ① du tunnel — « Le colis » en natif, et le tunnel web repris sur captures · `feat/mobile-booking-colis` (A214)
+
+## Le besoin et la méthode
+
+La fiche trajet native (A213) se terminait sur une pastille grise « Bientôt réservable » et une
+promesse écrite dans le code : *« au lot réservation, cette pastille devient le CTA mangue, à la
+place EXACTE qui lui était réservée »*. Ce lot ouvre le parcours — et **seulement sa première
+page**.
+
+La méthode a été tranchée le 17/10 et vaut pour tout le tunnel : **une page à la fois**. Pour
+chaque page — la page mobile native traitée en expert UX (jamais un portage mécanique), puis
+l'optimisation de la page web jumelle (le téléphone force à trancher ce que l'écran large
+laisse flou), puis la PR et les documents de CETTE page. Pas de gros lot monolithique, pas de
+rattrapage documentaire global. Et depuis le 17/10 : **pas de code à l'aveugle** — on annonce la
+page, l'utilisateur fournit les captures web, on optimise sur captures, puis on fait le mobile.
+Cette page ① a vécu **quatre passes de retours** (`context/captures/mobile/booking/1-web/`,
+`1-mob/`, `1-mob/back1/`, `1-mob/back-2/`).
+
+## Le découpage : 7 pages côté app, 4 étapes côté site
+
+Le site porte une étape 1 à **huit sections** (lieux, règles d'or, catégorie, poids, valeur,
+description, photos, garantie). Transposée telle quelle sur un téléphone, elle redonnait le
+formulaire à rallonge que la fiche trajet avait justement dû désempiler. Découpe retenue :
+
+| # | Page mobile | Ce qu'on y décide |
+|---|---|---|
+| ① | **Le colis** | produit (colis au kilo / bagage forfaitaire), famille, poids, taille |
+| ② | Le contenu | valeur déclarée, photos, description |
+| ③ | Livraison | lieux de remise et de retrait |
+| ④ | La garantie | BASIC / ÉTENDUE 500 € |
+| ⑤ | Le destinataire | identité + téléphone (porte d'identité ici, pas avant) |
+| ⑥ | L'engagement | charte, conditions |
+| ⑦ | Paiement | et confirmation |
+
+Le **web reste à 4 étapes** : un écran large porte légitimement plus de densité. Divergence
+assumée, précédents A203/A209/A210, consignée au registre § 7.6.
+
+## La pile mobile — quatre fichiers et un cadre
+
+- `apps/mobile/src/components/booking/booking-step-frame.tsx` — **le cadre des sept étapes**.
+  C'est lui qui tient la promesse d'A213 : la barre du bas ne bouge pas d'un pixel, prix à
+  gauche, geste à droite, de la première page au paiement. En-tête aligné à gauche (le titre
+  d'une étape, pas d'une modale), jauge en segments (`BOOKING_STEPS = 7` — la jauge le *dit*,
+  elle ne le devine pas), et le CTA **reste actif** même quand l'étape est incomplète : il NOMME
+  ce qui manque au tap (doctrine A209), il ne se tait pas en gris.
+- `apps/mobile/src/lib/booking-draft.ts` — **le brouillon, en mémoire de processus**. Une page
+  poussée ne retourne pas de valeur à celle qui l'a poussée : chaque étape écrit dans un objet
+  de module, les écrans s'abonnent par `useSyncExternalStore`. Même motif que `search-draft.ts`
+  (A212) et `auth-flow-state.ts` (A208) — zéro contexte React à traîner. Deux propriétés
+  voulues : le brouillon **meurt avec le processus** (une réservation non payée n'engage rien)
+  et il est **lié à un `tripId`** (`startBookingDraft` repart de zéro sur un autre trajet).
+- `apps/mobile/src/lib/booking-rules.ts` — **les règles pures**, miroir de
+  `apps/user-ui/src/components/booking/booking.config.ts` avec une différence de principe :
+  *ici, rien n'est une phrase*. `validateParcelStep` rend des **codes**
+  (`FAMILY_REFUSED`, `BAG_NOT_OFFERED`, `WEIGHT_REMAINING`…), l'écran les traduit — testable
+  sans i18n, et conforme à la règle « jamais un `fr ? … : …` » (D44).
+- `apps/mobile/src/lib/api/pricing.api.ts` — les **paramètres de plateforme** (D62) :
+  `GET /trips/pricing/params`, le même endpoint que le site. Cache de module + promesse en vol
+  partagée (deux écrans ne font qu'un appel), repli sur les défauts du moteur, jamais de
+  `throw`. Un devis calculé avec des paramètres périmés est de toute façon rattrapé au
+  paiement : le serveur refuse (`QUOTE_DIVERGENCE`) et rien n'est débité.
+- `apps/mobile/src/app/booking/parcel.tsx` + `booking/_layout.tsx` — l'écran et sa pile.
+
+Le CTA de la fiche trajet pousse `/booking/parcel?tripId=…` (`apps/mobile/src/app/trip/[id].tsx`).
+
+## Le prix VIVANT — et pourquoi il parle en euros
+
+Le devis vient de **`@packages/pricing`**, LE moteur, celui du snapshot serveur (D34) : le front
+**projette**, le serveur **tranche et fige** (D17). Aucune formule n'est réécrite côté app ;
+l'alias `@packages/pricing` a été ajouté à `apps/mobile/tsconfig.json` pour ça.
+
+Le vrai apport de la passe sur captures est ailleurs : **« ×1 / ×1,1 / ×1,25 » sous S/M/L était
+le coefficient interne du moteur**. Chaque taille annonce désormais son écart **en euros**,
+calculé pour le poids saisi — ce qui produit le cas honnête « à ce poids, la taille ne change
+pas le prix » (le plancher de transport l'avale) et fait que **seule la taille qui coûte plus
+cher est marquée**. C'est exactement la règle posée le 16/10 sur la carte de résultat : une
+interface qui annonce un prix annonce le prix qu'on paie. D'où aussi l'ordre **poids AVANT
+taille** : sans poids, aucun écart n'est calculable.
+
+Dans la même veine, « +6 € » et « 500 € » étaient **écrits en dur dans les traductions** alors
+que D62 rend prime et plafond paramétrables : ils viennent du moteur.
+
+## Ce que la page web a dû trancher
+
+- **L'ordre** : la page s'appelait « Décris ton colis » et commençait par les **lieux** — deux
+  écrans de défilement sur téléphone avant de voir le mot « colis ». Désormais : le colis, ce
+  qui le protège, ce qui le montre.
+- **Les lieux sortent de l'étape 1** dans `MeetingPoints.tsx`, et l'étape 2 devient
+  « Livraison » / « Où, et à qui ? ». La **validation a suivi le bloc**
+  (`validateStep1` → `validateStep2`, qui prend maintenant le `trip`) — sans ça, « Continuer »
+  se bloque sur une erreur invisible à l'écran.
+- **La garantie quitte la colonne de droite** (`BookingSummarySidebar.tsx` perd son
+  `InsuranceCard`) pour remonter dans le formulaire, **avant les photos** : c'est elle qui les
+  rend obligatoires, et une décision à +6 € n'est pas un récapitulatif.
+- **GAR-04 trahi par l'affichage** : la ligne « Service & protection » portait la **seule**
+  commission, juste au-dessus d'une ligne « Garantie Yamba » — deux protections facturées à la
+  lecture, alors que la règle dit que prime et commission *ne se mélangent jamais*. Elle devient
+  **« Service Yamba »** (le total, lui, était juste).
+- **GAR-05** exige que les exclusions (dont la saisie douanière d'un colis non conforme) soient
+  « présentées AVANT le choix » : un lien à cliquer ne présente rien — choisir la Garantie les
+  ouvre d'office.
+- **La forme** : plus aucun rectangle pour la taille (les mêmes pastilles que la question du
+  dessus), lieux en liste à plat, familles refusées **repliées et comptées**, photos en grille
+  plafonnée, infobulle qui s'ouvre vers le bas (elle sortait de la carte sous `overflow-hidden`).
+- **L'en-tête est réduit dans le tunnel** (`layout/Header.tsx`) : ni cloche, ni messagerie, ni
+  CTA « Partager un trajet » — un CTA concurrent dans un entonnoir. Et `devIndicators: false`
+  dans `next.config.js` : la pastille de dev Next se posait sur la page pendant la recette.
+
+## La sortie du tunnel — ce qui n'existait pas
+
+La flèche « Retour au trajet » et la croix effaçaient la saisie **sans rien demander** : anodin à
+l'étape 1, brutal à l'étape 4. `useBookingExit.ts` + `BookingExitDialog.tsx` donnent **un seul
+comportement** au desktop et au mobile :
+
+1. rien de saisi → on sort sans rien demander (`hasUserInput(draft, initialDraft)` — le
+   brouillon de départ porte déjà une famille acceptée, 2 kg par défaut (D33) et les lieux
+   pré-sélectionnés : sortir là n'efface rien de ce que l'utilisateur a tapé) ;
+2. sinon, confirmation — **« Reprendre » par défaut**, Échap = reprendre ;
+3. on sort → **le brouillon est effacé**. Arbitrage utilisateur : *toujours repartir de zéro*
+   (voir registre § 7.6 pour ce qu'il faudrait traiter pour prendre la reprise de brouillon) ;
+4. et le **favori est proposé coché** (D46) : côté serveur, lié au compte, il suit l'utilisateur
+   sur tous ses appareils. C'est la seule chose qui ait besoin de survivre à la sortie.
+
+## Le défaut latent trouvé en chemin
+
+`useBookingDraft` persistait sous une clé **fixe** (`yamba:form:booking-wizard`) : un brouillon
+commencé sur le trajet A était restauré tel quel sur le trajet B dans le même onglet — poids,
+description, destinataire, garantie, et surtout `pickupLocationId` / `deliveryLocationId`, dont
+les identifiants sont des **rangs** (`TRAIN_STATION-0`) et « correspondaient » donc à un lieu
+d'un AUTRE trajet **sans la moindre erreur visible**. La clé est désormais portée par le trajet
+(`${DRAFT_KEY}:${tripId}`).
+
+## Le livrable 12 — « Tarification et rentabilité »
+
+`docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE.{md,pdf}` (4 967 mots, généré par
+`scripts/build-doc-pdf.py`, indexé au README des livrables). Né d'un constat de recette sur
+cette page : *« poids ET taille, pour 0,75 € d'écart ? »*. **Mesuré** sur un trajet à 3,50 €/kg :
+sous **1,83 kg**, S, M et L donnent exactement le même total — le plancher de transport (8 €,
+D32) avale le coefficient PRC-03. Deux trous nommés : le coefficient est trop faible pour être
+crédible, et **CAP-01 ne compte que les kilos** (le volume n'est jamais décompté de
+`remainingKg`). Le correctif livré ici est d'**affichage seulement** (l'indice dit à quoi sert la
+taille, y compris quand elle ne change pas le prix) ; le fond est une décision de PRIX
+(D13/D32/PRC-03, moteur partagé avec le snapshot serveur) — **proposée, pas codée**.
+
+## Les contrôles
+
+- `nx typecheck @yamba-app/mobile` vert, `tsc --noEmit` sur `apps/user-ui` vert (le contrôle CI
+  — `user-ui` n'a pas de cible Nx `typecheck`, c'est la commande de la CI qu'on rejoue).
+- Contrôle i18n miroir parfait à chaque passe (`node scripts/check-i18n-messages.mjs`), clés
+  mortes purgées **dans les deux locales**.
+- **Piège payé** : les routes typées d'expo-router (`apps/mobile/.expo/types/router.d.ts`) sont
+  un artefact **généré par Metro**. Un aller-retour sur une autre branche l'a régénéré sans les
+  routes `booking/`, et `nx typecheck @yamba-app/mobile` échouait sur un `router.push` pourtant
+  juste. Il se répare en lançant Metro une fois (`npx nx start @yamba-app/mobile`), pas en
+  touchant au code.

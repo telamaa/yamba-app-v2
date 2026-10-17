@@ -1,14 +1,14 @@
 /**
  * BookingSummarySidebar.tsx
  * =========================
- * Desktop sticky sidebar. Step 1 adds an Insurance card above the recap.
+ * Desktop sticky sidebar : le trajet, le prix, le bouton. RIEN à décider ici —
+ * la garantie est remontée dans le formulaire (revue UX 17/10).
  */
 
 "use client";
 
 import { ArrowLeft, ArrowRight, Calendar, Clock, Lock, Plane, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { InsuranceOption } from "./BookingFormUi";
 import type { Draft, PriceBreakdown, Step, TripContext } from "./booking.types";
 
 type Props = {
@@ -53,57 +53,6 @@ export default function BookingSummarySidebar({
         showBackButton={showBackButton}
         onBackAction={onBackAction}
       />
-      {currentStep === 1 && (
-        <InsuranceCard draft={draft} setDraftAction={setDraftAction} />
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// INSURANCE CARD
-// ============================================================
-
-function InsuranceCard({
-                         draft,
-                         setDraftAction,
-                       }: {
-  draft: Draft;
-  setDraftAction: (updater: (prev: Draft) => Draft) => void;
-}) {
-  const t = useTranslations("booking");
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950">
-      <div className="px-5 pt-5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {t("insurance.title")}
-        </div>
-      </div>
-      <div className="px-5 pb-5 pt-3">
-        <InsuranceOption
-          selected={draft.insurance === "BASIC"}
-          onSelectAction={() =>
-            setDraftAction((prev) => ({ ...prev, insurance: "BASIC" }))
-          }
-          title={t("insurance.basic.title")}
-          price={t("insurance.basic.price")}
-          priceVariant="free"
-          description={t("insurance.basic.description")}
-        />
-        <InsuranceOption
-          selected={draft.insurance === "EXTENDED_500"}
-          onSelectAction={() =>
-            setDraftAction((prev) => ({ ...prev, insurance: "EXTENDED_500" }))
-          }
-          title={t("insurance.extended.title")}
-          price={t("insurance.extended.price")}
-          description={t("insurance.extended.description")}
-          extraLink={{
-            label: t("insurance.extended.ipidLink"),
-            onClickAction: () => console.info("[booking] open IPID sheet"),
-          }}
-        />
-      </div>
     </div>
   );
 }

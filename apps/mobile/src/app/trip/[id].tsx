@@ -960,7 +960,6 @@ function BottomBar({
   border: string;
 }) {
   const t = useTranslations('tripDetail');
-  const theme = useTheme();
   const locale = useLocale() as SupportedLocale;
   const insets = useSafeAreaInsets();
 
@@ -987,20 +986,19 @@ function BottomBar({
           </ThemedText>
         </ThemedText>
       </View>
-      {/* Le wizard de réservation n'existe pas encore : l'état est DIT, en
-          pastille discrète — un grand pavé gris était l'élément le plus
-          visible de l'écran pour la seule chose qu'on ne peut pas faire.
-          Au lot réservation, cette pastille devient le CTA mangue. */}
-      <View
-        accessible
+      {/* La promesse d'A213 est tenue : la pastille grise « Bientôt
+          réservable » devient le CTA mangue, à la place EXACTE qui lui était
+          réservée — la barre n'a pas bougé d'un pixel. Le parcours s'ouvre
+          sur sa première étape (le colis) ; un visiteur anonyme y entre
+          librement, la porte d'identité tombera au destinataire. */}
+      <Pressable
         accessibilityRole="button"
-        accessibilityState={{ disabled: true }}
-        style={[styles.bottomPill, { backgroundColor: theme.backgroundElement }]}>
-        <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
-        <ThemedText type="small" themeColor="textSecondary">
-          {t('bar.soon')}
+        onPress={() => router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } })}
+        style={({ pressed }) => [styles.bottomCta, { opacity: pressed ? 0.85 : 1 }]}>
+        <ThemedText type="smallBold" style={styles.bottomCtaLabel}>
+          {t('bar.book')}
         </ThemedText>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -1309,13 +1307,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 28,
   },
-  bottomPill: {
-    flexDirection: 'row',
+  bottomCta: {
+    backgroundColor: Brand.mango,
     alignItems: 'center',
-    gap: Spacing.one,
-    height: 36,
-    borderRadius: 18,
-    paddingHorizontal: Spacing.three,
+    justifyContent: 'center',
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.four,
+  },
+  bottomCtaLabel: {
+    color: '#1A1A1A',
+    fontSize: 15,
   },
   /* États */
   spinner: {

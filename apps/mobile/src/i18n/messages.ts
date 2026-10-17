@@ -11,12 +11,14 @@
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import authEn from '../../messages/en/auth.json';
+import bookingEn from '../../messages/en/booking.json';
 import favoritesEn from '../../messages/en/favorites.json';
 import searchEn from '../../messages/en/search.json';
 import tabsEn from '../../messages/en/tabs.json';
 import tripDetailEn from '../../messages/en/tripDetail.json';
 import welcomeEn from '../../messages/en/welcome.json';
 import authFr from '../../messages/fr/auth.json';
+import bookingFr from '../../messages/fr/booking.json';
 import favoritesFr from '../../messages/fr/favorites.json';
 import searchFr from '../../messages/fr/search.json';
 import tabsFr from '../../messages/fr/tabs.json';
@@ -26,6 +28,7 @@ import welcomeFr from '../../messages/fr/welcome.json';
 export const MESSAGES = {
   fr: {
     auth: authFr,
+    booking: bookingFr,
     favorites: favoritesFr,
     search: searchFr,
     tabs: tabsFr,
@@ -34,6 +37,7 @@ export const MESSAGES = {
   },
   en: {
     auth: authEn,
+    booking: bookingEn,
     favorites: favoritesEn,
     search: searchEn,
     tabs: tabsEn,

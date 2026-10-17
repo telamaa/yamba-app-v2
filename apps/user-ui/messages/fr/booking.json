@@ -9,33 +9,28 @@
   "close": "Fermer",
   "steps": {
     "parcel": "Colis",
-    "recipient": "Destinataire",
+    "recipient": "Livraison",
     "charter": "Engagement",
     "payment": "Paiement",
     "indicator": "étape {current} sur {total}"
   },
   "step1": {
     "title": "Décris ton colis",
-    "subtitle": "Précision et photos garantissent un envoi sans accroc",
-    "locationsTitle": "Lieux de rendez-vous",
-    "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
-    "deliveryBlockTitle": "Le destinataire récupère le colis",
-    "locationSingleHint": "Lieu convenu avec le Voyageur",
-    "locationMissing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.",
+    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise.",
     "goldenRules": {
       "title": "Les règles d''or pour un envoi qui se passe bien",
       "pack": "**Emballe soigneusement.** Sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
       "weigh": "**Pèse précisément.** Le poids déclaré doit correspondre au poids réel à la remise.",
       "describe": "**Décris fidèlement.** {carrierFirstName} vérifiera le contenu avant d''accepter ton colis.",
       "prohibited": "**Aucun produit interdit.**",
-      "linkProhibited": "Voir la liste complète",
-      "open": "Voir"
+      "linkProhibited": "Voir la liste complète"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Poids (kg)",
-      "valueLabel": "Valeur déclarée (€)",
+      "valueLabel": "Valeur du contenu (€)",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
@@ -45,43 +40,50 @@
     "photos": {
       "label": "Photos du colis",
       "requiredBadge": "Obligatoire avec la protection étendue",
-      "hint": "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo.",
+      "hint": "Une photo du contenu déballé, une du colis emballé. Jusqu''à {max} photos, JPEG ou PNG, 10 Mo maximum chacune.",
       "add": "Ajouter",
       "tagContent": "Contenu",
       "tagPackaged": "Emballé",
       "remove": "Supprimer cette photo"
     },
     "product": {
-      "label": "Que voulez-vous envoyer ?",
+      "label": "Un colis, ou un bagage entier ?",
       "parcel": "Un colis (au kilo)",
       "checkedBag": "Un bagage en soute 23 kg",
       "cabinBag": "Un bagage cabine 12 kg"
     },
     "family": {
-      "label": "Famille du colis",
-      "hint": "La famille dit si le Voyageur l'accepte — elle ne change pas le prix au kilo, sauf supplément affiché.",
-      "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet"
+      "label": "Qu'est-ce que tu envoies ?",
+      "hint": "Le Voyageur choisit ce qu'il accepte de transporter.",
+      "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet",
+      "refusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {carrierFirstName}",
+      "noneAccepted": "{carrierFirstName} n''accepte aucune famille de colis sur ce trajet."
     },
     "size": {
-      "label": "Taille — pas besoin de mesurer",
-      "hint": "À l'œil : le coefficient s'applique au prix au kilo.",
-      "S": "enveloppe → boîte à chaussures",
-      "M": "tient dans un sac cabine",
-      "L": "occupe une demi-valise"
-    }
+      "label": "Taille : pas besoin de mesurer",
+      "hint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
+      "S": "une boîte à chaussures",
+      "M": "un sac à dos",
+      "L": "une demi-valise",
+      "hintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
+      "hintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
+      "extra": "+{amount}"
+    },
+    "requiredBadge": "Obligatoire"
   },
   "insurance": {
     "title": "Protection du colis",
     "basic": {
       "title": "Protection de base",
       "price": "Inclus",
-      "description": "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu''à la remise au destinataire."
+      "description": "Ton argent est bloqué jusqu''à la livraison. Colis non remis, tu es remboursé."
     },
     "extended": {
-      "title": "Garantie Yamba 500 €",
-      "price": "+6 €",
-      "description": "Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).",
-      "ipidLink": "Voir les conditions"
+      "title": "Garantie Yamba {cap}",
+      "price": "+{amount}",
+      "description": "Perte, vol ou casse en route : tu es remboursé jusqu''à {cap}.",
+      "ipidLink": "Ce qui n'est pas couvert",
+      "ipidText": "Sont exclus : les produits interdits, un colis non conforme à sa description, une saisie douanière, et les dommages dus à un emballage insuffisant. Le remboursement ne dépasse jamais la valeur du contenu que tu as déclarée. Des photos du colis sont obligatoires."
     }
   },
   "categories": {
@@ -99,8 +101,8 @@
     "CABIN_BAG_12KG": "Bagage cabine 12 kg"
   },
   "step2": {
-    "title": "À qui livrer ?",
-    "subtitle": "Pas besoin de compte Yamba pour le destinataire. Tu lui transmettras le code.",
+    "title": "Où, et à qui ?",
+    "subtitle": "Le lieu du rendez-vous, puis la personne qui récupère le colis. Pas besoin de compte Yamba pour elle.",
     "deliveryFlow": {
       "title": "Comment se passera la livraison",
       "codeGiven": "**Un code à 6 chiffres** te sera donné après le paiement.",
@@ -189,9 +191,9 @@
     "compactTitle": "Récap",
     "toPayTitle": "Tu paies",
     "transport": "Transport",
-    "serviceYamba": "Service & protection",
+    "serviceYamba": "Service Yamba",
     "insurance": "Garantie Yamba",
-    "insurance500": "Garantie Yamba 500 €",
+    "insurance500": "Garantie Yamba",
     "total": "Total",
     "totalNote": "Débité à acceptation par le Voyageur",
     "totalNoteLong": "Le montant est autorisé maintenant et débité uniquement quand le Voyageur accepte.",
@@ -212,7 +214,7 @@
     "directFlight": "Direct",
     "duration": "{hours}h de vol",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
     "minimumApplied": "Minimum par colis appliqué : {min}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {
@@ -247,5 +249,21 @@
     "login": "Se connecter",
     "register": "Créer un compte"
   },
-  "previousStep": "Étape précédente"
+  "previousStep": "Étape précédente",
+  "locations": {
+    "title": "Lieux de rendez-vous",
+    "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
+    "deliveryBlockTitle": "Le destinataire récupère le colis",
+    "singleHint": "Lieu convenu avec le Voyageur",
+    "missing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée."
+  },
+  "exit": {
+    "title": "Quitter la réservation ?",
+    "body": "Ce que tu as saisi sera perdu : en revenant, tu repartiras d'une page vierge.",
+    "resume": "Reprendre",
+    "leave": "Quitter",
+    "favorite": "Garder ce trajet dans mes favoris",
+    "favoriteHint": "Tu le retrouveras d'un clic, sur n'importe quel appareil.",
+    "favoriteAlready": "Ce trajet est déjà dans tes favoris."
+  }
 }

@@ -15,6 +15,7 @@ Documents de transmission, chacun en Markdown (source) et en PDF (généré). Le
 | 9 | Dossier de présentation aux juristes | avocats, délégué à la protection des données | `09-YAMBA-DOSSIER-JURIDIQUE.md` | `.pdf` |
 | 10 | Dossier de demande d'aides publiques | guichets d'aide, réseaux d'accompagnement | `10-YAMBA-DOSSIER-AIDES-PUBLIQUES.md` | `.pdf` |
 | 11 | Dossier identité, vérification et parcours d'inscription du Voyageur | produit, développeurs, assureurs (08), juristes et DPO (09) | `11-YAMBA-DOSSIER-IDENTITE-VERIFICATION.md` | `.pdf` |
+| 12 | Tarification et rentabilité — logique de calcul, comparaison concurrentielle, hypothèses | fondateur, produit, futurs partenaires (07) | `12-YAMBA-TARIFICATION-ET-RENTABILITE.md` | `.pdf` |
 
 ## Régénérer
 
