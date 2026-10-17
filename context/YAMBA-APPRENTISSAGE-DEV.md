@@ -4284,3 +4284,184 @@ le vestige d'un chemin écrit avant que le helper n'existe.
 - *Lifting state up* dans la documentation React, et sa variante « source externe » :
   URL, stockage, événements système.
 - Le motif *flash message* et la consommation d'un état à usage unique.
+
+---
+
+## Chapitre 217 — Le clavier qui cache le prix, l'échelle qu'aucun mot ne porte, et la virgule flottante qui ruine un écran
+
+Un lot d'interface, et cinq leçons qui ne sont pas des questions de goût.
+
+### 1. « Pas sexy » est un symptôme — le diagnostic est ailleurs
+
+Le retour était : *« le champ poids et taille, c'est pas sexy »*. Le réflexe serait d'ajouter
+un dégradé, des ombres, une animation. C'est presque toujours une erreur.
+
+L'écran posait quatre questions sous quatre rangées de pastilles identiques. Ce qui manquait
+n'était pas la décoration mais **la structure** : aucune hiérarchie, et surtout **aucun objet
+à manipuler**. Un tunnel de réservation doit donner quelque chose qu'on façonne ; celui-ci
+donnait un formulaire de réglages.
+
+Le test pour distinguer les deux : *si je retire toute la couleur, l'écran reste-t-il
+compréhensible et hiérarchisé ?* Si oui, le problème est cosmétique. Si non — et c'était le
+cas — il est structurel, et aucune ombre portée ne le réparera.
+
+### 2. Deux contrôles qui alimentent un seul calcul appartiennent au même bloc
+
+C'est la leçon la plus transposable du lot. Depuis D81 :
+
+```
+poidsFacturé = max(poidsRéel, plancher, minimumDeLaTaille)
+```
+
+Le poids et la taille **entrent dans le même `max`**. L'interface les séparait par un titre,
+une aide et vingt pixels de marge — soit le vocabulaire visuel de l'indépendance. Résultat :
+l'utilisateur change une taille, le prix saute, et rien ne relie les deux dans son champ de
+vision.
+
+> **La mise en page est une affirmation sur le modèle.** Deux champs côte à côte disent « ces
+> deux choses vont ensemble » ; deux sections séparées disent « elles n'ont rien à voir ». Si
+> l'affirmation contredit le calcul, l'utilisateur ne comprendra jamais le résultat.
+
+Le corollaire s'est vérifié dans le même lot, en sens inverse : la **valeur du contenu**
+était posée à côté du poids, par simple accident de grille à deux colonnes. Elle ne fait
+pourtant pas le prix du transport — elle fixe le plafond d'indemnisation. Elle a donc
+déménagé au contact de la protection, qu'elle commande.
+
+### 3. Le clavier virtuel est un élément d'interface, pas un détail
+
+```tsx
+<TextInput keyboardType="decimal-pad" … />   // AVANT
+```
+
+Toucher ce champ faisait monter un pavé numérique qui occupe environ **la moitié basse** de
+l'écran — précisément là où vit la barre « total + Continuer ». L'utilisateur modifiait le
+poids **sans jamais voir le prix changer**. La promesse du « prix vivant » s'effondrait à
+l'instant exact où elle devait payer.
+
+C'est un défaut qu'on ne voit pas en relisant du code, ni sur une maquette, ni sur un
+simulateur où l'on tape au clavier physique. **On le voit sur un téléphone, avec un pouce.**
+
+Le remède général : sur mobile, pour une valeur numérique bornée et à granularité connue,
+préférer un **pas** à une saisie libre.
+
+```tsx
+<StepperButton direction="minus" … />
+<Pressable onPress={() => setEditingWeight(true)}>{draft.weightKg} kg</Pressable>
+<StepperButton direction="plus" … />
+```
+
+La saisie libre reste accessible — en touchant la valeur — mais elle devient le chemin
+exceptionnel au lieu d'être le chemin par défaut.
+
+Deux détails de ce stepper méritent d'être copiés :
+
+- **le pas s'adapte** (`kg < 5 ? 0.5 : 1`) : fin là où vivent les colis réels, large
+  au-dessus où la précision n'apporte rien et où il faudrait vingt appuis ;
+- **le bouton se désactive, il ne disparaît pas.** Un bouton qui disparaît déplace son
+  voisin sous le doigt entre deux appuis — l'utilisateur appuie sur autre chose que ce
+  qu'il visait.
+
+### 4. `0.1 + 0.2 !== 0.3` : la virgule flottante arrive toujours par l'interface
+
+```ts
+const next = Math.round((current + direction * weightStep(current)) * 10) / 10;
+```
+
+Sans ce `Math.round(x * 10) / 10`, un utilisateur qui descend de 3 à 2,9 voit s'afficher
+**2.9000000000000004**. La représentation IEEE 754 ne peut pas coder 0,1 exactement, et les
+erreurs s'accumulent à chaque pas.
+
+C'est la raison pour laquelle le dépôt impose **les montants en cents entiers** — règle non
+négociable. Le poids, lui, est un `Float` légitime (un colis pèse 2,5 kg), donc l'arrondi
+doit être fait **au moment de l'écriture dans l'état**, pas seulement à l'affichage : sinon
+la valeur sale se propage dans le brouillon, puis dans le devis, puis dans la photographie
+serveur.
+
+> Règle pratique : dès qu'une valeur décimale est **incrémentée** plutôt que saisie,
+> arrondissez au pas d'affichage à chaque opération.
+
+### 5. L'échelle est une information que le texte ne peut pas porter
+
+Les icônes de taille avaient été retirées quelques jours plus tôt, et c'était justifié : une
+boîte à chaussures *dessinée* n'apprend rien de plus que les mots « une boîte à chaussures ».
+Elle coûtait une ligne de hauteur pour une redondance.
+
+Mais retirer l'icône avait aussi retiré **l'échelle**, et là on a perdu quelque chose de
+réel :
+
+```ts
+const SIZE_SILHOUETTES = {
+  S: { width: 26, height: 18 },   // 33 × 23 cm
+  M: { width: 36, height: 24 },   // 45 × 30 cm
+  L: { width: 44, height: 32 },   // 55 × 40 cm
+};
+```
+
+Trois rectangles nus, aux **proportions réelles des gabarits**. Ce ne sont pas des icônes :
+c'est une **mesure**. Et le détail qui fait tout fonctionner :
+
+```tsx
+<span className="flex h-9 items-end">   {/* ligne de base COMMUNE */}
+```
+
+Alignées au centre, les trois silhouettes perdraient la moitié de leur sens — la comparaison
+de hauteur deviendrait illisible. C'est exactement le principe d'un graphique en barres :
+**une base commune, sinon aucune comparaison**.
+
+La distinction générale à retenir : *une illustration qui redit le texte est du bruit ; une
+représentation qui encode une grandeur est de l'information.*
+
+### 6. Un champ calculé qu'on n'affiche pas est un champ inutile
+
+`billableReason` (`ACTUAL` / `FLOOR` / `SIZE_MIN`) avait été ajouté au devis par D81,
+précisément parce qu'un booléen « minimum appliqué » ne permettait pas d'expliquer *lequel*
+des minimums avait gagné. Il a ensuite traversé le moteur, le contrat, la photographie
+serveur… **et n'a été affiché nulle part**.
+
+Pendant ce temps, l'utilisateur voyait le prix ne pas suivre son poids, sans explication.
+
+```tsx
+{billedNote ?? sizeHint}
+```
+
+La leçon de méthode : quand on ajoute un champ « pour expliquer », **la tâche n'est pas finie
+tant qu'un écran ne l'affiche pas**. Sinon on a payé le coût du champ (contrat, snapshot,
+tests, migration mentale) sans jamais en toucher le bénéfice.
+
+### 7. Un nombre magique écrit deux fois
+
+```ts
+} else if (w > 30) {
+  errors.weightKg = isFr ? "30 kg maximum par colis" : "30 kg max per parcel";
+```
+
+La limite **et** son message. Changer l'une sans l'autre produit une interface qui refuse à
+30 en annonçant 25. Le remède tient en deux lignes :
+
+```ts
+export const MAX_PARCEL_KG = 30;
+…
+errors.weightKg = isFr ? `${MAX_PARCEL_KG} kg maximum par colis` : …
+```
+
+Et c'est l'écran qui a révélé le problème : il avait besoin de la limite pour borner son
+pas, et il n'y avait rien à importer. **Un besoin d'ailleurs est souvent ce qui révèle une
+constante mal rangée.**
+
+### Les pièges payés dans ce lot
+
+- Traiter « pas sexy » comme une demande de décoration au lieu de chercher la structure.
+- Séparer visuellement deux contrôles qui alimentent un même calcul.
+- Oublier que le clavier virtuel **recouvre** l'information qui justifie la saisie.
+- Incrémenter un décimal sans arrondir : la valeur sale se propage dans l'état.
+- Retirer une illustration sans distinguer ce qui était **redondant** (le dessin) de ce qui
+  était **informatif** (l'échelle).
+- Ajouter un champ explicatif et ne jamais l'afficher.
+
+### Aller plus loin
+
+- *Thinking with Type* et la notion de ligne de base commune ; les règles de comparabilité
+  des graphiques en barres (Cleveland & McGill sur la précision perceptive).
+- Les recommandations de taille de cible tactile (44 px côté Apple, 48 dp côté Material).
+- IEEE 754 et la représentation des décimaux, et pourquoi le dépôt impose les cents entiers.
+- Le livrable 12, § 5.1 : d'où viennent les proportions S/M/L et le diviseur 5000.

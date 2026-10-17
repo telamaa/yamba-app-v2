@@ -7194,3 +7194,52 @@ seule exception, et elle portait justement l'engagement le plus fort.
 | MOB115 | Sur un écran large comme sur un téléphone | **Une seule** demande s'affiche — jamais deux superposées |
 | MOB116 | Connecté — ouvrir l'adresse de réservation | La réservation s'ouvre normalement : aucune redirection, aucun passage par la fiche |
 | MOB117 | Session qui expire pendant la réservation, puis recharger la page | Retour sur la fiche du trajet avec la demande de connexion ; les informations saisies ne sont pas affichées à un inconnu |
+
+---
+
+# Le colis se compose dans un seul objet (PR à venir)
+
+## Le besoin
+
+Retour d'usage sur la première page de réservation : « le champ poids et taille, c'est pas
+sexy ». Derrière la formule, un vrai défaut d'usage — la page posait quatre questions en
+quatre rangées identiques, sans hiérarchie et sans rien à manipuler.
+
+Et un défaut de fond : le poids et la taille **servent au même calcul** (le prix se fait sur
+le plus grand des trois : le poids réel, le minimum du trajet, le minimum de la taille) mais
+étaient posés comme deux questions indépendantes. L'Expéditeur choisissait un poids, puis
+une taille, et le prix changeait sans explication visible.
+
+Enfin, un défaut mécanique mesurable : sur téléphone, toucher le champ de poids faisait
+monter le clavier, qui recouvrait la barre du prix — on modifiait le poids sans jamais voir
+l'effet sur le total.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-71** | Le poids et la taille se décident dans un **seul bloc** : ce sont deux faces de la même question, « combien ça pèse, et quelle place ça prend ». |
+| **RG-MOB-72** | Le poids se règle par **pas** (un demi-kilo sous 5 kg, un kilo au-dessus), sans clavier. Toucher la valeur permet quand même de la saisir directement. Le total reste visible pendant tout le réglage. |
+| **RG-MOB-73** | Le pas ne laisse jamais sortir des limites : il s'arrête au maximum par colis et à la place restante sur le trajet. Le bouton correspondant devient inactif plutôt que de disparaître. |
+| **RG-MOB-74** | La place restante est une **barre qui se remplit**, pas une note en bas. Elle se remplit de la place RÉELLEMENT réservée — celle qu'on facture — et prévient visuellement avant que la limite soit atteinte. |
+| **RG-MOB-75** | Les trois tailles se présentent **à l'échelle**, alignées sur une ligne commune : on voit la différence de gabarit avant de lire les mots. Aucune illustration décorative. |
+| **RG-MOB-76** | Quand le poids facturé diffère du poids saisi, la page **dit pourquoi** : parce que le minimum du trajet s'applique, ou parce que la taille choisie impose le sien. L'explication est au contact de la décision, pas dans une aide au-dessus. |
+| **RG-MOB-77** | La valeur du contenu n'est pas posée à côté du poids : elle ne fait pas le prix du transport, elle fixe le plafond d'indemnisation. Elle est posée **juste avant** le choix de la protection. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB118 | Étape ① — régler le poids avec ⊖ et ⊕ | Le total en bas de l'écran **reste visible** et change à chaque appui ; aucun clavier n'apparaît |
+| MOB119 | Toucher la valeur du poids | Le clavier s'ouvre et la valeur est modifiable directement |
+| MOB120 | Appuyer sur ⊖ jusqu'en bas | Le bouton devient inactif au plus petit poids accepté — il ne disparaît pas |
+| MOB121 | Appuyer sur ⊕ sur un trajet où il reste 3 kg | Le bouton devient inactif à 3 kg : on ne peut pas réserver plus que la place disponible |
+| MOB122 | Régler 2,5 kg puis 3 kg | La valeur affichée est **« 3 »**, jamais « 2.9000000000000004 » |
+| MOB123 | Choisir la taille L avec un colis d'1 kg | La barre de place restante se remplit de **6 kg**, pas d'1 kg : c'est la place réellement prise |
+| MOB124 | Approcher la limite de place | La barre change de couleur **avant** que la limite soit atteinte |
+| MOB125 | Regarder les trois tailles | Trois rectangles de tailles **différentes et proportionnées**, posés sur la même ligne — la différence se voit avant de se lire |
+| MOB126 | Colis d'1 kg en taille M | La page affiche « Facturé 3 kg — la place que prend un colis M » |
+| MOB127 | Colis de 0,2 kg en taille S | La page affiche « Facturé 2,3 kg — le minimum de ce trajet » |
+| MOB128 | Colis de 8 kg en taille S | Aucune explication de poids facturé : le poids réel suffit, rien à justifier |
+| MOB129 | Web — chercher la valeur du contenu | Elle est posée **juste avant** le choix de la protection, plus à côté du poids |
+| MOB130 | Web — saisir 31 kg | Le message d'erreur annonce le maximum réel, dérivé du même réglage que la limite du pas |

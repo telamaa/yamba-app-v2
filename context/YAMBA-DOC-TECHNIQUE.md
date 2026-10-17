@@ -12994,3 +12994,126 @@ Les clés `booking.authGate.*` restent lues par la modale : **aucune clé morte*
 
 `tsc --noEmit --project apps/user-ui` vert (la commande CI), contrôle i18n **miroir
 parfait**. Aucun service touché, aucune dépendance ajoutée.
+
+---
+
+# Le colis devient UN objet — la carte qui fusionne le poids et la taille (PR à venir)
+
+## Le constat, posé comme une critique d'expert
+
+L'écran ① posait **quatre questions sous quatre rangées de pastilles identiques**, empilées
+sous quatre titres en petites capitales. Le retour utilisateur était « le champ poids et
+taille, c'est pas sexy ». Le diagnostic est plus précis que l'adjectif : l'écran **n'est pas
+laid, il est plat**. Aucune hiérarchie, et surtout **rien à manipuler** — un formulaire de
+réglages, pas un objet qu'on façonne.
+
+## Le défaut de fond : une décision présentée comme deux
+
+Depuis **D81**, le prix se calcule ainsi :
+
+```
+poidsFacturé = max(poidsRéel, plancher, minimumDeLaTaille)
+```
+
+Les deux contrôles **entrent dans le même `max`**. L'écran les séparait par un titre, une
+phrase d'aide et vingt pixels de marge, comme s'ils étaient indépendants. Conséquence
+concrète : l'Expéditeur choisit 1 kg, puis choisit « L », et le prix saute — pour une raison
+qui n'était expliquée nulle part à l'endroit où il regarde.
+
+**Deux contrôles qui alimentent un seul calcul appartiennent au même bloc.** D'où une carte
+unique, « Ton colis ».
+
+## Les quatre corrections
+
+### 1. Le clavier ne recouvre plus le prix
+
+C'était le défaut le plus grave, et le plus mesurable. Le champ poids était un
+`TextInput` en `decimal-pad` : le toucher faisait monter un clavier qui mange la moitié
+basse de l'écran — exactement là où vit la barre « 11,00 € · Continuer ». On tapait un poids
+et **on ne voyait pas le prix changer**. Toute la promesse du prix vivant s'effondrait à
+l'instant précis où elle devait payer.
+
+Un **pas ⊖/⊕** le remplace :
+
+```ts
+function weightStep(kg: number): number {
+  return kg < 5 ? 0.5 : 1;        // fin là où vivent les colis réels, large au-dessus
+}
+```
+
+Borné par la capacité du trajet et `MAX_PARCEL_KG`, et **arrondi au dixième** — `0.1 + 0.2`
+ne vaut pas `0.3` en virgule flottante, et un poids affiché « 2.9000000000000004 » ruine une
+interface. Toucher la valeur ouvre quand même la saisie libre : un seul contrôle, deux
+gestes, le clavier en option.
+
+Les quatre raccourcis (1, 2, 5, 10 kg) disparaissent. Ils existaient parce que le champ
+libre était pénible ; une fois le pas en place, ils redeviennent une redondance.
+
+### 2. La capacité devient le contrôle, au lieu de le commenter
+
+« 3 kg encore disponibles sur ce trajet » était une **note de bas de page**, en gris, en
+petit, *après* le champ. C'est une **contrainte** : elle doit former le contrôle.
+
+Elle devient une barre qui se remplit et **vire au mangue à 80 %**. Détail qui compte : elle
+se remplit du **poids FACTURÉ**, pas du poids déclaré — c'est la place réellement réservée
+au Voyageur (D81 · CAP-01). Un colis L d'1 kg en prend six, et la barre le montre.
+
+### 3. Les tailles reprennent leur échelle
+
+Les icônes avaient été retirées à raison : une boîte à chaussures *dessinée* n'apprend rien
+de plus que les mots « une boîte à chaussures ». Mais **l'échelle relative**, elle, est la
+seule information que le texte ne peut pas porter.
+
+Trois rectangles aux proportions des gabarits du livrable 12 (S 33×23 cm, M 45×30, L 55×40),
+posés sur une **ligne de base commune** :
+
+```ts
+const SIZE_SILHOUETTES: Record<SizeClass, { width: number; height: number }> = {
+  S: { width: 26, height: 18 },
+  M: { width: 36, height: 24 },
+  L: { width: 44, height: 32 },
+};
+```
+
+L'alignement en bas (`alignItems: 'flex-end'` / `items-end`) n'est pas cosmétique : alignées
+au centre, les trois silhouettes **perdraient la moitié de leur sens**, parce que la
+comparaison de hauteur deviendrait illisible.
+
+### 4. `billableReason` enfin affiché
+
+Il vivait dans le devis depuis D81 et **n'était montré nulle part**. L'Expéditeur voyait le
+prix ne pas suivre son poids, sans explication. La carte se termine donc par la raison :
+
+> « Facturé 3 kg — la place que prend un colis M. »
+> « Facturé 2,3 kg — le minimum de ce trajet. »
+
+D81 expliqué **là où il se décide**, pas dans une aide au-dessus du bloc.
+
+## Deux corrections venues avec, côté web
+
+- **La valeur du contenu quitte la ligne du poids.** Elle ne fait pas le prix du transport :
+  elle fixe le **plafond d'indemnisation**. Elle était à côté du poids par accident de mise
+  en page, et laissait croire qu'elle entrait dans le calcul. Elle se colle désormais à la
+  protection, qu'elle commande.
+- **`30` était écrit en dur** dans `booking.config.ts`, deux fois (la valeur et le message
+  d'erreur). Il devient `MAX_PARCEL_KG`, exporté — l'écran en avait besoin pour borner son
+  pas, et le message le dérive au lieu de le répéter.
+
+Le legacy PER_CATEGORY (déprécié) garde un champ simple : sans taille, la carte n'aurait
+rien à y montrer. `step1.parcelDetails.remainingKg` reste vivant pour le bagage entier, où
+la place restante compte aussi.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+Le réflexe devant « pas sexy » est d'ajouter du dégradé, des ombres, des animations. Ça
+aurait été une erreur : **l'écran ne manquait pas de décoration, il manquait de structure.**
+Une fois les deux contrôles fusionnés dans une carte avec une vraie hiérarchie, il tient
+debout sans un seul effet — et il reste lisible sur un téléphone d'entrée de gamme en plein
+soleil, ce qui n'est pas le cas d'un dégradé.
+
+## Les contrôles
+
+`nx typecheck @yamba-app/mobile` vert, `tsc --noEmit --project apps/user-ui` vert (la
+commande CI), contrôle i18n **miroir parfait** avec **contre-épreuve rouge vérifiée puis
+restaurée**. Cinq clés mortes purgées côté mobile (`weightTitle`, `weightHint`,
+`weightShortcut`, `remaining`, `sizeTitle`), une côté web (`weightShortcut`).
