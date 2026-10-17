@@ -516,7 +516,11 @@ export default function StepParcel({
    */
   const valueBlock = (
     <div className="mb-4">
-      <SectionTitle>{t("step1.parcelDetails.valueLabel")}</SectionTitle>
+      {/* PAS de `SectionTitle` ici : il répéterait mot pour mot le libellé de la
+          ligne. La référence fait la même distinction — ses cartes de CHAMPS
+          (« Voyageurs · 1 adulte · Modifier ») n'ont pas de titre au-dessus,
+          seuls ses groupes d'OPTIONS en ont un. Une carte à une seule ligne se
+          suffit à elle-même. */}
       <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
         <div className="flex items-center gap-3 py-4">
           <div className="min-w-0 flex-1">

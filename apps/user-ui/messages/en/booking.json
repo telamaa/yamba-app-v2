@@ -28,8 +28,8 @@
     "parcelDetails": {
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Weight (kg)",
-      "valueLabel": "Content value (€)",
+      "weightLabel": "Weight",
+      "valueLabel": "Content value",
       "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",

@@ -28,8 +28,8 @@
     "parcelDetails": {
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Poids (kg)",
-      "valueLabel": "Valeur du contenu (€)",
+      "weightLabel": "Poids",
+      "valueLabel": "Valeur du contenu",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
