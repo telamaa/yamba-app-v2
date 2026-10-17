@@ -13117,3 +13117,43 @@ soleil, ce qui n'est pas le cas d'un dégradé.
 commande CI), contrôle i18n **miroir parfait** avec **contre-épreuve rouge vérifiée puis
 restaurée**. Cinq clés mortes purgées côté mobile (`weightTitle`, `weightHint`,
 `weightShortcut`, `remaining`, `sizeTitle`), une côté web (`weightShortcut`).
+
+## Révision du 21/10 — la structure était juste, la grammaire était à moi
+
+Retour sur la première version de la carte : « toujours moche ». Juste, et le diagnostic est
+précis : la carte avait réglé la **structure** (poids et taille réunis, clavier supprimé,
+échelle rendue) mais gardé une **mise en forme inventée** — un bloc centré, une jauge de
+capacité, trois colonnes serrées pour les tailles.
+
+Trois captures de référence ont été fournies. Elles donnent une grammaire éprouvée, appliquée
+telle quelle :
+
+> **« libellé gras · ligne grise · contrôle à DROITE »**, des lignes **pleine largeur**
+> séparées par un **filet fin**, dans une carte bordée **sans cadre imbriqué**. C'est le
+> blanc qui fait la structure, pas les bordures.
+
+| Élément | Première version | Révision, d'après les références |
+|---|---|---|
+| **Le poids** | bloc centré, gros chiffre, boutons pleins de 44 px | modèle *« Modifiez le nombre de voyageurs »* : libellé et contrainte à gauche, pas ⊖/⊕ à droite, **cercles bordés** de 34 px |
+| **La capacité** | barre de progression qui se remplit | une **phrase** (« 3 kg restants sur ce trajet ») qui passe en mangue avant la limite |
+| **Les tailles** | trois colonnes serrées, silhouette au-dessus du texte | modèle *« Choisissez quand vous souhaitez payer »* : trois **lignes pleine largeur**, pastille de choix à **droite**, conséquence en ligne grise |
+| **L'explication D81** | collée en bas de la carte | **sous** la carte, comme « Annulation gratuite » sous le récapitulatif de la référence |
+
+**Pourquoi la jauge a perdu.** Elle était mon idée et elle paraissait plus « riche ». Mais une
+barre demande de décoder une proportion, elle dépend de la couleur pour signaler l'urgence,
+et elle ne dit pas *combien* il reste. La phrase donne le chiffre, survit à n'importe quel
+écran, et se lit par un lecteur d'écran sans travail supplémentaire. La référence fait mieux
+avec des mots.
+
+**Pourquoi les boutons sont bordés et non pleins.** Un cercle plein attire l'œil autant que le
+CTA « Continuer », alors qu'il ne fait qu'ajuster une valeur. Le contour suffit à dire
+« touchable » sans entrer en concurrence avec l'action principale de l'écran.
+
+**Pourquoi les silhouettes survivent au changement de disposition.** En colonnes, c'était une
+**ligne de base commune** qui rendait la comparaison lisible. Empilées en lignes, c'est le
+**bord gauche commun** qui joue ce rôle : d'où une gouttière de largeur fixe (46 px) plutôt
+qu'un centrage. Le principe — une origine commune, sinon aucune comparaison — est le même ;
+seul l'axe change.
+
+**Et toute la ligne devient la cible.** Viser une pastille de 22 px au pouce est une épreuve ;
+le `Pressable` englobe le libellé, la silhouette et la pastille.

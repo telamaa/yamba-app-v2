@@ -7243,3 +7243,17 @@ l'effet sur le total.
 | MOB128 | Colis de 8 kg en taille S | Aucune explication de poids facturé : le poids réel suffit, rien à justifier |
 | MOB129 | Web — chercher la valeur du contenu | Elle est posée **juste avant** le choix de la protection, plus à côté du poids |
 | MOB130 | Web — saisir 31 kg | Le message d'erreur annonce le maximum réel, dérivé du même réglage que la limite du pas |
+
+## Révision du 21/10 — une règle en supersède une autre
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-78** *(supersède RG-MOB-74)* | La place restante s'annonce par une **phrase qui donne le chiffre** (« 3 kg restants sur ce trajet »), et non par une barre. Elle change de couleur avant que la limite soit atteinte. Une phrase donne le nombre, se lit sans décoder une proportion, et reste compréhensible pour un lecteur d'écran. |
+| **RG-MOB-79** | Un choix dans une liste se fait sur **toute la ligne**, pas seulement sur sa pastille : la zone touchable couvre le libellé, l'illustration et le sélecteur. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB131 | Étape ① — regarder la place restante | Une **phrase** qui donne le nombre de kilos restants ; aucune barre à interpréter |
+| MOB132 | Régler un poids qui approche la limite du trajet | La phrase passe en mangue **avant** que la limite soit atteinte |
+| MOB133 | Choisir une taille en touchant le libellé (pas la pastille) | La taille est sélectionnée : toute la ligne est la cible |
+| MOB134 | Comparer les trois tailles | Les trois silhouettes partagent le **même bord gauche** : la différence de gabarit se voit en descendant la liste |

@@ -4465,3 +4465,40 @@ constante mal rangée.**
 - Les recommandations de taille de cible tactile (44 px côté Apple, 48 dp côté Material).
 - IEEE 754 et la représentation des décimaux, et pourquoi le dépôt impose les cents entiers.
 - Le livrable 12, § 5.1 : d'où viennent les proportions S/M/L et le diviseur 5000.
+
+### Post-scriptum au chapitre 217 — quand la structure est juste et la grammaire est à soi
+
+La première version de cette carte avait corrigé les cinq défauts décrits ci-dessus, et le
+retour est resté : « toujours moche ». Ce n'était pas une contradiction — c'étaient **deux
+problèmes différents**, et j'avais résolu le premier en inventant le second.
+
+- la **structure** (qu'est-ce qui va avec quoi, dans quel ordre, avec quelle hiérarchie) :
+  réglée, et c'est ce qui comptait le plus ;
+- la **grammaire visuelle** (à quoi ressemble une ligne, où vit un contrôle, comment on
+  sépare deux choix) : inventée au fil du clavier — un bloc centré ici, une jauge là, trois
+  colonnes plus loin. Trois idiomes différents dans un même écran.
+
+Trois captures de référence ont suffi à la fixer : « libellé gras · ligne grise · contrôle à
+droite », lignes pleine largeur, filets fins, pas de cadre imbriqué. **Une grammaire, répétée.**
+
+La leçon vaut au-delà de ce lot : *l'originalité n'a pas sa place au niveau du composant.*
+Inventer une façon de présenter un stepper ou un groupe de choix, c'est demander à
+l'utilisateur d'apprendre une convention qui n'existe que chez vous — pour aucun bénéfice.
+L'invention est utile sur ce qu'on montre et dans quel ordre ; sur **comment** on le montre,
+copier une grammaire éprouvée est presque toujours le bon choix.
+
+Deux arbitrages concrets de cette révision, parce qu'ils se reposeront ailleurs :
+
+- **une phrase bat une jauge** quand le chiffre compte. Une barre demande de décoder une
+  proportion, dépend de la couleur pour l'urgence, et ne dit pas *combien* il reste. « 3 kg
+  restants » donne le nombre, passe en mangue à l'approche de la limite, et se lit par un
+  lecteur d'écran sans travail supplémentaire ;
+- **un contrôle secondaire ne doit pas peser comme l'action principale.** Les boutons du pas
+  étaient des cercles pleins de 44 px : ils attiraient l'œil autant que le CTA « Continuer »,
+  pour une fonction d'ajustement. En cercles **bordés** de 34 px, ils disent « touchable »
+  sans entrer en concurrence.
+
+Et un détail qui fait le pont avec le chapitre : les silhouettes survivent au changement de
+disposition, mais **leur origine commune change d'axe**. En colonnes, c'était la ligne de base
+(`items-end`) ; empilées en lignes, c'est le bord gauche — d'où une gouttière de largeur fixe
+plutôt qu'un centrage. Le principe reste « une origine commune, sinon aucune comparaison ».
