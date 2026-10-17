@@ -124,7 +124,7 @@ export function RequiredBadge({ label }: { label: string }) {
 
 export function InfoTooltip({ content }: { content: string }) {
   return (
-    <span className="group relative ml-1 inline-flex items-center">
+    <span className="group ml-1 inline-flex items-center">
       <button
         type="button"
         className="inline-flex items-center text-slate-400 transition-colors hover:text-slate-600 focus:text-slate-600 focus:outline-none dark:hover:text-slate-300 dark:focus:text-slate-300"
@@ -134,10 +134,17 @@ export function InfoTooltip({ content }: { content: string }) {
       </button>
       {/* Elle s'ouvrait VERS LE HAUT : sur le premier champ d'une carte, elle
           sortait par le bord supérieur et se faisait rogner (capture du 17/10).
-          Vers le bas, elle se pose sur le champ — jamais hors du cadre. */}
+          Vers le bas, elle se pose sur le champ — jamais hors du cadre.
+          Puis elle était CENTRÉE SUR SON ICÔNE (left-1/2 -translate-x-1/2) : sur
+          un champ en demi-colonne de téléphone, 16 rem centrées sur une icône
+          posée près du libellé dépassent par la GAUCHE, et le conteneur de
+          défilement de BookingMobile les rogne (overflow-y-auto ramène aussi
+          l'axe X à auto — un `visible` ne survit jamais seul). Elle s'ancre
+          désormais sur le BORD GAUCHE DU CHAMP (le <label> porte `relative`) et
+          ne dépasse jamais sa largeur : aucune position ne peut la tronquer. */}
       <span
         role="tooltip"
-        className="pointer-events-none absolute top-full left-1/2 z-30 mt-1.5 w-[min(16rem,calc(100vw-2.5rem))] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-normal leading-[1.5] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-100 dark:text-slate-900"
+        className="pointer-events-none absolute top-full left-0 z-30 mt-1.5 w-[min(16rem,100%)] rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-normal leading-[1.5] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-100 dark:text-slate-900"
       >
         {content}
       </span>

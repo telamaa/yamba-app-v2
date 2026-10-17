@@ -3579,3 +3579,250 @@ propres valeurs par défaut.
 - Le livrable `docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE.md` prolonge la section sur
   les planchers : pourquoi, sous ~1,8 kg, la taille n'a *aucun* effet sur le prix, et ce qu'un
   poids volumétrique (la logique des transporteurs express) changerait.
+
+---
+
+## Chapitre 214 — L'axe qui ne survit jamais seul, le `??` qui invente un avion, et le nombre qu'on n'annonce pas
+
+Trois corrections de recette, trois leçons qui dépassent largement le bug corrigé.
+
+### 1. En CSS, `overflow` n'a pas deux axes indépendants
+
+Le symptôme : une infobulle tronquée sur téléphone. L'enquête a remonté jusqu'à ceci :
+
+```tsx
+// apps/user-ui/src/components/booking/BookingMobile.tsx
+<div className="flex-1 overflow-y-auto pb-40">
+```
+
+Personne n'a écrit « coupe ce qui dépasse à gauche ». Et pourtant c'est ce qui se passe.
+
+**La règle de la spécification CSS** (`overflow`, propriétés calculées) : si une valeur d'axe
+vaut `visible` et que **l'autre axe ne vaut pas `visible`**, alors le `visible` est calculé
+comme `auto`. Autrement dit : dès que vous écrivez `overflow-y: auto`, vous avez aussi
+`overflow-x: auto` — donc un conteneur de défilement, donc une zone qui **rogne**.
+
+La raison est géométrique : un conteneur ne peut pas à la fois défiler verticalement et
+laisser déborder horizontalement sans que le navigateur ait à décider où peindre le
+débordement par rapport à la barre de défilement. Le groupe de travail a tranché en
+supprimant le cas ambigu.
+
+C'est le **même piège** que celui déjà consigné dans le `CLAUDE.md` (« `overflow-x: clip`
+et non `hidden` pour préserver `position: sticky` »), vu par l'autre bout : là on perdait un
+comportement, ici on gagne un rognage.
+
+**Ce qu'on en retient pour coder** : tout élément en position absolue qui doit sortir de son
+parent — infobulle, menu, sélecteur de date, popover — est en sursis dès qu'un ancêtre
+défile. Deux stratégies :
+
+1. **le rendre incapable de dépasser** (choisie ici) ;
+2. le sortir du flux par un **portail** (`createPortal` vers `document.body`), au prix de
+   devoir repositionner à la main au défilement.
+
+### 2. Centrer sur la cible, c'est parier sur la place disponible
+
+L'infobulle était ancrée ainsi :
+
+```tsx
+className="absolute top-full left-1/2 -translate-x-1/2 w-[min(16rem,calc(100vw-2.5rem))]"
+```
+
+`left-1/2` + `-translate-x-1/2` est l'idiome classique du centrage sur l'élément déclencheur.
+Il a un défaut structurel : **il suppose qu'il y a autant de place des deux côtés**. Ici
+l'icône « ⓘ » est collée au libellé « Poids », donc à ~60 px du bord ; une bulle de 256 px
+centrée dessus commence à **−68 px**. Le `w-[min(…, calc(100vw - 2.5rem))]` limitait la
+*largeur*, pas la *position* — il n'a donc jamais rien empêché.
+
+La correction change le **référentiel** plutôt que la position :
+
+```tsx
+// le <label> (pleine largeur du champ) devient le contexte de positionnement
+<label className="relative mb-1.5 flex items-center …">
+// et la bulle s'aligne sur SON bord gauche
+className="absolute top-full left-0 w-[min(16rem,100%)]"
+```
+
+`100%` se lit maintenant « 100 % du champ ». La bulle commence au bord gauche du champ et ne
+peut pas être plus large que lui : **aucune position ne peut la tronquer**, quel que soit
+l'ancêtre. On est passé d'un correctif de cas à une propriété invariante.
+
+> Le réflexe à prendre : quand un élément positionné déborde, demandez-vous *par rapport à
+> quoi* il est positionné avant de corriger *de combien* il se décale.
+
+### 3. `?? "PLANE"` — la valeur par défaut qui fabrique un mensonge
+
+```ts
+// apps/user-ui/src/components/booking/trip-context.mapper.ts — AVANT
+travelMode: (trip.transportMode ?? "PLANE") as TripContext["travelMode"],
+```
+
+Le contrat dit `transportMode: TransportMode | null`. Le `??` transforme donc
+« **je ne sais pas** » en « **c'est un avion** ». Le type ne proteste pas : `"PLANE"` est
+une valeur parfaitement légale du type d'arrivée. Le compilateur ne peut pas savoir que ce
+défaut est une **affirmation sur le monde**.
+
+C'est une famille d'erreurs à reconnaître : `?? 0`, `?? ""`, `?? false`, `?? new Date()`.
+Chacun remplace une absence par une valeur **qui a un sens métier**. Pour un compteur, `?? 0`
+est souvent juste. Pour un mode de transport, un pays, une devise ou un consentement, c'est
+une invention.
+
+La correction consiste à **laisser l'absence remonter jusqu'à l'affichage** :
+
+```ts
+travelMode: (trip.transportMode ?? null) as TripContext["travelMode"],
+```
+
+```tsx
+const TravelIcon = trip.travelMode ? TRAVEL_MODE_ICONS[trip.travelMode] ?? Route : Route;
+…
+{trip.travelMode
+  ? t(`summary.durationByMode.${trip.travelMode}`, { hours })
+  : t("summary.durationNeutral", { hours })}
+```
+
+L'interface sait dire « je ne sais pas » (icône neutre, « 1 h de trajet ») — ce qui est
+toujours préférable à dire quelque chose de faux avec assurance. C'est la même doctrine que
+la règle maison « le front reflète, il ne décide pas », étendue : **il ne devine pas non
+plus**.
+
+### 4. Un champ rempli dans deux sens opposés n'a pas de lecteur
+
+`TripContext.originCountry` recevait, selon la source :
+
+| Source | Valeur écrite |
+|---|---|
+| `trip-context.mapper.ts` | `trip.origin.country` — un **nom** (« France »), figé dans la langue du créateur, souvent absent |
+| `booking.state.ts` (contexte par défaut) | `"FR"` — un **code ISO** |
+
+Ni l'un ni l'autre n'était lu : `grep` n'a trouvé que des écritures. Le champ était mort —
+et c'est précisément pour ça que l'incohérence avait survécu. Un champ qu'on écrit sans le
+lire ne proteste jamais.
+
+**La technique de diagnostic est généralisable** : avant de corriger un champ suspect,
+cherchez ses **lecteurs**, pas ses écrivains. Zéro lecteur = le champ est soit mort, soit
+sur le point de produire un bug au premier lecteur. Ici, le premier lecteur, c'était moi.
+
+La correction nomme ce que le champ contient — `originCountryCode` — et le remplit depuis
+`origin.countryCode`. Le nom du champ devient une **assertion vérifiable** par relecture.
+
+### 5. Un drapeau sans image : le bloc Regional Indicator
+
+```ts
+export function countryFlag(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const upper = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return null;
+  return String.fromCodePoint(...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+```
+
+Unicode réserve 26 points de code, `U+1F1E6` à `U+1F1FF`, appelés *Regional Indicator
+Symbols* : une lettre A–Z « régionale ». Isolée, elle s'affiche comme une lettre dans un
+carré. **Accolée à une autre**, la police du système reconnaît la paire comme un code pays
+ISO 3166-1 alpha-2 et dessine le drapeau. `"FR"` → `U+1F1EB U+1F1F7` → 🇫🇷.
+
+Conséquences pratiques :
+
+- **aucune ressource à charger** : pas d'image, pas de sprite, pas de dictionnaire ;
+- la fonction est **pure et testable**, et rend `null` sur toute entrée douteuse — un
+  drapeau est décoratif, il ne doit jamais casser une ligne de texte ;
+- `String.fromCodePoint` (et non `fromCharCode`) : au-delà de `U+FFFF`, un caractère
+  s'encode en deux unités UTF-16, et `fromCharCode` produirait deux moitiés invalides ;
+- le rendu dépend de la police : certains systèmes (Windows notamment) affichent les deux
+  lettres au lieu du drapeau. Ce n'est pas un bug, c'est un repli acceptable — d'où
+  l'importance que le texte reste lisible sans lui.
+
+Côté accessibilité, les drapeaux sont enveloppés dans `aria-hidden="true"` : le nom de la
+ville porte déjà l'information, et un lecteur d'écran annoncerait « drapeau de la France »
+devant chaque ligne.
+
+### 6. Ce n'est pas le nombre d'étapes, c'est le nombre annoncé
+
+La question posée en recette — *« 7 étapes c'est pas trop long visuellement ? »* — oppose en
+apparence deux vérités bien établies :
+
+- **les écrans courts gagnent sur mobile.** C'est la règle *one thing per page* du Design
+  System de GOV.UK, adoptée après recherche sur des parcours administratifs complexes :
+  moins de champs par écran, moins d'erreurs, et des messages d'erreur visibles sans
+  défiler. Sur un téléphone, le clavier virtuel mange la moitié de la hauteur ;
+- **la longueur fait abandonner.** Dans les études sur les tunnels de paiement, « processus
+  trop long ou trop compliqué » figure systématiquement parmi les premières causes
+  d'abandon.
+
+Les deux sont vraies parce qu'elles **ne parlent pas de la même chose** : la première parle
+de la charge par écran, la seconde de l'**effort perçu**. Et l'effort perçu se forme à la
+lecture de « sur 7 », pas au comptage des écrans traversés.
+
+D'où la solution, qui ne sacrifie ni l'une ni l'autre : **dissocier le découpage de
+l'annonce**.
+
+```ts
+export const BOOKING_STEPS = 7;            // ce que le code connaît
+export const BOOKING_PHASES = [            // ce que l'utilisateur lit
+  { key: 'parcel',     lastStep: 3 },
+  { key: 'delivery',   lastStep: 5 },
+  { key: 'commitment', lastStep: 6 },
+  { key: 'payment',    lastStep: 7 },
+] as const;
+
+export function phaseOfStep(step: number): { key: string; index: number } {
+  const index = BOOKING_PHASES.findIndex((phase) => step <= phase.lastStep);
+  const safe = index === -1 ? BOOKING_PHASES.length - 1 : index;
+  return { key: BOOKING_PHASES[safe].key, index: safe };
+}
+```
+
+Le tableau est ordonné et `findIndex` rend **la première** phase dont l'écran courant ne
+dépasse pas la borne : la structure porte la logique, il n'y a aucune cascade de `if` à
+maintenir. Le `index === -1` est un garde-fou pour un numéro d'écran hors bornes — il
+retombe sur la dernière phase plutôt que de planter.
+
+Deux détails qui comptent :
+
+- **la jauge reste fine** (`width: step / BOOKING_STEPS`) : elle avance à chaque écran, donc
+  le sentiment de progression est conservé, alors que l'en-tête n'affiche que quatre mots ;
+- **le lecteur d'écran reçoit « Colis, étape 1 sur 4 »**. On ne lui cache pas le chiffre —
+  on lui donne *le même* que celui qui est à l'écran. Une interface ne doit pas raconter une
+  histoire différente selon le canal.
+
+### 7. Corriger un commentaire qui documente une règle abandonnée
+
+`trip-result-card.tsx` portait, dans son en-tête de fichier :
+
+```
+ *   SEULEMENT à l'international (16/10 : deux fois le même drapeau sur un
+ *   trajet intérieur n'apprend rien), …
+```
+
+Quand l'arbitrage s'inverse, il y a deux manières de traiter ce commentaire : le supprimer,
+ou **le corriger en datant la bascule**. La seconde a été choisie :
+
+```
+ *   TOUJOURS affiché, trajet intérieur compris (17/10 : supersède la règle
+ *   « international seulement » du 16/10 — voir la dérivation plus bas), …
+```
+
+Un commentaire qui dit « j'ai changé d'avis le 17, voici pourquoi » vaut infiniment mieux
+qu'un commentaire effacé : le prochain lecteur qui aura l'idée de re-masquer les drapeaux
+trouvera l'argument qui l'en dissuade (*tout le monde n'habite pas en France*). Un
+commentaire périmé est un piège ; un commentaire **historié** est une protection.
+
+### Les pièges payés dans ce lot
+
+- `overflow-y: auto` **rogne aussi l'axe X** — un `visible` ne survit jamais seul.
+- `left-1/2 -translate-x-1/2` suppose de la place des deux côtés ; limiter la largeur ne
+  limite pas la position.
+- `?? "VALEUR"` sur un champ métier transforme une absence en affirmation, sans que le type
+  n'y voie rien.
+- Un champ écrit par deux sources dans deux formats différents **et jamais lu** est un bug
+  en sommeil : cherchez les lecteurs avant les écrivains.
+- `String.fromCharCode` ne sait pas construire un caractère au-delà de `U+FFFF`.
+
+### Aller plus loin
+
+- La spécification CSS `overflow` et la table des valeurs calculées (le cas `visible` + non-`visible`).
+- Le motif *one thing per page* du GOV.UK Design System, et ses comptes rendus de recherche.
+- `createPortal` de React, et ce qu'il coûte en repositionnement au défilement.
+- La CSS Anchor Positioning API (`anchor-name` / `position-anchor`), qui résoudra nativement
+  l'ancrage des bulles le jour où son support sera généralisé.
+- Le bloc Unicode *Enclosed Alphanumeric Supplement* et la construction des drapeaux.
