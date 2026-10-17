@@ -1,10 +1,10 @@
 {
   "bar": {
-    "search": "Rechercher",
+    "search": "Explorer",
+    "favorites": "Favoris",
     "publish": "Publier",
-    "trips": "Trajets",
-    "messages": "Messages",
-    "profile": "Profil"
+    "activity": "Activité",
+    "messages": "Messages"
   },
   "gate": {
     "title": "Connecte-toi pour continuer",
@@ -14,14 +14,7 @@
   },
   "publish": {
     "title": "Publie ton trajet",
-    "body": "Destination, date, kilos disponibles, ton prix au kilo : la publication arrive dans un prochain lot de l'app.",
-    "note": "En attendant, publie ton trajet depuis le site — il apparaîtra ici."
-  },
-  "trips": {
-    "title": "Mes trajets",
-    "pendingDeals": "{count, plural, =0 {Aucune demande en attente} one {# demande en attente} other {# demandes en attente}}",
-    "draftTrips": "{count, plural, =0 {Aucun trajet à finaliser} one {# trajet à finaliser} other {# trajets à finaliser}}",
-    "note": "Le détail des trajets et des demandes arrive dans un prochain lot."
+    "body": "Destination, date, kilos disponibles, ton prix au kilo : la publication arrive dans un prochain lot de l'app."
   },
   "messages": {
     "title": "Messages",
@@ -31,6 +24,16 @@
   "profile": {
     "title": "Profil",
     "logout": "Se déconnecter",
-    "note": "La gestion du profil arrive dans un prochain lot."
+    "note": "La gestion du profil arrive dans un prochain lot.",
+    "back": "Retour"
+  },
+  "activity": {
+    "title": "Activité",
+    "pendingDeals": "{count, plural, =0 {Aucune demande en attente} one {# demande en attente} other {# demandes en attente}}",
+    "draftTrips": "{count, plural, =0 {Aucun trajet à finaliser} one {# trajet à finaliser} other {# trajets à finaliser}}",
+    "note": "Le détail des trajets et des demandes arrive dans un prochain lot.",
+    "publishTitle": "Publie ton trajet",
+    "publishBody": "Tes kilos libres peuvent rapporter. Annonce ton prochain voyage et reçois des demandes.",
+    "publishSoon": "La publication arrive dans un prochain lot de l’app."
   }
 }

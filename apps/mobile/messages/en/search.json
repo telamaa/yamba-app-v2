@@ -6,15 +6,31 @@
     "toPlaceholder": "Arrival city",
     "dateLabel": "Date",
     "datePlaceholder": "Pick a date",
-    "dateAny": "Any date",
-    "dateClear": "Clear the date",
-    "dateConfirm": "OK",
-    "cancel": "Cancel",
     "submit": "Search"
   },
-  "summary": {
-    "edit": "Edit",
-    "everywhere": "Anywhere"
+  "title": {
+    "fromTo": "Trips for {from} → {to}",
+    "fromOnly": "Trips departing from {from}",
+    "toOnly": "Trips to {to}",
+    "dateOnly": "Trips on {date}"
+  },
+  "recap": {
+    "anywhere": "Anywhere",
+    "anyDate": "Any date"
+  },
+  "tabs": {
+    "all": "All",
+    "plane": "Plane",
+    "train": "Train",
+    "car": "Car"
+  },
+  "filters": {
+    "title": "Filters",
+    "active": "Filters (active)",
+    "sortBy": "Sort by",
+    "earliest": "Earliest departure",
+    "lowestPrice": "Lowest price",
+    "bestRated": "Best rated"
   },
   "corridors": {
     "label": "Right now",
@@ -32,9 +48,44 @@
     "retry": "Try again"
   },
   "card": {
-    "fromPrice": "from {price} {currency}",
-    "perKg": "{price} {currency}/kg",
+    "fromPrice": "from",
     "remainingKg": "{kg} kg left",
-    "rating": "★ {rating} ({count})"
+    "exampleParcel": "≈ {price} for {kg} kg",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# stop} other {# stops}}",
+    "remainingSlots": "{count, plural, one {# slot} other {# slots}}",
+    "newTripper": "New Traveler",
+    "popular": "Popular",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites",
+    "favoriteOwnTrip": "You cannot favorite your own trip",
+    "favoriteNotFavoritable": "This trip is no longer available",
+    "favoriteError": "Unable to update the favorite, please retry",
+    "mode": {
+      "plane": "Plane",
+      "train": "Train",
+      "car": "Car"
+    }
+  },
+  "date": {
+    "title": "When are you leaving?",
+    "exact": "Exact date",
+    "flex": "I'm flexible",
+    "thisWeek": "This week",
+    "thisMonth": "This month",
+    "next3Months": "Next 3 months",
+    "apply": "Apply",
+    "clear": "Clear"
+  },
+  "edit": {
+    "title": "Edit search",
+    "cancel": "Cancel",
+    "clearAll": "Clear all",
+    "swap": "Swap origin and destination"
+  },
+  "city": {
+    "clear": "Clear the field",
+    "noResult": "No city found",
+    "unavailable": "Suggestions unavailable — type the city, search still works"
   }
 }

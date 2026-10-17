@@ -27,15 +27,10 @@
   },
   "offer": {
     "title": "Ce que tu peux envoyer avec {firstName}",
-    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifie ci-dessous que ton type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
     "perKg": "Prix au kilo",
     "available": "Disponible",
-    "estimateLabel": "Estimation pour un colis de {kg} kg",
-    "allIn": "tout compris (transport + service Yamba)",
     "finalAtBooking": "Le prix définitif est fixé à la réservation.",
     "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids.",
-    "families": "Familles de colis",
-    "refused": "Refusé par le Voyageur",
     "surcharge": "+{pct} %",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papiers",
@@ -47,13 +42,14 @@
       "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires & divers"
     },
-    "bags": "Bagage entier — forfait",
     "checkedBag": "Bagage en soute 23 kg",
-    "cabinBag": "Bagage cabine 12 kg"
+    "cabinBag": "Bagage cabine 12 kg",
+    "estimateShort": "≈ {price} pour un colis de {kg} kg, tout compris",
+    "priceDetails": "Détails du prix",
+    "refusedFamilies": "Familles refusées"
   },
   "categories": {
     "title": "Ce que propose {firstName}",
-    "hint": "Une réservation = un colis d'une seule catégorie. Pour envoyer plusieurs colis, fais une réservation par colis.",
     "label": {
       "CLOTHES": "Vêtements",
       "SHOES": "Chaussures",
@@ -70,8 +66,8 @@
     }
   },
   "locations": {
-    "pickupTitle": "Lieux de remise",
-    "deliveryTitle": "Lieux de livraison",
+    "pickupTitle": "Remise",
+    "deliveryTitle": "Livraison",
     "kind": {
       "AIRPORT": "À l'aéroport",
       "TRAIN_STATION": "À la gare",
@@ -81,7 +77,8 @@
       "EXACT": "Lieu exact",
       "CITY_WIDE": "Ville entière",
       "RADIUS": "Rayon {km} km"
-    }
+    },
+    "title": "Lieux de remise & livraison"
   },
   "conditions": {
     "title": "Conditions",
@@ -103,7 +100,6 @@
   "notes": {
     "title": "Notes du Voyageur"
   },
-  "bookingSoon": "La réservation depuis l'app arrive bientôt. En attendant, ce trajet se réserve sur le site Yamba.",
   "notFound": {
     "title": "Trajet introuvable",
     "body": "Ce trajet n'existe pas ou n'est plus disponible."
@@ -111,5 +107,51 @@
   "error": {
     "network": "Impossible de charger ce trajet. Vérifie ta connexion et réessaie.",
     "retry": "Réessayer"
+  },
+  "favorite": {
+    "add": "Ajouter aux favoris",
+    "remove": "Retirer des favoris",
+    "ownTrip": "C'est ton trajet : tu ne peux pas le mettre en favori.",
+    "notFavoritable": "Ce trajet ne peut plus être mis en favori.",
+    "error": "Le favori n'a pas pu être enregistré. Réessaie."
+  },
+  "co2": {
+    "prefix": "Envoi sans empreinte additionnelle ·",
+    "amount": "{kg} kg de CO₂ évités vs fret express",
+    "suffix": "pour un colis de {weight} kg"
+  },
+  "bar": {
+    "from": "À partir de",
+    "soon": "Bientôt réservable"
+  },
+  "report": {
+    "title": {
+      "TRIP": "Signaler cette annonce",
+      "USER": "Signaler ce profil"
+    },
+    "intro": "Dis-nous ce qui ne va pas. Notre équipe regarde chaque signalement ; la personne concernée ne saura jamais qui l'a signalée.",
+    "reason": "Motif",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Contenu illicite ou interdit",
+      "SCAM": "Arnaque suspectée",
+      "INAPPROPRIATE": "Comportement inapproprié",
+      "IMPERSONATION": "Usurpation d'identité",
+      "OTHER": "Autre"
+    },
+    "reasonMissing": "Choisis d'abord un motif.",
+    "details": "Précisions (facultatif)",
+    "detailsPlaceholder": "Ce que tu as vu, quand…",
+    "submit": "Envoyer le signalement",
+    "cancel": "Annuler",
+    "back": "Fermer",
+    "done": "Merci, ton signalement est bien reçu.",
+    "doneHint": "Un email de confirmation t'a été envoyé. Nous ne communiquons pas la suite donnée.",
+    "already": "Tu as déjà signalé cet élément, notre équipe s'en occupe.",
+    "ownTarget": "Tu ne peux pas signaler ton propre contenu.",
+    "failed": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "notFound": "Cet élément est introuvable : il n'existe plus ou n'est plus visible.",
+    "gateTitle": "Connecte-toi pour signaler",
+    "gateSubtitle": "Un signalement est toujours signé : cela protège tout le monde des abus.",
+    "signIn": "Se connecter"
   }
 }

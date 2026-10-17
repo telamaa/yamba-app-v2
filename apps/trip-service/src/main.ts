@@ -10,6 +10,7 @@ import cookieParser = require("cookie-parser");
 import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import tripRouter from "./routes/trip.router";
 import uploadRouter from "./routes/upload.routes";
+import placesRouter from "./routes/places.router"; // A211 — autocomplétion de villes (clé Google côté serveur)
 import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
 import prisma from "@packages/libs/prisma";
 import redis from "@packages/libs/redis";
@@ -60,6 +61,7 @@ app.get("/docs", (req, res) => {
 // Routes
 app.use("/trips", tripRouter);
 app.use("/uploads", uploadRouter);
+app.use("/places", placesRouter); // A211 — relais Places : la clé ne quitte jamais le serveur
 app.use("/admin", adminRouter); // C-PR4 (D57) — trajets, masquage, billets
 
 app.use(notFoundHandler); // ANO-ADM-27 — route inconnue : 404 JSON ROUTE_NOT_FOUND, jamais la page HTML d'Express

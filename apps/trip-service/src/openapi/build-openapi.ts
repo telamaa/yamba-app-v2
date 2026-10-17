@@ -287,6 +287,50 @@ export function buildOpenApiDocument() {
         },
       },
 
+      /* ── Autocomplétion de villes (A211) ──────────────────── */
+      "/places/autocomplete": {
+        get: {
+          tags: ["places"],
+          summary: "Proposer des villes pour une saisie",
+          description:
+            "Relais de l'autocomplétion Google : la clé vit côté serveur, jamais dans un client. " +
+            "Public (la recherche l'est). Réponse mise en cache 5 minutes par (saisie, langue). " +
+            "Le `sessionToken` du client est relayé tel quel — c'est lui qui groupe la facturation Google. " +
+            "503 PLACES_UNAVAILABLE quand le service tiers ne répond pas : le client retombe sur la " +
+            "saisie LIBRE et le dit, il ne conclut jamais qu'aucune ville ne correspond.",
+          operationId: "autocompletePlaces",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              schema: { type: "string", minLength: 2, maxLength: 100 },
+              description: "La saisie en cours (2 caractères minimum)",
+            },
+            {
+              name: "language",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["fr", "en"] },
+              description: "Langue des propositions ; à défaut, l'en-tête x-locale",
+            },
+            {
+              name: "sessionToken",
+              in: "query",
+              required: false,
+              schema: { type: "string", maxLength: 36 },
+              description: "Jeton de session d'autocomplétion fabriqué par le client",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("PlaceAutocompleteResponse", "Propositions (8 au plus), éventuellement vide"),
+            "400": response400,
+            "503": jsonResponse("ErrorResponse", "Service d'autocomplétion indisponible (PLACES_UNAVAILABLE)"),
+            "500": response500,
+          },
+        },
+      },
+
       /* ── Recherche publique ───────────────────────────────── */
       "/trips/search": {
         get: {

@@ -6927,3 +6927,48 @@ chemin principal quand son serveur existera) sans redessiner un seul écran.
 | MOB64 | Envoi en cours (connexion, code, envoi d'e-mail) | Le bouton reste plein mangue, trois points pulsent en vague ; l'écran ne bouge pas d'un pixel |
 | MOB65 | Inscription expirée / étape perdue / reset expiré | L'écran d'échec plein écran (X, titre, explication) avec le geste de reprise |
 | MOB66 | Mot de passe oublié | « Envoyer le code » gris tant que l'adresse n'est pas valide (même règle que MOB61) |
+
+# Les résultats, la recherche et la fiche trajet · `feat/mobile-results` (A211, A212, A213)
+
+## Le besoin
+
+Un Expéditeur ouvre l'app pour savoir **qui part bientôt sur sa route, et combien ça coûte**.
+Trois besoins, dans l'ordre où il les rencontre : voir des trajets **sans rien avoir à lire
+d'abord**, pouvoir **changer sa recherche** sans quitter ce qu'il regarde, et ouvrir un trajet
+pour **décider**. À cela s'ajoute une exigence de confiance qui n'est pas d'affichage : le
+prix annoncé dans la liste doit être le prix qu'on paie.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-41** | L'autocomplétion de villes de l'app passe par l'API Yamba, jamais par un service tiers appelé depuis l'appareil : **aucune clé tierce ne voyage dans le bundle**. La langue des propositions est celle du COMPTE quand il y en a un, celle de l'appareil sinon (D44). |
+| **RG-MOB-42** | Un service de suggestion muet n'est **jamais** présenté comme une absence de résultat : « aucune ville trouvée » parle de la saisie, « suggestions indisponibles » parle du service — et rappelle que la saisie libre reste valide. L'autocomplétion est un confort, jamais un préalable à la recherche. |
+| **RG-MOB-43** | Une ville choisie part au serveur en « Ville, Pays » (le libellé qu'il attend) et s'affiche en **ville seule** dans les récapitulatifs. |
+| **RG-MOB-44** | Un récapitulatif de recherche dit un **état**, jamais un ordre ni un libellé de champ : une recherche large se nomme (« Partout », « Toutes les dates »). |
+| **RG-MOB-45** | **Toute annonce de prix dans une liste porte l'estimation tout compris pour le colis type** (2 kg), à côté du prix au kilo : sous les planchers D16/D32, le prix au kilo sous-estime de 57 % ce que paie l'Expéditeur. C'est une projection indicative — le prix réel est calculé et figé par le serveur (snapshot D17), jamais par le front. |
+| **RG-MOB-46** | Un compteur de preuve sociale ne s'affiche qu'au-dessus de son seuil (vues à partir de 15, « Populaire » à 20) : l'absence de badge est neutre, un petit chiffre est négatif. |
+| **RG-MOB-47** | Une fiche trajet montre **avant la décision** ce qui la détermine (route, horaires, Voyageur, prix, lieux) et **replie** ce qui se lit après (détail du prix, familles refusées, conditions) ; les familles refusées sont comptées, pas listées. Une seule carte par écran — le prix. |
+| **RG-MOB-48** | Un geste qui n'existe pas encore se dit en **pastille discrète**, jamais en bouton proéminent grisé ; une navigation qui n'existe pas ne se promet pas (ni chevron, ni ligne inerte). La place du futur CTA est réservée pour qu'elle ne bouge pas le jour où il arrive. |
+| **RG-MOB-49** | Le signalement d'une annonce (D68) est **signé** : un visiteur passe d'abord par la porte d'identité. Motifs fermés, précisions facultatives (≤ 500 caractères), accusé de réception dans la même feuille. |
+
+## Tests d'acceptation
+
+| # | Scénario | Attendu |
+|---|---|---|
+| MOB67 | Saisie de deux caractères dans « Départ » | Jusqu'à 8 propositions après 220 ms ; nom en gras, contexte dessous ; **aucune clé Google n'est présente dans le bundle** |
+| MOB68 | Service de suggestions indisponible (clé serveur absente : 503) | « Suggestions indisponibles — tape la ville, la recherche fonctionne quand même » ; taper « Paris » à la main et valider rend bien des résultats |
+| MOB69 | Saisie qui ne correspond à aucune ville | « Aucune ville trouvée » — message DIFFÉRENT de celui du service indisponible |
+| MOB70 | Membre connecté dont le compte est en anglais, appareil en français | Les propositions arrivent en **anglais** (la langue du compte l'emporte, D44) |
+| MOB71 | Choix d'une ville étrangère (ex. « Orléans, France ») | La recherche rend des résultats (le serveur reçoit « Ville, Pays ») et la pilule récap n'affiche que « Orléans » |
+| MOB72 | Ouverture de Explorer sans recherche | Aucun titre générique, aucun sous-titre explicatif ; la pilule dit « Partout » / « Toutes les dates » ; le premier trajet est visible sans défiler |
+| MOB73 | Trajet à 3,50 €/kg dans la liste | La carte affiche AUSSI « ≈ 11 € pour 2 kg » ; l'ouverture de la fiche donne la MÊME estimation |
+| MOB74 | Trajet avec 5 vues / avec 18 vues / avec 25 vues | Aucun compteur / « 18 vues » / badge « Populaire » |
+| MOB75 | Trajet intérieur (Paris → Orléans) vs international | Pas de drapeau sur le trajet intérieur, drapeaux des deux pays sur l'international |
+| MOB76 | Pilule récap tapée | La feuille « Modifier la recherche » monte, les résultats restent visibles derrière (floutés) ; « Tout effacer » vide les trois champs |
+| MOB77 | Choix d'une date en mode « Je suis flexible » → « Cette semaine » | La pilule nomme le raccourci (« Cette semaine »), jamais ses bornes ; la fenêtre est peinte dans le calendrier ; une fenêtre déjà commencée repart d'aujourd'hui |
+| MOB78 | Retour au mode « Date précise » après un raccourci | La fenêtre flexible est OUBLIÉE (le calendrier ne montrerait plus ce qui serait envoyé) |
+| MOB79 | Filtre de transport sans aucun trajet | La pastille reste tapable (chemin de sortie) mais s'affiche estompée ; l'état vide est centré et l'en-tête collant reste en place |
+| MOB80 | Fiche trajet ouverte | Une seule carte (le prix) ; familles acceptées visibles, refusées comptées et repliées ; aucune ligne « Discuter avec », aucun chevron vers un profil |
+| MOB81 | Barre du bas de la fiche | Pastille discrète « Bientôt réservable » — jamais un bouton mangue qui ne mène nulle part |
+| MOB82 | « Signaler cette annonce » en visiteur | Porte d'identité d'abord ; après connexion, motifs fermés, envoi, accusé de réception ; un second signalement de la même annonce est refusé (409) avec un message, pas un code |
