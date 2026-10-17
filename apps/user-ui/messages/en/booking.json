@@ -28,8 +28,7 @@
       "weigh": "**Weigh precisely.** Declared weight must match actual weight at handover.",
       "describe": "**Describe accurately.** {carrierFirstName} will inspect the content before accepting.",
       "prohibited": "**No prohibited items.**",
-      "linkProhibited": "See the full list",
-      "open": "Show"
+      "linkProhibited": "See the full list"
     },
     "parcelDetails": {
       "weightShortcut": "{kg} kg",
@@ -46,7 +45,7 @@
     "photos": {
       "label": "Parcel photos",
       "requiredBadge": "Required with extended protection",
-      "hint": "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
+      "hint": "One photo of the unpacked contents, one of the sealed parcel. Up to {max} photos, JPEG or PNG, 10 MB each at most.",
       "add": "Add",
       "tagContent": "Content",
       "tagPackaged": "Packed",
@@ -66,16 +65,16 @@
       "noneAccepted": "{carrierFirstName} accepts no parcel family on this trip."
     },
     "size": {
-      "label": "Size — no need to measure",
+      "label": "Size: no need to measure",
       "hint": "Pick it by eye. The price difference is shown under each size.",
       "S": "envelope → shoe box",
       "M": "fits in a cabin bag",
       "L": "takes half a suitcase",
       "hintPending": "Pick it by eye. Enter the weight to see the price difference.",
       "hintFlat": "At this weight the per-parcel minimum applies: size does not change the price.",
-      "included": "no extra",
       "extra": "+{amount}"
-    }
+    },
+    "requiredBadge": "Required"
   },
   "insurance": {
     "title": "Parcel protection",
@@ -220,7 +219,7 @@
     "directFlight": "Direct",
     "duration": "{hours}h flight",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
     "minimumApplied": "Per-parcel minimum applied: {min}",
     "newTripper": "New Traveler",
     "quoteHint": {

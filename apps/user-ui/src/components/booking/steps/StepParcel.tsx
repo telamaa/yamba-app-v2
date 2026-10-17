@@ -8,7 +8,6 @@ import { quoteShipperPrice } from "@packages/pricing";
 import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
 import { toast } from "sonner";
 import { usePricingParams } from "@/hooks/usePricingParams";
-import { Backpack, Luggage, ShoppingBag } from "lucide-react";
 import {
   FormField,
   FormInput,
@@ -22,8 +21,8 @@ import {
   LocationOption,
   PhotoGrid,
   RequiredBadge,
+  RenderBoldText,
   SectionTitle,
-  TipBlock,
 } from "../BookingFormUi";
 import {
   PARCEL_FAMILIES,
@@ -40,9 +39,6 @@ import {
 
 /** Les poids d'un envoi réel — les mêmes que l'app mobile. */
 const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
-
-/** Icônes Lucide des classes de taille (PRC-03) — jamais d'emoji */
-const SIZE_ICONS = { S: ShoppingBag, M: Backpack, L: Luggage } as const;
 
 function ChoiceChip({
   active,
@@ -300,7 +296,7 @@ export default function StepParcel({
 
   /** D14 — ce que le Voyageur accepte d'abord ; ses refus repliés sous une ligne */
   const familyBlock = (
-    <FormField label={t("step1.family.label")} hint={t("step1.family.hint")} error={errors.family}>
+    <FormField label={t("step1.family.label")} error={errors.family}>
       {acceptedFamilies.length > 0 ? (
         <div className="flex flex-wrap gap-2">{acceptedFamilies.map((f) => familyChip(f, false))}</div>
       ) : (
@@ -308,8 +304,13 @@ export default function StepParcel({
           {t("step1.family.noneAccepted", { carrierFirstName: trip.carrier.firstName })}
         </p>
       )}
+      {/* L'indice appartient au CHAMP : rendu par `FormField`, il tombait sous la
+          ligne des refus et se lisait comme un commentaire sur les refus. */}
+      <div className="mt-1.5 text-[12px] leading-5 text-slate-400 dark:text-slate-500">
+        {t("step1.family.hint")}
+      </div>
       {refusedFamilies.length > 0 && (
-        <div className="mt-2">
+        <div className="mt-1.5">
           <button
             type="button"
             onClick={() => setShowRefused((v) => !v)}
@@ -334,7 +335,7 @@ export default function StepParcel({
   );
 
   const weightValueBlock = (
-    <div className="grid grid-cols-2 gap-3.5">
+    <div className="grid grid-cols-2 gap-3.5 md:max-w-md">
       <FormFieldWithTooltip
         label={t("step1.parcelDetails.weightLabel")}
         tooltip={t("step1.parcelDetails.weightTooltip", { min: 0.5, floor: 8 })}
@@ -384,48 +385,47 @@ export default function StepParcel({
     </div>
   );
 
-  /** PRC-03 — à l'œil, jamais de dimensions, et l'écart en EUROS (plus de « ×1,1 ») */
+  /** PRC-03 — à l'œil, jamais de dimensions. Trois rectangles bordés pesaient
+   *  autant que le reste de la page pour un choix à trois options : un segmenté,
+   *  d'un seul tenant, et SEULE la taille qui coûte plus cher est marquée (revue
+   *  du 17/10 — on ne décore pas ce qui ne change rien). */
   const sizeBlock = (
     <FormField label={t("step1.size.label")} hint={sizeHint} error={errors.sizeClass}>
-      <div className="grid grid-cols-3 gap-2">
+      <div
+        role="radiogroup"
+        className="flex w-full items-stretch gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/60"
+      >
         {(["S", "M", "L"] as SizeClass[]).map((sz) => {
-          const Icon = SIZE_ICONS[sz];
           const active = draft.sizeClass === sz;
-          const delta = sizeDeltaCents?.[sz];
+          const delta = sizeDeltaCents?.[sz] ?? 0;
           return (
             <button
               key={sz}
               type="button"
-              aria-pressed={active}
+              role="radio"
+              aria-checked={active}
               onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
               className={[
-                "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-colors",
+                "flex-1 rounded-lg px-2 py-1.5 text-center transition-colors",
                 active
-                  ? "border-[#FF9900] bg-[#FFF6E8] dark:bg-[#FF9900]/10"
-                  : "border-slate-200 bg-transparent hover:border-slate-400 dark:border-slate-700",
+                  ? "bg-white shadow-sm ring-1 ring-[#FF9900]/50 dark:bg-slate-800"
+                  : "hover:bg-white/70 dark:hover:bg-slate-800/50",
               ].join(" ")}
             >
-              <Icon
-                size={18}
-                strokeWidth={1.75}
-                className={active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500"}
-              />
-              <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
-              <span className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+              <span
+                className={[
+                  "block text-[13px] font-bold",
+                  active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-700 dark:text-slate-200",
+                ].join(" ")}
+              >
+                {sz}
+              </span>
+              <span className="mt-0.5 block text-[10.5px] leading-tight text-slate-500 dark:text-slate-400">
                 {t(`step1.size.${sz}`)}
               </span>
-              {typeof delta === "number" && !sizeIsFlat && (
-                <span
-                  className={[
-                    "text-[10.5px] font-semibold",
-                    delta === 0
-                      ? "text-slate-400 dark:text-slate-500"
-                      : "text-[#B45309] dark:text-[#FFB84D]",
-                  ].join(" ")}
-                >
-                  {delta === 0
-                    ? t("step1.size.included")
-                    : t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
+              {!sizeIsFlat && delta > 0 && (
+                <span className="mt-0.5 block text-[10.5px] font-semibold text-[#B45309] dark:text-[#FFB84D]">
+                  {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
                 </span>
               )}
             </button>
@@ -501,7 +501,11 @@ export default function StepParcel({
   );
 
   const descriptionBlock = (
-    <FormField label={t("step1.parcelDetails.descriptionLabel")} error={errors.description}>
+    <FormField
+      label={t("step1.parcelDetails.descriptionLabel")}
+      error={errors.description}
+      badge={<RequiredBadge label={t("step1.requiredBadge")} />}
+    >
       <FormTextarea
         value={draft.description}
         onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, description: v }))}
@@ -515,7 +519,7 @@ export default function StepParcel({
   const photosBlock = (
     <FormField
       label={t("step1.photos.label")}
-      hint={t("step1.photos.hint")}
+      hint={t("step1.photos.hint", { max: MAX_PHOTOS })}
       error={errors.photos}
       badge={photosRequired ? <RequiredBadge label={t("step1.photos.requiredBadge")} /> : undefined}
     >
@@ -600,37 +604,45 @@ export default function StepParcel({
     </>
   );
 
-  /** Les règles d'or : repliées — le conseil à la demande, jamais en travers du chemin */
+  /** Les règles d'or : repliées, à plat. Trois défauts payés d'un coup (captures
+   *  du 17/10) — le titre s'écrivait DEUX fois à l'ouverture (le `summary` et le
+   *  `TipBlock` portaient le même), le mot « Voir » disparaissait sans laisser de
+   *  quoi replier, et un encadré teinté vivait dans un encadré bordé. */
   const goldenRulesBlock = (
-    <details className="group mb-2 rounded-lg border border-slate-200 dark:border-slate-700">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-200">
-        <span className="flex items-center gap-2">
-          <Lightbulb size={15} className="text-[#0F766E]" />
-          {t("step1.goldenRules.title")}
-        </span>
-        <span className="text-[11px] text-slate-400 group-open:hidden">{t("step1.goldenRules.open")}</span>
-      </summary>
-      <div className="px-4 pb-1">
-        <TipBlock
-          icon={<Lightbulb size={16} />}
-          title={t("step1.goldenRules.title")}
-          items={goldenRules}
-          extraLink={
-            showProhibited
-              ? undefined
-              : {
-                  label: t("step1.goldenRules.linkProhibited"),
-                  onClickAction: () => setShowProhibited(true),
-                }
-          }
+    <details className="group mb-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-200">
+        <Lightbulb size={15} className="flex-shrink-0 text-[#0F766E]" />
+        <span className="flex-1">{t("step1.goldenRules.title")}</span>
+        <ChevronDown
+          size={15}
+          className="flex-shrink-0 text-slate-400 transition-transform group-open:rotate-180"
         />
-        {showProhibited && (
-          <p className="-mt-3 mb-5 text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
-            <span className="font-semibold">{tTrip("conditions.prohibited.title")} : </span>
-            {tTrip("conditions.prohibited.description")}
-          </p>
-        )}
-      </div>
+      </summary>
+      <ul className="mt-2.5 list-disc space-y-1 pl-10 text-[12.5px] leading-[1.7] text-slate-600 dark:text-slate-300">
+        {goldenRules.map((rule, i) => (
+          <li key={i}>
+            <RenderBoldText text={rule} />
+            {i === goldenRules.length - 1 && !showProhibited && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => setShowProhibited(true)}
+                  className="text-[#0F766E] underline underline-offset-2 hover:no-underline dark:text-[#5EEAD4]"
+                >
+                  {t("step1.goldenRules.linkProhibited")}
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {showProhibited && (
+        <p className="mt-2 pl-10 text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
+          <span className="font-semibold">{tTrip("conditions.prohibited.title")} : </span>
+          {tTrip("conditions.prohibited.description")}
+        </p>
+      )}
     </details>
   );
 

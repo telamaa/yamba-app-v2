@@ -367,13 +367,11 @@ export default function BookingParcelScreen() {
                   label={t(`parcel.sizes.${size}`)}
                   example={t(`parcel.sizeExamples.${size}`)}
                   priceLabel={
-                    sizeDeltaCents === null || sizeIsFlat
+                    sizeDeltaCents === null || sizeIsFlat || sizeDeltaCents[size] === 0
                       ? null
-                      : sizeDeltaCents[size] === 0
-                        ? t('parcel.sizeIncluded')
-                        : t('parcel.sizeExtra', {
-                            amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
-                          })
+                      : t('parcel.sizeExtra', {
+                          amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
+                        })
                   }
                   onPressAction={() => setBookingDraft({ sizeClass: size })}
                 />

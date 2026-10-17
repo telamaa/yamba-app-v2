@@ -68,7 +68,6 @@
     "sizeHint": "L'écart de prix est affiché sous chaque taille.",
     "sizeHintPending": "Indique le poids pour voir l'écart de prix.",
     "sizeHintFlat": "À ce poids, le minimum par colis s'applique : la taille ne change pas le prix.",
-    "sizeIncluded": "sans supplément",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} sur ce trajet"
   }

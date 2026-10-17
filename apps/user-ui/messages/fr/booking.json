@@ -28,8 +28,7 @@
       "weigh": "**Pèse précisément.** Le poids déclaré doit correspondre au poids réel à la remise.",
       "describe": "**Décris fidèlement.** {carrierFirstName} vérifiera le contenu avant d''accepter ton colis.",
       "prohibited": "**Aucun produit interdit.**",
-      "linkProhibited": "Voir la liste complète",
-      "open": "Voir"
+      "linkProhibited": "Voir la liste complète"
     },
     "parcelDetails": {
       "weightShortcut": "{kg} kg",
@@ -46,7 +45,7 @@
     "photos": {
       "label": "Photos du colis",
       "requiredBadge": "Obligatoire avec la protection étendue",
-      "hint": "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo.",
+      "hint": "Une photo du contenu déballé, une du colis emballé. Jusqu''à {max} photos, JPEG ou PNG, 10 Mo maximum chacune.",
       "add": "Ajouter",
       "tagContent": "Contenu",
       "tagPackaged": "Emballé",
@@ -66,16 +65,16 @@
       "noneAccepted": "{carrierFirstName} n''accepte aucune famille de colis sur ce trajet."
     },
     "size": {
-      "label": "Taille — pas besoin de mesurer",
+      "label": "Taille : pas besoin de mesurer",
       "hint": "Choisis à l'œil. L'écart de prix est affiché sous chaque taille.",
       "S": "enveloppe → boîte à chaussures",
       "M": "tient dans un sac cabine",
       "L": "occupe une demi-valise",
       "hintPending": "Choisis à l'œil. Indique le poids pour voir l'écart de prix.",
       "hintFlat": "À ce poids, le minimum par colis s'applique : la taille ne change pas le prix.",
-      "included": "sans supplément",
       "extra": "+{amount}"
-    }
+    },
+    "requiredBadge": "Obligatoire"
   },
   "insurance": {
     "title": "Protection du colis",
@@ -220,7 +219,7 @@
     "directFlight": "Direct",
     "duration": "{hours}h de vol",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
     "minimumApplied": "Minimum par colis appliqué : {min}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {
