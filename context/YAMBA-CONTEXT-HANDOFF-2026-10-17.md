@@ -131,17 +131,46 @@ Pas de gros lot réservation monolithique, pas de rattrapage documentaire global
 | 29 | 17/10 | Santé de la branche après le merge | `nx typecheck @yamba-app/mobile` **vert**, `tsc --noEmit` user-ui **vert** (la cible Nx `typecheck` n'existe pas pour `user-ui` — c'est la commande CI qu'on rejoue), contrôle i18n **miroir parfait** (30 namespaces, 60 fichiers). **Piège payé** : `apps/mobile/.expo/types/router.d.ts` est GÉNÉRÉ par Metro ; l'aller-retour sur `feat/feed-relevance-server` l'avait régénéré sans les routes `booking/` → typecheck rouge sur un `router.push` pourtant juste. Réparé en lançant Metro une fois |
 | 30 | 17/10 | **Dette documentaire de la page ① soldée** | Les trois cumulatifs complétés en AJOUT SEUL (**0 suppression**, vérifié au `numstat`) : DOC-TECHNIQUE **+156** (la pile mobile, le prix vivant, ce que le web a dû trancher, la sortie du tunnel, le défaut de clé de brouillon, le livrable 12) ; DOC-MÉTIER **+52** (**RG-MOB-50→62**, fiches **MOB83→97**) ; APPRENTISSAGE **+217** (**chapitre 213** — `useSyncExternalStore`, l'état qui meurt par choix, la clé de stockage sans portée, le coefficient qui n'est pas une vérité d'écran). Le registre portait déjà **A214** |
 | 31 | 17/10 | **PR #386 ouverte** (`feat/mobile-booking-colis` → `dev`) — la page ① | **18/18 contrôles verts, COMPTÉS** (8 TypeScript, 5 tests unitaires, build webpack, i18n, anti-fuite, OpenAPI). Prête à merger (c'est toi qui merges). Reste après le merge : la PR d'état `chore/etat-385` (CONTEXT + SUIVI, lot mobile + page ①) |
+| 32 | 17/10 | **PR #386 mergée** (`fa3db13`) — la page ① du tunnel est dans `dev` | La procédure « une page à la fois » a livré sa première page |
+| 33 | 17/10 | **Quatrième arrêt machine — diagnostic MESURÉ, pas supposé** | Le panic est explicite : `userspace watchdog timeout: no successful checkins from opendirectoryd in 188 seconds`. **Ce n'est PAS la RAM** : aucun rapport *jetsam*, swap à **0,00 Mo**, 0 swapin. Ce qui sature, c'est l'ordonnanceur et les I/O — `mysqld` à **257 réveils/s** et `node` à **201/s** (quota système 150), plus Spotlight qui réindexait `.nx/workspace-data` (1,8 Go), `user-ui/.next` (2,5 Go) et `admin-ui/.next` (1,8 Go) à chaque build. **6,1 Go** sortis de l'indexation (`.metadata_never_index`) ; MySQL, inutile ici (Yamba est sur Mongo) et lancé par **DEUX** plists `RunAtLoad`, reste à neutraliser à la main (sudo) |
+| 34 | 17/10 | **Recette de la page ① — trois retours** | L'infobulle du poids rognée (`overflow-y: auto` ramène AUSSI l'axe X à `auto`), l'avion affiché sur un trajet en train (et le mapper qui écrivait `?? "PLANE"`), les drapeaux impossibles (`originCountry` rempli en TEXTE d'un côté, en CODE de l'autre, et **sans aucun lecteur**). Registre **A215** |
+| 35 | 17/10 | **« 7 étapes c'est pas trop long ? » — arbitrage A216** | Ce n'est pas le nombre d'écrans qui fait abandonner, c'est le nombre **ANNONCÉ**. Sept écrans, **quatre phases** (les mots du site), jauge continue, lecteur d'écran à « 1 sur 4 ». **La garantie remonte du ④ au ②** : le web validé l'a placée juste après la taille, l'ordre natif le contredisait |
+| 36 | 17/10 | **PR #387 ouverte puis mergée** | 18/18 comptées. Page ① native alignée sur `1-mob/back-3`, tailles en pastilles, `countryFlag` partagé des deux côtés |
+| 37 | 17/10 | **D81 gravée AVANT le code**, trois arbitrages tranchés avec l'utilisateur | Plancher de facturation **2,3 kg** (8,05 € à 3,50 €/kg — l'économie d'hier au centime près), grille douce **S 0 / M 3 / L 6**, capacité décomptée sur le **poids facturé**. Le livrable 12 avait spécifié, le registre a décidé |
+| 38 | 17/10 | **PR #388 — le moteur de prix refondu** | Les deux défauts MESURÉS corrigés. Admin : **aucun écran touché à la main** (le catalogue D62 est la source unique) et **aucune migration** (`mergeSettingsValues` n'itère que sur le catalogue — prouvé par contre-épreuve). Snapshot D17 : `sizeCoef`/`minimumApplied` ne sont plus ÉCRITS mais restent au schéma. **Référence de tests corrigée** : deal-service était noté 659, MESURÉ à 684 sur `dev` |
+| 39 | 17/10 | **PR #389 — la porte d'identité** | `/trips/:id/book` sans session affichait une page vide ; elle renvoie à la fiche avec `?auth=book`. Porte portée par `TripDetailView` : les DEUX barres de réservation sont montées et leurs modales rendues hors du `lg:hidden` — deux modales se seraient ouvertes |
+| 40 | 17/10 | **Les trois PR mergées** (`750d52f`) | Chaque fois le même conflit — les trois cumulatifs, **ajout contre ajout** — et la même résolution : les deux côtés PROUVÉS comme ajouts purs à l'ancêtre (`startswith(base)`) avant d'être recollés, **0 suppression**. Résolu dans un **worktree séparé** : l'arbre de travail et le serveur Next de l'utilisateur n'ont pas été touchés |
+| 41 | 17/10 | **Écart trouvé dans les protections de `dev`** | 18 contrôles TOURNENT, **17 seulement sont REQUIS** : « TypeScript (fiches de test) » n'est pas bloquant. C'est précisément celui ajouté le 18/09 parce qu'un défaut vivant dans un `.spec.ts` était invisible de toute la CI. `CLAUDE.md` affirme 18 : à corriger, de préférence en l'ajoutant aux protections |
 
-## 9. L'état après la reprise du 17/10 — ce qui reste
+## 9. L'état au soir du 17/10 — tout est mergé
 
-| PR | Branche | État |
+| PR | Sujet | État |
 |---|---|---|
-| **#383** | `feat/feed-relevance-server` | **MERGÉE** le 17/10 (D80 serveur) — `origin/dev` = `909df3a` |
-| **#384** | `feat/feed-relevance-web` | **MERGÉE** le 17/10, juste après #383 |
-| **#386** | `feat/mobile-booking-colis` | **Ouverte et PRÊTE** : la page ① du tunnel (web + mobile), documents soldés, **18/18 comptées** |
-| — | `chore/etat-385` | **À ouvrir** : `YAMBA-CONTEXT.md` + `YAMBA-SUIVI-PROJET.md` pour le lot mobile mergé (+ la page ①) |
+| **#383 / #384** | D80 — le flux d'atterrissage localisé (serveur puis web) | **MERGÉES** |
+| **#385** | la recherche, la carte et la fiche trajet natives + le relais Places (A210/A211) | **MERGÉE** |
+| **#386** | la page ① du tunnel « Le colis » (A214) | **MERGÉE** |
+| **#387** | la recette de la page ① — infobulle, mode de transport, drapeaux, quatre phases (A215/A216) | **MERGÉE** |
+| **#388** | **D81** — le prix se fait au poids FACTURÉ, la place prise est réservée | **MERGÉE** |
+| **#389** | la porte d'identité en modale au-dessus du trajet | **MERGÉE** |
+| — | `chore/etat-389` | **ouverte** : `YAMBA-CONTEXT.md` (+231, neuf lots) et `YAMBA-SUIVI-PROJET.md` (en-tête d'état, Jalon 4, Parcours Expéditeur, et les trois chiffres du § 8) |
 
-> Ordre acté : #383 (serveur) → #384 (web) → le mobile du flux localisé. Les deux premières
-> sont mergées. La procédure « une page à la fois » du § 8 court maintenant : page ① livrée,
-> page ② (**le contenu : valeur, photos, description**) à annoncer, captures web à fournir
-> AVANT tout code (§ 7, entrée 18).
+`origin/dev` = **`750d52f`** · aucune autre PR ouverte · **1297 tests plateforme** (trip 409 ·
+deal 687 · notification 122 · message 79) **+ auth 407**.
+
+**Ce qui vient ensuite**, dans l'ordre de la procédure « une page à la fois » (§ 8) :
+
+1. **l'écran ② du tunnel natif — LA GARANTIE** (remontée du ④ au ② par A216, parce que c'est
+   elle qui rend les photos obligatoires). Le web de ce bloc est déjà validé dans `1-mob/back-3` ;
+2. puis l'écran ③ — le contenu (valeur déclarée, description, photos) ;
+3. puis ④ à ⑦ — lieux, destinataire, engagement, paiement.
+
+**Deux restes hors code**, à la main de l'utilisateur :
+
+- **neutraliser MySQL** (`sudo launchctl bootout` + `disable` sur les DEUX plists) : 257
+  réveils/s pour une base que Yamba n'utilise pas, et c'est l'un des coupables du watchdog ;
+- **ajouter « TypeScript (fiches de test) » aux contrôles REQUIS** de `dev` : il tourne mais
+  ne bloque pas, alors qu'il existe justement parce qu'un défaut invisible était passé.
+
+**Toujours spécifié et NON codé** : PRC-05 (suggestion de prix par corridor) et PRC-09
+(forfait bagage) — les deux leviers que le livrable 12 désigne comme décisifs pour la
+rentabilité.
