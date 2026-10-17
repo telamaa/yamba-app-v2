@@ -115,13 +115,16 @@ Pas de gros lot réservation monolithique, pas de rattrapage documentaire global
 | 13 | 17/10 | `f464b30` — **merge committé** | Le rattrapage de 18 jours est dans la branche de #383 |
 | 14 | 17/10 | `nx test trip-service` **MESURÉ** | **408 tests / 30 suites** (326 côté `dev` + **82** de D80). `CLAUDE.md` : référence plateforme **1186 → 1268**, trip **326 → 408**. La branche n'avait JAMAIS mis `CLAUDE.md` à jour (le « trip 310 → 392 » n'existait que dans le message de `a774e3a`) |
 | 15 | 17/10 | `npm run generate:openapi` | **Aucune dérive** : les 5 `openapi.json` sont en phase après le merge (le contrôle CI de diff passera) |
+| 16 | 17/10 | `f464b30` + `87d8401` poussés | `59d5d62..87d8401` sur `origin/feat/feed-relevance-server` |
+| 17 | 17/10 | **CI de #383** | **18/18 vertes, comptées par bucket** (0 fail). La PR est passée de bloquée-sur-conflit à `MERGEABLE` / `CLEAN`. Le dernier contrôle tombé est « TypeScript (fiches de test) » — celui qui voit les `*.spec.ts` |
+| 18 | 17/10 | Merge contrôlé SÉMANTIQUEMENT, pas seulement textuellement | Aux deux points où `dev` et D80 se croisent : `trip-service/src/main.ts` (le routeur Places d'A211 monté à côté de `/trips`, `/uploads`, `/admin`) et `apps/api-gateway/src/main.ts` (le `x-client-ip` de D80 sur `/api/trips` ET le proxy `/api/places` d'A211) |
 
 ## 9. L'état après la reprise du 17/10 — ce qui reste
 
 | PR | Branche | État |
 |---|---|---|
-| **#383** | `feat/feed-relevance-server` | **Ouverte**, D80 serveur, **à jour de `dev`** depuis `f464b30`. Reste : pousser, compter les 18 contrôles, faire passer en « prête » |
-| **#384** | `feat/feed-relevance-web` | **Ouverte**, empilée sur #383 — devra être rebasée/mergée APRÈS #383 |
+| **#383** | `feat/feed-relevance-server` | **Ouverte et PRÊTE** (jamais en brouillon), D80 serveur, **à jour de `dev`** depuis `f464b30`, **18/18 CI vertes**, `MERGEABLE` / `CLEAN`. Il ne reste QUE le merge — c'est toi qui merges |
+| **#384** | `feat/feed-relevance-web` | **Ouverte**, basée sur `feat/feed-relevance-server` (empilement correct), 2 commits. Deux choses l'attendent : rejouer la MÊME résolution d'ajout contre ajout dans les trois cumulatifs, et renuméroter son chapitre d'apprentissage **212 → 213** (212 est désormais pris par le chapitre serveur de D80) |
 | — | `chore/etat-385` | **À ouvrir** : `YAMBA-CONTEXT.md` + `YAMBA-SUIVI-PROJET.md` pour le lot mobile mergé |
 
 > Ordre acté : #383 (serveur) → #384 (web) → le mobile du flux localisé. Puis la procédure
