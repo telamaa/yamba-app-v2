@@ -13157,3 +13157,24 @@ seul l'axe change.
 
 **Et toute la ligne devient la cible.** Viser une pastille de 22 px au pouce est une épreuve ;
 le `Pressable` englobe le libellé, la silhouette et la pastille.
+
+### Et les silhouettes repartent — pourquoi mon argument ne tenait pas
+
+La révision ci-dessus gardait les silhouettes, en remplaçant la **ligne de base commune** des
+colonnes par un **bord gauche commun** des lignes. L'argument est faux en pratique.
+
+L'œil compare ce qui est **adjacent**. En colonnes, trois rectangles côte à côte se comparent
+en une fixation. Empilés en lignes, ils sont séparés par ~60 px de texte : il faudrait
+balayer de haut en bas et mémoriser des tailles. Personne ne le fait. On conservait donc une
+gouttière de 46 px qui pousse le libellé, pour une information que personne ne lit.
+
+Et le texte faisait déjà le travail : « une boîte à chaussures », « un sac à dos », « une
+demi-valise » est **ordonné et concret**. La référence de recette ne porte aucune icône dans
+ses lignes de choix — elle n'en a pas besoin, et nous non plus.
+
+Il reste : `S · une boîte à chaussures` en gras, la conséquence en gris, la pastille à droite.
+`SIZE_SILHOUETTES` disparaît des deux fronts.
+
+> La leçon : une illustration se justifie par ce qu'elle **ajoute dans la disposition où elle
+> vit**. Changer la disposition peut lui retirer sa raison d'être, même si elle était juste
+> avant. Une décision graphique n'est jamais valable « en soi ».

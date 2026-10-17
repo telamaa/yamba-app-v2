@@ -4502,3 +4502,16 @@ Et un détail qui fait le pont avec le chapitre : les silhouettes survivent au c
 disposition, mais **leur origine commune change d'axe**. En colonnes, c'était la ligne de base
 (`items-end`) ; empilées en lignes, c'est le bord gauche — d'où une gouttière de largeur fixe
 plutôt qu'un centrage. Le principe reste « une origine commune, sinon aucune comparaison ».
+
+**Addendum au post-scriptum — l'illustration qui perd sa raison d'être en changeant de
+disposition.** Les silhouettes à l'échelle étaient justifiées en colonnes : trois rectangles
+**adjacents** se comparent en une fixation du regard. En passant aux lignes, j'ai prétendu
+que le « bord gauche commun » remplaçait la ligne de base. C'était faux : l'œil compare ce
+qui est adjacent, et soixante pixels de texte entre deux formes suffisent à tuer la
+comparaison. On gardait une gouttière qui pousse le libellé pour une information que personne
+ne lisait.
+
+La règle générale : **une décision graphique n'est jamais valable « en soi »** — elle est
+valable *dans une disposition donnée*. Quand la disposition change, il faut re-justifier
+chaque élément plutôt que le transposer. Le test est simple : *qu'est-ce que je perds en le
+retirant ?* Ici, rien — « une boîte à chaussures » est déjà ordonné et concret.

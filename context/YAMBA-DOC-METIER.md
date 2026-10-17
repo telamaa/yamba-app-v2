@@ -7257,3 +7257,7 @@ l'effet sur le total.
 | MOB132 | Régler un poids qui approche la limite du trajet | La phrase passe en mangue **avant** que la limite soit atteinte |
 | MOB133 | Choisir une taille en touchant le libellé (pas la pastille) | La taille est sélectionnée : toute la ligne est la cible |
 | MOB134 | Comparer les trois tailles | Les trois silhouettes partagent le **même bord gauche** : la différence de gabarit se voit en descendant la liste |
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-80** *(supersède RG-MOB-75)* | Les tailles se présentent par leurs **mots** — un repère (S / M / L) et un objet familier — sans illustration. Une image ne se justifie que si elle ajoute ce que le texte ne peut pas dire **dans la disposition où elle vit** ; empilée en liste, une silhouette n'est plus comparable à ses voisines. |

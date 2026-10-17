@@ -81,19 +81,6 @@ function weightStep(kg: number): number {
   return kg < 5 ? 0.5 : 1;
 }
 
-/**
- * Les silhouettes de taille, à l'ÉCHELLE. Les proportions viennent des gabarits
- * du livrable 12 (S 33×23 cm, M 45×30, L 55×40) ramenés à la même base : posées
- * sur une ligne commune, elles disent en un regard ce que trois mots ne peuvent
- * pas dire. Ce ne sont pas des icônes — on les avait retirées à raison —, c'est
- * une mesure.
- */
-const SIZE_SILHOUETTES: Record<SizeClass, { width: number; height: number }> = {
-  S: { width: 26, height: 18 },
-  M: { width: 36, height: 24 },
-  L: { width: 44, height: 32 },
-};
-
 
 
 export default function BookingParcelScreen() {
@@ -452,7 +439,6 @@ export default function BookingParcelScreen() {
                     active={draft.sizeClass === size}
                     code={t(`parcel.sizes.${size}`)}
                     example={t(`parcel.sizeExamples.${size}`)}
-                    silhouette={SIZE_SILHOUETTES[size]}
                     detail={
                       sizeDeltaCents === null
                         ? null
@@ -613,26 +599,26 @@ function StepperButton({
 
 /**
  * Une ligne de taille — grammaire « Choisissez quand vous souhaitez payer » :
- * la silhouette à gauche, le libellé gras, la conséquence en gris dessous, et
- * le choix par une pastille à DROITE. Toute la ligne est la cible : sur un
- * téléphone, viser une pastille de 22 px est une épreuve.
+ * le libellé gras, la conséquence en gris dessous, le choix par une pastille à
+ * DROITE. Toute la ligne est la cible : sur un téléphone, viser une pastille de
+ * 22 px est une épreuve.
  *
- * Les silhouettes restent à l'échelle et partagent une largeur de gouttière
- * fixe : le bord gauche commun est ce qui rend la comparaison lisible une fois
- * les lignes empilées.
+ * AUCUNE illustration (révision du 21/10). Les silhouettes à l'échelle avaient
+ * un sens en COLONNES, où trois rectangles adjacents se comparent d'un regard.
+ * Empilées en lignes, elles sont séparées par soixante pixels de texte : l'œil
+ * ne compare plus rien, et la gouttière ne fait que pousser le libellé. Or
+ * « une boîte à chaussures » dit déjà tout — ordonné et concret.
  */
 function SizeRow({
   active,
   code,
   example,
-  silhouette,
   detail,
   onPressAction,
 }: {
   active: boolean;
   code: string;
   example: string;
-  silhouette: { width: number; height: number };
   /** Ce que cette taille change au prix — `null` tant que le poids manque. */
   detail: string | null;
   onPressAction: () => void;
@@ -645,18 +631,6 @@ function SizeRow({
       accessibilityLabel={[code, example, detail].filter(Boolean).join(' ')}
       onPress={onPressAction}
       style={({ pressed }) => [styles.optionRow, { opacity: pressed ? 0.7 : 1 }]}>
-      <View style={styles.silhouetteSlot} aria-hidden>
-        <View
-          style={[
-            styles.silhouette,
-            {
-              width: silhouette.width,
-              height: silhouette.height,
-              borderColor: active ? Brand.mango : theme.textSecondary,
-            },
-          ]}
-        />
-      </View>
       <View style={styles.optionText}>
         <ThemedText type="smallBold">
           {code} · {example}
@@ -845,13 +819,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  // Gouttière FIXE : le bord gauche commun rend les trois silhouettes
-  // comparables une fois les lignes empilées.
-  silhouetteSlot: {
-    width: 46,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -878,10 +845,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     paddingVertical: 0,
-  },
-  silhouette: {
-    borderWidth: 1.5,
-    borderRadius: 3,
   },
   errorRow: {
     flexDirection: 'row',

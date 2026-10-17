@@ -77,19 +77,6 @@ type Props = {
   errors: ValidationErrors;
 };
 
-/**
- * Les silhouettes de taille, à l'ÉCHELLE. Proportions des gabarits du livrable 12
- * (S 33×23 cm, M 45×30, L 55×40) ramenées à la même base. Posées sur une ligne
- * commune, elles disent d'un regard ce que trois mots ne peuvent pas dire. Ce ne
- * sont pas des icônes — c'est une mesure. Jumelles de `SIZE_SILHOUETTES` dans
- * `apps/mobile/src/app/booking/parcel.tsx`.
- */
-const SIZE_SILHOUETTES: Record<SizeClass, { width: number; height: number }> = {
-  S: { width: 26, height: 18 },
-  M: { width: 36, height: 24 },
-  L: { width: 44, height: 32 },
-};
-
 const GOLDEN_RULES_KEYS = ["pack", "weigh", "describe", "prohibited"] as const;
 
 export default function StepParcel({
@@ -452,13 +439,15 @@ export default function StepParcel({
         </div>
 
         {/* LES TAILLES — des lignes pleine largeur, le choix par une pastille à
-            DROITE, la conséquence en ligne grise. Trois colonnes serrées
-            rognaient les libellés et n'offraient aucune cible confortable. */}
+            DROITE, la conséquence en ligne grise, et AUCUNE illustration
+            (révision du 21/10). Les silhouettes à l'échelle avaient un sens en
+            COLONNES, où trois rectangles adjacents se comparent d'un regard ;
+            empilées, elles sont séparées par soixante pixels de texte et l'œil
+            ne compare plus rien. « Une boîte à chaussures » dit déjà tout. */}
         <div role="radiogroup" aria-label={t("step1.size.label")}>
           {(["S", "M", "L"] as SizeClass[]).map((sz) => {
             const active = draft.sizeClass === sz;
             const delta = sizeDeltaCents?.[sz] ?? 0;
-            const box = SIZE_SILHOUETTES[sz];
             const detail =
               sizeDeltaCents === null
                 ? null
@@ -474,18 +463,6 @@ export default function StepParcel({
                 onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
                 className="flex w-full items-center gap-3 border-t border-slate-100 py-4 text-left transition-opacity hover:opacity-80 dark:border-slate-800/70"
               >
-                {/* Gouttière FIXE : le bord gauche commun rend les trois
-                    silhouettes comparables une fois les lignes empilées. */}
-                <span className="flex w-[46px] flex-shrink-0 items-center" aria-hidden="true">
-                  <span
-                    className="block rounded-[3px] border-[1.5px]"
-                    style={{
-                      width: box.width,
-                      height: box.height,
-                      borderColor: active ? "#FF9900" : "#94A3B8",
-                    }}
-                  />
-                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[14px] font-semibold text-slate-900 dark:text-white">
                     {sz} · {t(`step1.size.${sz}`)}
