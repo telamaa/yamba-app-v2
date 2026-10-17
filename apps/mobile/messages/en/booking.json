@@ -5,7 +5,9 @@
     "allIn": "all in",
     "quoteError": {
       "MISSING_WEIGHT": "Enter a weight to see the price",
-      "GENERIC": "No price for this choice"
+      "GENERIC": "No price for this choice",
+      "MISSING_PRICE_PER_KG": "This trip does not offer per-kilo shipping",
+      "BAG_NOT_OFFERED": "This bag is not offered on this trip"
     }
   },
   "unavailable": {
@@ -76,7 +78,8 @@
     "cardTitle": "Your parcel",
     "weightLabel": "Weight",
     "weightFree": "No limit stated on this trip",
-    "sizeIncluded": "No extra charge"
+    "sizeIncluded": "No extra charge",
+    "sizeHintNoPrice": "It tells the Traveler whether your parcel fits in their bag."
   },
   "phases": {
     "parcel": "Parcel",

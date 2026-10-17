@@ -5,7 +5,9 @@
     "allIn": "tout compris",
     "quoteError": {
       "MISSING_WEIGHT": "Indique un poids pour voir le prix",
-      "GENERIC": "Prix indisponible pour ce choix"
+      "GENERIC": "Prix indisponible pour ce choix",
+      "MISSING_PRICE_PER_KG": "Ce trajet ne propose pas d'envoi au kilo",
+      "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet"
     }
   },
   "unavailable": {
@@ -76,7 +78,8 @@
     },
     "weightLabel": "Poids",
     "weightFree": "Aucune limite annoncée sur ce trajet",
-    "sizeIncluded": "Sans supplément"
+    "sizeIncluded": "Sans supplément",
+    "sizeHintNoPrice": "Elle dit au Voyageur si ton colis tient dans son bagage."
   },
   "phases": {
     "parcel": "Colis",

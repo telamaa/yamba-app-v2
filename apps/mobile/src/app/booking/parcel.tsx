@@ -108,7 +108,15 @@ export default function BookingParcelScreen() {
     void getPublicTrip(tripId)
       .then((loaded) => {
         if (!alive) return;
-        startBookingDraft(loaded);
+        // Un trajet qui ne propose RIEN (ni prix au kilo, ni forfait bagage)
+        // n'est pas réservable : mieux vaut le dire que d'ouvrir un formulaire
+        // dont aucun devis ne sortira.
+        const offered = offeredProducts(loaded);
+        if (offered.length === 0) {
+          setFailed(true);
+          return;
+        }
+        startBookingDraft(loaded, offered[0]);
         setTrip(loaded);
       })
       .catch(() => {
@@ -258,10 +266,15 @@ export default function BookingParcelScreen() {
   const remainingKg = typeof trip.remainingKg === 'number' ? trip.remainingKg : null;
   const priceLabel =
     quote?.ok === true ? formatPrice(quote.quote.totalShipperCents, trip.currencyCode, locale) : null;
-  const priceHint =
-    quote?.ok === true
-      ? t('bar.allIn')
-      : t(`bar.quoteError.${quote?.code === 'MISSING_WEIGHT' ? 'MISSING_WEIGHT' : 'GENERIC'}`);
+  // Les causes qu'on sait NOMMER. La liste est explicite et non dérivée du code
+  // d'erreur : une clé construite à la volée qui n'existe pas fait planter le
+  // rendu next-intl au lieu d'afficher un message approximatif.
+  const QUOTE_ERROR_KEYS = ['MISSING_WEIGHT', 'MISSING_PRICE_PER_KG', 'BAG_NOT_OFFERED'] as const;
+  const quoteErrorKey =
+    quote?.ok === false && (QUOTE_ERROR_KEYS as readonly string[]).includes(quote.code)
+      ? quote.code
+      : 'GENERIC';
+  const priceHint = quote?.ok === true ? t('bar.allIn') : t(`bar.quoteError.${quoteErrorKey}`);
 
   return (
     <BookingStepFrame
@@ -464,12 +477,17 @@ export default function BookingParcelScreen() {
                 récapitulatif de la référence : la conséquence, en gris, au
                 contact de la décision. */}
             <ThemedText type="small" themeColor="textSecondary">
+              {/* Sans écart calculable, on distingue DEUX cas : le poids manque
+                  (on le demande), ou le devis a échoué pour une autre raison —
+                  et dans ce cas réclamer un poids déjà saisi est un mensonge. */}
               {billedNote ??
-                (sizeDeltaCents === null
-                  ? t('parcel.sizeHintPending')
-                  : sizeIsFlat
+                (sizeDeltaCents !== null
+                  ? sizeIsFlat
                     ? t('parcel.sizeHintFlat')
-                    : t('parcel.sizeHint'))}
+                    : t('parcel.sizeHint')
+                  : weightValue === null
+                    ? t('parcel.sizeHintPending')
+                    : t('parcel.sizeHintNoPrice'))}
             </ThemedText>
           </View>
         </>

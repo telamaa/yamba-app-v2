@@ -131,11 +131,20 @@ export function clearBookingDraft(): void {
  *   • la première famille ACCEPTÉE par le Voyageur (jamais une refusée) ;
  *   • un seul lieu proposé ⇒ il est choisi d'office (rien à décider).
  */
-export function startBookingDraft(trip: PublicTrip): void {
+/**
+ * @param offeredProduct le premier produit REELLEMENT proposé par ce trajet.
+ *   `EMPTY` part sur `PARCEL`, mais un trajet sans prix au kilo ne le propose
+ *   pas — et le sélecteur de produit est masqué quand il n'y a qu'une option.
+ *   Le brouillon restait alors sur un produit inexistant, et le devis échouait
+ *   en « Prix indisponible » sans que rien ne l'explique. Le produit se dérive
+ *   donc du trajet, exactement comme la famille et les lieux.
+ */
+export function startBookingDraft(trip: PublicTrip, offeredProduct?: ParcelProduct): void {
   if (draft.tripId === trip.id) return;
   draft = {
     ...EMPTY,
     tripId: trip.id,
+    product: offeredProduct ?? EMPTY.product,
     family: firstAcceptedFamily(trip),
     pickupIndex: trip.pickupLocations.length === 1 ? 0 : null,
     deliveryIndex: trip.deliveryLocations.length === 1 ? 0 : null,

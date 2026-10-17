@@ -13203,3 +13203,53 @@ contenu**, **Protection du colis** — titre + lignes pleine largeur à contrôl
 
 Le legacy PER_CATEGORY garde ses champs simples : la carte n'a pas sa place dans une grille à
 deux colonnes, et ce moteur est déprécié — on ne lui refait pas une mise en page.
+
+### « Prix indisponible pour ce choix » — la valeur par défaut qui affirmait du faux
+
+Constat de recette : sur un trajet donné, l'écran ① affichait tout le formulaire colis, mais
+la barre du bas disait « — · Prix indisponible pour ce choix », aucune taille n'annonçait son
+écart, et l'aide réclamait « Indique le poids » alors qu'un poids **était** saisi.
+
+Le moteur a d'abord été mis hors de cause : rejoué avec les paramètres servis par le serveur
+local (`billingFloorKg: 2.3`, `sizeMinKg: {S:0, M:3, L:6}`), un colis de 2 kg en M rend
+13,50 € sans broncher. Le défaut était dans l'état du brouillon.
+
+```ts
+const EMPTY: BookingDraft = { product: 'PARCEL', … };          // toujours PARCEL
+export function offeredProducts(trip) {                        // mais…
+  if (trip.pricePerKgCents > 0) products.push('PARCEL');       // …seulement si €/kg
+  …
+}
+{products.length > 1 ? <ProductCard … /> : null}               // sélecteur MASQUÉ à 1 option
+{draft.product === 'PARCEL' ? ( … la carte du colis … ) : null}
+```
+
+Sur un trajet qui ne propose **qu'un bagage** (forfait, sans prix au kilo) :
+
+1. `offeredProducts` ne contient pas `PARCEL` ;
+2. le sélecteur de produit est masqué — « un choix à une seule option n'est pas un choix » ;
+3. **personne ne corrige le brouillon**, qui reste sur `PARCEL` ;
+4. la carte du colis s'affiche pour un produit que le trajet n'offre pas ;
+5. le moteur répond `MISSING_PRICE_PER_KG`, affiché « Prix indisponible pour ce choix ».
+
+**La correction** : le produit se dérive du trajet, exactement comme la famille
+(`firstAcceptedFamily`) et les lieux le faisaient déjà — `startBookingDraft(trip, offered[0])`.
+L'oubli portait sur le seul champ du brouillon qu'on n'avait pas pensé à dériver. Et un trajet
+qui ne propose **rien** bascule sur l'écran « ce trajet n'est plus disponible » plutôt que
+d'ouvrir un formulaire dont aucun devis ne sortira.
+
+**Deux défauts d'honnêteté corrigés au passage :**
+
+- **le message nommait mal la cause.** Seul `MISSING_WEIGHT` était distingué ; tout le reste
+  tombait dans un « Prix indisponible » opaque. Les causes connues sont désormais nommées
+  (`MISSING_PRICE_PER_KG`, `BAG_NOT_OFFERED`), via une **liste explicite** et non une clé
+  construite depuis le code d'erreur : une clé i18n fabriquée à la volée qui n'existe pas
+  fait **planter le rendu** next-intl au lieu d'afficher un message approximatif ;
+- **l'aide réclamait un poids déjà saisi.** Sans écart calculable, deux cas se confondaient :
+  le poids manque (on le demande) ou le devis a échoué pour une autre raison. Le second a
+  désormais sa phrase, qui ne demande rien d'impossible.
+
+**Pourquoi le web n'était pas touché** : il branche au sommet sur `isPerKgTrip(trip)` — un
+trajet sans prix au kilo ne voit jamais la carte du colis. Le mobile, lui, gardait sa carte
+sur `draft.product` et laissait le brouillon diverger du trajet. **Deux gardes différentes
+pour la même règle, dont une seule tenait.**

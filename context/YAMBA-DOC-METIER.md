@@ -7261,3 +7261,15 @@ l'effet sur le total.
 | Règle | Énoncé |
 |---|---|
 | **RG-MOB-80** *(supersède RG-MOB-75)* | Les tailles se présentent par leurs **mots** — un repère (S / M / L) et un objet familier — sans illustration. Une image ne se justifie que si elle ajoute ce que le texte ne peut pas dire **dans la disposition où elle vit** ; empilée en liste, une silhouette n'est plus comparable à ses voisines. |
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-81** | La réservation part toujours sur un produit que le trajet propose RÉELLEMENT. Quand un trajet n'offre qu'une possibilité, elle est choisie d'office — on ne laisse jamais la réservation commencer sur un produit inexistant. |
+| **RG-MOB-82** | Un trajet qui ne propose ni envoi au kilo ni forfait bagage n'ouvre pas de formulaire : il s'annonce comme non réservable. |
+| **RG-MOB-83** | Quand le prix ne peut pas être calculé, l'application **dit pourquoi** (« Ce trajet ne propose pas d'envoi au kilo », « Indique un poids pour voir le prix ») et ne réclame jamais une information déjà fournie. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB135 | Ouvrir la réservation d'un trajet qui ne propose **qu'un bagage en soute** | Le bagage est sélectionné d'office ; aucun formulaire de colis, et un prix s'affiche |
+| MOB136 | Ouvrir la réservation d'un trajet sans aucune offre | Écran « ce trajet n'est plus disponible » — pas de formulaire vide |
+| MOB137 | Un prix ne peut pas être calculé | La barre du bas **nomme la cause** ; elle ne demande jamais un poids déjà saisi |
