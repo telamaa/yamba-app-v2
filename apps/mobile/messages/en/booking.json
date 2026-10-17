@@ -39,7 +39,6 @@
       "MISC_ACCESSORIES": "Misc accessories"
     },
     "surcharge": "+{pct}%",
-    "sizeTitle": "Size: no need to measure",
     "sizes": {
       "S": "S",
       "M": "M",
@@ -50,11 +49,7 @@
       "M": "a backpack",
       "L": "half a suitcase"
     },
-    "weightTitle": "Weight (kg)",
-    "weightHint": "The Traveler will check it at handover — a 10% difference is tolerated.",
     "weightUnit": "kg",
-    "weightShortcut": "{kg} kg",
-    "remaining": "{kg} kg still available on this trip",
     "nextStepSoon": "Next step: protecting your parcel.",
     "errors": {
       "FAMILY_REFUSED": "The Traveler does not take this content.",
@@ -69,7 +64,16 @@
     "sizeHintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# category refused} other {# categories refused}} by {name}",
-    "subtitle": "The more precise you are, the fewer surprises at handover."
+    "subtitle": "The more precise you are, the fewer surprises at handover.",
+    "weightDecrease": "Decrease weight",
+    "weightIncrease": "Increase weight",
+    "weightEdit": "Enter weight",
+    "capacityLeft": "{kg} kg left on this trip",
+    "billed": {
+      "FLOOR": "Billed at {kg} kg — this trip’s minimum.",
+      "SIZE_MIN": "Billed at {kg} kg — the space a {size} parcel takes."
+    },
+    "cardTitle": "Your parcel"
   },
   "phases": {
     "parcel": "Parcel",
