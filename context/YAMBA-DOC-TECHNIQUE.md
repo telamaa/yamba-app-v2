@@ -12599,3 +12599,97 @@ taille, y compris quand elle ne change pas le prix) ; le fond est une décision 
   routes `booking/`, et `nx typecheck @yamba-app/mobile` échouait sur un `router.push` pourtant
   juste. Il se répare en lançant Metro une fois (`npx nx start @yamba-app/mobile`), pas en
   touchant au code.
+
+---
+
+# La porte d'identité s'ouvre au-dessus du trajet, plus sur une page vide (PR #389)
+
+## Le constat
+
+`/trips/:id/book` atteint **sans session** affichait une **page entière** « Connecte-toi pour
+réserver » : un titre, deux boutons et un lien, flottant au milieu d'un écran vide. Le
+visiteur ne voyait même pas de quel trajet il s'agissait.
+
+Ce n'est pas le parcours normal. Sur la fiche trajet, « Réserver » ouvre déjà
+`BookingAuthGateModal` — la porte d'identité en modale, conforme à A58/A63. Mais cette page
+est la **seconde ligne de défense** (CNF-05), et elle est atteinte plus souvent qu'on ne le
+croit : lien partagé, favori, retour arrière après déconnexion, ou **session expirée pendant
+le tunnel**.
+
+## Pourquoi un simple « mettre une modale » ne suffisait pas
+
+Une modale a besoin d'une page derrière elle. Sur la route `/book`, il n'y a rien : le
+wizard ne peut pas se rendre sans session, et afficher une modale au-dessus du vide donne
+exactement l'impression de vide qu'on voulait supprimer.
+
+La correction consiste donc à **renvoyer le visiteur là où la modale a du sens** :
+
+```ts
+// apps/user-ui/src/app/[locale]/trips/[tripId]/book/BookingClient.tsx
+if (!user) {
+  router.replace(`/trips/${tripId}?auth=book`);
+  return <BookingFallback />;
+}
+```
+
+`replace` et non `push` : cette étape ne doit pas s'inscrire dans l'historique du navigateur,
+sinon le bouton « retour » ramène sur une route qui redirige à nouveau.
+
+## Pourquoi la porte est portée par `TripDetailView`
+
+La fiche trajet monte **deux** barres de réservation : `BookingSummaryCard` (colonne
+desktop) et `BookingMobileBar` (barre fixe, `lg:hidden`). Chacune possède déjà son propre
+`gateOpen` local pour son bouton « Réserver ».
+
+Le piège : leurs `<BookingAuthGateModal>` sont rendues **hors** du bloc caché en CSS (elles
+sont des sœurs du `<div className="… lg:hidden">`, pas des enfants). Confier l'ouverture par
+URL aux deux composants aurait donc ouvert **deux modales superposées** sur n'importe quelle
+largeur d'écran.
+
+La porte pilotée par l'URL est donc portée par leur parent commun, `TripDetailView`, avec
+son propre état — un seul rendu, quelle que soit la taille d'écran.
+
+## Lire le paramètre sans `useSearchParams()`
+
+```tsx
+const [urlGateOpen, setUrlGateOpen] = useState(false);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const auth = new URLSearchParams(window.location.search).get("auth");
+  if (auth === "book" && !user && !userLoading) setUrlGateOpen(true);
+}, [user, userLoading]);
+```
+
+`useSearchParams()` du App Router impose une **frontière Suspense** dès que la route est
+prérendue, sous peine d'échec au `next build`. Pour une valeur lue **une seule fois au
+montage**, la lecture directe de `window.location.search` évite la contrainte sans rien
+perdre : l'effet ne tourne que côté client, et le `typeof window === "undefined"` le protège
+du rendu serveur.
+
+La fermeture **retire le paramètre** (`router.replace(/trips/:id)`) pour deux raisons : le
+bouton « retour » ne doit pas rouvrir la porte, et l'URL reste partageable sans traîner un
+état d'authentification.
+
+## Au passage — une règle écrite deux fois
+
+La page supprimée ne dupliquait pas seulement le balisage de la modale : elle refabriquait
+**sa propre règle de retour**.
+
+```tsx
+const redirect = encodeURIComponent(`/trips/${tripId}/book`);  // la page
+```
+
+```ts
+redirect={bookingRedirectFor(tripId)}                          // la modale
+```
+
+Deux implémentations de la même décision — « où revient-on après connexion ? » — donc deux
+occasions de diverger au premier changement. Il n'en reste qu'une.
+
+Les clés `booking.authGate.*` restent lues par la modale : **aucune clé morte**, et le hook
+`useTranslations("booking.authGate")` devenu inutile dans `BookingClient` est retiré.
+
+## Les contrôles
+
+`tsc --noEmit --project apps/user-ui` vert (la commande CI), contrôle i18n **miroir
+parfait**. Aucun service touché, aucune dépendance ajoutée.

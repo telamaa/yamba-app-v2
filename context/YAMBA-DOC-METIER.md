@@ -7058,3 +7058,41 @@ son colis et voir son prix : on ne demande pas de compte pour regarder un prix.
 | MOB95 | Web — choisir la Garantie étendue | Les exclusions s'affichent **immédiatement**, sans clic supplémentaire |
 | MOB96 | Web — lire le récapitulatif de prix | Une ligne « Service Yamba » (commission seule) et, si choisie, une ligne de garantie distincte ; le total est juste |
 | MOB97 | Web — pendant tout le tunnel | L'en-tête ne propose ni cloche, ni messagerie, ni « Partager un trajet » |
+
+---
+
+# La porte d'identité : au-dessus du trajet, jamais sur une page vide (PR #389)
+
+## Le besoin
+
+Un visiteur qui arrive directement sur l'adresse de réservation — lien partagé, favori,
+retour arrière après déconnexion, ou session expirée en cours de tunnel — tombait sur une
+page entière « Connecte-toi pour réserver », sans aucun contexte : ni le trajet, ni le prix,
+ni le Voyageur. Un écran vide avec deux boutons, au moment précis où il faut inspirer
+confiance.
+
+Partout ailleurs sur le site (favoris, alertes, suivre un Voyageur), la demande de connexion
+s'ouvre **par-dessus** la page en cours, qui reste visible derrière. La réservation était la
+seule exception, et elle portait justement l'engagement le plus fort.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-C-22** | La demande de connexion s'ouvre TOUJOURS par-dessus une page qui reste visible. Aucun parcours ne conduit à un écran de connexion vide et sans contexte. |
+| **RG-C-23** | Un visiteur qui ouvre directement l'adresse de réservation est ramené sur la fiche du trajet, avec la demande de connexion ouverte dessus : il voit ce qu'il allait réserver pendant qu'on lui demande qui il est. |
+| **RG-C-24** | Après connexion, le visiteur repart exactement là où il allait — la réservation de CE trajet — quel que soit le chemin par lequel la demande s'est ouverte. |
+| **RG-C-25** | Fermer la demande de connexion ramène sur la fiche du trajet, et l'adresse redevient celle d'une fiche ordinaire : partageable, et dont le bouton « retour » ne rouvre pas la demande. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB110 | Déconnecté — coller l'adresse `/trips/:id/book` dans le navigateur | La **fiche du trajet** s'affiche, avec la demande de connexion **par-dessus**. Jamais une page vide |
+| MOB111 | Même scénario, puis fermer la demande | On reste sur la fiche du trajet ; l'adresse ne contient plus de paramètre d'authentification |
+| MOB112 | Même scénario, fermer, puis cliquer « retour » du navigateur | La demande **ne se rouvre pas** |
+| MOB113 | Même scénario, puis se connecter | On arrive **directement dans la réservation** de ce trajet |
+| MOB114 | Déconnecté — ouvrir la fiche trajet et cliquer « Réserver » | Même demande, même apparence, même retour après connexion que par le chemin direct |
+| MOB115 | Sur un écran large comme sur un téléphone | **Une seule** demande s'affiche — jamais deux superposées |
+| MOB116 | Connecté — ouvrir l'adresse de réservation | La réservation s'ouvre normalement : aucune redirection, aucun passage par la fiche |
+| MOB117 | Session qui expire pendant la réservation, puis recharger la page | Retour sur la fiche du trajet avec la demande de connexion ; les informations saisies ne sont pas affichées à un inconnu |
