@@ -130,6 +130,7 @@ Pas de gros lot réservation monolithique, pas de rattrapage documentaire global
 | 28 | 17/10 | **Troisième arrêt machine — reprise, état établi par mesure** | Le Mac s'est arrêté après le merge `b2dc126` (`origin/dev` dans `feat/mobile-booking-colis`, 13 h 17). **Rien de perdu** : arbre propre, aucun fichier revenu en arrière, seul le commit de merge n'était pas poussé — poussé. Pendant ce temps **#383 ET #384 ont été mergées** (10 h 39 / 10 h 41 UTC) : plus AUCUNE PR ouverte, `origin/dev` = `909df3a`, et la branche de travail est à jour de `dev` |
 | 29 | 17/10 | Santé de la branche après le merge | `nx typecheck @yamba-app/mobile` **vert**, `tsc --noEmit` user-ui **vert** (la cible Nx `typecheck` n'existe pas pour `user-ui` — c'est la commande CI qu'on rejoue), contrôle i18n **miroir parfait** (30 namespaces, 60 fichiers). **Piège payé** : `apps/mobile/.expo/types/router.d.ts` est GÉNÉRÉ par Metro ; l'aller-retour sur `feat/feed-relevance-server` l'avait régénéré sans les routes `booking/` → typecheck rouge sur un `router.push` pourtant juste. Réparé en lançant Metro une fois |
 | 30 | 17/10 | **Dette documentaire de la page ① soldée** | Les trois cumulatifs complétés en AJOUT SEUL (**0 suppression**, vérifié au `numstat`) : DOC-TECHNIQUE **+156** (la pile mobile, le prix vivant, ce que le web a dû trancher, la sortie du tunnel, le défaut de clé de brouillon, le livrable 12) ; DOC-MÉTIER **+52** (**RG-MOB-50→62**, fiches **MOB83→97**) ; APPRENTISSAGE **+217** (**chapitre 213** — `useSyncExternalStore`, l'état qui meurt par choix, la clé de stockage sans portée, le coefficient qui n'est pas une vérité d'écran). Le registre portait déjà **A214** |
+| 31 | 17/10 | **PR #386 ouverte** (`feat/mobile-booking-colis` → `dev`) — la page ① | **18/18 contrôles verts, COMPTÉS** (8 TypeScript, 5 tests unitaires, build webpack, i18n, anti-fuite, OpenAPI). Prête à merger (c'est toi qui merges). Reste après le merge : la PR d'état `chore/etat-385` (CONTEXT + SUIVI, lot mobile + page ①) |
 
 ## 9. L'état après la reprise du 17/10 — ce qui reste
 
@@ -137,7 +138,7 @@ Pas de gros lot réservation monolithique, pas de rattrapage documentaire global
 |---|---|---|
 | **#383** | `feat/feed-relevance-server` | **MERGÉE** le 17/10 (D80 serveur) — `origin/dev` = `909df3a` |
 | **#384** | `feat/feed-relevance-web` | **MERGÉE** le 17/10, juste après #383 |
-| — | `feat/mobile-booking-colis` | **À ouvrir** : la page ① du tunnel (web + mobile), documents soldés, à jour de `dev` |
+| **#386** | `feat/mobile-booking-colis` | **Ouverte et PRÊTE** : la page ① du tunnel (web + mobile), documents soldés, **18/18 comptées** |
 | — | `chore/etat-385` | **À ouvrir** : `YAMBA-CONTEXT.md` + `YAMBA-SUIVI-PROJET.md` pour le lot mobile mergé (+ la page ①) |
 
 > Ordre acté : #383 (serveur) → #384 (web) → le mobile du flux localisé. Les deux premières
