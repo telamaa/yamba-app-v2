@@ -372,84 +372,101 @@ export default function BookingParcelScreen() {
             {showErrors && errors.family ? <ErrorLine message={t(`parcel.errors.${errors.family}`)} /> : null}
           </Section>
 
-          {/* 3 + 4. LE COLIS — une seule carte, parce que c'est une seule
-              décision. Depuis D81, `poidsFacturé = max(poidsRéel, plancher,
-              minimumDeLaTaille)` : les deux contrôles entrent dans le MÊME
-              `max`. Les séparer par un titre et vingt pixels laissait croire
-              qu'ils étaient indépendants, et le prix sautait sans raison lisible.
-              L'ordre poids → taille suit A214 : sans poids, aucun écart de prix
-              n'est calculable, donc les tailles n'auraient rien à annoncer. */}
-          <View style={[styles.parcelCard, { borderColor: theme.backgroundElement }]}>
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.parcelCardTitle}>
-              {t('parcel.cardTitle')}
-            </ThemedText>
+          {/* 3 + 4. LE COLIS — un titre, puis UNE carte à filets fins où chaque
+              ligne est « libellé gras · ligne grise · contrôle à droite ». La
+              grammaire vient des références de recette (21/10) : des lignes
+              pleine largeur plutôt que des colonnes serrées, du blanc plutôt que
+              des cadres imbriqués. Poids et taille partagent la carte parce
+              qu'ils partagent le calcul (D81), et l'ordre suit A214. */}
+          <View style={styles.parcelSection}>
+            <ThemedText type="subtitle">{t('parcel.cardTitle')}</ThemedText>
 
-            {/* Le poids : un PAS, pas un clavier. Le `decimal-pad` recouvrait la
-                barre du bas — donc le prix — au moment exact où on le fait
-                varier. Le pas suffit au cas courant ; toucher la valeur ouvre
-                quand même la saisie libre pour les autres. */}
-            <View style={styles.stepperRow}>
-              <StepperButton
-                icon="remove"
-                accessibilityLabel={t('parcel.weightDecrease')}
-                disabled={weightValue !== null && weightValue <= MIN_PARCEL_KG}
-                onPressAction={() => adjustWeight(-1)}
-              />
-              {editingWeight ? (
-                <TextInput
-                  value={draft.weightKg}
-                  onChangeText={(weightKg) => setBookingDraft({ weightKg })}
-                  onBlur={() => setEditingWeight(false)}
-                  keyboardType="decimal-pad"
-                  inputMode="decimal"
-                  maxLength={5}
-                  autoFocus
-                  selectTextOnFocus
-                  accessibilityLabel={t('parcel.weightEdit')}
-                  style={[styles.stepperInput, { color: theme.text }]}
-                />
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('parcel.weightEdit')}
-                  onPress={() => setEditingWeight(true)}
-                  style={styles.stepperValue}>
-                  <ThemedText type="title">{draft.weightKg || '—'}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {t('parcel.weightUnit')}
+            <View style={[styles.optionCard, { borderColor: theme.backgroundElement }]}>
+              {/* LE POIDS — modèle « Modifiez le nombre de voyageurs » : le
+                  libellé et sa contrainte à gauche, le pas à droite. La
+                  contrainte se dit en MOTS, pas en jauge : une phrase survit à
+                  n'importe quel écran, et elle passe en mangue avant la limite. */}
+              <View style={styles.optionRow}>
+                <View style={styles.optionText}>
+                  <ThemedText type="smallBold">{t('parcel.weightLabel')}</ThemedText>
+                  <ThemedText
+                    type="small"
+                    themeColor={capacityTight ? undefined : 'textSecondary'}
+                    style={capacityTight ? { color: Brand.mango } : undefined}>
+                    {remainingKg === null
+                      ? t('parcel.weightFree')
+                      : t('parcel.capacityLeft', {
+                          kg: Math.max(0, Math.round((remainingKg - capacityUsedKg) * 10) / 10),
+                        })}
                   </ThemedText>
-                </Pressable>
-              )}
-              <StepperButton
-                icon="add"
-                accessibilityLabel={t('parcel.weightIncrease')}
-                disabled={remainingKg !== null && weightValue !== null && weightValue >= remainingKg}
-                onPressAction={() => adjustWeight(1)}
-              />
-            </View>
-
-            {/* La capacité DEVIENT le contrôle au lieu de le commenter : la barre
-                se remplit, et elle prévient AVANT que la limite soit franchie.
-                Elle se remplit du poids FACTURÉ (D81), pas du poids déclaré —
-                c'est bien la place réservée au Voyageur. */}
-            {remainingKg !== null ? (
-              <View style={styles.gaugeBlock}>
-                <View style={[styles.gaugeTrack, { backgroundColor: theme.backgroundElement }]}>
-                  <View
-                    style={[
-                      styles.gaugeFill,
-                      {
-                        width: `${Math.min(100, Math.round((capacityUsedKg / remainingKg) * 100))}%`,
-                        backgroundColor: capacityTight ? Brand.mango : theme.textSecondary,
-                      },
-                    ]}
+                </View>
+                <View style={styles.stepper}>
+                  <StepperButton
+                    icon="remove"
+                    accessibilityLabel={t('parcel.weightDecrease')}
+                    disabled={weightValue !== null && weightValue <= MIN_PARCEL_KG}
+                    onPressAction={() => adjustWeight(-1)}
+                  />
+                  {editingWeight ? (
+                    <TextInput
+                      value={draft.weightKg}
+                      onChangeText={(weightKg) => setBookingDraft({ weightKg })}
+                      onBlur={() => setEditingWeight(false)}
+                      keyboardType="decimal-pad"
+                      inputMode="decimal"
+                      maxLength={5}
+                      autoFocus
+                      selectTextOnFocus
+                      accessibilityLabel={t('parcel.weightEdit')}
+                      style={[styles.stepperInput, { color: theme.text }]}
+                    />
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('parcel.weightEdit')}
+                      onPress={() => setEditingWeight(true)}
+                      style={styles.stepperValue}>
+                      <ThemedText type="default">{draft.weightKg || '—'}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('parcel.weightUnit')}
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                  <StepperButton
+                    icon="add"
+                    accessibilityLabel={t('parcel.weightIncrease')}
+                    disabled={remainingKg !== null && weightValue !== null && weightValue >= remainingKg}
+                    onPressAction={() => adjustWeight(1)}
                   />
                 </View>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {t('parcel.capacityLeft', { kg: Math.max(0, remainingKg - capacityUsedKg) })}
-                </ThemedText>
               </View>
-            ) : null}
+
+              {/* LES TAILLES — modèle « Choisissez quand vous souhaitez payer » :
+                  des lignes pleine largeur, le choix par une pastille à DROITE,
+                  et la conséquence en ligne grise. Les trois colonnes serrées
+                  rognaient les libellés et n'offraient aucune cible confortable. */}
+              {SIZE_CLASSES.map((size) => (
+                <View key={size}>
+                  <View style={[styles.hairline, { backgroundColor: theme.backgroundElement }]} />
+                  <SizeRow
+                    active={draft.sizeClass === size}
+                    code={t(`parcel.sizes.${size}`)}
+                    example={t(`parcel.sizeExamples.${size}`)}
+                    silhouette={SIZE_SILHOUETTES[size]}
+                    detail={
+                      sizeDeltaCents === null
+                        ? null
+                        : sizeDeltaCents[size] === 0
+                          ? t('parcel.sizeIncluded')
+                          : t('parcel.sizeExtra', {
+                              amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
+                            })
+                    }
+                    onPressAction={() => setBookingDraft({ sizeClass: size })}
+                  />
+                </View>
+              ))}
+            </View>
 
             {showErrors && errors.weightKg ? (
               <ErrorLine
@@ -457,46 +474,17 @@ export default function BookingParcelScreen() {
               />
             ) : null}
 
-            {/* La taille : des SILHOUETTES à l'échelle réelle, pas des icônes.
-                Les icônes avaient été retirées à raison — une boîte à chaussures
-                dessinée n'apprend rien de plus que les mots. L'ÉCHELLE, si :
-                c'est la seule information que le texte ne peut pas porter. */}
-            <View style={styles.sizeRow}>
-              {SIZE_CLASSES.map((size) => (
-                <SizeOption
-                  key={size}
-                  active={draft.sizeClass === size}
-                  code={t(`parcel.sizes.${size}`)}
-                  example={t(`parcel.sizeExamples.${size}`)}
-                  silhouette={SIZE_SILHOUETTES[size]}
-                  priceLabel={
-                    sizeDeltaCents === null || sizeIsFlat || sizeDeltaCents[size] === 0
-                      ? null
-                      : t('parcel.sizeExtra', {
-                          amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
-                        })
-                  }
-                  onPressAction={() => setBookingDraft({ sizeClass: size })}
-                />
-              ))}
-            </View>
-
-            {/* D81 expliqué LÀ où il se décide. `billableReason` existait déjà
-                dans le devis et n'était affiché nulle part : on ne disait pas
-                POURQUOI le prix ne suivait pas le poids saisi. */}
-            {billedNote ? (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.billedNote}>
-                {billedNote}
-              </ThemedText>
-            ) : (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.billedNote}>
-                {sizeDeltaCents === null
+            {/* D81 expliqué sous la carte, comme « Annulation gratuite » sous le
+                récapitulatif de la référence : la conséquence, en gris, au
+                contact de la décision. */}
+            <ThemedText type="small" themeColor="textSecondary">
+              {billedNote ??
+                (sizeDeltaCents === null
                   ? t('parcel.sizeHintPending')
                   : sizeIsFlat
                     ? t('parcel.sizeHintFlat')
-                    : t('parcel.sizeHint')}
-              </ThemedText>
-            )}
+                    : t('parcel.sizeHint'))}
+            </ThemedText>
           </View>
         </>
       ) : null}
@@ -624,28 +612,29 @@ function StepperButton({
 }
 
 /**
- * Une taille : sa SILHOUETTE à l'échelle, son repère, son exemple, et ce qu'elle
- * coûte en plus. Les trois silhouettes sont posées sur une ligne de base commune
- * (`alignItems: flex-end`) — c'est ça qui rend la comparaison lisible ; alignées
- * au centre, elles perdraient la moitié de leur sens.
+ * Une ligne de taille — grammaire « Choisissez quand vous souhaitez payer » :
+ * la silhouette à gauche, le libellé gras, la conséquence en gris dessous, et
+ * le choix par une pastille à DROITE. Toute la ligne est la cible : sur un
+ * téléphone, viser une pastille de 22 px est une épreuve.
  *
- * Les rectangles sont `aria-hidden` de fait : ils ne portent aucun texte, et le
- * libellé accessible du bouton dit tout (repère + exemple + prix).
+ * Les silhouettes restent à l'échelle et partagent une largeur de gouttière
+ * fixe : le bord gauche commun est ce qui rend la comparaison lisible une fois
+ * les lignes empilées.
  */
-function SizeOption({
+function SizeRow({
   active,
   code,
   example,
   silhouette,
-  priceLabel,
+  detail,
   onPressAction,
 }: {
   active: boolean;
   code: string;
   example: string;
   silhouette: { width: number; height: number };
-  /** Ce que cette taille coûte EN PLUS — `null` tant que le poids manque. */
-  priceLabel: string | null;
+  /** Ce que cette taille change au prix — `null` tant que le poids manque. */
+  detail: string | null;
   onPressAction: () => void;
 }) {
   const theme = useTheme();
@@ -653,16 +642,10 @@ function SizeOption({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={[code, example, priceLabel].filter(Boolean).join(' ')}
+      accessibilityLabel={[code, example, detail].filter(Boolean).join(' ')}
       onPress={onPressAction}
-      style={[
-        styles.sizeOption,
-        {
-          backgroundColor: active ? `${Brand.mango}1A` : 'transparent',
-          borderColor: active ? Brand.mango : theme.backgroundElement,
-        },
-      ]}>
-      <View style={styles.silhouetteBox}>
+      style={({ pressed }) => [styles.optionRow, { opacity: pressed ? 0.7 : 1 }]}>
+      <View style={styles.silhouetteSlot} aria-hidden>
         <View
           style={[
             styles.silhouette,
@@ -674,15 +657,23 @@ function SizeOption({
           ]}
         />
       </View>
-      <ThemedText type="smallBold">{code}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.sizeExample}>
-        {example}
-      </ThemedText>
-      {priceLabel ? (
-        <ThemedText type="small" style={styles.surcharge}>
-          {priceLabel}
+      <View style={styles.optionText}>
+        <ThemedText type="smallBold">
+          {code} · {example}
         </ThemedText>
-      ) : null}
+        {detail ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {detail}
+          </ThemedText>
+        ) : null}
+      </View>
+      <View
+        style={[
+          styles.radio,
+          { borderColor: active ? Brand.mango : theme.textSecondary },
+        ]}>
+        {active ? <View style={[styles.radioDot, { backgroundColor: Brand.mango }]} /> : null}
+      </View>
     </Pressable>
   );
 }
@@ -815,85 +806,82 @@ const styles = StyleSheet.create({
     color: Brand.mango,
     fontWeight: '700',
   },
-  // LA CARTE DU COLIS — un seul objet, au lieu de quatre champs empilés.
-  parcelCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: Spacing.four,
+  // LA CARTE DU COLIS — un titre, puis des lignes pleine largeur séparées par
+  // un filet. Pas de cadre dans un cadre : le blanc fait la structure.
+  parcelSection: {
     gap: Spacing.three,
   },
-  parcelCardTitle: {
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
+  optionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.four,
   },
-  stepperRow: {
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: Spacing.three,
+    paddingVertical: Spacing.four,
+  },
+  optionText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  // Le filet n'atteint pas les bords de la carte : il sépare les lignes, il ne
+  // la découpe pas en tranches.
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  // Gouttière FIXE : le bord gauche commun rend les trois silhouettes
+  // comparables une fois les lignes empilées.
+  silhouetteSlot: {
+    width: 46,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   stepperButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperValue: {
-    flex: 1,
+    minWidth: 52,
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    gap: Spacing.one,
+    gap: 2,
   },
   stepperInput: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '800',
+    minWidth: 52,
+    fontSize: 17,
+    fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: Spacing.one,
-  },
-  gaugeBlock: {
-    gap: Spacing.one,
-  },
-  gaugeTrack: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  gaugeFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  sizeRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  sizeOption: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.two,
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  // Hauteur FIXE et contenu aligné en bas : c'est la ligne de base commune qui
-  // rend les trois silhouettes comparables d'un regard.
-  silhouetteBox: {
-    height: 36,
-    justifyContent: 'flex-end',
+    paddingVertical: 0,
   },
   silhouette: {
     borderWidth: 1.5,
     borderRadius: 3,
-  },
-  sizeExample: {
-    textAlign: 'center',
-  },
-  billedNote: {
-    marginTop: Spacing.one,
   },
   errorRow: {
     flexDirection: 'row',

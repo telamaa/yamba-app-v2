@@ -393,127 +393,135 @@ export default function StepParcel({
    * annoncer.
    */
   const parcelCardBlock = (
-    <div className="mb-4 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:max-w-md">
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+    <div className="mb-4 md:max-w-md">
+      <div className="mb-2 text-[15px] font-bold text-slate-900 dark:text-white">
         {t("step1.parcelCard.title")}
       </div>
 
-      {/* Le poids par un PAS, pas par un clavier : sur téléphone, le pavé
-          numérique recouvre la barre du bas — donc le prix — au moment exact où
-          on le fait varier. Le champ reste là pour les valeurs hors pas. */}
-      <div className="flex items-center gap-3">
-        <StepperButton
-          direction="minus"
-          label={t("step1.parcelCard.decrease")}
-          disabled={(parseWeight(draft.weightKg) ?? 0) <= 0.1}
-          onClickAction={() => adjustWeight(-1)}
-        />
-        <div className="flex flex-1 items-baseline justify-center gap-1">
-          <input
-            type="text"
-            inputMode="decimal"
-            value={draft.weightKg}
-            onChange={(e) => setDraftAction((prev) => ({ ...prev, weightKg: e.target.value }))}
-            aria-label={t("step1.parcelDetails.weightLabel")}
-            className="w-20 border-0 bg-transparent p-0 text-center text-[28px] font-extrabold text-slate-900 outline-none dark:text-white"
-          />
-          <span className="text-[13px] text-slate-500 dark:text-slate-400">kg</span>
-        </div>
-        <StepperButton
-          direction="plus"
-          label={t("step1.parcelCard.increase")}
-          disabled={
-            typeof trip.remainingKg === "number" && (parseWeight(draft.weightKg) ?? 0) >= trip.remainingKg
-          }
-          onClickAction={() => adjustWeight(1)}
-        />
-      </div>
-
-      {/* La capacité DEVIENT le contrôle au lieu de le commenter : elle prévient
-          AVANT que la limite soit franchie. Elle se remplit du poids FACTURÉ
-          (D81/CAP-01) — un colis L d'1 kg réserve 6 kg. */}
-      {typeof trip.remainingKg === "number" && (
-        <div className="mt-3">
-          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+      {/* Une carte à filets fins : chaque ligne est « libellé gras · ligne grise ·
+          contrôle à droite ». Pas de cadre dans un cadre — c'est le blanc qui
+          fait la structure. */}
+      <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
+        {/* LE POIDS — le libellé et sa contrainte à gauche, le pas à droite. La
+            contrainte se dit en MOTS et passe en mangue avant la limite : une
+            phrase survit à n'importe quel écran, une jauge non. */}
+        <div className="flex items-center gap-3 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">
+              {t("step1.parcelDetails.weightLabel")}
+            </div>
             <div
-              className="h-1 rounded-full transition-[width] duration-200"
-              style={{
-                width: `${Math.min(100, Math.round((capacityUsedKg / trip.remainingKg) * 100))}%`,
-                background: capacityTight ? "#FF9900" : "#94A3B8",
-              }}
+              className={`text-[12px] ${
+                capacityTight ? "font-medium text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {typeof trip.remainingKg === "number"
+                ? t("step1.parcelCard.capacityLeft", {
+                    kg: Math.max(0, Math.round((trip.remainingKg - capacityUsedKg) * 10) / 10),
+                  })
+                : t("step1.parcelCard.weightFree")}
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <StepperButton
+              direction="minus"
+              label={t("step1.parcelCard.decrease")}
+              disabled={(parseWeight(draft.weightKg) ?? 0) <= 0.1}
+              onClickAction={() => adjustWeight(-1)}
+            />
+            <div className="flex min-w-[56px] items-baseline justify-center gap-0.5">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={draft.weightKg}
+                onChange={(e) => setDraftAction((prev) => ({ ...prev, weightKg: e.target.value }))}
+                aria-label={t("step1.parcelDetails.weightLabel")}
+                className="w-10 border-0 bg-transparent p-0 text-center text-[17px] font-bold text-slate-900 outline-none dark:text-white"
+              />
+              <span className="text-[12px] text-slate-500 dark:text-slate-400">kg</span>
+            </div>
+            <StepperButton
+              direction="plus"
+              label={t("step1.parcelCard.increase")}
+              disabled={
+                typeof trip.remainingKg === "number" && (parseWeight(draft.weightKg) ?? 0) >= trip.remainingKg
+              }
+              onClickAction={() => adjustWeight(1)}
             />
           </div>
-          <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            {t("step1.parcelCard.capacityLeft", {
-              kg: Math.max(0, Math.round((trip.remainingKg - capacityUsedKg) * 10) / 10),
-            })}
-          </div>
         </div>
-      )}
+
+        {/* LES TAILLES — des lignes pleine largeur, le choix par une pastille à
+            DROITE, la conséquence en ligne grise. Trois colonnes serrées
+            rognaient les libellés et n'offraient aucune cible confortable. */}
+        <div role="radiogroup" aria-label={t("step1.size.label")}>
+          {(["S", "M", "L"] as SizeClass[]).map((sz) => {
+            const active = draft.sizeClass === sz;
+            const delta = sizeDeltaCents?.[sz] ?? 0;
+            const box = SIZE_SILHOUETTES[sz];
+            const detail =
+              sizeDeltaCents === null
+                ? null
+                : delta === 0
+                  ? t("step1.parcelCard.sizeIncluded")
+                  : t("step1.size.extra", { amount: formatEur(delta / 100, locale) });
+            return (
+              <button
+                key={sz}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
+                className="flex w-full items-center gap-3 border-t border-slate-100 py-4 text-left transition-opacity hover:opacity-80 dark:border-slate-800/70"
+              >
+                {/* Gouttière FIXE : le bord gauche commun rend les trois
+                    silhouettes comparables une fois les lignes empilées. */}
+                <span className="flex w-[46px] flex-shrink-0 items-center" aria-hidden="true">
+                  <span
+                    className="block rounded-[3px] border-[1.5px]"
+                    style={{
+                      width: box.width,
+                      height: box.height,
+                      borderColor: active ? "#FF9900" : "#94A3B8",
+                    }}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-slate-900 dark:text-white">
+                    {sz} · {t(`step1.size.${sz}`)}
+                  </span>
+                  {detail && (
+                    <span className="block text-[12px] text-slate-500 dark:text-slate-400">{detail}</span>
+                  )}
+                </span>
+                <span
+                  className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px]"
+                  style={{ borderColor: active ? "#FF9900" : "#94A3B8" }}
+                >
+                  {active && <span className="block h-2.5 w-2.5 rounded-full bg-[#FF9900]" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {errors.weightKg && (
         <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
           {errors.weightKg}
         </div>
       )}
-
-      {/* PRC-03 — la taille par sa SILHOUETTE à l'échelle. Les rectangles avaient
-          disparu à raison (une boîte à chaussures dessinée n'apprend rien de plus
-          que les mots) ; l'ÉCHELLE RELATIVE, elle, est la seule information que le
-          texte ne peut pas porter. Proportions des gabarits du livrable 12, posées
-          sur une ligne de base commune. */}
-      <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t("step1.size.label")}>
-        {(["S", "M", "L"] as SizeClass[]).map((sz) => {
-          const active = draft.sizeClass === sz;
-          const delta = sizeDeltaCents?.[sz] ?? 0;
-          const box = SIZE_SILHOUETTES[sz];
-          return (
-            <button
-              key={sz}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
-              className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors ${
-                active
-                  ? "border-[#FF9900] bg-[#FF9900]/10"
-                  : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
-              }`}
-            >
-              <span className="flex h-9 items-end" aria-hidden="true">
-                <span
-                  className="block rounded-[3px] border-[1.5px]"
-                  style={{
-                    width: box.width,
-                    height: box.height,
-                    borderColor: active ? "#FF9900" : "#94A3B8",
-                  }}
-                />
-              </span>
-              <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
-              <span className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                {t(`step1.size.${sz}`)}
-              </span>
-              {!sizeIsFlat && delta > 0 && (
-                <span className="text-[11px] font-bold text-[#B45309] dark:text-[#FFB84D]">
-                  {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* D81 expliqué LÀ où il se décide : `billableReason` existait dans le devis
-          et n'était montré nulle part. */}
-      <div className="mt-2 text-[11px] leading-[1.5] text-slate-500 dark:text-slate-400">
-        {billedNote ?? sizeHint}
-      </div>
       {errors.sizeClass && (
         <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
           {errors.sizeClass}
         </div>
       )}
+
+      {/* D81 sous la carte, comme « Annulation gratuite » sous le récapitulatif
+          de la référence : la conséquence, en gris, au contact de la décision. */}
+      <div className="mt-2 text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
+        {billedNote ?? sizeHint}
+      </div>
     </div>
   );
 
@@ -747,8 +755,10 @@ export default function StepParcel({
 }
 
 /**
- * Un bouton de pas. Cible de 44 px (minimum tactile), et `disabled` plutôt que
- * caché : un bouton qui disparaît déplace l'autre sous le doigt.
+ * Un bouton de pas : cercle BORDÉ et non plein, comme les références de recette
+ * du 21/10 — un cercle plein attire l'œil autant que le CTA, alors qu'il ne fait
+ * qu'ajuster. `disabled` plutôt que caché : un bouton qui disparaît déplace
+ * l'autre sous le doigt entre deux appuis.
  */
 function StepperButton({
   direction,
@@ -767,9 +777,9 @@ function StepperButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClickAction}
-      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-35 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+      className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
     >
-      {direction === "plus" ? <Plus size={18} /> : <Minus size={18} />}
+      {direction === "plus" ? <Plus size={16} /> : <Minus size={16} />}
     </button>
   );
 }

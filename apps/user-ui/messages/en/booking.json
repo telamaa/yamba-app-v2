@@ -75,7 +75,9 @@
       "increase": "Increase weight",
       "capacityLeft": "{kg} kg left on this trip",
       "billedFloor": "Billed at {kg} kg — this trip’s minimum.",
-      "billedSizeMin": "Billed at {kg} kg — the space a {size} parcel takes."
+      "billedSizeMin": "Billed at {kg} kg — the space a {size} parcel takes.",
+      "weightFree": "No limit stated on this trip",
+      "sizeIncluded": "No extra charge"
     }
   },
   "insurance": {

@@ -73,7 +73,10 @@
     "billed": {
       "FLOOR": "Facturé {kg} kg — le minimum de ce trajet.",
       "SIZE_MIN": "Facturé {kg} kg — la place que prend un colis {size}."
-    }
+    },
+    "weightLabel": "Poids",
+    "weightFree": "Aucune limite annoncée sur ce trajet",
+    "sizeIncluded": "Sans supplément"
   },
   "phases": {
     "parcel": "Colis",

@@ -75,7 +75,9 @@
       "increase": "Augmenter le poids",
       "capacityLeft": "{kg} kg restants sur ce trajet",
       "billedFloor": "Facturé {kg} kg — le minimum de ce trajet.",
-      "billedSizeMin": "Facturé {kg} kg — la place que prend un colis {size}."
+      "billedSizeMin": "Facturé {kg} kg — la place que prend un colis {size}.",
+      "weightFree": "Aucune limite annoncée sur ce trajet",
+      "sizeIncluded": "Sans supplément"
     }
   },
   "insurance": {

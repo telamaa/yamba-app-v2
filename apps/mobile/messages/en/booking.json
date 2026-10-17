@@ -73,7 +73,10 @@
       "FLOOR": "Billed at {kg} kg — this trip’s minimum.",
       "SIZE_MIN": "Billed at {kg} kg — the space a {size} parcel takes."
     },
-    "cardTitle": "Your parcel"
+    "cardTitle": "Your parcel",
+    "weightLabel": "Weight",
+    "weightFree": "No limit stated on this trip",
+    "sizeIncluded": "No extra charge"
   },
   "phases": {
     "parcel": "Parcel",
