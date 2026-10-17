@@ -26,7 +26,6 @@
       "linkProhibited": "See the full list"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Weight (kg)",
@@ -69,7 +68,15 @@
       "hintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Required"
+    "requiredBadge": "Required",
+    "parcelCard": {
+      "title": "Your parcel",
+      "decrease": "Decrease weight",
+      "increase": "Increase weight",
+      "capacityLeft": "{kg} kg left on this trip",
+      "billedFloor": "Billed at {kg} kg — this trip’s minimum.",
+      "billedSizeMin": "Billed at {kg} kg — the space a {size} parcel takes."
+    }
   },
   "insurance": {
     "title": "Parcel protection",

@@ -26,7 +26,6 @@
       "linkProhibited": "Voir la liste complète"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Poids (kg)",
@@ -69,7 +68,15 @@
       "hintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Obligatoire"
+    "requiredBadge": "Obligatoire",
+    "parcelCard": {
+      "title": "Ton colis",
+      "decrease": "Diminuer le poids",
+      "increase": "Augmenter le poids",
+      "capacityLeft": "{kg} kg restants sur ce trajet",
+      "billedFloor": "Facturé {kg} kg — le minimum de ce trajet.",
+      "billedSizeMin": "Facturé {kg} kg — la place que prend un colis {size}."
+    }
   },
   "insurance": {
     "title": "Protection du colis",

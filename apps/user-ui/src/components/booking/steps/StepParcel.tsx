@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Lightbulb } from "lucide-react";
+import { ChevronDown, Lightbulb, Minus, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
-import { MAX_PHOTOS, isPerKgTrip, parseWeight } from "../booking.config";
+import { MAX_PARCEL_KG, MAX_PHOTOS, isPerKgTrip, parseWeight } from "../booking.config";
 import { quoteShipperPrice } from "@packages/pricing";
 import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
 import { toast } from "sonner";
@@ -33,8 +33,6 @@ import {
   type ValidationErrors,
 } from "../booking.types";
 
-/** Les poids d'un envoi réel — les mêmes que l'app mobile. */
-const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
 
 function ChoiceChip({
   active,
@@ -77,6 +75,19 @@ type Props = {
   draft: Draft;
   setDraftAction: (updater: (prev: Draft) => Draft) => void;
   errors: ValidationErrors;
+};
+
+/**
+ * Les silhouettes de taille, à l'ÉCHELLE. Proportions des gabarits du livrable 12
+ * (S 33×23 cm, M 45×30, L 55×40) ramenées à la même base. Posées sur une ligne
+ * commune, elles disent d'un regard ce que trois mots ne peuvent pas dire. Ce ne
+ * sont pas des icônes — c'est une mesure. Jumelles de `SIZE_SILHOUETTES` dans
+ * `apps/mobile/src/app/booking/parcel.tsx`.
+ */
+const SIZE_SILHOUETTES: Record<SizeClass, { width: number; height: number }> = {
+  S: { width: 26, height: 18 },
+  M: { width: 36, height: 24 },
+  L: { width: 44, height: 32 },
 };
 
 const GOLDEN_RULES_KEYS = ["pack", "weigh", "describe", "prohibited"] as const;
@@ -228,6 +239,56 @@ export default function StepParcel({
       ? t("step1.size.hintFlat")
       : t("step1.size.hint");
 
+  /**
+   * Le devis du choix COURANT — pour deux choses que seul lui connaît : la place
+   * réellement réservée (D81/CAP-01) et la RAISON du poids facturé. Les écarts
+   * par taille ci-dessus comparent trois devis ; celui-ci décrit le devis réel.
+   */
+  const currentQuote = useMemo(() => {
+    const weight = parseWeight(draft.weightKg);
+    if (!perKg || draft.product !== "PARCEL" || !weight || !draft.sizeClass) return null;
+    try {
+      return quoteShipperPrice(
+        {
+          product: "PARCEL",
+          pricePerKgCents: trip.pricePerKgCents,
+          weightKg: weight,
+          sizeClass: draft.sizeClass,
+          familySurchargePct: draft.family ? (trip.familyStances?.[draft.family]?.surchargePct ?? 0) : 0,
+          protection: draft.insurance,
+        },
+        pricingParams
+      );
+    } catch {
+      return null;
+    }
+  }, [perKg, draft.product, draft.weightKg, draft.sizeClass, draft.family, draft.insurance, trip.familyStances, trip.pricePerKgCents, pricingParams]);
+
+  /** La place RÉSERVÉE : le poids facturé, pas le poids déclaré (D81). */
+  const capacityUsedKg = currentQuote?.capacityKgConsumed ?? parseWeight(draft.weightKg) ?? 0;
+  const capacityTight =
+    typeof trip.remainingKg === "number" && capacityUsedKg > trip.remainingKg * 0.8;
+
+  /** Pourquoi le poids facturé diffère du poids saisi — `billableReason`, affiché enfin. */
+  const billedNote = (() => {
+    if (!currentQuote?.billableReason || currentQuote.billableReason === "ACTUAL") return null;
+    if (currentQuote.billableWeightKg === null) return null;
+    return currentQuote.billableReason === "SIZE_MIN"
+      ? t("step1.parcelCard.billedSizeMin", { kg: currentQuote.billableWeightKg, size: currentQuote.sizeClass ?? "" })
+      : t("step1.parcelCard.billedFloor", { kg: currentQuote.billableWeightKg });
+  })();
+
+  /** Le pas : fin là où vivent les colis réels, large au-dessus. */
+  const adjustWeight = (direction: 1 | -1) => {
+    const current = parseWeight(draft.weightKg) ?? 0;
+    const step = current < 5 ? 0.5 : 1;
+    // `0.1 + 0.2` ne vaut pas `0.3` : on arrondit au dixième, sinon l'écran
+    // affiche « 2.9000000000000004 ».
+    const next = Math.round((current + direction * step) * 10) / 10;
+    const ceiling = Math.min(MAX_PARCEL_KG, trip.remainingKg ?? MAX_PARCEL_KG);
+    setDraftAction((prev) => ({ ...prev, weightKg: String(Math.min(ceiling, Math.max(0.1, next))) }));
+  };
+
   // ── Les blocs de la page, nommés — l'ordre se lit d'un coup d'œil tout en bas ──
 
   const familyChip = (f: ParcelFamily, refused: boolean) => {
@@ -323,41 +384,144 @@ export default function StepParcel({
     </FormField>
   );
 
-  const weightValueBlock = (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5 sm:grid-cols-2 md:max-w-md">
-      <FormFieldWithTooltip
-        label={t("step1.parcelDetails.weightLabel")}
-        tooltip={t("step1.parcelDetails.weightTooltip", { min: 0.5, floor: 8 })}
-        error={errors.weightKg}
-      >
-        <FormInput
-          value={draft.weightKg}
-          onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
-          hasError={Boolean(errors.weightKg)}
-          inputMode="decimal"
-          placeholder={locale === "fr" ? "2,5" : "2.5"}
+  /**
+   * LA CARTE DU COLIS — poids ET taille dans un seul objet, parce que c'est une
+   * seule décision : depuis D81, `poidsFacturé = max(poidsRéel, plancher,
+   * minimumDeLaTaille)`. Les séparer en deux champs laissait croire qu'ils
+   * étaient indépendants, et le prix sautait sans raison lisible.
+   * L'ordre poids → taille suit A214 : sans poids, aucune taille n'a d'écart à
+   * annoncer.
+   */
+  const parcelCardBlock = (
+    <div className="mb-4 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:max-w-md">
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {t("step1.parcelCard.title")}
+      </div>
+
+      {/* Le poids par un PAS, pas par un clavier : sur téléphone, le pavé
+          numérique recouvre la barre du bas — donc le prix — au moment exact où
+          on le fait varier. Le champ reste là pour les valeurs hors pas. */}
+      <div className="flex items-center gap-3">
+        <StepperButton
+          direction="minus"
+          label={t("step1.parcelCard.decrease")}
+          disabled={(parseWeight(draft.weightKg) ?? 0) <= 0.1}
+          onClickAction={() => adjustWeight(-1)}
         />
-        {/* On tape rarement « 2 » : on le choisit. Les poids réels d'un envoi,
-            filtrés par la place qui reste. */}
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {WEIGHT_SHORTCUTS.filter(
-            (kg) => typeof trip.remainingKg !== "number" || kg <= trip.remainingKg
-          ).map((kg) => (
-            <ChoiceChip
-              key={kg}
-              active={parseWeight(draft.weightKg) === kg}
-              onClickAction={() => setDraftAction((prev) => ({ ...prev, weightKg: String(kg) }))}
-            >
-              {t("step1.parcelDetails.weightShortcut", { kg })}
-            </ChoiceChip>
-          ))}
+        <div className="flex flex-1 items-baseline justify-center gap-1">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={draft.weightKg}
+            onChange={(e) => setDraftAction((prev) => ({ ...prev, weightKg: e.target.value }))}
+            aria-label={t("step1.parcelDetails.weightLabel")}
+            className="w-20 border-0 bg-transparent p-0 text-center text-[28px] font-extrabold text-slate-900 outline-none dark:text-white"
+          />
+          <span className="text-[13px] text-slate-500 dark:text-slate-400">kg</span>
         </div>
-        {typeof trip.remainingKg === "number" && (
-          <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            {t("step1.parcelDetails.remainingKg", { kg: trip.remainingKg })}
+        <StepperButton
+          direction="plus"
+          label={t("step1.parcelCard.increase")}
+          disabled={
+            typeof trip.remainingKg === "number" && (parseWeight(draft.weightKg) ?? 0) >= trip.remainingKg
+          }
+          onClickAction={() => adjustWeight(1)}
+        />
+      </div>
+
+      {/* La capacité DEVIENT le contrôle au lieu de le commenter : elle prévient
+          AVANT que la limite soit franchie. Elle se remplit du poids FACTURÉ
+          (D81/CAP-01) — un colis L d'1 kg réserve 6 kg. */}
+      {typeof trip.remainingKg === "number" && (
+        <div className="mt-3">
+          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+            <div
+              className="h-1 rounded-full transition-[width] duration-200"
+              style={{
+                width: `${Math.min(100, Math.round((capacityUsedKg / trip.remainingKg) * 100))}%`,
+                background: capacityTight ? "#FF9900" : "#94A3B8",
+              }}
+            />
           </div>
-        )}
-      </FormFieldWithTooltip>
+          <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {t("step1.parcelCard.capacityLeft", {
+              kg: Math.max(0, Math.round((trip.remainingKg - capacityUsedKg) * 10) / 10),
+            })}
+          </div>
+        </div>
+      )}
+
+      {errors.weightKg && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.weightKg}
+        </div>
+      )}
+
+      {/* PRC-03 — la taille par sa SILHOUETTE à l'échelle. Les rectangles avaient
+          disparu à raison (une boîte à chaussures dessinée n'apprend rien de plus
+          que les mots) ; l'ÉCHELLE RELATIVE, elle, est la seule information que le
+          texte ne peut pas porter. Proportions des gabarits du livrable 12, posées
+          sur une ligne de base commune. */}
+      <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t("step1.size.label")}>
+        {(["S", "M", "L"] as SizeClass[]).map((sz) => {
+          const active = draft.sizeClass === sz;
+          const delta = sizeDeltaCents?.[sz] ?? 0;
+          const box = SIZE_SILHOUETTES[sz];
+          return (
+            <button
+              key={sz}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
+              className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors ${
+                active
+                  ? "border-[#FF9900] bg-[#FF9900]/10"
+                  : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
+              }`}
+            >
+              <span className="flex h-9 items-end" aria-hidden="true">
+                <span
+                  className="block rounded-[3px] border-[1.5px]"
+                  style={{
+                    width: box.width,
+                    height: box.height,
+                    borderColor: active ? "#FF9900" : "#94A3B8",
+                  }}
+                />
+              </span>
+              <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
+              <span className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                {t(`step1.size.${sz}`)}
+              </span>
+              {!sizeIsFlat && delta > 0 && (
+                <span className="text-[11px] font-bold text-[#B45309] dark:text-[#FFB84D]">
+                  {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* D81 expliqué LÀ où il se décide : `billableReason` existait dans le devis
+          et n'était montré nulle part. */}
+      <div className="mt-2 text-[11px] leading-[1.5] text-slate-500 dark:text-slate-400">
+        {billedNote ?? sizeHint}
+      </div>
+      {errors.sizeClass && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.sizeClass}
+        </div>
+      )}
+    </div>
+  );
+
+  /** La valeur du contenu ne fait pas le prix du transport : elle fixe le plafond
+   *  d'indemnisation. Elle a donc quitté la ligne du poids pour se coller à la
+   *  protection, qu'elle commande. */
+  const valueBlock = (
+    <div className="md:max-w-md">
       <FormFieldWithTooltip
         label={t("step1.parcelDetails.valueLabel")}
         tooltip={t("step1.parcelDetails.declaredValueTooltip")}
@@ -374,34 +538,26 @@ export default function StepParcel({
     </div>
   );
 
-  /** PRC-03 — à l'œil, jamais de dimensions, et plus AUCUN rectangle : les mêmes
-   *  pastilles que la question juste au-dessus. Deux questions voisines répondues
-   *  de la même façon, c'est une chose de moins à comprendre (revue du 17/10).
-   *  Seule la taille qui coûte plus cher porte son prix. */
-  const sizeBlock = (
-    <FormField label={t("step1.size.label")} hint={sizeHint} error={errors.sizeClass}>
-      <div className="flex flex-wrap gap-2" role="radiogroup">
-        {(["S", "M", "L"] as SizeClass[]).map((sz) => {
-          const active = draft.sizeClass === sz;
-          const delta = sizeDeltaCents?.[sz] ?? 0;
-          return (
-            <ChoiceChip
-              key={sz}
-              active={active}
-              onClickAction={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
-            >
-              <span className="font-bold">{sz}</span>
-              <span className="ml-1.5 opacity-80">{t(`step1.size.${sz}`)}</span>
-              {!sizeIsFlat && delta > 0 && (
-                <span className="ml-1.5 font-bold text-[#B45309] dark:text-[#FFB84D]">
-                  {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
-                </span>
-              )}
-            </ChoiceChip>
-          );
-        })}
-      </div>
-    </FormField>
+  /** Legacy PER_CATEGORY (déprécié) : un prix par catégorie, donc ni taille ni
+   *  écart à annoncer. Le poids y reste un simple champ — la carte du colis
+   *  n'aurait rien à y montrer. */
+  const legacyWeightValueBlock = (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5 sm:grid-cols-2 md:max-w-md">
+      <FormFieldWithTooltip
+        label={t("step1.parcelDetails.weightLabel")}
+        tooltip={t("step1.parcelDetails.weightTooltip", { min: 0.5, floor: 8 })}
+        error={errors.weightKg}
+      >
+        <FormInput
+          value={draft.weightKg}
+          onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
+          hasError={Boolean(errors.weightKg)}
+          inputMode="decimal"
+          placeholder={locale === "fr" ? "2,5" : "2.5"}
+        />
+      </FormFieldWithTooltip>
+      {valueBlock}
+    </div>
   );
 
   /** Bagage entier : ni poids ni taille, seule la valeur du contenu reste à dire */
@@ -432,7 +588,7 @@ export default function StepParcel({
           hasError={Boolean(errors.category)}
         />
       </FormField>
-      {weightValueBlock}
+      {legacyWeightValueBlock}
     </>
   );
 
@@ -571,8 +727,7 @@ export default function StepParcel({
           {draft.product === "PARCEL" ? (
             <>
               {familyBlock}
-              {weightValueBlock}
-              {sizeBlock}
+              {parcelCardBlock}
             </>
           ) : (
             bagValueBlock
@@ -582,11 +737,40 @@ export default function StepParcel({
         legacyBlock
       )}
 
+      {draft.product === "PARCEL" && perKg ? valueBlock : null}
       {insuranceBlock}
       {descriptionBlock}
       {photosBlock}
       {goldenRulesBlock}
     </div>
+  );
+}
+
+/**
+ * Un bouton de pas. Cible de 44 px (minimum tactile), et `disabled` plutôt que
+ * caché : un bouton qui disparaît déplace l'autre sous le doigt.
+ */
+function StepperButton({
+  direction,
+  label,
+  disabled,
+  onClickAction,
+}: {
+  direction: "plus" | "minus";
+  label: string;
+  disabled: boolean;
+  onClickAction: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClickAction}
+      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-35 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+    >
+      {direction === "plus" ? <Plus size={18} /> : <Minus size={18} />}
+    </button>
   );
 }
 

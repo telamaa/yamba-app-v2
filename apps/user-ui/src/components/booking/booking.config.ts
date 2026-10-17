@@ -181,8 +181,10 @@ export function validateStep1(
     const w = parseWeight(draft.weightKg);
     if (w === null) {
       errors.weightKg = isFr ? "Poids requis" : "Weight required";
-    } else if (w > 30) {
-      errors.weightKg = isFr ? "30 kg maximum par colis" : "30 kg max per parcel";
+    } else if (w > MAX_PARCEL_KG) {
+      errors.weightKg = isFr
+        ? `${MAX_PARCEL_KG} kg maximum par colis`
+        : `${MAX_PARCEL_KG} kg max per parcel`;
     } else if (typeof trip.remainingKg === "number" && w > trip.remainingKg) {
       // CAP-01 — vérifié aussi côté serveur à la réservation
       errors.weightKg = isFr
@@ -301,6 +303,9 @@ export function getFirstAcceptedFamily(trip: TripContext): Draft["family"] {
 export function getFirstAcceptedCategory(trip: TripContext): ParcelCategory {
   return trip.acceptedCategories[0] ?? "CLOTHES";
 }
+
+/** Plafond de poids par colis — exporté : l'écran en a besoin pour borner son pas. */
+export const MAX_PARCEL_KG = 30;
 
 export const MAX_PHOTOS = 5;
 export const MAX_PHOTO_SIZE_MB = 10;
