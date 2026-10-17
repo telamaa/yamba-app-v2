@@ -13253,3 +13253,36 @@ d'ouvrir un formulaire dont aucun devis ne sortira.
 trajet sans prix au kilo ne voit jamais la carte du colis. Le mobile, lui, gardait sa carte
 sur `draft.product` et laissait le brouillon diverger du trajet. **Deux gardes différentes
 pour la même règle, dont une seule tenait.**
+
+### L'étape 2 adopte la même grammaire — et où elle s'arrête
+
+Après l'étape ①, l'étape ② parlait encore une autre langue : des lignes de lieu sans cadre
+avec la pastille à **gauche**, puis des champs nus sous des libellés. Un bloc de choix doit se
+reconnaître à sa **forme**, pas à sa place dans la page.
+
+**Les lieux de rendez-vous** passent à la grammaire de « Ton colis » : `LocationList` devient
+une **carte bordée** avec un filet entre les lignes, `LocationOption` déplace sa pastille à
+**droite** et respire en `py-4`, et `LocationDisplay` (un seul lieu, donc aucun choix) prend
+la **même carte** sans pastille — la page ne change pas de grammaire selon le trajet.
+
+Les deux groupes restent **côte à côte** sur grand écran : « je remets » et « il récupère »
+sont deux faces d'un même rendez-vous ; les empiler casserait le parallèle et allongerait une
+page qui porte déjà le téléphone, les noms et l'email. Sur téléphone, la grille retombe
+d'elle-même en une colonne.
+
+**Le destinataire** reçoit sa carte — et c'est là que la transposition s'arrête
+volontairement. La disposition « libellé à gauche, contrôle à droite » convient à une
+**valeur** : un nombre, un choix, un état. Elle ne convient pas au **texte libre**. Un email
+dans une boîte étroite alignée à droite est pénible à saisir, à relire et à corriger ; un nom
+tronqué ne se vérifie pas.
+
+> On adopte donc la grammaire du **conteneur** (la carte, les filets, le titre), pas celle de
+> la **ligne**. Les champs gardent leur libellé au-dessus et toute la largeur.
+
+C'est la nuance qui sépare « unifier » de « uniformiser » : l'unité se joue sur ce qui
+délimite et hiérarchise, pas sur une disposition appliquée mécaniquement à des contenus de
+nature différente.
+
+**Ce qui reste à trancher sur cette étape** : le bloc vert « Comment se passera la livraison »
+pèse visuellement autant que les décisions qui l'entourent, alors qu'il est purement
+informatif.

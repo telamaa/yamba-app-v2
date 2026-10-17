@@ -127,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optional)",
       "emailHint": "To notify the recipient when the parcel arrives",
-      "phonePrefix": "Country code"
+      "phonePrefix": "Country code",
+      "sectionTitle": "The recipient"
     }
   },
   "step3": {

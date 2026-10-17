@@ -127,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optionnel)",
       "emailHint": "Pour notifier le destinataire de l''arrivée du colis",
-      "phonePrefix": "Indicatif pays"
+      "phonePrefix": "Indicatif pays",
+      "sectionTitle": "Le destinataire"
     }
   },
   "step3": {

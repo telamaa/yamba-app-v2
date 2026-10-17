@@ -8,7 +8,7 @@
 
 import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { FormField, FormInput, TipBlock } from "../BookingFormUi";
+import { FormField, FormInput, SectionTitle, TipBlock } from "../BookingFormUi";
 import MeetingPoints from "../MeetingPoints";
 import { PHONE_PREFIXES } from "../booking.config";
 import { useLocale } from "next-intl";
@@ -62,76 +62,88 @@ export default function StepRecipient({
         items={deliveryFlow}
       />
 
-      {/* Téléphone D'ABORD : c'est le canal du code de livraison (indicatif pays + numéro) */}
-      <FormField
-        label={t("step2.form.phone")}
-        hint={t("step2.form.phoneHint")}
-        error={errors.recipientPhoneE164}
-      >
-        <div className="flex gap-2">
-          <select
-            value={draft.recipient.phonePrefix}
-            onChange={(e) => setRecipient({ phonePrefix: e.target.value })}
-            aria-label={t("step2.form.phonePrefix")}
-            className="h-11 w-[9.5rem] shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-900 focus:border-[#FF9900] focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+      {/* LA CARTE DU DESTINATAIRE — même conteneur que « Ton colis » et les
+          lieux : une carte bordée, un filet entre les blocs. Mais PAS la
+          disposition « libellé à gauche, contrôle à droite » : elle convient à
+          une VALEUR (un nombre, un choix), pas à du texte libre. Un email dans
+          une boîte étroite alignée à droite est pénible à saisir et à relire.
+          On adopte la grammaire du CONTENEUR, pas celle de la ligne. */}
+      <SectionTitle>{t("step2.form.sectionTitle")}</SectionTitle>
+      <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 px-4 dark:divide-slate-800/70 dark:border-slate-800">
+        {/* Téléphone D'ABORD : c'est le canal du code de livraison (indicatif + numéro) */}
+        <div className="pt-4">
+          <FormField
+            label={t("step2.form.phone")}
+            hint={t("step2.form.phoneHint")}
+            error={errors.recipientPhoneE164}
           >
-            {PHONE_PREFIXES.map((c) => (
-              <option key={c.code} value={c.prefix}>
-                {c.prefix} · {locale === "fr" ? c.labelFr : c.labelEn}
-              </option>
-            ))}
-          </select>
-          <div className="min-w-0 flex-1">
-            <FormInput
-              value={draft.recipient.phoneE164}
-              onChangeAction={(v) => setRecipient({ phoneE164: v })}
-              placeholder="6 42 18 81 12"
-              type="tel"
-              inputMode="tel"
-              hasError={Boolean(errors.recipientPhoneE164)}
-              autoComplete="tel-national"
-            />
-          </div>
+            <div className="flex gap-2">
+              <select
+                value={draft.recipient.phonePrefix}
+                onChange={(e) => setRecipient({ phonePrefix: e.target.value })}
+                aria-label={t("step2.form.phonePrefix")}
+                className="h-11 w-[9.5rem] shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-900 focus:border-[#FF9900] focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              >
+                {PHONE_PREFIXES.map((c) => (
+                  <option key={c.code} value={c.prefix}>
+                    {c.prefix} · {locale === "fr" ? c.labelFr : c.labelEn}
+                  </option>
+                ))}
+              </select>
+              <div className="min-w-0 flex-1">
+                <FormInput
+                  value={draft.recipient.phoneE164}
+                  onChangeAction={(v) => setRecipient({ phoneE164: v })}
+                  placeholder="6 42 18 81 12"
+                  type="tel"
+                  inputMode="tel"
+                  hasError={Boolean(errors.recipientPhoneE164)}
+                  autoComplete="tel-national"
+                />
+              </div>
+            </div>
+          </FormField>
         </div>
-      </FormField>
 
-      {/* First + Last name */}
-      <div className="grid grid-cols-2 gap-3.5">
-        <FormField label={t("step2.form.firstName")} error={errors.recipientFirstName}>
-          <FormInput
-            value={draft.recipient.firstName}
-            onChangeAction={(v) => setRecipient({ firstName: v })}
-            placeholder="Marie"
-            hasError={Boolean(errors.recipientFirstName)}
-            autoComplete="given-name"
-          />
-        </FormField>
-        <FormField label={t("step2.form.lastName")} error={errors.recipientLastName}>
-          <FormInput
-            value={draft.recipient.lastName}
-            onChangeAction={(v) => setRecipient({ lastName: v })}
-            placeholder="Mboungou"
-            hasError={Boolean(errors.recipientLastName)}
-            autoComplete="family-name"
-          />
-        </FormField>
+        <div className="grid grid-cols-2 gap-3.5 pt-4">
+          <FormField label={t("step2.form.firstName")} error={errors.recipientFirstName}>
+            <FormInput
+              value={draft.recipient.firstName}
+              onChangeAction={(v) => setRecipient({ firstName: v })}
+              placeholder="Marie"
+              hasError={Boolean(errors.recipientFirstName)}
+              autoComplete="given-name"
+            />
+          </FormField>
+          <FormField label={t("step2.form.lastName")} error={errors.recipientLastName}>
+            <FormInput
+              value={draft.recipient.lastName}
+              onChangeAction={(v) => setRecipient({ lastName: v })}
+              placeholder="Mboungou"
+              hasError={Boolean(errors.recipientLastName)}
+              autoComplete="family-name"
+            />
+          </FormField>
+        </div>
+
+        <div className="pt-4">
+          <FormField
+            label={`${t("step2.form.email")} ${t("step2.form.emailOptional")}`}
+            hint={t("step2.form.emailHint")}
+            error={errors.recipientEmail}
+          >
+            <FormInput
+              value={draft.recipient.email}
+              onChangeAction={(v) => setRecipient({ email: v })}
+              placeholder="marie.mboungou@gmail.com"
+              type="email"
+              inputMode="email"
+              hasError={Boolean(errors.recipientEmail)}
+              autoComplete="email"
+            />
+          </FormField>
+        </div>
       </div>
-
-      <FormField
-        label={`${t("step2.form.email")} ${t("step2.form.emailOptional")}`}
-        hint={t("step2.form.emailHint")}
-        error={errors.recipientEmail}
-      >
-        <FormInput
-          value={draft.recipient.email}
-          onChangeAction={(v) => setRecipient({ email: v })}
-          placeholder="marie.mboungou@gmail.com"
-          type="email"
-          inputMode="email"
-          hasError={Boolean(errors.recipientEmail)}
-          autoComplete="email"
-        />
-      </FormField>
     </div>
   );
 }
