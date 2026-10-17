@@ -32,6 +32,7 @@
       "open": "Voir"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Poids (kg)",
@@ -81,7 +82,7 @@
       "title": "Garantie Yamba 500 €",
       "price": "+6 €",
       "description": "Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).",
-      "ipidLink": "Voir les conditions"
+      "photoRequired": "Au moins une photo du colis est requise."
     }
   },
   "categories": {
@@ -221,7 +222,9 @@
       "MISSING_PRICE_PER_KG": "Ce trajet n'a pas de prix au kilo.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
       "UNKNOWN": "Prix indisponible."
-    }
+    },
+    "parcelRecap": "Colis · {kg} kg · valeur déclarée {value} €",
+    "parcelRecapNoValue": "Colis · {kg} kg · valeur déclarée à renseigner"
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

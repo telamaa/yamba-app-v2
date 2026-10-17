@@ -83,9 +83,13 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950">
+      {/* La flèche et la croix appelaient le MÊME handler : deux boutons
+          côte à côte, un seul comportement — on ne sait pas lequel choisir.
+          La flèche REMONTE d'une étape (et quitte depuis la première), la
+          croix quitte la réservation. Chacune fait ce qu'elle dessine. */}
       <BookingHeader
         subtitle={subtitle}
-        onBackAction={onCloseAction}
+        onBackAction={step > 1 ? prevStep : onCloseAction}
         onCloseAction={onCloseAction}
       />
 

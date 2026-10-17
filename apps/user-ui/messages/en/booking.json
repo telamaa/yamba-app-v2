@@ -32,6 +32,7 @@
       "open": "Show"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Weight (kg)",
@@ -81,7 +82,7 @@
       "title": "Yamba Guarantee €500",
       "price": "+€6",
       "description": "Loss, theft, damage during transport. Exclusions shown before confirmation (including customs seizure of a non-compliant parcel).",
-      "ipidLink": "See the terms"
+      "photoRequired": "At least one photo of the parcel is required."
     }
   },
   "categories": {
@@ -221,7 +222,9 @@
       "MISSING_PRICE_PER_KG": "This trip has no price per kg.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
       "UNKNOWN": "Price unavailable."
-    }
+    },
+    "parcelRecap": "Parcel · {kg} kg · declared value €{value}",
+    "parcelRecapNoValue": "Parcel · {kg} kg · declared value still to enter"
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

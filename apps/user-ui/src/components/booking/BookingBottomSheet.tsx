@@ -149,9 +149,14 @@ export default function BookingBottomSheet({
           {currentStep < 4 && (
             <div className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-700">
               {draft.weightKg && (
+                // Cette ligne récapitule le COLIS, pas un prix — mais elle vit
+                // sous les montants : un « — € » s'y lisait comme un montant
+                // manquant. La valeur déclarée est donc NOMMÉE, et quand elle
+                // n'est pas saisie la ligne le dit au lieu d'afficher un tiret.
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {t("summary.parcel")} · {draft.weightKg} kg ·{" "}
-                  {draft.declaredValueEur || "—"} €
+                  {draft.declaredValueEur
+                    ? t("summary.parcelRecap", { kg: draft.weightKg, value: draft.declaredValueEur })
+                    : t("summary.parcelRecapNoValue", { kg: draft.weightKg })}
                 </div>
               )}
             </div>
