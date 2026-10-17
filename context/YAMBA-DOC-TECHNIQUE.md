@@ -13286,3 +13286,26 @@ nature différente.
 **Ce qui reste à trancher sur cette étape** : le bloc vert « Comment se passera la livraison »
 pèse visuellement autant que les décisions qui l'entourent, alors qu'il est purement
 informatif.
+
+### Le bloc informatif cesse de peser autant que les décisions
+
+« Comment se passera la livraison » était un **gros encadré vert**, posé **avant** le
+destinataire. Deux défauts :
+
+- **il pesait autant que les décisions qui l'entouraient**, alors qu'il n'exige aucune
+  action. Dans une page où tout le reste est un choix, un pavé coloré capte l'attention qui
+  devrait aller aux lieux et au numéro ;
+- **il expliquait un code à transmettre à quelqu'un dont le numéro n'était pas encore saisi.**
+  L'information arrivait avant d'être concrète.
+
+Il est désormais **replié** derrière une ligne « Comment se passera la livraison ⌄ » et
+**déplacé après** la carte du destinataire : on explique le code une fois le numéro posé, au
+moment où il devient réel.
+
+Le repliable réutilise **exactement** le motif des « règles d'or » de l'étape ① — un
+`<details>/<summary>` natif avec un chevron en `group-open:rotate-180`. Donc : aucun état
+React, le clavier et les lecteurs d'écran le gèrent gratuitement, et l'étape ② n'invente pas
+un deuxième idiome de repli.
+
+`TipBlock` n'est pas modifié : il reste l'habillage des blocs informatifs de l'engagement et
+du paiement, où ils ne concurrencent rien.

@@ -6,9 +6,9 @@
 
 "use client";
 
-import { Lightbulb } from "lucide-react";
+import { ChevronDown, Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { FormField, FormInput, SectionTitle, TipBlock } from "../BookingFormUi";
+import { FormField, FormInput, RenderBoldText, SectionTitle } from "../BookingFormUi";
 import MeetingPoints from "../MeetingPoints";
 import { PHONE_PREFIXES } from "../booking.config";
 import { useLocale } from "next-intl";
@@ -55,12 +55,6 @@ export default function StepRecipient({
           l'étape 1, sur une page intitulée « Décris ton colis » — un lieu n'est
           pas une propriété du colis (revue UX 17/10). */}
       <MeetingPoints trip={trip} draft={draft} setDraftAction={setDraftAction} errors={errors} />
-
-      <TipBlock
-        icon={<Lightbulb size={16} />}
-        title={t("step2.deliveryFlow.title")}
-        items={deliveryFlow}
-      />
 
       {/* LA CARTE DU DESTINATAIRE — même conteneur que « Ton colis » et les
           lieux : une carte bordée, un filet entre les blocs. Mais PAS la
@@ -144,6 +138,31 @@ export default function StepRecipient({
           </FormField>
         </div>
       </div>
+
+      {/* Le code de livraison, APRÈS le numéro et REPLIÉ (revue du 17/10). Il
+          était en gros bloc vert AVANT le destinataire : purement informatif, il
+          pesait autant que les décisions qui l'entouraient, et il expliquait un
+          code à envoyer à quelqu'un dont le numéro n'était pas encore saisi.
+          Déplié d'un geste, il arrive au moment où il devient concret.
+          Même repliable que les « règles d'or » de l'étape 1 : un `<details>`
+          natif, donc gratuit au clavier et pour un lecteur d'écran. */}
+      <details className="group mt-5 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-200">
+          <Lightbulb size={15} className="flex-shrink-0 text-[#0F766E]" />
+          <span className="flex-1">{t("step2.deliveryFlow.title")}</span>
+          <ChevronDown
+            size={15}
+            className="flex-shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <ul className="mt-2.5 list-disc space-y-1 pl-10 text-[12.5px] leading-[1.7] text-slate-600 dark:text-slate-300">
+          {deliveryFlow.map((item, i) => (
+            <li key={i}>
+              <RenderBoldText text={item} />
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
