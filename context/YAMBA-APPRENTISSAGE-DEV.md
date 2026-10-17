@@ -4118,3 +4118,169 @@ de valeurs.
   hypothèses nommées.
 - **PRC-05** (suggestion de prix par corridor) et **PRC-09** (forfait bagage), spécifiés et
   non codés : les deux leviers que le livrable 12 désigne comme décisifs.
+
+---
+
+## Chapitre 216 — La modale qui n'a rien derrière elle, les deux arbres montés en même temps, et le hook qui coûte une frontière Suspense
+
+Un correctif de six lignes utiles, et trois pièges d'architecture front qu'on ne voit qu'en
+le faisant.
+
+### 1. Une modale est un motif *relatif* : elle suppose un contexte
+
+Le réflexe, devant une page de connexion plein écran, est : « ça devrait être une popup ».
+C'est juste, mais pas applicable tel quel. Une modale est définie par ce qu'elle **recouvre** :
+elle garde le contexte visible et signale que l'interruption est temporaire. Sur
+`/trips/:id/book` sans session, il n'y a **rien** à recouvrir — le wizard ne peut pas se
+rendre. Poser une modale au-dessus du vide reproduit exactement le vide qu'on voulait
+supprimer.
+
+La bonne question n'est donc pas « comment transformer cette page en modale ? » mais
+**« quelle page devrait être derrière ? »**. La réponse était évidente une fois posée : la
+fiche du trajet. D'où une redirection, pas un changement d'habillage.
+
+```ts
+if (!user) {
+  router.replace(`/trips/${tripId}?auth=book`);
+  return <BookingFallback />;
+}
+```
+
+Deux détails :
+
+- **`replace` et non `push`.** Une étape purement technique ne doit pas entrer dans
+  l'historique : sinon « retour » ramène sur la route qui redirige, et l'utilisateur se
+  retrouve prisonnier d'une boucle invisible. Règle générale : *toute redirection qui
+  corrige l'URL se fait en `replace`* ;
+- **on rend quand même quelque chose** (`<BookingFallback />`). Entre l'appel à `replace` et
+  la navigation effective, React rend au moins une fois. Retourner `null` produirait un
+  éclair blanc.
+
+### 2. Deux arbres montés en même temps : le piège du `lg:hidden`
+
+La fiche trajet contient les deux barres de réservation :
+
+```tsx
+{isOwner ? <OwnerCard … /> : <BookingSummaryCard trip={trip} …/>}   {/* colonne desktop */}
+…
+<BookingMobileBar trip={trip} />                                     {/* barre fixe, lg:hidden */}
+```
+
+Le piège est que `lg:hidden` est **du CSS, pas du rendu conditionnel** : les deux composants
+sont montés, leurs effets tournent, leur état existe. Et surtout, chacun rend sa modale
+**en sœur** du bloc caché :
+
+```tsx
+return (
+  <>
+  <BookingAuthGateModal open={gateOpen} … />        {/* PAS dans le lg:hidden */}
+  <div className="… lg:hidden"> … </div>
+  </>
+);
+```
+
+Donner à ces deux composants la capacité d'ouvrir la porte depuis l'URL aurait ouvert
+**deux modales superposées** sur toutes les largeurs d'écran. Le symptôme aurait été
+déroutant : un fond deux fois assombri, et une fermeture qui n'en ferme qu'une.
+
+La règle à retenir : **un état déclenché par l'URL appartient au parent commun**, jamais aux
+composants qui en dérivent une copie. C'est le même raisonnement que « remonter l'état »
+(*lifting state up*), appliqué à une source externe plutôt qu'à une interaction.
+
+Et la leçon de relecture : quand deux composants font « la même chose » pour deux tailles
+d'écran, vérifiez toujours **ce qui est hors du conteneur caché**. Un portail, une modale ou
+un `position: fixed` rendu à côté du bloc `hidden` n'est pas caché du tout.
+
+### 3. `useSearchParams()` coûte une frontière Suspense
+
+Le réflexe App Router pour lire un paramètre d'URL :
+
+```tsx
+const searchParams = useSearchParams();
+const auth = searchParams.get("auth");
+```
+
+Ce hook **désactive le prérendu statique** du segment qui l'utilise. Next exige alors une
+frontière `<Suspense>` au-dessus, faute de quoi le `next build` échoue avec
+*« useSearchParams() should be wrapped in a suspense boundary »*. La raison est logique : les
+paramètres de requête ne sont pas connus au moment du prérendu, donc le composant doit
+pouvoir être rendu en deux temps.
+
+Pour une valeur lue **une seule fois au montage**, le coût est disproportionné :
+
+```tsx
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const auth = new URLSearchParams(window.location.search).get("auth");
+  if (auth === "book" && !user && !userLoading) setUrlGateOpen(true);
+}, [user, userLoading]);
+```
+
+`useEffect` ne tourne jamais au rendu serveur, le garde `typeof window` est une ceinture de
+sécurité, et `URLSearchParams` fait le travail d'analyse. On perd la réactivité aux
+changements de paramètre **sans navigation** — ce dont ce cas n'a pas besoin.
+
+> Le critère de choix : si le paramètre pilote l'affichage **en continu**, prenez le hook et
+> assumez la frontière Suspense. S'il déclenche une action **une fois**, lisez-le dans un
+> effet.
+
+### 4. Nettoyer l'URL après usage
+
+```ts
+const closeUrlGate = () => {
+  setUrlGateOpen(false);
+  router.replace(`/trips/${trip.id}`);
+};
+```
+
+Un paramètre d'URL qui déclenche un état doit être **consommé**. Sinon :
+
+- le bouton « retour » du navigateur rouvre la modale, ce qui ressemble à un bug ;
+- l'utilisateur partage une adresse qui ouvrira une demande de connexion chez le
+  destinataire ;
+- un rechargement rouvre la porte alors que l'utilisateur vient de la fermer.
+
+C'est l'équivalent, côté URL, de la remise à zéro d'un message *flash* côté serveur : l'état
+transporté par l'adresse a une durée de vie d'un seul rendu.
+
+### 5. La même décision écrite à deux endroits finit toujours par diverger
+
+La page supprimée contenait :
+
+```tsx
+const redirect = encodeURIComponent(`/trips/${tripId}/book`);
+router.push(`/login?redirect=${redirect}`);
+```
+
+tandis que la modale utilisait le helper partagé :
+
+```ts
+redirect={bookingRedirectFor(tripId)}
+```
+
+Deux implémentations de la décision « où revient-on après connexion ? ». Tant qu'elles
+disent la même chose, personne ne le remarque ; le jour où la règle change (ajouter un
+paramètre, changer de locale, gérer un trajet supprimé), **une seule des deux est
+corrigée**. Et c'est l'autre que l'utilisateur rencontre.
+
+Le signal à repérer en relecture : un appel à `encodeURIComponent` ou une construction
+d'URL à la main **à côté** d'un helper qui fait déjà la même chose. C'est presque toujours
+le vestige d'un chemin écrit avant que le helper n'existe.
+
+### Les pièges payés dans ce lot
+
+- Une modale au-dessus du vide ne résout rien : chercher **quelle page devrait être
+  derrière**.
+- `lg:hidden` cache en CSS — les deux arbres sont montés, et ce qui est rendu **hors** du
+  bloc caché reste visible.
+- Un état déclenché par l'URL appartient au **parent commun**, pas aux composants jumeaux.
+- `useSearchParams()` impose une frontière Suspense : surdimensionné pour une lecture unique.
+- Un paramètre d'URL qui n'est pas retiré après usage transforme « retour » en bug.
+
+### Aller plus loin
+
+- La documentation Next.js sur `useSearchParams` et le rendu statique (`dynamic = "force-dynamic"`,
+  frontières Suspense).
+- *Lifting state up* dans la documentation React, et sa variante « source externe » :
+  URL, stockage, événements système.
+- Le motif *flash message* et la consommation d'un état à usage unique.

@@ -15,6 +15,7 @@ import FavoriteButton from "@/components/favorites/FavoriteButton";
 import ReviewsCard from "./ReviewsCard";
 import ConditionsCard from "./ConditionsCard";
 import BookingSummaryCard from "./BookingSummaryCard";
+import BookingAuthGateModal from "./BookingAuthGateModal";
 import BookingMobileBar from "./BookingMobileBar";
 import LocationsCard from "@/components/trips/detail/LocationsCard";
 import { track } from "@/lib/analytics";
@@ -28,9 +29,34 @@ type Props = {
 export default function TripDetailView({ trip }: Props) {
   const t = useTranslations("tripDetail");
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isLoading: userLoading } = useUser();
   // Le créateur ne se réserve pas lui-même : il édite (même écran que le dashboard)
   const isOwner = !!user && user.id === trip.tripper.id;
+
+  /**
+   * A58/A63 — la porte d'identité s'ouvre AU-DESSUS du trajet, jamais sur une
+   * page vide. `/trips/:id/book` atteint par un visiteur (lien partagé, retour
+   * arrière après déconnexion, session expirée dans le tunnel) renvoie ici avec
+   * `?auth=book` : on retrouve le trajet derrière, et la MÊME modale que le
+   * bouton « Réserver ». La porte est portée par CE composant et non par les
+   * deux barres de réservation, qui sont montées toutes les deux (desktop et
+   * mobile) : deux modales s'ouvriraient en même temps.
+   */
+  const [urlGateOpen, setUrlGateOpen] = useState(false);
+  useEffect(() => {
+    // Lecture directe plutôt que `useSearchParams()` : ce hook impose une
+    // frontière Suspense dès que la route est prérendue, pour une valeur qu'on
+    // ne lit qu'UNE fois, au montage.
+    if (typeof window === "undefined") return;
+    const auth = new URLSearchParams(window.location.search).get("auth");
+    if (auth === "book" && !user && !userLoading) setUrlGateOpen(true);
+  }, [user, userLoading]);
+  const closeUrlGate = () => {
+    setUrlGateOpen(false);
+    // Le paramètre a fait son office : on le retire pour que le bouton « retour »
+    // ne rouvre pas la porte, et que l'URL reste partageable.
+    router.replace(`/trips/${trip.id}`);
+  };
 
   // Poids du colis saisi en recherche (même clé) → continuité recherche → détail → réservation
   const [weightKg, setWeightKg] = useState<number | null>(null);
@@ -53,6 +79,9 @@ export default function TripDetailView({ trip }: Props) {
   const reportTarget = { type: "TRIP" as const, ref: trip.id, label: `${trip.origin?.city ?? "?"} → ${trip.destination?.city ?? "?"}` };
 
   return (
+    <>
+    {/* A58/A63 — la porte ouverte par l'URL, au-dessus du trajet. */}
+    <BookingAuthGateModal open={urlGateOpen} tripId={trip.id} onCloseAction={closeUrlGate} />
     <div className="mx-auto max-w-7xl px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:pb-12">
       <button
         type="button"
@@ -165,6 +194,7 @@ export default function TripDetailView({ trip }: Props) {
         <BookingMobileBar trip={trip} />
       )}
     </div>
+    </>
   );
 }
 

@@ -29,7 +29,6 @@ export default function BookingClient({ tripId }: Props) {
   const tLoc = useTranslations("booking.locationKinds");
   const { data: publicTrip, isLoading, isError } = usePublicTrip(tripId);
   const { user, isLoading: userLoading } = useUser();
-  const tBooking = useTranslations("booking.authGate");
   const tErrors = useTranslations("booking.step4.errors");
 
   const trip = useMemo(
@@ -45,24 +44,18 @@ export default function BookingClient({ tripId }: Props) {
     return <BookingFallback />;
   }
 
-  // CNF-05 — identité requise dès la 1re réservation : pas de wizard sans compte
+  // CNF-05 — identité requise dès la 1re réservation : pas de wizard sans compte.
+  // A58/A63 — mais la porte s'ouvre AU-DESSUS DU TRAJET, jamais sur une page vide.
+  // Cette route n'est atteinte sans session que par un chemin détourné (lien
+  // partagé, retour arrière après déconnexion, session expirée dans le tunnel) :
+  // il n'y a alors rien derrière quoi poser une modale. On renvoie donc à la
+  // fiche trajet avec `?auth=book`, qui ouvre LA MÊME modale que le bouton
+  // « Réserver » — un seul composant, un seul texte, une seule règle de retour
+  // (`bookingRedirectFor`). `replace` et non `push` : cette étape ne doit pas
+  // s'inscrire dans l'historique du navigateur.
   if (!user) {
-    const redirect = encodeURIComponent(`/trips/${tripId}/book`);
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white px-6 text-center dark:bg-slate-950">
-        <h1 className="text-lg font-bold text-slate-900 dark:text-white">{tBooking("title")}</h1>
-        <p className="max-w-sm text-sm text-slate-600 dark:text-slate-400">{tBooking("subtitle")}</p>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => router.push(`/login?redirect=${redirect}`)} className="rounded-full bg-[#FF9900] px-5 py-2.5 text-sm font-bold text-slate-950">
-            {tBooking("login")}
-          </button>
-          <button type="button" onClick={() => router.push(`/register?redirect=${redirect}`)} className="rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
-            {tBooking("register")}
-          </button>
-        </div>
-        <button type="button" onClick={handleClose} className="text-xs text-slate-500 underline-offset-4 hover:underline">{t("back")}</button>
-      </div>
-    );
+    router.replace(`/trips/${tripId}?auth=book`);
+    return <BookingFallback />;
   }
 
   // ANO-WEB-35 (recette 5.12) — l'auteur du trajet ne peut pas le réserver : on le dit à l'OUVERTURE
