@@ -25,7 +25,8 @@
     "messages": "Messages",
     "welcomeTitle": "Welcome to Yamba",
     "welcomeSubtitle": "Send your light parcels differently.",
-    "createAccount": "Create an account"
+    "createAccount": "Create an account",
+    "checkoutSecure": "Secure booking"
   },
   "userMenu": {
     "myAccount": "My account",

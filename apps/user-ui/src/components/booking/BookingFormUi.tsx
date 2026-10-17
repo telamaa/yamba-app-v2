@@ -549,6 +549,14 @@ type LocationOptionProps = {
   hasError?: boolean;
 };
 
+/**
+ * Les lieux de rendez-vous — une LISTE À PLAT, plus de cartes encadrées.
+ * Revue UX du 17/10 : deux colonnes de rectangles bordés donnaient à un simple
+ * choix de point de rencontre le poids visuel d'un formulaire. Ici : une ligne
+ * par lieu, séparées par un filet, la sélection portée par la pastille mangue
+ * (la couleur de décision du produit — le vert émeraude d'avant n'appartenait
+ * à rien) et la souplesse du lieu renvoyée à droite, en retrait.
+ */
 export function LocationOption({
                                  location,
                                  selected,
@@ -559,50 +567,67 @@ export function LocationOption({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={selected}
       onClick={onSelectAction}
-      className={[
-        "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors",
-        selected
-          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
-          : hasError
-            ? "border-[#FF9900] bg-white dark:bg-slate-900"
-            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600",
-      ].join(" ")}
+      className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity hover:opacity-80"
     >
       <span
         className={[
-          "mt-0.5 inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2",
-          selected ? "border-emerald-500" : "border-slate-300 dark:border-slate-600",
+          "inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2",
+          selected
+            ? "border-[#FF9900]"
+            : hasError
+              ? "border-[#FF9900]/60"
+              : "border-slate-300 dark:border-slate-600",
         ].join(" ")}
         aria-hidden="true"
       >
-        {selected && <span className="h-[8px] w-[8px] rounded-full bg-emerald-500" />}
+        {selected && <span className="h-[8px] w-[8px] rounded-full" style={{ backgroundColor: MANGO }} />}
       </span>
       <Icon
-        size={18}
+        size={17}
+        strokeWidth={1.75}
         className={[
-          "mt-0.5 flex-shrink-0",
-          selected
-            ? "text-emerald-700 dark:text-emerald-400"
-            : "text-slate-500 dark:text-slate-400",
+          "flex-shrink-0",
+          selected ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-400 dark:text-slate-500",
         ].join(" ")}
       />
-      <div className="flex-1">
-        <div className="text-[13px] font-medium text-slate-900 dark:text-white">
+      <span className="min-w-0 flex-1">
+        <span
+          className={[
+            "block truncate text-[13.5px]",
+            selected
+              ? "font-semibold text-slate-900 dark:text-white"
+              : "font-medium text-slate-700 dark:text-slate-300",
+          ].join(" ")}
+        >
           {location.label}
-        </div>
+        </span>
         {location.subLabel && (
-          <div className="mt-0.5 text-[12px] text-slate-600 dark:text-slate-400">
+          <span className="mt-0.5 block truncate text-[12px] text-slate-500 dark:text-slate-400">
             {location.subLabel}
-          </div>
+          </span>
         )}
-        {location.addressShort && (
-          <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-500">
-            {location.addressShort}
-          </div>
-        )}
-      </div>
+      </span>
+      {location.addressShort && (
+        <span className="flex-shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+          {location.addressShort}
+        </span>
+      )}
     </button>
+  );
+}
+
+/** Le conteneur des lignes de lieu : un filet entre elles, aucune bordure autour. */
+export function LocationList({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="radiogroup"
+      className="divide-y divide-slate-200/80 dark:divide-slate-800"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -614,43 +639,41 @@ type LocationDisplayProps = {
 /** Le Voyageur n'a pas précisé de lieu : la réservation reste possible, le lieu se convient au fil. */
 export function LocationMissing({ text }: { text: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-      <MapPin size={18} className="mt-0.5 flex-shrink-0 text-slate-400" />
+    <div className="flex items-start gap-2.5 py-2.5 text-[12.5px] leading-relaxed text-slate-500 dark:text-slate-400">
+      <MapPin size={16} className="mt-0.5 flex-shrink-0 text-slate-400" />
       <span>{text}</span>
     </div>
   );
 }
 
+/** Un seul lieu possible : rien à choisir, donc ni pastille ni cadre — une ligne. */
 export function LocationDisplay({ location, hint }: LocationDisplayProps) {
   // Défense : un trajet publié sans lieu passait ici avec `undefined` et cassait l'écran.
   if (!location) return null;
   const Icon = getLocationIcon(location.kind);
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      <Icon
-        size={18}
-        className="mt-0.5 flex-shrink-0 text-slate-500 dark:text-slate-400"
-      />
-      <div className="flex-1">
-        <div className="text-[13px] font-medium text-slate-900 dark:text-white">
+    <div className="flex items-center gap-3 py-2.5">
+      <Icon size={17} strokeWidth={1.75} className="flex-shrink-0 text-slate-400 dark:text-slate-500" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13.5px] font-medium text-slate-800 dark:text-slate-100">
           {location.label}
         </div>
         {location.subLabel && (
-          <div className="mt-0.5 text-[12px] text-slate-600 dark:text-slate-400">
+          <div className="mt-0.5 truncate text-[12px] text-slate-500 dark:text-slate-400">
             {location.subLabel}
           </div>
         )}
-        {location.addressShort && (
-          <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-500">
-            {location.addressShort}
-          </div>
-        )}
         {hint && (
-          <div className="mt-1.5 text-[11px] italic text-slate-400 dark:text-slate-500">
+          <div className="mt-0.5 text-[11px] italic text-slate-400 dark:text-slate-500">
             {hint}
           </div>
         )}
       </div>
+      {location.addressShort && (
+        <span className="flex-shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+          {location.addressShort}
+        </span>
+      )}
     </div>
   );
 }

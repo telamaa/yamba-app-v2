@@ -3,8 +3,14 @@
  * ===============================================
  * La première décision du parcours de réservation : **ce qu'on envoie**.
  * Quatre choix, dans l'ordre où on se les pose — le produit (un colis au kilo
- * ou un bagage entier au forfait), le contenu (les 8 familles D14), la taille
- * (PRC-03) et le poids — et un prix qui bouge à chaque geste.
+ * ou un bagage entier au forfait), le contenu (les 8 familles D14), le poids,
+ * puis la taille (PRC-03) — et un prix qui bouge à chaque geste.
+ *
+ * Le poids vient AVANT la taille pour une raison de vérité : sans poids, aucun
+ * écart de prix n'est calculable, et la taille devrait se vendre avec un
+ * coefficient (« ×1,1 ») — de la mécanique interne. Le poids posé, chaque
+ * taille annonce ce qu'elle COÛTE en euros (revue UX 17/10, comme la carte de
+ * résultat le 16/10).
  *
  * Pourquoi ces quatre-là et rien d'autre : sur le site, l'étape 1 porte HUIT
  * sections (lieux, règles d'or, catégorie, poids, valeur, description, photos,
@@ -84,6 +90,7 @@ export default function BookingParcelScreen() {
   const [params, setParams] = useState(currentPricingParams);
   const [showErrors, setShowErrors] = useState(false);
   const [nextStepSoon, setNextStepSoon] = useState(false);
+  const [showRefused, setShowRefused] = useState(false);
   const draft = useBookingDraft();
 
   useEffect(() => {
@@ -121,6 +128,37 @@ export default function BookingParcelScreen() {
     () => (trip ? quoteDraft(draft, trip, params) : null),
     [draft, trip, params]
   );
+
+  // PRC-03 — ce que chaque taille COÛTE, en euros, par le même moteur que le
+  // total. `null` tant que le poids manque : on n'affiche pas un écart inventé.
+  const sizeDeltaCents = useMemo((): Record<SizeClass, number> | null => {
+    if (!trip || draft.product !== 'PARCEL' || !parseWeight(draft.weightKg)) return null;
+    const totals: number[] = [];
+    for (const size of SIZE_CLASSES) {
+      const result = quoteDraft({ ...draft, sizeClass: size }, trip, params);
+      if (!result.ok) return null;
+      totals.push(result.quote.totalShipperCents);
+    }
+    const cheapest = Math.min(...totals);
+    return { S: totals[0] - cheapest, M: totals[1] - cheapest, L: totals[2] - cheapest };
+  }, [draft, trip, params]);
+
+  // D14 — ce que le Voyageur accepte d'abord, ses refus comptés et repliés.
+  const acceptedFamilies = useMemo(
+    () => (trip ? PARCEL_FAMILIES.filter((f) => familyStance(trip, f).mode !== 'REFUSE') : []),
+    [trip]
+  );
+  const refusedFamilies = useMemo(
+    () => (trip ? PARCEL_FAMILIES.filter((f) => familyStance(trip, f).mode === 'REFUSE') : []),
+    [trip]
+  );
+
+  // Plancher par colis : à ce poids, la taille ne change RIEN. On le dit.
+  const sizeIsFlat =
+    sizeDeltaCents !== null &&
+    sizeDeltaCents.S === 0 &&
+    sizeDeltaCents.M === 0 &&
+    sizeDeltaCents.L === 0;
 
   const onContinue = useCallback(() => {
     if (Object.keys(errors).length > 0) {
@@ -203,12 +241,14 @@ export default function BookingParcelScreen() {
 
       {draft.product === 'PARCEL' ? (
         <>
-          {/* 2. Le contenu — les 8 familles D14. Les refusées RESTENT visibles,
-              barrées : une porte fermée qu'on ne montre pas devient une
-              question (« pourquoi ma famille n'est pas là ? »). */}
+          {/* 2. Le contenu — les 8 familles D14, mais ce que le Voyageur ACCEPTE
+              d'abord. Les refusées restent atteignables derrière une ligne qui
+              les COMPTE : la porte fermée est dite (« pourquoi ma famille n'est
+              pas là ? » garde sa réponse) sans que six « non » barrés ouvrent
+              la page (revue UX 17/10). */}
           <Section title={t('parcel.familyTitle')} hint={t('parcel.familyHint')}>
             <View style={styles.chips}>
-              {PARCEL_FAMILIES.map((family) => (
+              {acceptedFamilies.map((family) => (
                 <FamilyChip
                   key={family}
                   family={family}
@@ -220,29 +260,43 @@ export default function BookingParcelScreen() {
                 />
               ))}
             </View>
+            {refusedFamilies.length > 0 ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showRefused }}
+                  onPress={() => setShowRefused((v) => !v)}
+                  style={styles.refusedToggle}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('parcel.familyRefusedToggle', { count: refusedFamilies.length })}
+                  </ThemedText>
+                  <Ionicons
+                    name={showRefused ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                </Pressable>
+                {showRefused ? (
+                  <View style={styles.chips}>
+                    {refusedFamilies.map((family) => (
+                      <FamilyChip
+                        key={family}
+                        family={family}
+                        label={t(`parcel.families.${family}`)}
+                        trip={trip}
+                        active={false}
+                        surchargeLabel={(pct) => t('parcel.surcharge', { pct })}
+                        onPressAction={() => undefined}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
             {showErrors && errors.family ? <ErrorLine message={t(`parcel.errors.${errors.family}`)} /> : null}
           </Section>
 
-          {/* 3. La taille (PRC-03) — le coefficient est DIT : un supplément
-              silencieux dans un total est un supplément qu'on subit. */}
-          <Section title={t('parcel.sizeTitle')}>
-            <View style={styles.cards}>
-              {SIZE_CLASSES.map((size) => (
-                <SizeCard
-                  key={size}
-                  active={draft.sizeClass === size}
-                  icon={SIZE_ICONS[size]}
-                  label={t(`parcel.sizes.${size}`)}
-                  example={t(`parcel.sizeExamples.${size}`)}
-                  coef={params.sizeCoef[size]}
-                  coefLabel={t('parcel.sizeCoef', { coef: formatCoef(params.sizeCoef[size], locale) })}
-                  onPressAction={() => setBookingDraft({ sizeClass: size })}
-                />
-              ))}
-            </View>
-          </Section>
-
-          {/* 4. Le poids — saisie libre ET raccourcis : on tape rarement
+          {/* 3. Le poids — saisie libre ET raccourcis : on tape rarement
               « 2 », on le choisit. */}
           <Section title={t('parcel.weightTitle')} hint={t('parcel.weightHint')}>
             <View style={[styles.weightRow, { borderColor: theme.backgroundElement }]}>
@@ -291,6 +345,40 @@ export default function BookingParcelScreen() {
                 message={t(`parcel.errors.${errors.weightKg}`, { kg: remainingKg ?? 0, max: MAX_PARCEL_KG })}
               />
             ) : null}
+          </Section>
+
+          {/* 4. La taille (PRC-03) — chaque taille annonce son PRIX, pas un
+              coefficient : « ×1,1 » ne se lit pas, « +1,20 € » se décide. */}
+          <Section
+            title={t('parcel.sizeTitle')}
+            hint={
+              sizeDeltaCents === null
+                ? t('parcel.sizeHintPending')
+                : sizeIsFlat
+                  ? t('parcel.sizeHintFlat')
+                  : t('parcel.sizeHint')
+            }>
+            <View style={styles.cards}>
+              {SIZE_CLASSES.map((size) => (
+                <SizeCard
+                  key={size}
+                  active={draft.sizeClass === size}
+                  icon={SIZE_ICONS[size]}
+                  label={t(`parcel.sizes.${size}`)}
+                  example={t(`parcel.sizeExamples.${size}`)}
+                  priceLabel={
+                    sizeDeltaCents === null || sizeIsFlat
+                      ? null
+                      : sizeDeltaCents[size] === 0
+                        ? t('parcel.sizeIncluded')
+                        : t('parcel.sizeExtra', {
+                            amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
+                          })
+                  }
+                  onPressAction={() => setBookingDraft({ sizeClass: size })}
+                />
+              ))}
+            </View>
           </Section>
         </>
       ) : null}
@@ -386,16 +474,15 @@ function SizeCard({
   icon,
   label,
   example,
-  coef,
-  coefLabel,
+  priceLabel,
   onPressAction,
 }: {
   active: boolean;
   icon: SizeIcon;
   label: string;
   example: string;
-  coef: number;
-  coefLabel: string;
+  /** Ce que cette taille coûte EN PLUS — `null` tant que le poids manque. */
+  priceLabel: string | null;
   onPressAction: () => void;
 }) {
   const theme = useTheme();
@@ -416,9 +503,9 @@ function SizeCard({
       <ThemedText type="small" themeColor="textSecondary">
         {example}
       </ThemedText>
-      {coef > 1 ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          {coefLabel}
+      {priceLabel ? (
+        <ThemedText type="smallBold" style={{ color: active ? Brand.mango : undefined }}>
+          {priceLabel}
         </ThemedText>
       ) : null}
     </Pressable>
@@ -491,12 +578,6 @@ function productPrice(
   return null;
 }
 
-/** « 1,1 » en français, « 1.1 » en anglais — sans passer par `Intl` (Hermes). */
-function formatCoef(coef: number, locale: SupportedLocale): string {
-  const text = String(coef);
-  return locale === 'fr' ? text.replace('.', ',') : text;
-}
-
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
@@ -544,6 +625,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     minHeight: 40,
+  },
+  refusedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingVertical: Spacing.one,
   },
   refused: {
     textDecorationLine: 'line-through',

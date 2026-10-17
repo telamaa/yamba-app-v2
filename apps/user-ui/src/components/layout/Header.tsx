@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -31,6 +32,12 @@ export default function Header() {
   const loginHref = loginHrefFor(pathname);
   const [isCompact, setIsCompact] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
+  // ── Tunnel de réservation : un en-tête qui ne propose PAS de sortir ──────────
+  // Pendant un paiement, la cloche, la messagerie, le menu du compte et surtout
+  // le CTA mangue « Partager un trajet » sont autant de portes de sortie — un CTA
+  // concurrent À L'INTÉRIEUR d'un entonnoir (revue UX 17/10). Il ne reste que le
+  // logo et la mention de sécurité.
+  const isCheckoutTunnel = /^\/trips\/[^/]+\/book\/?$/.test(pathname);
 
   useEffect(() => {
     const onScroll = () =>
@@ -82,7 +89,7 @@ export default function Header() {
       </div>
 
       <div style={{ display: userState.isLoading ? "none" : "block" }}>
-        <CommandPalette actions={commandActions} />
+        {!isCheckoutTunnel && <CommandPalette actions={commandActions} />}
 
         <header
           className="fixed inset-x-0 top-0 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85"
@@ -100,6 +107,13 @@ export default function Header() {
               <HeaderLogo compact={isCompact} mobile={true} />
             </div>
 
+            {isCheckoutTunnel ? (
+              <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
+                <Lock size={13} strokeWidth={2} />
+                <span>{t("checkoutSecure")}</span>
+              </div>
+            ) : (
+            <>
             <div className="hidden items-center gap-3 md:flex">
               <HeaderLocaleSwitcher variant="header" />
               <HeaderThemeToggle variant="icon" />
@@ -157,9 +171,12 @@ export default function Header() {
                 </>
               )}
             </div>
+            </>
+            )}
           </div>
         </header>
 
+        {!isCheckoutTunnel && (
         <HeaderMobileBottomSheet
           open={bottomSheetOpen}
           onCloseAction={() => setBottomSheetOpen(false)}
@@ -167,6 +184,7 @@ export default function Header() {
           notificationCount={notificationCount}
           messageCount={messageCount}
         />
+        )}
       </div>
     </>
   );

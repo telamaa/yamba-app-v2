@@ -16,7 +16,7 @@
   },
   "step1": {
     "title": "Décris ton colis",
-    "subtitle": "Précision et photos garantissent un envoi sans accroc",
+    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise.",
     "locationsTitle": "Lieux de rendez-vous",
     "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
     "deliveryBlockTitle": "Le destinataire récupère le colis",
@@ -36,7 +36,7 @@
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Poids (kg)",
-      "valueLabel": "Valeur déclarée (€)",
+      "valueLabel": "Valeur du contenu (€)",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
@@ -53,22 +53,28 @@
       "remove": "Supprimer cette photo"
     },
     "product": {
-      "label": "Que voulez-vous envoyer ?",
+      "label": "Que veux-tu envoyer ?",
       "parcel": "Un colis (au kilo)",
       "checkedBag": "Un bagage en soute 23 kg",
       "cabinBag": "Un bagage cabine 12 kg"
     },
     "family": {
-      "label": "Famille du colis",
-      "hint": "La famille dit si le Voyageur l'accepte — elle ne change pas le prix au kilo, sauf supplément affiché.",
-      "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet"
+      "label": "Qu'y a-t-il dans le colis ?",
+      "hint": "Sert au Voyageur à l'accepter. Le prix ne bouge que si un supplément est affiché.",
+      "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet",
+      "refusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {carrierFirstName}",
+      "noneAccepted": "{carrierFirstName} n''accepte aucune famille de colis sur ce trajet."
     },
     "size": {
       "label": "Taille — pas besoin de mesurer",
-      "hint": "À l'œil : le coefficient s'applique au prix au kilo.",
+      "hint": "Choisis à l'œil. L'écart de prix est affiché sous chaque taille.",
       "S": "enveloppe → boîte à chaussures",
       "M": "tient dans un sac cabine",
-      "L": "occupe une demi-valise"
+      "L": "occupe une demi-valise",
+      "hintPending": "Choisis à l'œil. Indique le poids pour voir l'écart de prix.",
+      "hintFlat": "À ce poids, le minimum par colis s'applique : la taille ne change pas le prix.",
+      "included": "sans supplément",
+      "extra": "+{amount}"
     }
   },
   "insurance": {
@@ -82,7 +88,8 @@
       "title": "Garantie Yamba 500 €",
       "price": "+6 €",
       "description": "Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).",
-      "ipidLink": "Voir les conditions"
+      "ipidLink": "Voir les conditions",
+      "ipidText": "Couvre la perte, le vol et la casse pendant le transport, jusqu''à 500 € et dans la limite de la valeur déclarée. Sont exclus : les produits interdits, un colis non conforme à sa description, une saisie douanière, et les dommages dus à un emballage insuffisant. Des photos du colis sont obligatoires."
     }
   },
   "categories": {

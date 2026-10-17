@@ -51,7 +51,6 @@
       "M": "A backpack",
       "L": "A cabin suitcase"
     },
-    "sizeCoef": "×{coef} on transport",
     "weightTitle": "Its weight",
     "weightHint": "The Traveler will check it at handover.",
     "weightUnit": "kg",
@@ -65,6 +64,12 @@
       "WEIGHT_REQUIRED": "Enter the parcel weight.",
       "WEIGHT_MAX": "{max} kg max per parcel.",
       "WEIGHT_REMAINING": "Only {kg} kg left on this trip."
-    }
+    },
+    "sizeHint": "The price difference is shown under each size.",
+    "sizeHintPending": "Enter the weight to see the price difference.",
+    "sizeHintFlat": "At this weight the per-parcel minimum applies: size does not change the price.",
+    "sizeIncluded": "no extra",
+    "sizeExtra": "+{amount}",
+    "familyRefusedToggle": "{count, plural, =1 {# family refused} other {# families refused}} on this trip"
   }
 }

@@ -25,7 +25,8 @@
     "messages": "Messages",
     "welcomeTitle": "Bienvenue sur Yamba",
     "welcomeSubtitle": "Envoie tes colis légers autrement.",
-    "createAccount": "Créer un compte"
+    "createAccount": "Créer un compte",
+    "checkoutSecure": "Réservation sécurisée"
   },
   "userMenu": {
     "myAccount": "Mon compte",
