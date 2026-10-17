@@ -61,12 +61,12 @@
     },
     "size": {
       "label": "Size: no need to measure",
-      "hint": "Judge by eye. Only the size that costs more is marked.",
+      "hint": "It tells the Traveler whether your parcel fits in their bag. Only the one that costs more is marked.",
       "S": "a shoe box",
       "M": "a backpack",
       "L": "half a suitcase",
-      "hintPending": "Judge by eye. Enter the weight to see what each size costs.",
-      "hintFlat": "At this weight the per-parcel minimum applies: size does not change the price.",
+      "hintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
+      "hintFlat": "At this weight, size does not change the price — the per-parcel minimum applies. It tells the Traveler whether your parcel fits in their bag.",
       "extra": "+{amount}"
     },
     "requiredBadge": "Required"

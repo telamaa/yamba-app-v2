@@ -61,12 +61,12 @@
     },
     "size": {
       "label": "Taille : pas besoin de mesurer",
-      "hint": "Compare à l'œil. Seule la taille qui coûte plus cher est marquée.",
+      "hint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
       "S": "une boîte à chaussures",
       "M": "un sac à dos",
       "L": "une demi-valise",
-      "hintPending": "Compare à l'œil. Indique le poids pour voir ce que chaque taille coûte.",
-      "hintFlat": "À ce poids, le minimum par colis s'applique : la taille ne change pas le prix.",
+      "hintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
+      "hintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
       "extra": "+{amount}"
     },
     "requiredBadge": "Obligatoire"

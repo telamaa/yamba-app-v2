@@ -65,9 +65,9 @@
       "WEIGHT_MAX": "{max} kg au maximum par colis.",
       "WEIGHT_REMAINING": "Il ne reste que {kg} kg sur ce trajet."
     },
-    "sizeHint": "L'écart de prix est affiché sous chaque taille.",
-    "sizeHintPending": "Indique le poids pour voir l'écart de prix.",
-    "sizeHintFlat": "À ce poids, le minimum par colis s'applique : la taille ne change pas le prix.",
+    "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
+    "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
+    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} sur ce trajet"
   }
