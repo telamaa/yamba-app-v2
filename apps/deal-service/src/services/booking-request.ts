@@ -157,7 +157,12 @@ export function assertQuoteMatches(quote: ShipperQuote, expectedTotalCents: numb
   }
 }
 
-/** CAP-01 — kg à réserver : le poids DÉCLARÉ du colis (le plancher 0,5 kg est une règle de prix, pas de place), la franchise d'un bagage. */
+/**
+ * CAP-01 (D81) — kg à réserver : le poids FACTURÉ du colis, la franchise d'un
+ * bagage. Avant D81 c'était le poids déclaré, et le volume n'était JAMAIS
+ * réservé : un Voyageur pouvait accepter dix colis « demi-valise » d'1 kg et se
+ * retrouver sans place. On réserve désormais ce qu'on facture.
+ */
 export function kgToReserve(quote: ShipperQuote): number {
   return quote.capacityKgConsumed;
 }
@@ -238,11 +243,14 @@ export function buildBookingSnapshots(args: {
       currencyCode: quote.currencyCode,
       product: quote.product,
       billableWeightKg: quote.billableWeightKg,
-      sizeCoef: quote.sizeCoef,
       familySurchargePct: quote.familySurchargePct,
       rawTransportCents: quote.rawTransportCents,
-      minimumApplied: quote.minimumApplied,
       serviceCents: quote.serviceCents,
+      // D81 — ce qui a fixé le poids facturé, plutôt qu'un booléen qui ne le
+      // disait pas. `sizeCoef` et `minimumApplied` ne sont plus écrits.
+      billingFloorKg: quote.billingFloorKg,
+      sizeMinKg: quote.sizeMinKg,
+      billableReason: quote.billableReason,
     },
     parcel: {
       category:

@@ -6,10 +6,10 @@
  * transposition littérale de la carte web (trop chargée : 11 éléments) :
  * — en-tête : pastille transport · date · alerte places (≤ 3) · CŒUR (D46) ;
  * — la ROUTE en pleine largeur, en gras : « 🇫🇷 Paris → 🇨🇬 Brazzaville » —
- *   le pays devient un DRAPEAU (zéro ligne consommée, lève Congo/RDC) mais
- *   SEULEMENT à l'international (16/10 : deux fois le même drapeau sur un
- *   trajet intérieur n'apprend rien), les villes longues passent à la
- *   ligne, jamais tronquées ;
+ *   le pays devient un DRAPEAU (zéro ligne consommée, lève Congo/RDC),
+ *   TOUJOURS affiché, trajet intérieur compris (17/10 : supersède la règle
+ *   « international seulement » du 16/10 — voir la dérivation plus bas), les
+ *   villes longues passent à la ligne, jamais tronquées ;
  * — DEUX lignes de trajet (16/10) : « 01:51 → 07:51⁺¹ », puis « 7 h ·
  *   Direct » — quand, puis combien de temps ;
  * — à droite : le prix au kilo, l'EXEMPLE honnête dessous (« ≈ 11 € pour
@@ -39,7 +39,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { ApiError } from '@/lib/api/client';
 import type { TripSearchResult } from '@/lib/api/search.api';
-import { countryName } from '@/lib/country-name';
+import { countryFlag, countryName } from '@/lib/country-name';
 import {
   estimateShipperTotalCents,
   PRICING_EXAMPLE_PARAMS,
@@ -88,16 +88,16 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
     }
   };
 
-  // Un drapeau gagne sa place quand il DISTINGUE (Paris → Brazzaville, où il
-  // lève en plus Congo/RDC). Sur un trajet intérieur, deux fois le même
-  // drapeau n'apprend rien et pousse les villes : on ne les montre qu'à
-  // l'international.
-  const international =
-    trip.fromCountryCode != null &&
-    trip.toCountryCode != null &&
-    trip.fromCountryCode.toUpperCase() !== trip.toCountryCode.toUpperCase();
-  const fromFlag = international ? flagEmoji(trip.fromCountryCode) : null;
-  const toFlag = international ? flagEmoji(trip.toCountryCode) : null;
+  // Le drapeau est SYSTÉMATIQUE, trajet intérieur compris — arbitrage du 17/10,
+  // qui supersède celui du 16/10 (« il n'apprend rien quand il est le même deux
+  // fois »). Le raisonnement qui tranche : TOUT LE MONDE N'HABITE PAS EN FRANCE.
+  // Pour un Expéditeur à Douala, « Paris → Orléans » ne dit le pays que par le
+  // drapeau ; et deux fois le même drapeau EST l'information — c'est un trajet
+  // intérieur, celui qui cherche à envoyer vers l'étranger le voit d'un coup
+  // d'œil. À l'international, il lève en plus Congo/RDC. Même règle sur le web
+  // (« Trajet sélectionné » du tunnel, countryFlag dans lib/country-name).
+  const fromFlag = countryFlag(trip.fromCountryCode);
+  const toFlag = countryFlag(trip.toCountryCode);
   // Les drapeaux sont muets pour VoiceOver : la route parlée nomme les pays.
   const routeLabel = [
     countryName(trip.fromCountryCode, locale),
@@ -334,14 +334,6 @@ function transportIcon(mode: TripSearchResult['transportMode']) {
 }
 
 /** Code ISO 3166-1 alpha-2 → drapeau émoji (indicateurs régionaux). */
-function flagEmoji(code: string | null | undefined): string | null {
-  if (!code || code.length !== 2) return null;
-  const upper = code.toUpperCase();
-  if (!/^[A-Z]{2}$/.test(upper)) return null;
-  return String.fromCodePoint(
-    ...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-  );
-}
 
 /** « 7 h », « 9 h 35 » — même forme que la carte web (formatDuration). */
 function formatDuration(minutes: number): string {

@@ -89,7 +89,7 @@
     "perKgHint": "{kg} kg encore disponibles · l'Expéditeur paie poids × prix",
     "perKgHintNoCap": "L'Expéditeur paie poids × prix au kilo",
     "example": "Estimation : un colis de {kg} kg ≈ {price} tout compris (transport + service Yamba)",
-    "lightParcel": "Colis léger : {min} € minimum."
+    "lightParcel": "Colis léger : facturé {kg} kg minimum."
   },
   "notFound": {
     "title": "Trajet introuvable",
@@ -136,6 +136,6 @@
     "estimateLabelFromSearch": "Estimation pour ton colis de {kg} kg (poids de ta recherche)",
     "allIn": "tout compris (transport + service Yamba)",
     "finalAtBooking": "Le prix définitif est fixé à la réservation.",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids."
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum, quel que soit son poids."
   }
 }

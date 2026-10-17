@@ -7061,6 +7061,104 @@ son colis et voir son prix : on ne demande pas de compte pour regarder un prix.
 
 ---
 
+# La recette de la page ① — lisibilité, vérité du trajet, et la longueur du tunnel (PR #387)
+
+## Le besoin
+
+Trois retours d'utilisation sur la première page de réservation : une aide contextuelle
+illisible sur téléphone, un récapitulatif de trajet qui **affirme du faux** (un avion sur un
+voyage en train), et une barre de progression qui annonce sept étapes — assez pour faire
+renoncer avant d'avoir commencé.
+
+Derrière le troisième, une question de fond posée par l'utilisateur : *« 7 étapes c'est pas
+trop long visuellement ? »* La réponse retenue sépare ce qu'on **découpe** de ce qu'on
+**annonce**.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-63** | Une aide contextuelle ne dépasse JAMAIS la largeur du champ qu'elle explique. Elle reste lisible en entier quel que soit l'écran, et aucune zone de défilement ne peut la couper. |
+| **RG-MOB-64** | Le récapitulatif du trajet affiche le mode de transport RÉEL : l'icône et la durée disent « train » pour un train, « bus » pour un bus. Un trajet dont le mode n'est pas renseigné n'en reçoit AUCUN par défaut — il affiche une icône neutre et « {n} h de trajet ». |
+| **RG-MOB-65** | Les villes d'un trajet portent le drapeau de leur pays, **partout et toujours** — y compris quand les deux drapeaux sont identiques. Un trajet intérieur se reconnaît alors d'un coup d'œil, et l'Expéditeur qui ne vit pas dans ce pays sait de quel pays on parle. |
+| **RG-MOB-66** | Les drapeaux sont décoratifs : un lecteur d'écran annonce les villes et les pays en toutes lettres, jamais « drapeau de… ». |
+| **RG-MOB-67** | Le tunnel de réservation annonce QUATRE phases — Colis, Livraison, Engagement, Paiement — les mêmes mots que sur le site. Le nombre d'écrans réels n'est jamais affiché. La barre de progression avance malgré tout à chaque écran. |
+| **RG-MOB-68** | Un écran du tunnel pose une seule question ou un seul groupe de questions. On ne fusionne pas deux écrans pour « faire moins d'étapes » : c'est l'annonce qu'on raccourcit, pas le confort. |
+| **RG-MOB-69** | La protection du colis est demandée AVANT les photos et les lieux : c'est elle qui rend les photos obligatoires. L'ordre est le même sur le site et dans l'application. |
+| **RG-MOB-70** | Deux questions voisines se répondent de la même façon : le contenu et la taille du colis se choisissent par les mêmes pastilles. Aucune illustration ne remplace les mots (« une boîte à chaussures » se lit, ne se devine pas). |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB98 | Téléphone — étape 1, toucher le « ⓘ » du champ Poids | L'aide s'affiche **en entier**, sous le champ, sans être coupée à gauche ni à droite |
+| MOB99 | Téléphone — étape 1 | Les champs Poids et Valeur occupent chacun **toute la largeur** ; les raccourcis de poids tiennent sur la ligne |
+| MOB100 | Réserver sur un trajet en TRAIN, lire « Trajet sélectionné » | Une icône de train, et « Direct, 1 h **de train** » — jamais « de vol » |
+| MOB101 | Réserver sur un trajet dont le mode n'est pas renseigné | Une icône neutre et « 1 h **de trajet** » : aucun mode n'est inventé |
+| MOB102 | Réserver sur Paris → Orléans (trajet intérieur) | « 🇫🇷 Paris → 🇫🇷 Orléans » : les deux drapeaux sont affichés |
+| MOB103 | Lire le récapitulatif avec un lecteur d'écran | Les villes et pays sont annoncés en toutes lettres ; aucun « drapeau de la France » |
+| MOB104 | Application — ouvrir la réservation | L'en-tête annonce « Colis · Livraison · Engagement · Paiement », la phase en cours en mangue. **Nulle part** le chiffre 7 |
+| MOB105 | Application — passer d'un écran au suivant | La barre de progression avance visiblement, alors que la phase annoncée n'a pas changé |
+| MOB106 | Application — lecteur d'écran sur la barre de progression | « Colis, étape 1 **sur 4** » |
+| MOB107 | Application — étape ① | Le titre « Décris ton colis » et son sous-titre sont dans le contenu, pas dans la barre du haut |
+| MOB108 | Application — étape ①, section Taille | Trois pastilles « S une boîte à chaussures / M un sac à dos / L une demi-valise », sans icône ni cadre ; seule celle qui coûte plus cher porte un prix |
+| MOB109 | Application — les familles refusées | La ligne repliée **nomme le Voyageur** : « 6 familles refusées par Marven » |
+
+---
+
+# Le prix au poids facturé — ce que ça pèse, la place que ça prend, ou le minimum du trajet (PR #388, D81)
+
+## Le besoin
+
+Un constat de recette : *« poids ET taille, pour 0,75 € d'écart ? »*. La vérification a
+montré pire que l'anecdote — **sur le colis le plus courant, la taille ne changeait rien du
+tout**. À 3,50 €/kg, un colis d'1 kg coûtait 11 € en S, 11 € en M et 11 € en L : le prix
+minimum de 8 € avalait le coefficient de taille. On posait donc une question décorative.
+
+Second constat, invisible pour l'Expéditeur mais coûteux pour le Voyageur : la **place**
+occupée par un colis n'était jamais décomptée de sa capacité. Dix colis « demi-valise » d'un
+kilo comptaient pour dix kilos, et le bagage était plein bien avant que le compteur ne le
+dise.
+
+La correction poursuit un objectif simple : que la taille demandée ait une conséquence
+vraie, et que le Voyageur soit payé pour la place qu'il cède.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-P-28** | Le transport d'un colis se calcule sur son **poids facturé** : le plus grand des trois — son poids réel, le minimum du trajet, ou le minimum de sa taille. Aucun coefficient ne s'applique par-dessus. |
+| **RG-P-29** | Le minimum du trajet s'exprime en **kilos** (2,3 kg), jamais en euros. Il se multiplie donc par le tarif du Voyageur : un corridor cher a mécaniquement un minimum plus élevé, sans qu'aucun réglage par corridor n'existe. |
+| **RG-P-30** | Chaque taille porte un poids facturé minimum : **S aucun, M 3 kg, L 6 kg**. S est le gabarit de référence et ne paie que son poids et le minimum du trajet — un petit objet de valeur (bague, lunettes, téléphone) n'est jamais surtaxé pour sa taille. |
+| **RG-P-31** | La **capacité** du Voyageur se décompte sur le poids FACTURÉ, pas sur le poids déclaré : un colis L d'1 kg réserve 6 kg, c'est-à-dire la place qu'il occupe réellement. Un bagage entier réserve sa franchise (23 ou 12 kg). |
+| **RG-P-32** | Le devis indique toujours **pourquoi** le poids facturé diffère du poids déclaré : parce que le minimum du trajet s'applique, ou parce que la taille choisie impose le sien. Jamais un simple « minimum appliqué ». |
+| **RG-P-33** | Les résultats de recherche annoncent le prix pour le **poids saisi, taille S** — le plus bas possible. Le devis du tunnel peut être plus élevé si l'Expéditeur choisit M ou L, jamais plus bas que l'annonce. |
+| **RG-P-34** | Le prix comparable qui sert à trier les trajets est celui du colis de référence (2 kg), facturé au minimum du trajet comme n'importe quel colis. Deux corridors bon marché ne sont plus confondus par un plancher commun. |
+| **RG-P-35** | Un changement de paramètre de prix n'est **jamais rétroactif** : une réservation déjà faite garde le prix figé à sa création, calculé avec les règles en vigueur ce jour-là. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| PRX01 | Trajet à 3,50 €/kg — réserver 1 kg en S, puis en M, puis en L | **Trois totaux différents** (2,3 kg, 3 kg et 6 kg facturés). La taille a enfin une conséquence |
+| PRX02 | Trajet à 3,50 €/kg — réserver 1 kg en S | Total **11,05 €** : la continuité avec l'ancien prix (11 €) est tenue à cinq centimes près |
+| PRX03 | Trajet à 12 €/kg — réserver 0,3 kg en S | Transport **27,60 €** : le minimum suit le corridor, sans réglage dédié |
+| PRX04 | Réserver une bague de 50 g en S sur un corridor cher | Facturée au minimum du trajet seulement — **aucun** supplément de taille |
+| PRX05 | Réserver 2,5 kg en L, famille à +20 % | Facturé 6 kg, et le supplément de famille s'applique **sur le poids facturé** |
+| PRX06 | Réserver 7 kg en S, M puis L | Les trois donnent le même prix : le colis pèse déjà plus que tous les minimums, et l'aide le **dit** |
+| PRX07 | Trajet de 15 kg de capacité — réserver un colis L d'1 kg | La capacité restante baisse de **6 kg**, pas d'1 kg |
+| PRX08 | Enchaîner des colis L d'1 kg sur un trajet de 15 kg | Le trajet se déclare complet après le 2ᵉ (12 kg réservés) et refuse le 3ᵉ |
+| PRX09 | Réserver un bagage en soute | 23 kg réservés, prix au forfait du Voyageur — ni poids ni taille demandés |
+| PRX10 | Lire le récapitulatif d'un colis de 1 kg en M | « Taille M : facturée 3 kg minimum — c'est la place qu'elle prend » |
+| PRX11 | Lire le récapitulatif d'un colis de 0,2 kg en S | « Facturé au minimum du trajet : 2,3 kg » |
+| PRX12 | Chercher des trajets avec un poids de 1 kg, puis ouvrir la réservation en S | Le prix du tunnel est **identique** à celui annoncé dans les résultats |
+| PRX13 | Même recherche, puis choisir la taille L | Le prix du tunnel est **plus élevé** que celui annoncé — jamais plus bas |
+| PRX14 | Admin — ouvrir les paramètres de prix | Les quatre réglages « Plancher de facturation » et « Poids minimum S/M/L » sont présents ; aucun coefficient de taille |
+| PRX15 | Admin — saisir un poids minimum S supérieur à celui de M | Refus avec le message « Les poids minimum de taille doivent respecter S ≤ M ≤ L » ; rien n'est enregistré |
+| PRX16 | Admin — modifier le plancher, puis ouvrir une réservation déjà payée | Son prix est **inchangé** : la photographie n'est jamais recalculée |
+
+---
+
 # La porte d'identité : au-dessus du trajet, jamais sur une page vide (PR #389)
 
 ## Le besoin

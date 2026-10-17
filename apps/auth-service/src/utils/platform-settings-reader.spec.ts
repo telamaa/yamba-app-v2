@@ -15,11 +15,28 @@ describe("loadPlatformSettings", () => {
     expect(await loadPlatformSettings(dbWith(null).db)).toEqual(DEFAULT_SNAPSHOT);
   });
   it("fusionne : clé inconnue ignorée, valeur non numérique → défaut, valeur stockée conservée", async () => {
-    const snap = await loadPlatformSettings(dbWith({ values: { "pricing.commissionPct": 15, "pricing.minTransportCents": "800", ancienne: 1 }, version: 4 }).db);
+    const snap = await loadPlatformSettings(dbWith({ values: { "pricing.commissionPct": 15, "pricing.billingFloorKg": "2.3", ancienne: 1 }, version: 4 }).db);
     expect(snap.version).toBe(4);
     expect(snap.values["pricing.commissionPct"]).toBe(15);
-    expect(snap.values["pricing.minTransportCents"]).toBe(SETTINGS_DEFAULTS["pricing.minTransportCents"]);
+    expect(snap.values["pricing.billingFloorKg"]).toBe(SETTINGS_DEFAULTS["pricing.billingFloorKg"]);
     expect((snap.values as Record<string, unknown>).ancienne).toBeUndefined();
+  });
+  // D81 — les cinq clés de prix retirées du catalogue (coefficients de taille,
+  // minimum en euros, poids facturable minimum) vivent encore dans le document
+  // Mongo des plateformes déjà déployées. `mergeSettingsValues` n'itère que sur
+  // le catalogue : elles sont ignorées, sans migration ni script de nettoyage.
+  it("D81 — une clé RETIRÉE du catalogue est ignorée, même si le document la porte encore", async () => {
+    const snap = await loadPlatformSettings(
+      dbWith({ values: { "pricing.sizeCoefL": 1.25, "pricing.minTransportCents": 800, "pricing.minBillableKg": 0.5 }, version: 9 }).db
+    );
+    expect(snap.version).toBe(9);
+    const values = snap.values as Record<string, unknown>;
+    expect(values["pricing.sizeCoefL"]).toBeUndefined();
+    expect(values["pricing.minTransportCents"]).toBeUndefined();
+    expect(values["pricing.minBillableKg"]).toBeUndefined();
+    // …et les clés qui les remplacent prennent leur défaut de catalogue.
+    expect(snap.values["pricing.billingFloorKg"]).toBe(2.3);
+    expect(snap.values["pricing.sizeMinKgL"]).toBe(6);
   });
   it("base injoignable → défauts, l'erreur est signalée, jamais levée", async () => {
     const onError = jest.fn();

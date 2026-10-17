@@ -1,6 +1,5 @@
 {
   "back": "Retour",
-  "progress": "Étape {current} sur {total}",
   "bar": {
     "continue": "Continuer",
     "allIn": "tout compris",
@@ -15,7 +14,7 @@
     "cta": "Revenir"
   },
   "parcel": {
-    "title": "Le colis",
+    "title": "Décris ton colis",
     "productTitle": "Ce que tu envoies",
     "products": {
       "PARCEL": "Un colis",
@@ -27,36 +26,36 @@
       "CHECKED_BAG_23KG": "23 kg, au forfait",
       "CABIN_BAG_12KG": "12 kg, au forfait"
     },
-    "familyTitle": "Ce qu'il contient",
+    "familyTitle": "Qu'est-ce que tu envoies ?",
     "familyHint": "Le Voyageur choisit ce qu'il accepte de transporter.",
     "families": {
-      "DOCUMENTS_PAPERS": "Documents, papiers",
-      "CLOTHES_TEXTILE": "Vêtements, textile",
-      "FOOD_DRY_SEALED": "Alimentaire sec et scellé",
-      "ELECTRONICS_DEVICES": "Électronique, appareils",
-      "COSMETICS_CARE": "Cosmétiques, soins",
-      "PARTS_TOOLS": "Pièces, outillage",
-      "TOYS_CHILDCARE": "Jouets, puériculture",
+      "DOCUMENTS_PAPERS": "Documents & papiers",
+      "CLOTHES_TEXTILE": "Vêtements & textile",
+      "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+      "ELECTRONICS_DEVICES": "Électronique & appareils",
+      "COSMETICS_CARE": "Cosmétiques & soins",
+      "PARTS_TOOLS": "Pièces & outillage",
+      "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires divers"
     },
     "surcharge": "+{pct} %",
-    "sizeTitle": "Sa taille",
+    "sizeTitle": "Taille : pas besoin de mesurer",
     "sizes": {
-      "S": "Petit",
-      "M": "Moyen",
-      "L": "Grand"
+      "S": "S",
+      "M": "M",
+      "L": "L"
     },
     "sizeExamples": {
-      "S": "Une pochette",
-      "M": "Un sac à dos",
-      "L": "Une valise cabine"
+      "S": "une boîte à chaussures",
+      "M": "un sac à dos",
+      "L": "une demi-valise"
     },
-    "weightTitle": "Son poids",
-    "weightHint": "Le Voyageur le vérifiera à la remise.",
+    "weightTitle": "Poids (kg)",
+    "weightHint": "Le Voyageur le vérifiera à la remise — un écart de 10 % est toléré.",
     "weightUnit": "kg",
     "weightShortcut": "{kg} kg",
     "remaining": "{kg} kg encore disponibles sur ce trajet",
-    "nextStepSoon": "Étape suivante — la valeur, les photos et la description — au prochain lot.",
+    "nextStepSoon": "Étape suivante : la protection de ton colis.",
     "errors": {
       "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
@@ -67,8 +66,16 @@
     },
     "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
     "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
-    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — le minimum par colis s'applique. Elle dit au Voyageur si ton colis tient dans son bagage.",
+    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
     "sizeExtra": "+{amount}",
-    "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} sur ce trajet"
-  }
+    "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {name}",
+    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise."
+  },
+  "phases": {
+    "parcel": "Colis",
+    "delivery": "Livraison",
+    "commitment": "Engagement",
+    "payment": "Paiement"
+  },
+  "phaseProgress": "{phase}, étape {current} sur {total}"
 }

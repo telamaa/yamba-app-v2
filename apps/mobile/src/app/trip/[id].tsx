@@ -45,7 +45,7 @@ import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { getPublicTrip, type PublicTrip, type TripLocationPoint } from '@/lib/api/trip.api';
 import {
   estimateShipperTotalCents,
-  MIN_PARCEL_PRICE_EUR,
+  BILLING_FLOOR_KG,
   PRICING_EXAMPLE_PARAMS,
 } from '@/lib/pricing-example';
 import { useSession } from '@/lib/session-context';
@@ -721,7 +721,7 @@ function Offer({ trip }: { trip: PublicTrip }) {
             {t('offer.finalAtBooking')}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {t('offer.lightParcel', { min: MIN_PARCEL_PRICE_EUR })}
+            {t('offer.lightParcel', { kg: BILLING_FLOOR_KG })}
           </ThemedText>
           {trip.checkedBag23PriceCents ? (
             <View style={styles.row}>

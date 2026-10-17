@@ -3582,6 +3582,545 @@ propres valeurs par défaut.
 
 ---
 
+## Chapitre 214 — L'axe qui ne survit jamais seul, le `??` qui invente un avion, et le nombre qu'on n'annonce pas
+
+Trois corrections de recette, trois leçons qui dépassent largement le bug corrigé.
+
+### 1. En CSS, `overflow` n'a pas deux axes indépendants
+
+Le symptôme : une infobulle tronquée sur téléphone. L'enquête a remonté jusqu'à ceci :
+
+```tsx
+// apps/user-ui/src/components/booking/BookingMobile.tsx
+<div className="flex-1 overflow-y-auto pb-40">
+```
+
+Personne n'a écrit « coupe ce qui dépasse à gauche ». Et pourtant c'est ce qui se passe.
+
+**La règle de la spécification CSS** (`overflow`, propriétés calculées) : si une valeur d'axe
+vaut `visible` et que **l'autre axe ne vaut pas `visible`**, alors le `visible` est calculé
+comme `auto`. Autrement dit : dès que vous écrivez `overflow-y: auto`, vous avez aussi
+`overflow-x: auto` — donc un conteneur de défilement, donc une zone qui **rogne**.
+
+La raison est géométrique : un conteneur ne peut pas à la fois défiler verticalement et
+laisser déborder horizontalement sans que le navigateur ait à décider où peindre le
+débordement par rapport à la barre de défilement. Le groupe de travail a tranché en
+supprimant le cas ambigu.
+
+C'est le **même piège** que celui déjà consigné dans le `CLAUDE.md` (« `overflow-x: clip`
+et non `hidden` pour préserver `position: sticky` »), vu par l'autre bout : là on perdait un
+comportement, ici on gagne un rognage.
+
+**Ce qu'on en retient pour coder** : tout élément en position absolue qui doit sortir de son
+parent — infobulle, menu, sélecteur de date, popover — est en sursis dès qu'un ancêtre
+défile. Deux stratégies :
+
+1. **le rendre incapable de dépasser** (choisie ici) ;
+2. le sortir du flux par un **portail** (`createPortal` vers `document.body`), au prix de
+   devoir repositionner à la main au défilement.
+
+### 2. Centrer sur la cible, c'est parier sur la place disponible
+
+L'infobulle était ancrée ainsi :
+
+```tsx
+className="absolute top-full left-1/2 -translate-x-1/2 w-[min(16rem,calc(100vw-2.5rem))]"
+```
+
+`left-1/2` + `-translate-x-1/2` est l'idiome classique du centrage sur l'élément déclencheur.
+Il a un défaut structurel : **il suppose qu'il y a autant de place des deux côtés**. Ici
+l'icône « ⓘ » est collée au libellé « Poids », donc à ~60 px du bord ; une bulle de 256 px
+centrée dessus commence à **−68 px**. Le `w-[min(…, calc(100vw - 2.5rem))]` limitait la
+*largeur*, pas la *position* — il n'a donc jamais rien empêché.
+
+La correction change le **référentiel** plutôt que la position :
+
+```tsx
+// le <label> (pleine largeur du champ) devient le contexte de positionnement
+<label className="relative mb-1.5 flex items-center …">
+// et la bulle s'aligne sur SON bord gauche
+className="absolute top-full left-0 w-[min(16rem,100%)]"
+```
+
+`100%` se lit maintenant « 100 % du champ ». La bulle commence au bord gauche du champ et ne
+peut pas être plus large que lui : **aucune position ne peut la tronquer**, quel que soit
+l'ancêtre. On est passé d'un correctif de cas à une propriété invariante.
+
+> Le réflexe à prendre : quand un élément positionné déborde, demandez-vous *par rapport à
+> quoi* il est positionné avant de corriger *de combien* il se décale.
+
+### 3. `?? "PLANE"` — la valeur par défaut qui fabrique un mensonge
+
+```ts
+// apps/user-ui/src/components/booking/trip-context.mapper.ts — AVANT
+travelMode: (trip.transportMode ?? "PLANE") as TripContext["travelMode"],
+```
+
+Le contrat dit `transportMode: TransportMode | null`. Le `??` transforme donc
+« **je ne sais pas** » en « **c'est un avion** ». Le type ne proteste pas : `"PLANE"` est
+une valeur parfaitement légale du type d'arrivée. Le compilateur ne peut pas savoir que ce
+défaut est une **affirmation sur le monde**.
+
+C'est une famille d'erreurs à reconnaître : `?? 0`, `?? ""`, `?? false`, `?? new Date()`.
+Chacun remplace une absence par une valeur **qui a un sens métier**. Pour un compteur, `?? 0`
+est souvent juste. Pour un mode de transport, un pays, une devise ou un consentement, c'est
+une invention.
+
+La correction consiste à **laisser l'absence remonter jusqu'à l'affichage** :
+
+```ts
+travelMode: (trip.transportMode ?? null) as TripContext["travelMode"],
+```
+
+```tsx
+const TravelIcon = trip.travelMode ? TRAVEL_MODE_ICONS[trip.travelMode] ?? Route : Route;
+…
+{trip.travelMode
+  ? t(`summary.durationByMode.${trip.travelMode}`, { hours })
+  : t("summary.durationNeutral", { hours })}
+```
+
+L'interface sait dire « je ne sais pas » (icône neutre, « 1 h de trajet ») — ce qui est
+toujours préférable à dire quelque chose de faux avec assurance. C'est la même doctrine que
+la règle maison « le front reflète, il ne décide pas », étendue : **il ne devine pas non
+plus**.
+
+### 4. Un champ rempli dans deux sens opposés n'a pas de lecteur
+
+`TripContext.originCountry` recevait, selon la source :
+
+| Source | Valeur écrite |
+|---|---|
+| `trip-context.mapper.ts` | `trip.origin.country` — un **nom** (« France »), figé dans la langue du créateur, souvent absent |
+| `booking.state.ts` (contexte par défaut) | `"FR"` — un **code ISO** |
+
+Ni l'un ni l'autre n'était lu : `grep` n'a trouvé que des écritures. Le champ était mort —
+et c'est précisément pour ça que l'incohérence avait survécu. Un champ qu'on écrit sans le
+lire ne proteste jamais.
+
+**La technique de diagnostic est généralisable** : avant de corriger un champ suspect,
+cherchez ses **lecteurs**, pas ses écrivains. Zéro lecteur = le champ est soit mort, soit
+sur le point de produire un bug au premier lecteur. Ici, le premier lecteur, c'était moi.
+
+La correction nomme ce que le champ contient — `originCountryCode` — et le remplit depuis
+`origin.countryCode`. Le nom du champ devient une **assertion vérifiable** par relecture.
+
+### 5. Un drapeau sans image : le bloc Regional Indicator
+
+```ts
+export function countryFlag(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const upper = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return null;
+  return String.fromCodePoint(...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+```
+
+Unicode réserve 26 points de code, `U+1F1E6` à `U+1F1FF`, appelés *Regional Indicator
+Symbols* : une lettre A–Z « régionale ». Isolée, elle s'affiche comme une lettre dans un
+carré. **Accolée à une autre**, la police du système reconnaît la paire comme un code pays
+ISO 3166-1 alpha-2 et dessine le drapeau. `"FR"` → `U+1F1EB U+1F1F7` → 🇫🇷.
+
+Conséquences pratiques :
+
+- **aucune ressource à charger** : pas d'image, pas de sprite, pas de dictionnaire ;
+- la fonction est **pure et testable**, et rend `null` sur toute entrée douteuse — un
+  drapeau est décoratif, il ne doit jamais casser une ligne de texte ;
+- `String.fromCodePoint` (et non `fromCharCode`) : au-delà de `U+FFFF`, un caractère
+  s'encode en deux unités UTF-16, et `fromCharCode` produirait deux moitiés invalides ;
+- le rendu dépend de la police : certains systèmes (Windows notamment) affichent les deux
+  lettres au lieu du drapeau. Ce n'est pas un bug, c'est un repli acceptable — d'où
+  l'importance que le texte reste lisible sans lui.
+
+Côté accessibilité, les drapeaux sont enveloppés dans `aria-hidden="true"` : le nom de la
+ville porte déjà l'information, et un lecteur d'écran annoncerait « drapeau de la France »
+devant chaque ligne.
+
+### 6. Ce n'est pas le nombre d'étapes, c'est le nombre annoncé
+
+La question posée en recette — *« 7 étapes c'est pas trop long visuellement ? »* — oppose en
+apparence deux vérités bien établies :
+
+- **les écrans courts gagnent sur mobile.** C'est la règle *one thing per page* du Design
+  System de GOV.UK, adoptée après recherche sur des parcours administratifs complexes :
+  moins de champs par écran, moins d'erreurs, et des messages d'erreur visibles sans
+  défiler. Sur un téléphone, le clavier virtuel mange la moitié de la hauteur ;
+- **la longueur fait abandonner.** Dans les études sur les tunnels de paiement, « processus
+  trop long ou trop compliqué » figure systématiquement parmi les premières causes
+  d'abandon.
+
+Les deux sont vraies parce qu'elles **ne parlent pas de la même chose** : la première parle
+de la charge par écran, la seconde de l'**effort perçu**. Et l'effort perçu se forme à la
+lecture de « sur 7 », pas au comptage des écrans traversés.
+
+D'où la solution, qui ne sacrifie ni l'une ni l'autre : **dissocier le découpage de
+l'annonce**.
+
+```ts
+export const BOOKING_STEPS = 7;            // ce que le code connaît
+export const BOOKING_PHASES = [            // ce que l'utilisateur lit
+  { key: 'parcel',     lastStep: 3 },
+  { key: 'delivery',   lastStep: 5 },
+  { key: 'commitment', lastStep: 6 },
+  { key: 'payment',    lastStep: 7 },
+] as const;
+
+export function phaseOfStep(step: number): { key: string; index: number } {
+  const index = BOOKING_PHASES.findIndex((phase) => step <= phase.lastStep);
+  const safe = index === -1 ? BOOKING_PHASES.length - 1 : index;
+  return { key: BOOKING_PHASES[safe].key, index: safe };
+}
+```
+
+Le tableau est ordonné et `findIndex` rend **la première** phase dont l'écran courant ne
+dépasse pas la borne : la structure porte la logique, il n'y a aucune cascade de `if` à
+maintenir. Le `index === -1` est un garde-fou pour un numéro d'écran hors bornes — il
+retombe sur la dernière phase plutôt que de planter.
+
+Deux détails qui comptent :
+
+- **la jauge reste fine** (`width: step / BOOKING_STEPS`) : elle avance à chaque écran, donc
+  le sentiment de progression est conservé, alors que l'en-tête n'affiche que quatre mots ;
+- **le lecteur d'écran reçoit « Colis, étape 1 sur 4 »**. On ne lui cache pas le chiffre —
+  on lui donne *le même* que celui qui est à l'écran. Une interface ne doit pas raconter une
+  histoire différente selon le canal.
+
+### 7. Corriger un commentaire qui documente une règle abandonnée
+
+`trip-result-card.tsx` portait, dans son en-tête de fichier :
+
+```
+ *   SEULEMENT à l'international (16/10 : deux fois le même drapeau sur un
+ *   trajet intérieur n'apprend rien), …
+```
+
+Quand l'arbitrage s'inverse, il y a deux manières de traiter ce commentaire : le supprimer,
+ou **le corriger en datant la bascule**. La seconde a été choisie :
+
+```
+ *   TOUJOURS affiché, trajet intérieur compris (17/10 : supersède la règle
+ *   « international seulement » du 16/10 — voir la dérivation plus bas), …
+```
+
+Un commentaire qui dit « j'ai changé d'avis le 17, voici pourquoi » vaut infiniment mieux
+qu'un commentaire effacé : le prochain lecteur qui aura l'idée de re-masquer les drapeaux
+trouvera l'argument qui l'en dissuade (*tout le monde n'habite pas en France*). Un
+commentaire périmé est un piège ; un commentaire **historié** est une protection.
+
+### Les pièges payés dans ce lot
+
+- `overflow-y: auto` **rogne aussi l'axe X** — un `visible` ne survit jamais seul.
+- `left-1/2 -translate-x-1/2` suppose de la place des deux côtés ; limiter la largeur ne
+  limite pas la position.
+- `?? "VALEUR"` sur un champ métier transforme une absence en affirmation, sans que le type
+  n'y voie rien.
+- Un champ écrit par deux sources dans deux formats différents **et jamais lu** est un bug
+  en sommeil : cherchez les lecteurs avant les écrivains.
+- `String.fromCharCode` ne sait pas construire un caractère au-delà de `U+FFFF`.
+
+### Aller plus loin
+
+- La spécification CSS `overflow` et la table des valeurs calculées (le cas `visible` + non-`visible`).
+- Le motif *one thing per page* du GOV.UK Design System, et ses comptes rendus de recherche.
+- `createPortal` de React, et ce qu'il coûte en repositionnement au défilement.
+- La CSS Anchor Positioning API (`anchor-name` / `position-anchor`), qui résoudra nativement
+  l'ancrage des bulles le jour où son support sera généralisé.
+- Le bloc Unicode *Enclosed Alphanumeric Supplement* et la construction des drapeaux.
+
+---
+
+## Chapitre 215 — Le poids volumétrique, le plancher qui se multiplie, et le catalogue qui évite une migration
+
+Une refonte de moteur de prix est l'exercice le plus délicat d'une plateforme : le calcul
+est partagé entre le front (qui projette) et le serveur (qui fige), il touche de l'argent
+réel, et il laisse derrière lui un historique qu'on n'a pas le droit de réécrire. Ce
+chapitre raconte comment D81 a été menée.
+
+### 1. Mesurer avant de décider — le point de bascule se calcule
+
+Le signalement était : « poids ET taille, pour 0,75 € d'écart ? ». La tentation est de
+corriger le symptôme (durcir le coefficient). La bonne démarche est de **chercher le point
+de bascule**.
+
+L'ancienne formule :
+
+```
+transport = max(round(€/kg × max(poids, 0,5) × coefTaille × (1 + surcharge)), 800)
+```
+
+Le coefficient ne devient visible que si le produit **dépasse** le plancher. On pose donc
+l'inéquation, sur un trajet à 3,50 €/kg et en L (`coef = 1,25`) :
+
+```
+3,50 × poids × 1,25 > 8   ⟺   poids > 8 / (3,50 × 1,25) = 1,83 kg
+```
+
+**1,83 kg.** Sous ce poids, S, M et L donnent tous 8 € de transport — donc 11 € au total,
+commission comprise. Le chiffre transforme l'anecdote en fait : *sur le colis le plus
+courant, la question de la taille est décorative*.
+
+> La leçon de méthode : un défaut de prix se démontre par une inéquation, pas par un
+> ressenti. Le seuil calculé est ce qui donne le droit — et l'obligation — de changer la
+> règle.
+
+### 2. Le poids volumétrique, et pourquoi on ne le copie pas tel quel
+
+Les transporteurs express facturent le plus grand du poids réel et du **poids
+volumétrique** : `L × l × h / 5000` (le diviseur encode une densité de référence — 200
+kg/m³, soit un carton de vêtements). Un colis léger mais encombrant paie sa place.
+
+Yamba ne peut pas l'appliquer littéralement : sa promesse produit est « **pas besoin de
+mesurer** ». Demander trois dimensions à quelqu'un qui envoie un pull ferait fuir le
+parcours bien avant d'améliorer le prix.
+
+**L'adaptation est une pré-tabulation.** On fait le calcul de l'express une fois pour
+toutes, sur les trois gabarits qu'on affiche déjà :
+
+| Classe | Gabarit annoncé | Dimensions typiques | Poids volumétrique |
+|---|---|---|---|
+| S | une boîte à chaussures | 33 × 23 × 14 cm | 2,1 kg |
+| M | un sac à dos | 45 × 30 × 20 cm | 5,4 kg |
+| L | une demi-valise | 55 × 40 × 20 cm | 8,8 kg |
+
+C'est un motif général et réutilisable : **quand une mesure exacte coûte trop cher à
+l'utilisateur, on tabule la mesure sur des classes qu'il sait reconnaître.** On perd en
+précision ce qu'on gagne en adoption — et on garde la possibilité de raffiner les classes
+plus tard sans changer la formule.
+
+La grille retenue est volontairement **plus douce** que l'express (M 3 / L 6 au lieu de
+5,4 / 8,8) pour une raison de confiance : durcir un prix est facile, le baisser après coup
+abîme durablement la relation. On garde de la marge dans le bon sens.
+
+### 3. Un plancher en kilos se dérive ; un plancher en euros se maintient
+
+L'ancien plancher valait **8 €**, tous corridors confondus. Problème : sur Paris–Libreville
+à 12 €/kg, 8 € ne protège rien du tout ; sur Paris–Orléans à 3,50 €/kg, il est juste. Un
+plancher en euros est donc **faux partout sauf sur un corridor**, et le corriger
+demanderait un réglage par corridor — une table à maintenir, à faire vivre, à expliquer.
+
+Le changement d'unité résout le problème sans rien ajouter :
+
+```
+plancher = 2,3 kg        →  2,3 × 3,50 =  8,05 €   (Paris–Orléans)
+                            2,3 × 12   = 27,60 €   (Paris–Libreville)
+```
+
+Le plancher **multiplie le tarif du Voyageur**, donc il hérite gratuitement de toute la
+variabilité des corridors. Un seul paramètre, juste partout.
+
+Et le choix de **2,3** plutôt que 2 n'est pas esthétique : `2,3 × 3,50 = 8,05 €` reproduit
+l'économie d'avant **au centime près**. Une refonte de prix qui ne change rien là où le
+prix était juste, c'est une refonte qu'on peut déployer sans prévenir personne.
+
+> Le réflexe à garder : quand une constante métier « ne marche que dans un cas »,
+> interrogez son **unité** avant d'ajouter une table de cas particuliers. Changer l'unité
+> fait parfois disparaître le problème au lieu de le paramétrer.
+
+### 4. Un booléen ne sait pas dire pourquoi
+
+L'ancien devis portait :
+
+```ts
+minimumApplied: boolean;
+```
+
+L'interface pouvait donc écrire « Minimum par colis appliqué », et rien d'autre. Avec trois
+candidats au maximum (`poids réel`, `plancher`, `minimum de taille`), le booléen devient
+franchement insuffisant : l'Expéditeur ne sait pas s'il doit **baisser le poids** ou
+**changer de taille**.
+
+```ts
+billableWeightKg = Math.max(input.weightKg, billingFloorKg, sizeMinKg);
+billableReason =
+  billableWeightKg === input.weightKg
+    ? "ACTUAL"
+    : billableWeightKg === sizeMinKg
+      ? "SIZE_MIN"
+      : "FLOOR";
+```
+
+Deux détails valent d'être relevés :
+
+- **l'ordre des comparaisons est une décision de produit**, pas un hasard : en cas
+  d'égalité entre le plancher et le minimum de taille, on attribue la cause à la **taille**,
+  parce que c'est la seule des deux sur laquelle l'Expéditeur peut agir ;
+- `Math.max` à trois arguments remplace une cascade de `if` — la structure de données
+  (`max`) porte la règle, et le `switch` n'existe que pour **nommer** le gagnant.
+
+C'est une application directe de la règle maison « une règle métier rend un **code**, jamais
+une phrase » : `billableReason` traverse l'API, le snapshot et les deux fronts ; chacun le
+traduit dans sa langue et son format.
+
+### 5. Un catalogue bien placé supprime la migration
+
+Changer les paramètres de prix voulait dire, a priori : modifier le moteur, la page admin,
+les infobulles, le contrat OpenAPI, la documentation des paramètres, **et migrer le document
+Mongo qui porte les valeurs**. Il n'y a eu à toucher que le premier et le catalogue.
+
+```ts
+// packages/libs/api-contracts/src/admin/platform-settings.schema.ts
+export function mergeSettingsValues(stored: Record<string, unknown> | null | undefined) {
+  const out = { ...SETTINGS_DEFAULTS };
+  if (stored && typeof stored === "object") {
+    for (const key of SETTING_KEYS) {          // ← LE catalogue, pas le document
+      const raw = (stored as Record<string, unknown>)[key];
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        const def = settingDefinition(key)!;
+        out[key] = Math.min(def.max, Math.max(def.min, raw));
+      }
+    }
+  }
+  return out;
+}
+```
+
+La boucle itère sur **les clés connues du code**, et va chercher la valeur stockée. Par
+construction :
+
+- une clé **retirée** du catalogue n'est jamais relue, même si elle traîne encore en base ;
+- une clé **ajoutée** tombe sur son défaut jusqu'à ce qu'un admin l'enregistre ;
+- une valeur stockée **hors des bornes** actuelles est ramenée dans ses bornes.
+
+C'est l'inverse exact du réflexe naturel (itérer sur le document stocké), et c'est ce
+renversement qui rend le schéma de configuration **évolutif sans migration**. Le principe
+porte un nom dans d'autres contextes : *tolerant reader* — lire ce qu'on comprend, ignorer
+le reste.
+
+La propriété étant trop précieuse pour être supposée, elle est **prouvée** :
+
+```ts
+it("D81 — une clé RETIRÉE du catalogue est ignorée, même si le document la porte encore", async () => {
+  const snap = await loadPlatformSettings(
+    dbWith({ values: { "pricing.sizeCoefL": 1.25, "pricing.minTransportCents": 800 }, version: 9 }).db
+  );
+  expect((snap.values as Record<string, unknown>)["pricing.sizeCoefL"]).toBeUndefined();
+  expect(snap.values["pricing.billingFloorKg"]).toBe(2.3);
+});
+```
+
+Et comme le catalogue est aussi la source de la page admin, de ses infobulles, de l'OpenAPI
+et du document `YAMBA-PARAMETRES.md`, deux commandes (`npm run settings-doc`,
+`npm run generate:openapi`) ont suffi à mettre tout l'admin à jour. **Zéro écran touché à la
+main.** C'est le retour sur investissement d'une source unique : le jour où la règle change,
+on ne paie qu'une fois.
+
+### 6. On n'écrit plus un champ historique, on ne le réinterprète jamais
+
+Le `Booking` porte une **photographie immuable** du prix (D17). Elle contenait `sizeCoef` et
+`minimumApplied`. Deux tentations, toutes deux mauvaises :
+
+1. **supprimer les champs** — les réservations passées deviennent illisibles ;
+2. **réutiliser `minimumApplied` avec le nouveau sens** (« le poids facturé a été relevé ») —
+   les lignes anciennes et nouvelles porteraient le même nom pour deux faits différents.
+   C'est le pire des deux mondes : la donnée semble homogène et ne l'est pas.
+
+La règle appliquée : **on cesse d'écrire, on ne réinterprète jamais.**
+
+```prisma
+// D81 — le poids FACTURÉ remplace le coefficient de taille.
+billingFloorKg Float?
+sizeMinKg      Float?
+billableReason String?  // "ACTUAL" | "FLOOR" | "SIZE_MIN"
+
+// LEGACY — plus jamais écrits depuis D81, conservés pour les réservations
+// antérieures : on ne réinterprète jamais un champ historique.
+sizeCoef       Float?
+minimumApplied Boolean?
+```
+
+Deux régimes de prix cohabitent dans l'historique, chacun lisible avec ses propres champs.
+Le test le verrouille en vérifiant une **absence** :
+
+```ts
+expect(s.pricing).not.toHaveProperty("sizeCoef");
+expect(s.pricing).not.toHaveProperty("minimumApplied");
+```
+
+Affirmer qu'un champ **n'est pas écrit** est aussi important qu'affirmer la valeur de ceux
+qui le sont — et c'est le genre d'assertion qu'on oublie systématiquement.
+
+### 7. Trouver les consommateurs par le compilateur
+
+Une question revient dans toute refonte : *qu'est-ce que je casse ?* La réponse la moins
+coûteuse a été de **retirer les champs du type et de laisser `tsc` énumérer**.
+
+```sh
+npx nx run-many --target=typecheck --all --skip-sync
+```
+
+Six points d'impact, nommés avec fichier et ligne, en une passe. Dont deux qu'une recherche
+textuelle sur `sizeCoef` aurait **manqués** : `trip.controller.ts` et
+`trip-search.controller.ts` ne citaient aucun nom de champ — ils passaient un objet de
+paramètres dont la **forme** ne correspondait plus.
+
+> Un type bien placé est un moteur de recherche sur les conséquences. Supprimez d'abord le
+> champ, laissez le compilateur dresser la liste, corrigez ensuite.
+
+Attention à un angle mort du dépôt : `nx run-many --target=typecheck --all` ne couvre **pas**
+`user-ui` ni `admin-ui`, qui ont leurs propres jobs CI (`tsc --noEmit --project apps/<app>`).
+Les lancer à part fait partie de la vérification.
+
+### 8. Un prix annoncé ne doit jamais être plus bas que le prix facturé
+
+La recherche connaît le **poids** saisi, jamais la **taille** (elle n'est demandée que dans
+le tunnel). Deux options :
+
+- appliquer un minimum de taille moyen → la recherche annoncerait parfois **plus cher** que
+  le devis, ce qui fait fuir ;
+- n'appliquer **aucun** minimum de taille → la recherche annonce le prix d'un colis **S**,
+  le plus bas possible.
+
+La seconde a été retenue, et la raison est une règle d'honnêteté commerciale : **une
+annonce peut être dépassée par un choix de l'utilisateur, elle ne doit jamais se révéler
+mensongère par construction.** Le commentaire du fichier le dit, pour que personne ne
+« corrige » ça plus tard :
+
+```ts
+// D81 — la recherche connaît le POIDS, jamais la taille : elle n'applique donc
+// aucun minimum de taille. Le prix affiché est celui d'un colis S, c'est-à-dire
+// le PLUS BAS possible pour ce poids — il ne promet jamais moins cher que la
+// réalité du devis, il peut seulement être dépassé si l'Expéditeur choisit M ou L.
+```
+
+### 9. Un effet de bord bénéfique sur le tri par prix
+
+`comparable-price.ts` calcule le prix du colis de référence (2 kg) qui sert à **trier** les
+trajets. Il valait `max(2 × €/kg, 800)`. Conséquence invisible jusqu'ici : **tous** les
+corridors sous 4 €/kg étaient ramenés à 8 € — donc **indiscernables** dans le tri par prix.
+Un trajet à 2 €/kg et un à 3,50 €/kg se valaient à l'écran.
+
+Avec le plancher en kilos, la formule devient `round(€/kg × max(2 ; 2,3))` et les deux se
+séparent (4,60 € contre 8,05 €). La correction d'un défaut de **facturation** a réparé au
+passage un défaut de **classement** — ce qui arrive souvent quand on supprime un écrasement
+de valeurs.
+
+### Les pièges payés dans ce lot
+
+- Une constante métier en euros est fausse dès qu'il existe plusieurs corridors : interroger
+  l'**unité** avant d'ajouter des cas particuliers.
+- Un booléen « un minimum s'est appliqué » devient inexploitable dès qu'il y a plus d'un
+  minimum possible.
+- Réutiliser un champ historique avec un sens neuf rend l'historique **silencieusement**
+  hétérogène.
+- `nx run-many --target=typecheck --all` ne couvre pas les deux applications Next : les
+  vérifier séparément.
+- Une référence de tests écrite à la main se périme : celle de `deal-service` disait 659, la
+  mesure sur `dev` donnait **684**. Mesurer, toujours — et dater la mesure.
+
+### Aller plus loin
+
+- Le poids volumétrique et le diviseur 5000 (IATA, et ses variantes 6000 / 139 selon les
+  transporteurs et les unités).
+- Le motif *tolerant reader* de Martin Fowler, dont `mergeSettingsValues` est une
+  application exacte.
+- Le livrable `docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE.md` : la formule
+  complète, la comparaison express / postal, et le modèle de rentabilité avec ses six
+  hypothèses nommées.
+- **PRC-05** (suggestion de prix par corridor) et **PRC-09** (forfait bagage), spécifiés et
+  non codés : les deux leviers que le livrable 12 désigne comme décisifs.
+
+---
+
 ## Chapitre 216 — La modale qui n'a rien derrière elle, les deux arbres montés en même temps, et le hook qui coûte une frontière Suspense
 
 Un correctif de six lignes utiles, et trois pièges d'architecture front qu'on ne voit qu'en

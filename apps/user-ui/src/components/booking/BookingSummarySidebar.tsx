@@ -7,7 +7,9 @@
 
 "use client";
 
-import { ArrowLeft, ArrowRight, Calendar, Clock, Lock, Plane, Star } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bus, Calendar, Car, Clock, Lock, Plane, Route, Star, Train } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { countryFlag } from "@/lib/country-name";
 import { useLocale, useTranslations } from "next-intl";
 import type { Draft, PriceBreakdown, Step, TripContext } from "./booking.types";
 
@@ -24,6 +26,19 @@ type Props = {
   onCtaPrimaryAction: () => void;
   showBackButton: boolean;
   onBackAction?: () => void;
+};
+
+/**
+ * L'icone du trajet SUIT son mode. Elle etait cablee sur `Plane` : un trajet en
+ * train s'affichait avec un avion, et la duree se lisait « de vol » (retour de
+ * recette du 17/10). Les quatre modes du TripContext sont couverts, BUS compris
+ * — un mode non reconnu n'a pas d'icone plutot qu'une fausse.
+ */
+const TRAVEL_MODE_ICONS: Record<string, LucideIcon> = {
+  PLANE: Plane,
+  TRAIN: Train,
+  CAR: Car,
+  BUS: Bus,
 };
 
 export default function BookingSummarySidebar({
@@ -88,6 +103,9 @@ function RecapCard({
     `${trip.carrier.firstName[0] ?? ""}${trip.carrier.lastInitial}`.toUpperCase();
   const departureDate = formatDateShort(trip.departureDate, locale);
   const departureTime = formatTimeShort(trip.departureDate, locale);
+  const TravelIcon = trip.travelMode ? TRAVEL_MODE_ICONS[trip.travelMode] ?? Route : Route;
+  const originFlag = countryFlag(trip.originCountryCode);
+  const destinationFlag = countryFlag(trip.destinationCountryCode);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-950">
@@ -122,16 +140,23 @@ function RecapCard({
           </div>
 
           <div className="mx-5 mb-4 space-y-2 border-b border-slate-100 pb-4 text-[12px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <Row icon={<Plane size={13} />}>
-              {trip.originCity} → {trip.destinationCity}
+            <Row icon={<TravelIcon size={13} />}>
+              {/* Drapeaux decoratifs (aria-hidden) : la ville porte deja le sens,
+                  et un lecteur d'ecran annoncerait « drapeau de la France » pour rien. */}
+              {originFlag && <span aria-hidden="true">{originFlag}&nbsp;</span>}
+              {trip.originCity} →{" "}
+              {destinationFlag && <span aria-hidden="true">{destinationFlag}&nbsp;</span>}
+              {trip.destinationCity}
             </Row>
             <Row icon={<Calendar size={13} />}>
               {departureDate} · {departureTime}
             </Row>
             {trip.durationHours && (
               <Row icon={<Clock size={13} />}>
-                {trip.isDirect ? `${t("summary.directFlight")}, ` : ""}
-                {t("summary.duration", { hours: trip.durationHours })}
+                {trip.isDirect ? `${t("summary.direct")}, ` : ""}
+                {trip.travelMode
+                  ? t(`summary.durationByMode.${trip.travelMode}`, { hours: trip.durationHours })
+                  : t("summary.durationNeutral", { hours: trip.durationHours })}
               </Row>
             )}
           </div>
@@ -165,9 +190,14 @@ function RecapCard({
               {t(`summary.quoteHint.${price.quoteError}`)}
             </div>
           )}
-          {price.quote?.minimumApplied && (
+          {/* D81 — on ne dit plus « minimum appliqué » sans dire LEQUEL : le
+              plancher du trajet et le minimum de la taille ne se corrigent pas
+              de la même façon (baisser le poids, ou changer de taille). */}
+          {price.quote && price.quote.billableReason && price.quote.billableReason !== "ACTUAL" && (
             <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
-              {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}
+              {price.quote.billableReason === "SIZE_MIN"
+                ? t("summary.billableSizeMin", { size: price.quote.sizeClass ?? "", kg: price.quote.billableWeightKg ?? 0 })
+                : t("summary.billableFloor", { kg: price.quote.billableWeightKg ?? 0 })}
             </div>
           )}
         <PriceRow label={t("summary.serviceYamba")} amount={price.serviceFee} locale={locale} />

@@ -102,10 +102,14 @@ export type TripContext = {
   carrier: TripCarrier;
   originCity: string;
   destinationCity: string;
-  originCountry: string;
-  destinationCountry: string;
+  /** Code ISO 3166-1 alpha-2 — JAMAIS le texte `country` du trajet, qui est figé
+   *  dans la locale du createur et absent du jeu d'essai (cf. lib/country-name). */
+  originCountryCode: string | null;
+  destinationCountryCode: string | null;
   departureDate: string; // ISO
-  travelMode: "PLANE" | "TRAIN" | "CAR" | "BUS";
+  /** `null` = le trajet ne declare pas son mode. On ne le DEVINE pas : l'ancien
+   *  `?? "PLANE"` du mapper affichait un avion sur un trajet en train. */
+  travelMode: "PLANE" | "TRAIN" | "CAR" | "BUS" | null;
   isDirect: boolean;
   durationHours?: number;
   pickupOptions: LocationPoint[];

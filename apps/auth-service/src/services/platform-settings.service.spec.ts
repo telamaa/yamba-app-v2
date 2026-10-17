@@ -46,7 +46,7 @@ describe("platform-settings.service — update", () => {
     const r = await svc.update(SUPER, { changes: { "pricing.commissionPct": 15, "alerts.outboxLagMinutes": 30 }, reason, expectedVersion: 0 });
     expect(r).toEqual({ version: 1, changed: [{ key: "pricing.commissionPct", before: 12, after: 15 }, { key: "alerts.outboxLagMinutes", before: 15, after: 30 }] });
     expect(db.row()?.values["pricing.commissionPct"]).toBe(15);
-    expect(db.row()?.values["pricing.minTransportCents"]).toBe(800); // les autres clés gardent leur défaut
+    expect(db.row()?.values["pricing.billingFloorKg"]).toBe(2.3); // les autres clés gardent leur défaut
     expect(db.actions.map((a) => [a.action, a.targetType, a.targetId])).toEqual([["SETTING_CHANGED", "SETTINGS", "pricing.commissionPct"], ["SETTING_CHANGED", "SETTINGS", "alerts.outboxLagMinutes"]]);
     expect(db.actions[0].after).toEqual({ key: "pricing.commissionPct", value: 15, reason, version: 1 });
     expect(invalidate).toHaveBeenCalledTimes(1);
@@ -98,7 +98,9 @@ describe("platform-settings.service — update", () => {
   it("cohérence : S ≤ M ≤ L et intervalle ≥ délai sont refusés en 400, rien n'est écrit", async () => {
     const db = fakeDb();
     const svc = makePlatformSettingsService({ db });
-    await expect(svc.update(SUPER, { changes: { "pricing.sizeCoefS": 1.5 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("S ≤ M ≤ L") });
+    // D81 — l'invariant porte désormais sur les POIDS MINIMUM de taille : S ne
+    // peut pas exiger plus de kilos que M (ici 4 > M 3), le 400 est le même.
+    await expect(svc.update(SUPER, { changes: { "pricing.sizeMinKgS": 4 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("S ≤ M ≤ L") });
     await expect(svc.update(SUPER, { changes: { "messaging.reminderDelayMinutes": 120 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 400 });
     expect(db.row()).toBeNull();
     expect(db.actions).toHaveLength(0);
