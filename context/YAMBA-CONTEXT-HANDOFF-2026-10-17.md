@@ -104,3 +104,6 @@ réservation, cette pastille devient le CTA mangue »).
 4. seulement ensuite, la page suivante.
 
 Pas de gros lot réservation monolithique, pas de rattrapage documentaire global.
+| 5 | 17/10 | Dette documentaire soldée | Registre **A211 / A212 / A213** ; DOC-TECHNIQUE +230 ; DOC-MÉTIER +45 (**RG-MOB-41→49**, fiches **MOB67→82**) ; APPRENTISSAGE +160 (**chapitre 211**). Ajout seul : 0 suppression |
+| 6 | 17/10 | CI de #385 | **18/18 vertes**, comptées |
+| 7 | 17/10 | `a683186` poussé, **PR #385 passée en « prête »** | Il reste à la merger (c'est toi qui merges), puis une PR d'état `chore/etat-385` (CONTEXT + SUIVI) |
