@@ -1,6 +1,5 @@
 {
   "back": "Back",
-  "progress": "Step {current} of {total}",
   "bar": {
     "continue": "Continue",
     "allIn": "all in",
@@ -15,7 +14,7 @@
     "cta": "Go back"
   },
   "parcel": {
-    "title": "The parcel",
+    "title": "Describe your parcel",
     "productTitle": "What you are sending",
     "products": {
       "PARCEL": "A parcel",
@@ -27,36 +26,36 @@
       "CHECKED_BAG_23KG": "23 kg, flat rate",
       "CABIN_BAG_12KG": "12 kg, flat rate"
     },
-    "familyTitle": "What is inside",
+    "familyTitle": "What are you sending?",
     "familyHint": "The Traveler picks what they agree to carry.",
     "families": {
-      "DOCUMENTS_PAPERS": "Documents, papers",
-      "CLOTHES_TEXTILE": "Clothes, textile",
+      "DOCUMENTS_PAPERS": "Documents & papers",
+      "CLOTHES_TEXTILE": "Clothes & textiles",
       "FOOD_DRY_SEALED": "Dry sealed food",
-      "ELECTRONICS_DEVICES": "Electronics, devices",
-      "COSMETICS_CARE": "Cosmetics, care",
-      "PARTS_TOOLS": "Parts, tools",
-      "TOYS_CHILDCARE": "Toys, childcare",
+      "ELECTRONICS_DEVICES": "Electronics & devices",
+      "COSMETICS_CARE": "Cosmetics & care",
+      "PARTS_TOOLS": "Parts & tools",
+      "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Misc accessories"
     },
     "surcharge": "+{pct}%",
-    "sizeTitle": "Its size",
+    "sizeTitle": "Size: no need to measure",
     "sizes": {
-      "S": "Small",
-      "M": "Medium",
-      "L": "Large"
+      "S": "S",
+      "M": "M",
+      "L": "L"
     },
     "sizeExamples": {
-      "S": "A pouch",
-      "M": "A backpack",
-      "L": "A cabin suitcase"
+      "S": "a shoebox",
+      "M": "a backpack",
+      "L": "half a suitcase"
     },
-    "weightTitle": "Its weight",
-    "weightHint": "The Traveler will check it at handover.",
+    "weightTitle": "Weight (kg)",
+    "weightHint": "The Traveler will check it at handover — a 10% difference is tolerated.",
     "weightUnit": "kg",
     "weightShortcut": "{kg} kg",
     "remaining": "{kg} kg still available on this trip",
-    "nextStepSoon": "Next step — value, photos and description — is coming in the next batch.",
+    "nextStepSoon": "Next step: protecting your parcel.",
     "errors": {
       "FAMILY_REFUSED": "The Traveler does not take this content.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
@@ -69,6 +68,14 @@
     "sizeHintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
     "sizeHintFlat": "At this weight, size does not change the price — the per-parcel minimum applies. It tells the Traveler whether your parcel fits in their bag.",
     "sizeExtra": "+{amount}",
-    "familyRefusedToggle": "{count, plural, =1 {# family refused} other {# families refused}} on this trip"
-  }
+    "familyRefusedToggle": "{count, plural, =1 {# category refused} other {# categories refused}} by {name}",
+    "subtitle": "The more precise you are, the fewer surprises at handover."
+  },
+  "phases": {
+    "parcel": "Parcel",
+    "delivery": "Delivery",
+    "commitment": "Commitment",
+    "payment": "Payment"
+  },
+  "phaseProgress": "{phase}, step {current} of {total}"
 }

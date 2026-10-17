@@ -31,7 +31,7 @@
  * porte d'identité tombera à l'étape du destinataire, pas avant — on ne
  * demande pas de compte pour regarder un prix.
  */
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -44,6 +44,7 @@ import { BookingStepFrame } from '@/components/booking/booking-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
+import { countryFlag } from '@/lib/country-name';
 import { useTheme } from '@/hooks/use-theme';
 import { currentPricingParams, loadPricingParams } from '@/lib/api/pricing.api';
 import { getPublicTrip, type PublicTrip } from '@/lib/api/trip.api';
@@ -71,13 +72,7 @@ import { formatPrice } from '@/lib/trip-format';
 /** Les raccourcis de poids : les colis réels, pas une règle graduée. */
 const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
 
-type SizeIcon = 'purse-outline' | 'bag-personal-outline' | 'bag-suitcase-outline';
 
-const SIZE_ICONS: Record<SizeClass, SizeIcon> = {
-  S: 'purse-outline',
-  M: 'bag-personal-outline',
-  L: 'bag-suitcase-outline',
-};
 
 export default function BookingParcelScreen() {
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
@@ -166,8 +161,10 @@ export default function BookingParcelScreen() {
       setNextStepSoon(false);
       return;
     }
-    // L'étape 2 (valeur, photos, description) est le lot suivant : on le DIT,
-    // on ne pousse pas vers une page qui n'existe pas.
+    // L'étape ② est désormais LA GARANTIE (remontée du ④ au ②, 17/10 : c'est
+    // elle qui rend les photos obligatoires, le web l'a placée juste après la
+    // taille). Elle est le lot suivant : on le DIT, on ne pousse pas vers une
+    // page qui n'existe pas.
     setShowErrors(false);
     setNextStepSoon(true);
   }, [errors]);
@@ -197,6 +194,12 @@ export default function BookingParcelScreen() {
     );
   }
 
+  const routeLabel = [
+    [countryFlag(trip.origin.countryCode), trip.origin.city].filter(Boolean).join(' '),
+    [countryFlag(trip.destination.countryCode), trip.destination.city].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(' → ');
   const products = offeredProducts(trip);
   const remainingKg = typeof trip.remainingKg === 'number' ? trip.remainingKg : null;
   const priceLabel =
@@ -209,14 +212,17 @@ export default function BookingParcelScreen() {
   return (
     <BookingStepFrame
       title={t('parcel.title')}
+      subtitle={t('parcel.subtitle')}
       step={1}
       priceLabel={priceLabel}
       priceHint={priceHint}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
-      {/* Ce qu'on réserve, en une ligne : on ne laisse jamais oublier le trajet. */}
-      <ThemedText type="small" themeColor="textSecondary">
-        {[trip.origin.city, trip.destination.city].filter(Boolean).join(' → ')}
+      {/* Ce qu'on réserve, en une ligne : on ne laisse jamais oublier le trajet.
+          Les drapeaux sont systématiques, trajet intérieur compris (A215) — ils
+          disent le pays sans consommer de ligne. */}
+      <ThemedText type="small" themeColor="textSecondary" accessibilityLabel={routeLabel}>
+        {routeLabel}
       </ThemedText>
 
       {/* 1. Le produit — masqué quand le trajet ne propose QUE le colis :
@@ -268,7 +274,10 @@ export default function BookingParcelScreen() {
                   onPress={() => setShowRefused((v) => !v)}
                   style={styles.refusedToggle}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {t('parcel.familyRefusedToggle', { count: refusedFamilies.length })}
+                    {t('parcel.familyRefusedToggle', {
+                      count: refusedFamilies.length,
+                      name: trip.tripper.firstName,
+                    })}
                   </ThemedText>
                   <Ionicons
                     name={showRefused ? 'chevron-up' : 'chevron-down'}
@@ -358,13 +367,12 @@ export default function BookingParcelScreen() {
                   ? t('parcel.sizeHintFlat')
                   : t('parcel.sizeHint')
             }>
-            <View style={styles.cards}>
+            <View style={styles.chips}>
               {SIZE_CLASSES.map((size) => (
-                <SizeCard
+                <SizePill
                   key={size}
                   active={draft.sizeClass === size}
-                  icon={SIZE_ICONS[size]}
-                  label={t(`parcel.sizes.${size}`)}
+                  code={t(`parcel.sizes.${size}`)}
                   example={t(`parcel.sizeExamples.${size}`)}
                   priceLabel={
                     sizeDeltaCents === null || sizeIsFlat || sizeDeltaCents[size] === 0
@@ -467,17 +475,22 @@ function ProductCard({
   );
 }
 
-function SizeCard({
+/**
+ * La taille prend la MÊME forme que la famille : deux questions voisines, une
+ * seule grammaire de réponse. Les rectangles et les icônes ont disparu avec la
+ * passe web du 17/10 — une boîte à chaussures dessinée n'apprend rien de plus
+ * que les mots « une boîte à chaussures », et elle coûtait une ligne.
+ */
+function SizePill({
   active,
-  icon,
-  label,
+  code,
   example,
   priceLabel,
   onPressAction,
 }: {
   active: boolean;
-  icon: SizeIcon;
-  label: string;
+  /** « S », « M », « L » — le repère, pas une phrase. */
+  code: string;
   example: string;
   /** Ce que cette taille coûte EN PLUS — `null` tant que le poids manque. */
   priceLabel: string | null;
@@ -488,21 +501,19 @@ function SizeCard({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
+      accessibilityLabel={[code, example, priceLabel].filter(Boolean).join(' ')}
       onPress={onPressAction}
       style={[
-        styles.card,
+        styles.chip,
         {
-          backgroundColor: active ? `${Brand.mango}14` : theme.backgroundElement,
+          backgroundColor: active ? `${Brand.mango}22` : theme.backgroundElement,
           borderColor: active ? Brand.mango : 'transparent',
         },
       ]}>
-      <MaterialCommunityIcons name={icon} size={22} color={active ? Brand.mango : theme.text} />
-      <ThemedText type="smallBold">{label}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        {example}
-      </ThemedText>
+      <ThemedText type="smallBold">{code}</ThemedText>
+      <ThemedText type="small">{example}</ThemedText>
       {priceLabel ? (
-        <ThemedText type="smallBold" style={{ color: active ? Brand.mango : undefined }}>
+        <ThemedText type="small" style={styles.surcharge}>
           {priceLabel}
         </ThemedText>
       ) : null}

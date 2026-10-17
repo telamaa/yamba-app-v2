@@ -39,7 +39,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { ApiError } from '@/lib/api/client';
 import type { TripSearchResult } from '@/lib/api/search.api';
-import { countryName } from '@/lib/country-name';
+import { countryFlag, countryName } from '@/lib/country-name';
 import {
   estimateShipperTotalCents,
   PRICING_EXAMPLE_PARAMS,
@@ -96,8 +96,8 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   // intérieur, celui qui cherche à envoyer vers l'étranger le voit d'un coup
   // d'œil. À l'international, il lève en plus Congo/RDC. Même règle sur le web
   // (« Trajet sélectionné » du tunnel, countryFlag dans lib/country-name).
-  const fromFlag = flagEmoji(trip.fromCountryCode);
-  const toFlag = flagEmoji(trip.toCountryCode);
+  const fromFlag = countryFlag(trip.fromCountryCode);
+  const toFlag = countryFlag(trip.toCountryCode);
   // Les drapeaux sont muets pour VoiceOver : la route parlée nomme les pays.
   const routeLabel = [
     countryName(trip.fromCountryCode, locale),
@@ -334,14 +334,6 @@ function transportIcon(mode: TripSearchResult['transportMode']) {
 }
 
 /** Code ISO 3166-1 alpha-2 → drapeau émoji (indicateurs régionaux). */
-function flagEmoji(code: string | null | undefined): string | null {
-  if (!code || code.length !== 2) return null;
-  const upper = code.toUpperCase();
-  if (!/^[A-Z]{2}$/.test(upper)) return null;
-  return String.fromCodePoint(
-    ...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-  );
-}
 
 /** « 7 h », « 9 h 35 » — même forme que la carte web (formatDuration). */
 function formatDuration(minutes: number): string {
