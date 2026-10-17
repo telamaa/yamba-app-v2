@@ -6,15 +6,31 @@
     "toPlaceholder": "Ville d'arrivée",
     "dateLabel": "Date",
     "datePlaceholder": "Choisis une date",
-    "dateAny": "Toutes les dates",
-    "dateClear": "Effacer la date",
-    "dateConfirm": "OK",
-    "cancel": "Annuler",
     "submit": "Rechercher"
   },
-  "summary": {
-    "edit": "Modifier",
-    "everywhere": "Partout"
+  "title": {
+    "fromTo": "Trajets pour {from} → {to}",
+    "fromOnly": "Trajets au départ de {from}",
+    "toOnly": "Trajets à destination de {to}",
+    "dateOnly": "Trajets le {date}"
+  },
+  "recap": {
+    "anywhere": "Partout",
+    "anyDate": "Toutes les dates"
+  },
+  "tabs": {
+    "all": "Tout",
+    "plane": "Avion",
+    "train": "Train",
+    "car": "Voiture"
+  },
+  "filters": {
+    "title": "Filtres",
+    "active": "Filtres (actifs)",
+    "sortBy": "Trier par",
+    "earliest": "Départ le plus tôt",
+    "lowestPrice": "Prix le plus bas",
+    "bestRated": "Mieux notés"
   },
   "corridors": {
     "label": "En ce moment",
@@ -32,9 +48,44 @@
     "retry": "Réessayer"
   },
   "card": {
-    "fromPrice": "dès {price} {currency}",
-    "perKg": "{price} {currency}/kg",
+    "fromPrice": "dès",
     "remainingKg": "{kg} kg dispo",
-    "rating": "★ {rating} ({count})"
+    "exampleParcel": "≈ {price} pour {kg} kg",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# escale} other {# escales}}",
+    "remainingSlots": "{count, plural, one {# place} other {# places}}",
+    "newTripper": "Nouveau Voyageur",
+    "popular": "Populaire",
+    "favoriteAdd": "Ajouter aux favoris",
+    "favoriteRemove": "Retirer des favoris",
+    "favoriteOwnTrip": "Tu ne peux pas mettre ton propre trajet en favori",
+    "favoriteNotFavoritable": "Ce trajet n'est plus disponible",
+    "favoriteError": "Impossible de modifier le favori, réessaie",
+    "mode": {
+      "plane": "Avion",
+      "train": "Train",
+      "car": "Voiture"
+    }
+  },
+  "date": {
+    "title": "Quand pars-tu ?",
+    "exact": "Date précise",
+    "flex": "Je suis flexible",
+    "thisWeek": "Cette semaine",
+    "thisMonth": "Ce mois",
+    "next3Months": "3 prochains mois",
+    "apply": "Appliquer",
+    "clear": "Effacer"
+  },
+  "edit": {
+    "title": "Modifier la recherche",
+    "cancel": "Annuler",
+    "clearAll": "Tout effacer",
+    "swap": "Inverser le départ et la destination"
+  },
+  "city": {
+    "clear": "Effacer la saisie",
+    "noResult": "Aucune ville trouvée",
+    "unavailable": "Suggestions indisponibles — tape la ville, la recherche fonctionne quand même"
   }
 }

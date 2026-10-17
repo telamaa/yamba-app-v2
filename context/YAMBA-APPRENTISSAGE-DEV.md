@@ -3133,7 +3133,167 @@ comme un faux billet. Les deux SVG officiels pèsent 1 Ko, s'embarquent dans
 la charte d'un tiers AVANT de dessiner son bouton : c'est du droit des marques autant que de
 l'UX.
 
-## Chapitre 211 — Le feed à la Airbnb : les anneaux qui dominent, le percentile sans médiane, et la géoloc qui ne sort jamais
+## Chapitre 211 — La clé qui n'a pas d'origine, le vide qui ment, et le prix au kilo qui n'est pas le prix
+
+### Une clé « publique » n'existe pas : elle est contrainte par l'origine
+
+L'autocomplétion de villes ne proposait rien et le code de l'app était irréprochable. Deux
+clés Google, deux refus différents : l'une appartenait à un projet **sans facturation**
+(`403 REQUEST_DENIED`), l'autre — celle du site, qui marche — est restreinte **par referer**
+et répond `API_KEY_HTTP_REFERRER_BLOCKED` à un `fetch` natif.
+
+La leçon est conceptuelle, pas anecdotique. Sur le web, une clé « publique » est sûre parce
+que le navigateur envoie une **origine** que le fournisseur vérifie : la clé est visible, mais
+inutilisable ailleurs. **Une app n'a pas d'origine.** Il ne reste donc que deux options : une
+clé sans restriction (extractible du binaire par `strings`, facturable par n'importe qui,
+révocable seulement après la facture) ou **un relais serveur**. Dans un produit où chaque
+appel est facturé, la question n'est même pas la sécurité : c'est le budget de quelqu'un
+d'autre qu'on laisse à la porte.
+
+Le relais tient en quatre décisions qu'il vaut la peine de savoir justifier :
+
+```
+GET /places/autocomplete?input=&language=&sessionToken=
+```
+
+1. **Dans trip-service**, pas dans un service neuf : c'est le service qui porte déjà la
+   recherche. Un endpoint n'est pas un service.
+2. **Authentification optionnelle**, comme la recherche : la langue vient du compte s'il
+   existe, de l'appareil sinon. Un visiteur reste un client de plein droit.
+3. **Le `sessionToken` est relayé tel quel.** Chez Google, ce jeton groupe toutes les frappes
+   d'une même saisie en UNE facturation. Seul le client sait quand une saisie commence : le
+   serveur n'a pas à le fabriquer, il le transmet.
+4. **Le cache échoue OUVERT.** `try { redis.get } catch { /* on interroge Google */ }` : une
+   panne de cache n'est pas une panne de service. C'est le choix inverse d'un verrou, et
+   c'est volontaire — un cache qui refuse de servir doit s'effacer, pas bloquer.
+
+### Le vide qui ment : un résultat discriminé plutôt qu'un tableau vide
+
+Avant le relais, le client rendait `[]` dans tous les cas — réseau coupé, clé refusée,
+réponse vide. L'écran affichait donc « Aucune ville trouvée » : il **accusait la saisie d'une
+panne de service**.
+
+```ts
+type SuggestResult = { status: 'ok'; items: CitySuggestion[] } | { status: 'unavailable' };
+```
+
+C'est un **type somme** (discriminated union) : le compilateur force l'appelant à traiter les
+deux cas, et le message cesse d'être une déduction. Côté serveur la même discipline, en
+HTTP : `400 INVALID_QUERY` (le contrat n'est pas respecté) et `503 PLACES_UNAVAILABLE` (le
+tiers est muet) — **jamais 200 avec une liste vide**, qui est la façon la plus courante de
+transformer une panne en mensonge.
+
+Règle à emporter : **une valeur vide ne doit jamais encoder deux faits différents.** Si « rien
+trouvé » et « pas pu chercher » tombent dans la même case, l'interface mentira, et le défaut
+sera indiagnosticable — ici il a fallu ajouter une trace (`console.warn` avec le code HTTP et
+le corps de la réponse) pour simplement VOIR la cause depuis un téléphone.
+
+### Une page poussée ne retourne pas de valeur : l'état hors de React
+
+Sur le web, un champ plein écran est un composant : il remonte sa valeur par un callback. En
+navigation native, « Départ » est une **page** empilée, et une page qui se dépile ne rend
+rien à celle qui l'a poussée. Le réflexe (un contexte React qui enveloppe tout) traîne un
+rendu global pour trois champs.
+
+Le motif retenu — déjà utilisé pour l'auth (`auth-flow-state.ts`) — est un **store en mémoire
+de processus** : un objet module, un `Set` d'abonnés, et côté React le hook officiel
+`useSyncExternalStore(subscribe, getSnapshot)`.
+
+```ts
+let draft: SearchDraft = EMPTY;
+const listeners = new Set<() => void>();
+export const setField = (f: Field, v: string) => { draft = { ...draft, [f]: v }; listeners.forEach(l => l()); };
+export const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
+export const getDraft = () => draft;            // doit rendre la MÊME référence tant que rien ne change
+```
+
+Deux pièges payés : `getSnapshot` doit rendre une référence **stable** (sinon React boucle),
+et l'état est perdu si l'app est tuée — ce qui est **voulu** pour un brouillon de recherche,
+mais serait un bug pour un panier.
+
+Dernier point, structurel : la feuille n'appelle pas le serveur. Elle écrit le brouillon et
+incrémente un `submitNonce` ; l'écran de résultats sert chaque valeur **une fois** et reste
+seul maître de la requête. Un producteur, un consommateur : la pagination, le tri et les
+pastilles ne se marchent jamais dessus.
+
+### Hermes : rien d'`Intl` n'est acquis
+
+`new Intl.PluralRules()` existe sur Hermes… et jette `FORMATTING_ERROR` sur une locale non
+embarquée ; `Intl.DisplayNames` manque carrément — d'où des pays affichés en code `ISO`. On
+charge donc les polyfills `@formatjs` au démarrage, **en `.js`** (en `.ts`, TypeScript refuse
+l'import sans types : TS2882).
+
+Et la conclusion va plus loin que le polyfill : **les libellés de dates ne passent pas par
+`toLocaleDateString`**. Les données CLDR embarquées varient selon le moteur et la version
+d'OS — deux téléphones afficheraient deux libellés. Des tables de mois et de jours
+partagées (`trip-format.ts`) rendent le rendu **déterministe**, ce qui est aussi ce qui rend
+les tests possibles.
+
+### Le flou n'est pas la même primitive sur les deux OS
+
+iOS sait flouter **à travers une fenêtre** : un `UIVisualEffectView` traverse une modale
+transparente, donc la feuille voit les résultats derrière elle. Android ne le sait pas — le
+`blurTarget` d'`expo-blur` vit dans UNE hiérarchie de vues. Résultat : iOS reçoit un matériau
+(`thin` à 32 après dosage sur capture, pas `thick` à 72 : les résultats doivent rester
+**reconnaissables**, simplement repoussés), Android un voile plus dense qui obtient le même
+effet de mise au second plan. Et l'animation porte sur l'**opacité** (driver natif) : la
+propriété `intensity` n'est pas animable nativement.
+
+Morale de portabilité : on ne porte pas un EFFET, on porte une **intention** (« ce qui est
+derrière passe au second plan ») et chaque OS la rend avec ce qu'il sait faire.
+
+### Le prix au kilo n'est pas le prix — ce que les planchers font à un affichage
+
+La leçon la plus chère du lot ne tient pas à du code :
+
+```
+transport  = max(€/kg × kg, MIN_TRANSPORT = 8 €)      (D32)
+commission = max(transport × pct, FLOOR = 3 €)        (D16)
+```
+
+Avec un trajet à 3,50 €/kg, un colis de 2 kg ne coûte pas 7 € mais **11 €** : les deux
+planchers mordent. Le prix au kilo ne devient « vrai » qu'au-delà de **2,29 kg** — soit
+**57 % d'écart sur le colis type**. La fiche trajet montrait déjà l'exemple honnête ; la
+liste, elle, annonçait moins, et l'écart se découvrait juste avant de réserver.
+
+Deux principes en sortent :
+
+1. **Un prix unitaire affiché à côté d'un plancher est un prix faux.** Dès qu'un barème a un
+   minimum, l'affichage doit porter un EXEMPLE chiffré sur le cas typique.
+2. **Le front projette, le serveur tranche.** L'estimation vient du même miroir que la fiche
+   (`pricing-example.ts`) et reste indicative : le prix réel est calculé puis **figé** dans le
+   Booking (snapshot D17). Un front qui calcule pour afficher est utile ; un front qui calcule
+   pour engager est un bug.
+
+### Dessiner par le MOMENT de la lecture
+
+La fiche trajet, premier jet, transposait les cartes du site : cinq boîtes grises sur fond
+noir. Retour de recette : « pas très sexy et un peu trop chargé ». Le défaut n'était pas le
+style, c'était la **hiérarchie** — tout avait le même poids, donc rien n'en avait.
+
+La grammaire qui a corrigé ça se résume en une question posée à chaque bloc : **est-ce qu'on
+le lit AVANT de décider, ou APRÈS ?** Avant (route, horaires, Voyageur, prix, lieux) : à plat,
+visible. Après (détail du prix, familles refusées, conditions) : replié. Et **une seule carte
+dans tout l'écran** — le prix : une carte redevient un signal parce qu'elle est unique. Même
+raisonnement sur les huit familles D14 : on montre ce qui est accepté, on compte ce qui est
+refusé (« Familles refusées (6) ») — huit lignes de bruit pour une seule qui concerne
+l'Expéditeur.
+
+Corollaire livré le même jour : **un geste indisponible se dit en pastille discrète**, jamais
+en gros bouton grisé. Le pavé « Bientôt réservable » était l'élément le plus visible de
+l'écran… pour la seule chose qu'on ne pouvait pas faire. Et la place est **réservée** : au lot
+réservation, la pastille devient le CTA mangue et la barre ne bouge pas d'un pixel.
+
+### Aller plus loin
+
+- Le **jeton de session Places** de Google et son modèle de facturation : à relire avant
+  d'ajouter un second champ d'adresse (chaque champ = une session).
+- `useSyncExternalStore` : la doc React explique pourquoi `getSnapshot` doit être stable —
+  c'est le même contrat que pour un store Redux.
+- Les **types sommes** (`{ status: 'ok' } | { status: 'unavailable' }`) : le remède général au
+  « vide qui ment », bien au-delà de l'autocomplétion.
+
+## Chapitre 212 — Le feed à la Airbnb : les anneaux qui dominent, le percentile sans médiane, et la géoloc qui ne sort jamais
 
 **Le lot** : `feat/feed-relevance-server` (D80) — le tri par défaut de la recherche devient un
 classement localisé, calculé en lecture côté serveur.

@@ -12663,6 +12663,65 @@
         "additionalProperties": false,
         "description": "Mes favoris — du plus récent au plus ancien, trajets passés inclus"
       },
+      "PlaceAutocompleteQuery": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "sessionToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{1,36}$"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false,
+        "description": "Paramètres de l'autocomplétion de villes"
+      },
+      "PlaceSuggestion": {
+        "type": "object",
+        "properties": {
+          "main": {
+            "type": "string"
+          },
+          "secondary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "main",
+          "secondary"
+        ],
+        "additionalProperties": false,
+        "description": "Une proposition de ville ou d'aéroport"
+      },
+      "PlaceAutocompleteResponse": {
+        "type": "object",
+        "properties": {
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceSuggestion"
+            }
+          }
+        },
+        "required": [
+          "suggestions"
+        ],
+        "additionalProperties": false,
+        "description": "Propositions de villes (8 au plus, dans la langue demandée)"
+      },
       "ArbitrationKind": {
         "type": "string",
         "enum": [

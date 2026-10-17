@@ -12100,6 +12100,236 @@ Revolut) :
 - Les routes typées ont suivi à chaud (le Metro du poste régénère `.expo/types` à la volée).
 - Aucune dépendance ajoutée, services INTOUCHÉS, tests plateforme INCHANGÉS (1576).
 
+# Les résultats, la recherche et la fiche trajet en natif — et le relais Places · `feat/mobile-results` (A211, A212, A213)
+
+*PR #385. Dix-neuf commits du 29/09 au 17/10. Tout est dans `apps/mobile` SAUF A211, qui est
+un lot serveur (trip-service + contrat + gateway + les cinq `openapi.json`).*
+
+## Le besoin
+
+Après l'auth (A208/A209), l'app savait montrer une liste de trajets, mais la liste était un
+brouillon : carte de socle, formulaire en ligne, aucune fiche trajet, et une autocomplétion de
+villes qui ne proposait jamais rien. Trois chantiers, dans cet ordre : **la page de résultats**
+(la carte, l'en-tête, le parcours de recherche), **le relais Places** (la clé Google), **la
+fiche trajet**.
+
+---
+
+## 1. Le relais Places — `GET /places/autocomplete` (A211, lot SERVEUR)
+
+### Le diagnostic (une soirée, et pas une ligne de l'app en cause)
+
+L'autocomplétion ne proposait rien. Deux clés, deux causes :
+
+| Clé | Projet | Verdict |
+|---|---|---|
+| `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (racine) | sans facturation | `403 REQUEST_DENIED` — « You must enable Billing » |
+| celle du site (`apps/user-ui/.env.local`) | facturé | `API_KEY_HTTP_REFERRER_BLOCKED` — un `fetch` natif n'envoie pas de referer |
+
+**La leçon, générale** : une clé « publique » côté web est une clé *contrainte par l'origine*.
+Dans une app, il n'y a pas d'origine — la même clé est soit refusée, soit extractible du
+bundle et facturable par n'importe qui. Une clé tierce n'a rien à faire dans un binaire.
+
+### Le serveur
+
+`apps/trip-service/src/` — le service qui porte déjà la recherche, donc **aucun service
+nouveau** :
+
+```
+routes/places.router.ts        → GET /places/autocomplete
+controllers/places.controller.ts
+services/places.service.ts     → appel Google + cache Redis + délai
+lib/places.rules.ts            → PUR : projection de la réponse, clé de cache, validation
+```
+
+- **Authentification OPTIONNELLE**, comme la recherche (`isOptionallyAuthenticated`) : la
+  langue vient du COMPTE s'il y en a un (`resolveViewerLocale`, D44), de l'appareil sinon.
+- La clé vit dans `GOOGLE_MAPS_SERVER_API_KEY`, **`.env` RACINE** (jamais un `.env` de
+  projet : piège déjà payé sur ImageKit), documentée dans `.env.example`.
+- **Trois protections**, parce que l'endpoint est public et que chaque appel est facturé :
+  le débit limité du gateway ; un **cache Redis de 5 min** par (saisie, langue) qui **échoue
+  OUVERT** (Redis muet ⇒ on interroge Google : une panne de cache n'est pas une panne de
+  service) ; un **délai de 3 s** au-delà duquel Google est tenu pour muet.
+- Le **`sessionToken` du client est relayé tel quel** : c'est lui qui groupe la facturation
+  Google en une session de frappe, et seul le client sait quand une saisie commence.
+- **Deux refus, deux sens** — `400 INVALID_QUERY` (contrat) et `503 PLACES_UNAVAILABLE`
+  (tiers muet). Jamais une liste vide : une liste vide ferait dire « aucune ville trouvée »
+  à un écran qui n'a pas pu demander.
+
+Contrat Zod dans `packages/libs/api-contracts/src/places/places.schema.ts`, chemin déclaré
+dans `apps/trip-service/src/openapi/build-openapi.ts`, **les cinq `openapi.json` régénérés**
+(registre de schémas commun, A22 — la CI les diffe). Gateway : `/api/places/*` → `:6002`
+`/places/*`.
+
+### Le client, et le défaut d'interface qu'il cachait
+
+`apps/mobile/src/lib/api/places.api.ts` appelle notre API : **plus aucune clé dans le
+bundle**. Avant même le relais, `suggestCities` rendait un tableau vide dans TOUS les cas —
+l'écran accusait donc la saisie d'une panne de service. Il rend maintenant un résultat
+discriminé :
+
+```ts
+type SuggestResult = { status: 'ok'; items: CitySuggestion[] } | { status: 'unavailable' };
+```
+
+Deux messages distincts : « Aucune ville trouvée » parle de la **saisie** ; « Suggestions
+indisponibles — tape la ville, la recherche fonctionne quand même » parle du **service**, et
+rappelle que la saisie libre reste valide (l'autocomplétion est un confort, jamais un
+préalable). Toute panne est **tracée** en développement (code HTTP + corps de la réponse) —
+sans cette trace, le défaut était indiagnosticable depuis l'app.
+
+---
+
+## 2. La page de résultats (A212)
+
+### La carte, en trois itérations sur captures
+
+réf. SNCF Connect (colonne horaires + frise pointillée) → la carte web mobile à l'identique
+→ **V2 épurée à drapeaux** (`proposition-carte-epuree.png`) : route pleine largeur en gras,
+UNE ligne d'horaires, prix sans libellé, kg disponibles en teal, pied `nom · note`.
+`apps/mobile/src/components/trip-result-card.tsx`. Le DTO serveur portait déjà tout —
+**aucun endpoint mobile** ; le cœur favori est optimiste (D46, visiteur → `/login`).
+
+**Rien d'`Intl` n'est acquis sur Hermes.** Les pluriels ICU rendaient la clé brute
+(`FORMATTING_ERROR`) et les pays sortaient en code : polyfills `@formatjs`
+(`Intl.PluralRules`, `Intl.DisplayNames`) dans `src/i18n/intl-polyfills.ts`, écrits en `.js`
+(TS2882). Et les libellés de dates passent par des **tables partagées**
+(`src/lib/trip-format.ts` : `formatDayMonth`, `formatMonthYear`, `weekdayLabels`), **jamais**
+par `toLocaleDateString`, dont les données dépendent du moteur et de l'OS.
+
+### L'en-tête collant
+
+`expo-blur` : pilule récap et pastilles de transport épinglées, la liste défile dessous
+jusque sous la barre de statut (`SafeAreaView` sans bord haut, encoche gérée à la main,
+hauteur mesurée par `onLayout`). iOS : matériau chrome système. Android : `BlurTargetView`
++ `dimezisBlurViewSdk31Plus`, repli translucide avant Android 12 — **à valider au poste
+Android**. Les pastilles sont alimentées par les **facettes serveur**
+(`GET /trips/search/facets`), le tri et les filtres sont servis par le serveur : le front ne
+décide d'aucune limite.
+
+### Le parcours de recherche devient natif
+
+Les trois champs quittent le formulaire en ligne pour une **feuille** (`src/app/search/edit.tsx`)
+et de **vraies pages poussées** (`search/city.tsx`, `search/date.tsx`), le motif des deux OS.
+
+- La pile `search/` est présentée en `transparentModal` au niveau racine — le motif du
+  groupe `(auth)` d'A208. La feuille est l'écran transparent de la pile ; ville et date sont
+  des pages pleines qui glissent depuis la droite.
+- La feuille est **animée à la main** (montée, voile, glisser-pour-fermer, retour matériel
+  Android) plutôt qu'en `formSheet` natif, qui enfermerait les étapes suivantes DANS la
+  feuille.
+- **Une page poussée ne retourne pas de valeur.** Le choix repart par un brouillon en
+  mémoire de processus (`src/lib/search-draft.ts`, motif `auth-flow-state.ts`), auquel
+  l'écran s'abonne par `useSyncExternalStore` ; la feuille incrémente un `submitNonce` et
+  **l'écran reste seul maître de l'appel serveur** (pastilles, tri, pagination).
+- **Supersession d'A207** : le `DatePicker` d'`@expo/ui` est remplacé par un calendrier
+  maison sans dépendance (`src/components/search-calendar.tsx`) — douze mois qui défilent
+  verticalement (geste natif : Airbnb, Booking, SNCF Connect) là où le site a deux flèches
+  (geste de souris). Raison : le composant système ne sait pas **peindre la fenêtre
+  flexible**, ne se teinte pas, et n'existe qu'en DIALOGUE sur Android — deux parcours pour
+  une même étape.
+- Le flou du fond a été **dosé sur capture** : matériau `thin` à 32 (et non `thick` à 72),
+  voile 0,18 ; Android, qui ne sait pas flouter à travers une fenêtre, reçoit un voile à
+  0,42. L'animation porte sur l'**opacité** (driver natif) : `intensity` n'est pas animable.
+- Le choix d'une ville est normalisé en **« Ville, Pays »** (le libellé que le serveur
+  attend — WEB-ACC-9, sans quoi toute ville étrangère rendait zéro résultat) mais n'est
+  affiché qu'en **ville seule** dans les récapitulatifs.
+
+### La revue UX du 16/10 — ce que l'écran disait de trop, et le prix qu'il disait faux
+
+Sur un écran de 844 pt, **287 pt (34 %) passaient avant le premier trajet**, pour redire
+trois fois la même chose.
+
+| Geste | Gain |
+|---|---|
+| Titre générique « Tous les trajets disponibles » supprimé (la pastille « Tout » et la pilule « Partout » le disaient déjà) | ~60 pt |
+| Sous-titre explicatif supprimé — **et c'était le seul vouvoiement de toute l'app** (décision du 03/09 : tutoiement), vérifié sur les six dictionnaires FR | 2 lignes |
+| « Filtres » en icône seule, point mangue si un tri non-défaut est posé, le mot dans le libellé d'accessibilité | ~50 pt |
+| Pastilles sans icône de transport (le mot la dit), compte en texte, paddings resserrés | ~19 pt × 4 + 16 pt |
+
+La pilule récap dit désormais un **état** (« Partout », « Toutes les dates ») et non un ordre
+(« Choisis une date ») ni des libellés de champ.
+
+**Et le prix.** « 3,50 €/kg » n'est pas ce que l'Expéditeur paie : sous le plancher de
+transport (8 €, D32) et avec le plancher de commission (3 €, D16), un colis de 2 kg coûte
+11 €. Le prix au kilo ne devient vrai qu'au-delà de **2,29 kg** — **57 % d'écart sur le colis
+type**. La carte porte maintenant « ≈ 11 € pour 2 kg », MÊME miroir que la fiche
+(`src/lib/pricing-example.ts`) ; c'est une **projection indicative**, le prix réel reste
+calculé et figé par le serveur (snapshot D17).
+
+Enfin, deux règles d'affichage : les compteurs de preuve sociale ont un **seuil** (vues
+à partir de 15, « Populaire » à 20 — un petit chiffre n'est pas neutre, il est négatif), et
+les drapeaux ne s'affichent qu'à l'**international**.
+
+---
+
+## 3. La fiche trajet (A213)
+
+Livrée le 13/10 comme transposition de la page publique du site (`src/app/trip/[id].tsx`,
+même endpoint `GET /trips/:id/public`), **refondue le soir même** sur retour de recette.
+
+Le défaut était **structurel** : la première version transposait les CARTES du site, soit
+cinq boîtes grises empilées sur fond noir — tout avait le même poids, donc rien n'en avait.
+
+La grammaire retenue (fiches natives Airbnb / Booking) :
+
+- page **à plat**, sections séparées par un filet, **UNE SEULE carte** : le prix, légèrement
+  teintée mangue. Une carte redevient un signal parce qu'elle est unique ;
+- le tri se fait par le **moment de la lecture** : route, horaires, Voyageur, prix, lieux
+  restent visibles ; détails du prix, familles refusées, conditions se replient ;
+- les **8 familles D14 ne s'affichent plus toutes** : ce que le Voyageur accepte (avec son
+  supplément) s'affiche, ce qu'il refuse se replie (« Familles refusées (6) ») ;
+- les lieux redeviennent des **lignes** (quatre cartes bordées pour quatre informations
+  d'une ligne, c'était du cadre pour du cadre) ;
+- l'estimation tient en **une phrase** (« ≈ 11,00 € pour un colis de 2 kg, tout compris »).
+
+**Deux promesses retirées plutôt que grisées** : la ligne « Discuter avec X » disparaît (le
+chat n'ouvre qu'après acceptation, chantier F) et la fiche Voyageur n'a pas de chevron (la
+page profil publique n'existe pas dans l'app). **Le geste indisponible se dit en pastille
+discrète** : le pavé gris « Bientôt réservable » était l'élément le plus visible de l'écran
+pour la seule chose qu'on ne peut pas faire ; au lot réservation, cette pastille devient le
+CTA mangue **et la barre ne bouge pas**.
+
+**Le signalement (D68) est natif et signé** (`src/components/report-sheet.tsx`) : une feuille
+à trois états — porte d'identité pour un visiteur, formulaire à motifs FERMÉS
+(`REPORT_REASONS_BY_TARGET`, précisions ≤ 500), accusé de réception. `POST /reports`, aucun
+endpoint mobile, refus traduits par leur code (`OWN_TARGET`, 409 doublon, 404 cible
+invisible).
+
+**Bug de mise en page corrigé** : la frise était désalignée (« Orléans » tombait sous son
+point) — ses trois colonnes partagent désormais la MÊME grille (rangée 44, écart 28, point
+centré par calcul).
+
+---
+
+## Écarté (et pourquoi)
+
+- **Une seconde clé Google sans restriction de referer** : extractible du bundle, facturable
+  par un tiers, révocable seulement après la facture.
+- **Un service proxy dédié** pour Places : un service de plus pour un chemin ; trip-service
+  porte déjà la recherche.
+- **`formSheet` natif** pour « Modifier la recherche » : il enfermerait ville et date DANS la
+  feuille.
+- **`DatePicker` d'`@expo/ui`** : ne peint pas la fenêtre flexible, ne se teinte pas, n'existe
+  qu'en dialogue sur Android.
+- **Griser le CTA de réservation** en pleine largeur : l'élément le plus visible de l'écran
+  pour la seule chose indisponible.
+
+## Vérifié
+
+- `nx typecheck @yamba-app/mobile` vert (commande CI) ; **PR #385 : 18/18 contrôles verts**,
+  comptés.
+- trip-service **310 → 326 tests** (7 sur la projection pure et la clé de cache, 9 sur le
+  contrôleur : forme, liste vide = 200, 503 à code, 400 à code, contrat strict, les quatre
+  priorités de langue). Référence plateforme portée à **1186** dans `CLAUDE.md`.
+- Service DÉMARRÉ et interrogé : `/health` 200, `503 PLACES_UNAVAILABLE` sans clé serveur,
+  `400 INVALID_QUERY` à un caractère, `details.code` présent dans les deux (A146).
+- i18n : miroir FR/EN parfait à chaque itération, clés mortes purgées dans **les deux**
+  locales ; aucun style orphelin (contrôles automatisés) ; aucune clé `tripDetail` inutilisée.
+- Bundles Hermes iOS **et** Android à chaque lot : marqueurs présents, témoins PROUVÉS
+  absents, en UTF-8 **et** UTF-16 (leçon A204).
+- **Reste à valider au poste Android** : le repli de flou avant Android 12.
+
 # Le flux d'atterrissage localisé — côté serveur · `feat/feed-relevance-server` (D80)
 
 ## Le besoin et la décision

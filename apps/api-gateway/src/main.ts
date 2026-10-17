@@ -115,6 +115,19 @@ app.use(
   })
 );
 
+// ─── Places (port 6002) ──────────────────────
+// A211 — /api/places/* → trip-service reçoit /places/*
+// Le relais d'autocomplétion : la clé Google vit côté serveur, jamais dans
+// un bundle (une clé embarquée est extractible, donc facturable par
+// n'importe qui ; et une clé restreinte par referer est de toute façon
+// refusée à un `fetch` natif, qui n'en envoie pas).
+app.use(
+  "/api/places",
+  proxy("http://localhost:6002", {
+    proxyReqPathResolver: (req) => `/places${req.url}`,
+  })
+);
+
 // ─── Upload Service (port 6002) ──────────────
 // /api/uploads/* → trip-service reçoit /uploads/*
 app.use(

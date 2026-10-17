@@ -27,15 +27,10 @@
   },
   "offer": {
     "title": "What you can send with {firstName}",
-    "hint": "One price per kg, whatever the content. Check below that your parcel type is accepted: some carry a surcharge, some are refused.",
     "perKg": "Price per kg",
     "available": "Available",
-    "estimateLabel": "Estimate for a {kg} kg parcel",
-    "allIn": "all-in (transport + Yamba service)",
     "finalAtBooking": "The final price is set at booking.",
     "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum, whatever the weight.",
-    "families": "Parcel families",
-    "refused": "Refused by the Traveler",
     "surcharge": "+{pct}%",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papers",
@@ -47,13 +42,14 @@
       "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Accessories & misc."
     },
-    "bags": "Whole bag — flat rate",
     "checkedBag": "Checked bag 23 kg",
-    "cabinBag": "Cabin bag 12 kg"
+    "cabinBag": "Cabin bag 12 kg",
+    "estimateShort": "≈ {price} for a {kg} kg parcel, all in",
+    "priceDetails": "Price details",
+    "refusedFamilies": "Refused families"
   },
   "categories": {
     "title": "What {firstName} offers",
-    "hint": "One booking = one parcel from a single category. To send multiple parcels, make a booking per parcel.",
     "label": {
       "CLOTHES": "Clothes",
       "SHOES": "Shoes",
@@ -70,8 +66,8 @@
     }
   },
   "locations": {
-    "pickupTitle": "Handover spots",
-    "deliveryTitle": "Delivery spots",
+    "pickupTitle": "Pickup",
+    "deliveryTitle": "Delivery",
     "kind": {
       "AIRPORT": "At the airport",
       "TRAIN_STATION": "At the train station",
@@ -81,7 +77,8 @@
       "EXACT": "Exact spot",
       "CITY_WIDE": "Whole city",
       "RADIUS": "Within {km} km"
-    }
+    },
+    "title": "Pickup & delivery places"
   },
   "conditions": {
     "title": "Conditions",
@@ -103,7 +100,6 @@
   "notes": {
     "title": "Traveler's notes"
   },
-  "bookingSoon": "Booking from the app is coming soon. Until then, this trip can be booked on the Yamba website.",
   "notFound": {
     "title": "Trip not found",
     "body": "This trip doesn't exist or is no longer available."
@@ -111,5 +107,51 @@
   "error": {
     "network": "We couldn't load this trip. Check your connection and try again.",
     "retry": "Retry"
+  },
+  "favorite": {
+    "add": "Add to favourites",
+    "remove": "Remove from favourites",
+    "ownTrip": "This is your own trip: you can't add it to favourites.",
+    "notFavoritable": "This trip can no longer be added to favourites.",
+    "error": "The favourite couldn't be saved. Please try again."
+  },
+  "co2": {
+    "prefix": "Shipping with no extra footprint ·",
+    "amount": "{kg} kg of CO₂ saved vs express freight",
+    "suffix": "for a {weight} kg parcel"
+  },
+  "bar": {
+    "from": "From",
+    "soon": "Booking coming soon"
+  },
+  "report": {
+    "title": {
+      "TRIP": "Report this listing",
+      "USER": "Report this profile"
+    },
+    "intro": "Tell us what's wrong. Our team reviews every report; the person concerned will never know who reported them.",
+    "reason": "Reason",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Illegal or prohibited content",
+      "SCAM": "Suspected scam",
+      "INAPPROPRIATE": "Inappropriate behaviour",
+      "IMPERSONATION": "Impersonation",
+      "OTHER": "Other"
+    },
+    "reasonMissing": "Pick a reason first.",
+    "details": "Details (optional)",
+    "detailsPlaceholder": "What you saw, when…",
+    "submit": "Send the report",
+    "cancel": "Cancel",
+    "back": "Close",
+    "done": "Thank you, your report has been received.",
+    "doneHint": "A confirmation email has been sent. We don't share the outcome.",
+    "already": "You already reported this; our team is on it.",
+    "ownTarget": "You can't report your own content.",
+    "failed": "The report couldn't be sent. Please try again.",
+    "notFound": "This item cannot be found: it no longer exists or is no longer visible.",
+    "gateTitle": "Sign in to report",
+    "gateSubtitle": "A report is always signed: it protects everyone from abuse.",
+    "signIn": "Sign in"
   }
 }

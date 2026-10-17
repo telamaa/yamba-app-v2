@@ -1,3 +1,6 @@
+// AVANT tout : Hermes sans `Intl.PluralRules`, les clés ICU plural cassent.
+import '@/i18n/intl-polyfills';
+
 import { useEffect, useRef, useState } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import { Animated, useColorScheme } from 'react-native';
@@ -75,6 +78,16 @@ export default function RootLayout() {
             {/* La fiche trajet se pousse PAR-DESSUS les onglets (pas dedans) :
                 le retour ramène aux résultats, la barre reste celle du groupe. */}
             <Stack.Screen name="trip/[id]" />
+            {/* L'éditeur de recherche (feuille « Modifier la recherche » +
+                ses pages ville/date) : UNE pile par-dessus les résultats,
+                en modale TRANSPARENTE — la feuille laisse voir la liste
+                dessous, ses étapes suivantes sont des pages pleines. */}
+            <Stack.Screen
+              name="search"
+              options={{ presentation: 'transparentModal', animation: 'none' }}
+            />
+            {/* Profil n'est plus un onglet (A210) : il se pousse par-dessus. */}
+            <Stack.Screen name="profile" />
           </Stack>
           {/* Après la pile : le splash peint PAR-DESSUS pendant l'amorçage. */}
           <LaunchGate />

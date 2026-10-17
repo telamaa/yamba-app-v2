@@ -13,19 +13,43 @@
  */
 import { apiFetch } from './client';
 
+/** Catégories de colis (mêmes clés que le web, `search-results.types.ts`). */
+export type SearchParcelCategory =
+  | 'clothes'
+  | 'shoes'
+  | 'fashion-accessories'
+  | 'other-accessories'
+  | 'books'
+  | 'documents'
+  | 'small-toys'
+  | 'phone'
+  | 'computer'
+  | 'other-electronics'
+  | 'checked-bag-23kg'
+  | 'cabin-bag-12kg';
+
 export type TripSearchResult = {
   id: string;
   fromCity: string;
+  /** Texte figé dans la locale du créateur — préférer fromCountryCode. */
+  fromCountry?: string;
   fromCountryCode?: string;
   toCity: string;
+  toCountry?: string;
   toCountryCode?: string;
   /** Déjà localisée par le serveur (« 12 juin 2026 » / « June 12, 2026 »). */
   travelDate: string;
+  /** ISO 8601 — le SEUL champ datable côté client (`travelDate` est du texte).
+   *  Envoyé par le serveur depuis ANO-WEB-30, pour séparer les favoris encore
+   *  en ligne des trajets passés. Optionnel : un trajet sans date reste actif. */
+  departureAt?: string;
   departureTime: string;
   /** Absente quand le trajet n'a pas d'heure d'arrivée. */
   arrivalTime?: string;
   nextDay?: boolean;
   durationMinutes?: number;
+  /** Nombre d'escales (0 = direct). */
+  stopovers?: number;
   transportMode: 'plane' | 'train' | 'car';
   /** Euros — minimum des tarifs par catégorie (moteur legacy). */
   minPrice: number;
@@ -34,10 +58,20 @@ export type TripSearchResult = {
   /** Kilos encore disponibles (CAP-02). */
   remainingKg?: number | null;
   currency?: string;
+  /** Catégories acceptées par le Voyageur (aperçu en pied de carte). */
+  allowedCategories?: SearchParcelCategory[];
+  /** Places restantes — alerte rouge quand ≤ 3, absent = capacité illimitée. */
+  remainingSlots?: number;
   superTripper?: boolean;
+  /** D5 / C-PR6 — vues dédoublonnées ; « Populaire » à partir de 20. */
+  viewsCount?: number;
   rating?: number;
   reviewCount?: number;
+  /** D46 — favori du membre connecté (absent pour un visiteur). */
+  isFavorite?: boolean;
   travelerFirstName?: string;
+  /** Toujours JUSTE l'initiale (privacy par défaut, côté serveur). */
+  travelerLastName?: string;
   travelerAvatarUrl?: string;
 };
 
@@ -47,24 +81,57 @@ export type SearchPage = {
   totalCount: number;
 };
 
+/** Filtre transport des pastilles (« Tout » = pas de paramètre serveur). */
+export type SearchTransportFilter = 'all' | 'plane' | 'train' | 'car';
+
+/** Tris serveur (mêmes clés que le web ; « earliest » = défaut, omis). */
+export type SearchSort = 'earliest' | 'lowestPrice' | 'bestRated';
+
 export type SearchParams = {
   from?: string;
   to?: string;
   /** ISO — bornes de la fenêtre de départ. */
   dateFrom?: string;
   dateTo?: string;
+  mode?: SearchTransportFilter;
+  sort?: SearchSort;
   cursor?: string | null;
   limit?: number;
 };
 
-export async function searchTrips(params: SearchParams): Promise<SearchPage> {
+function baseQuery(params: SearchParams): URLSearchParams {
   const query = new URLSearchParams();
   if (params.from) query.set('from', params.from);
   if (params.to) query.set('to', params.to);
   if (params.dateFrom) query.set('dateFrom', params.dateFrom);
   if (params.dateTo) query.set('dateTo', params.dateTo);
+  return query;
+}
+
+export async function searchTrips(params: SearchParams): Promise<SearchPage> {
+  const query = baseQuery(params);
+  if (params.mode && params.mode !== 'all') query.set('mode', params.mode);
+  if (params.sort && params.sort !== 'earliest') query.set('sort', params.sort);
   if (params.cursor) query.set('cursor', params.cursor);
   if (params.limit) query.set('limit', String(params.limit));
   const qs = query.toString();
   return apiFetch<SearchPage>(`/trips/search${qs ? `?${qs}` : ''}`);
+}
+
+/** Comptes des pastilles transport — sous-ensemble utile du DTO web. */
+export type SearchFacets = {
+  totalCount: number;
+  modeCount: { all: number; plane: number; train: number; car: number };
+};
+
+export type SearchFacetsParams = Pick<SearchParams, 'from' | 'to' | 'dateFrom' | 'dateTo'>;
+
+/**
+ * GET /trips/search/facets — mêmes paramètres STRUCTURANTS que la recherche,
+ * SANS le mode : les pastilles comptent « combien par transport » parmi les
+ * filtres actifs (miroir de useSearchFacets côté web).
+ */
+export async function getSearchFacets(params: SearchFacetsParams): Promise<SearchFacets> {
+  const qs = baseQuery(params).toString();
+  return apiFetch<SearchFacets>(`/trips/search/facets${qs ? `?${qs}` : ''}`);
 }

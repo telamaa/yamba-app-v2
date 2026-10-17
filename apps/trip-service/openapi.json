@@ -86,6 +86,94 @@
         }
       }
     },
+    "/places/autocomplete": {
+      "get": {
+        "tags": [
+          "places"
+        ],
+        "summary": "Proposer des villes pour une saisie",
+        "description": "Relais de l'autocomplétion Google : la clé vit côté serveur, jamais dans un client. Public (la recherche l'est). Réponse mise en cache 5 minutes par (saisie, langue). Le `sessionToken` du client est relayé tel quel — c'est lui qui groupe la facturation Google. 503 PLACES_UNAVAILABLE quand le service tiers ne répond pas : le client retombe sur la saisie LIBRE et le dit, il ne conclut jamais qu'aucune ville ne correspond.",
+        "operationId": "autocompletePlaces",
+        "parameters": [
+          {
+            "name": "input",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            },
+            "description": "La saisie en cours (2 caractères minimum)"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fr",
+                "en"
+              ]
+            },
+            "description": "Langue des propositions ; à défaut, l'en-tête x-locale"
+          },
+          {
+            "name": "sessionToken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 36
+            },
+            "description": "Jeton de session d'autocomplétion fabriqué par le client"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Propositions (8 au plus), éventuellement vide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceAutocompleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service d'autocomplétion indisponible (PLACES_UNAVAILABLE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/trips/search": {
       "get": {
         "tags": [
@@ -14153,6 +14241,65 @@
         ],
         "additionalProperties": false,
         "description": "Mes favoris — du plus récent au plus ancien, trajets passés inclus"
+      },
+      "PlaceAutocompleteQuery": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "sessionToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{1,36}$"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "additionalProperties": false,
+        "description": "Paramètres de l'autocomplétion de villes"
+      },
+      "PlaceSuggestion": {
+        "type": "object",
+        "properties": {
+          "main": {
+            "type": "string"
+          },
+          "secondary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "main",
+          "secondary"
+        ],
+        "additionalProperties": false,
+        "description": "Une proposition de ville ou d'aéroport"
+      },
+      "PlaceAutocompleteResponse": {
+        "type": "object",
+        "properties": {
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceSuggestion"
+            }
+          }
+        },
+        "required": [
+          "suggestions"
+        ],
+        "additionalProperties": false,
+        "description": "Propositions de villes (8 au plus, dans la langue demandée)"
       },
       "ArbitrationKind": {
         "type": "string",
