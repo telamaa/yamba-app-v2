@@ -153,7 +153,9 @@ export default function BookingParcelScreen() {
     [trip]
   );
 
-  // Plancher par colis : à ce poids, la taille ne change RIEN. On le dit.
+  // D81 — à ce poids, la taille ne change RIEN : le colis pèse déjà plus que
+  // TOUS les minimums de taille (le plus haut est celui de L). On le dit, au
+  // lieu de laisser croire que la question est décorative.
   const sizeIsFlat =
     sizeDeltaCents !== null &&
     sizeDeltaCents.S === 0 &&

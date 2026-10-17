@@ -120,11 +120,14 @@ function toShipperPricing(quote: ShipperQuote) {
     currencyCode: quote.currencyCode,
     product: quote.product,
     billableWeightKg: quote.billableWeightKg,
-    sizeCoef: quote.sizeCoef,
     familySurchargePct: quote.familySurchargePct,
     rawTransportCents: quote.rawTransportCents,
-    minimumApplied: quote.minimumApplied,
     serviceCents: quote.serviceCents,
+    // D81 — ce qui a fixé le poids facturé, plutôt qu'un booléen qui ne le
+    // disait pas. `sizeCoef` et `minimumApplied` ne sont plus écrits.
+    billingFloorKg: quote.billingFloorKg,
+    sizeMinKg: quote.sizeMinKg,
+    billableReason: quote.billableReason,
   };
 }
 

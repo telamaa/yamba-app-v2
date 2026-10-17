@@ -118,17 +118,20 @@ describe("checkTripBookable", () => {
 });
 
 describe("buildQuoteInput + quoteForTrip (D34 : le même moteur que le front)", () => {
-  it("colis 2 kg M, 12 €/kg, sans supplément → 26,40 € transport, 3,17 € commission", () => {
+  it("D81 — colis 2 kg M, 12 €/kg : facturé 3 kg (le minimum de M) → 36 € transport, 4,32 € commission", () => {
     const q = quoteForTrip(trip(), input());
-    expect(q.transportCents).toBe(2640);
-    expect(q.commissionCents).toBe(317);
-    expect(q.totalShipperCents).toBe(2957);
-    expect(q.capacityKgConsumed).toBe(2);
+    expect(q.billableWeightKg).toBe(3);
+    expect(q.billableReason).toBe("SIZE_MIN");
+    expect(q.transportCents).toBe(3600);
+    expect(q.commissionCents).toBe(432);
+    expect(q.totalShipperCents).toBe(4032);
+    // CAP-01 (D81) : on RÉSERVE ce qu'on facture — la place, pas la masse.
+    expect(q.capacityKgConsumed).toBe(3);
   });
-  it("le supplément de famille du Voyageur entre dans le devis", () => {
+  it("le supplément de famille du Voyageur entre dans le devis, sur le poids FACTURÉ", () => {
     const q = quoteForTrip(trip(), input({ family: "ELECTRONICS_DEVICES" }));
     expect(q.familySurchargePct).toBe(20);
-    expect(q.transportCents).toBe(Math.round(1200 * 2 * 1.1 * 1.2));
+    expect(q.transportCents).toBe(Math.round(1200 * 3 * 1.2));
   });
   it("bagage 23 kg → forfait, poids/sizeClass ignorés, 23 kg consommés", () => {
     const qi = buildQuoteInput(trip(), input({ product: "CHECKED_BAG_23KG", weightKg: 2, sizeClass: "M" }));
@@ -165,8 +168,17 @@ describe("capacité (CAP-01)", () => {
     expect(remainingKg(trip())).toBe(15);
     expect(remainingKg(trip({ capacityKg: null }))).toBeNull();
   });
-  it("kg à réserver = poids déclaré du colis (pas le facturable) / franchise du bagage", () => {
-    expect(kgToReserve(quoteForTrip(trip(), input({ weightKg: 0.2 })))).toBe(0.2);
+  /**
+   * D81 — le défaut § 4.2 du livrable 12, en non-régression : AVANT, on réservait
+   * le poids DÉCLARÉ, donc un colis « demi-valise » d'1 kg ne prenait qu'1 kg de
+   * capacité. Dix colis comme celui-là et le Voyageur n'avait plus de place, sans
+   * qu'aucune règle ne s'en aperçoive. On réserve désormais ce qu'on facture.
+   */
+  it("D81 — kg à réserver = poids FACTURÉ du colis / franchise du bagage", () => {
+    // 0,2 kg en M : ni le poids réel ni le plancher (2,3) ne gagnent — M vaut 3 kg.
+    expect(kgToReserve(quoteForTrip(trip(), input({ weightKg: 0.2 })))).toBe(3);
+    // en S, c'est le plancher qui décide : 2,3 kg réservés pour 0,2 kg déclaré.
+    expect(kgToReserve(quoteForTrip(trip(), input({ weightKg: 0.2, sizeClass: "S" })))).toBe(2.3);
     expect(kgToReserve(quoteForTrip(trip(), input({ product: "CHECKED_BAG_23KG" })))).toBe(23);
   });
   it("dépassement → CAPACITY_EXCEEDED ; exactement le reste → OK", () => {
@@ -202,21 +214,27 @@ describe("buildBookingSnapshots (D17 : figé tel quel)", () => {
       pricingModel: "PER_KG",
       product: "PARCEL",
       weightKg: 2,
-      billableWeightKg: 2,
+      billableWeightKg: 3,
       sizeClass: "M",
-      sizeCoef: 1.1,
       pricePerKgCents: 1200,
-      transportCents: 2640,
+      transportCents: 3600,
       commissionPct: 0.12,
-      commissionCents: 317,
+      commissionCents: 432,
       protectionProvider: "YAMBA_GUARANTEE",
       protectionTier: "EXTENDED_500",
       premiumCents: 600,
-      serviceCents: 917,
-      totalShipperCents: 3557,
-      minimumApplied: false,
+      serviceCents: 1032,
+      totalShipperCents: 4632,
+      // D81 — la photographie dit POURQUOI le poids facturé diffère du réel.
+      billingFloorKg: 2.3,
+      sizeMinKg: 3,
+      billableReason: "SIZE_MIN",
       currencyCode: "EUR",
     });
+    // D81 (6A) — les deux champs du régime précédent ne sont PLUS écrits : on ne
+    // réinterprète jamais un champ historique, on cesse de l'alimenter.
+    expect(s.pricing).not.toHaveProperty("sizeCoef");
+    expect(s.pricing).not.toHaveProperty("minimumApplied");
     expect(s.parcel).toMatchObject({ category: "CLOTHES", categoryFamily: "CLOTHES_TEXTILE", declaredValueCents: 12000 });
     // A85 — les listes EXISTENT dès la création (pitfall Mongo : une liste absente n'est matchée par aucun filtre).
     expect(s.trackingEvents).toEqual([]);

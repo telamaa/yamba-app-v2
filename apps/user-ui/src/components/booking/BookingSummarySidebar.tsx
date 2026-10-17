@@ -165,9 +165,14 @@ function RecapCard({
               {t(`summary.quoteHint.${price.quoteError}`)}
             </div>
           )}
-          {price.quote?.minimumApplied && (
+          {/* D81 — on ne dit plus « minimum appliqué » sans dire LEQUEL : le
+              plancher du trajet et le minimum de la taille ne se corrigent pas
+              de la même façon (baisser le poids, ou changer de taille). */}
+          {price.quote && price.quote.billableReason && price.quote.billableReason !== "ACTUAL" && (
             <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
-              {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}
+              {price.quote.billableReason === "SIZE_MIN"
+                ? t("summary.billableSizeMin", { size: price.quote.sizeClass ?? "", kg: price.quote.billableWeightKg ?? 0 })
+                : t("summary.billableFloor", { kg: price.quote.billableWeightKg ?? 0 })}
             </div>
           )}
         <PriceRow label={t("summary.serviceYamba")} amount={price.serviceFee} locale={locale} />

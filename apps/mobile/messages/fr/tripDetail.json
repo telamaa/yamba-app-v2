@@ -30,7 +30,7 @@
     "perKg": "Prix au kilo",
     "available": "Disponible",
     "finalAtBooking": "Le prix définitif est fixé à la réservation.",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids.",
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum, quel que soit son poids.",
     "surcharge": "+{pct} %",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papiers",

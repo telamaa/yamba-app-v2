@@ -66,7 +66,7 @@
       "M": "a backpack",
       "L": "half a suitcase",
       "hintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
-      "hintFlat": "At this weight, size does not change the price — the per-parcel minimum applies. It tells the Traveler whether your parcel fits in their bag.",
+      "hintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
       "extra": "+{amount}"
     },
     "requiredBadge": "Required"
@@ -215,7 +215,6 @@
     "duration": "{hours}h flight",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
-    "minimumApplied": "Per-parcel minimum applied: {min}",
     "newTripper": "New Traveler",
     "quoteHint": {
       "MISSING_WEIGHT": "Enter the parcel weight to see the price.",
@@ -223,7 +222,9 @@
       "MISSING_PRICE_PER_KG": "This trip has no price per kg.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
       "UNKNOWN": "Price unavailable."
-    }
+    },
+    "billableFloor": "Billed at the trip minimum: {kg} kg.",
+    "billableSizeMin": "Size {size}: billed at a {kg} kg minimum — that's the space it takes."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",
