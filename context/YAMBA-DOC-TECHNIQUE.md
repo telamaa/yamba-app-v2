@@ -12602,6 +12602,138 @@ taille, y compris quand elle ne change pas le prix) ; le fond est une décision 
 
 ---
 
+# La recette de la page ① — l'infobulle rognée, l'avion sur un train, et le tunnel qui annonçait sept étapes (PR #387, A215 · A216)
+
+Trois retours de recette du 17/10, tous sur la page ① du tunnel de réservation. Chacun
+cachait une cause plus profonde que le symptôme.
+
+## L'infobulle du poids se faisait tronquer — deux causes qui se cumulaient
+
+Le symptôme : en vue responsive, l'infobulle « ⓘ » du champ **Poids** sortait coupée. Une
+infobulle de cette page avait déjà été corrigée (passe `back-2` : elle s'ouvrait vers le
+HAUT et sortait par le bord supérieur de la carte). Celle-ci se coupait sur l'autre axe.
+
+**Cause 1 — la grille.** `weightValueBlock` était écrit `grid grid-cols-2` **sans point de
+rupture** : sur un téléphone de 390 px, le champ Poids ne faisait qu'une demi-largeur
+(~165 px), alors qu'il porte un input, jusqu'à quatre puces de raccourci et la ligne des
+kilos restants. C'est le piège #175 du `CLAUDE.md`, pris par l'autre bout : on s'était
+protégé des grilles déclarées à partir de `lg:`, pas de celles déclarées *sans condition*
+pour un confort desktop.
+
+**Cause 2 — le point d'ancrage.** `InfoTooltip` positionnait sa bulle `left-1/2
+-translate-x-1/2`, c'est-à-dire **centrée sur son icône**. L'icône est collée au libellé,
+donc près du bord gauche du champ : 16 rem centrées là-dessus débordent par la gauche.
+
+**Et qui rogne ?** `BookingMobile.tsx` enveloppe le contenu dans
+`<div className="flex-1 overflow-y-auto pb-40">`. Or **`overflow-y: auto` ne peut pas
+coexister avec un `overflow-x: visible`** : par spécification CSS, l'axe resté `visible` est
+ramené à `auto` dès que l'autre ne l'est plus. Ce conteneur rogne donc horizontalement sans
+que personne ne l'ait écrit — c'est le cousin du piège déjà consigné (`overflow-x: clip` et
+non `hidden` pour préserver `sticky`).
+
+**Le correctif.** L'infobulle s'ancre sur le **bord gauche du champ** : le `<label>` porte
+`relative`, la bulle passe en `left-0` et `w-[min(16rem,100%)]`. Elle ne peut plus excéder
+la largeur du champ, donc **aucune position ne peut la tronquer** — quel que soit le
+conteneur au-dessus. Et Poids/Valeur passent à une colonne sous `sm`, en
+`grid-cols-[minmax(0,1fr)]` avec `min-w-0` sur la cellule.
+
+> La leçon : corriger la position d'une bulle, c'est traiter un cas. La rendre **incapable
+> de dépasser son champ**, c'est traiter la classe entière.
+
+## « Trajet sélectionné » parlait avion sur un trajet en train
+
+Trois lignes mentaient ensemble dans `BookingSummarySidebar` : une icône `<Plane>` **écrite
+en dur**, une durée libellée « {hours}h **de vol** », et aucun drapeau de pays.
+
+Le web avait pourtant déjà tout ce qu'il fallait — `TRANSPORT_ICONS`, `TRANSPORT_LABEL_KEYS`,
+et un `ItineraryCard` qui gère correctement PLANE / TRAIN / CAR avec escales. Le
+récapitulatif du tunnel n'en utilisait **rien**.
+
+Deux défauts de fond sont apparus en creusant :
+
+**Le mapper inventait l'avion.** `trip-context.mapper.ts` écrivait
+`travelMode: trip.transportMode ?? "PLANE"`. Or le contrat déclare `transportMode:
+TransportMode | null` : un trajet qui ne déclare pas son mode **en devenait un**. Même avec
+l'icône corrigée, le mensonge serait resté. `travelMode` devient donc *nullable*, le mode
+inconnu prend l'icône neutre `Route` et le libellé « {hours} h de trajet ». **On ne devine
+plus un mode de transport.**
+
+**Le champ pays était rempli dans deux sens opposés.** `TripContext.originCountry` recevait
+`trip.origin.country` — le texte que l'en-tête de `lib/country-name.ts` documente comme
+*figé dans la locale du créateur et absent du jeu d'essai* — tandis que le `TripContext` par
+défaut y mettait un **code ISO** (`"FR"`, `"CG"`). Le champ n'avait d'ailleurs **aucun
+lecteur** : aucun drapeau n'était affichable. Il devient `originCountryCode` /
+`destinationCountryCode`, alimenté par `origin.countryCode`.
+
+`countryFlag()` dérive le drapeau du code par le bloc *Regional Indicator* (U+1F1E6 = « A ») :
+la police du système assemble la paire, **aucune image à charger**. Il vit dans
+`lib/country-name.ts`, à côté de `countryName` et pour la même raison : partir du code,
+jamais du texte. Les drapeaux sont `aria-hidden` — la ville porte déjà le sens, un lecteur
+d'écran annoncerait « drapeau de la France » pour rien.
+
+## A215 — le drapeau est systématique sur les deux fronts
+
+La carte de résultat mobile ne montrait les drapeaux qu'à l'international (règle du 16/10 :
+« deux fois le même drapeau n'apprend rien »). **Arbitrage du 17/10, qui la supersède :**
+*tout le monde n'habite pas en France.* Pour un Expéditeur à Douala, « Paris → Orléans » ne
+dit le pays **que** par le drapeau — et deux fois le même drapeau **est** l'information : il
+dit « trajet intérieur » d'un coup d'œil. L'en-tête de `trip-result-card.tsx`, qui
+documentait l'ancienne règle, est **corrigé plutôt que laissé mentir**.
+
+`countryFlag` existe désormais dans `lib/country-name.ts` **des deux côtés**, même nom même
+fichier, et la carte mobile consomme le helper partagé au lieu de son `flagEmoji` local.
+
+## A216 — sept écrans, quatre phases annoncées
+
+Le cadre natif écrivait `Étape {current} sur {total}`, donc « Étape 1 sur 7 ». Question
+posée en recette : *« 7 étapes c'est pas trop long visuellement ? »*
+
+La réponse n'est pas « 7 c'est trop » : **ce n'est pas le nombre d'écrans qui fait
+abandonner, c'est le nombre ANNONCÉ.** Les deux vérités du domaine ne se contredisent pas —
+les écrans courts gagnent sur téléphone (règle *one thing per page* du Design System de
+GOV.UK : un formulaire long cache son CTA et affiche ses erreurs hors écran, et le clavier
+mange déjà la moitié de la hauteur), tandis que la longueur **perçue** est ce que mesurent
+les études d'abandon de tunnel. Il suffit de dissocier le **découpage** (sept) de
+l'**annonce** (quatre).
+
+`BOOKING_PHASES` + `phaseOfStep` groupent les sept écrans sous les mots du site :
+
+| Phase | Écrans |
+|---|---|
+| **Colis** | ① le colis · ② la garantie · ③ le contenu |
+| **Livraison** | ④ les lieux · ⑤ le destinataire |
+| **Engagement** | ⑥ |
+| **Paiement** | ⑦ |
+
+L'en-tête montre les quatre, la courante en mangue ; la jauge devient **continue** et avance
+par septièmes — on sent qu'on progresse sans compter jusqu'à sept. Le lecteur d'écran, lui, a
+droit au chiffre : « Colis, étape **1 sur 4** » — quatre, jamais sept, la même promesse qu'à
+l'écran. Et le **titre de l'étape descend dans le contenu** (avec un sous-titre), comme sur
+le web où « Décris ton colis » est dans la carte et non dans la barre.
+
+**La garantie remonte de l'écran ④ au ②.** Le découpage du 17/10 la plaçait après les lieux,
+alors que la passe web validée l'a remontée juste après la taille — c'est elle qui rend les
+photos obligatoires (A214). L'ordre natif contredisait donc l'ordre web, et aucun
+regroupement « Colis » ne tenait.
+
+## La page ① native alignée sur les captures validées
+
+« Décris ton colis » + sous-titre, « Qu'est-ce que tu envoies ? », les refus **nomment le
+Voyageur** (« 6 familles refusées par Marven »), familles au « & », « Poids (kg) », « Taille :
+pas besoin de mesurer ». Et les tailles prennent la **forme de pastille des familles** : deux
+questions voisines, une seule grammaire de réponse. Les rectangles et les icônes partent avec
+— une boîte à chaussures dessinée n'apprend rien de plus que les mots « une boîte à
+chaussures », et coûtait une ligne de hauteur.
+
+## Les contrôles
+
+`tsc --noEmit --project apps/user-ui` vert (la commande CI), `nx typecheck
+@yamba-app/mobile` vert, contrôle i18n **miroir parfait** (30 namespaces, 60 fichiers), la
+clé `progress` purgée avec son dernier appelant. Registre : **A215** et **A216**, tranchées
+avant le code. **18/18 contrôles CI comptés.**
+
+---
+
 # Le prix se fait au poids FACTURÉ — le coefficient de taille disparaît, la place prise est réservée (PR #388, D81)
 
 Refonte du moteur de prix, décidée en **D81** et gravée au registre *avant* la première

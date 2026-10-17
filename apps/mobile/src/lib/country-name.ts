@@ -38,3 +38,23 @@ export function countryName(code: string | null | undefined, locale: string): st
     return null;
   }
 }
+
+/**
+ * Drapeau emoji dérivé du code ISO 3166-1 alpha-2 (« FR » → 🇫🇷).
+ *
+ * Les deux lettres sont décalées dans le bloc REGIONAL INDICATOR SYMBOL
+ * (U+1F1E6 = « A ») : le système assemble la paire en drapeau, aucune image à
+ * embarquer. Même raison que `countryName` de partir du CODE.
+ *
+ * Jumeau de `countryFlag` dans `apps/user-ui/src/lib/country-name.ts` — même
+ * nom, même fichier, des deux côtés (porte de sortie : un paquet partagé).
+ *
+ * Rend `null` sur tout code absent ou malformé : un drapeau est décoratif, il
+ * ne casse jamais une ligne de texte.
+ */
+export function countryFlag(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const upper = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return null;
+  return String.fromCodePoint(...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}

@@ -211,8 +211,14 @@
     "insuranceLabel": "Protection",
     "date": "Date",
     "route": "Trajet",
-    "directFlight": "Direct",
-    "duration": "{hours}h de vol",
+    "direct": "Direct",
+    "durationByMode": {
+      "PLANE": "{hours} h de vol",
+      "TRAIN": "{hours} h de train",
+      "CAR": "{hours} h de route",
+      "BUS": "{hours} h de bus"
+    },
+    "durationNeutral": "{hours} h de trajet",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
     "newTripper": "Nouveau Voyageur",
