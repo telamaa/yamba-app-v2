@@ -10,8 +10,15 @@
  * parle du destinataire (revue UX du 17/10). Sorti ici, il ne dépend plus
  * d'une étape : si la découpe bouge encore, il suit.
  *
- * L'affichage est une LISTE À PLAT (pas des cartes encadrées) : une ligne par
- * lieu, un filet entre elles, la sélection portée par la pastille mangue.
+ * L'affichage suit la grammaire de « Ton colis » (21/10) : une CARTE bordée par
+ * groupe, une ligne pleine largeur par lieu, un filet entre elles, et la
+ * pastille de choix à DROITE. Un bloc de choix se reconnaît à sa forme, pas à sa
+ * place dans la page — l'étape 1 et l'étape 2 parlent la même langue.
+ *
+ * Les deux groupes restent CÔTE À CÔTE sur grand écran : « je remets » et « il
+ * récupère » sont deux faces d'un même rendez-vous, les empiler casserait le
+ * parallèle et allongerait une page qui porte déjà le téléphone, les noms et
+ * l'email. Sur téléphone, la grille retombe d'elle-même en une colonne.
  */
 "use client";
 
@@ -53,7 +60,7 @@ export default function MeetingPoints({ trip, draft, setDraftAction, errors }: P
       <SectionTitle>{t("title")}</SectionTitle>
       <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-4 md:grid-cols-2">
         <div className="min-w-0">
-          <div className="mb-1 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
+          <div className="mb-2 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
             {t("pickupBlockTitle", { carrierFirstName: trip.carrier.firstName })}
           </div>
           {hasMultiplePickup ? (
@@ -85,7 +92,7 @@ export default function MeetingPoints({ trip, draft, setDraftAction, errors }: P
         </div>
 
         <div className="min-w-0">
-          <div className="mb-1 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
+          <div className="mb-2 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
             {t("deliveryBlockTitle")}
           </div>
           {hasMultipleDelivery ? (

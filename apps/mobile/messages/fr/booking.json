@@ -5,7 +5,9 @@
     "allIn": "tout compris",
     "quoteError": {
       "MISSING_WEIGHT": "Indique un poids pour voir le prix",
-      "GENERIC": "Prix indisponible pour ce choix"
+      "GENERIC": "Prix indisponible pour ce choix",
+      "MISSING_PRICE_PER_KG": "Ce trajet ne propose pas d'envoi au kilo",
+      "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet"
     }
   },
   "unavailable": {
@@ -39,7 +41,6 @@
       "MISC_ACCESSORIES": "Accessoires divers"
     },
     "surcharge": "+{pct} %",
-    "sizeTitle": "Taille : pas besoin de mesurer",
     "sizes": {
       "S": "S",
       "M": "M",
@@ -50,11 +51,7 @@
       "M": "un sac à dos",
       "L": "une demi-valise"
     },
-    "weightTitle": "Poids (kg)",
-    "weightHint": "Le Voyageur le vérifiera à la remise — un écart de 10 % est toléré.",
     "weightUnit": "kg",
-    "weightShortcut": "{kg} kg",
-    "remaining": "{kg} kg encore disponibles sur ce trajet",
     "nextStepSoon": "Étape suivante : la protection de ton colis.",
     "errors": {
       "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
@@ -69,7 +66,20 @@
     "sizeHintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {name}",
-    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise."
+    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise.",
+    "cardTitle": "Ton colis",
+    "weightDecrease": "Diminuer le poids",
+    "weightIncrease": "Augmenter le poids",
+    "weightEdit": "Saisir le poids",
+    "capacityLeft": "{kg} kg restants sur ce trajet",
+    "billed": {
+      "FLOOR": "Facturé {kg} kg — le minimum de ce trajet.",
+      "SIZE_MIN": "Facturé {kg} kg — la place que prend un colis {size}."
+    },
+    "weightLabel": "Poids",
+    "weightFree": "Aucune limite annoncée sur ce trajet",
+    "sizeIncluded": "Sans supplément",
+    "sizeHintNoPrice": "Elle dit au Voyageur si ton colis tient dans son bagage."
   },
   "phases": {
     "parcel": "Colis",

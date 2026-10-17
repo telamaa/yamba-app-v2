@@ -26,16 +26,16 @@
       "linkProhibited": "Voir la liste complète"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Poids (kg)",
-      "valueLabel": "Valeur du contenu (€)",
+      "weightLabel": "Poids",
+      "valueLabel": "Valeur du contenu",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
       "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
-      "remainingKg": "{kg} kg encore disponibles sur ce trajet"
+      "remainingKg": "{kg} kg encore disponibles sur ce trajet",
+      "valueHint": "Elle fixe le plafond d'indemnisation en cas de litige — indique le prix d'achat."
     },
     "photos": {
       "label": "Photos du colis",
@@ -69,7 +69,17 @@
       "hintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Obligatoire"
+    "requiredBadge": "Obligatoire",
+    "parcelCard": {
+      "title": "Ton colis",
+      "decrease": "Diminuer le poids",
+      "increase": "Augmenter le poids",
+      "capacityLeft": "{kg} kg restants sur ce trajet",
+      "billedFloor": "Facturé {kg} kg — le minimum de ce trajet.",
+      "billedSizeMin": "Facturé {kg} kg — la place que prend un colis {size}.",
+      "weightFree": "Aucune limite annoncée sur ce trajet",
+      "sizeIncluded": "Sans supplément"
+    }
   },
   "insurance": {
     "title": "Protection du colis",
@@ -117,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optionnel)",
       "emailHint": "Pour notifier le destinataire de l''arrivée du colis",
-      "phonePrefix": "Indicatif pays"
+      "phonePrefix": "Indicatif pays",
+      "sectionTitle": "Le destinataire"
     }
   },
   "step3": {

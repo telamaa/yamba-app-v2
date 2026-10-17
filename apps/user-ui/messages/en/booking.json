@@ -26,16 +26,16 @@
       "linkProhibited": "See the full list"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Weight (kg)",
-      "valueLabel": "Content value (€)",
+      "weightLabel": "Weight",
+      "valueLabel": "Content value",
       "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
       "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
-      "remainingKg": "{kg} kg still available on this trip"
+      "remainingKg": "{kg} kg still available on this trip",
+      "valueHint": "It sets the compensation cap in case of a dispute — state the purchase price."
     },
     "photos": {
       "label": "Parcel photos",
@@ -69,7 +69,17 @@
       "hintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Required"
+    "requiredBadge": "Required",
+    "parcelCard": {
+      "title": "Your parcel",
+      "decrease": "Decrease weight",
+      "increase": "Increase weight",
+      "capacityLeft": "{kg} kg left on this trip",
+      "billedFloor": "Billed at {kg} kg — this trip’s minimum.",
+      "billedSizeMin": "Billed at {kg} kg — the space a {size} parcel takes.",
+      "weightFree": "No limit stated on this trip",
+      "sizeIncluded": "No extra charge"
+    }
   },
   "insurance": {
     "title": "Parcel protection",
@@ -117,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optional)",
       "emailHint": "To notify the recipient when the parcel arrives",
-      "phonePrefix": "Country code"
+      "phonePrefix": "Country code",
+      "sectionTitle": "The recipient"
     }
   },
   "step3": {

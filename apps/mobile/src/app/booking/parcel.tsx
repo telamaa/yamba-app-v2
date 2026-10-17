@@ -69,8 +69,17 @@ import {
 } from '@/lib/booking-rules';
 import { formatPrice } from '@/lib/trip-format';
 
-/** Les raccourcis de poids : les colis réels, pas une règle graduée. */
-const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
+/** Le plus petit colis qu'on accepte de peser — en dessous, c'est une erreur de saisie. */
+const MIN_PARCEL_KG = 0.1;
+
+/**
+ * Le PAS du sélecteur de poids. Fin là où vivent les colis réels (sous 5 kg,
+ * un demi-kilo change le prix), plus large au-dessus où la précision n'apporte
+ * rien et où il faudrait vingt appuis.
+ */
+function weightStep(kg: number): number {
+  return kg < 5 ? 0.5 : 1;
+}
 
 
 
@@ -86,6 +95,8 @@ export default function BookingParcelScreen() {
   const [showErrors, setShowErrors] = useState(false);
   const [nextStepSoon, setNextStepSoon] = useState(false);
   const [showRefused, setShowRefused] = useState(false);
+  /** Le clavier ne monte QUE si on le demande, en touchant la valeur. */
+  const [editingWeight, setEditingWeight] = useState(false);
   const draft = useBookingDraft();
 
   useEffect(() => {
@@ -97,7 +108,15 @@ export default function BookingParcelScreen() {
     void getPublicTrip(tripId)
       .then((loaded) => {
         if (!alive) return;
-        startBookingDraft(loaded);
+        // Un trajet qui ne propose RIEN (ni prix au kilo, ni forfait bagage)
+        // n'est pas réservable : mieux vaut le dire que d'ouvrir un formulaire
+        // dont aucun devis ne sortira.
+        const offered = offeredProducts(loaded);
+        if (offered.length === 0) {
+          setFailed(true);
+          return;
+        }
+        startBookingDraft(loaded, offered[0]);
         setTrip(loaded);
       })
       .catch(() => {
@@ -157,6 +176,47 @@ export default function BookingParcelScreen() {
     sizeDeltaCents.M === 0 &&
     sizeDeltaCents.L === 0;
 
+  const weightValue = parseWeight(draft.weightKg);
+
+  /**
+   * Le pas, borné par la capacité du trajet et le maximum par colis. On arrondit
+   * au dixième : `0.1 + 0.2` ne vaut pas `0.3` en virgule flottante, et un poids
+   * affiché « 2.9000000000000004 » ruine une interface.
+   */
+  const adjustWeight = useCallback(
+    (direction: 1 | -1) => {
+      const current = parseWeight(draft.weightKg) ?? 0;
+      const next = Math.round((current + direction * weightStep(current)) * 10) / 10;
+      const ceiling = Math.min(MAX_PARCEL_KG, trip?.remainingKg ?? MAX_PARCEL_KG);
+      setBookingDraft({ weightKg: String(Math.min(ceiling, Math.max(MIN_PARCEL_KG, next))) });
+    },
+    [draft.weightKg, trip?.remainingKg]
+  );
+
+  /**
+   * La jauge se remplit du poids FACTURÉ, pas du poids déclaré (D81, CAP-01) :
+   * c'est la place réellement réservée au Voyageur. Un colis L d'1 kg en prend
+   * six, et la barre doit le montrer.
+   */
+  const capacityUsedKg = quote?.ok === true ? quote.quote.capacityKgConsumed : (weightValue ?? 0);
+  const capacityTight =
+    typeof trip?.remainingKg === 'number' && capacityUsedKg > trip.remainingKg * 0.8;
+
+  /**
+   * Pourquoi le poids facturé diffère du poids saisi. `billableReason` vivait
+   * dans le devis depuis D81 sans jamais être affiché : l'Expéditeur voyait le
+   * prix ne pas suivre son poids, sans explication.
+   */
+  const billedNote = useMemo(() => {
+    if (quote?.ok !== true || !trip) return null;
+    const { billableReason, billableWeightKg, sizeClass } = quote.quote;
+    if (!billableReason || billableReason === 'ACTUAL' || billableWeightKg === null) return null;
+    if (billableReason === 'SIZE_MIN') {
+      return t('parcel.billed.SIZE_MIN', { kg: billableWeightKg, size: sizeClass ?? '' });
+    }
+    return t('parcel.billed.FLOOR', { kg: billableWeightKg });
+  }, [quote, trip, t]);
+
   const onContinue = useCallback(() => {
     if (Object.keys(errors).length > 0) {
       setShowErrors(true);
@@ -206,10 +266,15 @@ export default function BookingParcelScreen() {
   const remainingKg = typeof trip.remainingKg === 'number' ? trip.remainingKg : null;
   const priceLabel =
     quote?.ok === true ? formatPrice(quote.quote.totalShipperCents, trip.currencyCode, locale) : null;
-  const priceHint =
-    quote?.ok === true
-      ? t('bar.allIn')
-      : t(`bar.quoteError.${quote?.code === 'MISSING_WEIGHT' ? 'MISSING_WEIGHT' : 'GENERIC'}`);
+  // Les causes qu'on sait NOMMER. La liste est explicite et non dérivée du code
+  // d'erreur : une clé construite à la volée qui n'existe pas fait planter le
+  // rendu next-intl au lieu d'afficher un message approximatif.
+  const QUOTE_ERROR_KEYS = ['MISSING_WEIGHT', 'MISSING_PRICE_PER_KG', 'BAG_NOT_OFFERED'] as const;
+  const quoteErrorKey =
+    quote?.ok === false && (QUOTE_ERROR_KEYS as readonly string[]).includes(quote.code)
+      ? quote.code
+      : 'GENERIC';
+  const priceHint = quote?.ok === true ? t('bar.allIn') : t(`bar.quoteError.${quoteErrorKey}`);
 
   return (
     <BookingStepFrame
@@ -307,87 +372,124 @@ export default function BookingParcelScreen() {
             {showErrors && errors.family ? <ErrorLine message={t(`parcel.errors.${errors.family}`)} /> : null}
           </Section>
 
-          {/* 3. Le poids — saisie libre ET raccourcis : on tape rarement
-              « 2 », on le choisit. */}
-          <Section title={t('parcel.weightTitle')} hint={t('parcel.weightHint')}>
-            <View style={[styles.weightRow, { borderColor: theme.backgroundElement }]}>
-              <TextInput
-                value={draft.weightKg}
-                onChangeText={(weightKg) => setBookingDraft({ weightKg })}
-                keyboardType="decimal-pad"
-                inputMode="decimal"
-                maxLength={5}
-                selectTextOnFocus
-                accessibilityLabel={t('parcel.weightTitle')}
-                style={[styles.weightInput, { color: theme.text }]}
-              />
-              <ThemedText type="subtitle" themeColor="textSecondary">
-                {t('parcel.weightUnit')}
-              </ThemedText>
+          {/* 3 + 4. LE COLIS — un titre, puis UNE carte à filets fins où chaque
+              ligne est « libellé gras · ligne grise · contrôle à droite ». La
+              grammaire vient des références de recette (21/10) : des lignes
+              pleine largeur plutôt que des colonnes serrées, du blanc plutôt que
+              des cadres imbriqués. Poids et taille partagent la carte parce
+              qu'ils partagent le calcul (D81), et l'ordre suit A214. */}
+          <View style={styles.parcelSection}>
+            <ThemedText type="subtitle">{t('parcel.cardTitle')}</ThemedText>
+
+            <View style={[styles.optionCard, { borderColor: theme.backgroundElement }]}>
+              {/* LE POIDS — modèle « Modifiez le nombre de voyageurs » : le
+                  libellé et sa contrainte à gauche, le pas à droite. La
+                  contrainte se dit en MOTS, pas en jauge : une phrase survit à
+                  n'importe quel écran, et elle passe en mangue avant la limite. */}
+              <View style={styles.optionRow}>
+                <View style={styles.optionText}>
+                  <ThemedText type="smallBold">{t('parcel.weightLabel')}</ThemedText>
+                  <ThemedText
+                    type="small"
+                    themeColor={capacityTight ? undefined : 'textSecondary'}
+                    style={capacityTight ? { color: Brand.mango } : undefined}>
+                    {remainingKg === null
+                      ? t('parcel.weightFree')
+                      : t('parcel.capacityLeft', {
+                          kg: Math.max(0, Math.round((remainingKg - capacityUsedKg) * 10) / 10),
+                        })}
+                  </ThemedText>
+                </View>
+                <View style={styles.stepper}>
+                  <StepperButton
+                    icon="remove"
+                    accessibilityLabel={t('parcel.weightDecrease')}
+                    disabled={weightValue !== null && weightValue <= MIN_PARCEL_KG}
+                    onPressAction={() => adjustWeight(-1)}
+                  />
+                  {editingWeight ? (
+                    <TextInput
+                      value={draft.weightKg}
+                      onChangeText={(weightKg) => setBookingDraft({ weightKg })}
+                      onBlur={() => setEditingWeight(false)}
+                      keyboardType="decimal-pad"
+                      inputMode="decimal"
+                      maxLength={5}
+                      autoFocus
+                      selectTextOnFocus
+                      accessibilityLabel={t('parcel.weightEdit')}
+                      style={[styles.stepperInput, { color: theme.text }]}
+                    />
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('parcel.weightEdit')}
+                      onPress={() => setEditingWeight(true)}
+                      style={styles.stepperValue}>
+                      <ThemedText type="default">{draft.weightKg || '—'}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('parcel.weightUnit')}
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                  <StepperButton
+                    icon="add"
+                    accessibilityLabel={t('parcel.weightIncrease')}
+                    disabled={remainingKg !== null && weightValue !== null && weightValue >= remainingKg}
+                    onPressAction={() => adjustWeight(1)}
+                  />
+                </View>
+              </View>
+
+              {/* LES TAILLES — modèle « Choisissez quand vous souhaitez payer » :
+                  des lignes pleine largeur, le choix par une pastille à DROITE,
+                  et la conséquence en ligne grise. Les trois colonnes serrées
+                  rognaient les libellés et n'offraient aucune cible confortable. */}
+              {SIZE_CLASSES.map((size) => (
+                <View key={size}>
+                  <View style={[styles.hairline, { backgroundColor: theme.backgroundElement }]} />
+                  <SizeRow
+                    active={draft.sizeClass === size}
+                    code={t(`parcel.sizes.${size}`)}
+                    example={t(`parcel.sizeExamples.${size}`)}
+                    detail={
+                      sizeDeltaCents === null
+                        ? null
+                        : sizeDeltaCents[size] === 0
+                          ? t('parcel.sizeIncluded')
+                          : t('parcel.sizeExtra', {
+                              amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
+                            })
+                    }
+                    onPressAction={() => setBookingDraft({ sizeClass: size })}
+                  />
+                </View>
+              ))}
             </View>
-            <View style={styles.chips}>
-              {WEIGHT_SHORTCUTS.filter((kg) => remainingKg === null || kg <= remainingKg).map((kg) => {
-                const active = parseWeight(draft.weightKg) === kg;
-                return (
-                  <Pressable
-                    key={kg}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setBookingDraft({ weightKg: String(kg) })}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: active ? `${Brand.mango}22` : theme.backgroundElement,
-                        borderColor: active ? Brand.mango : 'transparent',
-                      },
-                    ]}>
-                    <ThemedText type="small">{t('parcel.weightShortcut', { kg })}</ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {remainingKg !== null ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('parcel.remaining', { kg: remainingKg })}
-              </ThemedText>
-            ) : null}
+
             {showErrors && errors.weightKg ? (
               <ErrorLine
                 message={t(`parcel.errors.${errors.weightKg}`, { kg: remainingKg ?? 0, max: MAX_PARCEL_KG })}
               />
             ) : null}
-          </Section>
 
-          {/* 4. La taille (PRC-03) — chaque taille annonce son PRIX, pas un
-              coefficient : « ×1,1 » ne se lit pas, « +1,20 € » se décide. */}
-          <Section
-            title={t('parcel.sizeTitle')}
-            hint={
-              sizeDeltaCents === null
-                ? t('parcel.sizeHintPending')
-                : sizeIsFlat
-                  ? t('parcel.sizeHintFlat')
-                  : t('parcel.sizeHint')
-            }>
-            <View style={styles.chips}>
-              {SIZE_CLASSES.map((size) => (
-                <SizePill
-                  key={size}
-                  active={draft.sizeClass === size}
-                  code={t(`parcel.sizes.${size}`)}
-                  example={t(`parcel.sizeExamples.${size}`)}
-                  priceLabel={
-                    sizeDeltaCents === null || sizeIsFlat || sizeDeltaCents[size] === 0
-                      ? null
-                      : t('parcel.sizeExtra', {
-                          amount: formatPrice(sizeDeltaCents[size], trip.currencyCode, locale),
-                        })
-                  }
-                  onPressAction={() => setBookingDraft({ sizeClass: size })}
-                />
-              ))}
-            </View>
-          </Section>
+            {/* D81 expliqué sous la carte, comme « Annulation gratuite » sous le
+                récapitulatif de la référence : la conséquence, en gris, au
+                contact de la décision. */}
+            <ThemedText type="small" themeColor="textSecondary">
+              {/* Sans écart calculable, on distingue DEUX cas : le poids manque
+                  (on le demande), ou le devis a échoué pour une autre raison —
+                  et dans ce cas réclamer un poids déjà saisi est un mensonge. */}
+              {billedNote ??
+                (sizeDeltaCents !== null
+                  ? sizeIsFlat
+                    ? t('parcel.sizeHintFlat')
+                    : t('parcel.sizeHint')
+                  : weightValue === null
+                    ? t('parcel.sizeHintPending')
+                    : t('parcel.sizeHintNoPrice'))}
+            </ThemedText>
+          </View>
         </>
       ) : null}
 
@@ -478,24 +580,65 @@ function ProductCard({
 }
 
 /**
- * La taille prend la MÊME forme que la famille : deux questions voisines, une
- * seule grammaire de réponse. Les rectangles et les icônes ont disparu avec la
- * passe web du 17/10 — une boîte à chaussures dessinée n'apprend rien de plus
- * que les mots « une boîte à chaussures », et elle coûtait une ligne.
+ * Un bouton de pas. Cible de 44 px (le minimum tactile recommandé), et
+ * `disabled` plutôt que caché : un bouton qui disparaît déplace l'autre sous le
+ * doigt entre deux appuis.
  */
-function SizePill({
+function StepperButton({
+  icon,
+  accessibilityLabel,
+  disabled,
+  onPressAction,
+}: {
+  icon: 'add' | 'remove';
+  accessibilityLabel: string;
+  disabled: boolean;
+  onPressAction: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPressAction}
+      style={({ pressed }) => [
+        styles.stepperButton,
+        {
+          backgroundColor: theme.backgroundElement,
+          opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
+        },
+      ]}>
+      <Ionicons name={icon} size={20} color={theme.text} />
+    </Pressable>
+  );
+}
+
+/**
+ * Une ligne de taille — grammaire « Choisissez quand vous souhaitez payer » :
+ * le libellé gras, la conséquence en gris dessous, le choix par une pastille à
+ * DROITE. Toute la ligne est la cible : sur un téléphone, viser une pastille de
+ * 22 px est une épreuve.
+ *
+ * AUCUNE illustration (révision du 21/10). Les silhouettes à l'échelle avaient
+ * un sens en COLONNES, où trois rectangles adjacents se comparent d'un regard.
+ * Empilées en lignes, elles sont séparées par soixante pixels de texte : l'œil
+ * ne compare plus rien, et la gouttière ne fait que pousser le libellé. Or
+ * « une boîte à chaussures » dit déjà tout — ordonné et concret.
+ */
+function SizeRow({
   active,
   code,
   example,
-  priceLabel,
+  detail,
   onPressAction,
 }: {
   active: boolean;
-  /** « S », « M », « L » — le repère, pas une phrase. */
   code: string;
   example: string;
-  /** Ce que cette taille coûte EN PLUS — `null` tant que le poids manque. */
-  priceLabel: string | null;
+  /** Ce que cette taille change au prix — `null` tant que le poids manque. */
+  detail: string | null;
   onPressAction: () => void;
 }) {
   const theme = useTheme();
@@ -503,25 +646,30 @@ function SizePill({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={[code, example, priceLabel].filter(Boolean).join(' ')}
+      accessibilityLabel={[code, example, detail].filter(Boolean).join(' ')}
       onPress={onPressAction}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? `${Brand.mango}22` : theme.backgroundElement,
-          borderColor: active ? Brand.mango : 'transparent',
-        },
-      ]}>
-      <ThemedText type="smallBold">{code}</ThemedText>
-      <ThemedText type="small">{example}</ThemedText>
-      {priceLabel ? (
-        <ThemedText type="small" style={styles.surcharge}>
-          {priceLabel}
+      style={({ pressed }) => [styles.optionRow, { opacity: pressed ? 0.7 : 1 }]}>
+      <View style={styles.optionText}>
+        <ThemedText type="smallBold">
+          {code} · {example}
         </ThemedText>
-      ) : null}
+        {detail ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {detail}
+          </ThemedText>
+        ) : null}
+      </View>
+      <View
+        style={[
+          styles.radio,
+          { borderColor: active ? Brand.mango : theme.textSecondary },
+        ]}>
+        {active ? <View style={[styles.radioDot, { backgroundColor: Brand.mango }]} /> : null}
+      </View>
     </Pressable>
   );
 }
+
 
 function FamilyChip({
   family,
@@ -650,20 +798,71 @@ const styles = StyleSheet.create({
     color: Brand.mango,
     fontWeight: '700',
   },
-  weightRow: {
+  // LA CARTE DU COLIS — un titre, puis des lignes pleine largeur séparées par
+  // un filet. Pas de cadre dans un cadre : le blanc fait la structure.
+  parcelSection: {
+    gap: Spacing.three,
+  },
+  optionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.four,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.four,
+  },
+  optionText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  // Le filet n'atteint pas les bords de la carte : il sépare les lignes, il ne
+  // la découpe pas en tranches.
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  stepper: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
   },
-  weightInput: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '800',
-    paddingVertical: Spacing.two,
+  stepperButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValue: {
+    minWidth: 52,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  stepperInput: {
+    minWidth: 52,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 0,
   },
   errorRow: {
     flexDirection: 'row',
