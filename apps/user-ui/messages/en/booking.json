@@ -211,8 +211,14 @@
     "insuranceLabel": "Protection",
     "date": "Date",
     "route": "Route",
-    "directFlight": "Direct",
-    "duration": "{hours}h flight",
+    "direct": "Direct",
+    "durationByMode": {
+      "PLANE": "{hours}h flight",
+      "TRAIN": "{hours}h by train",
+      "CAR": "{hours}h drive",
+      "BUS": "{hours}h by bus"
+    },
+    "durationNeutral": "{hours}h travel",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
     "minimumApplied": "Per-parcel minimum applied: {min}",
