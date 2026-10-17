@@ -107,3 +107,22 @@ Pas de gros lot réservation monolithique, pas de rattrapage documentaire global
 | 5 | 17/10 | Dette documentaire soldée | Registre **A211 / A212 / A213** ; DOC-TECHNIQUE +230 ; DOC-MÉTIER +45 (**RG-MOB-41→49**, fiches **MOB67→82**) ; APPRENTISSAGE +160 (**chapitre 211**). Ajout seul : 0 suppression |
 | 6 | 17/10 | CI de #385 | **18/18 vertes**, comptées |
 | 7 | 17/10 | `a683186` poussé, **PR #385 passée en « prête »** | Il reste à la merger (c'est toi qui merges), puis une PR d'état `chore/etat-385` (CONTEXT + SUIVI) |
+| 8 | 17/10 | **PR #385 mergée** dans `dev` (`c439979`, 12 h 10) | `origin/dev` = `c439979`. La PR d'état `chore/etat-385` reste à ouvrir |
+| 9 | 17/10 | **Reprise après un second arrêt machine** — diagnostic | Le Mac s'est arrêté PENDANT un `git merge origin/dev` sur `feat/feed-relevance-server` (PR **#383**, D80 serveur, ouverte depuis le 29/09) : `MERGE_HEAD` présent, **3 conflits** dans les cumulatifs. Aucune perte : les 5 commits D80 étaient poussés |
+| 10 | 17/10 | Conflits résolus — **ajout contre ajout** | Les deux côtés sont des ajouts PURS à la base (vérifié ligne à ligne contre `:1:`) : gardés tous les deux, `dev` d'abord (mergé), D80 ensuite (mergera après). **0 suppression face à `dev`** (+114 / +34 / +70). Le chapitre d'apprentissage de D80 passe de **211 à 212** (211 est pris par #385) |
+| 11 | 17/10 | `maxmind` absent de `node_modules` | Déclaré au manifeste ET au lock côté branche, jamais installé : `npm install` (3 paquets, aucune dérive du lock). Sans lui, `nx typecheck trip-service` ET `api-gateway` échouaient — la brique `packages/libs/geoip` ne compilait pas |
+| 12 | 17/10 | `nx run-many --target=typecheck --all --skip-sync` | **10/10 vertes** (32 s) — le merge est sain |
+| 13 | 17/10 | `f464b30` — **merge committé** | Le rattrapage de 18 jours est dans la branche de #383 |
+| 14 | 17/10 | `nx test trip-service` **MESURÉ** | **408 tests / 30 suites** (326 côté `dev` + **82** de D80). `CLAUDE.md` : référence plateforme **1186 → 1268**, trip **326 → 408**. La branche n'avait JAMAIS mis `CLAUDE.md` à jour (le « trip 310 → 392 » n'existait que dans le message de `a774e3a`) |
+| 15 | 17/10 | `npm run generate:openapi` | **Aucune dérive** : les 5 `openapi.json` sont en phase après le merge (le contrôle CI de diff passera) |
+
+## 9. L'état après la reprise du 17/10 — ce qui reste
+
+| PR | Branche | État |
+|---|---|---|
+| **#383** | `feat/feed-relevance-server` | **Ouverte**, D80 serveur, **à jour de `dev`** depuis `f464b30`. Reste : pousser, compter les 18 contrôles, faire passer en « prête » |
+| **#384** | `feat/feed-relevance-web` | **Ouverte**, empilée sur #383 — devra être rebasée/mergée APRÈS #383 |
+| — | `chore/etat-385` | **À ouvrir** : `YAMBA-CONTEXT.md` + `YAMBA-SUIVI-PROJET.md` pour le lot mobile mergé |
+
+> Ordre acté : #383 (serveur) → #384 (web) → le mobile du flux localisé. Puis la procédure
+> « une page à la fois » du § 8 reprend sur le wizard de réservation natif (§ 4).
