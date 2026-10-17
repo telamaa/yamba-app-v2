@@ -1,9 +1,9 @@
 "use client";
 
 import { Lightbulb } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { useCallback } from "react";
-import { MAX_PHOTOS, isPerKgTrip } from "../booking.config";
+import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useState } from "react";
+import { MAX_PHOTOS, isPerKgTrip, parseWeight } from "../booking.config";
 import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
 import { toast } from "sonner";
 import { usePricingParams } from "@/hooks/usePricingParams";
@@ -34,6 +34,9 @@ import {
   type TripContext,
   type ValidationErrors,
 } from "../booking.types";
+
+/** Les poids d'un envoi réel — les mêmes que l'app mobile. */
+const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
 
 /** Icônes Lucide des classes de taille (PRC-03) — jamais d'emoji */
 const SIZE_ICONS = { S: ShoppingBag, M: Backpack, L: Luggage } as const;
@@ -91,6 +94,12 @@ export default function StepParcel({
                                    }: Props) {
   const pricingParams = usePricingParams(); // D62 7A
   const t = useTranslations("booking");
+  // La liste des objets interdits est celle de la fiche trajet — UNE source,
+  // pas une copie qui divergera (le lien ci-dessous ne faisait que l'écrire
+  // dans la console : une promesse d'interface qui ne menait nulle part).
+  const tTrip = useTranslations("tripDetail");
+  const locale = useLocale();
+  const [showProhibited, setShowProhibited] = useState(false);
 
   const hasMultiplePickup = trip.pickupOptions.length > 1;
   const hasMultipleDelivery = trip.deliveryOptions.length > 1;
@@ -257,14 +266,24 @@ export default function StepParcel({
         </summary>
         <div className="px-4 pb-1">
           <TipBlock
-        icon={<Lightbulb size={16} />}
-        title={t("step1.goldenRules.title")}
-        items={goldenRules}
-        extraLink={{
-          label: t("step1.goldenRules.linkProhibited"),
-          onClickAction: () => console.info("[booking] open prohibited items list"),
-        }}
+            icon={<Lightbulb size={16} />}
+            title={t("step1.goldenRules.title")}
+            items={goldenRules}
+            extraLink={
+              showProhibited
+                ? undefined
+                : {
+                    label: t("step1.goldenRules.linkProhibited"),
+                    onClickAction: () => setShowProhibited(true),
+                  }
+            }
           />
+          {showProhibited && (
+            <p className="-mt-3 mb-5 text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
+              <span className="font-semibold">{tTrip("conditions.prohibited.title")} : </span>
+              {tTrip("conditions.prohibited.description")}
+            </p>
+          )}
         </div>
       </details>
 
@@ -294,6 +313,15 @@ export default function StepParcel({
                     </ChoiceChip>
                   ))}
               </div>
+              {/* CAP-01 — la place restante conditionne AUSSI le bagage entier
+                  (23 ou 12 kg) : elle était annoncée sous le poids du colis
+                  seulement, donc invisible pour un bagage — le refus tombait
+                  sans que rien ne l'ait dit. */}
+              {draft.product !== "PARCEL" && typeof trip.remainingKg === "number" && (
+                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  {t("step1.parcelDetails.remainingKg", { kg: trip.remainingKg })}
+                </div>
+              )}
             </FormField>
           )}
 
@@ -335,8 +363,23 @@ export default function StepParcel({
                     onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
                     hasError={Boolean(errors.weightKg)}
                     inputMode="decimal"
-                    placeholder="2,5"
+                    placeholder={locale === "fr" ? "2,5" : "2.5"}
                   />
+                  {/* On tape rarement « 2 » : on le choisit. Les quatre poids
+                      réels d'un envoi, filtrés par la place qui reste. */}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {WEIGHT_SHORTCUTS.filter(
+                      (kg) => typeof trip.remainingKg !== "number" || kg <= trip.remainingKg
+                    ).map((kg) => (
+                      <ChoiceChip
+                        key={kg}
+                        active={parseWeight(draft.weightKg) === kg}
+                        onClickAction={() => setDraftAction((prev) => ({ ...prev, weightKg: String(kg) }))}
+                      >
+                        {t("step1.parcelDetails.weightShortcut", { kg })}
+                      </ChoiceChip>
+                    ))}
+                  </div>
                   {typeof trip.remainingKg === "number" && (
                     <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                       {t("step1.parcelDetails.remainingKg", { kg: trip.remainingKg })}
@@ -380,7 +423,7 @@ export default function StepParcel({
                         <Icon size={18} strokeWidth={1.75} className={active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500"} />
                         <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
                         <span className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">{t(`step1.size.${sz}`)}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">×{pricingParams.sizeCoef[sz].toLocaleString("fr-FR")}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">×{pricingParams.sizeCoef[sz].toLocaleString(locale)}</span>
                       </button>
                     );
                   })}
@@ -423,7 +466,7 @@ export default function StepParcel({
                 onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
                 hasError={Boolean(errors.weightKg)}
                 inputMode="decimal"
-                placeholder="2.5"
+                placeholder={locale === "fr" ? "2,5" : "2.5"}
               />
             </FormField>
             <FormFieldWithTooltip

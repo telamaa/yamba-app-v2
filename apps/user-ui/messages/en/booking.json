@@ -32,6 +32,7 @@
       "open": "Show"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Weight (kg)",

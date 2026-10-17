@@ -86,6 +86,10 @@ export default function RootLayout() {
               name="search"
               options={{ presentation: 'transparentModal', animation: 'none' }}
             />
+            {/* Le parcours de RÉSERVATION : sept étapes poussées l'une après
+                l'autre, par-dessus l'app. On le termine ou on le quitte — ce
+                n'est pas une destination où l'on navigue. */}
+            <Stack.Screen name="booking" />
             {/* Profil n'est plus un onglet (A210) : il se pousse par-dessus. */}
             <Stack.Screen name="profile" />
           </Stack>

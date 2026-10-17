@@ -1,0 +1,70 @@
+{
+  "back": "Retour",
+  "progress": "Étape {current} sur {total}",
+  "bar": {
+    "continue": "Continuer",
+    "allIn": "tout compris",
+    "quoteError": {
+      "MISSING_WEIGHT": "Indique un poids pour voir le prix",
+      "GENERIC": "Prix indisponible pour ce choix"
+    }
+  },
+  "unavailable": {
+    "title": "Ce trajet n'est plus disponible",
+    "body": "Il a peut-être été modifié ou retiré pendant que tu le regardais.",
+    "cta": "Revenir"
+  },
+  "parcel": {
+    "title": "Le colis",
+    "productTitle": "Ce que tu envoies",
+    "products": {
+      "PARCEL": "Un colis",
+      "CHECKED_BAG_23KG": "Un bagage en soute",
+      "CABIN_BAG_12KG": "Un bagage cabine"
+    },
+    "productHints": {
+      "PARCEL": "Facturé au kilo",
+      "CHECKED_BAG_23KG": "23 kg, au forfait",
+      "CABIN_BAG_12KG": "12 kg, au forfait"
+    },
+    "familyTitle": "Ce qu'il contient",
+    "familyHint": "Le Voyageur choisit ce qu'il accepte de transporter.",
+    "families": {
+      "DOCUMENTS_PAPERS": "Documents, papiers",
+      "CLOTHES_TEXTILE": "Vêtements, textile",
+      "FOOD_DRY_SEALED": "Alimentaire sec et scellé",
+      "ELECTRONICS_DEVICES": "Électronique, appareils",
+      "COSMETICS_CARE": "Cosmétiques, soins",
+      "PARTS_TOOLS": "Pièces, outillage",
+      "TOYS_CHILDCARE": "Jouets, puériculture",
+      "MISC_ACCESSORIES": "Accessoires divers"
+    },
+    "surcharge": "+{pct} %",
+    "sizeTitle": "Sa taille",
+    "sizes": {
+      "S": "Petit",
+      "M": "Moyen",
+      "L": "Grand"
+    },
+    "sizeExamples": {
+      "S": "Une pochette",
+      "M": "Un sac à dos",
+      "L": "Une valise cabine"
+    },
+    "sizeCoef": "×{coef} sur le transport",
+    "weightTitle": "Son poids",
+    "weightHint": "Le Voyageur le vérifiera à la remise.",
+    "weightUnit": "kg",
+    "weightShortcut": "{kg} kg",
+    "remaining": "{kg} kg encore disponibles sur ce trajet",
+    "nextStepSoon": "Étape suivante — la valeur, les photos et la description — au prochain lot.",
+    "errors": {
+      "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
+      "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
+      "NOT_ENOUGH_CAPACITY": "Il ne reste pas assez de place pour ce bagage ({kg} kg disponibles).",
+      "WEIGHT_REQUIRED": "Indique le poids du colis.",
+      "WEIGHT_MAX": "{max} kg au maximum par colis.",
+      "WEIGHT_REMAINING": "Il ne reste que {kg} kg sur ce trajet."
+    }
+  }
+}

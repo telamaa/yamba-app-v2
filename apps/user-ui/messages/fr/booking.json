@@ -32,6 +32,7 @@
       "open": "Voir"
     },
     "parcelDetails": {
+      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
       "weightLabel": "Poids (kg)",

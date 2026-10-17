@@ -1,0 +1,70 @@
+{
+  "back": "Back",
+  "progress": "Step {current} of {total}",
+  "bar": {
+    "continue": "Continue",
+    "allIn": "all in",
+    "quoteError": {
+      "MISSING_WEIGHT": "Enter a weight to see the price",
+      "GENERIC": "No price for this choice"
+    }
+  },
+  "unavailable": {
+    "title": "This trip is no longer available",
+    "body": "It may have been changed or taken down while you were looking at it.",
+    "cta": "Go back"
+  },
+  "parcel": {
+    "title": "The parcel",
+    "productTitle": "What you are sending",
+    "products": {
+      "PARCEL": "A parcel",
+      "CHECKED_BAG_23KG": "A checked bag",
+      "CABIN_BAG_12KG": "A cabin bag"
+    },
+    "productHints": {
+      "PARCEL": "Priced per kilo",
+      "CHECKED_BAG_23KG": "23 kg, flat rate",
+      "CABIN_BAG_12KG": "12 kg, flat rate"
+    },
+    "familyTitle": "What is inside",
+    "familyHint": "The Traveler picks what they agree to carry.",
+    "families": {
+      "DOCUMENTS_PAPERS": "Documents, papers",
+      "CLOTHES_TEXTILE": "Clothes, textile",
+      "FOOD_DRY_SEALED": "Dry sealed food",
+      "ELECTRONICS_DEVICES": "Electronics, devices",
+      "COSMETICS_CARE": "Cosmetics, care",
+      "PARTS_TOOLS": "Parts, tools",
+      "TOYS_CHILDCARE": "Toys, childcare",
+      "MISC_ACCESSORIES": "Misc accessories"
+    },
+    "surcharge": "+{pct}%",
+    "sizeTitle": "Its size",
+    "sizes": {
+      "S": "Small",
+      "M": "Medium",
+      "L": "Large"
+    },
+    "sizeExamples": {
+      "S": "A pouch",
+      "M": "A backpack",
+      "L": "A cabin suitcase"
+    },
+    "sizeCoef": "×{coef} on transport",
+    "weightTitle": "Its weight",
+    "weightHint": "The Traveler will check it at handover.",
+    "weightUnit": "kg",
+    "weightShortcut": "{kg} kg",
+    "remaining": "{kg} kg still available on this trip",
+    "nextStepSoon": "Next step — value, photos and description — is coming in the next batch.",
+    "errors": {
+      "FAMILY_REFUSED": "The Traveler does not take this content.",
+      "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
+      "NOT_ENOUGH_CAPACITY": "Not enough room left for this bag ({kg} kg available).",
+      "WEIGHT_REQUIRED": "Enter the parcel weight.",
+      "WEIGHT_MAX": "{max} kg max per parcel.",
+      "WEIGHT_REMAINING": "Only {kg} kg left on this trip."
+    }
+  }
+}
