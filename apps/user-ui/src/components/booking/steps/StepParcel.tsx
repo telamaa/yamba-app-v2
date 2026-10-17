@@ -380,10 +380,11 @@ export default function StepParcel({
    * annoncer.
    */
   const parcelCardBlock = (
-    <div className="mb-4 md:max-w-md">
-      <div className="mb-2 text-[15px] font-bold text-slate-900 dark:text-white">
-        {t("step1.parcelCard.title")}
-      </div>
+    // Pleine largeur et `SectionTitle`, comme « Protection du colis » : deux
+    // blocs de même nature doivent avoir la même largeur et le même titre, sinon
+    // la page donne l'impression de deux mises en page cousues ensemble.
+    <div className="mb-4">
+      <SectionTitle>{t("step1.parcelCard.title")}</SectionTitle>
 
       {/* Une carte à filets fins : chaque ligne est « libellé gras · ligne grise ·
           contrôle à droite ». Pas de cadre dans un cadre — c'est le blanc qui
