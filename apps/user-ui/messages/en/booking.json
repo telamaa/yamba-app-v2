@@ -35,7 +35,7 @@
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
       "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
       "remainingKg": "{kg} kg still available on this trip",
-      "valueHint": "It sets the compensation cap in case of a dispute — state the purchase price."
+      "valueHint": "Sets the compensation cap in case of a dispute."
     },
     "photos": {
       "label": "Parcel photos",
@@ -75,8 +75,8 @@
       "decrease": "Decrease weight",
       "increase": "Increase weight",
       "capacityLeft": "{kg} kg left on this trip",
-      "billedFloor": "Billed at {kg} kg — this trip’s minimum.",
-      "billedSizeMin": "Billed at {kg} kg — the space a {size} parcel takes.",
+      "billedFloor": "Billed at {kg} kg, this trip's minimum.",
+      "billedSizeMin": "Billed at {kg} kg, the space a {size} parcel takes.",
       "weightFree": "No limit stated on this trip",
       "sizeIncluded": "No extra charge"
     }
@@ -241,7 +241,7 @@
       "UNKNOWN": "Price unavailable."
     },
     "billableFloor": "Billed at the trip minimum: {kg} kg.",
-    "billableSizeMin": "Size {size}: billed at a {kg} kg minimum — that's the space it takes."
+    "billableSizeMin": "Size {size}: billed at {kg} kg minimum, the space it takes."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

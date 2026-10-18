@@ -62,7 +62,7 @@
     },
     "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
     "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
-    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
+    "sizeHintFlat": "À ce poids, la taille ne change pas le prix : ton colis pèse déjà plus que tous les minimums.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {name}",
     "subtitle": "Plus c'est précis, moins il y a de surprises à la remise.",
@@ -72,8 +72,8 @@
     "weightEdit": "Saisir le poids",
     "capacityLeft": "{kg} kg restants sur ce trajet",
     "billed": {
-      "FLOOR": "Facturé {kg} kg — le minimum de ce trajet.",
-      "SIZE_MIN": "Facturé {kg} kg — la place que prend un colis {size}."
+      "FLOOR": "Facturé {kg} kg, le minimum de ce trajet.",
+      "SIZE_MIN": "Facturé {kg} kg, la place que prend un colis {size}."
     },
     "weightLabel": "Poids",
     "weightFree": "Aucune limite annoncée sur ce trajet",
@@ -89,13 +89,13 @@
   "phaseProgress": "{phase}, étape {current} sur {total}",
   "places": {
     "title": "Le rendez-vous",
-    "subtitle": "Les points proposés par {name} — choisis celui qui t'arrange, pour la remise puis pour le retrait.",
+    "subtitle": "Les points proposés par {name}. Choisis celui qui t'arrange, pour la remise puis pour le retrait.",
     "pickupTitle": "Tu remets le colis à {name}",
     "deliveryTitle": "Le destinataire récupère le colis",
     "errorPickup": "Choisis le lieu de remise.",
     "errorDelivery": "Choisis le lieu de retrait.",
-    "emptyPickup": "{name} n'a pas précisé de lieu — vous conviendrez du point de rendez-vous par message.",
-    "emptyDelivery": "Aucun lieu précisé — le point de retrait se conviendra par message."
+    "emptyPickup": "{name} n'a pas précisé de lieu. Vous conviendrez du point de rendez-vous par message.",
+    "emptyDelivery": "Aucun lieu précisé. Le point de retrait se conviendra par message."
   },
   "recipient": {
     "title": "Le destinataire",
@@ -103,14 +103,14 @@
     "phone": "Téléphone",
     "phonePrefix": "Indicatif du pays",
     "close": "Fermer",
-    "phoneHint": "Le code de livraison lui sera envoyé par SMS ou WhatsApp — indique l'indicatif de son pays.",
+    "phoneHint": "Le code de livraison lui sera envoyé par SMS ou WhatsApp. Indique l'indicatif de son pays.",
     "firstName": "Prénom",
     "lastName": "Nom",
     "email": "Email (facultatif)",
     "emailHint": "Pour le prévenir de l'arrivée du colis.",
     "errors": {
       "PHONE_REQUIRED": "Indique le numéro du destinataire.",
-      "PHONE_INVALID": "Ce numéro ne semble pas valide — vérifie l'indicatif et les chiffres.",
+      "PHONE_INVALID": "Ce numéro ne semble pas valide. Vérifie l'indicatif et les chiffres.",
       "FIRST_NAME_REQUIRED": "Indique son prénom.",
       "LAST_NAME_REQUIRED": "Indique son nom.",
       "EMAIL_INVALID": "Cet email ne semble pas valide."
@@ -127,17 +127,17 @@
     "title": "La protection",
     "subtitle": "Déclare ce que vaut le contenu, puis choisis la couverture.",
     "valueLabel": "Valeur du contenu",
-    "valueHint": "Le prix d'achat — il fixe le plafond d'indemnisation.",
+    "valueHint": "Fixe le plafond de l'indemnisation.",
     "cardTitle": "Protection du colis",
     "basic": {
       "title": "Protection de base",
       "price": "Inclus",
-      "description": "Ton argent est bloqué jusqu'à la livraison. Colis non remis, tu es remboursé."
+      "description": "Ton argent est bloqué jusqu'à la livraison, colis non remis remboursé."
     },
     "extended": {
       "title": "Garantie Yamba {cap}",
       "price": "+{amount}",
-      "description": "Perte, vol ou casse en route : tu es remboursé jusqu’à {cap}.",
+      "description": "Perte, vol ou casse en route, remboursé jusqu’à {cap}.",
       "exclusionsTitle": "Ce qui n'est pas couvert",
       "exclusionsText": "Les produits interdits, un colis non conforme à sa description, une saisie douanière, et l'usure normale."
     },
@@ -161,6 +161,18 @@
     "errors": {
       "DESCRIPTION_TOO_SHORT": "Décris brièvement le contenu (5 caractères au minimum).",
       "PHOTOS_REQUIRED_WITH_GUARANTEE": "Au moins une photo est requise avec la Garantie Yamba."
-    }
+    },
+    "goldenRules": {
+      "title": "Les règles d'or pour un envoi qui se passe bien",
+      "pack": "Emballe soigneusement : sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
+      "weigh": "Pèse précisément : le poids déclaré doit correspondre au poids réel à la remise.",
+      "describe": "Décris fidèlement : {name} vérifiera le contenu avant d'accepter ton colis.",
+      "prohibited": "Aucun produit interdit."
+    },
+    "fromCamera": "Prendre une photo",
+    "fromLibrary": "Choisir dans mes photos",
+    "cancel": "Annuler",
+    "cameraDeniedTitle": "Accès à l'appareil photo refusé",
+    "cameraDeniedBody": "Yamba a besoin de l'appareil photo pour photographier ton colis. Tu peux l'autoriser dans les réglages."
   }
 }

@@ -35,7 +35,7 @@
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
       "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
       "remainingKg": "{kg} kg encore disponibles sur ce trajet",
-      "valueHint": "Elle fixe le plafond d'indemnisation en cas de litige — indique le prix d'achat."
+      "valueHint": "Fixe le plafond de l'indemnisation en cas de litige."
     },
     "photos": {
       "label": "Photos du colis",
@@ -75,8 +75,8 @@
       "decrease": "Diminuer le poids",
       "increase": "Augmenter le poids",
       "capacityLeft": "{kg} kg restants sur ce trajet",
-      "billedFloor": "Facturé {kg} kg — le minimum de ce trajet.",
-      "billedSizeMin": "Facturé {kg} kg — la place que prend un colis {size}.",
+      "billedFloor": "Facturé {kg} kg, le minimum de ce trajet.",
+      "billedSizeMin": "Facturé {kg} kg, la place que prend un colis {size}.",
       "weightFree": "Aucune limite annoncée sur ce trajet",
       "sizeIncluded": "Sans supplément"
     }
@@ -241,7 +241,7 @@
       "UNKNOWN": "Prix indisponible."
     },
     "billableFloor": "Facturé au minimum du trajet : {kg} kg.",
-    "billableSizeMin": "Taille {size} : facturée {kg} kg minimum — c'est la place qu'elle prend."
+    "billableSizeMin": "Taille {size} : facturée {kg} kg minimum, la place qu’elle prend."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

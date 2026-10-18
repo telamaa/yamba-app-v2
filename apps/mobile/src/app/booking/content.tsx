@@ -38,6 +38,9 @@ import { formatPrice } from '@/lib/trip-format';
 /** Le même plafond que le site (MAX_PHOTOS) : une photo du contenu, une de l'emballage, et de la marge. */
 const MAX_PHOTOS = 5;
 
+/** Les mêmes quatre règles que le site : emballer, peser, décrire, rien d'interdit. */
+const GOLDEN_RULES_KEYS = ['pack', 'weigh', 'describe', 'prohibited'] as const;
+
 export default function BookingContentScreen() {
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
   const t = useTranslations('booking');
@@ -48,6 +51,7 @@ export default function BookingContentScreen() {
   const [trip, setTrip] = useState<PublicTrip | null>(null);
   const [failed, setFailed] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [params, setParams] = useState(currentPricingParams);
 
   useEffect(() => {
@@ -73,38 +77,70 @@ export default function BookingContentScreen() {
 
   const errors = useMemo(() => validateContentStep(draft), [draft]);
 
-  const addPhoto = useCallback(async () => {
-    if (draft.photos.length >= MAX_PHOTOS) return;
-    // La permission se demande ICI, au geste — pas au montage de l'écran.
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(t('content.permissionTitle'), t('content.permissionBody'));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-      selectionLimit: MAX_PHOTOS - draft.photos.length,
-      allowsMultipleSelection: true,
-    });
-    if (result.canceled) return;
+  /**
+   * Deux chemins, et le premier compte : sur un téléphone, photographier le
+   * colis qu'on a sous la main est le geste NATUREL. N'offrir que la
+   * photothèque obligeait à sortir de l'app, prendre la photo, revenir.
+   *
+   * La permission se demande AU GESTE, jamais au montage de l'écran, et
+   * séparément pour chaque source : accepter l'appareil photo ne doit pas
+   * donner accès à toute la photothèque.
+   */
+  const pickFrom = useCallback(
+    async (source: 'camera' | 'library') => {
+      if (draft.photos.length >= MAX_PHOTOS) return;
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          t(source === 'camera' ? 'content.cameraDeniedTitle' : 'content.permissionTitle'),
+          t(source === 'camera' ? 'content.cameraDeniedBody' : 'content.permissionBody')
+        );
+        return;
+      }
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              selectionLimit: MAX_PHOTOS - draft.photos.length,
+              allowsMultipleSelection: true,
+            });
+      if (result.canceled) return;
     // Le CONTEXTE se déduit du rang, comme le dit l'aide juste en dessous : la
     // première photo montre le contenu déballé, la deuxième le colis emballé.
     // Les suivantes sont libres. L'URI locale sert d'identifiant — elle est
     // unique sur l'appareil, et la photo n'a pas encore d'identité serveur.
-    const added = result.assets.map((asset, i) => {
-      const rank = draft.photos.length + i;
-      return {
-        id: asset.assetId ?? asset.uri,
-        uri: asset.uri,
-        context:
-          rank === 0 ? ('DECLARED_CONTENT' as const)
-          : rank === 1 ? ('DECLARED_PACKAGED' as const)
-          : ('CUSTOM' as const),
-      };
-    });
-    setBookingDraft({ photos: [...draft.photos, ...added].slice(0, MAX_PHOTOS) });
-  }, [draft.photos, t]);
+      const added = result.assets.map((asset, i) => {
+        const rank = draft.photos.length + i;
+        return {
+          id: asset.assetId ?? asset.uri,
+          uri: asset.uri,
+          context:
+            rank === 0
+              ? ('DECLARED_CONTENT' as const)
+              : rank === 1
+                ? ('DECLARED_PACKAGED' as const)
+                : ('CUSTOM' as const),
+        };
+      });
+      setBookingDraft({ photos: [...draft.photos, ...added].slice(0, MAX_PHOTOS) });
+    },
+    [draft.photos, t]
+  );
+
+  /** Le choix de la source. `Alert` plutôt qu'une feuille maison : c'est le
+   *  sélecteur natif des deux OS, donc familier et gratuit en accessibilité. */
+  const addPhoto = useCallback(() => {
+    Alert.alert(t('content.addPhoto'), undefined, [
+      { text: t('content.fromCamera'), onPress: () => void pickFrom('camera') },
+      { text: t('content.fromLibrary'), onPress: () => void pickFrom('library') },
+      { text: t('content.cancel'), style: 'cancel' },
+    ]);
+  }, [pickFrom, t]);
 
   const removePhoto = useCallback(
     (id: string) => setBookingDraft({ photos: draft.photos.filter((p) => p.id !== id) }),
@@ -220,6 +256,40 @@ export default function BookingContentScreen() {
           {showErrors && errors.photos ? <FieldError code={errors.photos} /> : null}
         </View>
       </View>
+
+      {/* LES RÈGLES D'OR — repliées, comme sur le site : elles n'exigent aucune
+          action, elles ne doivent donc pas peser autant que les champs. Elles
+          vivent ICI et non à l'étape ① parce qu'elles parlent de ce qu'on vient
+          de décrire : emballer, peser, décrire fidèlement. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: rulesOpen }}
+        onPress={() => setRulesOpen((v) => !v)}
+        style={styles.rulesToggle}>
+        <Ionicons name="bulb-outline" size={16} color={Brand.teal} />
+        <ThemedText type="small" style={styles.rulesTitle}>
+          {t('content.goldenRules.title')}
+        </ThemedText>
+        <Ionicons
+          name={rulesOpen ? 'chevron-up' : 'chevron-down'}
+          size={16}
+          color={theme.textSecondary}
+        />
+      </Pressable>
+      {rulesOpen ? (
+        <View style={styles.rulesList}>
+          {GOLDEN_RULES_KEYS.map((key) => (
+            <View key={key} style={styles.ruleItem}>
+              <ThemedText type="small" themeColor="textSecondary">
+                •
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.ruleText}>
+                {t(`content.goldenRules.${key}`, { name: trip.tripper.firstName })}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </BookingStepFrame>
   );
 
@@ -266,4 +336,9 @@ const styles = StyleSheet.create({
   },
   thumbAdd: { borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  rulesToggle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
+  rulesTitle: { flex: 1 },
+  rulesList: { gap: Spacing.one, paddingLeft: Spacing.five },
+  ruleItem: { flexDirection: 'row', gap: Spacing.two },
+  ruleText: { flex: 1 },
 });

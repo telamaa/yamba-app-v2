@@ -62,7 +62,7 @@
     },
     "sizeHint": "It tells the Traveler whether your parcel fits in their bag. Only the one that costs more is marked.",
     "sizeHintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
-    "sizeHintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
+    "sizeHintFlat": "At this weight, size does not change the price: your parcel already weighs more than every minimum.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# category refused} other {# categories refused}} by {name}",
     "subtitle": "The more precise you are, the fewer surprises at handover.",
@@ -71,8 +71,8 @@
     "weightEdit": "Enter weight",
     "capacityLeft": "{kg} kg left on this trip",
     "billed": {
-      "FLOOR": "Billed at {kg} kg — this trip’s minimum.",
-      "SIZE_MIN": "Billed at {kg} kg — the space a {size} parcel takes."
+      "FLOOR": "Billed at {kg} kg, this trip's minimum.",
+      "SIZE_MIN": "Billed at {kg} kg, the space a {size} parcel takes."
     },
     "cardTitle": "Your parcel",
     "weightLabel": "Weight",
@@ -89,13 +89,13 @@
   "phaseProgress": "{phase}, step {current} of {total}",
   "places": {
     "title": "The meeting point",
-    "subtitle": "The spots {name} offers — pick the one that suits you, for the handover then the pickup.",
+    "subtitle": "The spots {name} offers. Pick the one that suits you, for the handover then the pickup.",
     "pickupTitle": "You hand the parcel to {name}",
     "deliveryTitle": "The recipient picks the parcel up",
     "errorPickup": "Choose the handover spot.",
     "errorDelivery": "Choose the pickup spot.",
-    "emptyPickup": "{name} did not state a spot — you will agree on the meeting point by message.",
-    "emptyDelivery": "No spot stated — the pickup point will be agreed by message."
+    "emptyPickup": "{name} did not state a spot. You will agree on the meeting point by message.",
+    "emptyDelivery": "No spot stated. The pickup point will be agreed by message."
   },
   "recipient": {
     "title": "The recipient",
@@ -103,14 +103,14 @@
     "phone": "Phone",
     "phonePrefix": "Country code",
     "close": "Close",
-    "phoneHint": "The delivery code will be sent to them by SMS or WhatsApp — pick their country code.",
+    "phoneHint": "The delivery code will be sent to them by SMS or WhatsApp. Pick their country code.",
     "firstName": "First name",
     "lastName": "Last name",
     "email": "Email (optional)",
     "emailHint": "To let them know the parcel has arrived.",
     "errors": {
       "PHONE_REQUIRED": "Enter the recipient's number.",
-      "PHONE_INVALID": "This number does not look valid — check the country code and digits.",
+      "PHONE_INVALID": "This number does not look valid. Check the country code and digits.",
       "FIRST_NAME_REQUIRED": "Enter their first name.",
       "LAST_NAME_REQUIRED": "Enter their last name.",
       "EMAIL_INVALID": "This email does not look valid."
@@ -127,17 +127,17 @@
     "title": "Protection",
     "subtitle": "State what the contents are worth, then choose your cover.",
     "valueLabel": "Content value",
-    "valueHint": "The purchase price — it sets the compensation cap.",
+    "valueHint": "Sets the compensation cap.",
     "cardTitle": "Parcel protection",
     "basic": {
       "title": "Basic protection",
       "price": "Included",
-      "description": "Your money is held until delivery. Parcel not handed over, you are refunded."
+      "description": "Your money is held until delivery, parcel not handed over refunded."
     },
     "extended": {
       "title": "Yamba Guarantee {cap}",
       "price": "+{amount}",
-      "description": "Loss, theft or damage in transit: you are refunded up to {cap}.",
+      "description": "Loss, theft or damage in transit, refunded up to {cap}.",
       "exclusionsTitle": "What is not covered",
       "exclusionsText": "Prohibited goods, a parcel that does not match its description, customs seizure, and normal wear."
     },
@@ -161,6 +161,18 @@
     "errors": {
       "DESCRIPTION_TOO_SHORT": "Briefly describe the contents (5 characters minimum).",
       "PHOTOS_REQUIRED_WITH_GUARANTEE": "At least one photo is required with the Yamba Guarantee."
-    }
+    },
+    "goldenRules": {
+      "title": "The golden rules for a smooth shipment",
+      "pack": "Pack carefully: a sturdy bag or box, bubble wrap for fragile items, taped properly.",
+      "weigh": "Weigh precisely: the declared weight must match the real weight at handover.",
+      "describe": "Describe faithfully: {name} will check the contents before accepting your parcel.",
+      "prohibited": "No prohibited goods."
+    },
+    "fromCamera": "Take a photo",
+    "fromLibrary": "Choose from my photos",
+    "cancel": "Cancel",
+    "cameraDeniedTitle": "Camera access denied",
+    "cameraDeniedBody": "Yamba needs the camera to photograph your parcel. You can allow it in settings."
   }
 }

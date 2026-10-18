@@ -104,7 +104,7 @@ export default function StepRecipient({
             <FormInput
               value={draft.recipient.firstName}
               onChangeAction={(v) => setRecipient({ firstName: v })}
-              placeholder="Marie"
+              placeholder="Jean"
               hasError={Boolean(errors.recipientFirstName)}
               autoComplete="given-name"
             />
@@ -113,7 +113,7 @@ export default function StepRecipient({
             <FormInput
               value={draft.recipient.lastName}
               onChangeAction={(v) => setRecipient({ lastName: v })}
-              placeholder="Mboungou"
+              placeholder="Jacques"
               hasError={Boolean(errors.recipientLastName)}
               autoComplete="family-name"
             />
@@ -129,7 +129,7 @@ export default function StepRecipient({
             <FormInput
               value={draft.recipient.email}
               onChangeAction={(v) => setRecipient({ email: v })}
-              placeholder="marie.mboungou@gmail.com"
+              placeholder="jean.jacques@gmail.com"
               type="email"
               inputMode="email"
               hasError={Boolean(errors.recipientEmail)}
