@@ -216,3 +216,34 @@ export function validateRecipientStep(draft: BookingDraft): RecipientErrors {
   }
   return errors;
 }
+
+/** Ce qui empêche de continuer aux étapes ② (valeur, protection) et ③ (contenu). */
+export type ValueErrors = { declaredValueEur?: 'VALUE_REQUIRED' };
+export type ContentErrors = {
+  description?: 'DESCRIPTION_TOO_SHORT';
+  photos?: 'PHOTOS_REQUIRED_WITH_GUARANTEE';
+};
+
+/** La valeur déclarée fixe le plafond d'indemnisation : sans elle, la garantie
+ *  n'a pas de montant à couvrir (A217). Un prix d'achat, pas une estimation. */
+export function validateValueStep(draft: BookingDraft): ValueErrors {
+  const value = Number(draft.declaredValueEur.replace(',', '.'));
+  return Number.isFinite(value) && value > 0 ? {} : { declaredValueEur: 'VALUE_REQUIRED' };
+}
+
+/**
+ * Le contenu : une description courte et, AVEC la Garantie, au moins une photo.
+ *
+ * La photo n'est obligatoire QUE sous garantie, et c'est la raison pour
+ * laquelle la protection se choisit AVANT (A214/A217) : on ne peut pas exiger
+ * une preuve pour une couverture qui n'a pas encore été demandée. Les mêmes
+ * seuils que le site (5 caractères, 1 photo) — le serveur revérifie.
+ */
+export function validateContentStep(draft: BookingDraft): ContentErrors {
+  const errors: ContentErrors = {};
+  if (draft.description.trim().length < 5) errors.description = 'DESCRIPTION_TOO_SHORT';
+  if (draft.protection === 'EXTENDED_500' && draft.photos.length === 0) {
+    errors.photos = 'PHOTOS_REQUIRED_WITH_GUARANTEE';
+  }
+  return errors;
+}

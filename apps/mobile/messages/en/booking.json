@@ -122,5 +122,45 @@
       "handToTraveler": "They give it to the Traveler on delivery. Without this code, the parcel cannot be handed over."
     },
     "nextStepSoon": "Next step: the commitment, then payment."
+  },
+  "protection": {
+    "title": "Protection",
+    "subtitle": "State what the contents are worth, then choose your cover.",
+    "valueLabel": "Content value",
+    "valueHint": "The purchase price — it sets the compensation cap.",
+    "cardTitle": "Parcel protection",
+    "basic": {
+      "title": "Basic protection",
+      "price": "Included",
+      "description": "Your money is held until delivery. Parcel not handed over, you are refunded."
+    },
+    "extended": {
+      "title": "Yamba Guarantee {cap}",
+      "price": "+{amount}",
+      "description": "Loss, theft or damage in transit: you are refunded up to {cap}.",
+      "exclusionsTitle": "What is not covered",
+      "exclusionsText": "Prohibited goods, a parcel that does not match its description, customs seizure, and normal wear."
+    },
+    "errors": {
+      "VALUE_REQUIRED": "Enter the content value."
+    }
+  },
+  "content": {
+    "title": "The contents",
+    "subtitle": "Describe what you are sending, and show it.",
+    "descriptionLabel": "Short description",
+    "descriptionPlaceholder": "E.g. 3 t-shirts, 1 jumper, chocolate",
+    "descriptionHint": "It helps the Traveler recognise the parcel at handover.",
+    "photosLabel": "Parcel photos",
+    "photosRequired": "(required with the Guarantee)",
+    "photosHint": "One photo of the unpacked contents, one of the wrapped parcel. Up to {max}.",
+    "addPhoto": "Add a photo",
+    "removePhoto": "Remove this photo",
+    "permissionTitle": "Photo access denied",
+    "permissionBody": "Yamba needs access to your photos to attach them to the parcel. You can allow it in settings.",
+    "errors": {
+      "DESCRIPTION_TOO_SHORT": "Briefly describe the contents (5 characters minimum).",
+      "PHOTOS_REQUIRED_WITH_GUARANTEE": "At least one photo is required with the Yamba Guarantee."
+    }
   }
 }

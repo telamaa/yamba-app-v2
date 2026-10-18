@@ -180,7 +180,7 @@ export default function BookingRecipientScreen() {
             value={draft.recipient.firstName}
             onChangeText={(firstName) => setRecipient({ firstName })}
             autoComplete="name-given"
-            placeholder="Marie"
+            placeholder="Jean"
             placeholderTextColor={theme.textSecondary}
             accessibilityLabel={t('recipient.firstName')}
             style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
@@ -196,7 +196,7 @@ export default function BookingRecipientScreen() {
             value={draft.recipient.lastName}
             onChangeText={(lastName) => setRecipient({ lastName })}
             autoComplete="name-family"
-            placeholder="Mboungou"
+            placeholder="Jacques"
             placeholderTextColor={theme.textSecondary}
             accessibilityLabel={t('recipient.lastName')}
             style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
@@ -215,7 +215,7 @@ export default function BookingRecipientScreen() {
             inputMode="email"
             autoCapitalize="none"
             autoComplete="email"
-            placeholder="marie.mboungou@gmail.com"
+            placeholder="jean.jacques@gmail.com"
             placeholderTextColor={theme.textSecondary}
             accessibilityLabel={t('recipient.email')}
             style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}

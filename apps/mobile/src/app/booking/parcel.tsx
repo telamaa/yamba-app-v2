@@ -222,12 +222,12 @@ export default function BookingParcelScreen() {
       return;
     }
     setShowErrors(false);
-    // RACCOURCI ASSUMÉ, à retirer quand les écrans ② (la garantie) et ③ (le
-    // contenu) existeront : on pousse vers le premier écran CONSTRUIT, les
-    // lieux. Le bandeau de phases dit alors « Livraison », ce qui est vrai —
-    // simplement, deux écrans de la phase « Colis » n'ont pas encore été
-    // traversés. Mieux vaut un enchaînement réel et incomplet qu'un cul-de-sac.
-    router.push({ pathname: '/booking/places', params: { tripId: trip?.id ?? '' } });
+    // La chaîne est complète de ① à ⑤ : le raccourci temporaire vers les lieux
+    // a disparu avec les écrans ② et ③. L'ordre suit A217 — la valeur et la
+    // protection d'abord, parce que la valeur fixe le plafond que la garantie
+    // couvre ; le contenu ensuite, parce que c'est la garantie qui rend la
+    // photo obligatoire.
+    router.push({ pathname: '/booking/protection', params: { tripId: trip?.id ?? '' } });
   }, [errors, trip?.id]);
 
   if (failed) {

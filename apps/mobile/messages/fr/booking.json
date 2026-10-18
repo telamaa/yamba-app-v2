@@ -122,5 +122,45 @@
       "handToTraveler": "Il le donne au Voyageur à la livraison. Sans ce code, le colis ne peut pas être remis."
     },
     "nextStepSoon": "Étape suivante : l'engagement, puis le paiement."
+  },
+  "protection": {
+    "title": "La protection",
+    "subtitle": "Déclare ce que vaut le contenu, puis choisis la couverture.",
+    "valueLabel": "Valeur du contenu",
+    "valueHint": "Le prix d'achat — il fixe le plafond d'indemnisation.",
+    "cardTitle": "Protection du colis",
+    "basic": {
+      "title": "Protection de base",
+      "price": "Inclus",
+      "description": "Ton argent est bloqué jusqu'à la livraison. Colis non remis, tu es remboursé."
+    },
+    "extended": {
+      "title": "Garantie Yamba {cap}",
+      "price": "+{amount}",
+      "description": "Perte, vol ou casse en route : tu es remboursé jusqu’à {cap}.",
+      "exclusionsTitle": "Ce qui n'est pas couvert",
+      "exclusionsText": "Les produits interdits, un colis non conforme à sa description, une saisie douanière, et l'usure normale."
+    },
+    "errors": {
+      "VALUE_REQUIRED": "Indique la valeur du contenu."
+    }
+  },
+  "content": {
+    "title": "Le contenu",
+    "subtitle": "Décris ce que tu envoies, et montre-le.",
+    "descriptionLabel": "Description courte",
+    "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
+    "descriptionHint": "Elle aide le Voyageur à reconnaître le colis à la remise.",
+    "photosLabel": "Photos du colis",
+    "photosRequired": "(requise avec la Garantie)",
+    "photosHint": "Une photo du contenu déballé, une du colis emballé. Jusqu'à {max}.",
+    "addPhoto": "Ajouter une photo",
+    "removePhoto": "Retirer cette photo",
+    "permissionTitle": "Accès aux photos refusé",
+    "permissionBody": "Yamba a besoin d'accéder à tes photos pour les joindre au colis. Tu peux l'autoriser dans les réglages.",
+    "errors": {
+      "DESCRIPTION_TOO_SHORT": "Décris brièvement le contenu (5 caractères au minimum).",
+      "PHOTOS_REQUIRED_WITH_GUARANTEE": "Au moins une photo est requise avec la Garantie Yamba."
+    }
   }
 }
