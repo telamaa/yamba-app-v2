@@ -125,6 +125,11 @@ export default function BookingContentScreen() {
               : rank === 1
                 ? ('DECLARED_PACKAGED' as const)
                 : ('CUSTOM' as const),
+          // Gardés DÈS la sélection : au moment du téléversement (étape ⑦),
+          // l'asset d'origine n'est plus là pour les redonner.
+          mimeType: asset.mimeType ?? null,
+          fileName: asset.fileName ?? null,
+          sizeBytes: asset.fileSize ?? null,
         };
       });
       setBookingDraft({ photos: [...draft.photos, ...added].slice(0, MAX_PHOTOS) });

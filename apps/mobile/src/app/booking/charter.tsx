@@ -51,7 +51,6 @@ export default function BookingCharterScreen() {
   const [trip, setTrip] = useState<PublicTrip | null>(null);
   const [failed, setFailed] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [nextStepSoon, setNextStepSoon] = useState(false);
   const [params, setParams] = useState(currentPricingParams);
 
   useEffect(() => {
@@ -83,12 +82,8 @@ export default function BookingCharterScreen() {
       return;
     }
     setShowErrors(false);
-    // L'écran ⑦ (le paiement) n'existe pas encore : il demande de faire entrer
-    // `@stripe/stripe-react-native` dans l'app, ce qui est une décision de
-    // dépendance ET un chemin d'argent. On le DIT au lieu de pousser vers une
-    // route qui n'existe pas.
-    setNextStepSoon(true);
-  }, [accepted]);
+    router.push({ pathname: '/booking/payment', params: { tripId: tripId ?? '' } });
+  }, [accepted, tripId]);
 
   if (failed) {
     return (
@@ -204,15 +199,6 @@ export default function BookingCharterScreen() {
         </ThemedText>
       </Pressable>
 
-      {nextStepSoon ? (
-        <View style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="arrow-forward-circle-outline" size={18} color={theme.textSecondary} />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.flex}>
-            {t('charter.nextStepSoon')}
-          </ThemedText>
-        </View>
-      ) : null}
-
       {showErrors && !accepted ? (
         <View style={styles.errorRow}>
           <Ionicons name="alert-circle-outline" size={15} color={Brand.mango} />
@@ -244,5 +230,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: 12, padding: Spacing.three },
 });

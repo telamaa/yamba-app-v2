@@ -42,11 +42,22 @@ export type ParcelProduct = 'PARCEL' | 'CHECKED_BAG_23KG' | 'CABIN_BAG_12KG';
 /** D22 — niveau de protection. Le mot « assurance » ne s'affiche nulle part (ANO-WEB-33). */
 export type ProtectionTier = 'BASIC' | 'EXTENDED_500';
 
-/** Une photo déclarée : l'URI locale tant qu'elle n'est pas téléversée (lot photos). */
+/**
+ * Une photo déclarée : l'URI locale tant qu'elle n'est pas téléversée (A45).
+ *
+ * Le type MIME, le nom et la taille viennent du sélecteur et sont gardés tels
+ * quels — `expo-image-picker` ne les garantit pas tous. Les DÉDUIRE plus tard
+ * de l'extension marche la plupart du temps ; les mémoriser quand ils existent
+ * évite de refuser une photo valable (ou d'en envoyer une trop lourde) au pire
+ * moment, juste avant l'autorisation bancaire.
+ */
 export type BookingPhoto = {
   id: string;
   uri: string;
   context: 'DECLARED_CONTENT' | 'DECLARED_PACKAGED' | 'CUSTOM';
+  mimeType: string | null;
+  fileName: string | null;
+  sizeBytes: number | null;
 };
 
 export type BookingRecipient = {

@@ -201,7 +201,74 @@
     "accept": {
       "label": "J'accepte la Charte Expéditeur, les CGV et le Contrat de transport.",
       "error": "Tu dois accepter la charte pour continuer."
+    }
+  },
+  "payment": {
+    "title": "Paiement",
+    "subtitle": "Le montant est autorisé maintenant, débité seulement quand le Voyageur accepte.",
+    "cta": "Payer {amount}",
+    "ctaBusy": "Envoi en cours…",
+    "summaryTitle": "Ce que tu paies",
+    "transport": "Transport",
+    "transportDetail": "{kg} kg facturés",
+    "service": "Frais de service Yamba",
+    "protection": "Garantie Yamba",
+    "total": "Total",
+    "hold": "Rien n'est débité maintenant. Le Voyageur a 24 h pour accepter : c'est à ce moment-là que tu paies.",
+    "methodTitle": "Le moyen de paiement",
+    "preparing": "Préparation du paiement…",
+    "retry": "Réessayer",
+    "testMode": "Mode test : aucun prestataire de paiement n'est configuré sur ce poste. L'autorisation de {amount} est simulée.",
+    "card": "Carte bancaire",
+    "cardPending": "La feuille de paiement s'ouvre quand tu appuies sur Payer.",
+    "cardAuthorized": "Carte autorisée. Il reste à envoyer ta demande.",
+    "unavailableTitle": "Le paiement par carte n'est pas disponible dans cette version",
+    "unavailableBody": "Elle ne peut pas ouvrir la feuille de paiement. Ta saisie est gardée : reviens quand l'app est à jour.",
+    "afterTitle": "Après ton paiement",
+    "after": {
+      "step1": "Le Voyageur reçoit ta demande et a 24 h pour accepter. Tu n'es débité qu'à ce moment-là.",
+      "step2": "Rendez-vous avec le Voyageur pour la remise, qu'il vérifiera et photographiera.",
+      "step3": "Une fois le colis déposé, tu reçois ton code à 6 chiffres, à transmettre au destinataire.",
+      "step4": "Le destinataire donne le code au Voyageur à l'arrivée, qui le saisit pour valider la livraison.",
+      "step5": "3 jours après la livraison validée, le Voyageur reçoit son paiement."
     },
-    "nextStepSoon": "Étape suivante : le paiement. Le montant est autorisé maintenant, débité seulement quand le Voyageur accepte."
+    "trust": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.",
+    "notReady": "Le paiement se prépare, encore un instant.",
+    "errors": {
+      "CANCELED": "Paiement abandonné. Rien n'a été débité.",
+      "SHEET_FAILED": "Le paiement n'a pas pu être autorisé. Vérifie ta carte et réessaie.",
+      "UPLOAD_FAILED": "Une photo n'a pas pu être envoyée. Vérifie ta connexion et réessaie. Rien n'a été débité.",
+      "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Retire-la ou reprends-la. Rien n'a été débité.",
+      "UPLOAD_INVALID_TYPE": "Une photo est dans un format non pris en charge. Rien n'a été débité.",
+      "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché : vérifie-le avant de payer.",
+      "QUOTE_UNAVAILABLE": "Le devis n'est pas calculable pour ce colis. Reviens sur le poids et la taille.",
+      "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
+      "FAMILY_REFUSED": "Le Voyageur n'accepte pas ce contenu sur ce trajet.",
+      "TRIP_NOT_BOOKABLE": "Ce trajet n'accepte plus de demandes.",
+      "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
+      "NEW_ACCOUNT_CAP": "Ton compte est récent : tes envois sont encore plafonnés. Le plafond se lève avec tes premiers envois terminés.",
+      "PAYMENT_NOT_AUTHORIZED": "Le paiement n'a pas encore été autorisé. Réessaie.",
+      "PAYMENT_MISMATCH": "L'autorisation ne correspond plus à ta demande. Une nouvelle est en préparation.",
+      "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
+      "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
+      "UNAUTHENTICATED": "Reconnecte-toi pour envoyer ta demande.",
+      "GENERIC": "Une erreur est survenue. Rien n'a été débité, tu peux réessayer."
+    }
+  },
+  "confirmation": {
+    "title": "Demande envoyée",
+    "subtitle": "{name} a 24 h pour accepter. Tu n'es débité qu'à ce moment-là.",
+    "deadline": "Réponse attendue avant le",
+    "amount": "Montant autorisé",
+    "reference": "Référence",
+    "nextTitle": "La suite",
+    "next": {
+      "step1": "S'il accepte, tu es débité et le rendez-vous de remise est confirmé.",
+      "step2": "À la remise, il vérifie et photographie le colis. Tu reçois ton code à 6 chiffres.",
+      "step3": "Le destinataire donne ce code à l'arrivée : c'est lui qui valide la livraison."
+    },
+    "refused": "S'il refuse ou ne répond pas sous 24 h, l'autorisation tombe d'elle-même et tu n'as rien payé.",
+    "cta": "Voir mes envois",
+    "secondary": "Explorer d'autres trajets"
   }
 }
