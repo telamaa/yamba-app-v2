@@ -60,7 +60,6 @@ export default function BookingRecipientScreen() {
   const [trip, setTrip] = useState<PublicTrip | null>(null);
   const [failed, setFailed] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [nextStepSoon, setNextStepSoon] = useState(false);
   const [prefixOpen, setPrefixOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const [params, setParams] = useState(currentPricingParams);
@@ -97,12 +96,11 @@ export default function BookingRecipientScreen() {
   const onContinue = useCallback(() => {
     if (Object.keys(errors).length > 0) {
       setShowErrors(true);
-      setNextStepSoon(false);
       return;
     }
     setShowErrors(false);
-    setNextStepSoon(true);
-  }, [errors]);
+    router.push({ pathname: '/booking/charter', params: { tripId: trip?.id ?? '' } });
+  }, [errors, trip?.id]);
 
   if (failed) {
     return (
@@ -260,14 +258,6 @@ export default function BookingRecipientScreen() {
         </View>
       ) : null}
 
-      {nextStepSoon ? (
-        <View style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="arrow-forward-circle-outline" size={18} color={theme.textSecondary} />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.flowText}>
-            {t('recipient.nextStepSoon')}
-          </ThemedText>
-        </View>
-      ) : null}
 
       {/* La feuille des indicatifs : pas de `<select>` en natif, et vingt-et-une
           entrées se parcourent mieux en pleine hauteur qu'en roulette. */}

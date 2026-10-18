@@ -120,8 +120,7 @@
       "codeGiven": "A 6-digit code will be given to you after payment.",
       "shareIt": "You pass it to the recipient by SMS, WhatsApp or in person.",
       "handToTraveler": "They give it to the Traveler on delivery. Without this code, the parcel cannot be handed over."
-    },
-    "nextStepSoon": "Next step: the commitment, then payment."
+    }
   },
   "protection": {
     "title": "Protection",
@@ -174,5 +173,35 @@
     "cancel": "Cancel",
     "cameraDeniedTitle": "Camera access denied",
     "cameraDeniedBody": "Yamba needs the camera to photograph your parcel. You can allow it in settings."
+  },
+  "charter": {
+    "title": "Your commitment",
+    "subtitle": "You certify the contents of the parcel on your honour.",
+    "cta": "Go to payment",
+    "handover": {
+      "title": "At handover, here is what will happen",
+      "visualInspectionLead": "Visual check is mandatory.",
+      "visualInspection": "The Traveler will inspect your parcel before accepting. Do not be surprised.",
+      "refusalPossibleLead": "Refusal is possible if it does not match.",
+      "refusalPossible": "If the contents differ from your declaration, the Traveler may refuse. You will be refunded, but the trip will be lost.",
+      "crossPhotosLead": "Cross photos.",
+      "crossPhotos": "The Traveler will take their own photos, which will prevail in a dispute."
+    },
+    "pledge": {
+      "title": "Shipper Charter",
+      "subtitle": "A legal commitment, read it carefully.",
+      "intro": "By confirming your booking, you declare and warrant on your honour that your parcel:",
+      "noIllicit": "contains no illicit, dangerous or prohibited goods,",
+      "matchDeclared": "matches exactly the category, weight and contents declared,",
+      "customsCompliant": "complies with the customs obligations of the destination country.",
+      "disclaimer": "Any false declaration engages your sole civil and criminal liability, excluding that of the Traveler and Yamba.",
+      "fullLink": "See the full charter and prohibited goods",
+      "fullUrl": "https://yamba.app/en/legal/shipper-charter"
+    },
+    "accept": {
+      "label": "I accept the Shipper Charter, the Terms and the Transport Contract.",
+      "error": "You must accept the charter to continue."
+    },
+    "nextStepSoon": "Next step: payment. The amount is authorised now, charged only when the Traveler accepts."
   }
 }

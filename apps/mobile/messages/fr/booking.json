@@ -120,8 +120,7 @@
       "codeGiven": "Un code à 6 chiffres te sera donné après le paiement.",
       "shareIt": "Tu le transmets au destinataire par SMS, WhatsApp ou oralement.",
       "handToTraveler": "Il le donne au Voyageur à la livraison. Sans ce code, le colis ne peut pas être remis."
-    },
-    "nextStepSoon": "Étape suivante : l'engagement, puis le paiement."
+    }
   },
   "protection": {
     "title": "La protection",
@@ -174,5 +173,35 @@
     "cancel": "Annuler",
     "cameraDeniedTitle": "Accès à l'appareil photo refusé",
     "cameraDeniedBody": "Yamba a besoin de l'appareil photo pour photographier ton colis. Tu peux l'autoriser dans les réglages."
+  },
+  "charter": {
+    "title": "Ton engagement",
+    "subtitle": "Tu certifies sur l'honneur le contenu du colis.",
+    "cta": "Passer au paiement",
+    "handover": {
+      "title": "À la remise, voici ce qui se passera",
+      "visualInspectionLead": "Vérification visuelle obligatoire.",
+      "visualInspection": "Le Voyageur examinera ton colis avant d'accepter. Ne sois pas surpris.",
+      "refusalPossibleLead": "Refus possible si non conforme.",
+      "refusalPossible": "Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé, mais le trajet sera perdu.",
+      "crossPhotosLead": "Photos croisées.",
+      "crossPhotos": "Le Voyageur prendra ses propres photos, qui feront foi en cas de litige."
+    },
+    "pledge": {
+      "title": "Charte Expéditeur",
+      "subtitle": "Engagement juridique, à lire attentivement.",
+      "intro": "En validant ta réservation, tu déclares et garantis sur l'honneur que ton colis :",
+      "noIllicit": "ne contient aucun produit illicite, dangereux ou interdit,",
+      "matchDeclared": "correspond exactement à la catégorie, au poids et au contenu déclarés,",
+      "customsCompliant": "respecte les obligations douanières du pays de destination.",
+      "disclaimer": "Toute déclaration mensongère engage ta seule responsabilité civile et pénale, à l'exclusion de celle du Voyageur et de Yamba.",
+      "fullLink": "Voir la charte complète et les produits interdits",
+      "fullUrl": "https://yamba.app/fr/legal/charte-expediteur"
+    },
+    "accept": {
+      "label": "J'accepte la Charte Expéditeur, les CGV et le Contrat de transport.",
+      "error": "Tu dois accepter la charte pour continuer."
+    },
+    "nextStepSoon": "Étape suivante : le paiement. Le montant est autorisé maintenant, débité seulement quand le Voyageur accepte."
   }
 }
