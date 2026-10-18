@@ -409,35 +409,54 @@ export function CharterCheckbox({
   const linkClass = "underline-offset-2 hover:underline";
   const linkStyle = { color: TIP_TEXT };
 
+  // Les liens vers les documents vivent HORS du <label> : cliqués à l'intérieur,
+  // ils cochaient la case en même temps qu'ils ouvraient le document — lire les CGV
+  // revenait à les accepter. Ils s'ouvrent aussi dans un nouvel onglet, sinon quitter
+  // le tunnel pour lire un document perd le brouillon (il vit en mémoire de page).
   return (
-    <label
-      htmlFor={id}
+    <div
       className={[
-        "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
-        "bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800",
+        "rounded-lg border p-4 transition-colors",
+        "bg-slate-50 dark:bg-slate-900",
         hasError
           ? "border-[#FF9900]"
           : "border-transparent hover:border-slate-200 dark:hover:border-slate-700",
       ].join(" ")}
     >
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChangeAction(e.target.checked)}
-        className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 cursor-pointer accent-[#FF9900]"
-      />
-      <div>
-        <div className="mb-1 text-[14px] font-medium">{title}</div>
-        <div className="text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
-          {descPrefix}
-          <a href={cgvHref} className={linkClass} style={linkStyle}>{cgvLabel}</a>
-          {descJoin}
-          <a href={contractHref} className={linkClass} style={linkStyle}>{contractLabel}</a>
-          {descSuffix}
-        </div>
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChangeAction(e.target.checked)}
+          className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 cursor-pointer accent-[#FF9900]"
+        />
+        <span className="text-[14px] font-medium">{title}</span>
+      </label>
+      <div className="mt-1 pl-[30px] text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
+        {descPrefix}
+        <a
+          href={cgvHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+          style={linkStyle}
+        >
+          {cgvLabel}
+        </a>
+        {descJoin}
+        <a
+          href={contractHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+          style={linkStyle}
+        >
+          {contractLabel}
+        </a>
+        {descSuffix}
       </div>
-    </label>
+    </div>
   );
 }
 

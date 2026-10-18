@@ -136,25 +136,25 @@
     "subtitle": "Tu certifies sur l''honneur le contenu du colis",
     "handoverFlow": {
       "title": "À la remise du colis, voici ce qui se passera",
-      "visualInspection": "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
-      "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
-      "crossPhotos": "**Photos croisées.** Le Voyageur prendra ses propres photos qui feront foi en cas de litige."
+      "visualInspection": "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d''accepter. Ne sois pas surpris.",
+      "refusalPossible": "**Refus possible si non conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé, mais le trajet sera perdu.",
+      "crossPhotos": "**Photos croisées.** Le Voyageur prendra ses propres photos, qui feront foi en cas de litige."
     },
     "charter": {
       "title": "Charte Expéditeur",
-      "subtitle": "Engagement juridique — à lire attentivement",
-      "intro": "En validant ce deal, je déclare et garantis sur l''honneur que mon colis :",
+      "subtitle": "Engagement juridique, à lire attentivement.",
+      "intro": "En validant ta réservation, tu déclares et garantis sur l''honneur que ton colis :",
       "noIllicit": "ne contient **aucun produit illicite**, dangereux ou interdit",
       "matchDeclared": "correspond exactement à la **catégorie, au poids et au contenu déclarés**",
       "customsCompliant": "respecte les **obligations douanières** du pays de destination",
-      "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du Voyageur et de Yamba.",
+      "disclaimer": "Toute déclaration mensongère engage ta seule responsabilité civile et pénale, à l''exclusion de celle du Voyageur et de Yamba.",
       "fullLink": "Voir la charte complète et les produits interdits"
     },
     "accept": {
-      "title": "J''accepte la Charte Expéditeur",
+      "title": "J''accepte la Charte Expéditeur, les CGV et le Contrat de transport.",
       "cgvLabel": "CGV",
       "contractLabel": "Contrat de transport",
-      "descPrefix": "J''ai lu et j''accepte également les ",
+      "descPrefix": "Lire les ",
       "descJoin": " et le ",
       "descSuffix": "."
     }
@@ -230,7 +230,7 @@
       "BUS": "{hours} h de bus"
     },
     "durationNeutral": "{hours} h de trajet",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}",
+    "deals": "{count, plural, =1 {# colis transporté} other {# colis transportés}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {

@@ -136,25 +136,25 @@
     "subtitle": "You certify on your honor the content of the parcel",
     "handoverFlow": {
       "title": "What will happen when you hand over the parcel",
-      "visualInspection": "**Mandatory visual inspection.** The Traveler will examine your parcel before accepting — don''t be surprised.",
-      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the Traveler can refuse. You''ll be refunded but the trip is lost.",
-      "crossPhotos": "**Cross-referenced photos.** The Traveler will take their own photos as evidence in case of dispute."
+      "visualInspection": "**Mandatory visual inspection.** The Traveler will examine your parcel before accepting. Don''t be surprised.",
+      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the Traveler can refuse. You''ll be refunded, but the trip is lost.",
+      "crossPhotos": "**Cross-referenced photos.** The Traveler will take their own photos, which prevail in case of dispute."
     },
     "charter": {
       "title": "Shipper Charter",
-      "subtitle": "Legal commitment — read carefully",
-      "intro": "By confirming this deal, I declare and guarantee on my honor that my parcel:",
+      "subtitle": "Legal commitment, read carefully.",
+      "intro": "By confirming your booking, you declare and guarantee on your honor that your parcel:",
       "noIllicit": "contains **no illicit**, dangerous or prohibited products",
       "matchDeclared": "matches exactly the **declared category, weight and content**",
       "customsCompliant": "complies with the **customs regulations** of the destination country",
-      "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the Traveler and Yamba.",
+      "disclaimer": "Any false declaration engages your sole civil and criminal liability, to the exclusion of the Traveler and Yamba.",
       "fullLink": "See the full charter and prohibited items"
     },
     "accept": {
-      "title": "I accept the Shipper Charter",
+      "title": "I accept the Shipper Charter, the Terms and the Transport Contract.",
       "cgvLabel": "Terms",
       "contractLabel": "Transport Contract",
-      "descPrefix": "I have also read and accept the ",
+      "descPrefix": "Read the ",
       "descJoin": " and the ",
       "descSuffix": "."
     }
@@ -230,7 +230,7 @@
       "BUS": "{hours}h by bus"
     },
     "durationNeutral": "{hours}h travel",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}",
+    "deals": "{count, plural, =1 {# parcel carried} other {# parcels carried}}",
     "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
     "newTripper": "New Traveler",
     "quoteHint": {
