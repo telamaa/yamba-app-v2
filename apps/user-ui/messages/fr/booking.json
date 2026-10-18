@@ -34,7 +34,7 @@
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
       "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
-      "remainingKg": "{kg} kg encore disponibles sur ce trajet",
+      "remainingKg": "{kg, number} kg encore disponibles sur ce trajet",
       "valueHint": "Fixe le plafond de l'indemnisation en cas de litige."
     },
     "photos": {
@@ -74,9 +74,9 @@
       "title": "Ton colis",
       "decrease": "Diminuer le poids",
       "increase": "Augmenter le poids",
-      "capacityLeft": "{kg} kg restants sur ce trajet",
-      "billedFloor": "Facturé {kg} kg, le minimum de ce trajet.",
-      "billedSizeMin": "Facturé {kg} kg, la place que prend un colis {size}.",
+      "capacityLeft": "{kg, number} kg restants sur ce trajet",
+      "billedFloor": "Facturé {kg, number} kg, le minimum de ce trajet.",
+      "billedSizeMin": "Facturé {kg, number} kg, la place que prend un colis {size}.",
       "weightFree": "Aucune limite annoncée sur ce trajet",
       "sizeIncluded": "Sans supplément"
     }
@@ -231,7 +231,7 @@
     },
     "durationNeutral": "{hours} h de trajet",
     "deals": "{count, plural, =1 {# colis transporté} other {# colis transportés}}",
-    "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
+    "transportDetail": "Transport · {kg, number} kg · {rate}/kg · taille {size}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {
       "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
@@ -240,8 +240,8 @@
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
       "UNKNOWN": "Prix indisponible."
     },
-    "billableFloor": "Facturé au minimum du trajet : {kg} kg.",
-    "billableSizeMin": "Taille {size} : facturée {kg} kg minimum, la place qu’elle prend."
+    "billableFloor": "Facturé au minimum du trajet : {kg, number} kg.",
+    "billableSizeMin": "Taille {size} : facturée {kg, number} kg minimum, la place qu’elle prend."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

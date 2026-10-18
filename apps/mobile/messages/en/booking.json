@@ -55,10 +55,10 @@
     "errors": {
       "FAMILY_REFUSED": "The Traveler does not take this content.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
-      "NOT_ENOUGH_CAPACITY": "Not enough room left for this bag ({kg} kg available).",
+      "NOT_ENOUGH_CAPACITY": "Not enough room left for this bag ({kg, number} kg available).",
       "WEIGHT_REQUIRED": "Enter the parcel weight.",
-      "WEIGHT_MAX": "{max} kg max per parcel.",
-      "WEIGHT_REMAINING": "Only {kg} kg left on this trip."
+      "WEIGHT_MAX": "{max, number} kg max per parcel.",
+      "WEIGHT_REMAINING": "Only {kg, number} kg left on this trip."
     },
     "sizeHint": "It tells the Traveler whether your parcel fits in their bag. Only the one that costs more is marked.",
     "sizeHintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
@@ -69,10 +69,10 @@
     "weightDecrease": "Decrease weight",
     "weightIncrease": "Increase weight",
     "weightEdit": "Enter weight",
-    "capacityLeft": "{kg} kg left on this trip",
+    "capacityLeft": "{kg, number} kg left on this trip",
     "billed": {
-      "FLOOR": "Billed at {kg} kg, this trip's minimum.",
-      "SIZE_MIN": "Billed at {kg} kg, the space a {size} parcel takes."
+      "FLOOR": "Billed at {kg, number} kg, this trip's minimum.",
+      "SIZE_MIN": "Billed at {kg, number} kg, the space a {size} parcel takes."
     },
     "cardTitle": "Your parcel",
     "weightLabel": "Weight",
@@ -152,7 +152,7 @@
     "descriptionHint": "It helps the Traveler recognise the parcel at handover.",
     "photosLabel": "Parcel photos",
     "photosRequired": "(required with the Guarantee)",
-    "photosHint": "One photo of the unpacked contents, one of the wrapped parcel. Up to {max}.",
+    "photosHint": "One photo of the unpacked contents, one of the wrapped parcel. Up to {max, number}.",
     "addPhoto": "Add a photo",
     "removePhoto": "Remove this photo",
     "permissionTitle": "Photo access denied",
@@ -210,7 +210,7 @@
     "ctaBusy": "Sending…",
     "summaryTitle": "What you pay",
     "transport": "Transport",
-    "transportDetail": "{kg} kg billed",
+    "transportDetail": "{kg, number} kg billed",
     "service": "Yamba service fee",
     "protection": "Yamba Guarantee",
     "total": "Total",

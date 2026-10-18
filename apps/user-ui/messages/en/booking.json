@@ -34,7 +34,7 @@
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
       "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
-      "remainingKg": "{kg} kg still available on this trip",
+      "remainingKg": "{kg, number} kg still available on this trip",
       "valueHint": "Sets the compensation cap in case of a dispute."
     },
     "photos": {
@@ -74,9 +74,9 @@
       "title": "Your parcel",
       "decrease": "Decrease weight",
       "increase": "Increase weight",
-      "capacityLeft": "{kg} kg left on this trip",
-      "billedFloor": "Billed at {kg} kg, this trip's minimum.",
-      "billedSizeMin": "Billed at {kg} kg, the space a {size} parcel takes.",
+      "capacityLeft": "{kg, number} kg left on this trip",
+      "billedFloor": "Billed at {kg, number} kg, this trip's minimum.",
+      "billedSizeMin": "Billed at {kg, number} kg, the space a {size} parcel takes.",
       "weightFree": "No limit stated on this trip",
       "sizeIncluded": "No extra charge"
     }
@@ -231,7 +231,7 @@
     },
     "durationNeutral": "{hours}h travel",
     "deals": "{count, plural, =1 {# parcel carried} other {# parcels carried}}",
-    "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
+    "transportDetail": "Transport · {kg, number} kg · {rate}/kg · size {size}",
     "newTripper": "New Traveler",
     "quoteHint": {
       "MISSING_WEIGHT": "Enter the parcel weight to see the price.",
@@ -240,8 +240,8 @@
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
       "UNKNOWN": "Price unavailable."
     },
-    "billableFloor": "Billed at the trip minimum: {kg} kg.",
-    "billableSizeMin": "Size {size}: billed at {kg} kg minimum, the space it takes."
+    "billableFloor": "Billed at the trip minimum: {kg, number} kg.",
+    "billableSizeMin": "Size {size}: billed at {kg, number} kg minimum, the space it takes."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

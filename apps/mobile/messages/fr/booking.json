@@ -55,10 +55,10 @@
     "errors": {
       "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
-      "NOT_ENOUGH_CAPACITY": "Il ne reste pas assez de place pour ce bagage ({kg} kg disponibles).",
+      "NOT_ENOUGH_CAPACITY": "Il ne reste pas assez de place pour ce bagage ({kg, number} kg disponibles).",
       "WEIGHT_REQUIRED": "Indique le poids du colis.",
-      "WEIGHT_MAX": "{max} kg au maximum par colis.",
-      "WEIGHT_REMAINING": "Il ne reste que {kg} kg sur ce trajet."
+      "WEIGHT_MAX": "{max, number} kg au maximum par colis.",
+      "WEIGHT_REMAINING": "Il ne reste que {kg, number} kg sur ce trajet."
     },
     "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
     "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
@@ -70,10 +70,10 @@
     "weightDecrease": "Diminuer le poids",
     "weightIncrease": "Augmenter le poids",
     "weightEdit": "Saisir le poids",
-    "capacityLeft": "{kg} kg restants sur ce trajet",
+    "capacityLeft": "{kg, number} kg restants sur ce trajet",
     "billed": {
-      "FLOOR": "Facturé {kg} kg, le minimum de ce trajet.",
-      "SIZE_MIN": "Facturé {kg} kg, la place que prend un colis {size}."
+      "FLOOR": "Facturé {kg, number} kg, le minimum de ce trajet.",
+      "SIZE_MIN": "Facturé {kg, number} kg, la place que prend un colis {size}."
     },
     "weightLabel": "Poids",
     "weightFree": "Aucune limite annoncée sur ce trajet",
@@ -152,7 +152,7 @@
     "descriptionHint": "Elle aide le Voyageur à reconnaître le colis à la remise.",
     "photosLabel": "Photos du colis",
     "photosRequired": "(requise avec la Garantie)",
-    "photosHint": "Une photo du contenu déballé, une du colis emballé. Jusqu'à {max}.",
+    "photosHint": "Une photo du contenu déballé, une du colis emballé. Jusqu'à {max, number}.",
     "addPhoto": "Ajouter une photo",
     "removePhoto": "Retirer cette photo",
     "permissionTitle": "Accès aux photos refusé",
@@ -210,7 +210,7 @@
     "ctaBusy": "Envoi en cours…",
     "summaryTitle": "Ce que tu paies",
     "transport": "Transport",
-    "transportDetail": "{kg} kg facturés",
+    "transportDetail": "{kg, number} kg facturés",
     "service": "Frais de service Yamba",
     "protection": "Garantie Yamba",
     "total": "Total",
