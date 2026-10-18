@@ -1,9 +1,11 @@
 /**
  * booking/_layout.tsx — la pile du parcours de RÉSERVATION.
  * ==========================================================
- * Sept étapes, sept pages poussées : le colis, sa valeur et ses photos, les
- * lieux de rendez-vous, la garantie, le destinataire, l'engagement, le
- * paiement. Chacune glisse depuis la droite et se dépile au retour — le motif
+ * Sept écrans, sept pages poussées — dans l'ordre d'A216 : ① le colis,
+ * ② la garantie, ③ le contenu (valeur, description, photos), ④ les lieux de
+ * rendez-vous, ⑤ le destinataire, ⑥ l'engagement, ⑦ le paiement. La garantie
+ * est remontée du ④ au ② parce que c'est elle qui rend les photos obligatoires
+ * (A214) : l'ordre natif suit celui du site, il ne le contredit pas. Chacune glisse depuis la droite et se dépile au retour — le motif
  * natif des deux OS, celui du parcours de recherche (`search/`).
  *
  * La pile vit au niveau RACINE (déclarée dans `app/_layout.tsx`), par-dessus

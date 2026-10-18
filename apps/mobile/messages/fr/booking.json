@@ -52,7 +52,6 @@
       "L": "une demi-valise"
     },
     "weightUnit": "kg",
-    "nextStepSoon": "Étape suivante : la protection de ton colis.",
     "errors": {
       "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
@@ -87,5 +86,16 @@
     "commitment": "Engagement",
     "payment": "Paiement"
   },
-  "phaseProgress": "{phase}, étape {current} sur {total}"
+  "phaseProgress": "{phase}, étape {current} sur {total}",
+  "places": {
+    "title": "Où se passe le rendez-vous ?",
+    "subtitle": "Le lieu de la remise, puis celui du retrait.",
+    "pickupTitle": "Tu remets le colis à {name}",
+    "deliveryTitle": "Le destinataire récupère le colis",
+    "errorPickup": "Choisis le lieu de remise.",
+    "errorDelivery": "Choisis le lieu de retrait.",
+    "emptyPickup": "{name} n'a pas précisé de lieu — vous conviendrez du point de rendez-vous par message.",
+    "emptyDelivery": "Aucun lieu précisé — le point de retrait se conviendra par message.",
+    "nextStepSoon": "Étape suivante : la personne qui récupère le colis."
+  }
 }

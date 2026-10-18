@@ -52,7 +52,6 @@
       "L": "half a suitcase"
     },
     "weightUnit": "kg",
-    "nextStepSoon": "Next step: protecting your parcel.",
     "errors": {
       "FAMILY_REFUSED": "The Traveler does not take this content.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
@@ -87,5 +86,16 @@
     "commitment": "Commitment",
     "payment": "Payment"
   },
-  "phaseProgress": "{phase}, step {current} of {total}"
+  "phaseProgress": "{phase}, step {current} of {total}",
+  "places": {
+    "title": "Where do you meet?",
+    "subtitle": "The handover spot, then the pickup spot.",
+    "pickupTitle": "You hand the parcel to {name}",
+    "deliveryTitle": "The recipient picks the parcel up",
+    "errorPickup": "Choose the handover spot.",
+    "errorDelivery": "Choose the pickup spot.",
+    "emptyPickup": "{name} did not state a spot — you will agree on the meeting point by message.",
+    "emptyDelivery": "No spot stated — the pickup point will be agreed by message.",
+    "nextStepSoon": "Next step: the person picking the parcel up."
+  }
 }

@@ -43,6 +43,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { getPublicTrip, type PublicTrip, type TripLocationPoint } from '@/lib/api/trip.api';
+import { DEFAULT_LOCATION_ICON, LOCATION_ICONS } from '@/lib/location-format';
 import {
   estimateShipperTotalCents,
   BILLING_FLOOR_KG,
@@ -79,12 +80,6 @@ const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   PLANE: 'airplane',
   TRAIN: 'train',
   CAR: 'car-sport',
-};
-
-const LOCATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  AIRPORT: 'airplane-outline',
-  TRAIN_STATION: 'train-outline',
-  CITY_AREA: 'business-outline',
 };
 
 /* La frise partage UNE grille entre ses trois colonnes : sans hauteurs
@@ -850,7 +845,7 @@ function PlaceRow({ point }: { point: TripLocationPoint }) {
   return (
     <View style={styles.placeRow}>
       <Ionicons
-        name={LOCATION_ICONS[point.kind] ?? 'location-outline'}
+        name={LOCATION_ICONS[point.kind] ?? DEFAULT_LOCATION_ICON}
         size={16}
         color={theme.textSecondary}
       />

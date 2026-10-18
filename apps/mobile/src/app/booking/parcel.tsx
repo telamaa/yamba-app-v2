@@ -93,7 +93,6 @@ export default function BookingParcelScreen() {
   const [failed, setFailed] = useState(false);
   const [params, setParams] = useState(currentPricingParams);
   const [showErrors, setShowErrors] = useState(false);
-  const [nextStepSoon, setNextStepSoon] = useState(false);
   const [showRefused, setShowRefused] = useState(false);
   /** Le clavier ne monte QUE si on le demande, en touchant la valeur. */
   const [editingWeight, setEditingWeight] = useState(false);
@@ -220,16 +219,16 @@ export default function BookingParcelScreen() {
   const onContinue = useCallback(() => {
     if (Object.keys(errors).length > 0) {
       setShowErrors(true);
-      setNextStepSoon(false);
       return;
     }
-    // L'étape ② est désormais LA GARANTIE (remontée du ④ au ②, 17/10 : c'est
-    // elle qui rend les photos obligatoires, le web l'a placée juste après la
-    // taille). Elle est le lot suivant : on le DIT, on ne pousse pas vers une
-    // page qui n'existe pas.
     setShowErrors(false);
-    setNextStepSoon(true);
-  }, [errors]);
+    // RACCOURCI ASSUMÉ, à retirer quand les écrans ② (la garantie) et ③ (le
+    // contenu) existeront : on pousse vers le premier écran CONSTRUIT, les
+    // lieux. Le bandeau de phases dit alors « Livraison », ce qui est vrai —
+    // simplement, deux écrans de la phase « Colis » n'ont pas encore été
+    // traversés. Mieux vaut un enchaînement réel et incomplet qu'un cul-de-sac.
+    router.push({ pathname: '/booking/places', params: { tripId: trip?.id ?? '' } });
+  }, [errors, trip?.id]);
 
   if (failed) {
     return (
@@ -493,14 +492,6 @@ export default function BookingParcelScreen() {
         </>
       ) : null}
 
-      {nextStepSoon ? (
-        <View style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="arrow-forward-circle-outline" size={18} color={theme.textSecondary} />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.noticeText}>
-            {t('parcel.nextStepSoon')}
-          </ThemedText>
-        </View>
-      ) : null}
     </BookingStepFrame>
   );
 }
@@ -871,16 +862,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#DC2626',
-    flex: 1,
-  },
-  notice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: 12,
-    padding: Spacing.three,
-  },
-  noticeText: {
     flex: 1,
   },
 });
