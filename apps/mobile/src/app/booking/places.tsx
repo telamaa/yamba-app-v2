@@ -53,7 +53,6 @@ export default function BookingPlacesScreen() {
   const [trip, setTrip] = useState<PublicTrip | null>(null);
   const [failed, setFailed] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [nextStepSoon, setNextStepSoon] = useState(false);
   const [params, setParams] = useState(currentPricingParams);
 
   useEffect(() => {
@@ -83,11 +82,10 @@ export default function BookingPlacesScreen() {
     const deliveryMissing = (trip?.deliveryLocations.length ?? 0) > 1 && draft.deliveryIndex === null;
     if (pickupMissing || deliveryMissing) {
       setShowErrors(true);
-      setNextStepSoon(false);
       return;
     }
     setShowErrors(false);
-    setNextStepSoon(true);
+    router.push({ pathname: '/booking/recipient', params: { tripId: trip?.id ?? '' } });
   }, [trip, draft.pickupIndex, draft.deliveryIndex]);
 
   if (failed) {
@@ -119,7 +117,7 @@ export default function BookingPlacesScreen() {
   return (
     <BookingStepFrame
       title={t('places.title')}
-      subtitle={t('places.subtitle')}
+      subtitle={t('places.subtitle', { name: trip.tripper.firstName })}
       step={4}
       priceLabel={priceLabel}
       priceHint={quote.ok === true ? t('bar.allIn') : t('bar.quoteError.GENERIC')}
@@ -145,14 +143,6 @@ export default function BookingPlacesScreen() {
         onSelectAction={(index) => setBookingDraft({ deliveryIndex: index })}
       />
 
-      {nextStepSoon ? (
-        <View style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
-          <Ionicons name="arrow-forward-circle-outline" size={18} color={theme.textSecondary} />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.noticeText}>
-            {t('places.nextStepSoon')}
-          </ThemedText>
-        </View>
-      ) : null}
     </BookingStepFrame>
   );
 
@@ -292,6 +282,4 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: 12, padding: Spacing.three },
-  noticeText: { flex: 1 },
 });

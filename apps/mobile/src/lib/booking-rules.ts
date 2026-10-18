@@ -22,6 +22,7 @@ import {
   type PricingParams,
   type ShipperQuote,
 } from '@packages/pricing';
+import { toE164 } from './phone-prefixes';
 
 import type { PublicTrip, TripFamilyCondition } from '@/lib/api/trip.api';
 import type { BookingDraft, ParcelFamily, ParcelProduct, SizeClass } from '@/lib/booking-draft';
@@ -175,4 +176,43 @@ export function quoteDraft(
   } catch (error) {
     return { ok: false, code: error instanceof QuoteError ? error.code : 'UNKNOWN' };
   }
+}
+
+/** Ce qui empêche de continuer à l'étape « Le destinataire ». */
+export type RecipientErrors = {
+  phone?: 'PHONE_REQUIRED' | 'PHONE_INVALID';
+  firstName?: 'FIRST_NAME_REQUIRED';
+  lastName?: 'LAST_NAME_REQUIRED';
+  email?: 'EMAIL_INVALID';
+};
+
+/**
+ * Le destinataire : un numéro JOIGNABLE et un nom. Le serveur revérifie tout
+ * (RG-MOB-1) ; ici on évite de faire marcher l'Expéditeur jusqu'au paiement.
+ *
+ * Le téléphone est la seule donnée VRAIMENT critique : c'est par lui que
+ * transite le code de livraison (D43). Un numéro invalide se corrige mieux ici
+ * qu'au moment où le colis attend à la gare.
+ *
+ * L'email reste facultatif — il ne sert qu'à prévenir de l'arrivée — mais s'il
+ * est saisi, il doit être plausible : un email fautif ne prévient personne et
+ * ne dit pas qu'il a échoué.
+ */
+export function validateRecipientStep(draft: BookingDraft): RecipientErrors {
+  const errors: RecipientErrors = {};
+  const { firstName, lastName, phonePrefix, phoneNational, email } = draft.recipient;
+
+  if (!phoneNational.trim()) {
+    errors.phone = 'PHONE_REQUIRED';
+  } else if (toE164(phonePrefix, phoneNational) === null) {
+    errors.phone = 'PHONE_INVALID';
+  }
+  if (!firstName.trim()) errors.firstName = 'FIRST_NAME_REQUIRED';
+  if (!lastName.trim()) errors.lastName = 'LAST_NAME_REQUIRED';
+  // Volontairement permissif : on refuse ce qui ne PEUT pas être un email, pas
+  // ce qui n'est pas dans une liste de domaines. Le serveur tranche vraiment.
+  if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+    errors.email = 'EMAIL_INVALID';
+  }
+  return errors;
 }

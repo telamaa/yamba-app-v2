@@ -54,6 +54,8 @@ export type BookingRecipient = {
   lastName: string;
   phonePrefix: string;
   phoneNational: string;
+  /** Facultatif — il ne sert qu'à prévenir le destinataire de l'arrivée du colis. */
+  email: string;
 };
 
 export type BookingDraft = {
@@ -90,7 +92,7 @@ const EMPTY: BookingDraft = {
   protection: 'BASIC',
   pickupIndex: null,
   deliveryIndex: null,
-  recipient: { firstName: '', lastName: '', phonePrefix: '+33', phoneNational: '' },
+  recipient: { firstName: '', lastName: '', phonePrefix: '+33', phoneNational: '', email: '' },
   charterAccepted: false,
   termsAccepted: false,
 };

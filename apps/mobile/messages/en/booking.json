@@ -88,14 +88,39 @@
   },
   "phaseProgress": "{phase}, step {current} of {total}",
   "places": {
-    "title": "Where do you meet?",
-    "subtitle": "The handover spot, then the pickup spot.",
+    "title": "The meeting point",
+    "subtitle": "The spots {name} offers — pick the one that suits you, for the handover then the pickup.",
     "pickupTitle": "You hand the parcel to {name}",
     "deliveryTitle": "The recipient picks the parcel up",
     "errorPickup": "Choose the handover spot.",
     "errorDelivery": "Choose the pickup spot.",
     "emptyPickup": "{name} did not state a spot — you will agree on the meeting point by message.",
-    "emptyDelivery": "No spot stated — the pickup point will be agreed by message.",
-    "nextStepSoon": "Next step: the person picking the parcel up."
+    "emptyDelivery": "No spot stated — the pickup point will be agreed by message."
+  },
+  "recipient": {
+    "title": "The recipient",
+    "subtitle": "The person picking the parcel up. They do not need a Yamba account.",
+    "phone": "Phone",
+    "phonePrefix": "Country code",
+    "close": "Close",
+    "phoneHint": "The delivery code will be sent to them by SMS or WhatsApp — pick their country code.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "email": "Email (optional)",
+    "emailHint": "To let them know the parcel has arrived.",
+    "errors": {
+      "PHONE_REQUIRED": "Enter the recipient's number.",
+      "PHONE_INVALID": "This number does not look valid — check the country code and digits.",
+      "FIRST_NAME_REQUIRED": "Enter their first name.",
+      "LAST_NAME_REQUIRED": "Enter their last name.",
+      "EMAIL_INVALID": "This email does not look valid."
+    },
+    "deliveryFlow": {
+      "title": "How delivery will work",
+      "codeGiven": "A 6-digit code will be given to you after payment.",
+      "shareIt": "You pass it to the recipient by SMS, WhatsApp or in person.",
+      "handToTraveler": "They give it to the Traveler on delivery. Without this code, the parcel cannot be handed over."
+    },
+    "nextStepSoon": "Next step: the commitment, then payment."
   }
 }

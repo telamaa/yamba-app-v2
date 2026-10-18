@@ -88,14 +88,39 @@
   },
   "phaseProgress": "{phase}, étape {current} sur {total}",
   "places": {
-    "title": "Où se passe le rendez-vous ?",
-    "subtitle": "Le lieu de la remise, puis celui du retrait.",
+    "title": "Le rendez-vous",
+    "subtitle": "Les points proposés par {name} — choisis celui qui t'arrange, pour la remise puis pour le retrait.",
     "pickupTitle": "Tu remets le colis à {name}",
     "deliveryTitle": "Le destinataire récupère le colis",
     "errorPickup": "Choisis le lieu de remise.",
     "errorDelivery": "Choisis le lieu de retrait.",
     "emptyPickup": "{name} n'a pas précisé de lieu — vous conviendrez du point de rendez-vous par message.",
-    "emptyDelivery": "Aucun lieu précisé — le point de retrait se conviendra par message.",
-    "nextStepSoon": "Étape suivante : la personne qui récupère le colis."
+    "emptyDelivery": "Aucun lieu précisé — le point de retrait se conviendra par message."
+  },
+  "recipient": {
+    "title": "Le destinataire",
+    "subtitle": "La personne qui récupère le colis. Pas besoin de compte Yamba pour elle.",
+    "phone": "Téléphone",
+    "phonePrefix": "Indicatif du pays",
+    "close": "Fermer",
+    "phoneHint": "Le code de livraison lui sera envoyé par SMS ou WhatsApp — indique l'indicatif de son pays.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Email (facultatif)",
+    "emailHint": "Pour le prévenir de l'arrivée du colis.",
+    "errors": {
+      "PHONE_REQUIRED": "Indique le numéro du destinataire.",
+      "PHONE_INVALID": "Ce numéro ne semble pas valide — vérifie l'indicatif et les chiffres.",
+      "FIRST_NAME_REQUIRED": "Indique son prénom.",
+      "LAST_NAME_REQUIRED": "Indique son nom.",
+      "EMAIL_INVALID": "Cet email ne semble pas valide."
+    },
+    "deliveryFlow": {
+      "title": "Comment se passera la livraison",
+      "codeGiven": "Un code à 6 chiffres te sera donné après le paiement.",
+      "shareIt": "Tu le transmets au destinataire par SMS, WhatsApp ou oralement.",
+      "handToTraveler": "Il le donne au Voyageur à la livraison. Sans ce code, le colis ne peut pas être remis."
+    },
+    "nextStepSoon": "Étape suivante : l'engagement, puis le paiement."
   }
 }
