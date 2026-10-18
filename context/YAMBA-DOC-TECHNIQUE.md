@@ -13497,3 +13497,52 @@ Au passage, un défaut d'affichage visible sur la même capture : la carte « Ce
 annonçait « Préparation du paiement… » alors que la préparation avait **échoué**. Sans devis
 serveur il n'y a pas de détail à montrer ; elle affiche désormais le total que la barre du
 bas porte déjà, et rien de plus.
+
+## Le fournisseur de paiement devient un choix, pas une déduction (A220)
+
+Suite directe du constat précédent. Session rétablie, l'écran ⑦ répond : « le paiement par
+carte n'est pas disponible dans cette version ». La réponse est **juste** — la feuille Stripe
+est un module natif absent d'Expo Go (A218) — mais le parcours de bout en bout devenait
+inatteignable, parce que `deal-service` tournait sur Stripe.
+
+Pourquoi : `createPaymentProviderFromEnv` ne regardait que `STRIPE_SECRET_KEY`. Présente →
+Stripe, absente → Fake. Et cette clé vit dans le `.env` **racine**, que `nx serve` impose à
+tous les services. Forcer le Fake demandait donc de construire le bundle et de le lancer à la
+main avec la variable vidée — une manœuvre qu'on ne refait pas tous les jours.
+
+La correction reprend la forme déjà en place pour l'e-mail (`resolveEmailProviderName`,
+D35/D44) :
+
+```ts
+export function resolvePaymentProviderName(env = process.env): PaymentProviderName {
+  const explicit = (env.PAYMENT_PROVIDER ?? "").trim().toUpperCase();
+  const key = env.STRIPE_SECRET_KEY?.trim();
+  const name = explicit === "STRIPE" || explicit === "FAKE" ? explicit : key ? "STRIPE" : "FAKE";
+  if (name === "FAKE" && env.NODE_ENV === "production") throw new Error(/* … */);
+  if (name === "STRIPE" && !key) throw new Error("PAYMENT_PROVIDER=stripe requires STRIPE_SECRET_KEY");
+  return name;
+}
+```
+
+Trois propriétés tenues par cinq tests (`payment-provider.spec.ts`, deal-service 687 → **692**
+mesuré) :
+
+- une valeur explicite l'emporte sur la clé, casse et espaces compris ;
+- le Fake reste **refusé en production**, y compris demandé explicitement — et le message dit
+  lequel des deux refus s'applique ;
+- `stripe` sans clé **refuse de démarrer** plutôt que de se replier en silence ; une valeur
+  inconnue (`paypal`) ne décide de rien et laisse la clé trancher, comme avant.
+
+**Un test vert n'est pas un type juste.** La première écriture redéclarait
+`PaymentProviderName`, déjà exporté en tête du même fichier. `nx test deal-service` passait au
+vert ; c'est `nx run-many --target=typecheck --all` — le contrôle CI « TypeScript ×8 » — qui a
+sorti les deux `TS2300`.
+
+**Sur le poste**, une ligne suffit désormais dans le `.env` racine :
+
+```
+PAYMENT_PROVIDER=fake
+```
+
+Elle vaut pour les deux fronts : le wizard du site affiche son « Mode test », et l'app mobile
+va jusqu'à la demande créée sans build de développement.

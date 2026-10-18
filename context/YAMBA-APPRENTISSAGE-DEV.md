@@ -4763,3 +4763,48 @@ juste n'est pas « Réessayer » — qui rejouerait le même refus — mais « S
 « Préparation du paiement… » alors que la préparation avait échoué cinq lignes plus bas. Un
 état de chargement doit être conditionné à *en cours*, jamais à *pas encore de résultat* —
 « pas de résultat » couvre aussi l'échec.
+
+### 7. Un repli implicite n'est pas une configuration
+
+**Le motif fautif.** Une fabrique qui déduit son comportement de la présence d'un secret :
+
+```ts
+const key = env.STRIPE_SECRET_KEY?.trim();
+if (key) return new StripePaymentProvider(key);
+return new FakePaymentProvider();   // « pas de clé » = « mode développement »
+```
+
+C'est commode et c'est faux dès que la variable sert **aussi** à autre chose. Ici la clé vit
+dans le `.env` racine, lu par tous les services : pour obtenir le fournisseur simulé, il
+fallait *enlever* une information plutôt que *demander* un comportement — donc construire un
+bundle et le lancer à la main avec la variable vidée.
+
+**La règle.** *Un comportement qu'on veut pouvoir choisir mérite sa propre variable.* Déduire
+reste utile **en repli**, pas comme unique levier :
+
+```
+explicite ? explicite : (indice ? A : B)
+```
+
+**Les garde-fous ne se relâchent pas pour autant.** Rendre un mode demandable ne le rend pas
+permis partout :
+
+- le mode simulé reste **refusé en production**, qu'il soit déduit ou demandé — et le message
+  d'erreur dit *lequel* des deux refus s'applique, sinon on cherche la mauvaise cause ;
+- demander le mode réel sans son secret **lève** au lieu de se replier : un repli silencieux
+  vers le simulé est exactement le bug qu'on cherche à rendre impossible ;
+- une valeur inconnue (`paypal`) ne décide de rien et laisse le repli jouer — refuser de
+  démarrer sur une faute de frappe dans une variable facultative serait plus brutal
+  qu'utile.
+
+**Chercher le précédent avant d'inventer la forme.** Le dépôt avait déjà ce problème résolu
+pour l'e-mail (`resolveEmailProviderName` : explicite, puis indices, puis refus en
+production). Reprendre la forme coûte dix minutes de lecture et évite une deuxième mécanique
+à connaître. Deux chemins sensibles pilotés différemment, c'est une mécanique de trop.
+
+**Et un test vert n'est pas un type juste.** La première écriture redéclarait un type déjà
+exporté vingt lignes plus haut dans le même fichier. `nx test` était vert — jest transpile
+fichier par fichier sans contrôle global de types. C'est `nx run-many --target=typecheck --all`
+qui a sorti les deux `TS2300`. D'où la règle du dépôt : « CI OK » se compte, et un lot qui
+touche un paquet partagé se typecheck **en entier**, pas seulement dans le projet où on a
+écrit.

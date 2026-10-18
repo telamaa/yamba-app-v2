@@ -7334,3 +7334,18 @@ se passe rien**. Les trois réponses doivent être à l'écran, pas dans une FAQ
 | MOB150 | Fermer la feuille sans se connecter, puis quitter la fiche trajet, puis se connecter ailleurs | Aucun tunnel ne s'ouvre : l'attente appartenait à l'écran quitté |
 | MOB151 | Session expirée entre l'écran ⑥ et l'écran ⑦ | L'écran propose « Se connecter » (pas « Réessayer ») ; au retour l'autorisation repart seule et la saisie est intacte |
 | MOB152 | L'autorisation échoue | La carte « Ce que tu paies » montre le total, **jamais** « Préparation du paiement… » |
+
+## Complément — le fournisseur de paiement (A220)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-100** | Le fournisseur de paiement se déclare explicitement (`PAYMENT_PROVIDER`). À défaut, la présence d'une clé secrète Stripe décide — le comportement historique est inchangé. |
+| **RG-MOB-101** | Le fournisseur simulé est **refusé en production**, qu'il soit déduit ou demandé explicitement. Aucune configuration ne permet d'encaisser pour de faux en production. |
+| **RG-MOB-102** | Demander Stripe sans clé secrète **empêche le démarrage** : jamais de repli silencieux vers le simulé. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB153 | `PAYMENT_PROVIDER=fake` avec une clé Stripe présente, hors production | Fournisseur simulé ; le parcours mobile va jusqu'à la demande créée |
+| MOB154 | `PAYMENT_PROVIDER=fake` en production | Le service refuse de démarrer, en nommant la règle |
+| MOB155 | `PAYMENT_PROVIDER=stripe` sans clé secrète | Le service refuse de démarrer |
+| MOB156 | `PAYMENT_PROVIDER` vide ou inconnu | Comportement d'avant : la clé décide |
