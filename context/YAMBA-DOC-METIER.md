@@ -7273,3 +7273,47 @@ l'effet sur le total.
 | MOB135 | Ouvrir la réservation d'un trajet qui ne propose **qu'un bagage en soute** | Le bagage est sélectionné d'office ; aucun formulaire de colis, et un prix s'affiche |
 | MOB136 | Ouvrir la réservation d'un trajet sans aucune offre | Écran « ce trajet n'est plus disponible » — pas de formulaire vide |
 | MOB137 | Un prix ne peut pas être calculé | La barre du bas **nomme la cause** ; elle ne demande jamais un poids déjà saisi |
+
+# Le tunnel natif va jusqu'au paiement (PR #391, A218)
+
+## Le besoin
+
+Un Expéditeur sur téléphone doit pouvoir aller du trajet jusqu'à la demande envoyée **sans
+jamais quitter l'app**. Jusqu'ici le parcours natif s'arrêtait avant l'argent : le dernier
+écran annonçait le paiement au lieu de le proposer.
+
+Le besoin derrière le besoin, lui, est une question de confiance : au moment de payer, un
+membre veut savoir **ce qu'il paie**, **quand il est débité**, et **ce qui se passe s'il ne
+se passe rien**. Les trois réponses doivent être à l'écran, pas dans une FAQ.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-84** | Le détail du prix affiché à l'écran de paiement est celui **rendu par le serveur** avec l'autorisation, jamais le calcul local. Le calcul local ne sert qu'à annoncer un total en cours de parcours et à permettre au serveur de refuser une divergence. |
+| **RG-MOB-85** | Les photos déclarées sont téléversées **avant** toute empreinte bancaire. Un échec de téléversement arrête le parcours sans qu'aucune autorisation n'ait été posée, et le dit (« rien n'a été débité »). |
+| **RG-MOB-86** | Une photo déjà téléversée n'est jamais renvoyée une seconde fois, même après un refus métier et un réessai. |
+| **RG-MOB-87** | L'écran de paiement annonce explicitement que **rien n'est débité maintenant** : le montant est autorisé, le débit a lieu quand le Voyageur accepte, sous 24 h. |
+| **RG-MOB-88** | Quand le paiement par carte n'est pas disponible sur l'appareil, l'app **le dit** et conserve la saisie. Elle ne masque pas le moyen de paiement, ne propose aucun contournement, et ne renvoie jamais vers le site. |
+| **RG-MOB-89** | Fermer la feuille de paiement est une **annulation**, pas un échec : le message le distingue et aucune demande n'est créée. |
+| **RG-MOB-90** | Une divergence de prix constatée par le serveur relit le trajet et les paramètres de plateforme avant de proposer un nouvel essai : l'Expéditeur ne peut pas réessayer sur un calcul périmé. |
+| **RG-MOB-91** | Une demande envoyée ne se re-paie pas : le parcours est dépilé derrière la confirmation, et aucun retour ne ramène sur l'écran de paiement. |
+| **RG-MOB-92** | La confirmation énonce le montant autorisé, une référence citable, l'échéance de réponse, la suite du parcours, **et ce qui se passe en cas de refus ou de silence** (l'autorisation tombe, rien n'est payé). |
+| **RG-MOB-93** | Un poids affiché dans une phrase suit la locale du membre : « 2,3 kg » en français, « 2.3 kg » en anglais. Aucun nombre n'est interpolé brut dans un message. |
+| **RG-MOB-94** | Aucune chaîne visible n'emploie le mot « deal » : c'est un mot de code. Le compte d'un Voyageur se dit en **colis transportés** (A144). |
+| **RG-MOB-95** | Un lien vers un document contractuel n'emporte **jamais** son acceptation : ouvrir les CGV depuis la case d'acceptation ne coche pas la case, et n'efface pas la saisie en cours. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB138 | Arriver à l'écran ⑦ avec le fournisseur FAKE, appuyer sur « Payer » | Les photos montent, la demande est créée, la confirmation s'affiche avec le montant et la référence |
+| MOB139 | Même parcours, revenir en arrière depuis la confirmation | On sort de la réservation ; on ne revient jamais sur l'engagement ni sur le paiement |
+| MOB140 | Couper le réseau pendant le téléversement d'une photo | Message « rien n'a été débité » ; aucune autorisation n'a été posée |
+| MOB141 | Réessayer après ce refus, réseau rétabli | Les photos déjà montées ne repartent pas ; la demande se crée |
+| MOB142 | Le Voyageur modifie son prix pendant le parcours | Refus « le prix a changé » ; le trajet est relu ; le nouvel essai porte le bon total |
+| MOB143 | Appareil sans module de paiement natif (Expo Go), fournisseur STRIPE | L'écran annonce que la carte n'est pas disponible dans cette version et garde la saisie |
+| MOB144 | Ouvrir la feuille Stripe puis la fermer | « Paiement abandonné. Rien n'a été débité. » — aucune demande créée |
+| MOB145 | Lire un colis facturé 2,3 kg en français | « Facturé 2,3 kg » — virgule, jamais point. En anglais : « 2.3 kg » |
+| MOB146 | Ouvrir les CGV depuis la case d'acceptation (web) | Le document s'ouvre dans un nouvel onglet, la case **reste décochée**, le brouillon est intact |
+| MOB147 | Lire la note d'un Voyageur sur le récapitulatif de réservation | « 12 colis transportés » — le mot « deal » n'apparaît nulle part |

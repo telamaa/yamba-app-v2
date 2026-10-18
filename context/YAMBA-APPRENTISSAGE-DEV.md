@@ -4515,3 +4515,174 @@ La règle générale : **une décision graphique n'est jamais valable « en soi 
 valable *dans une disposition donnée*. Quand la disposition change, il faut re-justifier
 chaque élément plutôt que le transposer. Le test est simple : *qu'est-ce que je perds en le
 retirant ?* Ici, rien — « une boîte à chaussures » est déjà ordonné et concret.
+
+## Chapitre 218 — L'argument ICU qui ne formate rien, le module natif qu'on n'importe pas, et la pile qu'il faut dépiler
+
+### 1. Un argument ICU simple ne met rien en forme
+
+**Le symptôme.** Sur une capture du récapitulatif, deux lignes qui se suivent dans la même
+carte :
+
+```
+Transport · 2,3 kg · 3,50 €/kg · taille S      8,05 €
+Facturé au minimum du trajet : 2.3 kg.
+```
+
+**La théorie.** ICU MessageFormat distingue deux formes d'argument :
+
+- `{kg}` — un argument **simple**. La valeur est convertie en chaîne. Pour un nombre,
+  c'est `String(2.3)`, donc `"2.3"`, quelle que soit la locale ;
+- `{kg, number}` — un argument **typé**. La valeur passe par `Intl.NumberFormat` avec la
+  locale du message.
+
+On ne devine pas cette règle : elle ne se voit qu'avec un nombre **décimal**, dans une
+locale dont le séparateur n'est pas le point. Avec `3` au lieu de `2.3`, les deux formes
+donnent le même résultat et le défaut reste invisible des mois.
+
+**La mesure plutôt que la croyance** — trois lignes suffisent à trancher :
+
+```js
+const { IntlMessageFormat } = require('intl-messageformat');
+new IntlMessageFormat('… : {kg} kg.', 'fr').format({ kg: 2.3 });          // « 2.3 kg »
+new IntlMessageFormat('… : {kg, number} kg.', 'fr').format({ kg: 2.3 });  // « 2,3 kg »
+```
+
+**Le contournement qui cache le défaut.** La première ligne s'en tirait parce que le
+composant faisait le travail lui-même :
+
+```tsx
+kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+```
+
+C'est ce `locale === "fr" ? … : …` qui est le vrai signal : **quand un composant formate un
+nombre à la main, c'est que le message ne le fait pas.** La correction rend le travail au
+message (`{kg, number}`) et supprime la table de locales écrite en dur.
+
+**Le piège du balayage.** `{x, number}` nourri d'une **chaîne** lève au rendu. Avant de
+changer quinze messages, il faut vérifier quinze points d'appel — et dans ce dépôt, certains
+passent déjà une chaîne pré-formatée (`co2Saved.toFixed(1).replace(".", ",")`). D'où une
+correction limitée au domaine en cours, et un inventaire écrit pour les autres.
+
+**Pour aller plus loin.** La même famille de pièges : `{n, plural, …}` qui n'accorde rien si
+on passe une chaîne, et `{d, date, …}` qui dépend des données ICU embarquées dans le moteur
+— raison pour laquelle ce dépôt formate ses dates avec ses propres tables de mois plutôt
+qu'avec `toLocaleDateString` (voir `lib/trip-format.ts`).
+
+### 2. Un module natif ne s'importe pas, il se sonde
+
+**Le problème.** `@stripe/stripe-react-native` contient du code natif (iOS/Android). Expo Go
+est une app **déjà compilée** : elle embarque un jeu fixe de modules natifs, et celui-là n'y
+est pas. Ce qui surprend, c'est *quand* ça casse :
+
+```ts
+import { presentPaymentSheet } from '@stripe/stripe-react-native'; // ← lève DÈS l'évaluation
+```
+
+Le module appelle `TurboModuleRegistry.getEnforcing(...)` au moment où il s'évalue, pas au
+moment où on l'utilise. Et comme Metro hisse les imports, le fichier qui contient cette
+ligne fait tomber l'app **dès qu'une route voisine le charge** — à l'ouverture du tunnel,
+pas au paiement.
+
+**Le motif.** Un chargement paresseux dans un `try`, et une seule sonde mémorisée :
+
+```ts
+let cached: StripeNativeModule | null = null;
+let probed = false;
+
+function loadModule(): StripeNativeModule | null {
+  if (cached) return cached;
+  if (probed) return null;      // dans Expo Go, l'évaluation lève à CHAQUE appel
+  probed = true;
+  try {
+    cached = require('@stripe/stripe-react-native') as StripeNativeModule;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+```
+
+Trois points qui comptent :
+
+- **`require` et non `import`** : c'est tout l'objet du fichier. `import` est statique, donc
+  évalué au chargement du module ;
+- **le typage est local** (`type StripeNativeModule = { … }`) : on décrit les trois
+  fonctions qu'on utilise, pas la bibliothèque. Le code reste typé sans dépendre d'un
+  module dont on refuse justement de dépendre à la compilation ;
+- **la sonde est mémorisée**. Sans `probed`, un `require` qui lève recommence à chaque
+  rendu — et l'écran consulte la disponibilité à chaque rendu.
+
+**La conséquence de conception.** Le reste de l'app ne connaît de Stripe que deux fonctions :
+`isPaymentSheetAvailable()` et `confirmWithPaymentSheet()`. L'écran ne sait pas *pourquoi*
+la feuille est absente, seulement qu'elle l'est — et il le dit. C'est la même frontière que
+le serveur s'était donnée avec `PaymentProvider` (D11) : **le fournisseur de paiement est
+une dépendance remplaçable, y compris par rien du tout.**
+
+**Pour aller plus loin.** C'est le motif *optional peer dependency* appliqué au natif. Il
+vaut pour tout module non inclus dans Expo Go (paiement, Bluetooth, santé…) : tant que la
+porte existe, l'app reste testable dans Expo Go, et le build de développement devient une
+décision d'outillage — pas un prérequis pour écrire la fonctionnalité.
+
+### 3. Une pile de navigation se dépile, elle ne se remplace pas
+
+**Le problème.** Le tunnel est une pile de sept pages poussées. Après `POST /deals`, un
+`router.replace('/booking/confirmation')` remplace **la page courante** — les six autres
+restent dessous. Le geste de retour ramène alors sur « Ton engagement », avec un brouillon
+qui vient d'être effacé : un écran vide, après un paiement réussi.
+
+**Le geste juste** (expo-router v6, vérifié dans la doc SDK 57) :
+
+```ts
+if (router.canDismiss()) router.dismissAll(); // retour au premier écran de la pile la plus proche
+router.replace({ pathname: '/booking/confirmation', params: { … } });
+```
+
+`dismissAll()` ramène au premier écran de la pile ; le `replace` qui suit le remplace par la
+confirmation. La pile ne contient plus qu'un écran, et le retour **sort** de la réservation.
+
+**La leçon générale.** Chaque fois qu'un parcours se **termine**, il faut se demander ce que
+le bouton retour fera — c'est un geste que l'utilisateur fera, pas un cas limite. Trois
+questions suffisent : où est-ce qu'il atterrit, cet écran est-il encore vrai, et peut-il
+refaire l'action qu'il vient de faire ?
+
+### 4. Un ordre d'effets de bord est une règle métier
+
+Dans un chemin d'argent, l'ordre des appels **est** la spécification :
+
+```
+photos → autorisation → création de la demande
+```
+
+Inverser les deux premiers ne « marche » pas moins bien : ça laisse une empreinte bancaire
+sur la carte d'un membre pour une demande qui n'existera jamais, parce qu'une photo n'a pas
+pu partir. C'est invisible en test et très visible sur un relevé.
+
+Deux techniques accompagnent cet ordre :
+
+- **l'idempotence de l'étape coûteuse**. Les URLs téléversées sont gardées dans un
+  `useRef(new Map())` indexé par l'identité de la photo. Un réessai après un refus métier ne
+  repaie pas le téléversement. Un `useRef` et non un `useState` : cette valeur ne doit
+  **pas** provoquer de rendu, et elle doit survivre aux rendus ;
+- **la relecture des entrées après un refus**. Quand le serveur répond « ton total n'est pas
+  le mien », réessayer sans rien relire rejoue exactement le même calcul faux. L'écran relit
+  donc le trajet et les paramètres de plateforme avant de proposer un nouvel essai.
+
+### 5. Un libellé qui enveloppe un lien fait deux choses à la fois
+
+Trouvé sur le site, dans la case d'acceptation de la charte :
+
+```tsx
+<label htmlFor={id}>
+  <input type="checkbox" … />
+  <div>J'ai lu et j'accepte … <a href="/legal/cgv">CGV</a> …</div>
+</label>
+```
+
+Un `<label>` transmet l'activation à son champ. Un lien **à l'intérieur** du label navigue
+*et* coche la case : **lire les conditions revient à les accepter**. Ajouté à cela, le lien
+naviguait dans le même onglet alors que le brouillon du tunnel vit en mémoire de page : la
+saisie était perdue.
+
+La correction tient en deux gestes — sortir les liens du `<label>`, et les ouvrir dans un
+nouvel onglet. La règle à retenir : **un `<label>` ne contient que ce qui doit activer le
+champ.** Tout le reste est un frère, pas un enfant.

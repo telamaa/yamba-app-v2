@@ -13309,3 +13309,144 @@ un deuxième idiome de repli.
 
 `TipBlock` n'est pas modifié : il reste l'habillage des blocs informatifs de l'engagement et
 du paiement, où ils ne concurrencent rien.
+
+# Le tunnel natif va jusqu'au paiement — les écrans ④ à ⑦, et le jumeau web de l'engagement (PR #391)
+
+## Ce qui existait, et ce qui manquait
+
+La PR portait déjà l'écran ① (« Le colis ») et sa carte fusionnée. Le reste du tunnel
+s'arrêtait sur un raccourci : l'écran ① poussait directement vers les lieux, et l'écran ⑥
+se refermait sur une phrase — « étape suivante : le paiement » — parce que l'écran ⑦
+demandait une décision qui n'avait pas été prise.
+
+Les six écrans manquants ont été construits dans l'ordre d'A217 : ② la valeur puis la
+protection, ③ la description et les photos, ④ les lieux de rendez-vous, ⑤ le destinataire,
+⑥ l'engagement, ⑦ le paiement — suivi d'un septième écran qui n'appartient plus au tunnel,
+la confirmation.
+
+## L'écran ⑦ : trois gestes, dans un ordre qui n'est pas négociable
+
+Le fichier `apps/mobile/src/app/booking/payment.tsx` enchaîne trois appels, et l'ordre est
+une règle, pas une préférence :
+
+1. **les photos montent d'abord** (`lib/api/upload.api.ts`). Le serveur ne reçoit jamais le
+   fichier : il *signe* une autorisation courte (`GET /uploads/imagekit-auth`), l'appareil
+   envoie l'image directement à ImageKit, et seule l'URL revient. C'est ce que fait déjà le
+   site. Pourquoi avant l'argent : un échec de téléversement doit tout arrêter **pendant
+   qu'aucune empreinte bancaire n'existe**, sinon on laisse une autorisation orpheline sur
+   la carte pour une demande qui ne sera jamais créée (A34/A45) ;
+2. **la carte autorise** — feuille native Stripe, ou rien du tout chez le fournisseur FAKE,
+   qui a déjà posé une empreinte simulée en créant l'intention ;
+3. **`POST /deals`** crée la demande PENDING dans une transaction.
+
+Les URLs déjà téléversées sont mémorisées dans un `useRef(new Map())` indexé par l'identité
+de la photo : un réessai après un refus métier ne renvoie pas deux fois les mêmes images.
+
+## Ce que l'écran affiche n'est pas le calcul local
+
+`POST /deals/payment-intents` ne rend pas qu'un `clientSecret` : il rend aussi `quote`, le
+devis **recalculé par le serveur**, celui qui sera figé dans le Booking (D17). C'est donc
+lui que l'écran ⑦ affiche, ligne à ligne — transport, frais de service Yamba, garantie si
+elle est prise, total.
+
+Le calcul local (`@packages/pricing`, le même moteur) garde exactement **un** rôle :
+alimenter la barre du bas depuis l'écran ①, et fournir `expectedTotalCents` pour que le
+serveur puisse REFUSER une divergence. Un montant jamais montré n'est jamais débité.
+
+Le site, lui, continue d'afficher son calcul local à l'étape 4 alors que la réponse porte
+déjà le devis serveur. La divergence est assumée : c'est le mobile qui a raison.
+
+## Stripe est isolé derrière une porte, pas importé
+
+`@stripe/stripe-react-native` est un module **natif**. Il n'est pas embarqué dans Expo Go,
+et — c'est le piège — son **évaluation** lève là-bas : le module réclame son pendant natif
+dès qu'on l'importe. Un `import` statique en tête de l'écran ⑦ aurait donc fait tomber
+l'app **à l'ouverture du tunnel**, pas au paiement.
+
+`apps/mobile/src/lib/stripe-sheet.ts` (124 lignes) est la seule porte :
+
+- le module est chargé par `require` **à l'instant** où une feuille doit s'ouvrir, et
+  seulement si le serveur a répondu `provider: "STRIPE"` ;
+- la sonde est mémorisée (`probed`) : dans Expo Go, l'évaluation lève à *chaque* appel, et
+  l'écran la consulte à chaque rendu ;
+- toute absence — module non lié, clé publiable absente, appel natif qui lève — devient
+  `UNAVAILABLE`, un état que l'écran SAIT dire. Jamais un écran blanc ;
+- l'annulation (`Canceled`) est distinguée de l'échec : fermer la feuille n'est pas une
+  erreur de carte et ne s'affiche pas comme telle.
+
+Conséquence **voulue** : avec le fournisseur FAKE — celui du poste de développement, prévu
+par D11/D38 — le parcours ① → ⑦ va jusqu'au bout **dans Expo Go, sur un vrai téléphone**,
+et crée une demande PENDING réelle. La vraie carte attend un build de développement.
+
+## La confirmation ne renvoie nulle part
+
+Le site redirige vers le suivi du deal (`/bookings/:id`). Ce suivi n'existe pas en natif, et
+la doctrine interdit de renvoyer au site (A210 b). `booking/confirmation.tsx` dit donc tout
+ce qui compte à cette seconde : le montant autorisé, la référence (les six derniers
+caractères de l'identifiant — ce qui se lit et se cite au support), l'échéance des 24 h, les
+trois étapes suivantes, et ce que personne ne demande mais que tout le monde se demande :
+« et s'il refuse ? ».
+
+Un détail de navigation qui n'en est pas un : le tunnel est **dépilé** avant d'afficher la
+confirmation (`router.canDismiss()` → `dismissAll()`, puis `replace`). Un `replace` seul
+aurait laissé les six écrans précédents dessous, et le retour serait revenu sur « Ton
+engagement » avec un brouillon déjà effacé.
+
+## Le jumeau web de l'écran ⑥
+
+Les trois corrections de texte faites sur le mobile avaient été **trouvées sur le site** et
+appliquées au seul mobile. Elles traversent : « En validant ce deal » devient « En validant
+ta réservation » (« deal » est un mot de code — le modèle `Booking` — et A144 exige que les
+chaînes visibles parlent la langue du membre), les tirets cadratins redeviennent de la
+ponctuation ordinaire, et la case d'acceptation **nomme les trois documents** au lieu d'en
+reléguer deux dans une ligne grise.
+
+Deux défauts ont été trouvés en chemin dans `CharterCheckbox` :
+
+- les deux liens vivaient **dans le `<label>`**. Cliquer « CGV » cochait la case en même
+  temps qu'il ouvrait le document : **lire les conditions revenait à les accepter** ;
+- ils naviguaient dans le même onglet, alors que le brouillon du tunnel vit en mémoire de
+  page : aller lire un document **perdait la saisie**.
+
+Au passage, `summary.deals` affichait « 12 deals » sous la note du Voyageur — le mot de code
+était visible sur les deux faces de la page. Il devient « 12 colis transportés », le
+vocabulaire déjà retenu sur la fiche trajet native.
+
+## Le défaut i18n trouvé sur une capture
+
+Dans la même carte, deux lignes qui se suivent :
+
+```
+Transport · 2,3 kg · 3,50 €/kg · taille S      8,05 €
+Facturé au minimum du trajet : 2.3 kg.
+```
+
+Virgule sur la première, **point** sur la seconde. La cause est une règle d'ICU qu'on ne
+devine pas : un argument **simple** (`{kg}`) n'est pas mis en forme, il est converti en
+chaîne — c'est `{kg, number}` qui applique le format de la locale. La première ligne s'en
+tirait parce qu'un `toLocaleString("fr-FR")` était écrit à la main dans le composant.
+
+Les quinze messages du domaine `booking` (sept web, huit mobile) passent à `{kg, number}`,
+et les deux appels qui formataient le nombre à la main rendent ce travail au message. Tous
+les points d'appel ont été vérifiés un par un : un `{x, number}` nourri d'une chaîne lève au
+rendu.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **`expo-dev-client`, le plugin de config Stripe et `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`**
+  ne sont pas ajoutés. Une déclaration de plugin sans build qui la consomme ne prouve rien,
+  et le build de développement est une décision d'outillage (EAS, compte Apple Developer
+  pour iOS) prise le jour où une carte réelle doit être testée ;
+- **le même défaut `{kg}`** vit ailleurs (`search.card.remainingKg`, les estimations de
+  `trip-detail`, les CO₂). Il n'est pas balayé ici : certains de ces appels passent déjà une
+  chaîne pré-formatée (`co2Saved.toFixed(1).replace(".", ",")`), et un balayage aveugle y
+  casserait le rendu. Ils sont inventoriés pour la passe de leur page ;
+- **`booking.copy.ts`** (apps/user-ui) reste en place. C'est un fichier de 300 lignes en
+  `isFr ? … : …` — la forme interdite depuis D44 — qui n'a **aucun lecteur** et qui porte
+  deux chaînes déjà corrigées ailleurs (« deal », « h de vol »). Sa suppression est proposée,
+  pas faite dans une passe de textes.
+
+## Les contrôles
+
+`nx typecheck @yamba-app/mobile` vert, `tsc --noEmit` user-ui vert, contrôle i18n « miroir
+parfait » (30 namespaces, 60 fichiers). Le comportement d'ICU a été **mesuré**, pas supposé.
