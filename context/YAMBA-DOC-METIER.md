@@ -7317,3 +7317,20 @@ se passe rien**. Les trois réponses doivent être à l'écran, pas dans une FAQ
 | MOB145 | Lire un colis facturé 2,3 kg en français | « Facturé 2,3 kg » — virgule, jamais point. En anglais : « 2.3 kg » |
 | MOB146 | Ouvrir les CGV depuis la case d'acceptation (web) | Le document s'ouvre dans un nouvel onglet, la case **reste décochée**, le brouillon est intact |
 | MOB147 | Lire la note d'un Voyageur sur le récapitulatif de réservation | « 12 colis transportés » — le mot « deal » n'apparaît nulle part |
+
+## Complément — la porte d'identité du tunnel (A219)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-96** | La demande d'identité se fait **à l'entrée** du tunnel de réservation, jamais au paiement. Un visiteur sans session qui touche « Réserver » voit la feuille de connexion, pas la première étape. |
+| **RG-MOB-97** | Après une connexion ouverte depuis « Réserver », le parcours **reprend de lui-même** : le membre n'a pas à retrouver son geste. |
+| **RG-MOB-98** | Une session qui meurt **pendant** le parcours ne détruit pas la saisie : l'écran propose de se reconnecter, et l'autorisation repart seule au retour. |
+| **RG-MOB-99** | Les refus d'identité du serveur (jeton absent, expiré, session révoquée) disent **une seule chose** au membre : reconnecte-toi. Leur distinction reste technique. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB148 | Visiteur anonyme, toucher « Réserver » sur un trajet | La feuille de connexion s'ouvre ; aucune étape du tunnel n'est poussée |
+| MOB149 | Se connecter depuis cette feuille | La feuille se referme et l'écran ① s'ouvre **tout seul**, sur le bon trajet |
+| MOB150 | Fermer la feuille sans se connecter, puis quitter la fiche trajet, puis se connecter ailleurs | Aucun tunnel ne s'ouvre : l'attente appartenait à l'écran quitté |
+| MOB151 | Session expirée entre l'écran ⑥ et l'écran ⑦ | L'écran propose « Se connecter » (pas « Réessayer ») ; au retour l'autorisation repart seule et la saisie est intacte |
+| MOB152 | L'autorisation échoue | La carte « Ce que tu paies » montre le total, **jamais** « Préparation du paiement… » |

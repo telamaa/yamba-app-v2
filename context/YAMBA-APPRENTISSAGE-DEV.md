@@ -4686,3 +4686,80 @@ saisie était perdue.
 La correction tient en deux gestes — sortir les liens du `<label>`, et les ouvrir dans un
 nouvel onglet. La règle à retenir : **un `<label>` ne contient que ce qui doit activer le
 champ.** Tout le reste est un frère, pas un enfant.
+
+### 6. Où placer une porte d'identité — et comment la mesurer avant de la déplacer
+
+**Le symptôme.** Un parcours de huit écrans se bloque sur le neuvième avec « reconnecte-toi ».
+
+**Le réflexe à ne pas avoir** : corriger le message d'erreur. Le message était juste — c'est
+sa *place* qui était fausse.
+
+**Mesurer d'abord.** Trois commandes avant toute hypothèse :
+
+```sh
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health   # les services répondent ?
+curl -s -X POST http://localhost:8080/api/deals/payment-intents -d '{}' -H 'content-type: application/json'
+# → {"message":"Unauthorized! Token missing.","details":{"code":"TOKEN_MISSING"}}
+```
+
+La route fonctionne, le refus est une **décision** du serveur, pas une panne. La question
+devient : *pourquoi ce refus arrive-t-il seulement ici ?* Réponse : parce que c'est le
+**premier appel authentifié du parcours**. Tout ce qui précède est anonyme.
+
+**La règle de placement.** Une porte d'identité se place là où elle coûte le moins à celui
+qui la franchit — pas là où elle gêne le moins à écrire :
+
+| Placement | Coût pour le membre si refus |
+|---|---|
+| À l'entrée | un geste |
+| Au milieu | la saisie faite jusque-là, si elle ne survit pas |
+| À la fin | **le parcours entier**, au moment où l'intention d'achat était formée |
+
+**Le signal de conception à repérer.** Le code portait ce commentaire :
+
+```
+un visiteur anonyme y entre librement, la porte d'identité tombera au destinataire.
+```
+
+Un commentaire au futur qui décrit un comportement **absent** n'est pas une documentation,
+c'est une dette non enregistrée. Et comme il contredisait le front jumeau sans qu'aucune
+décision ne l'ait tranché, ce n'était pas une divergence assumée : c'était un oubli. Le test
+qui les sépare tient en une question — *est-ce écrit quelque part que les deux fronts
+diffèrent, et pourquoi ?*
+
+**Le motif technique : reprendre le geste.** Une feuille modale d'authentification se referme
+sur l'écran qui l'a ouverte. Pour reprendre l'action interrompue, il faut une mémoire — et
+la borner :
+
+```ts
+// posée par l'écran qui ouvre la connexion
+setPendingBooking(trip.id);
+router.push('/login');
+
+// reprise, sur le MÊME écran, quand la session arrive
+useEffect(() => {
+  if (status !== 'authenticated') return;
+  if (!takePendingBooking(trip.id)) return;   // vrai une fois, pour CE trajet
+  router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } });
+}, [status, trip.id]);
+
+// et elle meurt avec l'écran qui l'a posée
+useEffect(() => () => clearPendingBooking(trip.id), [trip.id]);
+```
+
+Les trois gestes comptent autant l'un que l'autre. Sans le `take` conditionnel, une connexion
+faite ailleurs consommerait une attente qui n'est pas la sienne. Sans le nettoyage au
+démontage, se connecter trois écrans plus loin pousserait un parcours que personne n'a
+demandé. C'est le même raisonnement que pour un `AbortController` : **une intention
+asynchrone appartient à ce qui l'a émise, et meurt avec.**
+
+**Sept codes, un seul geste.** Le middleware distingue `TOKEN_MISSING`, `TOKEN_EXPIRED`,
+`SESSION_REVOKED`… parce qu'un client doit pouvoir les distinguer. Mais côté écran, ils
+demandent tous la même chose. Les ramener à un état (`sessionBlocked`) n'est pas une perte
+d'information : c'est traduire une taxonomie technique en **un geste proposé**. Et le geste
+juste n'est pas « Réessayer » — qui rejouerait le même refus — mais « Se connecter ».
+
+**Enfin : un écran ne dit pas qu'il prépare ce qui a échoué.** La carte du haut annonçait
+« Préparation du paiement… » alors que la préparation avait échoué cinq lignes plus bas. Un
+état de chargement doit être conditionné à *en cours*, jamais à *pas encore de résultat* —
+« pas de résultat » couvre aussi l'échec.

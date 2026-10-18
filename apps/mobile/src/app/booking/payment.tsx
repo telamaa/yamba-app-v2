@@ -55,6 +55,7 @@ import { getPublicTrip, type PublicTrip } from '@/lib/api/trip.api';
 import { PHOTO_MAX_MB, uploadDeclaredPhoto } from '@/lib/api/upload.api';
 import { clearBookingDraft, getBookingDraft, useBookingDraft } from '@/lib/booking-draft';
 import { quoteDraft } from '@/lib/booking-rules';
+import { useSession } from '@/lib/session-context';
 import { confirmWithPaymentSheet, isPaymentSheetAvailable } from '@/lib/stripe-sheet';
 import { formatPrice } from '@/lib/trip-format';
 
@@ -73,7 +74,22 @@ const KNOWN_CODES = new Set([
   'PAYMENT_MISMATCH',
   'PAYMENT_ALREADY_USED',
   'ACCOUNT_DELETED',
-  'UNAUTHENTICATED',
+  'ACCOUNT_SUSPENDED',
+]);
+
+/**
+ * Les refus d'IDENTITÉ du middleware partagé (ANO-API-07 : sept codes
+ * distincts). Ils disent des choses différentes au serveur — jeton absent,
+ * expiré, session révoquée depuis un autre appareil — mais UNE seule chose au
+ * membre : il faut se reconnecter. L'écran les ramène donc à un état, pas à
+ * sept messages.
+ */
+const SESSION_CODES = new Set([
+  'TOKEN_MISSING',
+  'TOKEN_INVALID',
+  'TOKEN_EXPIRED',
+  'SESSION_REVOKED',
+  'USER_NOT_FOUND',
 ]);
 
 /** Après ces deux-là, l'autorisation ne vaut plus : on en refait une. */
@@ -85,6 +101,7 @@ export default function BookingPaymentScreen() {
   const locale = useLocale() as SupportedLocale;
   const theme = useTheme();
   const scheme = useColorScheme();
+  const { status } = useSession();
   const draft = useBookingDraft();
 
   const [trip, setTrip] = useState<PublicTrip | null>(null);
@@ -94,6 +111,8 @@ export default function BookingPaymentScreen() {
   const [intent, setIntent] = useState<PaymentIntentInfo | null>(null);
   const [intentLoading, setIntentLoading] = useState(false);
   const [intentError, setIntentError] = useState<string | null>(null);
+  /** Le refus vient-il de l'identité ? Alors « Réessayer » ne sert à rien. */
+  const [sessionBlocked, setSessionBlocked] = useState(false);
   const [cardAuthorized, setCardAuthorized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,8 +145,11 @@ export default function BookingPaymentScreen() {
   const codeOf = useCallback((e: unknown): string => {
     if (e instanceof QuoteUnavailableError) return 'QUOTE_UNAVAILABLE';
     if (e instanceof ApiError) {
+      if (e.code && SESSION_CODES.has(e.code)) return 'SESSION';
       if (e.code && KNOWN_CODES.has(e.code)) return e.code;
-      if (e.status === 401) return 'UNAUTHENTICATED';
+      // Un 401 sans code exploitable reste un problème de session : le client
+      // a déjà tenté UN rafraîchissement avant d'arriver ici.
+      if (e.status === 401) return 'SESSION';
     }
     return 'GENERIC';
   }, []);
@@ -136,6 +158,7 @@ export default function BookingPaymentScreen() {
     async (current: PublicTrip) => {
       setIntentLoading(true);
       setIntentError(null);
+      setSessionBlocked(false);
       // Une nouvelle autorisation annule la précédente : la carte devra la
       // reconfirmer, sinon on enverrait une demande sur une empreinte morte.
       setCardAuthorized(false);
@@ -146,6 +169,7 @@ export default function BookingPaymentScreen() {
         const code = codeOf(e);
         setIntent(null);
         setIntentError(t(`payment.errors.${code}`));
+        setSessionBlocked(code === 'SESSION');
         // Le serveur ne calcule PAS le même total : nos entrées sont périmées
         // (prix du trajet modifié, paramètre de plateforme changé). Relire le
         // trajet et les paramètres réaligne le devis local — sans cela,
@@ -168,6 +192,13 @@ export default function BookingPaymentScreen() {
     if (!trip || intent || intentLoading || intentError) return;
     void requestIntent(trip);
   }, [trip, intent, intentLoading, intentError, requestIntent]);
+
+  // Retour de la feuille de connexion : on relance SANS que le membre ait à
+  // retoucher quoi que ce soit. Il a déjà rempli huit écrans.
+  useEffect(() => {
+    if (!sessionBlocked || status !== 'authenticated' || !trip) return;
+    void requestIntent(trip);
+  }, [sessionBlocked, status, trip, requestIntent]);
 
   /** Les photos déclarées, montées une fois pour toutes. */
   const uploadPhotos = useCallback(async (): Promise<string[] | { failure: string }> => {
@@ -366,6 +397,16 @@ export default function BookingPaymentScreen() {
               </ThemedText>
             </View>
           </>
+        ) : intentError ? (
+          // Pas de détail SERVEUR tant qu'il n'y a pas d'autorisation : on
+          // montre le total déjà porté par la barre du bas, pas une
+          // « préparation » qui n'a plus lieu.
+          <View style={[styles.line, styles.totalLine, { borderTopColor: theme.backgroundElement }]}>
+            <ThemedText type="smallBold" style={styles.flex}>
+              {t('payment.total')}
+            </ThemedText>
+            <ThemedText type="subtitle">{amountLabel ?? '—'}</ThemedText>
+          </View>
         ) : (
           <ThemedText type="small" themeColor="textSecondary">
             {t('payment.preparing')}
@@ -382,15 +423,28 @@ export default function BookingPaymentScreen() {
         {intentError ? (
           <View style={styles.gap}>
             <ThemedText type="small">{intentError}</ThemedText>
+            {/* Un « Réessayer » sur une session morte rejoue le même refus :
+                le geste qui débloque est la connexion, c'est donc lui qu'on
+                propose. Le parcours reprend seul au retour. */}
             <Pressable
               accessibilityRole="button"
               onPress={() => {
+                if (sessionBlocked) {
+                  router.push('/login');
+                  return;
+                }
                 setIntentError(null);
                 void requestIntent(trip);
               }}
               style={[styles.retry, { borderColor: theme.backgroundElement }]}>
-              <Ionicons name="refresh" size={15} color={theme.text} />
-              <ThemedText type="smallBold">{t('payment.retry')}</ThemedText>
+              <Ionicons
+                name={sessionBlocked ? 'log-in-outline' : 'refresh'}
+                size={15}
+                color={theme.text}
+              />
+              <ThemedText type="smallBold">
+                {sessionBlocked ? t('payment.signIn') : t('payment.retry')}
+              </ThemedText>
             </Pressable>
           </View>
         ) : intentLoading || !intent ? (

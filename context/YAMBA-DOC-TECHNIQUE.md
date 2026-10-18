@@ -13450,3 +13450,50 @@ rendu.
 
 `nx typecheck @yamba-app/mobile` vert, `tsc --noEmit` user-ui vert, contrôle i18n « miroir
 parfait » (30 namespaces, 60 fichiers). Le comportement d'ICU a été **mesuré**, pas supposé.
+
+## La porte d'identité manquait — trouvée sur appareil, au pire endroit (A219)
+
+Le parcours natif se bloquait à l'écran ⑦ sur « Reconnecte-toi pour envoyer ta demande ».
+Mesure avant diagnostic : les quatre services répondent, et un appel sans jeton rend
+
+```
+{"message":"Unauthorized! Token missing.","details":{"code":"TOKEN_MISSING"}}
+```
+
+Ce n'est donc pas une panne, c'est un refus d'identité — et il tombe au **premier appel
+authentifié de tout le tunnel**, qui se trouve être la demande d'autorisation de l'écran ⑦.
+Tout ce qui précède (`GET /trips/:id/public`, les écrans de saisie) est anonyme.
+
+**Le CTA « Réserver » ne regardait pas la session.** Le commentaire du code annonçait que
+« la porte d'identité tombera au destinataire » — une porte qui n'a jamais été écrite. Un
+visiteur anonyme remplissait donc huit écrans avant le mur.
+
+Le site, lui, tranche à l'entrée depuis A58 (`BookingSummaryCard` → `BookingAuthGateModal`) :
+« Connecte-toi pour réserver » s'ouvre au-dessus du trajet, et le retour entre **directement
+dans le wizard**. Le natif s'y aligne :
+
+- `auth-flow-state.ts` gagne `setPendingBooking` / `takePendingBooking` / `clearPendingBooking`
+  — une mémoire de processus bornée à l'écran qui la pose (il la nettoie en se démontant,
+  sinon une connexion faite trois écrans plus loin pousserait un tunnel que personne n'a
+  demandé) ;
+- la barre de la fiche trajet ouvre la feuille d'auth au lieu du tunnel, et **reprend le
+  geste** quand la session arrive ;
+- pendant l'amorçage de session (`status === 'loading'`, quelques centaines de millisecondes
+  au lancement), le CTA ne tranche pas : ouvrir la connexion à un membre déjà connecté serait
+  pire que d'attendre.
+
+**Et l'écran ⑦ cesse d'être un cul-de-sac**, parce qu'une session peut mourir en cours de
+parcours (jeton expiré, appareil révoqué depuis un autre téléphone) :
+
+- les sept refus d'identité du middleware partagé (ANO-API-07 : `TOKEN_MISSING`,
+  `TOKEN_INVALID`, `TOKEN_EXPIRED`, `SESSION_REVOKED`, `USER_NOT_FOUND`…) sont ramenés à **un
+  seul état**. Ils disent des choses différentes au serveur, une seule au membre ;
+- le bouton devient « Se connecter » — un « Réessayer » sur une session morte rejoue le même
+  refus ;
+- l'autorisation **repart seule** au retour de la feuille : le membre a déjà rempli huit
+  écrans, il ne doit rien retoucher.
+
+Au passage, un défaut d'affichage visible sur la même capture : la carte « Ce que tu paies »
+annonçait « Préparation du paiement… » alors que la préparation avait **échoué**. Sans devis
+serveur il n'y a pas de détail à montrer ; elle affiche désormais le total que la barre du
+bas porte déjà, et rien de plus.

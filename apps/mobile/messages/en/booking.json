@@ -251,9 +251,11 @@
       "PAYMENT_MISMATCH": "The authorisation no longer matches your request. A new one is being prepared.",
       "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",
       "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
-      "UNAUTHENTICATED": "Sign in again to send your request.",
+      "SESSION": "Your session has expired. Sign in again: your entries are kept.",
+      "ACCOUNT_SUSPENDED": "Your account is suspended. Contact support to find out more.",
       "GENERIC": "Something went wrong. Nothing was charged, you can try again."
-    }
+    },
+    "signIn": "Sign in"
   },
   "confirmation": {
     "title": "Request sent",

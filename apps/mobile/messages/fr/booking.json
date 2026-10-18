@@ -251,9 +251,11 @@
       "PAYMENT_MISMATCH": "L'autorisation ne correspond plus à ta demande. Une nouvelle est en préparation.",
       "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
       "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
-      "UNAUTHENTICATED": "Reconnecte-toi pour envoyer ta demande.",
+      "SESSION": "Ta session a expiré. Reconnecte-toi : ta saisie est gardée.",
+      "ACCOUNT_SUSPENDED": "Ton compte est suspendu. Contacte le support pour en savoir plus.",
       "GENERIC": "Une erreur est survenue. Rien n'a été débité, tu peux réessayer."
-    }
+    },
+    "signIn": "Se connecter"
   },
   "confirmation": {
     "title": "Demande envoyée",
