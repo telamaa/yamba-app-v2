@@ -13729,3 +13729,140 @@ son, et une permission micro se voit dans la fiche du magasin comme en revue. La
 bibliothèque demande cette permission à l'exécution en ouvrant l'appareil photo, un blocage
 casserait les photos de colis — c'est-à-dire une règle métier (RG-MOB-85). À vérifier sur
 un appareil réel, au premier build de développement, puis à graver.
+
+---
+
+# « Attends » n'est pas « c'est raté », et l'argent retenu pour rien se libère (PR à venir, D82 7A/8A/9A — serveur)
+
+## Le besoin
+
+Klarna et PayPal **redirigent** : entre l'empreinte et la réservation, le membre quitte
+l'app ou la page. Deux conséquences, et aucune n'existait tant qu'on ne payait qu'à la carte.
+
+1. **Il peut revenir trop tôt.** L'intention est encore en `processing` : l'empreinte se
+   pose, mais n'est pas encore capturable.
+2. **Il peut ne jamais revenir.** L'autorisation reste vivante sur son moyen de paiement
+   pour une réservation qui n'existe pas — ~7 jours sur une carte, **28 jours chez Klarna**.
+
+## Ce qui existait déjà, et qu'il ne fallait pas réécrire
+
+D82 8A annonçait « le webhook promu de l'accusé simple à la vérité de l'empreinte ». La
+lecture du code a montré que **l'essentiel était déjà vrai** :
+`deal-request.service.ts` appelle `provider.retrieve(paymentIntentId)` et refuse tout ce qui
+n'est pas `AUTHORIZED`. La réservation n'a JAMAIS été créée sur la parole du client.
+
+Il n'y avait donc rien à « promouvoir » : écrire du code pour tenir une phrase déjà tenue
+aurait été du théâtre. Ce qui manquait réellement était ailleurs — dans la **nuance du
+refus**, et dans **l'empreinte que personne ne ramasse**.
+
+## ① Le refus réessayable (7A/8A)
+
+`PROCESSING` tombait dans le même refus que « cette autorisation n'existe pas » :
+`PAYMENT_NOT_AUTHORIZED`. Le front annonçait donc un échec de paiement à quelqu'un qui
+venait de payer, et lui faisait tout reprendre.
+
+La décision est sortie du service pour devenir une **règle pure** (`booking-request.ts`) :
+
+```ts
+export function assertAuthorizationUsable(status: PaymentAuthorizationStatus): void {
+  if (status === "AUTHORIZED") return;
+  if (status === "PROCESSING") {
+    throw new BookingRequestError("PAYMENT_PROCESSING", "The payment is still being processed.", {
+      paymentStatus: status,
+      retryAfterSeconds: PAYMENT_PROCESSING_RETRY_SECONDS, // 3
+    });
+  }
+  throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", "…", { paymentStatus: status });
+}
+```
+
+L'invariant ne bouge pas (**pas de réservation sans empreinte posée**, A45/D31) : c'est le
+*vocabulaire du non* qui s'enrichit. `PAYMENT_PROCESSING` entre au contrat
+(`BOOKING_REQUEST_ERROR_CODES`), donc en 409 avec son `details.code` qui atteint le client
+(A146).
+
+**Les deux fronts attendent au lieu d'annoncer un échec** : `useBookingCheckout.ts` (web) et
+`booking/payment.tsx` (mobile) rejouent `POST /deals` au plus **trois fois**, en respectant
+`retryAfterSeconds`. Jamais une seconde empreinte, jamais une saisie à refaire ; au-delà,
+l'écran le dit et garde tout. Messages FR/EN posés dans les quatre dictionnaires.
+
+## ② L'empreinte orpheline (9A) — et pourquoi la base ne peut pas la trouver
+
+La création de l'intention **n'écrit rien chez nous** (D37). Une empreinte posée sans
+réservation n'existe donc *nulle part* dans notre base : aucun cron ne pourrait la chercher
+en Mongo. Elle n'existe que chez le fournisseur — et c'est la doctrine D40 qui tranche :
+entre notre base et lui, c'est lui qui a l'argent.
+
+D'où une méthode nouvelle, **optionnelle** sur l'interface (même précédent que
+`findTransfers`) : un fournisseur qui ne l'offre pas n'est pas consulté, la chasse se tait
+au lieu de jeter.
+
+```ts
+listAuthorizedHolds?(input: { createdBefore: Date; limit?: number }): Promise<AuthorizedHold[]>;
+```
+
+Côté Stripe, `paymentIntents.list` ne sait pas filtrer par statut : le tri sur
+`requires_capture` se fait chez nous, la fenêtre est bornée par `created.lte`, et la limite
+de 100 est celle de l'API. Côté Fake, une date de création a été ajoutée (plus
+`_setCreatedAtForTest`) — sans passé, le Fake ne pouvait rien simuler.
+
+**Les trois conditions** (`lib/orphan-holds.rules.ts`, pures) :
+
+| Condition | Pourquoi elle existe |
+|---|---|
+| L'empreinte porte `metadata.tripId` **et** `shipperId` | Un compte de paiement peut servir plusieurs applications, un bac à sable est partagé. **Annuler l'empreinte d'un autre serait un vol, pas un ménage.** |
+| Elle a passé le **délai de grâce** (2 h par défaut) | En dessous, le membre est peut-être en train de payer. On ne coupe jamais sous les pieds de quelqu'un. La grâce reste l'argument par défaut d'une règle pure (D62 : pas de clé de catalogue sans consommateur). |
+| **Aucune réservation ne la porte** | C'est la définition. Une réservation annulée ou expirée compte comme « connue » : son sort appartient à la machine à états, pas à ce ménage. |
+
+Le service (`orphan-holds.service.ts`) fait **une seule** lecture en base pour toute la
+fenêtre, annule avec le motif `abandoned`, et compte `examined / canceled / kept / failed`.
+Une annulation refusée **n'échoue pas la passe** : la suivante réessaiera.
+
+## ③ Les deux événements de webhook qui manquaient
+
+`payment_intent.processing` (journalisé : c'est l'état qui EXPLIQUE un `PAYMENT_PROCESSING`
+côté client) et `payment_intent.payment_failed` (journalisé en avertissement, avec son
+motif). Le motif est désormais extrait par la lib (`last_payment_error.message`) et **ne sort
+jamais vers le client** — il peut nommer la banque, le moyen, l'adresse. La réponse à Stripe
+reste un accusé nu : `{ received: true }`.
+
+## Le garde-fou qui a attrapé une erreur réelle
+
+Le cron a d'abord été écrit sur `17,47 * * * *`. La suite auth-service a échoué : **A178**
+exige que tout fichier de cron figure au `CRON_CATALOGUE` lu par la page d'état admin — un
+cron absent du catalogue est un cron invisible. Au passage, `:17` était **déjà pris par le
+cron de notation**. Horaire corrigé en `23,53 * * * *`, entrée ajoutée au catalogue.
+
+C'est exactement la valeur d'un test de cohérence : il n'a pas trouvé un bug de logique, il
+a trouvé un oubli d'intégration que personne ne voit avant la production.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test deal-service` | **732** tests / 51 suites (**+40**, +3 suites) |
+| `nx test auth-service` | **407** / 54 — vert après l'ajout au catalogue (il était rouge à 406 : garde-fou A178) |
+| trip / notification / message | **409 / 122 / 79** — inchangés |
+| `nx run-many --target=typecheck --all --skip-sync` | 10 projets verts |
+| `tsc --noEmit --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 namespaces (mobile compris) |
+| `npm run generate:openapi` | **aucun contrat ne bouge** |
+| `bash scripts/smoke-services.sh` | **les six services démarrent**, cron compris |
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **La durabilité du brouillon et la page de reprise web** (le reste de D82 7A) : lot suivant.
+  Ce lot-ci rend le serveur juste ; l'autre rendra le retour de redirection sûr.
+- **`urlScheme` + `handleURLCallback` côté app** : même lot que ci-dessus (ils vont avec le
+  retour de redirection, et se vérifient sur un build de développement).
+- **Aucune clé de catalogue PlatformSettings** pour la grâce : elle n'aurait eu qu'un
+  consommateur, et D62 interdit une clé sans besoin réel.
+
+## Axe non demandé — les codes de refus métier sont absents de l'OpenAPI
+
+Constat fait en régénérant les contrats : ajouter `PAYMENT_PROCESSING` à
+`BOOKING_REQUEST_ERROR_CODES` **n'a produit aucun diff** dans les cinq `openapi.json`. Les
+codes de refus — ceux dont le dépôt garantit qu'ils atteignent le client — ne sont donc
+documentés nulle part dans le contrat public. Un client tiers ne peut les découvrir qu'en
+lisant notre code. Correction possible : exposer l'énumération dans le schéma d'erreur du
+contrat. Non fait ici (hors périmètre), signalé pour arbitrage.

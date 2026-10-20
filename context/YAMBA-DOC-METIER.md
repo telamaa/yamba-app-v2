@@ -7401,3 +7401,51 @@ Deux contraintes de réalité commandent l'ordre des travaux, et aucune n'est te
 | MOB163 | Activer Klarna au Dashboard Stripe, relancer le parcours | Klarna apparaît dans la feuille **sans aucune livraison de code** |
 | MOB164 | Payer en Klarna puis abandonner sur la page Klarna | Aucune demande créée, aucune empreinte vivante laissée sans réservation |
 | MOB165 | Passer du mode test à l'argent réel | Seuls les identifiants changent ; aucun écran, aucun refus, aucun message ne diffère |
+
+---
+
+# Attendre n'est pas échouer, et l'argent retenu pour rien se rend (PR à venir, D82 7A/8A/9A)
+
+## Le besoin
+
+Deux situations que seuls les moyens de paiement à **redirection** (Klarna, PayPal) font
+apparaître, et qui touchent toutes les deux à l'argent du membre.
+
+**La première est une question de vérité à l'écran.** Un Expéditeur revient de sa banque,
+le paiement est accepté, mais l'empreinte n'a pas fini de se poser. Jusqu'ici l'app lui
+disait « le paiement n'a pas été autorisé » : un mensonge, qui l'invite à tout recommencer —
+et donc, au mieux, à payer une deuxième fois son attention, au pire à abandonner une demande
+qui était valide.
+
+**La seconde est une question d'argent.** Un Expéditeur part payer chez Klarna et ne revient
+pas. L'autorisation reste vivante sur son moyen de paiement : jusqu'à **7 jours** sur une
+carte, **28 jours** chez Klarna. Il n'a pas de réservation, personne ne le sait, et c'est sur
+son relevé qu'il le découvre. Un marketplace qui retient de l'argent sans contrepartie, même
+par oubli technique, perd la confiance qu'il met des mois à construire.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-111** | Une empreinte **en cours de pose** n'est pas un échec de paiement. L'app l'annonce comme une attente, conserve toute la saisie, et envoie la demande dès que l'empreinte est confirmée — sans aucun geste du membre. |
+| **RG-MOB-112** | Un membre n'est **jamais** invité à payer une seconde fois parce que le premier paiement était « en cours ». Une seule empreinte par demande, toujours. |
+| **RG-MOB-113** | L'attente est **bornée** : passé trois tentatives, l'app dit ce qui se passe au lieu de tourner indéfiniment — et garde la saisie intacte. |
+| **RG-MOB-114** | L'invariant ne bouge pas : **aucune réservation n'est créée sans empreinte réellement posée**, et l'état de l'empreinte est lu chez le fournisseur de paiement, jamais annoncé par le client. |
+| **RG-MOB-115** | Une empreinte posée que personne n'a transformée en réservation est **libérée d'elle-même** après un délai de grâce. On ne retient pas l'argent d'un membre qui n'a rien réservé. |
+| **RG-MOB-116** | Ce ménage ne touche **que** les empreintes de Yamba : une autorisation qui ne porte pas nos références de réservation n'est jamais annulée, quel que soit son âge. |
+| **RG-MOB-117** | Le délai de grâce protège le membre qui paie encore : une empreinte récente n'est jamais annulée, même sans réservation. |
+| **RG-MOB-118** | Un motif d'échec de paiement (« carte refusée », nom de la banque, adresse) reste **interne** : il part dans les journaux d'exploitation, jamais à l'écran. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB166 | Payer par Klarna et revenir dans l'app avant la confirmation bancaire | Message d'ATTENTE (pas d'échec) ; la demande part seule dès confirmation ; aucune saisie à refaire |
+| MOB167 | Même cas, la confirmation n'arrive pas après trois tentatives | L'app le dit, garde la saisie, et n'a posé qu'UNE empreinte |
+| MOB168 | Empreinte annulée par la banque, puis tentative de création | Refus terminal : il faut repasser par le paiement |
+| MOB169 | Empreinte déjà débitée (anomalie), puis tentative de création | Refus : une empreinte capturée ne devient pas une réservation |
+| MOB170 | Partir payer chez Klarna et ne jamais revenir | Au bout du délai de grâce, l'autorisation est annulée : plus rien n'est retenu |
+| MOB171 | Une réservation (même annulée) porte l'empreinte | L'empreinte n'est PAS annulée par le ménage : son sort suit la réservation |
+| MOB172 | Une empreinte d'une autre application sur le même compte de paiement | Jamais annulée, quel que soit son âge |
+| MOB173 | Un membre au milieu de son paiement pendant une passe de ménage | Son empreinte est épargnée (délai de grâce) |
+| MOB174 | Échec de paiement avec motif bancaire | Le motif est journalisé ; l'écran reste sur un message générique |
