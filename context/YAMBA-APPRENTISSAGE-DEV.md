@@ -4808,3 +4808,179 @@ fichier par fichier sans contrôle global de types. C'est `nx run-many --target=
 qui a sorti les deux `TS2300`. D'où la règle du dépôt : « CI OK » se compte, et un lot qui
 touche un paquet partagé se typecheck **en entier**, pas seulement dans le projet où on a
 écrit.
+
+---
+
+## Chapitre 219 — Le mode qui bascule sans le dire, le plugin qu'on ne croit pas sur parole, et la contrainte qu'un vieux choix a déjà tranchée
+
+Ce chapitre accompagne **D82** et le lot d'outillage qui la suit. Il ne contient aucun
+écran : il contient quatre notions que l'on paie cher quand on les découvre en recette.
+
+### 1. Expo Go, *development build*, *bare workflow* : trois choses différentes
+
+**Expo Go** est une application publiée sur les magasins qui embarque un **jeu figé de
+modules natifs**. Elle charge ton JavaScript à distance — d'où le rechargement instantané —
+mais elle ne contient que ce qu'Expo y a mis. Si ton code appelle un module natif absent,
+l'erreur arrive **à la résolution du module**, pas à l'usage : l'app tombe en ouvrant
+l'écran, pas en touchant le bouton.
+
+C'est exactement pourquoi `apps/mobile/src/lib/stripe-sheet.ts` charge
+`@stripe/stripe-react-native` en `require` **paresseux**, dans un `try/catch`, et traduit
+toute absence en `UNAVAILABLE` :
+
+```ts
+// apps/mobile/src/lib/stripe-sheet.ts
+cached = require('@stripe/stripe-react-native') as StripeNativeModule;
+```
+
+Un `import` statique en tête de fichier serait résolu au chargement de l'écran — donc dans
+Expo Go, où le module réclame son pendant natif dès son évaluation.
+
+Un **development build** est *ton* application compilée avec *tes* modules natifs, plus le
+client de développement (`expo-dev-client`) qui lui garde le rechargement à distance. C'est
+le seul endroit où une feuille de paiement natif, Apple Pay ou Google Pay peuvent exister.
+Le **bare workflow** (dossiers `ios/` et `android/` versionnés) n'est pas nécessaire :
+EAS compile à distance depuis `app.json`, et `/ios` + `/android` restent d'ailleurs
+gitignorés ici.
+
+### 2. Installer une dépendance peut changer le comportement d'une commande
+
+Voici la leçon la plus chère du lot, et elle ne se voit dans aucun diff de code :
+
+> Dès qu'`expo-dev-client` est une dépendance, `expo start` **bascule en mode build natif
+> par défaut**. Le code QR affiché cesse de fonctionner dans Expo Go.
+
+Rien n'est cassé, rien n'est signalé : le mode a changé parce que la liste des dépendances
+a changé. Sur un poste où la recette se fait en Expo Go sur un iPhone, le temps perdu se
+compte en soirée. La parade est d'écrire le mode **explicitement**, des deux côtés :
+
+```jsonc
+// apps/mobile/package.json
+"start": "… expo start --go",              // Expo Go, comme avant
+"start-dev-client": "… expo start --dev-client"
+```
+
+Règle générale à retenir : **une dépendance qui modifie le comportement par défaut d'un
+outil doit être accompagnée du geste qui rend l'ancien comportement explicite.** Sinon
+l'ancien comportement devient un accident.
+
+### 3. Un *config plugin* ne se croit pas sur parole — il s'introspecte
+
+Un config plugin est une fonction qui **réécrit les fichiers natifs** au moment du build :
+`AndroidManifest.xml`, `Info.plist`, `build.gradle`, le `Podfile`. Déclaré dans `app.json` :
+
+```json
+["@stripe/stripe-react-native", { "enableGooglePay": true }]
+```
+
+Il ne s'exécute **ni dans Metro, ni dans les tests, ni au typecheck** — autrement dit, tout
+peut être vert alors que le plugin n'a jamais tourné. Les vérifier demande une commande
+dédiée, qui applique les plugins « à blanc » et rend le résultat :
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo config --type introspect
+```
+
+Trois types existent : `prebuild` (la configuration brute), `public` (le manifeste servi aux
+clients) et `introspect` (**les plugins appliqués**). C'est le troisième qui prouve quelque
+chose — ici, l'injection attendue par Google Pay :
+
+```
+'android:name': 'com.google.android.gms.wallet.api.enabled'
+package: 'com.telama.yamba'
+```
+
+Même méthode, même esprit que le reste du dépôt : *un build vert n'est pas un service
+démarré* (la leçon `esModuleInterop`), *une CI verte se compte* — et un plugin déclaré n'est
+pas un plugin exécuté.
+
+### 4. Capture manuelle + redirection : pourquoi un moyen de paiement casse un ordre de gestes
+
+Yamba pose une **empreinte** (autorisation en capture manuelle) puis débite à l'acceptation
+du Voyageur (D31/D39). L'ordre actuel est : photos chez ImageKit → **autorisation
+synchrone** → `POST /deals`.
+
+Klarna et PayPal cassent la synchronicité, parce qu'ils **redirigent** : le membre quitte
+l'app ou la page entre l'étape 2 et l'étape 3. Deux conséquences qu'il faut voir avant
+d'écrire la moindre ligne :
+
+```ts
+// apps/user-ui/src/components/booking/steps/StepPayment.tsx:139
+redirect: "if_required",   // « redirige seulement si nécessaire »
+```
+
+`if_required` signifie « reste sur la page sauf si la banque l'exige » — c'est parfait pour
+la carte avec 3-D Secure, et **faux par construction** pour un moyen qui redirige toujours.
+Côté mobile, le brouillon vit en **mémoire de processus** (propriété voulue :
+`booking-draft.ts`, « le brouillon meurt avec le processus ») : partir vers Klarna et
+revenir peut le perdre.
+
+La correction choisie (D82 7A) ne touche **pas** l'ordre des gestes — elle rend le
+brouillon durable *le temps de l'aller-retour*, avec un stockage choisi selon ce qu'il
+contient : `expo-secure-store` sur mobile (le nom et le téléphone du destinataire sont des
+données personnelles, elles ne dorment pas en clair), `sessionStorage` sur le web (il meurt
+avec l'onglet), **jamais** `localStorage`. L'alternative — créer la réservation en attente
+puis autoriser — était plus simple à lire, mais cassait l'invariant « pas de réservation
+sans empreinte posée » et touchait une machine à 16 transitions. On a préféré la correction
+locale à la refonte d'un invariant.
+
+Corollaire, et c'est une leçon générale d'architecture : **quand un chemin cesse d'être
+synchrone, la source de vérité doit changer de camp.** Le webhook
+`payment_intent.amount_capturable_updated`, aujourd'hui simple accusé de réception, devient
+la preuve que l'empreinte est posée ; la création de la réservation lit l'état réel de
+l'intention, jamais la parole du client (D82 8A).
+
+### 5. La contrainte qu'un choix d'architecture passé avait déjà tranchée
+
+Stripe Connect offre deux modèles d'argent : les *destination charges* (un paiement au nom
+du compte connecté, via `on_behalf_of`) et les **charges et transferts séparés** (on
+encaisse, puis on transfère). Yamba a choisi le second :
+
+```ts
+// packages/libs/payments/src/index.ts:235
+const t = await this.stripe.transfers.create({ /* … */ destination: input.destinationAccountId });
+```
+
+Or la documentation Stripe dit : **« PayPal ne prend pas en charge `on_behalf_of` »**. Avec
+des *destination charges*, PayPal serait **impossible** sur Yamba. La possibilité d'accepter
+PayPal aujourd'hui est donc le dividende d'un choix fait des mois plus tôt, pour d'autres
+raisons.
+
+La leçon n'est pas « nous avons eu de la chance ». Elle est : **un choix structurant ferme
+des portes qu'on ne voit pas au moment de le faire** — d'où les portes 🚪→ / 🚪↔ du registre,
+et d'où la contrainte explicitement gravée en D82 5A : personne n'introduit `on_behalf_of`
+sans réouvrir la décision. Une contrainte non écrite est une contrainte qu'un développeur
+futur annulera de bonne foi.
+
+### 6. Où vivent les variables d'un bundle Expo — mesuré, pas supposé
+
+Les variables `EXPO_PUBLIC_*` ne sont pas lues à l'exécution : elles sont **incorporées au
+bundle** par la compilation Metro (une substitution de texte). Elles doivent donc exister
+dans l'environnement **du processus Metro**, et pas ailleurs. Encore faut-il savoir qui le
+donne. Mesure :
+
+```sh
+npx nx exec --projects=@yamba-app/mobile -- node -e "console.log(!!process.env.STRIPE_SECRET_KEY)"
+# → true     : Nx charge le .env RACINE pour toutes ses cibles
+cd apps/mobile && node -e "console.log(process.env.PAYMENT_PROVIDER)"
+# → undefined : lancé à la main, le .env racine n'est pas lu
+```
+
+D'où la cohérence avec la règle non négociable du dépôt (« tout dans le `.env` RACINE ») :
+la clé publiable y va, et c'est `npx nx start @yamba-app/mobile` qui la transmet. Et une
+clé publiable **n'est pas un secret** : elle n'autorise que la confirmation d'une intention
+déjà créée par le serveur. C'est l'inverse exact de la clé Maps retirée du mobile, qui,
+extraite d'un bundle, se **dépense**. Deux clés « publiques », deux risques opposés : le
+critère n'est pas « est-elle visible ? » mais « que permet-elle à qui la lit ? ».
+
+### 7. Pour aller plus loin
+
+- `expo config --type introspect` sur **chaque** lot qui touche `app.json` : c'est le seul
+  contrôle qui voit les plugins.
+- Les profils EAS s'héritent (`extends`) : `development-simulator` ne redéfinit que
+  `ios.simulator`. Éviter de dupliquer un profil pour une seule clé.
+- Un `channel` EAS exige `expo-updates` : le déclarer sans la bibliothèque échoue au build.
+  Ici, pas de canal — l'OTA viendra avec sa propre décision (D36 ⑥ : OTA réservé au JS non
+  structurel).
+- Lire la colonne « Redirection requise » **avant** de promettre un moyen de paiement : elle
+  décide de l'architecture du tunnel, pas d'une case du Dashboard.

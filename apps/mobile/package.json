@@ -13,6 +13,7 @@
     "expo": "~57.0.24",
     "expo-blur": "~57.0.3",
     "expo-constants": "~57.0.19",
+    "expo-dev-client": "~57.0.20",
     "expo-device": "~57.0.2",
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.3",
@@ -43,7 +44,8 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "NODE_PATH=./node_modules expo start",
+    "start": "NODE_PATH=./node_modules expo start --go",
+    "start-dev-client": "NODE_PATH=./node_modules expo start --dev-client",
     "android": "NODE_PATH=./node_modules expo start --android",
     "ios": "NODE_PATH=./node_modules expo start --ios",
     "web": "NODE_PATH=./node_modules expo start --web"

@@ -13546,3 +13546,160 @@ PAYMENT_PROVIDER=fake
 
 Elle vaut pour les deux fronts : le wizard du site affiche son « Mode test », et l'app mobile
 va jusqu'à la demande créée sans build de développement.
+
+---
+
+# Le build de développement, et la décision qui le précède (PR à venir, D82)
+
+## Le besoin, dans les mots de l'utilisateur
+
+« Traiter les paiements maintenant **en condition de prod, pas du fake** — CB, Klarna,
+PayPal, plus Apple Pay sur iOS et Google Pay sur Android. »
+
+Or aucune feuille de paiement réelle ne s'est jamais ouverte sur Yamba : le tunnel natif
+① → ⑦ se termine grâce au fournisseur simulé (A220), et le wizard web monte un Payment
+Element sans clé publiable. Ce lot ne pose **aucune feuille** : il grave la décision qui
+commande tout le chantier (**D82**) et pose l'outillage sans lequel rien de natif n'est
+essayable.
+
+## Les quatre obstacles, dont UN SEUL est du code
+
+L'inventaire a été fait dans le code, puis vérifié en documentation Stripe (jamais de
+mémoire) :
+
+1. **Les comptes.** Activer Klarna et PayPal au Dashboard ; créer un *merchant ID* Apple
+   et son certificat (compte développeur Apple, 99 $/an) ; activer Google Pay. En mode
+   *live* : entreprise vérifiée, Connect ouvert, et validation Klarna/PayPal par leurs
+   équipes. Rien de tout cela n'est du code.
+2. **Expo Go ne saura jamais ouvrir une feuille native.** D'où ce lot.
+3. **La redirection casse l'ordre des gestes** — le seul vrai chantier de code, traité au
+   lot suivant (D82 7A/8A).
+4. **Rien n'est déployé** : Apple Pay *sur le web* exige un domaine HTTPS vérifié auprès
+   d'Apple, donc le bouton ne s'affichera jamais sur `localhost`. Les wallets **dans
+   l'app** n'exigent aucun domaine → le seul chemin réellement ouvert est le mobile.
+
+## Ce que la documentation Stripe confirme (vérifié le 18 et le 21/10/2026)
+
+| Moyen | PaymentIntents | **Capture manuelle** | Mobile Payment Element | Redirection requise |
+|---|---|---|---|---|
+| Carte | ✓ | ✓ | ✓ | Non |
+| Apple Pay / Google Pay | ✓ | ✓ (rails carte) | ✓ | Non |
+| **Klarna** (`klarna`) | ✓ | **✓** | ✓ | **Oui** |
+| **PayPal** (`paypal`) | ✓ | **✓** | ✓ | **Oui** |
+
+Klarna : entreprise FR éligible, EUR pris en charge, autorisation valable **28 jours**.
+PayPal : EUR ✓, FR ✓, et la documentation dit noir sur blanc que **« PayPal ne prend pas
+en charge `on_behalf_of` »**. Yamba utilise des **charges et transferts séparés**
+(`transfers.create` + `destination`, `packages/libs/payments/src/index.ts:235`) et
+`on_behalf_of` est **absent du dépôt** : PayPal passe. Avec des *destination charges*, il
+serait impossible. C'est une **contrainte gravée en D82 5A**, pas un détail.
+
+Autre vérification utile : la fenêtre d'acceptation de 24 h
+(`ACCEPTANCE_WINDOW_HOURS`, `apps/deal-service/src/services/booking-request.ts:205`) tient
+sous toutes les rétentions d'empreinte — carte ~7 j, PayPal 3 j, Klarna 28 j. Aucun moyen
+ne se périme avant la capture.
+
+## Le piège payé ici : `expo start` change de mode sans le dire
+
+Installer `expo-dev-client` fait basculer `expo start` en mode **build natif par défaut** :
+le code QR cesse de fonctionner dans Expo Go, et rien ne l'explique à l'écran. La recette
+courante se fait justement en Expo Go sur un iPhone.
+
+```json
+// apps/mobile/package.json
+"start": "NODE_PATH=./node_modules expo start --go",
+"start-dev-client": "NODE_PATH=./node_modules expo start --dev-client",
+```
+
+`--go` est donc devenu **explicite**, et le second mode a son propre script. Les deux
+restent accessibles ; aucun des deux n'est un effet de bord.
+
+## L'identifiant applicatif : `com.telama.yamba`
+
+`app.json` ne portait ni `android.package` ni `ios.bundleIdentifier` — le README le signalait
+comme « à trancher avant le premier prebuild ». Un build EAS l'exige, et un identifiant
+publié sur un magasin **ne se change plus jamais**. Tranché avec l'utilisateur le 21/10 :
+convention DNS inversée sur l'éditeur (Telama publie Yamba), ce qui laisse la place à
+d'autres applications sous `com.telama.*` sur le même compte développeur.
+
+## Le plugin de configuration, et la preuve qu'il tourne
+
+```json
+// apps/mobile/app.json — plugins
+[
+  "@stripe/stripe-react-native",
+  { "enableGooglePay": true }
+]
+```
+
+Un *config plugin* ne s'exécute ni dans Metro ni dans les tests : il écrit les fichiers
+natifs au moment du build. On ne le croit donc pas sur parole — on l'introspecte :
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo config --type introspect
+# → android.manifest … 'android:name': 'com.google.android.gms.wallet.api.enabled'
+# → package: 'com.telama.yamba' · bundleIdentifier: 'com.telama.yamba'
+# → zéro erreur, zéro avertissement
+```
+
+`merchantIdentifier` reste **absent** : Apple Pay réclame un compte développeur Apple qui
+n'existe pas encore, et un identifiant marchand inventé serait pire que son absence (le
+build passerait, la feuille échouerait à l'exécution).
+
+## `eas.json` : quatre profils, et pas de `channel`
+
+`development` (dev client, `distribution: internal`, APK installable directement),
+`development-simulator` (iOS en simulateur, puisque ce Mac ne compile pas iOS en local),
+`preview`, `production` (`autoIncrement`, `app-bundle` pour le Play Store). **Aucun
+`channel`** : les canaux EAS exigent `expo-updates`, qui n'est pas installé — déclarer un
+canal sans la bibliothèque échoue au build.
+
+## Où vit la clé publiable — une mesure, pas une supposition
+
+`EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` n'existait **nulle part** dans le dépôt. Expo
+incorpore les variables `EXPO_PUBLIC_*` au bundle à l'instant où Metro compile : elles
+doivent donc être dans l'environnement **de Metro**. Mesuré le 21/10 :
+
+```sh
+npx nx exec --projects=@yamba-app/mobile -- node -e "console.log(!!process.env.STRIPE_SECRET_KEY)"
+# → true   (Nx charge le .env RACINE pour toutes ses cibles)
+cd apps/mobile && node -e "console.log(process.env.PAYMENT_PROVIDER)"
+# → undefined   (lancé à la main, le .env racine n'est pas lu)
+```
+
+Conclusion : la clé va dans le `.env` **RACINE** (règle non négociable du dépôt), et c'est
+`npx nx start @yamba-app/mobile` qui la donne à Metro — jamais un `npm start` lancé à la
+main depuis `apps/mobile`.
+
+## L'état réel du poste, mesuré (et une affirmation du handoff corrigée)
+
+| Clé du `.env` racine | État | Conséquence |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | **`sk_test_…` renseignée** | Le mode test voulu par D82 1A est déjà celui du poste |
+| `PAYMENT_PROVIDER` | **absente** | Le handoff du 19/10 affirmait `=fake` : **c'est faux**. La clé secrète présente fait résoudre **STRIPE** (`resolvePaymentProviderName`), donc en Expo Go la feuille répond `UNAVAILABLE` et le tunnel ① → ⑦ ne se termine PAS sans ajouter la ligne |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | absente | Payment Element web inopérant avec une vraie clé |
+| `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | absente | Feuille native impossible, même en build de développement |
+| `STRIPE_WEBHOOK_SECRET` | **en commentaire seulement** | `POST /webhooks/stripe` répond **501** — or D82 8A en fait la vérité de l'empreinte |
+| `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | renseignée | Contredit `.env.example`, qui la déclare **RETIRÉE** (une clé facturable extraite d'un bundle se dépense) — reliquat local à nettoyer |
+
+Aucune de ces lignes n'a été modifiée : un `.env` est à l'utilisateur, et le changer en
+silence aurait déplacé le défaut au lieu de le nommer.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Aucune feuille réelle ouverte** : il manque les clés ci-dessus et un build EAS, qui
+  réclame un compte Expo (`npx eas login`, puis `npx eas init` qui écrit
+  `extra.eas.projectId` dans `app.json`). C'est une démarche de compte, pas du code.
+- **Apple Pay non configuré** (compte Apple requis) — D82 2A : Android d'abord.
+- **La durabilité du brouillon, la page de reprise web, la promotion du webhook et le cron
+  d'empreintes orphelines** (D82 7A/8A/9A) : lot suivant, avec ses tests.
+- **`automatic_payment_methods` non touché** : c'est le Dashboard qui pilote la liste, et
+  Stripe filtre seul les moyens incompatibles avec la capture manuelle. Ajouter Klarna ou
+  PayPal coûtera **zéro ligne** (D82 4A).
+
+## Les contrôles
+
+- `npx nx typecheck @yamba-app/mobile --skip-sync` → **vert**.
+- `npx expo config --type introspect` → plugin exécuté, `wallet.api.enabled` injecté,
+  identifiants posés, aucune erreur.
+- Aucun code applicatif touché : ce lot ne peut rien casser à l'exécution.

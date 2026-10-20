@@ -7349,3 +7349,55 @@ se passe rien**. Les trois réponses doivent être à l'écran, pas dans une FAQ
 | MOB154 | `PAYMENT_PROVIDER=fake` en production | Le service refuse de démarrer, en nommant la règle |
 | MOB155 | `PAYMENT_PROVIDER=stripe` sans clé secrète | Le service refuse de démarrer |
 | MOB156 | `PAYMENT_PROVIDER` vide ou inconnu | Comportement d'avant : la clé décide |
+
+---
+
+# Les vrais moyens de paiement : par quel bout on commence (PR à venir, D82)
+
+## Le besoin
+
+Un Expéditeur doit pouvoir payer **comme il paie partout ailleurs** : carte, Klarna,
+PayPal, et le portefeuille de son téléphone (Apple Pay sur iPhone, Google Pay sur Android).
+Aujourd'hui, aucune feuille de paiement réelle ne s'ouvre : le parcours ne se termine
+qu'avec un fournisseur simulé, réservé au poste de développement.
+
+Le besoin derrière le besoin est une question de confiance commerciale : **un moyen de
+paiement absent est une vente perdue**, et un parcours d'argent qu'on ne peut essayer qu'en
+contournant l'outillage n'est essayé par personne. D'où la doctrine du dépôt : Yamba n'est
+jamais un MVP.
+
+Deux contraintes de réalité commandent l'ordre des travaux, et aucune n'est technique :
+
+- **Apple Pay sur le web** exige un domaine HTTPS vérifié auprès d'Apple. Rien n'étant
+  déployé, le bouton **ne peut pas** s'afficher. Dans l'app, il n'exige aucun domaine.
+- **Klarna et PayPal en argent réel** exigent une entreprise vérifiée, des versements
+  Connect ouverts, et la validation de leurs équipes — plusieurs jours, hors de notre main.
+  En **mode test**, leurs **vraies** feuilles s'ouvrent avec des comptes de démonstration :
+  le parcours est intégralement réel, aucun euro ne bouge.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-103** | La liste des moyens de paiement proposés est décidée par le **compte Stripe**, jamais par le code. Activer Klarna ou PayPal ne demande aucune livraison applicative. |
+| **RG-MOB-104** | Un moyen de paiement incompatible avec l'empreinte différée (autorisation maintenant, débit à l'acceptation) **n'est pas proposé** : le filtrage est fait par le fournisseur, pas par une liste à maintenir. |
+| **RG-MOB-105** | Le passage de la recette à l'argent réel **ne change aucun comportement visible** : mêmes écrans, mêmes refus, mêmes messages. Seuls les identifiants du compte changent. |
+| **RG-MOB-106** | Les portefeuilles (Apple Pay, Google Pay) sont proposés **dans l'application**. Leur absence sur le site n'est pas un défaut tant qu'aucun domaine n'est vérifié : le site propose la carte, Klarna et PayPal. |
+| **RG-MOB-107** | Apple Pay n'apparaît que sur iOS, Google Pay que sur Android : un portefeuille n'est jamais annoncé sur un appareil qui ne peut pas l'ouvrir. |
+| **RG-MOB-108** | Rien n'est débité au paiement, quel que soit le moyen choisi : l'empreinte est posée, le débit a lieu à l'acceptation du Voyageur, sous 24 h (règle inchangée, D31/D39). Tous les moyens retenus tiennent cette fenêtre. |
+| **RG-MOB-109** | Un moyen de paiement qui emmène le membre **hors de l'app ou hors de la page** (Klarna, PayPal) doit le ramener au même endroit, saisie intacte. Un retour perdu ne crée jamais de demande, et ne laisse jamais une empreinte vivante sans réservation. |
+| **RG-MOB-110** | Le paiement fractionné (Klarna) n'a de sens que sur un montant où il en a : sous 30 €, il est proposé parce que le compte l'autorise, pas parce qu'il sert le membre. Le retirer est une décision commerciale, jamais technique. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB157 | Recette en Expo Go après l'installation du build de développement | `npx nx start @yamba-app/mobile` ouvre **toujours** Expo Go : le code se scanne, l'app charge |
+| MOB158 | Lancer le mode build natif | `npm run start-dev-client` depuis `apps/mobile` : Metro annonce un *development build* |
+| MOB159 | Build Android de développement | `npx eas build --platform android --profile development` rend un APK installable sur un téléphone réel |
+| MOB160 | Google Pay sur un émulateur Android | Non testable : le portefeuille n'existe que sur un appareil physique (ce n'est pas un défaut de l'app) |
+| MOB161 | Apple Pay avant l'ouverture du compte Apple | Absent de la feuille — aucun identifiant marchand n'est déclaré, et aucun message ne le promet |
+| MOB162 | Payer par carte sans clé publiable dans le `.env` racine | L'écran annonce que le paiement n'est pas disponible et **garde la saisie** (RG-MOB-88) |
+| MOB163 | Activer Klarna au Dashboard Stripe, relancer le parcours | Klarna apparaît dans la feuille **sans aucune livraison de code** |
+| MOB164 | Payer en Klarna puis abandonner sur la page Klarna | Aucune demande créée, aucune empreinte vivante laissée sans réservation |
+| MOB165 | Passer du mode test à l'argent réel | Seuls les identifiants changent ; aucun écran, aucun refus, aucun message ne diffère |
