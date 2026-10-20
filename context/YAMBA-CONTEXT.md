@@ -796,6 +796,237 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 17/10 : **LA PORTE D'IDENTITE S'OUVRE AU-DESSUS DU TRAJET, PLUS SUR UNE PAGE VIDE (#389).**
+  `/trips/:id/book` atteint SANS session affichait une PAGE ENTIERE « Connecte-toi pour
+  reserver » : un titre, deux boutons, flottant au milieu d'un ecran vide — le visiteur ne
+  voyait meme pas de quel trajet il s'agissait. Ce n'est pas le parcours normal (sur la fiche
+  trajet, « Reserver » ouvre deja `BookingAuthGateModal`, A58/A63), mais c'est la SECONDE
+  LIGNE de CNF-05, atteinte plus souvent qu'on ne croit : lien partage, favori, retour arriere
+  apres deconnexion, session expiree DANS le tunnel. UNE MODALE A BESOIN D'UNE PAGE DERRIERE
+  ELLE : la route /book n'en a pas, donc elle RENVOIE a la fiche trajet avec `?auth=book`, et
+  c'est `TripDetailView` qui ouvre LA MEME modale que le bouton. Le visiteur voit le trajet
+  derriere, et les deux chemins se comportent pareil. PIEGE EVITE : la fiche monte les DEUX
+  barres de reservation (desktop et `lg:hidden`), et leurs modales sont rendues HORS du bloc
+  cache — confier l'ouverture par URL aux deux aurait affiche DEUX modales superposees ; la
+  porte est donc portee par leur parent commun. `router.replace` et non `push` (une etape
+  technique ne s'inscrit pas dans l'historique), et la fermeture RETIRE le parametre (sinon
+  « retour » rouvre la porte et l'URL partagee ouvre une connexion chez le destinataire). Le
+  parametre se lit par `window.location.search` et non `useSearchParams()`, qui imposerait une
+  frontiere Suspense des que la route est prerendue, pour une valeur lue UNE fois au montage.
+  AU PASSAGE : la page dupliquait le balisage de la modale ET sa propre regle de retour
+  (`encodeURIComponent` a la main) au lieu de `bookingRedirectFor()` — deux implementations de
+  la meme decision, donc deux occasions de diverger. Il n'en reste qu'une, et aucune cle morte.
+  RG-C-22..25, MOB110-117, chapitre 216.
+- 17/10 : **LE PRIX SE FAIT AU POIDS FACTURE — LE COEFFICIENT DE TAILLE DISPARAIT, LA PLACE
+  PRISE EST RESERVEE, D81 (#388).** Refonte du moteur, gravee au registre AVANT le code, nee
+  d'un constat de recette sur la page ① (« poids ET taille, pour 0,75 € d'ecart ? »). DEUX
+  DEFAUTS MESURES. (1) Sous 1,83 kg la taille n'avait AUCUN effet : a 3,50 €/kg, S, M et L
+  donnaient exactement 11 € — le plancher de 8 € avalait le coefficient PRC-03, et le point de
+  bascule se calcule (`8 / (3,50 × 1,25)`). Or le colis le plus courant pese moins de 2 kg :
+  on posait une question decorative, et un colis d'1 kg « demi-valise » coutait le prix d'une
+  enveloppe. (2) CAP-01 ne comptait QUE les kilos : le volume n'etait jamais decompte de
+  `remainingKg` — dix colis L d'1 kg et le Voyageur n'avait plus de place. LA CORRECTION reprend
+  le POIDS VOLUMETRIQUE de l'express (diviseur 5000) mais PRE-CALCULE par classe de taille,
+  pour ne jamais demander trois dimensions (PRC-03 « pas besoin de mesurer ») :
+  `poidsFacture = max(poidsReel, plancherKg, minimumDeLaTaille)`, puis
+  `transport = €/kg × poidsFacture × (1 + surchargeFamille)`. Le PLANCHER passe en KILOS (2,3)
+  et remplace le minimum de 8 € : a 3,50 €/kg il vaut 8,05 € — l'economie d'hier AU CENTIME
+  PRES — et a 12 €/kg 27,60 €, SANS aucun parametre supplementaire, puisqu'il multiplie le
+  tarif du Voyageur. Minimums de taille S 0 / M 3 / L 6, grille volontairement plus DOUCE que
+  l'express (M 5,4 / L 8,8) : durcir un prix est facile, le baisser abime la confiance ; et S
+  n'en porte AUCUN, sinon on rencherirait precisement les petits objets de valeur que le
+  plancher protege. La CAPACITE se decompte sur le poids FACTURE (`kgToReserve` etait deja LE
+  point unique). `billableReason` (ACTUAL / FLOOR / SIZE_MIN) remplace le booleen
+  `minimumApplied`, qui ne disait pas LEQUEL des minimums avait gagne. ADMIN : le catalogue D62
+  etant la source UNIQUE, la page, les infobulles, l'OpenAPI et `YAMBA-PARAMETRES.md` ont suivi
+  SANS une ligne de code dediee — 5 cles retirees, 4 ajoutees, invariant bascule des
+  coefficients aux minimums. AUCUNE MIGRATION : `mergeSettingsValues` n'itere que sur le
+  catalogue (motif « tolerant reader »), donc une cle retiree n'est jamais relue — PROUVE par
+  contre-epreuve. SNAPSHOT D17 : `sizeCoef` et `minimumApplied` ne sont PLUS ECRITS mais restent
+  au schema — on ne reinterprete jamais un champ historique, on cesse de l'alimenter. FRONTS :
+  « {min} € minimum » n'etait vrai que sur un corridor, les libelles « colis leger » parlent
+  desormais du plancher EN KILOS ; la recherche n'applique AUCUN minimum de taille (elle ne
+  connait que le poids) et annonce donc le prix d'un S — le plus bas possible, jamais un
+  mensonge. Effet de bord repare : un plancher en EUROS ecrasait tous les corridors sous
+  4 €/kg a 8 €, les rendant indiscernables dans le tri par prix. Tests : deal +3, trip +1,
+  auth +1. REFERENCE CORRIGEE : `CLAUDE.md` notait deal-service 659, MESURE a 684 sur dev avant
+  toute modification — 25 tests jamais reportes. RG-P-28..35, fiches PRX01-16, chapitre 215.
+  RESTE SPECIFIE ET NON CODE : PRC-05 (suggestion par corridor) et PRC-09 (forfait bagage).
+- 17/10 : **LA RECETTE DE LA PAGE ① — L'INFOBULLE ROGNEE, L'AVION SUR UN TRAIN, LE TUNNEL QUI
+  ANNONCAIT SEPT ETAPES, A215/A216 (#387).** (1) L'INFOBULLE DU POIDS se faisait tronquer en
+  responsive, deux causes cumulees : `grid-cols-2` SANS point de rupture (le champ Poids a une
+  demi-largeur de telephone — piege #175 pris par l'autre bout), et une bulle CENTREE SUR SON
+  ICONE, donc debordant par la gauche. Et ce qui rogne n'etait ecrit nulle part :
+  `overflow-y: auto` RAMENE AUSSI l'axe X a `auto` (un `visible` ne survit jamais seul sur un
+  seul axe) — le cousin du piege `overflow-x: clip` deja consigne. Remede : la bulle s'ancre sur
+  le BORD GAUCHE DU CHAMP (`left-0`, `w-[min(16rem,100%)]`) et ne peut plus exceder sa largeur,
+  donc AUCUNE position ne la tronque. (2) « TRAJET SELECTIONNE » parlait avion sur un train :
+  icone `<Plane>` en dur, duree « de vol ». Defaut de fond : le mapper ecrivait
+  `trip.transportMode ?? "PLANE"` — un trajet sans mode EN DEVENAIT UN. `travelMode` devient
+  nullable, le mode inconnu prend l'icone neutre `Route` et « {hours} h de trajet ». ON NE
+  DEVINE PLUS. (3) Les DRAPEAUX ne pouvaient pas s'afficher : `originCountry` recevait le TEXTE
+  `origin.country` (fige dans la locale du createur, absent du jeu d'essai) tandis que le
+  contexte par defaut y mettait un CODE — un champ rempli dans deux sens opposes, et SANS AUCUN
+  LECTEUR. Devient `originCountryCode`, et `countryFlag()` en derive le drapeau par le bloc
+  REGIONAL INDICATOR (aucune image a charger), `aria-hidden`. A215 : le drapeau est SYSTEMATIQUE
+  sur les deux fronts, trajet interieur compris — « tout le monde n'habite pas en France » : pour
+  un Expediteur a Douala, « Paris → Orleans » ne dit le pays QUE par le drapeau, et deux fois le
+  meme drapeau EST l'information. La regle du 16/10 est supersedee et l'en-tete qui la
+  documentait CORRIGE plutot que laisse mentir. A216 : le tunnel natif ecrivait « Etape 1 sur 7 » —
+  ce n'est pas le nombre d'ecrans qui fait abandonner, c'est le nombre ANNONCE. `BOOKING_PHASES`
+  groupe les sept ecrans sous les QUATRE mots du site (Colis 1-3 · Livraison 4-5 · Engagement 6 ·
+  Paiement 7), la jauge devient continue et avance par septiemes, le lecteur d'ecran entend
+  « Colis, etape 1 sur 4 », et le titre descend dans le contenu comme sur le web. LA GARANTIE
+  REMONTE DU ④ AU ② : le web valide l'a placee juste apres la taille (c'est elle qui rend les
+  photos obligatoires, A214), l'ordre natif le contredisait. Page ① alignee sur les captures
+  validees, et les TAILLES prennent la forme de PASTILLE des familles (icones et rectangles
+  supprimes). RG-MOB-63..70, MOB98-109, chapitre 214.
+- 17/10 : **LA PAGE ① DU TUNNEL — « LE COLIS » EN NATIF, LE WEB REPRIS SUR CAPTURES, A214 (#386).**
+  Premiere application de la procedure « UNE PAGE A LA FOIS » (actee le 17/10) : la page mobile traitee
+  en expert UX, PUIS la page web jumelle optimisee sur captures, PUIS la PR et les documents de CETTE
+  page — pas de gros lot reservation monolithique, pas de rattrapage documentaire global. Le tunnel est
+  decoupe en SEPT pages (① le colis ② valeur/photos/description ③ lieux de RDV ④ garantie ⑤ destinataire
+  ⑥ engagement ⑦ paiement + confirmation). MOBILE : `booking-step-frame.tsx` porte le cadre des sept
+  etapes (barre du bas immuable — prix a gauche, geste a droite —, jauge en segments, CTA qui reste
+  ACTIF et nomme ce qui manque, A209) ; `booking-draft.ts` tient le brouillon en MEMOIRE DE PROCESSUS
+  (`useSyncExternalStore`, motif de `search-draft.ts`) et surtout LIE A UN tripId ; `booking-rules.ts`
+  rend des CODES, jamais des phrases ; `pricing.api.ts` sert les parametres de plateforme D62 avec cache
+  de module et repli qui ne jette jamais ; `booking/parcel.tsx` fait le prix VIVANT par
+  `@packages/pricing` — le moteur meme du snapshot serveur (D34 : le front projette, le serveur fige).
+  La pastille grise « Bientot reservable » de la fiche trajet devient le CTA mangue, a la place exacte
+  qui lui etait reservee (promesse A213). WEB (quatre passes de retours sur captures) : l'ORDRE refait —
+  la page commencait par les lieux, qui partent a l'etape 2 « Livraison » AVEC leur validation
+  (`MeetingPoints.tsx`) ; le PRIX EN EUROS — « ×1 / ×1,1 / ×1,25 » etait le coefficient interne, chaque
+  taille annonce son ecart reel et quand le plancher l'absorbe on le DIT ; « +6 € » et « 500 € » etaient
+  ECRITS EN DUR dans les traductions alors que D62 les rend parametrables → ils viennent du moteur.
+  GAR-04 : la ligne « Service & protection » portait la SEULE commission juste au-dessus d'une ligne
+  « Garantie Yamba » — deux protections facturees a la lecture, alors que prime et commission ne se
+  melangent jamais → « Frais de service Yamba ». GAR-05 : choisir la Garantie OUVRE D'OFFICE les
+  exclusions (un lien a cliquer ne presente rien). La garantie quitte la colonne de droite pour le
+  formulaire (une decision a +6 € n'est pas un recapitulatif). LA SORTIE DU TUNNEL n'existait pas :
+  confirmation « Reprendre » par defaut, brouillon efface — on repart toujours de zero — et favori
+  propose coche (D46) ; rien de saisi, rien de demande. DEFAUT LATENT CORRIGE : le brouillon de session
+  n'etait pas porte par le trajet — celui du trajet A etait restaure sur le trajet B dans le meme
+  onglet, `pickupLocationId` compris (les identifiants sont des RANGS, donc « correspondants » sans
+  erreur visible). CONSTAT DE PRIX remonte par la recette et MESURE : sous 1,83 kg sur un trajet a
+  3,50 €/kg, S, M et L donnent EXACTEMENT le meme total (le plancher de 8 € de D32 avale le coefficient
+  PRC-03), et CAP-01 ne compte QUE les kilos — le volume n'est jamais decompte de `remainingKg`.
+  Correctif livre : AFFICHAGE SEULEMENT (l'indice dit a quoi sert la taille, « elle dit au Voyageur si
+  ton colis tient dans son bagage »). Le fond est une decision de PRIX, PROPOSEE ET NON CODEE — d'ou le
+  livrable 12 « Tarification et rentabilite » (`docs/livrables/12-YAMBA-TARIFICATION-ET-RENTABILITE`,
+  4 967 mots : la formule et ses dix parametres D62, les deux defauts mesures, le poids volumetrique
+  propose avec plancher en KILOS, express vs postal, la commission SEULE comme revenu — la prime est un
+  flux distinct, GAR-04 —, le modele de rentabilite et ses six hypotheses nommees, 1 778 colis
+  domestiques contre 348 bagages pour un meme salaire : la rentabilite se joue sur le MIX, pas sur le
+  taux ; PRC-05 et PRC-09 specifies et NON codes). Registre A214 + nouveau § 7.6 « Evolutions
+  proposees » (reprise de brouillon, brouillon serveur, web a 7 etapes — parkees AVEC leur motif de
+  refus, plutot qu'un 29e fichier dans context/). 18/18 controles comptes. Tests plateforme INCHANGES
+  (1268 + auth 406). RG-MOB-50..62, MOB83-97, chapitre 213. AUCUNE attribution Claude.
+- 17/10 : **LA RECHERCHE, LA CARTE DE RESULTAT ET LA FICHE TRAJET EN NATIF — L'AUTOCOMPLETION PAR NOTRE
+  API, A210 a A213 (#385).** Dix-neuf commits du 29/09 au 17/10, tous sur `apps/mobile` SAUF A211 qui
+  est un lot serveur a part entiere. (1) LA CARTE DE RESULTAT : polyfills `Intl.PluralRules` /
+  `Intl.DisplayNames` pour Hermes (`@formatjs`, en `.js` — sinon TS2882) parce que les pluriels ICU
+  rendaient la cle brute et le pays s'affichait en CODE ; trois iterations sur captures (reference SNCF
+  Connect → la carte web mobile a l'identique → V2 epuree a drapeaux) : route pleine largeur, une seule
+  ligne d'horaires `01:51 → 07:51+1 · 7 h · Direct`, prix + kg dispo, pied `nom · note` ; coeur favori
+  optimiste (D46, visiteur → `/login`). Le DTO serveur portait deja tout : AUCUN endpoint mobile.
+  (2) LE HAUT DE LA PAGE RESULTATS : barre recap `Depart → Destination` + date + Filtres, pastilles de
+  transport alimentees par les FACETTES SERVEUR (`/trips/search/facets`), feuille Filtres native avec le
+  tri serveur ; en-tete COLLANT sur fond floute (`expo-blur`) — materiau chrome systeme sur iOS,
+  `BlurTargetView` sur Android (repli translucide avant Android 12, A VALIDER AU POSTE ANDROID).
+  (3) A210, LA BARRE CIBLE : `Explorer · Favoris · [ + ] · Activite · Messages` — quatre destinations et
+  UNE action ; Favoris a trois segments (trajets D46 / souhaits de route / Voyageurs suivis), Profil
+  pousse depuis une pastille d'angle. DOCTRINE GRAVEE : l'app est FULL NATIVE, elle ne renvoie JAMAIS au
+  site — deux reliquats textuels supprimes. (4) LE PARCOURS DE RECHERCHE NATIF : depart, destination et
+  date en PAGES POUSSEES, date intelligente (deux modes, trois raccourcis), feuille « Modifier la
+  recherche » sur fond reellement floute, dose apres capture (materiau `thin` a 32, voile 0,18 — les
+  resultats restent reconnaissables derriere). (5) A211, L'AUTOCOMPLETION PASSE PAR NOTRE API : une cle
+  Google utilisable par une app mobile voyagerait DANS LE BUNDLE — extractible, facturable par
+  n'importe qui ; et une cle restreinte par referer est de toute facon refusee a un `fetch` natif
+  (`API_KEY_HTTP_REFERRER_BLOCKED`, MESURE le 13/10) → relais serveur. `GET /places/autocomplete` en
+  trip-service (le service qui porte deja la recherche), authentification OPTIONNELLE comme la
+  recherche : la langue vient du compte s'il existe, de l'appareil sinon (D44) ; cle dans
+  `GOOGLE_MAPS_SERVER_API_KEY` au `.env` RACINE, sans elle 503 `PLACES_UNAVAILABLE` — un refus porteur
+  d'un `details.code` (A146), et c'est le comportement VOULU ; contrat Zod
+  `packages/libs/api-contracts/src/places/`, route gateway, CINQ `openapi.json` regeneres, DEUX fichiers
+  de tests (`places.rules.spec.ts`, `places.controller.spec.ts`, +16). (6) LA FICHE TRAJET NATIVE : la
+  page publique du site en natif (frise, Voyageur, offre, lieux, signalement D68, barre collante), puis
+  ALLEGEE le soir meme sur revue — page a plat, UNE SEULE carte (le prix), ce qui se lit apres se
+  replie ; meme endpoint que le web (`GET /trips/:id/public`). (7) REVUE UX DU 16/10 : le haut arrete de
+  bavarder, la carte dit le VRAI prix. PIEGE PAYE : `apps/mobile/.expo/types/router.d.ts` est GENERE par
+  Metro et gitignore — un aller-retour de branche le regenere sans les nouvelles routes et le typecheck
+  refuse un `router.push` pourtant juste ; remede : lancer Metro une fois (ni `expo export`, qui ne le
+  regenere pas). trip-service MESURE a 326 tests (etait 310). RG-MOB-37..49, MOB59-82, chapitres 210 a
+  212. AUCUNE attribution Claude.
+- 17/10 : **LE FLUX LOCALISE RENDU VISIBLE — LES SECTIONS PAR ANNEAU, D80 COTE WEB (#384).**
+  Le classement serveur de #383 devient VISIBLE : la liste de resultats se decoupe en SECTIONS NOMMEES
+  dans l'ordre des anneaux — « Au depart de Douala », « A proximite », « Dans ta region », « Ailleurs ·
+  Cameroun », « Plus loin dans le monde » — et quand l'ancrage vient de l'IP, le sous-titre LE DIT
+  (« Les departs proches de {ville} d'abord »). Sans ancrage : la liste d'aujourd'hui, inchangee. Le tri
+  « Pertinence » est premier et par defaut, et JAMAIS ENVOYE : le serveur decide, le front reflete
+  (`trip.api.ts` n'emet `sort` que s'il differe du defaut) ; `clearAll` et `hasActiveFilters` basculent
+  sur le nouveau defaut. Les sections sont DERENDUES, jamais re-triees : un en-tete a la PREMIERE
+  apparition de chaque anneau dans l'ordre RECU, un trajet PLEIN (queue de liste) ne rouvre jamais de
+  section, la pagination prolonge sans dupliquer. `anchor` est lu sur la premiere page, le pays localise
+  via `lib/country-name` (jamais un code brut). i18n FR/EN miroir. RESTE : l'envoi de `near*` par le
+  front (adresse du membre / derniere recherche — l'ancrage web vient de l'IP SEULE pour l'instant), la
+  chip « Autour de : X ✕ » interactive, et la recette navigateur avec la base GeoLite2 telechargee ou un
+  `near*` simule. RG-FEED-08..10, chapitre 212 (renumerote : 211 etait pris par #385).
+- 17/10 : **LE FLUX D'ATTERRISSAGE LOCALISE — LA PERTINENCE PAR DEFAUT, D80 COTE SERVEUR (#383).**
+  D80 gravee au registre AVANT le code : le tri par defaut de `GET /trips/search` devient `relevance` —
+  des trajets au depart de chez l'utilisateur, sinon on elargit anneau par anneau, et JAMAIS un ecran
+  vide ni bete. `packages/libs/geoip` fait l'ancrage IP HORS-LIGNE (GeoLite2 locale via `maxmind`, base
+  gitignoree, `scripts/download-geolite2.sh`) : l'IP ne sort JAMAIS de chez nous (doctrine D78 etendue)
+  et tout chemin d'erreur rend `null` — une geoloc ne vaut jamais un 500. Le gateway pose (ECRASE)
+  `x-client-ip` sur le proxy trips : `express-http-proxy` n'ajoute pas l'IP du client, et l'en-tete est
+  infalsifiable a travers nous. `feed-ranking.ts` (PUR) tient une cle de tri a quatre etages : le PLEIN
+  coule sous tout mais n'est JAMAIS exclu (ANO-API-11) → l'ANNEAU (meme ville < 25 km → proche < 100 km
+  → region < 300 km meme pays → pays → international) → le SCORE qualite (depart jouable J+1..J+7,
+  confiance avec prior neutre du sans-note, prix en percentile de fenetre, fraicheur ; JAMAIS les vues)
+  → l'`id` (A199, determinisme). Sans ancrage : un flux decouverte a diversite <= 3 par corridor, qui
+  DEMEUT sans retirer. Contrat : `sort=relevance` par defaut (un tri inconnu DEGRADE, doctrine
+  ANO-API-10), `nearLat`/`nearLng`/`nearCountry` tolerants, `ring` par carte et `anchor` en reponse —
+  jamais l'IP ni des coordonnees ; les cinq `openapi.json` regeneres. ANO-API-24 CLOSE : le curseur
+  `o:<n>` du tri prix-au-poids (D33) etait refuse par la regex du DTO — la page 2 de ce tri etait
+  INATTEIGNABLE depuis toujours. Sondes reelles sur le bundle contre la base de dev, et
+  `smoke-services.sh` vert (dependance `maxmind` validee sous webpack). trip-service +82 tests.
+  PIEGE PAYE : `maxmind` etait declare au manifeste ET au lock mais jamais installe — sans lui,
+  `nx typecheck` echouait sur trip-service ET api-gateway. RESTE une minute hors depot : la cle MaxMind
+  et `download-geolite2.sh` ; plus la migration d'`isPrivateIp` d'auth-service vers la lib.
+  RG-FEED-01..07, FEED01-07, chapitre 211.
+- 29/09 : **L'AUTHENTIFICATION MEMBRE EN NATIF — FEUILLE (auth), INSCRIPTION + OTP, OUBLI, A208 (#382).**
+  UNE FEUILLE MODALE pour toute l'auth : groupe `(auth)` avec pile native interne — connexion →
+  inscription → code OTP, et connexion → oubli → code → nouveau mot de passe ; les chemins ne changent
+  pas (`/login` reste `/login`). MEMES ENDPOINTS que le web, aucun endpoint mobile ; refus par
+  `details.code` (RG-MOB-1), `ApiError` expose le `details` COMPLET (`attemptsLeft`,
+  `lockUntilSeconds`). INSCRIPTION : prenom/nom/e-mail/mot de passe avec jauge a 8 criteres (troisieme
+  miroir assume de `password-rules`), CGU, versions legales depuis `@packages/legal/versions`, et LOGIN
+  CHAINE APRES L'OTP puisque le serveur n'ouvre pas de session a la verification — avec repli
+  « connexion prerempli, compte active ». OTP NATIF : un `TextInput` invisible derriere six cases (le
+  collage et l'autofill deviennent gratuits), verification d'office a la 6e frappe, trois compteurs sur
+  ECHEANCE ABSOLUE (expiration 600 s, renvoi 60 s PUREMENT CLIENT — anti-enumeration —, verrou serveur).
+  OUBLI : forgot → code → nouveau mot de passe, silence anti-enumeration respecte,
+  `RESET_SESSION_EXPIRED` → etat « recommencer ». Bienvenue : « S'inscrire » prend le primaire (promesse
+  A207) ; la porte d'identite gagne le lien « Creer un compte ». Bundle Hermes iOS + Android : six
+  marqueurs x deux encodages, temoin faux a 0. Services intouches, tests plateforme inchanges.
+  RG-MOB-31..36, MOB48-58, chapitre 209. AUCUNE attribution Claude.
+- 29/09 : **L'ACCUEIL MOBILE — L'ACCUEIL WEB TRANSPOSE, CORRIDORS REELS VERS RECHERCHER, A206 (#381).**
+  L'onglet Accueil sort de sa coquille de socle : l'accueil web refondu (#357, « une page qui ne dit que
+  du vrai ») transpose a l'ecran de telephone. HERO : accroche + sous-titre du web, salutation
+  « Bonjour {prenom} » connecte, CTA « Chercher un trajet » qui BASCULE D'ONGLET — PAS de barre de
+  recherche dupliquee, la recherche EST un onglet. LIGNE DE CONFIANCE : les trois mecanismes REELS
+  (sequestre Stripe, code confidentiel, profils et billets verifies) — jamais des chiffres. CORRIDORS
+  REELS : meme derivation que `CorridorsSection` web (miroir assume, consigne dans A206) —
+  `GET /trips/search` limit 50, agregation a l'affichage, six au plus ; zero trajet ou panne → la
+  section DISPARAIT. « Comment ca marche » a deux faces (J'envoie / Je voyage), les 4 etapes du web.
+  PREREMPLISSAGE : un corridor touche part en parametres de route (`from`/`to`/`seed`) vers Rechercher —
+  la GRAINE ne rejoue que quand elle CHANGE (retaper relance, revenir d'onglet non), et la recherche
+  lancee est comptee serveur comme toute autre (RG-MOB-14) ; `runSearch` refactoree en
+  `runSearchWith(params)` parce que le `setState` n'est pas synchrone. La `socleNote` disparait, et ses
+  cles avec elle — pas de cle morte. Bundle Hermes `expo export --clear` : six marqueurs FR accentues +
+  EN cherches dans LES DEUX encodages (UTF-16-LE et UTF-8), tous a 1, temoin faux a 0. Aucune
+  dependance ajoutee, services intouches. RG-MOB-21..24, MOB32-38, chapitre 207. AUCUNE attribution
+  Claude.
 - 20/09 : **LA PAGE TRAJET MOBILE — LA FICHE PUBLIQUE DU SITE, LA VUE COMPTEE SERVEUR, A205 (#379).**
   La carte de resultat s'ouvre enfin : `app/trip/[id].tsx` pousse la fiche PAR-DESSUS les onglets (le
   retour garde les resultats) et consomme le MEME endpoint que le web — `GET /trips/:id/public`,
