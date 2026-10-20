@@ -5,10 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import { Animated, useColorScheme } from 'react-native';
 
+import { useLinkingURL } from 'expo-linking';
+
 import { AppSplash } from '@/components/app-splash';
 import { Brand } from '@/constants/theme';
 import { AppIntlProvider } from '@/i18n/provider';
 import { SessionProvider, useSession } from '@/lib/session-context';
+import { handleStripeRedirect } from '@/lib/stripe-sheet';
 import { isWelcomeDismissed } from '@/lib/welcome-state';
 
 // Le splash tient AU MOINS ce temps-là avant de s'effacer en fondu : un
@@ -16,6 +19,28 @@ import { isWelcomeDismissed } from '@/lib/welcome-state';
 // plafond — un vrai chargement lent le dépasse naturellement.
 const SPLASH_MIN_MS = 1500;
 const SPLASH_FADE_MS = 350;
+
+/**
+ * D82 7A — le relais des redirections bancaires.
+ *
+ * Quand un moyen de paiement emmène le membre dehors (3-D Secure, Klarna, PayPal), c'est
+ * une URL `yamba://…` qui réveille l'app. Sur iOS, le SDK Stripe ne la voit pas tout seul :
+ * si personne ne la lui passe, l'authentification se termine dans le navigateur système et
+ * la feuille attend pour rien. Sur Android, le SDK s'en charge — ce relais n'y fait rien de
+ * mal, et l'app n'a pas à savoir sur quel système elle tourne.
+ *
+ * `useLinkingURL` (SDK 57 ; `useURL` est déprécié) rend l'URL de lancement ET les suivantes.
+ * Le relais est muet par construction : dans Expo Go le module natif n'existe pas, et une
+ * URL qui ne vient pas de Stripe n'est pas une erreur — c'est une URL qui ne nous concerne
+ * pas (un lien de partage de trajet, par exemple).
+ */
+function StripeRedirectRelay() {
+  const url = useLinkingURL();
+  useEffect(() => {
+    if (url) void handleStripeRedirect(url);
+  }, [url]);
+  return null;
+}
 
 // L'ouverture (lot bienvenue) : le splash JS prolonge le splash natif pendant
 // l'amorçage de la session ; l'amorçage rend son verdict UNE fois — anonyme
@@ -95,6 +120,8 @@ export default function RootLayout() {
           </Stack>
           {/* Après la pile : le splash peint PAR-DESSUS pendant l'amorçage. */}
           <LaunchGate />
+          {/* Ne peint rien : il écoute les retours de redirection bancaire (D82 7A). */}
+          <StripeRedirectRelay />
         </ThemeProvider>
       </SessionProvider>
     </AppIntlProvider>
