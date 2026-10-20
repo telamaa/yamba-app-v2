@@ -38,6 +38,7 @@ export const CRON_CATALOGUE: readonly CronCatalogueEntry[] = [
   { service: "deal-service", name: "ops-digest", schedule: "0 8 * * *", intervalMs: DAY },
   { service: "deal-service", name: "outbox-retention", schedule: "55 3 * * *", intervalMs: DAY },
   { service: "deal-service", name: "payout-bookings", schedule: "*/5 * * * *", intervalMs: 5 * MIN },
+  { service: "deal-service", name: "orphan-holds", schedule: "23,53 * * * *", intervalMs: 30 * MIN },
   { service: "deal-service", name: "rating", schedule: "17 * * * *", intervalMs: HOUR },
   { service: "deal-service", name: "recipient-redaction", schedule: "40 3 * * *", intervalMs: DAY },
   { service: "message-service", name: "conversation-retention", schedule: "30 3 * * *", intervalMs: DAY },

@@ -21,6 +21,17 @@ import { BookingApiError, createDeal, createPaymentIntent } from "@/services/boo
 import { track } from "@/lib/analytics";
 import type { Draft, PaymentIntentInfo, Step, TripContext } from "./booking.types";
 
+/**
+ * D82 7A — Klarna et PayPal REDIRIGENT : au retour, l'empreinte peut n'être pas encore
+ * capturable, et le serveur répond `PAYMENT_PROCESSING` avec le délai à attendre. Ce n'est
+ * pas un échec : on attend et on redemande, au plus trois fois. Au-delà, on le dit — mais
+ * sans jamais ressaisir quoi que ce soit, et sans jamais poser une seconde empreinte.
+ */
+const PROCESSING_MAX_ATTEMPTS = 3;
+const PROCESSING_FALLBACK_DELAY_MS = 3000;
+
+const attendre = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /** Ce que l'étape 4 enregistre : « confirme le paiement, dis-moi si c'est bon ». */
 export type ConfirmPaymentFn = () => Promise<{ ok: true } | { ok: false; message: string }>;
 
@@ -31,6 +42,7 @@ const KNOWN_CODES = new Set([
   "TRIP_NOT_BOOKABLE",
   "OWN_TRIP",
   "PAYMENT_NOT_AUTHORIZED",
+  "PAYMENT_PROCESSING", // D82 7A
   "PAYMENT_MISMATCH",
   "PAYMENT_ALREADY_USED",
   "NEW_ACCOUNT_CAP", // D71
@@ -129,7 +141,21 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
           return;
         }
       }
-      const result = await createDeal(draft, trip, intent.paymentIntentId, photoUrls);
+      // Le serveur relit l'état réel de l'empreinte chez le fournisseur (D82 8A) : tant
+      // qu'elle se pose, il dit « attends » au lieu de « c'est raté ».
+      let result: Awaited<ReturnType<typeof createDeal>> | null = null;
+      for (let tentative = 1; tentative <= PROCESSING_MAX_ATTEMPTS; tentative += 1) {
+        try {
+          result = await createDeal(draft, trip, intent.paymentIntentId, photoUrls);
+          break;
+        } catch (e) {
+          const encoreEnCours = e instanceof BookingApiError && e.code === "PAYMENT_PROCESSING";
+          if (!encoreEnCours || tentative === PROCESSING_MAX_ATTEMPTS) throw e;
+          const secondes = Number((e as BookingApiError).details?.retryAfterSeconds);
+          await attendre(Number.isFinite(secondes) && secondes > 0 ? secondes * 1000 : PROCESSING_FALLBACK_DELAY_MS);
+        }
+      }
+      if (!result) return;
       void track("booking_created", { tripId: trip.tripId, bookingId: result.bookingId }); // D66 3A
       toast.success(t("step4.requestSent"), { duration: 3500 });
       clear();

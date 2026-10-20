@@ -248,6 +248,7 @@
       "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
       "NEW_ACCOUNT_CAP": "Ton compte est récent : tes envois sont encore plafonnés. Le plafond se lève avec tes premiers envois terminés.",
       "PAYMENT_NOT_AUTHORIZED": "Le paiement n'a pas encore été autorisé. Réessaie.",
+      "PAYMENT_PROCESSING": "Ta banque valide encore le paiement. Reste sur cet écran, rien n'est perdu — ta demande part dès que c'est confirmé.",
       "PAYMENT_MISMATCH": "L'autorisation ne correspond plus à ta demande. Une nouvelle est en préparation.",
       "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
       "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
