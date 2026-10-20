@@ -129,6 +129,35 @@ describe("webhook Stripe — le contrôleur", () => {
     expect((service as unknown as { cancelBookingForDeadPayment: jest.Mock }).cancelBookingForDeadPayment).not.toHaveBeenCalled();
   });
 
+  /* ── D82 7A/8A — les deux états que les moyens à REDIRECTION font apparaître ── */
+
+  it("journalise l'empreinte en cours de pose (payment_intent.processing) sans rien écrire", async () => {
+    construct.mockReturnValue(evenement({ type: "payment_intent.processing", paymentIntentId: "pi_klarna" }));
+    const { res, out } = fauxResponse();
+    await makeStripeWebhookHandler(service, logger, settlement)(requete("t=1,v1=x"), res as never);
+    expect(out.statusCode).toBe(200);
+    expect((service as unknown as { cancelBookingForDeadPayment: jest.Mock }).cancelBookingForDeadPayment).not.toHaveBeenCalled();
+    expect((logger as unknown as { info: jest.Mock }).info).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentIntentId: "pi_klarna" }),
+      expect.stringContaining("still processing")
+    );
+  });
+
+  it("journalise l'échec de paiement avec son motif — et le motif ne sort JAMAIS vers le client", async () => {
+    construct.mockReturnValue(
+      evenement({ type: "payment_intent.payment_failed", paymentIntentId: "pi_ko", failureMessage: "Your card was declined." })
+    );
+    const { res, out } = fauxResponse();
+    await makeStripeWebhookHandler(service, logger, settlement)(requete("t=1,v1=x"), res as never);
+    expect(out.statusCode).toBe(200);
+    // La réponse à Stripe est un accusé nu : aucun motif, aucun id d'intention.
+    expect(out.body).toEqual({ received: true });
+    expect((logger as unknown as { warn: jest.Mock }).warn).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentIntentId: "pi_ko", failureMessage: "Your card was declined." }),
+      expect.stringContaining("payment attempt failed")
+    );
+  });
+
   it("fait suivre les drapeaux du Voyageur et relance ses versements quand le compte redevient prêt", async () => {
     construct.mockReturnValue(
       evenement({

@@ -4984,3 +4984,177 @@ critère n'est pas « est-elle visible ? » mais « que permet-elle à qui la li
   structurel).
 - Lire la colonne « Redirection requise » **avant** de promettre un moyen de paiement : elle
   décide de l'architecture du tunnel, pas d'une case du Dashboard.
+
+---
+
+## Chapitre 220 — Le vocabulaire du « non », l'état qui n'existe que chez le voisin, et le test qui attrape un oubli d'intégration
+
+### 1. Un refus n'est pas une valeur booléenne
+
+Le code refusait ainsi :
+
+```ts
+if (auth.status !== "AUTHORIZED") throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", …);
+```
+
+Correct, et pourtant faux dès qu'un moyen de paiement redirige. Car sous ce `!==` cohabitent
+deux mondes opposés :
+
+| Statut | Ce que le membre doit comprendre |
+|---|---|
+| `CANCELED`, `REQUIRES_PAYMENT_METHOD` | **C'est raté**, il faut repayer |
+| `PROCESSING` | **Attends**, ton paiement arrive |
+
+Les confondre, c'est annoncer un échec à quelqu'un qui vient de payer. La leçon est
+générale : **la granularité d'un refus est une décision produit, pas un détail
+d'implémentation.** Quand un `else` unique couvre des conséquences opposées pour
+l'utilisateur, il faut l'ouvrir.
+
+Et le corollaire côté client : un code de refus **réessayable** doit porter son délai
+(`retryAfterSeconds`), sinon chaque appelant invente le sien.
+
+### 2. Sortir une décision du service pour pouvoir la tester
+
+`createBooking` est une orchestration : Prisma, paramètres de plateforme, plafonds de
+confiance, transaction. **Aucune spec ne l'exerçait** — monter ce harnais coûte plus cher
+que la règle qu'on veut vérifier.
+
+La parade est un réflexe du dépôt : la décision devient une **fonction pure**.
+
+```ts
+export function assertAuthorizationUsable(status: PaymentAuthorizationStatus): void
+```
+
+Le service se réduit à un appel, la règle se teste en douze cas sans rien monter, et le test
+documente l'invariant lui-même (« tout statut autre qu'AUTHORIZED est refusé »). C'est le
+même découpage que `recipient-redaction.rules` / `recipient-redaction.service`, ou que
+`ops-alerts.rules` / `ops-alerts.service` : **les règles dans `lib/` ou en tête de service,
+l'orchestration autour.**
+
+### 3. Un état qui n'existe que chez le voisin
+
+L'empreinte orpheline pose un problème d'architecture amusant : **on ne peut pas la chercher
+chez nous**, parce que créer une intention de paiement n'écrit rien en base (D37). Elle
+n'existe que chez le fournisseur.
+
+Trois réponses étaient possibles :
+
+| Option | Pourquoi écartée (ou retenue) |
+|---|---|
+| Écrire une trace à chaque intention créée | Une écriture de plus sur le chemin chaud, et un état dérivé à maintenir — pour un cas marginal |
+| Attendre l'expiration naturelle | 7 jours sur une carte, **28 chez Klarna** : c'est l'argent du membre |
+| **Lire chez le fournisseur** | ✅ Il est déjà la source de vérité du paiement (D40). La lecture est bornée, le tri est pur, rien à maintenir |
+
+Le détail qui compte : la méthode est **optionnelle** sur l'interface
+(`listAuthorizedHolds?`), exactement comme `findTransfers?` avant elle. Une méthode
+obligatoire aurait cassé le typecheck de **toutes les doublures de test** qui implémentent
+`PaymentProvider` — et, la CI voyant désormais les fichiers de spec, cela se serait vu en
+rouge. Ajouter à une interface déjà implémentée partout : toujours se demander *qui d'autre
+l'implémente*, les tests compris.
+
+### 4. Le garde-fou « est-ce à nous ? », et pourquoi il n'est pas de la paranoïa
+
+Avant d'annuler une autorisation, la règle vérifie qu'elle porte `metadata.tripId` **et**
+`metadata.shipperId` — posés par `authorize()` à chaque fois.
+
+Un compte de paiement peut servir plusieurs applications ; un bac à sable de test est
+partagé ; un collègue peut poser des intentions à la main. Un ménage qui annulerait
+largement **prendrait l'argent d'un autre système en otage**. La règle est donc restrictive
+par défaut : on n'annule que ce qu'on reconnaît.
+
+Et le délai de grâce complète la protection dans l'autre sens : **on ne coupe jamais sous
+les pieds de quelqu'un qui paie encore.** Le service re-vérifie l'âge même si le fournisseur
+a déjà filtré par date — une double garde volontaire : un fournisseur qui rendrait trop
+large ne doit pas pouvoir faire annuler un paiement en cours.
+
+### 5. Le test qui attrape un oubli d'intégration (et pas un bug de logique)
+
+Le cron écrit, testé, typé, vert — et la suite **auth-service** passe au rouge :
+
+```
+● CRON_CATALOGUE (A178) — chaque fichier de cron laisse un battement
+  et figure au catalogue avec la même expression
+  Expected value: {"name": "orphan-holds", "schedule": "17,47 * * * *", …}
+```
+
+Ce test lit les **fichiers de cron du dépôt** et exige que chacun figure au catalogue que lit
+la page d'état de l'administration. Un cron absent du catalogue fonctionne parfaitement… et
+reste **invisible** : personne ne verra qu'il ne tourne plus.
+
+Au passage, il a révélé une collision : `:17` était déjà l'horaire du cron de notation.
+Horaire changé en `23,53`, entrée ajoutée au catalogue.
+
+La leçon vaut au-delà de ce cas : **les tests les plus rentables ne sont pas toujours ceux
+qui vérifient une logique, mais ceux qui vérifient une cohérence** — un fichier et son
+catalogue, un contrat et son implémentation, un message et son miroir dans l'autre langue.
+Ils attrapent la classe d'erreurs que personne ne pense à chercher.
+
+### 6. Un motif d'échec ne sort jamais vers le client
+
+`payment_intent.payment_failed` porte un motif dans `last_payment_error.message`. Précieux
+pour l'exploitation — et impubliable : il peut nommer la banque, le moyen, parfois l'adresse.
+
+```ts
+logger.warn({ eventId, paymentIntentId, failureMessage: event.failureMessage }, "…");
+// La réponse au fournisseur reste nue :
+res.json({ received: true });
+```
+
+Même doctrine que le code de livraison qui ne voyage jamais dans un événement (D43), que les
+exports opérationnels qui ne portent que des identifiants (D60), ou que la projection
+PostHog en liste blanche (D66) : **ce qui est utile en interne n'est pas pour autant
+servable.** La question n'est jamais « est-ce que j'ai la donnée ? » mais « qui la lit, et
+pour quoi faire ? ».
+
+### 7. Pour aller plus loin
+
+- Un refus réessayable mérite toujours trois choses : un **code distinct**, un **délai**, et
+  une **borne** côté client (ici trois tentatives). Sans la borne, on a écrit une boucle
+  infinie polie.
+- `paymentIntents.list` ne filtre pas par statut : vérifier ce que l'API du fournisseur sait
+  filtrer **avant** de concevoir une passe, sinon la fenêtre se paie en lectures inutiles.
+- Une doublure de test (ici le fournisseur Fake) n'est utile que si elle peut simuler le
+  passé : d'où `_setCreatedAtForTest`. Un faux sans horloge ne sait rien dire des règles
+  temporelles.
+
+### 8. Complément du chapitre 220 — lire la documentation plutôt que la mémoire d'une décision
+
+Trois enseignements de l'implémentation de D82 7A, et le premier est méthodologique.
+
+**La décision écrite portait deux faits faux.** Elle affirmait qu'il fallait rendre le
+brouillon web durable (il l'était déjà) et retirer `redirect: "if_required"` (c'est le bon
+réglage). Les deux ont été démentis : l'un par la lecture du code, l'autre par la
+documentation Stripe.js, qui dit textuellement que `if_required` « ne redirige **que** si
+l'utilisateur choisit un moyen à redirection ».
+
+La règle du dépôt existe pour ça — *code + ses tests > registre* — mais elle ne sert à rien si
+personne ne relit. **Une décision d'architecture est une hypothèse de travail, pas une
+vérité** : la première tâche de l'implémentation est de la vérifier, et le registre se
+corrige visiblement quand elle est fausse. Coder pour tenir une phrase erronée aurait produit
+deux régressions : un stockage redondant, et tous les paiements par carte basculés dans un
+rechargement de page complet.
+
+**Ce qui se perd dans une redirection n'est pas ce qu'on croit.** Le brouillon est persisté ;
+ce sont les variables de la fonction en cours qui disparaissent — l'identifiant de
+l'autorisation et les URL des photos déjà téléversées. D'où un réflexe : avant de confier le
+contrôle à un tiers (redirection, feuille native, fenêtre OAuth), énumérer ce qui vit
+**uniquement** dans la pile d'appels, et le consigner.
+
+**Un garde qui bloque doit savoir se rouvrir.** La reprise lève un drapeau pour empêcher la
+création d'une seconde autorisation. Première version : le drapeau restait levé si la reprise
+échouait, et l'écran devenait définitivement inerte — *pire* que l'échec annoncé. Tout
+verrou posé pour empêcher un effet de bord doit avoir son chemin de libération dans le cas
+d'erreur, pas seulement dans le cas nominal.
+
+```ts
+} catch (e) {
+  toast.error(errorMessage(e));
+  clearPendingPayment(trip.tripId);
+  resumeStarted.current = false;   // sans cette ligne, l'écran est mort
+}
+```
+
+**Et un dernier réflexe, propre à ce dépôt** : `apps/mobile/AGENTS.md` exige de lire la
+documentation **versionnée** d'Expo avant d'écrire du code. Bien vu : `useURL()` est
+**déprécié** en SDK 57 au profit de `useLinkingURL()`. Une API « connue » est une API dont on
+se souvient d'une version antérieure.

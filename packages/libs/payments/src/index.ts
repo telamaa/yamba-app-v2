@@ -126,6 +126,23 @@ export function isStripeResourceMissing(err: unknown): boolean {
  */
 export type ExistingTransfer = { id: string; amountCents: number; reversedCents: number; metadata: Record<string, string>; createdAt: string | null };
 
+/**
+ * Empreinte POSÉE et encore capturable, telle que le fournisseur la voit (D82 9A).
+ *
+ * Yamba n'écrit RIEN en base à la création de l'intention (D37) : une empreinte posée
+ * dont le membre n'a jamais créé la réservation — il est parti sur Klarna et n'est pas
+ * revenu — n'existe donc nulle part chez nous. Le fournisseur est le seul à la connaître,
+ * et c'est pour cela que la chasse aux orphelines se fait en LECTURE chez lui.
+ */
+export type AuthorizedHold = {
+  intentId: string;
+  amountCents: number;
+  currencyCode: string;
+  createdAt: Date;
+  /** clés de rapprochement posées à l'autorisation (tripId, shipperId…) — jamais de PII */
+  metadata: Record<string, string>;
+};
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   authorize(input: AuthorizeInput): Promise<PaymentAuthorization>;
@@ -143,6 +160,12 @@ export interface PaymentProvider {
   inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection>;
   /** Lecture seule (A164) : les transferts d'un groupe. Optionnel : un fournisseur qui ne l'offre pas n'est pas consulté. */
   findTransfers?(transferGroup: string): Promise<ExistingTransfer[]>;
+  /**
+   * Lecture seule (D82 9A) : les empreintes posées AVANT `createdBefore` et encore
+   * capturables. Optionnel, comme `findTransfers` : un fournisseur qui ne l'offre pas
+   * n'est pas consulté — la chasse aux orphelines se tait au lieu de jeter.
+   */
+  listAuthorizedHolds?(input: { createdBefore: Date; limit?: number }): Promise<AuthorizedHold[]>;
 }
 
 /* ══ Stripe ═══════════════════════════════════════════════════ */
@@ -204,6 +227,27 @@ export class StripePaymentProvider implements PaymentProvider {
 
   async retrieve(intentId: string): Promise<PaymentAuthorization> {
     return fromStripe(await this.stripe.paymentIntents.retrieve(intentId));
+  }
+
+  /**
+   * D82 9A — `paymentIntents.list` ne sait pas filtrer par statut : le tri se fait ici,
+   * sur `requires_capture` (l'argent est réellement bloqué). `created.lte` borne la
+   * fenêtre, et le plafond de 100 est celui de l'API.
+   */
+  async listAuthorizedHolds(input: { createdBefore: Date; limit?: number }): Promise<AuthorizedHold[]> {
+    const res = await this.stripe.paymentIntents.list({
+      created: { lte: Math.floor(input.createdBefore.getTime() / 1000) },
+      limit: Math.min(Math.max(input.limit ?? 100, 1), 100),
+    });
+    return res.data
+      .filter((pi) => pi.status === "requires_capture")
+      .map((pi) => ({
+        intentId: pi.id,
+        amountCents: pi.amount,
+        currencyCode: pi.currency.toUpperCase(),
+        createdAt: new Date(pi.created * 1000),
+        metadata: (pi.metadata ?? {}) as Record<string, string>,
+      }));
   }
 
   async capture(intentId: string): Promise<PaymentAuthorization> {
@@ -292,6 +336,8 @@ export class StripePaymentProvider implements PaymentProvider {
 export class FakePaymentProvider implements PaymentProvider {
   readonly name = "FAKE" as const;
   private readonly intents = new Map<string, PaymentAuthorization>();
+  /** D82 9A — le Fake doit savoir QUAND une empreinte a été posée, sinon il ne peut pas mentir sur l'âge. */
+  private readonly createdAt = new Map<string, Date>();
   private seq = 0;
 
   async authorize(input: AuthorizeInput): Promise<PaymentAuthorization> {
@@ -307,6 +353,7 @@ export class FakePaymentProvider implements PaymentProvider {
       chargeId: null,
     };
     this.intents.set(intentId, auth);
+    this.createdAt.set(intentId, new Date());
     return auth;
   }
 
@@ -440,6 +487,23 @@ export class FakePaymentProvider implements PaymentProvider {
     };
   }
 
+  /** D82 9A — même lecture que Stripe : les empreintes POSÉES et plus vieilles que la borne. */
+  async listAuthorizedHolds(input: { createdBefore: Date; limit?: number }): Promise<AuthorizedHold[]> {
+    const out: AuthorizedHold[] = [];
+    for (const [intentId, a] of this.intents) {
+      if (a.status !== "AUTHORIZED") continue;
+      const created = this.createdAt.get(intentId);
+      if (!created || created.getTime() > input.createdBefore.getTime()) continue;
+      out.push({ intentId, amountCents: a.amountCents, currencyCode: a.currencyCode, createdAt: created, metadata: { ...a.metadata } });
+    }
+    return out.slice(0, Math.max(input.limit ?? out.length, 0));
+  }
+
+  /** aide aux tests : vieillir une empreinte (la chasse aux orphelines a besoin d'un passé) */
+  _setCreatedAtForTest(intentId: string, createdAt: Date) {
+    this.createdAt.set(intentId, createdAt);
+  }
+
   /** aide aux tests : forcer un état (ex. simuler une autorisation non confirmée) */
   _setStatusForTest(intentId: string, status: PaymentAuthorizationStatus) {
     this.setStatus(intentId, status);
@@ -494,6 +558,7 @@ export function constructStripeWebhookEvent(
     payouts_enabled?: boolean;
     details_submitted?: boolean;
     failure_message?: string | null;
+    last_payment_error?: { message?: string | null } | null;
   };
   return {
     id: event.id,
@@ -510,7 +575,15 @@ export function constructStripeWebhookEvent(
             detailsSubmitted: object.details_submitted ?? false,
           }
         : null,
-    failureMessage: object?.object === "payout" ? (object.failure_message ?? null) : null,
+    // D82 8A — `payment_intent.payment_failed` porte son motif dans `last_payment_error` :
+    // utile aux journaux et à l'exploitation, JAMAIS servi au client tel quel (il peut nommer
+    // la banque, le moyen, l'adresse).
+    failureMessage:
+      object?.object === "payout"
+        ? (object.failure_message ?? null)
+        : object?.object === "payment_intent"
+          ? (object.last_payment_error?.message ?? null)
+          : null,
   };
 }
 
