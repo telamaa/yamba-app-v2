@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Lightbulb } from "lucide-react";
+import { ChevronDown, Lightbulb, Minus, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
-import { MAX_PHOTOS, isPerKgTrip, parseWeight } from "../booking.config";
+import { MAX_PARCEL_KG, MAX_PHOTOS, isPerKgTrip, parseWeight } from "../booking.config";
 import { quoteShipperPrice } from "@packages/pricing";
 import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
 import { toast } from "sonner";
@@ -33,8 +33,6 @@ import {
   type ValidationErrors,
 } from "../booking.types";
 
-/** Les poids d'un envoi réel — les mêmes que l'app mobile. */
-const WEIGHT_SHORTCUTS = [1, 2, 5, 10] as const;
 
 function ChoiceChip({
   active,
@@ -228,6 +226,56 @@ export default function StepParcel({
       ? t("step1.size.hintFlat")
       : t("step1.size.hint");
 
+  /**
+   * Le devis du choix COURANT — pour deux choses que seul lui connaît : la place
+   * réellement réservée (D81/CAP-01) et la RAISON du poids facturé. Les écarts
+   * par taille ci-dessus comparent trois devis ; celui-ci décrit le devis réel.
+   */
+  const currentQuote = useMemo(() => {
+    const weight = parseWeight(draft.weightKg);
+    if (!perKg || draft.product !== "PARCEL" || !weight || !draft.sizeClass) return null;
+    try {
+      return quoteShipperPrice(
+        {
+          product: "PARCEL",
+          pricePerKgCents: trip.pricePerKgCents,
+          weightKg: weight,
+          sizeClass: draft.sizeClass,
+          familySurchargePct: draft.family ? (trip.familyStances?.[draft.family]?.surchargePct ?? 0) : 0,
+          protection: draft.insurance,
+        },
+        pricingParams
+      );
+    } catch {
+      return null;
+    }
+  }, [perKg, draft.product, draft.weightKg, draft.sizeClass, draft.family, draft.insurance, trip.familyStances, trip.pricePerKgCents, pricingParams]);
+
+  /** La place RÉSERVÉE : le poids facturé, pas le poids déclaré (D81). */
+  const capacityUsedKg = currentQuote?.capacityKgConsumed ?? parseWeight(draft.weightKg) ?? 0;
+  const capacityTight =
+    typeof trip.remainingKg === "number" && capacityUsedKg > trip.remainingKg * 0.8;
+
+  /** Pourquoi le poids facturé diffère du poids saisi — `billableReason`, affiché enfin. */
+  const billedNote = (() => {
+    if (!currentQuote?.billableReason || currentQuote.billableReason === "ACTUAL") return null;
+    if (currentQuote.billableWeightKg === null) return null;
+    return currentQuote.billableReason === "SIZE_MIN"
+      ? t("step1.parcelCard.billedSizeMin", { kg: currentQuote.billableWeightKg, size: currentQuote.sizeClass ?? "" })
+      : t("step1.parcelCard.billedFloor", { kg: currentQuote.billableWeightKg });
+  })();
+
+  /** Le pas : fin là où vivent les colis réels, large au-dessus. */
+  const adjustWeight = (direction: 1 | -1) => {
+    const current = parseWeight(draft.weightKg) ?? 0;
+    const step = current < 5 ? 0.5 : 1;
+    // `0.1 + 0.2` ne vaut pas `0.3` : on arrondit au dixième, sinon l'écran
+    // affiche « 2.9000000000000004 ».
+    const next = Math.round((current + direction * step) * 10) / 10;
+    const ceiling = Math.min(MAX_PARCEL_KG, trip.remainingKg ?? MAX_PARCEL_KG);
+    setDraftAction((prev) => ({ ...prev, weightKg: String(Math.min(ceiling, Math.max(0.1, next))) }));
+  };
+
   // ── Les blocs de la page, nommés — l'ordre se lit d'un coup d'œil tout en bas ──
 
   const familyChip = (f: ParcelFamily, refused: boolean) => {
@@ -323,7 +371,196 @@ export default function StepParcel({
     </FormField>
   );
 
-  const weightValueBlock = (
+  /**
+   * LA CARTE DU COLIS — poids ET taille dans un seul objet, parce que c'est une
+   * seule décision : depuis D81, `poidsFacturé = max(poidsRéel, plancher,
+   * minimumDeLaTaille)`. Les séparer en deux champs laissait croire qu'ils
+   * étaient indépendants, et le prix sautait sans raison lisible.
+   * L'ordre poids → taille suit A214 : sans poids, aucune taille n'a d'écart à
+   * annoncer.
+   */
+  const parcelCardBlock = (
+    // Pleine largeur et `SectionTitle`, comme « Protection du colis » : deux
+    // blocs de même nature doivent avoir la même largeur et le même titre, sinon
+    // la page donne l'impression de deux mises en page cousues ensemble.
+    <div className="mb-4">
+      <SectionTitle>{t("step1.parcelCard.title")}</SectionTitle>
+
+      {/* Une carte à filets fins : chaque ligne est « libellé gras · ligne grise ·
+          contrôle à droite ». Pas de cadre dans un cadre — c'est le blanc qui
+          fait la structure. */}
+      <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
+        {/* LE POIDS — le libellé et sa contrainte à gauche, le pas à droite. La
+            contrainte se dit en MOTS et passe en mangue avant la limite : une
+            phrase survit à n'importe quel écran, une jauge non. */}
+        <div className="flex items-center gap-3 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">
+              {t("step1.parcelDetails.weightLabel")}
+            </div>
+            <div
+              className={`text-[12px] ${
+                capacityTight ? "font-medium text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {typeof trip.remainingKg === "number"
+                ? t("step1.parcelCard.capacityLeft", {
+                    kg: Math.max(0, Math.round((trip.remainingKg - capacityUsedKg) * 10) / 10),
+                  })
+                : t("step1.parcelCard.weightFree")}
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <StepperButton
+              direction="minus"
+              label={t("step1.parcelCard.decrease")}
+              disabled={(parseWeight(draft.weightKg) ?? 0) <= 0.1}
+              onClickAction={() => adjustWeight(-1)}
+            />
+            <div className="flex min-w-[56px] items-baseline justify-center gap-0.5">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={draft.weightKg}
+                onChange={(e) => setDraftAction((prev) => ({ ...prev, weightKg: e.target.value }))}
+                aria-label={t("step1.parcelDetails.weightLabel")}
+                className="w-10 border-0 bg-transparent p-0 text-center text-[17px] font-bold text-slate-900 outline-none dark:text-white"
+              />
+              <span className="text-[12px] text-slate-500 dark:text-slate-400">kg</span>
+            </div>
+            <StepperButton
+              direction="plus"
+              label={t("step1.parcelCard.increase")}
+              disabled={
+                typeof trip.remainingKg === "number" && (parseWeight(draft.weightKg) ?? 0) >= trip.remainingKg
+              }
+              onClickAction={() => adjustWeight(1)}
+            />
+          </div>
+        </div>
+
+        {/* LES TAILLES — des lignes pleine largeur, le choix par une pastille à
+            DROITE, la conséquence en ligne grise, et AUCUNE illustration
+            (révision du 21/10). Les silhouettes à l'échelle avaient un sens en
+            COLONNES, où trois rectangles adjacents se comparent d'un regard ;
+            empilées, elles sont séparées par soixante pixels de texte et l'œil
+            ne compare plus rien. « Une boîte à chaussures » dit déjà tout. */}
+        <div role="radiogroup" aria-label={t("step1.size.label")}>
+          {(["S", "M", "L"] as SizeClass[]).map((sz) => {
+            const active = draft.sizeClass === sz;
+            const delta = sizeDeltaCents?.[sz] ?? 0;
+            const detail =
+              sizeDeltaCents === null
+                ? null
+                : delta === 0
+                  ? t("step1.parcelCard.sizeIncluded")
+                  : t("step1.size.extra", { amount: formatEur(delta / 100, locale) });
+            return (
+              <button
+                key={sz}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
+                className="flex w-full items-center gap-3 border-t border-slate-100 py-4 text-left transition-opacity hover:opacity-80 dark:border-slate-800/70"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-slate-900 dark:text-white">
+                    {sz} · {t(`step1.size.${sz}`)}
+                  </span>
+                  {detail && (
+                    <span className="block text-[12px] text-slate-500 dark:text-slate-400">{detail}</span>
+                  )}
+                </span>
+                <span
+                  className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px]"
+                  style={{ borderColor: active ? "#FF9900" : "#94A3B8" }}
+                >
+                  {active && <span className="block h-2.5 w-2.5 rounded-full bg-[#FF9900]" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {errors.weightKg && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.weightKg}
+        </div>
+      )}
+      {errors.sizeClass && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.sizeClass}
+        </div>
+      )}
+
+      {/* D81 sous la carte, comme « Annulation gratuite » sous le récapitulatif
+          de la référence : la conséquence, en gris, au contact de la décision. */}
+      <div className="mt-2 text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
+        {billedNote ?? sizeHint}
+      </div>
+    </div>
+  );
+
+  /**
+   * LA VALEUR DU CONTENU — même grammaire que « Ton colis » et « Protection du
+   * colis » : un titre, une carte, une ligne « libellé gras · ligne grise ·
+   * contrôle à droite ». Une seule grammaire sur toute l'étape.
+   *
+   * Elle ne fait PAS le prix du transport : elle fixe le plafond
+   * d'indemnisation. Elle est donc posée juste avant la protection, qu'elle
+   * commande — et non à côté du poids, où elle laissait croire qu'elle entrait
+   * dans le calcul. L'explication passe en ligne grise plutôt qu'en infobulle :
+   * une phrase visible vaut mieux qu'une phrase à découvrir.
+   */
+  const valueBlock = (
+    <div className="mb-4">
+      {/* PAS de `SectionTitle` ici : il répéterait mot pour mot le libellé de la
+          ligne. La référence fait la même distinction — ses cartes de CHAMPS
+          (« Voyageurs · 1 adulte · Modifier ») n'ont pas de titre au-dessus,
+          seuls ses groupes d'OPTIONS en ont un. Une carte à une seule ligne se
+          suffit à elle-même. */}
+      <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
+        <div className="flex items-center gap-3 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">
+              {t("step1.parcelDetails.valueLabel")}
+            </div>
+            <div className="text-[12px] text-slate-500 dark:text-slate-400">
+              {t("step1.parcelDetails.valueHint")}
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-baseline gap-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={draft.declaredValueEur}
+              onChange={(e) => setDraftAction((prev) => ({ ...prev, declaredValueEur: e.target.value }))}
+              placeholder="150"
+              aria-label={t("step1.parcelDetails.valueLabel")}
+              className={`w-16 border-b bg-transparent pb-0.5 text-right text-[17px] font-bold outline-none ${
+                errors.declaredValueEur
+                  ? "border-[#FF9900] text-[#B45309] dark:text-[#FFB84D]"
+                  : "border-slate-200 text-slate-900 focus:border-slate-400 dark:border-slate-700 dark:text-white dark:focus:border-slate-500"
+              }`}
+            />
+            <span className="text-[13px] text-slate-500 dark:text-slate-400">€</span>
+          </div>
+        </div>
+      </div>
+      {errors.declaredValueEur && (
+        <div className="mt-1.5 text-[12px] font-medium" style={{ color: "#FF9900" }}>
+          {errors.declaredValueEur}
+        </div>
+      )}
+    </div>
+  );
+
+  /** Legacy PER_CATEGORY (déprécié) : un prix par catégorie, donc ni taille ni
+   *  écart à annoncer. Le poids y reste un simple champ — la carte du colis
+   *  n'aurait rien à y montrer. */
+  const legacyWeightValueBlock = (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5 sm:grid-cols-2 md:max-w-md">
       <FormFieldWithTooltip
         label={t("step1.parcelDetails.weightLabel")}
@@ -337,27 +574,10 @@ export default function StepParcel({
           inputMode="decimal"
           placeholder={locale === "fr" ? "2,5" : "2.5"}
         />
-        {/* On tape rarement « 2 » : on le choisit. Les poids réels d'un envoi,
-            filtrés par la place qui reste. */}
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {WEIGHT_SHORTCUTS.filter(
-            (kg) => typeof trip.remainingKg !== "number" || kg <= trip.remainingKg
-          ).map((kg) => (
-            <ChoiceChip
-              key={kg}
-              active={parseWeight(draft.weightKg) === kg}
-              onClickAction={() => setDraftAction((prev) => ({ ...prev, weightKg: String(kg) }))}
-            >
-              {t("step1.parcelDetails.weightShortcut", { kg })}
-            </ChoiceChip>
-          ))}
-        </div>
-        {typeof trip.remainingKg === "number" && (
-          <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            {t("step1.parcelDetails.remainingKg", { kg: trip.remainingKg })}
-          </div>
-        )}
       </FormFieldWithTooltip>
+      {/* Le legacy garde un champ simple : la carte pleine largeur de la valeur
+          n'a pas sa place dans une grille à deux colonnes, et ce moteur est
+          déprécié — on ne lui refait pas une mise en page. */}
       <FormFieldWithTooltip
         label={t("step1.parcelDetails.valueLabel")}
         tooltip={t("step1.parcelDetails.declaredValueTooltip")}
@@ -372,36 +592,6 @@ export default function StepParcel({
         />
       </FormFieldWithTooltip>
     </div>
-  );
-
-  /** PRC-03 — à l'œil, jamais de dimensions, et plus AUCUN rectangle : les mêmes
-   *  pastilles que la question juste au-dessus. Deux questions voisines répondues
-   *  de la même façon, c'est une chose de moins à comprendre (revue du 17/10).
-   *  Seule la taille qui coûte plus cher porte son prix. */
-  const sizeBlock = (
-    <FormField label={t("step1.size.label")} hint={sizeHint} error={errors.sizeClass}>
-      <div className="flex flex-wrap gap-2" role="radiogroup">
-        {(["S", "M", "L"] as SizeClass[]).map((sz) => {
-          const active = draft.sizeClass === sz;
-          const delta = sizeDeltaCents?.[sz] ?? 0;
-          return (
-            <ChoiceChip
-              key={sz}
-              active={active}
-              onClickAction={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
-            >
-              <span className="font-bold">{sz}</span>
-              <span className="ml-1.5 opacity-80">{t(`step1.size.${sz}`)}</span>
-              {!sizeIsFlat && delta > 0 && (
-                <span className="ml-1.5 font-bold text-[#B45309] dark:text-[#FFB84D]">
-                  {t("step1.size.extra", { amount: formatEur(delta / 100, locale) })}
-                </span>
-              )}
-            </ChoiceChip>
-          );
-        })}
-      </div>
-    </FormField>
   );
 
   /** Bagage entier : ni poids ni taille, seule la valeur du contenu reste à dire */
@@ -432,7 +622,7 @@ export default function StepParcel({
           hasError={Boolean(errors.category)}
         />
       </FormField>
-      {weightValueBlock}
+      {legacyWeightValueBlock}
     </>
   );
 
@@ -571,8 +761,7 @@ export default function StepParcel({
           {draft.product === "PARCEL" ? (
             <>
               {familyBlock}
-              {weightValueBlock}
-              {sizeBlock}
+              {parcelCardBlock}
             </>
           ) : (
             bagValueBlock
@@ -582,11 +771,42 @@ export default function StepParcel({
         legacyBlock
       )}
 
+      {draft.product === "PARCEL" && perKg ? valueBlock : null}
       {insuranceBlock}
       {descriptionBlock}
       {photosBlock}
       {goldenRulesBlock}
     </div>
+  );
+}
+
+/**
+ * Un bouton de pas : cercle BORDÉ et non plein, comme les références de recette
+ * du 21/10 — un cercle plein attire l'œil autant que le CTA, alors qu'il ne fait
+ * qu'ajuster. `disabled` plutôt que caché : un bouton qui disparaît déplace
+ * l'autre sous le doigt entre deux appuis.
+ */
+function StepperButton({
+  direction,
+  label,
+  disabled,
+  onClickAction,
+}: {
+  direction: "plus" | "minus";
+  label: string;
+  disabled: boolean;
+  onClickAction: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClickAction}
+      className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+    >
+      {direction === "plus" ? <Plus size={16} /> : <Minus size={16} />}
+    </button>
   );
 }
 

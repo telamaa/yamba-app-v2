@@ -31,7 +31,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Yamba joint tes photos au colis pour prouver son état au départ.",
+          "cameraPermission": "Yamba utilise l'appareil photo pour photographier ton colis avant l'envoi."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

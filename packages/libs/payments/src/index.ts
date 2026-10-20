@@ -517,14 +517,43 @@ export function constructStripeWebhookEvent(
 /* ══ Factory (env) ════════════════════════════════════════════ */
 
 /**
- * STRIPE_SECRET_KEY présent → Stripe. Absent → Fake, SAUF en production
- * (NODE_ENV=production) où l'on refuse de démarrer sans fournisseur réel.
+ * Quel fournisseur, et pourquoi — même forme que `resolveEmailProviderName`
+ * (D35/D44), pour que les deux chemins sensibles de la plateforme se pilotent
+ * de la même façon.
+ *
+ * `PAYMENT_PROVIDER` (stripe | fake) tranche EXPLICITEMENT ; sans lui, la
+ * présence de `STRIPE_SECRET_KEY` décide, comme avant. Le besoin est né du
+ * poste de développement : la clé secrète vit dans le `.env` RACINE, et
+ * `nx serve` l'impose à tout le monde — forcer le fournisseur Fake demandait
+ * jusqu'ici de lancer le bundle construit à la main. Un parcours de paiement
+ * qu'on ne peut essayer qu'en contournant l'outillage finit par n'être essayé
+ * par personne.
+ *
+ * Les deux garde-fous de D11/D30 ne bougent pas : le Fake est REFUSÉ en
+ * production, quelle que soit la façon dont il est demandé, et Stripe sans
+ * clé est une erreur de démarrage, pas un repli silencieux.
  */
-export function createPaymentProviderFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentProvider {
+export function resolvePaymentProviderName(env: NodeJS.ProcessEnv = process.env): PaymentProviderName {
+  const explicit = (env.PAYMENT_PROVIDER ?? "").trim().toUpperCase();
   const key = env.STRIPE_SECRET_KEY?.trim();
-  if (key) return new StripePaymentProvider(key);
-  if (env.NODE_ENV === "production") {
-    throw new Error("STRIPE_SECRET_KEY is required in production (no fake payment provider)");
+  const name: PaymentProviderName =
+    explicit === "STRIPE" || explicit === "FAKE" ? (explicit as PaymentProviderName) : key ? "STRIPE" : "FAKE";
+
+  if (name === "FAKE" && env.NODE_ENV === "production") {
+    throw new Error(
+      explicit === "FAKE"
+        ? "PAYMENT_PROVIDER=fake is refused in production (D11/D30)"
+        : "STRIPE_SECRET_KEY is required in production (no fake payment provider)"
+    );
   }
-  return new FakePaymentProvider();
+  if (name === "STRIPE" && !key) {
+    throw new Error("PAYMENT_PROVIDER=stripe requires STRIPE_SECRET_KEY");
+  }
+  return name;
+}
+
+export function createPaymentProviderFromEnv(env: NodeJS.ProcessEnv = process.env): PaymentProvider {
+  return resolvePaymentProviderName(env) === "STRIPE"
+    ? new StripePaymentProvider(env.STRIPE_SECRET_KEY!.trim())
+    : new FakePaymentProvider();
 }

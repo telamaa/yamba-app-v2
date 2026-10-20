@@ -176,7 +176,7 @@ function RecapCard({
             label={
               price.quote?.pricingModel === "PER_KG"
                 ? t("summary.transportDetail", {
-                    kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+                    kg: price.quote.billableWeightKg ?? 0,
                     rate: formatPrice((price.quote.pricePerKgCents ?? 0) / 100, locale),
                     size: price.quote.sizeClass ?? "",
                   }) + (price.quote.familySurchargePct > 0 ? ` · +${price.quote.familySurchargePct} %` : "")

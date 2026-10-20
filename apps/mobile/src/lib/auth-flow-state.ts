@@ -61,3 +61,31 @@ export const consumeLoginPrefill = (): LoginPrefill | null => {
   loginPrefill = null;
   return value;
 };
+
+/**
+ * Le trajet dont la RÉSERVATION attend une identité (A58, aligné sur le site).
+ *
+ * Le site ouvre « Connecte-toi pour réserver » au-dessus du trajet et revient
+ * DIRECTEMENT dans le wizard. En natif, la feuille d'auth se referme sur
+ * l'écran qui l'a ouverte : sans cette mémoire, le membre se reconnecte et
+ * doit retrouver son geste lui-même. Elle vit en mémoire de processus, comme
+ * tout ce fichier, et elle est bornée à l'écran qui l'a posée (il la nettoie
+ * en se démontant) — un retour de connexion trois écrans plus loin ne doit
+ * jamais pousser un tunnel que personne n'a demandé.
+ */
+let pendingBookingTripId: string | null = null;
+
+export const setPendingBooking = (tripId: string) => {
+  pendingBookingTripId = tripId;
+};
+
+/** Vrai UNE fois, et seulement pour le trajet qui avait posé l'attente. */
+export const takePendingBooking = (tripId: string): boolean => {
+  if (pendingBookingTripId !== tripId) return false;
+  pendingBookingTripId = null;
+  return true;
+};
+
+export const clearPendingBooking = (tripId: string) => {
+  if (pendingBookingTripId === tripId) pendingBookingTripId = null;
+};

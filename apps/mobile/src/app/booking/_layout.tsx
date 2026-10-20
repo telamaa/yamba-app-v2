@@ -1,9 +1,16 @@
 /**
  * booking/_layout.tsx — la pile du parcours de RÉSERVATION.
  * ==========================================================
- * Sept étapes, sept pages poussées : le colis, sa valeur et ses photos, les
- * lieux de rendez-vous, la garantie, le destinataire, l'engagement, le
- * paiement. Chacune glisse depuis la droite et se dépile au retour — le motif
+ * Sept écrans, sept pages poussées — dans l'ordre d'A217 : ① le colis (famille,
+ * poids, taille), ② la valeur du contenu puis la protection, ③ la description
+ * courte et les photos, ④ les lieux de rendez-vous, ⑤ le destinataire,
+ * ⑥ l'engagement, ⑦ le paiement.
+ *
+ * Pourquoi la VALEUR avant la PROTECTION : elle fixe le plafond
+ * d'indemnisation que la garantie utilise. Une décision à +6 € posée avant le
+ * montant qu'elle couvre se prend à l'aveugle. Et la protection reste avant les
+ * photos, parce que c'est elle qui les rend obligatoires (A214). C'est
+ * exactement l'ordre de l'étape 1 du site : le natif ne le contredit plus. Chacune glisse depuis la droite et se dépile au retour — le motif
  * natif des deux OS, celui du parcours de recherche (`search/`).
  *
  * La pile vit au niveau RACINE (déclarée dans `app/_layout.tsx`), par-dessus

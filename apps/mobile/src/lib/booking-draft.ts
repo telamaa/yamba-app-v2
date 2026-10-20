@@ -42,11 +42,22 @@ export type ParcelProduct = 'PARCEL' | 'CHECKED_BAG_23KG' | 'CABIN_BAG_12KG';
 /** D22 — niveau de protection. Le mot « assurance » ne s'affiche nulle part (ANO-WEB-33). */
 export type ProtectionTier = 'BASIC' | 'EXTENDED_500';
 
-/** Une photo déclarée : l'URI locale tant qu'elle n'est pas téléversée (lot photos). */
+/**
+ * Une photo déclarée : l'URI locale tant qu'elle n'est pas téléversée (A45).
+ *
+ * Le type MIME, le nom et la taille viennent du sélecteur et sont gardés tels
+ * quels — `expo-image-picker` ne les garantit pas tous. Les DÉDUIRE plus tard
+ * de l'extension marche la plupart du temps ; les mémoriser quand ils existent
+ * évite de refuser une photo valable (ou d'en envoyer une trop lourde) au pire
+ * moment, juste avant l'autorisation bancaire.
+ */
 export type BookingPhoto = {
   id: string;
   uri: string;
   context: 'DECLARED_CONTENT' | 'DECLARED_PACKAGED' | 'CUSTOM';
+  mimeType: string | null;
+  fileName: string | null;
+  sizeBytes: number | null;
 };
 
 export type BookingRecipient = {
@@ -54,6 +65,8 @@ export type BookingRecipient = {
   lastName: string;
   phonePrefix: string;
   phoneNational: string;
+  /** Facultatif — il ne sert qu'à prévenir le destinataire de l'arrivée du colis. */
+  email: string;
 };
 
 export type BookingDraft = {
@@ -90,7 +103,7 @@ const EMPTY: BookingDraft = {
   protection: 'BASIC',
   pickupIndex: null,
   deliveryIndex: null,
-  recipient: { firstName: '', lastName: '', phonePrefix: '+33', phoneNational: '' },
+  recipient: { firstName: '', lastName: '', phonePrefix: '+33', phoneNational: '', email: '' },
   charterAccepted: false,
   termsAccepted: false,
 };
@@ -131,11 +144,20 @@ export function clearBookingDraft(): void {
  *   • la première famille ACCEPTÉE par le Voyageur (jamais une refusée) ;
  *   • un seul lieu proposé ⇒ il est choisi d'office (rien à décider).
  */
-export function startBookingDraft(trip: PublicTrip): void {
+/**
+ * @param offeredProduct le premier produit REELLEMENT proposé par ce trajet.
+ *   `EMPTY` part sur `PARCEL`, mais un trajet sans prix au kilo ne le propose
+ *   pas — et le sélecteur de produit est masqué quand il n'y a qu'une option.
+ *   Le brouillon restait alors sur un produit inexistant, et le devis échouait
+ *   en « Prix indisponible » sans que rien ne l'explique. Le produit se dérive
+ *   donc du trajet, exactement comme la famille et les lieux.
+ */
+export function startBookingDraft(trip: PublicTrip, offeredProduct?: ParcelProduct): void {
   if (draft.tripId === trip.id) return;
   draft = {
     ...EMPTY,
     tripId: trip.id,
+    product: offeredProduct ?? EMPTY.product,
     family: firstAcceptedFamily(trip),
     pickupIndex: trip.pickupLocations.length === 1 ? 0 : null,
     deliveryIndex: trip.deliveryLocations.length === 1 ? 0 : null,

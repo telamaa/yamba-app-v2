@@ -5,7 +5,9 @@
     "allIn": "all in",
     "quoteError": {
       "MISSING_WEIGHT": "Enter a weight to see the price",
-      "GENERIC": "No price for this choice"
+      "GENERIC": "No price for this choice",
+      "MISSING_PRICE_PER_KG": "This trip does not offer per-kilo shipping",
+      "BAG_NOT_OFFERED": "This bag is not offered on this trip"
     }
   },
   "unavailable": {
@@ -39,7 +41,6 @@
       "MISC_ACCESSORIES": "Misc accessories"
     },
     "surcharge": "+{pct}%",
-    "sizeTitle": "Size: no need to measure",
     "sizes": {
       "S": "S",
       "M": "M",
@@ -50,26 +51,34 @@
       "M": "a backpack",
       "L": "half a suitcase"
     },
-    "weightTitle": "Weight (kg)",
-    "weightHint": "The Traveler will check it at handover — a 10% difference is tolerated.",
     "weightUnit": "kg",
-    "weightShortcut": "{kg} kg",
-    "remaining": "{kg} kg still available on this trip",
-    "nextStepSoon": "Next step: protecting your parcel.",
     "errors": {
       "FAMILY_REFUSED": "The Traveler does not take this content.",
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
-      "NOT_ENOUGH_CAPACITY": "Not enough room left for this bag ({kg} kg available).",
+      "NOT_ENOUGH_CAPACITY": "Not enough room left for this bag ({kg, number} kg available).",
       "WEIGHT_REQUIRED": "Enter the parcel weight.",
-      "WEIGHT_MAX": "{max} kg max per parcel.",
-      "WEIGHT_REMAINING": "Only {kg} kg left on this trip."
+      "WEIGHT_MAX": "{max, number} kg max per parcel.",
+      "WEIGHT_REMAINING": "Only {kg, number} kg left on this trip."
     },
     "sizeHint": "It tells the Traveler whether your parcel fits in their bag. Only the one that costs more is marked.",
     "sizeHintPending": "It tells the Traveler whether your parcel fits in their bag. Enter the weight to see what it costs.",
-    "sizeHintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
+    "sizeHintFlat": "At this weight, size does not change the price: your parcel already weighs more than every minimum.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# category refused} other {# categories refused}} by {name}",
-    "subtitle": "The more precise you are, the fewer surprises at handover."
+    "subtitle": "The more precise you are, the fewer surprises at handover.",
+    "weightDecrease": "Decrease weight",
+    "weightIncrease": "Increase weight",
+    "weightEdit": "Enter weight",
+    "capacityLeft": "{kg, number} kg left on this trip",
+    "billed": {
+      "FLOOR": "Billed at {kg, number} kg, this trip's minimum.",
+      "SIZE_MIN": "Billed at {kg, number} kg, the space a {size} parcel takes."
+    },
+    "cardTitle": "Your parcel",
+    "weightLabel": "Weight",
+    "weightFree": "No limit stated on this trip",
+    "sizeIncluded": "No extra charge",
+    "sizeHintNoPrice": "It tells the Traveler whether your parcel fits in their bag."
   },
   "phases": {
     "parcel": "Parcel",
@@ -77,5 +86,191 @@
     "commitment": "Commitment",
     "payment": "Payment"
   },
-  "phaseProgress": "{phase}, step {current} of {total}"
+  "phaseProgress": "{phase}, step {current} of {total}",
+  "places": {
+    "title": "The meeting point",
+    "subtitle": "The spots {name} offers. Pick the one that suits you, for the handover then the pickup.",
+    "pickupTitle": "You hand the parcel to {name}",
+    "deliveryTitle": "The recipient picks the parcel up",
+    "errorPickup": "Choose the handover spot.",
+    "errorDelivery": "Choose the pickup spot.",
+    "emptyPickup": "{name} did not state a spot. You will agree on the meeting point by message.",
+    "emptyDelivery": "No spot stated. The pickup point will be agreed by message."
+  },
+  "recipient": {
+    "title": "The recipient",
+    "subtitle": "The person picking the parcel up. They do not need a Yamba account.",
+    "phone": "Phone",
+    "phonePrefix": "Country code",
+    "close": "Close",
+    "phoneHint": "The delivery code will be sent to them by SMS or WhatsApp. Pick their country code.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "email": "Email (optional)",
+    "emailHint": "To let them know the parcel has arrived.",
+    "errors": {
+      "PHONE_REQUIRED": "Enter the recipient's number.",
+      "PHONE_INVALID": "This number does not look valid. Check the country code and digits.",
+      "FIRST_NAME_REQUIRED": "Enter their first name.",
+      "LAST_NAME_REQUIRED": "Enter their last name.",
+      "EMAIL_INVALID": "This email does not look valid."
+    },
+    "deliveryFlow": {
+      "title": "How delivery will work",
+      "codeGiven": "A 6-digit code will be given to you after payment.",
+      "shareIt": "You pass it to the recipient by SMS, WhatsApp or in person.",
+      "handToTraveler": "They give it to the Traveler on delivery. Without this code, the parcel cannot be handed over."
+    }
+  },
+  "protection": {
+    "title": "Protection",
+    "subtitle": "State what the contents are worth, then choose your cover.",
+    "valueLabel": "Content value",
+    "valueHint": "Sets the compensation cap.",
+    "cardTitle": "Parcel protection",
+    "basic": {
+      "title": "Basic protection",
+      "price": "Included",
+      "description": "Your money is held until delivery, parcel not handed over refunded."
+    },
+    "extended": {
+      "title": "Yamba Guarantee {cap}",
+      "price": "+{amount}",
+      "description": "Loss, theft or damage in transit, refunded up to {cap}.",
+      "exclusionsTitle": "What is not covered",
+      "exclusionsText": "Prohibited goods, a parcel that does not match its description, customs seizure, and normal wear."
+    },
+    "errors": {
+      "VALUE_REQUIRED": "Enter the content value."
+    }
+  },
+  "content": {
+    "title": "The contents",
+    "subtitle": "Describe what you are sending, and show it.",
+    "descriptionLabel": "Short description",
+    "descriptionPlaceholder": "E.g. 3 t-shirts, 1 jumper, chocolate",
+    "descriptionHint": "It helps the Traveler recognise the parcel at handover.",
+    "photosLabel": "Parcel photos",
+    "photosRequired": "(required with the Guarantee)",
+    "photosHint": "One photo of the unpacked contents, one of the wrapped parcel. Up to {max, number}.",
+    "addPhoto": "Add a photo",
+    "removePhoto": "Remove this photo",
+    "permissionTitle": "Photo access denied",
+    "permissionBody": "Yamba needs access to your photos to attach them to the parcel. You can allow it in settings.",
+    "errors": {
+      "DESCRIPTION_TOO_SHORT": "Briefly describe the contents (5 characters minimum).",
+      "PHOTOS_REQUIRED_WITH_GUARANTEE": "At least one photo is required with the Yamba Guarantee."
+    },
+    "goldenRules": {
+      "title": "The golden rules for a smooth shipment",
+      "pack": "Pack carefully: a sturdy bag or box, bubble wrap for fragile items, taped properly.",
+      "weigh": "Weigh precisely: the declared weight must match the real weight at handover.",
+      "describe": "Describe faithfully: {name} will check the contents before accepting your parcel.",
+      "prohibited": "No prohibited goods."
+    },
+    "fromCamera": "Take a photo",
+    "fromLibrary": "Choose from my photos",
+    "cancel": "Cancel",
+    "cameraDeniedTitle": "Camera access denied",
+    "cameraDeniedBody": "Yamba needs the camera to photograph your parcel. You can allow it in settings."
+  },
+  "charter": {
+    "title": "Your commitment",
+    "subtitle": "You certify the contents of the parcel on your honour.",
+    "cta": "Go to payment",
+    "handover": {
+      "title": "At handover, here is what will happen",
+      "visualInspectionLead": "Visual check is mandatory.",
+      "visualInspection": "The Traveler will inspect your parcel before accepting. Do not be surprised.",
+      "refusalPossibleLead": "Refusal is possible if it does not match.",
+      "refusalPossible": "If the contents differ from your declaration, the Traveler may refuse. You will be refunded, but the trip will be lost.",
+      "crossPhotosLead": "Cross photos.",
+      "crossPhotos": "The Traveler will take their own photos, which will prevail in a dispute."
+    },
+    "pledge": {
+      "title": "Shipper Charter",
+      "subtitle": "A legal commitment, read it carefully.",
+      "intro": "By confirming your booking, you declare and warrant on your honour that your parcel:",
+      "noIllicit": "contains no illicit, dangerous or prohibited goods,",
+      "matchDeclared": "matches exactly the category, weight and contents declared,",
+      "customsCompliant": "complies with the customs obligations of the destination country.",
+      "disclaimer": "Any false declaration engages your sole civil and criminal liability, excluding that of the Traveler and Yamba.",
+      "fullLink": "See the full charter and prohibited goods",
+      "fullUrl": "https://yamba.app/en/legal/shipper-charter"
+    },
+    "accept": {
+      "label": "I accept the Shipper Charter, the Terms and the Transport Contract.",
+      "error": "You must accept the charter to continue."
+    }
+  },
+  "payment": {
+    "title": "Payment",
+    "subtitle": "The amount is authorised now, and only charged when the Traveler accepts.",
+    "cta": "Pay {amount}",
+    "ctaBusy": "Sending…",
+    "summaryTitle": "What you pay",
+    "transport": "Transport",
+    "transportDetail": "{kg, number} kg billed",
+    "service": "Yamba service fee",
+    "protection": "Yamba Guarantee",
+    "total": "Total",
+    "hold": "Nothing is charged now. The Traveler has 24 hours to accept: that is when you pay.",
+    "methodTitle": "Payment method",
+    "preparing": "Preparing payment…",
+    "retry": "Try again",
+    "testMode": "Test mode: no payment provider is configured on this machine. The {amount} authorisation is simulated.",
+    "card": "Bank card",
+    "cardPending": "The payment sheet opens when you tap Pay.",
+    "cardAuthorized": "Card authorised. Your request still has to be sent.",
+    "unavailableTitle": "Card payment is not available in this version",
+    "unavailableBody": "It cannot open the payment sheet. Your entries are kept: come back once the app is up to date.",
+    "afterTitle": "After your payment",
+    "after": {
+      "step1": "The Traveler receives your request and has 24 hours to accept. You are only charged then.",
+      "step2": "Meet the Traveler for the handover, which they will check and photograph.",
+      "step3": "Once the parcel is handed over, you receive your 6-digit code to pass on to the recipient.",
+      "step4": "The recipient gives the code to the Traveler on arrival, who enters it to confirm delivery.",
+      "step5": "3 days after the confirmed delivery, the Traveler receives their payment."
+    },
+    "trust": "Payment secured by Stripe. Yamba never stores your card details.",
+    "notReady": "Payment is being prepared, one moment.",
+    "errors": {
+      "CANCELED": "Payment abandoned. Nothing was charged.",
+      "SHEET_FAILED": "The payment could not be authorised. Check your card and try again.",
+      "UPLOAD_FAILED": "A photo could not be sent. Check your connection and try again. Nothing was charged.",
+      "UPLOAD_TOO_LARGE": "A photo is over {maxMb} MB. Remove it or take it again. Nothing was charged.",
+      "UPLOAD_INVALID_TYPE": "A photo is in an unsupported format. Nothing was charged.",
+      "QUOTE_DIVERGENCE": "The price changed since your quote. The new total is shown: check it before paying.",
+      "QUOTE_UNAVAILABLE": "The quote cannot be computed for this parcel. Go back to the weight and size.",
+      "CAPACITY_EXCEEDED": "There is no longer enough room on this trip for your parcel.",
+      "FAMILY_REFUSED": "The Traveler does not accept this content on this trip.",
+      "TRIP_NOT_BOOKABLE": "This trip no longer accepts requests.",
+      "OWN_TRIP": "You cannot book your own trip.",
+      "NEW_ACCOUNT_CAP": "Your account is new: your shipments are still capped. The cap lifts with your first completed shipments.",
+      "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorised yet. Try again.",
+      "PAYMENT_MISMATCH": "The authorisation no longer matches your request. A new one is being prepared.",
+      "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",
+      "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
+      "SESSION": "Your session has expired. Sign in again: your entries are kept.",
+      "ACCOUNT_SUSPENDED": "Your account is suspended. Contact support to find out more.",
+      "GENERIC": "Something went wrong. Nothing was charged, you can try again."
+    },
+    "signIn": "Sign in"
+  },
+  "confirmation": {
+    "title": "Request sent",
+    "subtitle": "{name} has 24 hours to accept. You are only charged then.",
+    "deadline": "Answer expected before",
+    "amount": "Authorised amount",
+    "reference": "Reference",
+    "nextTitle": "What happens next",
+    "next": {
+      "step1": "If they accept, you are charged and the handover meeting is confirmed.",
+      "step2": "At the handover, they check and photograph the parcel. You receive your 6-digit code.",
+      "step3": "The recipient gives that code on arrival: it is what confirms the delivery."
+    },
+    "refused": "If they refuse or do not answer within 24 hours, the authorisation lapses on its own and you have paid nothing.",
+    "cta": "See my shipments",
+    "secondary": "Explore other trips"
+  }
 }

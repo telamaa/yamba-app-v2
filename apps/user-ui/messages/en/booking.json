@@ -26,16 +26,16 @@
       "linkProhibited": "See the full list"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Weight (kg)",
-      "valueLabel": "Content value (€)",
+      "weightLabel": "Weight",
+      "valueLabel": "Content value",
       "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
       "descriptionLabel": "Short description",
       "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
       "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
-      "remainingKg": "{kg} kg still available on this trip"
+      "remainingKg": "{kg, number} kg still available on this trip",
+      "valueHint": "Sets the compensation cap in case of a dispute."
     },
     "photos": {
       "label": "Parcel photos",
@@ -69,7 +69,17 @@
       "hintFlat": "At this weight, size does not change the price — your parcel already weighs more than every minimum. It tells the Traveler whether your parcel fits in their bag.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Required"
+    "requiredBadge": "Required",
+    "parcelCard": {
+      "title": "Your parcel",
+      "decrease": "Decrease weight",
+      "increase": "Increase weight",
+      "capacityLeft": "{kg, number} kg left on this trip",
+      "billedFloor": "Billed at {kg, number} kg, this trip's minimum.",
+      "billedSizeMin": "Billed at {kg, number} kg, the space a {size} parcel takes.",
+      "weightFree": "No limit stated on this trip",
+      "sizeIncluded": "No extra charge"
+    }
   },
   "insurance": {
     "title": "Parcel protection",
@@ -117,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optional)",
       "emailHint": "To notify the recipient when the parcel arrives",
-      "phonePrefix": "Country code"
+      "phonePrefix": "Country code",
+      "sectionTitle": "The recipient"
     }
   },
   "step3": {
@@ -125,25 +136,25 @@
     "subtitle": "You certify on your honor the content of the parcel",
     "handoverFlow": {
       "title": "What will happen when you hand over the parcel",
-      "visualInspection": "**Mandatory visual inspection.** The Traveler will examine your parcel before accepting — don''t be surprised.",
-      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the Traveler can refuse. You''ll be refunded but the trip is lost.",
-      "crossPhotos": "**Cross-referenced photos.** The Traveler will take their own photos as evidence in case of dispute."
+      "visualInspection": "**Mandatory visual inspection.** The Traveler will examine your parcel before accepting. Don''t be surprised.",
+      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the Traveler can refuse. You''ll be refunded, but the trip is lost.",
+      "crossPhotos": "**Cross-referenced photos.** The Traveler will take their own photos, which prevail in case of dispute."
     },
     "charter": {
       "title": "Shipper Charter",
-      "subtitle": "Legal commitment — read carefully",
-      "intro": "By confirming this deal, I declare and guarantee on my honor that my parcel:",
+      "subtitle": "Legal commitment, read carefully.",
+      "intro": "By confirming your booking, you declare and guarantee on your honor that your parcel:",
       "noIllicit": "contains **no illicit**, dangerous or prohibited products",
       "matchDeclared": "matches exactly the **declared category, weight and content**",
       "customsCompliant": "complies with the **customs regulations** of the destination country",
-      "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the Traveler and Yamba.",
+      "disclaimer": "Any false declaration engages your sole civil and criminal liability, to the exclusion of the Traveler and Yamba.",
       "fullLink": "See the full charter and prohibited items"
     },
     "accept": {
-      "title": "I accept the Shipper Charter",
+      "title": "I accept the Shipper Charter, the Terms and the Transport Contract.",
       "cgvLabel": "Terms",
       "contractLabel": "Transport Contract",
-      "descPrefix": "I have also read and accept the ",
+      "descPrefix": "Read the ",
       "descJoin": " and the ",
       "descSuffix": "."
     }
@@ -219,8 +230,8 @@
       "BUS": "{hours}h by bus"
     },
     "durationNeutral": "{hours}h travel",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg · {rate}/kg · size {size}",
+    "deals": "{count, plural, =1 {# parcel carried} other {# parcels carried}}",
+    "transportDetail": "Transport · {kg, number} kg · {rate}/kg · size {size}",
     "newTripper": "New Traveler",
     "quoteHint": {
       "MISSING_WEIGHT": "Enter the parcel weight to see the price.",
@@ -229,8 +240,8 @@
       "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
       "UNKNOWN": "Price unavailable."
     },
-    "billableFloor": "Billed at the trip minimum: {kg} kg.",
-    "billableSizeMin": "Size {size}: billed at a {kg} kg minimum — that's the space it takes."
+    "billableFloor": "Billed at the trip minimum: {kg, number} kg.",
+    "billableSizeMin": "Size {size}: billed at {kg, number} kg minimum, the space it takes."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

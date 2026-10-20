@@ -26,16 +26,16 @@
       "linkProhibited": "Voir la liste complète"
     },
     "parcelDetails": {
-      "weightShortcut": "{kg} kg",
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
-      "weightLabel": "Poids (kg)",
-      "valueLabel": "Valeur du contenu (€)",
+      "weightLabel": "Poids",
+      "valueLabel": "Valeur du contenu",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
       "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
       "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
-      "remainingKg": "{kg} kg encore disponibles sur ce trajet"
+      "remainingKg": "{kg, number} kg encore disponibles sur ce trajet",
+      "valueHint": "Fixe le plafond de l'indemnisation en cas de litige."
     },
     "photos": {
       "label": "Photos du colis",
@@ -69,7 +69,17 @@
       "hintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
       "extra": "+{amount}"
     },
-    "requiredBadge": "Obligatoire"
+    "requiredBadge": "Obligatoire",
+    "parcelCard": {
+      "title": "Ton colis",
+      "decrease": "Diminuer le poids",
+      "increase": "Augmenter le poids",
+      "capacityLeft": "{kg, number} kg restants sur ce trajet",
+      "billedFloor": "Facturé {kg, number} kg, le minimum de ce trajet.",
+      "billedSizeMin": "Facturé {kg, number} kg, la place que prend un colis {size}.",
+      "weightFree": "Aucune limite annoncée sur ce trajet",
+      "sizeIncluded": "Sans supplément"
+    }
   },
   "insurance": {
     "title": "Protection du colis",
@@ -117,7 +127,8 @@
       "email": "Email",
       "emailOptional": "(optionnel)",
       "emailHint": "Pour notifier le destinataire de l''arrivée du colis",
-      "phonePrefix": "Indicatif pays"
+      "phonePrefix": "Indicatif pays",
+      "sectionTitle": "Le destinataire"
     }
   },
   "step3": {
@@ -125,25 +136,25 @@
     "subtitle": "Tu certifies sur l''honneur le contenu du colis",
     "handoverFlow": {
       "title": "À la remise du colis, voici ce qui se passera",
-      "visualInspection": "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
-      "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
-      "crossPhotos": "**Photos croisées.** Le Voyageur prendra ses propres photos qui feront foi en cas de litige."
+      "visualInspection": "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d''accepter. Ne sois pas surpris.",
+      "refusalPossible": "**Refus possible si non conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé, mais le trajet sera perdu.",
+      "crossPhotos": "**Photos croisées.** Le Voyageur prendra ses propres photos, qui feront foi en cas de litige."
     },
     "charter": {
       "title": "Charte Expéditeur",
-      "subtitle": "Engagement juridique — à lire attentivement",
-      "intro": "En validant ce deal, je déclare et garantis sur l''honneur que mon colis :",
+      "subtitle": "Engagement juridique, à lire attentivement.",
+      "intro": "En validant ta réservation, tu déclares et garantis sur l''honneur que ton colis :",
       "noIllicit": "ne contient **aucun produit illicite**, dangereux ou interdit",
       "matchDeclared": "correspond exactement à la **catégorie, au poids et au contenu déclarés**",
       "customsCompliant": "respecte les **obligations douanières** du pays de destination",
-      "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du Voyageur et de Yamba.",
+      "disclaimer": "Toute déclaration mensongère engage ta seule responsabilité civile et pénale, à l''exclusion de celle du Voyageur et de Yamba.",
       "fullLink": "Voir la charte complète et les produits interdits"
     },
     "accept": {
-      "title": "J''accepte la Charte Expéditeur",
+      "title": "J''accepte la Charte Expéditeur, les CGV et le Contrat de transport.",
       "cgvLabel": "CGV",
       "contractLabel": "Contrat de transport",
-      "descPrefix": "J''ai lu et j''accepte également les ",
+      "descPrefix": "Lire les ",
       "descJoin": " et le ",
       "descSuffix": "."
     }
@@ -219,8 +230,8 @@
       "BUS": "{hours} h de bus"
     },
     "durationNeutral": "{hours} h de trajet",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}",
-    "transportDetail": "Transport · {kg} kg · {rate}/kg · taille {size}",
+    "deals": "{count, plural, =1 {# colis transporté} other {# colis transportés}}",
+    "transportDetail": "Transport · {kg, number} kg · {rate}/kg · taille {size}",
     "newTripper": "Nouveau Voyageur",
     "quoteHint": {
       "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
@@ -229,8 +240,8 @@
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
       "UNKNOWN": "Prix indisponible."
     },
-    "billableFloor": "Facturé au minimum du trajet : {kg} kg.",
-    "billableSizeMin": "Taille {size} : facturée {kg} kg minimum — c'est la place qu'elle prend."
+    "billableFloor": "Facturé au minimum du trajet : {kg, number} kg.",
+    "billableSizeMin": "Taille {size} : facturée {kg, number} kg minimum, la place qu’elle prend."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

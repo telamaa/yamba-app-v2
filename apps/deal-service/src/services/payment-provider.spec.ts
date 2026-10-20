@@ -62,6 +62,27 @@ describe("createPaymentProviderFromEnv", () => {
   it("avec clé → STRIPE", () => {
     expect(createPaymentProviderFromEnv({ STRIPE_SECRET_KEY: "sk_test_x" } as NodeJS.ProcessEnv).name).toBe("STRIPE");
   });
+  it("PAYMENT_PROVIDER=fake l'emporte sur une clé présente (poste de développement)", () => {
+    const env = { NODE_ENV: "development", PAYMENT_PROVIDER: "fake", STRIPE_SECRET_KEY: "sk_test_x" } as NodeJS.ProcessEnv;
+    expect(createPaymentProviderFromEnv(env).name).toBe("FAKE");
+  });
+  it("PAYMENT_PROVIDER est insensible à la casse et aux espaces", () => {
+    const env = { NODE_ENV: "development", PAYMENT_PROVIDER: " Fake ", STRIPE_SECRET_KEY: "sk_test_x" } as NodeJS.ProcessEnv;
+    expect(createPaymentProviderFromEnv(env).name).toBe("FAKE");
+  });
+  it("PAYMENT_PROVIDER=fake reste REFUSÉ en production, même avec une clé", () => {
+    const env = { NODE_ENV: "production", PAYMENT_PROVIDER: "fake", STRIPE_SECRET_KEY: "sk_live_x" } as NodeJS.ProcessEnv;
+    expect(() => createPaymentProviderFromEnv(env)).toThrow(/refused in production/);
+  });
+  it("PAYMENT_PROVIDER=stripe sans clé est une erreur de démarrage, pas un repli silencieux", () => {
+    const env = { NODE_ENV: "development", PAYMENT_PROVIDER: "stripe" } as NodeJS.ProcessEnv;
+    expect(() => createPaymentProviderFromEnv(env)).toThrow(/requires STRIPE_SECRET_KEY/);
+  });
+  it("une valeur inconnue ne décide de rien : la clé tranche comme avant", () => {
+    const env = { NODE_ENV: "development", PAYMENT_PROVIDER: "paypal", STRIPE_SECRET_KEY: "sk_test_x" } as NodeJS.ProcessEnv;
+    expect(createPaymentProviderFromEnv(env).name).toBe("STRIPE");
+    expect(createPaymentProviderFromEnv({ NODE_ENV: "development", PAYMENT_PROVIDER: "paypal" } as NodeJS.ProcessEnv).name).toBe("FAKE");
+  });
   it("C-PR5 (D58) : inspect reflète capture, remboursements et transfert (renversement simulable), lecture seule", async () => {
     const p = new FakePaymentProvider();
     const a = await p.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });

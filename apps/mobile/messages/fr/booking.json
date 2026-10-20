@@ -5,7 +5,9 @@
     "allIn": "tout compris",
     "quoteError": {
       "MISSING_WEIGHT": "Indique un poids pour voir le prix",
-      "GENERIC": "Prix indisponible pour ce choix"
+      "GENERIC": "Prix indisponible pour ce choix",
+      "MISSING_PRICE_PER_KG": "Ce trajet ne propose pas d'envoi au kilo",
+      "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet"
     }
   },
   "unavailable": {
@@ -39,7 +41,6 @@
       "MISC_ACCESSORIES": "Accessoires divers"
     },
     "surcharge": "+{pct} %",
-    "sizeTitle": "Taille : pas besoin de mesurer",
     "sizes": {
       "S": "S",
       "M": "M",
@@ -50,26 +51,34 @@
       "M": "un sac à dos",
       "L": "une demi-valise"
     },
-    "weightTitle": "Poids (kg)",
-    "weightHint": "Le Voyageur le vérifiera à la remise — un écart de 10 % est toléré.",
     "weightUnit": "kg",
-    "weightShortcut": "{kg} kg",
-    "remaining": "{kg} kg encore disponibles sur ce trajet",
-    "nextStepSoon": "Étape suivante : la protection de ton colis.",
     "errors": {
       "FAMILY_REFUSED": "Le Voyageur ne prend pas ce contenu.",
       "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
-      "NOT_ENOUGH_CAPACITY": "Il ne reste pas assez de place pour ce bagage ({kg} kg disponibles).",
+      "NOT_ENOUGH_CAPACITY": "Il ne reste pas assez de place pour ce bagage ({kg, number} kg disponibles).",
       "WEIGHT_REQUIRED": "Indique le poids du colis.",
-      "WEIGHT_MAX": "{max} kg au maximum par colis.",
-      "WEIGHT_REMAINING": "Il ne reste que {kg} kg sur ce trajet."
+      "WEIGHT_MAX": "{max, number} kg au maximum par colis.",
+      "WEIGHT_REMAINING": "Il ne reste que {kg, number} kg sur ce trajet."
     },
     "sizeHint": "Elle dit au Voyageur si ton colis tient dans son bagage. Seule celle qui coûte plus cher est marquée.",
     "sizeHintPending": "Elle dit au Voyageur si ton colis tient dans son bagage. Indique le poids pour voir ce qu'elle coûte.",
-    "sizeHintFlat": "À ce poids, la taille ne change pas le prix — ton colis pèse déjà plus que tous les minimums. Elle dit au Voyageur si ton colis tient dans son bagage.",
+    "sizeHintFlat": "À ce poids, la taille ne change pas le prix : ton colis pèse déjà plus que tous les minimums.",
     "sizeExtra": "+{amount}",
     "familyRefusedToggle": "{count, plural, =1 {# famille refusée} other {# familles refusées}} par {name}",
-    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise."
+    "subtitle": "Plus c'est précis, moins il y a de surprises à la remise.",
+    "cardTitle": "Ton colis",
+    "weightDecrease": "Diminuer le poids",
+    "weightIncrease": "Augmenter le poids",
+    "weightEdit": "Saisir le poids",
+    "capacityLeft": "{kg, number} kg restants sur ce trajet",
+    "billed": {
+      "FLOOR": "Facturé {kg, number} kg, le minimum de ce trajet.",
+      "SIZE_MIN": "Facturé {kg, number} kg, la place que prend un colis {size}."
+    },
+    "weightLabel": "Poids",
+    "weightFree": "Aucune limite annoncée sur ce trajet",
+    "sizeIncluded": "Sans supplément",
+    "sizeHintNoPrice": "Elle dit au Voyageur si ton colis tient dans son bagage."
   },
   "phases": {
     "parcel": "Colis",
@@ -77,5 +86,191 @@
     "commitment": "Engagement",
     "payment": "Paiement"
   },
-  "phaseProgress": "{phase}, étape {current} sur {total}"
+  "phaseProgress": "{phase}, étape {current} sur {total}",
+  "places": {
+    "title": "Le rendez-vous",
+    "subtitle": "Les points proposés par {name}. Choisis celui qui t'arrange, pour la remise puis pour le retrait.",
+    "pickupTitle": "Tu remets le colis à {name}",
+    "deliveryTitle": "Le destinataire récupère le colis",
+    "errorPickup": "Choisis le lieu de remise.",
+    "errorDelivery": "Choisis le lieu de retrait.",
+    "emptyPickup": "{name} n'a pas précisé de lieu. Vous conviendrez du point de rendez-vous par message.",
+    "emptyDelivery": "Aucun lieu précisé. Le point de retrait se conviendra par message."
+  },
+  "recipient": {
+    "title": "Le destinataire",
+    "subtitle": "La personne qui récupère le colis. Pas besoin de compte Yamba pour elle.",
+    "phone": "Téléphone",
+    "phonePrefix": "Indicatif du pays",
+    "close": "Fermer",
+    "phoneHint": "Le code de livraison lui sera envoyé par SMS ou WhatsApp. Indique l'indicatif de son pays.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Email (facultatif)",
+    "emailHint": "Pour le prévenir de l'arrivée du colis.",
+    "errors": {
+      "PHONE_REQUIRED": "Indique le numéro du destinataire.",
+      "PHONE_INVALID": "Ce numéro ne semble pas valide. Vérifie l'indicatif et les chiffres.",
+      "FIRST_NAME_REQUIRED": "Indique son prénom.",
+      "LAST_NAME_REQUIRED": "Indique son nom.",
+      "EMAIL_INVALID": "Cet email ne semble pas valide."
+    },
+    "deliveryFlow": {
+      "title": "Comment se passera la livraison",
+      "codeGiven": "Un code à 6 chiffres te sera donné après le paiement.",
+      "shareIt": "Tu le transmets au destinataire par SMS, WhatsApp ou oralement.",
+      "handToTraveler": "Il le donne au Voyageur à la livraison. Sans ce code, le colis ne peut pas être remis."
+    }
+  },
+  "protection": {
+    "title": "La protection",
+    "subtitle": "Déclare ce que vaut le contenu, puis choisis la couverture.",
+    "valueLabel": "Valeur du contenu",
+    "valueHint": "Fixe le plafond de l'indemnisation.",
+    "cardTitle": "Protection du colis",
+    "basic": {
+      "title": "Protection de base",
+      "price": "Inclus",
+      "description": "Ton argent est bloqué jusqu'à la livraison, colis non remis remboursé."
+    },
+    "extended": {
+      "title": "Garantie Yamba {cap}",
+      "price": "+{amount}",
+      "description": "Perte, vol ou casse en route, remboursé jusqu’à {cap}.",
+      "exclusionsTitle": "Ce qui n'est pas couvert",
+      "exclusionsText": "Les produits interdits, un colis non conforme à sa description, une saisie douanière, et l'usure normale."
+    },
+    "errors": {
+      "VALUE_REQUIRED": "Indique la valeur du contenu."
+    }
+  },
+  "content": {
+    "title": "Le contenu",
+    "subtitle": "Décris ce que tu envoies, et montre-le.",
+    "descriptionLabel": "Description courte",
+    "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
+    "descriptionHint": "Elle aide le Voyageur à reconnaître le colis à la remise.",
+    "photosLabel": "Photos du colis",
+    "photosRequired": "(requise avec la Garantie)",
+    "photosHint": "Une photo du contenu déballé, une du colis emballé. Jusqu'à {max, number}.",
+    "addPhoto": "Ajouter une photo",
+    "removePhoto": "Retirer cette photo",
+    "permissionTitle": "Accès aux photos refusé",
+    "permissionBody": "Yamba a besoin d'accéder à tes photos pour les joindre au colis. Tu peux l'autoriser dans les réglages.",
+    "errors": {
+      "DESCRIPTION_TOO_SHORT": "Décris brièvement le contenu (5 caractères au minimum).",
+      "PHOTOS_REQUIRED_WITH_GUARANTEE": "Au moins une photo est requise avec la Garantie Yamba."
+    },
+    "goldenRules": {
+      "title": "Les règles d'or pour un envoi qui se passe bien",
+      "pack": "Emballe soigneusement : sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
+      "weigh": "Pèse précisément : le poids déclaré doit correspondre au poids réel à la remise.",
+      "describe": "Décris fidèlement : {name} vérifiera le contenu avant d'accepter ton colis.",
+      "prohibited": "Aucun produit interdit."
+    },
+    "fromCamera": "Prendre une photo",
+    "fromLibrary": "Choisir dans mes photos",
+    "cancel": "Annuler",
+    "cameraDeniedTitle": "Accès à l'appareil photo refusé",
+    "cameraDeniedBody": "Yamba a besoin de l'appareil photo pour photographier ton colis. Tu peux l'autoriser dans les réglages."
+  },
+  "charter": {
+    "title": "Ton engagement",
+    "subtitle": "Tu certifies sur l'honneur le contenu du colis.",
+    "cta": "Passer au paiement",
+    "handover": {
+      "title": "À la remise, voici ce qui se passera",
+      "visualInspectionLead": "Vérification visuelle obligatoire.",
+      "visualInspection": "Le Voyageur examinera ton colis avant d'accepter. Ne sois pas surpris.",
+      "refusalPossibleLead": "Refus possible si non conforme.",
+      "refusalPossible": "Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé, mais le trajet sera perdu.",
+      "crossPhotosLead": "Photos croisées.",
+      "crossPhotos": "Le Voyageur prendra ses propres photos, qui feront foi en cas de litige."
+    },
+    "pledge": {
+      "title": "Charte Expéditeur",
+      "subtitle": "Engagement juridique, à lire attentivement.",
+      "intro": "En validant ta réservation, tu déclares et garantis sur l'honneur que ton colis :",
+      "noIllicit": "ne contient aucun produit illicite, dangereux ou interdit,",
+      "matchDeclared": "correspond exactement à la catégorie, au poids et au contenu déclarés,",
+      "customsCompliant": "respecte les obligations douanières du pays de destination.",
+      "disclaimer": "Toute déclaration mensongère engage ta seule responsabilité civile et pénale, à l'exclusion de celle du Voyageur et de Yamba.",
+      "fullLink": "Voir la charte complète et les produits interdits",
+      "fullUrl": "https://yamba.app/fr/legal/charte-expediteur"
+    },
+    "accept": {
+      "label": "J'accepte la Charte Expéditeur, les CGV et le Contrat de transport.",
+      "error": "Tu dois accepter la charte pour continuer."
+    }
+  },
+  "payment": {
+    "title": "Paiement",
+    "subtitle": "Le montant est autorisé maintenant, débité seulement quand le Voyageur accepte.",
+    "cta": "Payer {amount}",
+    "ctaBusy": "Envoi en cours…",
+    "summaryTitle": "Ce que tu paies",
+    "transport": "Transport",
+    "transportDetail": "{kg, number} kg facturés",
+    "service": "Frais de service Yamba",
+    "protection": "Garantie Yamba",
+    "total": "Total",
+    "hold": "Rien n'est débité maintenant. Le Voyageur a 24 h pour accepter : c'est à ce moment-là que tu paies.",
+    "methodTitle": "Le moyen de paiement",
+    "preparing": "Préparation du paiement…",
+    "retry": "Réessayer",
+    "testMode": "Mode test : aucun prestataire de paiement n'est configuré sur ce poste. L'autorisation de {amount} est simulée.",
+    "card": "Carte bancaire",
+    "cardPending": "La feuille de paiement s'ouvre quand tu appuies sur Payer.",
+    "cardAuthorized": "Carte autorisée. Il reste à envoyer ta demande.",
+    "unavailableTitle": "Le paiement par carte n'est pas disponible dans cette version",
+    "unavailableBody": "Elle ne peut pas ouvrir la feuille de paiement. Ta saisie est gardée : reviens quand l'app est à jour.",
+    "afterTitle": "Après ton paiement",
+    "after": {
+      "step1": "Le Voyageur reçoit ta demande et a 24 h pour accepter. Tu n'es débité qu'à ce moment-là.",
+      "step2": "Rendez-vous avec le Voyageur pour la remise, qu'il vérifiera et photographiera.",
+      "step3": "Une fois le colis déposé, tu reçois ton code à 6 chiffres, à transmettre au destinataire.",
+      "step4": "Le destinataire donne le code au Voyageur à l'arrivée, qui le saisit pour valider la livraison.",
+      "step5": "3 jours après la livraison validée, le Voyageur reçoit son paiement."
+    },
+    "trust": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.",
+    "notReady": "Le paiement se prépare, encore un instant.",
+    "errors": {
+      "CANCELED": "Paiement abandonné. Rien n'a été débité.",
+      "SHEET_FAILED": "Le paiement n'a pas pu être autorisé. Vérifie ta carte et réessaie.",
+      "UPLOAD_FAILED": "Une photo n'a pas pu être envoyée. Vérifie ta connexion et réessaie. Rien n'a été débité.",
+      "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Retire-la ou reprends-la. Rien n'a été débité.",
+      "UPLOAD_INVALID_TYPE": "Une photo est dans un format non pris en charge. Rien n'a été débité.",
+      "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché : vérifie-le avant de payer.",
+      "QUOTE_UNAVAILABLE": "Le devis n'est pas calculable pour ce colis. Reviens sur le poids et la taille.",
+      "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
+      "FAMILY_REFUSED": "Le Voyageur n'accepte pas ce contenu sur ce trajet.",
+      "TRIP_NOT_BOOKABLE": "Ce trajet n'accepte plus de demandes.",
+      "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
+      "NEW_ACCOUNT_CAP": "Ton compte est récent : tes envois sont encore plafonnés. Le plafond se lève avec tes premiers envois terminés.",
+      "PAYMENT_NOT_AUTHORIZED": "Le paiement n'a pas encore été autorisé. Réessaie.",
+      "PAYMENT_MISMATCH": "L'autorisation ne correspond plus à ta demande. Une nouvelle est en préparation.",
+      "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
+      "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
+      "SESSION": "Ta session a expiré. Reconnecte-toi : ta saisie est gardée.",
+      "ACCOUNT_SUSPENDED": "Ton compte est suspendu. Contacte le support pour en savoir plus.",
+      "GENERIC": "Une erreur est survenue. Rien n'a été débité, tu peux réessayer."
+    },
+    "signIn": "Se connecter"
+  },
+  "confirmation": {
+    "title": "Demande envoyée",
+    "subtitle": "{name} a 24 h pour accepter. Tu n'es débité qu'à ce moment-là.",
+    "deadline": "Réponse attendue avant le",
+    "amount": "Montant autorisé",
+    "reference": "Référence",
+    "nextTitle": "La suite",
+    "next": {
+      "step1": "S'il accepte, tu es débité et le rendez-vous de remise est confirmé.",
+      "step2": "À la remise, il vérifie et photographie le colis. Tu reçois ton code à 6 chiffres.",
+      "step3": "Le destinataire donne ce code à l'arrivée : c'est lui qui valide la livraison."
+    },
+    "refused": "S'il refuse ou ne répond pas sous 24 h, l'autorisation tombe d'elle-même et tu n'as rien payé.",
+    "cta": "Voir mes envois",
+    "secondary": "Explorer d'autres trajets"
+  }
 }

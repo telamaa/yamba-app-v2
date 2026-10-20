@@ -43,11 +43,17 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
 import { getPublicTrip, type PublicTrip, type TripLocationPoint } from '@/lib/api/trip.api';
+import { DEFAULT_LOCATION_ICON, LOCATION_ICONS } from '@/lib/location-format';
 import {
   estimateShipperTotalCents,
   BILLING_FLOOR_KG,
   PRICING_EXAMPLE_PARAMS,
 } from '@/lib/pricing-example';
+import {
+  clearPendingBooking,
+  setPendingBooking,
+  takePendingBooking,
+} from '@/lib/auth-flow-state';
 import { useSession } from '@/lib/session-context';
 import {
   calculateCO2SavedKg,
@@ -79,12 +85,6 @@ const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   PLANE: 'airplane',
   TRAIN: 'train',
   CAR: 'car-sport',
-};
-
-const LOCATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  AIRPORT: 'airplane-outline',
-  TRAIN_STATION: 'train-outline',
-  CITY_AREA: 'business-outline',
 };
 
 /* La frise partage UNE grille entre ses trois colonnes : sans hauteurs
@@ -850,7 +850,7 @@ function PlaceRow({ point }: { point: TripLocationPoint }) {
   return (
     <View style={styles.placeRow}>
       <Ionicons
-        name={LOCATION_ICONS[point.kind] ?? 'location-outline'}
+        name={LOCATION_ICONS[point.kind] ?? DEFAULT_LOCATION_ICON}
         size={16}
         color={theme.textSecondary}
       />
@@ -962,9 +962,42 @@ function BottomBar({
   const t = useTranslations('tripDetail');
   const locale = useLocale() as SupportedLocale;
   const insets = useSafeAreaInsets();
+  const { status } = useSession();
 
   const perKgCents =
     trip.pricePerKgCents != null && trip.pricePerKgCents > 0 ? trip.pricePerKgCents : null;
+
+  /**
+   * Retour de la feuille d'auth : on REPREND le geste au lieu de le faire
+   * refaire. C'est ce que fait le site, qui revient directement dans le
+   * wizard après « Connecte-toi pour réserver » (A58). L'attente est nettoyée
+   * au démontage : elle appartient à cet écran, pas à l'application.
+   */
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    if (!takePendingBooking(trip.id)) return;
+    router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } });
+  }, [status, trip.id]);
+
+  useEffect(() => () => clearPendingBooking(trip.id), [trip.id]);
+
+  /**
+   * LA PORTE D'IDENTITÉ EST ICI, à l'entrée du tunnel — pas au paiement.
+   * Le commentaire qui précédait annonçait une porte « au destinataire » qui
+   * n'a jamais été écrite : le mur tombait donc à l'écran ⑦, après huit
+   * écrans remplis, et le site ne fait pas cela (A58, RG-C-12). Pendant
+   * l'amorçage de session (`loading`), on ne tranche pas : ouvrir la
+   * connexion à un membre déjà connecté serait pire que d'attendre 200 ms.
+   */
+  const onReserve = () => {
+    if (status === 'loading') return;
+    if (status !== 'authenticated') {
+      setPendingBooking(trip.id);
+      router.push('/login');
+      return;
+    }
+    router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } });
+  };
 
   return (
     <View
@@ -989,11 +1022,10 @@ function BottomBar({
       {/* La promesse d'A213 est tenue : la pastille grise « Bientôt
           réservable » devient le CTA mangue, à la place EXACTE qui lui était
           réservée — la barre n'a pas bougé d'un pixel. Le parcours s'ouvre
-          sur sa première étape (le colis) ; un visiteur anonyme y entre
-          librement, la porte d'identité tombera au destinataire. */}
+          sur sa première étape (le colis), derrière la porte d'identité. */}
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } })}
+        onPress={onReserve}
         style={({ pressed }) => [styles.bottomCta, { opacity: pressed ? 0.85 : 1 }]}>
         <ThemedText type="smallBold" style={styles.bottomCtaLabel}>
           {t('bar.book')}

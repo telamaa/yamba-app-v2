@@ -12994,3 +12994,555 @@ Les clés `booking.authGate.*` restent lues par la modale : **aucune clé morte*
 
 `tsc --noEmit --project apps/user-ui` vert (la commande CI), contrôle i18n **miroir
 parfait**. Aucun service touché, aucune dépendance ajoutée.
+
+---
+
+# Le colis devient UN objet — la carte qui fusionne le poids et la taille (PR à venir)
+
+## Le constat, posé comme une critique d'expert
+
+L'écran ① posait **quatre questions sous quatre rangées de pastilles identiques**, empilées
+sous quatre titres en petites capitales. Le retour utilisateur était « le champ poids et
+taille, c'est pas sexy ». Le diagnostic est plus précis que l'adjectif : l'écran **n'est pas
+laid, il est plat**. Aucune hiérarchie, et surtout **rien à manipuler** — un formulaire de
+réglages, pas un objet qu'on façonne.
+
+## Le défaut de fond : une décision présentée comme deux
+
+Depuis **D81**, le prix se calcule ainsi :
+
+```
+poidsFacturé = max(poidsRéel, plancher, minimumDeLaTaille)
+```
+
+Les deux contrôles **entrent dans le même `max`**. L'écran les séparait par un titre, une
+phrase d'aide et vingt pixels de marge, comme s'ils étaient indépendants. Conséquence
+concrète : l'Expéditeur choisit 1 kg, puis choisit « L », et le prix saute — pour une raison
+qui n'était expliquée nulle part à l'endroit où il regarde.
+
+**Deux contrôles qui alimentent un seul calcul appartiennent au même bloc.** D'où une carte
+unique, « Ton colis ».
+
+## Les quatre corrections
+
+### 1. Le clavier ne recouvre plus le prix
+
+C'était le défaut le plus grave, et le plus mesurable. Le champ poids était un
+`TextInput` en `decimal-pad` : le toucher faisait monter un clavier qui mange la moitié
+basse de l'écran — exactement là où vit la barre « 11,00 € · Continuer ». On tapait un poids
+et **on ne voyait pas le prix changer**. Toute la promesse du prix vivant s'effondrait à
+l'instant précis où elle devait payer.
+
+Un **pas ⊖/⊕** le remplace :
+
+```ts
+function weightStep(kg: number): number {
+  return kg < 5 ? 0.5 : 1;        // fin là où vivent les colis réels, large au-dessus
+}
+```
+
+Borné par la capacité du trajet et `MAX_PARCEL_KG`, et **arrondi au dixième** — `0.1 + 0.2`
+ne vaut pas `0.3` en virgule flottante, et un poids affiché « 2.9000000000000004 » ruine une
+interface. Toucher la valeur ouvre quand même la saisie libre : un seul contrôle, deux
+gestes, le clavier en option.
+
+Les quatre raccourcis (1, 2, 5, 10 kg) disparaissent. Ils existaient parce que le champ
+libre était pénible ; une fois le pas en place, ils redeviennent une redondance.
+
+### 2. La capacité devient le contrôle, au lieu de le commenter
+
+« 3 kg encore disponibles sur ce trajet » était une **note de bas de page**, en gris, en
+petit, *après* le champ. C'est une **contrainte** : elle doit former le contrôle.
+
+Elle devient une barre qui se remplit et **vire au mangue à 80 %**. Détail qui compte : elle
+se remplit du **poids FACTURÉ**, pas du poids déclaré — c'est la place réellement réservée
+au Voyageur (D81 · CAP-01). Un colis L d'1 kg en prend six, et la barre le montre.
+
+### 3. Les tailles reprennent leur échelle
+
+Les icônes avaient été retirées à raison : une boîte à chaussures *dessinée* n'apprend rien
+de plus que les mots « une boîte à chaussures ». Mais **l'échelle relative**, elle, est la
+seule information que le texte ne peut pas porter.
+
+Trois rectangles aux proportions des gabarits du livrable 12 (S 33×23 cm, M 45×30, L 55×40),
+posés sur une **ligne de base commune** :
+
+```ts
+const SIZE_SILHOUETTES: Record<SizeClass, { width: number; height: number }> = {
+  S: { width: 26, height: 18 },
+  M: { width: 36, height: 24 },
+  L: { width: 44, height: 32 },
+};
+```
+
+L'alignement en bas (`alignItems: 'flex-end'` / `items-end`) n'est pas cosmétique : alignées
+au centre, les trois silhouettes **perdraient la moitié de leur sens**, parce que la
+comparaison de hauteur deviendrait illisible.
+
+### 4. `billableReason` enfin affiché
+
+Il vivait dans le devis depuis D81 et **n'était montré nulle part**. L'Expéditeur voyait le
+prix ne pas suivre son poids, sans explication. La carte se termine donc par la raison :
+
+> « Facturé 3 kg — la place que prend un colis M. »
+> « Facturé 2,3 kg — le minimum de ce trajet. »
+
+D81 expliqué **là où il se décide**, pas dans une aide au-dessus du bloc.
+
+## Deux corrections venues avec, côté web
+
+- **La valeur du contenu quitte la ligne du poids.** Elle ne fait pas le prix du transport :
+  elle fixe le **plafond d'indemnisation**. Elle était à côté du poids par accident de mise
+  en page, et laissait croire qu'elle entrait dans le calcul. Elle se colle désormais à la
+  protection, qu'elle commande.
+- **`30` était écrit en dur** dans `booking.config.ts`, deux fois (la valeur et le message
+  d'erreur). Il devient `MAX_PARCEL_KG`, exporté — l'écran en avait besoin pour borner son
+  pas, et le message le dérive au lieu de le répéter.
+
+Le legacy PER_CATEGORY (déprécié) garde un champ simple : sans taille, la carte n'aurait
+rien à y montrer. `step1.parcelDetails.remainingKg` reste vivant pour le bagage entier, où
+la place restante compte aussi.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+Le réflexe devant « pas sexy » est d'ajouter du dégradé, des ombres, des animations. Ça
+aurait été une erreur : **l'écran ne manquait pas de décoration, il manquait de structure.**
+Une fois les deux contrôles fusionnés dans une carte avec une vraie hiérarchie, il tient
+debout sans un seul effet — et il reste lisible sur un téléphone d'entrée de gamme en plein
+soleil, ce qui n'est pas le cas d'un dégradé.
+
+## Les contrôles
+
+`nx typecheck @yamba-app/mobile` vert, `tsc --noEmit --project apps/user-ui` vert (la
+commande CI), contrôle i18n **miroir parfait** avec **contre-épreuve rouge vérifiée puis
+restaurée**. Cinq clés mortes purgées côté mobile (`weightTitle`, `weightHint`,
+`weightShortcut`, `remaining`, `sizeTitle`), une côté web (`weightShortcut`).
+
+## Révision du 21/10 — la structure était juste, la grammaire était à moi
+
+Retour sur la première version de la carte : « toujours moche ». Juste, et le diagnostic est
+précis : la carte avait réglé la **structure** (poids et taille réunis, clavier supprimé,
+échelle rendue) mais gardé une **mise en forme inventée** — un bloc centré, une jauge de
+capacité, trois colonnes serrées pour les tailles.
+
+Trois captures de référence ont été fournies. Elles donnent une grammaire éprouvée, appliquée
+telle quelle :
+
+> **« libellé gras · ligne grise · contrôle à DROITE »**, des lignes **pleine largeur**
+> séparées par un **filet fin**, dans une carte bordée **sans cadre imbriqué**. C'est le
+> blanc qui fait la structure, pas les bordures.
+
+| Élément | Première version | Révision, d'après les références |
+|---|---|---|
+| **Le poids** | bloc centré, gros chiffre, boutons pleins de 44 px | modèle *« Modifiez le nombre de voyageurs »* : libellé et contrainte à gauche, pas ⊖/⊕ à droite, **cercles bordés** de 34 px |
+| **La capacité** | barre de progression qui se remplit | une **phrase** (« 3 kg restants sur ce trajet ») qui passe en mangue avant la limite |
+| **Les tailles** | trois colonnes serrées, silhouette au-dessus du texte | modèle *« Choisissez quand vous souhaitez payer »* : trois **lignes pleine largeur**, pastille de choix à **droite**, conséquence en ligne grise |
+| **L'explication D81** | collée en bas de la carte | **sous** la carte, comme « Annulation gratuite » sous le récapitulatif de la référence |
+
+**Pourquoi la jauge a perdu.** Elle était mon idée et elle paraissait plus « riche ». Mais une
+barre demande de décoder une proportion, elle dépend de la couleur pour signaler l'urgence,
+et elle ne dit pas *combien* il reste. La phrase donne le chiffre, survit à n'importe quel
+écran, et se lit par un lecteur d'écran sans travail supplémentaire. La référence fait mieux
+avec des mots.
+
+**Pourquoi les boutons sont bordés et non pleins.** Un cercle plein attire l'œil autant que le
+CTA « Continuer », alors qu'il ne fait qu'ajuster une valeur. Le contour suffit à dire
+« touchable » sans entrer en concurrence avec l'action principale de l'écran.
+
+**Pourquoi les silhouettes survivent au changement de disposition.** En colonnes, c'était une
+**ligne de base commune** qui rendait la comparaison lisible. Empilées en lignes, c'est le
+**bord gauche commun** qui joue ce rôle : d'où une gouttière de largeur fixe (46 px) plutôt
+qu'un centrage. Le principe — une origine commune, sinon aucune comparaison — est le même ;
+seul l'axe change.
+
+**Et toute la ligne devient la cible.** Viser une pastille de 22 px au pouce est une épreuve ;
+le `Pressable` englobe le libellé, la silhouette et la pastille.
+
+### Et les silhouettes repartent — pourquoi mon argument ne tenait pas
+
+La révision ci-dessus gardait les silhouettes, en remplaçant la **ligne de base commune** des
+colonnes par un **bord gauche commun** des lignes. L'argument est faux en pratique.
+
+L'œil compare ce qui est **adjacent**. En colonnes, trois rectangles côte à côte se comparent
+en une fixation. Empilés en lignes, ils sont séparés par ~60 px de texte : il faudrait
+balayer de haut en bas et mémoriser des tailles. Personne ne le fait. On conservait donc une
+gouttière de 46 px qui pousse le libellé, pour une information que personne ne lit.
+
+Et le texte faisait déjà le travail : « une boîte à chaussures », « un sac à dos », « une
+demi-valise » est **ordonné et concret**. La référence de recette ne porte aucune icône dans
+ses lignes de choix — elle n'en a pas besoin, et nous non plus.
+
+Il reste : `S · une boîte à chaussures` en gras, la conséquence en gris, la pastille à droite.
+`SIZE_SILHOUETTES` disparaît des deux fronts.
+
+> La leçon : une illustration se justifie par ce qu'elle **ajoute dans la disposition où elle
+> vit**. Changer la disposition peut lui retirer sa raison d'être, même si elle était juste
+> avant. Une décision graphique n'est jamais valable « en soi ».
+
+### La valeur du contenu rejoint la grammaire
+
+Dernier bloc de l'étape à garder une mise en forme à part : un champ étroit (`md:max-w-md`)
+coincé entre deux cartes pleine largeur. Il paraissait orphelin.
+
+Il adopte la même grammaire : `SectionTitle`, carte pleine largeur, une ligne
+« libellé gras · ligne grise · contrôle à droite » — exactement la ligne « Poids ». La valeur
+est, comme le poids, **un nombre qu'on pose**.
+
+Deux conséquences qui valent mieux que la mise en page :
+
+- **l'explication quitte l'infobulle pour la ligne grise** (« Elle fixe le plafond
+  d'indemnisation en cas de litige — indique le prix d'achat »). Une phrase **visible** vaut
+  mieux qu'une phrase à découvrir, surtout quand elle commande le bloc suivant (la Garantie) ;
+- **le champ reste étroit à l'intérieur de la carte** : un `input` qui s'étire sur toute une
+  colonne large est inconfortable à lire et à remplir, l'œil perd la ligne. La carte porte la
+  largeur, le champ garde sa mesure.
+
+L'étape ① a désormais **une seule grammaire** : familles en pastilles (une question à huit
+réponses courtes s'y prête), puis trois cartes jumelles — **Ton colis**, **Valeur du
+contenu**, **Protection du colis** — titre + lignes pleine largeur à contrôle droit.
+
+Le legacy PER_CATEGORY garde ses champs simples : la carte n'a pas sa place dans une grille à
+deux colonnes, et ce moteur est déprécié — on ne lui refait pas une mise en page.
+
+### « Prix indisponible pour ce choix » — la valeur par défaut qui affirmait du faux
+
+Constat de recette : sur un trajet donné, l'écran ① affichait tout le formulaire colis, mais
+la barre du bas disait « — · Prix indisponible pour ce choix », aucune taille n'annonçait son
+écart, et l'aide réclamait « Indique le poids » alors qu'un poids **était** saisi.
+
+Le moteur a d'abord été mis hors de cause : rejoué avec les paramètres servis par le serveur
+local (`billingFloorKg: 2.3`, `sizeMinKg: {S:0, M:3, L:6}`), un colis de 2 kg en M rend
+13,50 € sans broncher. Le défaut était dans l'état du brouillon.
+
+```ts
+const EMPTY: BookingDraft = { product: 'PARCEL', … };          // toujours PARCEL
+export function offeredProducts(trip) {                        // mais…
+  if (trip.pricePerKgCents > 0) products.push('PARCEL');       // …seulement si €/kg
+  …
+}
+{products.length > 1 ? <ProductCard … /> : null}               // sélecteur MASQUÉ à 1 option
+{draft.product === 'PARCEL' ? ( … la carte du colis … ) : null}
+```
+
+Sur un trajet qui ne propose **qu'un bagage** (forfait, sans prix au kilo) :
+
+1. `offeredProducts` ne contient pas `PARCEL` ;
+2. le sélecteur de produit est masqué — « un choix à une seule option n'est pas un choix » ;
+3. **personne ne corrige le brouillon**, qui reste sur `PARCEL` ;
+4. la carte du colis s'affiche pour un produit que le trajet n'offre pas ;
+5. le moteur répond `MISSING_PRICE_PER_KG`, affiché « Prix indisponible pour ce choix ».
+
+**La correction** : le produit se dérive du trajet, exactement comme la famille
+(`firstAcceptedFamily`) et les lieux le faisaient déjà — `startBookingDraft(trip, offered[0])`.
+L'oubli portait sur le seul champ du brouillon qu'on n'avait pas pensé à dériver. Et un trajet
+qui ne propose **rien** bascule sur l'écran « ce trajet n'est plus disponible » plutôt que
+d'ouvrir un formulaire dont aucun devis ne sortira.
+
+**Deux défauts d'honnêteté corrigés au passage :**
+
+- **le message nommait mal la cause.** Seul `MISSING_WEIGHT` était distingué ; tout le reste
+  tombait dans un « Prix indisponible » opaque. Les causes connues sont désormais nommées
+  (`MISSING_PRICE_PER_KG`, `BAG_NOT_OFFERED`), via une **liste explicite** et non une clé
+  construite depuis le code d'erreur : une clé i18n fabriquée à la volée qui n'existe pas
+  fait **planter le rendu** next-intl au lieu d'afficher un message approximatif ;
+- **l'aide réclamait un poids déjà saisi.** Sans écart calculable, deux cas se confondaient :
+  le poids manque (on le demande) ou le devis a échoué pour une autre raison. Le second a
+  désormais sa phrase, qui ne demande rien d'impossible.
+
+**Pourquoi le web n'était pas touché** : il branche au sommet sur `isPerKgTrip(trip)` — un
+trajet sans prix au kilo ne voit jamais la carte du colis. Le mobile, lui, gardait sa carte
+sur `draft.product` et laissait le brouillon diverger du trajet. **Deux gardes différentes
+pour la même règle, dont une seule tenait.**
+
+### L'étape 2 adopte la même grammaire — et où elle s'arrête
+
+Après l'étape ①, l'étape ② parlait encore une autre langue : des lignes de lieu sans cadre
+avec la pastille à **gauche**, puis des champs nus sous des libellés. Un bloc de choix doit se
+reconnaître à sa **forme**, pas à sa place dans la page.
+
+**Les lieux de rendez-vous** passent à la grammaire de « Ton colis » : `LocationList` devient
+une **carte bordée** avec un filet entre les lignes, `LocationOption` déplace sa pastille à
+**droite** et respire en `py-4`, et `LocationDisplay` (un seul lieu, donc aucun choix) prend
+la **même carte** sans pastille — la page ne change pas de grammaire selon le trajet.
+
+Les deux groupes restent **côte à côte** sur grand écran : « je remets » et « il récupère »
+sont deux faces d'un même rendez-vous ; les empiler casserait le parallèle et allongerait une
+page qui porte déjà le téléphone, les noms et l'email. Sur téléphone, la grille retombe
+d'elle-même en une colonne.
+
+**Le destinataire** reçoit sa carte — et c'est là que la transposition s'arrête
+volontairement. La disposition « libellé à gauche, contrôle à droite » convient à une
+**valeur** : un nombre, un choix, un état. Elle ne convient pas au **texte libre**. Un email
+dans une boîte étroite alignée à droite est pénible à saisir, à relire et à corriger ; un nom
+tronqué ne se vérifie pas.
+
+> On adopte donc la grammaire du **conteneur** (la carte, les filets, le titre), pas celle de
+> la **ligne**. Les champs gardent leur libellé au-dessus et toute la largeur.
+
+C'est la nuance qui sépare « unifier » de « uniformiser » : l'unité se joue sur ce qui
+délimite et hiérarchise, pas sur une disposition appliquée mécaniquement à des contenus de
+nature différente.
+
+**Ce qui reste à trancher sur cette étape** : le bloc vert « Comment se passera la livraison »
+pèse visuellement autant que les décisions qui l'entourent, alors qu'il est purement
+informatif.
+
+### Le bloc informatif cesse de peser autant que les décisions
+
+« Comment se passera la livraison » était un **gros encadré vert**, posé **avant** le
+destinataire. Deux défauts :
+
+- **il pesait autant que les décisions qui l'entouraient**, alors qu'il n'exige aucune
+  action. Dans une page où tout le reste est un choix, un pavé coloré capte l'attention qui
+  devrait aller aux lieux et au numéro ;
+- **il expliquait un code à transmettre à quelqu'un dont le numéro n'était pas encore saisi.**
+  L'information arrivait avant d'être concrète.
+
+Il est désormais **replié** derrière une ligne « Comment se passera la livraison ⌄ » et
+**déplacé après** la carte du destinataire : on explique le code une fois le numéro posé, au
+moment où il devient réel.
+
+Le repliable réutilise **exactement** le motif des « règles d'or » de l'étape ① — un
+`<details>/<summary>` natif avec un chevron en `group-open:rotate-180`. Donc : aucun état
+React, le clavier et les lecteurs d'écran le gèrent gratuitement, et l'étape ② n'invente pas
+un deuxième idiome de repli.
+
+`TipBlock` n'est pas modifié : il reste l'habillage des blocs informatifs de l'engagement et
+du paiement, où ils ne concurrencent rien.
+
+# Le tunnel natif va jusqu'au paiement — les écrans ④ à ⑦, et le jumeau web de l'engagement (PR #391)
+
+## Ce qui existait, et ce qui manquait
+
+La PR portait déjà l'écran ① (« Le colis ») et sa carte fusionnée. Le reste du tunnel
+s'arrêtait sur un raccourci : l'écran ① poussait directement vers les lieux, et l'écran ⑥
+se refermait sur une phrase — « étape suivante : le paiement » — parce que l'écran ⑦
+demandait une décision qui n'avait pas été prise.
+
+Les six écrans manquants ont été construits dans l'ordre d'A217 : ② la valeur puis la
+protection, ③ la description et les photos, ④ les lieux de rendez-vous, ⑤ le destinataire,
+⑥ l'engagement, ⑦ le paiement — suivi d'un septième écran qui n'appartient plus au tunnel,
+la confirmation.
+
+## L'écran ⑦ : trois gestes, dans un ordre qui n'est pas négociable
+
+Le fichier `apps/mobile/src/app/booking/payment.tsx` enchaîne trois appels, et l'ordre est
+une règle, pas une préférence :
+
+1. **les photos montent d'abord** (`lib/api/upload.api.ts`). Le serveur ne reçoit jamais le
+   fichier : il *signe* une autorisation courte (`GET /uploads/imagekit-auth`), l'appareil
+   envoie l'image directement à ImageKit, et seule l'URL revient. C'est ce que fait déjà le
+   site. Pourquoi avant l'argent : un échec de téléversement doit tout arrêter **pendant
+   qu'aucune empreinte bancaire n'existe**, sinon on laisse une autorisation orpheline sur
+   la carte pour une demande qui ne sera jamais créée (A34/A45) ;
+2. **la carte autorise** — feuille native Stripe, ou rien du tout chez le fournisseur FAKE,
+   qui a déjà posé une empreinte simulée en créant l'intention ;
+3. **`POST /deals`** crée la demande PENDING dans une transaction.
+
+Les URLs déjà téléversées sont mémorisées dans un `useRef(new Map())` indexé par l'identité
+de la photo : un réessai après un refus métier ne renvoie pas deux fois les mêmes images.
+
+## Ce que l'écran affiche n'est pas le calcul local
+
+`POST /deals/payment-intents` ne rend pas qu'un `clientSecret` : il rend aussi `quote`, le
+devis **recalculé par le serveur**, celui qui sera figé dans le Booking (D17). C'est donc
+lui que l'écran ⑦ affiche, ligne à ligne — transport, frais de service Yamba, garantie si
+elle est prise, total.
+
+Le calcul local (`@packages/pricing`, le même moteur) garde exactement **un** rôle :
+alimenter la barre du bas depuis l'écran ①, et fournir `expectedTotalCents` pour que le
+serveur puisse REFUSER une divergence. Un montant jamais montré n'est jamais débité.
+
+Le site, lui, continue d'afficher son calcul local à l'étape 4 alors que la réponse porte
+déjà le devis serveur. La divergence est assumée : c'est le mobile qui a raison.
+
+## Stripe est isolé derrière une porte, pas importé
+
+`@stripe/stripe-react-native` est un module **natif**. Il n'est pas embarqué dans Expo Go,
+et — c'est le piège — son **évaluation** lève là-bas : le module réclame son pendant natif
+dès qu'on l'importe. Un `import` statique en tête de l'écran ⑦ aurait donc fait tomber
+l'app **à l'ouverture du tunnel**, pas au paiement.
+
+`apps/mobile/src/lib/stripe-sheet.ts` (124 lignes) est la seule porte :
+
+- le module est chargé par `require` **à l'instant** où une feuille doit s'ouvrir, et
+  seulement si le serveur a répondu `provider: "STRIPE"` ;
+- la sonde est mémorisée (`probed`) : dans Expo Go, l'évaluation lève à *chaque* appel, et
+  l'écran la consulte à chaque rendu ;
+- toute absence — module non lié, clé publiable absente, appel natif qui lève — devient
+  `UNAVAILABLE`, un état que l'écran SAIT dire. Jamais un écran blanc ;
+- l'annulation (`Canceled`) est distinguée de l'échec : fermer la feuille n'est pas une
+  erreur de carte et ne s'affiche pas comme telle.
+
+Conséquence **voulue** : avec le fournisseur FAKE — celui du poste de développement, prévu
+par D11/D38 — le parcours ① → ⑦ va jusqu'au bout **dans Expo Go, sur un vrai téléphone**,
+et crée une demande PENDING réelle. La vraie carte attend un build de développement.
+
+## La confirmation ne renvoie nulle part
+
+Le site redirige vers le suivi du deal (`/bookings/:id`). Ce suivi n'existe pas en natif, et
+la doctrine interdit de renvoyer au site (A210 b). `booking/confirmation.tsx` dit donc tout
+ce qui compte à cette seconde : le montant autorisé, la référence (les six derniers
+caractères de l'identifiant — ce qui se lit et se cite au support), l'échéance des 24 h, les
+trois étapes suivantes, et ce que personne ne demande mais que tout le monde se demande :
+« et s'il refuse ? ».
+
+Un détail de navigation qui n'en est pas un : le tunnel est **dépilé** avant d'afficher la
+confirmation (`router.canDismiss()` → `dismissAll()`, puis `replace`). Un `replace` seul
+aurait laissé les six écrans précédents dessous, et le retour serait revenu sur « Ton
+engagement » avec un brouillon déjà effacé.
+
+## Le jumeau web de l'écran ⑥
+
+Les trois corrections de texte faites sur le mobile avaient été **trouvées sur le site** et
+appliquées au seul mobile. Elles traversent : « En validant ce deal » devient « En validant
+ta réservation » (« deal » est un mot de code — le modèle `Booking` — et A144 exige que les
+chaînes visibles parlent la langue du membre), les tirets cadratins redeviennent de la
+ponctuation ordinaire, et la case d'acceptation **nomme les trois documents** au lieu d'en
+reléguer deux dans une ligne grise.
+
+Deux défauts ont été trouvés en chemin dans `CharterCheckbox` :
+
+- les deux liens vivaient **dans le `<label>`**. Cliquer « CGV » cochait la case en même
+  temps qu'il ouvrait le document : **lire les conditions revenait à les accepter** ;
+- ils naviguaient dans le même onglet, alors que le brouillon du tunnel vit en mémoire de
+  page : aller lire un document **perdait la saisie**.
+
+Au passage, `summary.deals` affichait « 12 deals » sous la note du Voyageur — le mot de code
+était visible sur les deux faces de la page. Il devient « 12 colis transportés », le
+vocabulaire déjà retenu sur la fiche trajet native.
+
+## Le défaut i18n trouvé sur une capture
+
+Dans la même carte, deux lignes qui se suivent :
+
+```
+Transport · 2,3 kg · 3,50 €/kg · taille S      8,05 €
+Facturé au minimum du trajet : 2.3 kg.
+```
+
+Virgule sur la première, **point** sur la seconde. La cause est une règle d'ICU qu'on ne
+devine pas : un argument **simple** (`{kg}`) n'est pas mis en forme, il est converti en
+chaîne — c'est `{kg, number}` qui applique le format de la locale. La première ligne s'en
+tirait parce qu'un `toLocaleString("fr-FR")` était écrit à la main dans le composant.
+
+Les quinze messages du domaine `booking` (sept web, huit mobile) passent à `{kg, number}`,
+et les deux appels qui formataient le nombre à la main rendent ce travail au message. Tous
+les points d'appel ont été vérifiés un par un : un `{x, number}` nourri d'une chaîne lève au
+rendu.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **`expo-dev-client`, le plugin de config Stripe et `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`**
+  ne sont pas ajoutés. Une déclaration de plugin sans build qui la consomme ne prouve rien,
+  et le build de développement est une décision d'outillage (EAS, compte Apple Developer
+  pour iOS) prise le jour où une carte réelle doit être testée ;
+- **le même défaut `{kg}`** vit ailleurs (`search.card.remainingKg`, les estimations de
+  `trip-detail`, les CO₂). Il n'est pas balayé ici : certains de ces appels passent déjà une
+  chaîne pré-formatée (`co2Saved.toFixed(1).replace(".", ",")`), et un balayage aveugle y
+  casserait le rendu. Ils sont inventoriés pour la passe de leur page ;
+- **`booking.copy.ts`** (apps/user-ui) reste en place. C'est un fichier de 300 lignes en
+  `isFr ? … : …` — la forme interdite depuis D44 — qui n'a **aucun lecteur** et qui porte
+  deux chaînes déjà corrigées ailleurs (« deal », « h de vol »). Sa suppression est proposée,
+  pas faite dans une passe de textes.
+
+## Les contrôles
+
+`nx typecheck @yamba-app/mobile` vert, `tsc --noEmit` user-ui vert, contrôle i18n « miroir
+parfait » (30 namespaces, 60 fichiers). Le comportement d'ICU a été **mesuré**, pas supposé.
+
+## La porte d'identité manquait — trouvée sur appareil, au pire endroit (A219)
+
+Le parcours natif se bloquait à l'écran ⑦ sur « Reconnecte-toi pour envoyer ta demande ».
+Mesure avant diagnostic : les quatre services répondent, et un appel sans jeton rend
+
+```
+{"message":"Unauthorized! Token missing.","details":{"code":"TOKEN_MISSING"}}
+```
+
+Ce n'est donc pas une panne, c'est un refus d'identité — et il tombe au **premier appel
+authentifié de tout le tunnel**, qui se trouve être la demande d'autorisation de l'écran ⑦.
+Tout ce qui précède (`GET /trips/:id/public`, les écrans de saisie) est anonyme.
+
+**Le CTA « Réserver » ne regardait pas la session.** Le commentaire du code annonçait que
+« la porte d'identité tombera au destinataire » — une porte qui n'a jamais été écrite. Un
+visiteur anonyme remplissait donc huit écrans avant le mur.
+
+Le site, lui, tranche à l'entrée depuis A58 (`BookingSummaryCard` → `BookingAuthGateModal`) :
+« Connecte-toi pour réserver » s'ouvre au-dessus du trajet, et le retour entre **directement
+dans le wizard**. Le natif s'y aligne :
+
+- `auth-flow-state.ts` gagne `setPendingBooking` / `takePendingBooking` / `clearPendingBooking`
+  — une mémoire de processus bornée à l'écran qui la pose (il la nettoie en se démontant,
+  sinon une connexion faite trois écrans plus loin pousserait un tunnel que personne n'a
+  demandé) ;
+- la barre de la fiche trajet ouvre la feuille d'auth au lieu du tunnel, et **reprend le
+  geste** quand la session arrive ;
+- pendant l'amorçage de session (`status === 'loading'`, quelques centaines de millisecondes
+  au lancement), le CTA ne tranche pas : ouvrir la connexion à un membre déjà connecté serait
+  pire que d'attendre.
+
+**Et l'écran ⑦ cesse d'être un cul-de-sac**, parce qu'une session peut mourir en cours de
+parcours (jeton expiré, appareil révoqué depuis un autre téléphone) :
+
+- les sept refus d'identité du middleware partagé (ANO-API-07 : `TOKEN_MISSING`,
+  `TOKEN_INVALID`, `TOKEN_EXPIRED`, `SESSION_REVOKED`, `USER_NOT_FOUND`…) sont ramenés à **un
+  seul état**. Ils disent des choses différentes au serveur, une seule au membre ;
+- le bouton devient « Se connecter » — un « Réessayer » sur une session morte rejoue le même
+  refus ;
+- l'autorisation **repart seule** au retour de la feuille : le membre a déjà rempli huit
+  écrans, il ne doit rien retoucher.
+
+Au passage, un défaut d'affichage visible sur la même capture : la carte « Ce que tu paies »
+annonçait « Préparation du paiement… » alors que la préparation avait **échoué**. Sans devis
+serveur il n'y a pas de détail à montrer ; elle affiche désormais le total que la barre du
+bas porte déjà, et rien de plus.
+
+## Le fournisseur de paiement devient un choix, pas une déduction (A220)
+
+Suite directe du constat précédent. Session rétablie, l'écran ⑦ répond : « le paiement par
+carte n'est pas disponible dans cette version ». La réponse est **juste** — la feuille Stripe
+est un module natif absent d'Expo Go (A218) — mais le parcours de bout en bout devenait
+inatteignable, parce que `deal-service` tournait sur Stripe.
+
+Pourquoi : `createPaymentProviderFromEnv` ne regardait que `STRIPE_SECRET_KEY`. Présente →
+Stripe, absente → Fake. Et cette clé vit dans le `.env` **racine**, que `nx serve` impose à
+tous les services. Forcer le Fake demandait donc de construire le bundle et de le lancer à la
+main avec la variable vidée — une manœuvre qu'on ne refait pas tous les jours.
+
+La correction reprend la forme déjà en place pour l'e-mail (`resolveEmailProviderName`,
+D35/D44) :
+
+```ts
+export function resolvePaymentProviderName(env = process.env): PaymentProviderName {
+  const explicit = (env.PAYMENT_PROVIDER ?? "").trim().toUpperCase();
+  const key = env.STRIPE_SECRET_KEY?.trim();
+  const name = explicit === "STRIPE" || explicit === "FAKE" ? explicit : key ? "STRIPE" : "FAKE";
+  if (name === "FAKE" && env.NODE_ENV === "production") throw new Error(/* … */);
+  if (name === "STRIPE" && !key) throw new Error("PAYMENT_PROVIDER=stripe requires STRIPE_SECRET_KEY");
+  return name;
+}
+```
+
+Trois propriétés tenues par cinq tests (`payment-provider.spec.ts`, deal-service 687 → **692**
+mesuré) :
+
+- une valeur explicite l'emporte sur la clé, casse et espaces compris ;
+- le Fake reste **refusé en production**, y compris demandé explicitement — et le message dit
+  lequel des deux refus s'applique ;
+- `stripe` sans clé **refuse de démarrer** plutôt que de se replier en silence ; une valeur
+  inconnue (`paypal`) ne décide de rien et laisse la clé trancher, comme avant.
+
+**Un test vert n'est pas un type juste.** La première écriture redéclarait
+`PaymentProviderName`, déjà exporté en tête du même fichier. `nx test deal-service` passait au
+vert ; c'est `nx run-many --target=typecheck --all` — le contrôle CI « TypeScript ×8 » — qui a
+sorti les deux `TS2300`.
+
+**Sur le poste**, une ligne suffit désormais dans le `.env` racine :
+
+```
+PAYMENT_PROVIDER=fake
+```
+
+Elle vaut pour les deux fronts : le wizard du site affiche son « Mode test », et l'app mobile
+va jusqu'à la demande créée sans build de développement.

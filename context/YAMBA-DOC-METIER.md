@@ -7194,3 +7194,158 @@ seule exception, et elle portait justement l'engagement le plus fort.
 | MOB115 | Sur un écran large comme sur un téléphone | **Une seule** demande s'affiche — jamais deux superposées |
 | MOB116 | Connecté — ouvrir l'adresse de réservation | La réservation s'ouvre normalement : aucune redirection, aucun passage par la fiche |
 | MOB117 | Session qui expire pendant la réservation, puis recharger la page | Retour sur la fiche du trajet avec la demande de connexion ; les informations saisies ne sont pas affichées à un inconnu |
+
+---
+
+# Le colis se compose dans un seul objet (PR à venir)
+
+## Le besoin
+
+Retour d'usage sur la première page de réservation : « le champ poids et taille, c'est pas
+sexy ». Derrière la formule, un vrai défaut d'usage — la page posait quatre questions en
+quatre rangées identiques, sans hiérarchie et sans rien à manipuler.
+
+Et un défaut de fond : le poids et la taille **servent au même calcul** (le prix se fait sur
+le plus grand des trois : le poids réel, le minimum du trajet, le minimum de la taille) mais
+étaient posés comme deux questions indépendantes. L'Expéditeur choisissait un poids, puis
+une taille, et le prix changeait sans explication visible.
+
+Enfin, un défaut mécanique mesurable : sur téléphone, toucher le champ de poids faisait
+monter le clavier, qui recouvrait la barre du prix — on modifiait le poids sans jamais voir
+l'effet sur le total.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-71** | Le poids et la taille se décident dans un **seul bloc** : ce sont deux faces de la même question, « combien ça pèse, et quelle place ça prend ». |
+| **RG-MOB-72** | Le poids se règle par **pas** (un demi-kilo sous 5 kg, un kilo au-dessus), sans clavier. Toucher la valeur permet quand même de la saisir directement. Le total reste visible pendant tout le réglage. |
+| **RG-MOB-73** | Le pas ne laisse jamais sortir des limites : il s'arrête au maximum par colis et à la place restante sur le trajet. Le bouton correspondant devient inactif plutôt que de disparaître. |
+| **RG-MOB-74** | La place restante est une **barre qui se remplit**, pas une note en bas. Elle se remplit de la place RÉELLEMENT réservée — celle qu'on facture — et prévient visuellement avant que la limite soit atteinte. |
+| **RG-MOB-75** | Les trois tailles se présentent **à l'échelle**, alignées sur une ligne commune : on voit la différence de gabarit avant de lire les mots. Aucune illustration décorative. |
+| **RG-MOB-76** | Quand le poids facturé diffère du poids saisi, la page **dit pourquoi** : parce que le minimum du trajet s'applique, ou parce que la taille choisie impose le sien. L'explication est au contact de la décision, pas dans une aide au-dessus. |
+| **RG-MOB-77** | La valeur du contenu n'est pas posée à côté du poids : elle ne fait pas le prix du transport, elle fixe le plafond d'indemnisation. Elle est posée **juste avant** le choix de la protection. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB118 | Étape ① — régler le poids avec ⊖ et ⊕ | Le total en bas de l'écran **reste visible** et change à chaque appui ; aucun clavier n'apparaît |
+| MOB119 | Toucher la valeur du poids | Le clavier s'ouvre et la valeur est modifiable directement |
+| MOB120 | Appuyer sur ⊖ jusqu'en bas | Le bouton devient inactif au plus petit poids accepté — il ne disparaît pas |
+| MOB121 | Appuyer sur ⊕ sur un trajet où il reste 3 kg | Le bouton devient inactif à 3 kg : on ne peut pas réserver plus que la place disponible |
+| MOB122 | Régler 2,5 kg puis 3 kg | La valeur affichée est **« 3 »**, jamais « 2.9000000000000004 » |
+| MOB123 | Choisir la taille L avec un colis d'1 kg | La barre de place restante se remplit de **6 kg**, pas d'1 kg : c'est la place réellement prise |
+| MOB124 | Approcher la limite de place | La barre change de couleur **avant** que la limite soit atteinte |
+| MOB125 | Regarder les trois tailles | Trois rectangles de tailles **différentes et proportionnées**, posés sur la même ligne — la différence se voit avant de se lire |
+| MOB126 | Colis d'1 kg en taille M | La page affiche « Facturé 3 kg — la place que prend un colis M » |
+| MOB127 | Colis de 0,2 kg en taille S | La page affiche « Facturé 2,3 kg — le minimum de ce trajet » |
+| MOB128 | Colis de 8 kg en taille S | Aucune explication de poids facturé : le poids réel suffit, rien à justifier |
+| MOB129 | Web — chercher la valeur du contenu | Elle est posée **juste avant** le choix de la protection, plus à côté du poids |
+| MOB130 | Web — saisir 31 kg | Le message d'erreur annonce le maximum réel, dérivé du même réglage que la limite du pas |
+
+## Révision du 21/10 — une règle en supersède une autre
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-78** *(supersède RG-MOB-74)* | La place restante s'annonce par une **phrase qui donne le chiffre** (« 3 kg restants sur ce trajet »), et non par une barre. Elle change de couleur avant que la limite soit atteinte. Une phrase donne le nombre, se lit sans décoder une proportion, et reste compréhensible pour un lecteur d'écran. |
+| **RG-MOB-79** | Un choix dans une liste se fait sur **toute la ligne**, pas seulement sur sa pastille : la zone touchable couvre le libellé, l'illustration et le sélecteur. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB131 | Étape ① — regarder la place restante | Une **phrase** qui donne le nombre de kilos restants ; aucune barre à interpréter |
+| MOB132 | Régler un poids qui approche la limite du trajet | La phrase passe en mangue **avant** que la limite soit atteinte |
+| MOB133 | Choisir une taille en touchant le libellé (pas la pastille) | La taille est sélectionnée : toute la ligne est la cible |
+| MOB134 | Comparer les trois tailles | Les trois silhouettes partagent le **même bord gauche** : la différence de gabarit se voit en descendant la liste |
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-80** *(supersède RG-MOB-75)* | Les tailles se présentent par leurs **mots** — un repère (S / M / L) et un objet familier — sans illustration. Une image ne se justifie que si elle ajoute ce que le texte ne peut pas dire **dans la disposition où elle vit** ; empilée en liste, une silhouette n'est plus comparable à ses voisines. |
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-81** | La réservation part toujours sur un produit que le trajet propose RÉELLEMENT. Quand un trajet n'offre qu'une possibilité, elle est choisie d'office — on ne laisse jamais la réservation commencer sur un produit inexistant. |
+| **RG-MOB-82** | Un trajet qui ne propose ni envoi au kilo ni forfait bagage n'ouvre pas de formulaire : il s'annonce comme non réservable. |
+| **RG-MOB-83** | Quand le prix ne peut pas être calculé, l'application **dit pourquoi** (« Ce trajet ne propose pas d'envoi au kilo », « Indique un poids pour voir le prix ») et ne réclame jamais une information déjà fournie. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB135 | Ouvrir la réservation d'un trajet qui ne propose **qu'un bagage en soute** | Le bagage est sélectionné d'office ; aucun formulaire de colis, et un prix s'affiche |
+| MOB136 | Ouvrir la réservation d'un trajet sans aucune offre | Écran « ce trajet n'est plus disponible » — pas de formulaire vide |
+| MOB137 | Un prix ne peut pas être calculé | La barre du bas **nomme la cause** ; elle ne demande jamais un poids déjà saisi |
+
+# Le tunnel natif va jusqu'au paiement (PR #391, A218)
+
+## Le besoin
+
+Un Expéditeur sur téléphone doit pouvoir aller du trajet jusqu'à la demande envoyée **sans
+jamais quitter l'app**. Jusqu'ici le parcours natif s'arrêtait avant l'argent : le dernier
+écran annonçait le paiement au lieu de le proposer.
+
+Le besoin derrière le besoin, lui, est une question de confiance : au moment de payer, un
+membre veut savoir **ce qu'il paie**, **quand il est débité**, et **ce qui se passe s'il ne
+se passe rien**. Les trois réponses doivent être à l'écran, pas dans une FAQ.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-84** | Le détail du prix affiché à l'écran de paiement est celui **rendu par le serveur** avec l'autorisation, jamais le calcul local. Le calcul local ne sert qu'à annoncer un total en cours de parcours et à permettre au serveur de refuser une divergence. |
+| **RG-MOB-85** | Les photos déclarées sont téléversées **avant** toute empreinte bancaire. Un échec de téléversement arrête le parcours sans qu'aucune autorisation n'ait été posée, et le dit (« rien n'a été débité »). |
+| **RG-MOB-86** | Une photo déjà téléversée n'est jamais renvoyée une seconde fois, même après un refus métier et un réessai. |
+| **RG-MOB-87** | L'écran de paiement annonce explicitement que **rien n'est débité maintenant** : le montant est autorisé, le débit a lieu quand le Voyageur accepte, sous 24 h. |
+| **RG-MOB-88** | Quand le paiement par carte n'est pas disponible sur l'appareil, l'app **le dit** et conserve la saisie. Elle ne masque pas le moyen de paiement, ne propose aucun contournement, et ne renvoie jamais vers le site. |
+| **RG-MOB-89** | Fermer la feuille de paiement est une **annulation**, pas un échec : le message le distingue et aucune demande n'est créée. |
+| **RG-MOB-90** | Une divergence de prix constatée par le serveur relit le trajet et les paramètres de plateforme avant de proposer un nouvel essai : l'Expéditeur ne peut pas réessayer sur un calcul périmé. |
+| **RG-MOB-91** | Une demande envoyée ne se re-paie pas : le parcours est dépilé derrière la confirmation, et aucun retour ne ramène sur l'écran de paiement. |
+| **RG-MOB-92** | La confirmation énonce le montant autorisé, une référence citable, l'échéance de réponse, la suite du parcours, **et ce qui se passe en cas de refus ou de silence** (l'autorisation tombe, rien n'est payé). |
+| **RG-MOB-93** | Un poids affiché dans une phrase suit la locale du membre : « 2,3 kg » en français, « 2.3 kg » en anglais. Aucun nombre n'est interpolé brut dans un message. |
+| **RG-MOB-94** | Aucune chaîne visible n'emploie le mot « deal » : c'est un mot de code. Le compte d'un Voyageur se dit en **colis transportés** (A144). |
+| **RG-MOB-95** | Un lien vers un document contractuel n'emporte **jamais** son acceptation : ouvrir les CGV depuis la case d'acceptation ne coche pas la case, et n'efface pas la saisie en cours. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB138 | Arriver à l'écran ⑦ avec le fournisseur FAKE, appuyer sur « Payer » | Les photos montent, la demande est créée, la confirmation s'affiche avec le montant et la référence |
+| MOB139 | Même parcours, revenir en arrière depuis la confirmation | On sort de la réservation ; on ne revient jamais sur l'engagement ni sur le paiement |
+| MOB140 | Couper le réseau pendant le téléversement d'une photo | Message « rien n'a été débité » ; aucune autorisation n'a été posée |
+| MOB141 | Réessayer après ce refus, réseau rétabli | Les photos déjà montées ne repartent pas ; la demande se crée |
+| MOB142 | Le Voyageur modifie son prix pendant le parcours | Refus « le prix a changé » ; le trajet est relu ; le nouvel essai porte le bon total |
+| MOB143 | Appareil sans module de paiement natif (Expo Go), fournisseur STRIPE | L'écran annonce que la carte n'est pas disponible dans cette version et garde la saisie |
+| MOB144 | Ouvrir la feuille Stripe puis la fermer | « Paiement abandonné. Rien n'a été débité. » — aucune demande créée |
+| MOB145 | Lire un colis facturé 2,3 kg en français | « Facturé 2,3 kg » — virgule, jamais point. En anglais : « 2.3 kg » |
+| MOB146 | Ouvrir les CGV depuis la case d'acceptation (web) | Le document s'ouvre dans un nouvel onglet, la case **reste décochée**, le brouillon est intact |
+| MOB147 | Lire la note d'un Voyageur sur le récapitulatif de réservation | « 12 colis transportés » — le mot « deal » n'apparaît nulle part |
+
+## Complément — la porte d'identité du tunnel (A219)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-96** | La demande d'identité se fait **à l'entrée** du tunnel de réservation, jamais au paiement. Un visiteur sans session qui touche « Réserver » voit la feuille de connexion, pas la première étape. |
+| **RG-MOB-97** | Après une connexion ouverte depuis « Réserver », le parcours **reprend de lui-même** : le membre n'a pas à retrouver son geste. |
+| **RG-MOB-98** | Une session qui meurt **pendant** le parcours ne détruit pas la saisie : l'écran propose de se reconnecter, et l'autorisation repart seule au retour. |
+| **RG-MOB-99** | Les refus d'identité du serveur (jeton absent, expiré, session révoquée) disent **une seule chose** au membre : reconnecte-toi. Leur distinction reste technique. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB148 | Visiteur anonyme, toucher « Réserver » sur un trajet | La feuille de connexion s'ouvre ; aucune étape du tunnel n'est poussée |
+| MOB149 | Se connecter depuis cette feuille | La feuille se referme et l'écran ① s'ouvre **tout seul**, sur le bon trajet |
+| MOB150 | Fermer la feuille sans se connecter, puis quitter la fiche trajet, puis se connecter ailleurs | Aucun tunnel ne s'ouvre : l'attente appartenait à l'écran quitté |
+| MOB151 | Session expirée entre l'écran ⑥ et l'écran ⑦ | L'écran propose « Se connecter » (pas « Réessayer ») ; au retour l'autorisation repart seule et la saisie est intacte |
+| MOB152 | L'autorisation échoue | La carte « Ce que tu paies » montre le total, **jamais** « Préparation du paiement… » |
+
+## Complément — le fournisseur de paiement (A220)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-100** | Le fournisseur de paiement se déclare explicitement (`PAYMENT_PROVIDER`). À défaut, la présence d'une clé secrète Stripe décide — le comportement historique est inchangé. |
+| **RG-MOB-101** | Le fournisseur simulé est **refusé en production**, qu'il soit déduit ou demandé explicitement. Aucune configuration ne permet d'encaisser pour de faux en production. |
+| **RG-MOB-102** | Demander Stripe sans clé secrète **empêche le démarrage** : jamais de repli silencieux vers le simulé. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB153 | `PAYMENT_PROVIDER=fake` avec une clé Stripe présente, hors production | Fournisseur simulé ; le parcours mobile va jusqu'à la demande créée |
+| MOB154 | `PAYMENT_PROVIDER=fake` en production | Le service refuse de démarrer, en nommant la règle |
+| MOB155 | `PAYMENT_PROVIDER=stripe` sans clé secrète | Le service refuse de démarrer |
+| MOB156 | `PAYMENT_PROVIDER` vide ou inconnu | Comportement d'avant : la clé décide |

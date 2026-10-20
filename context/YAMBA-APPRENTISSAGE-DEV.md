@@ -4284,3 +4284,527 @@ le vestige d'un chemin écrit avant que le helper n'existe.
 - *Lifting state up* dans la documentation React, et sa variante « source externe » :
   URL, stockage, événements système.
 - Le motif *flash message* et la consommation d'un état à usage unique.
+
+---
+
+## Chapitre 217 — Le clavier qui cache le prix, l'échelle qu'aucun mot ne porte, et la virgule flottante qui ruine un écran
+
+Un lot d'interface, et cinq leçons qui ne sont pas des questions de goût.
+
+### 1. « Pas sexy » est un symptôme — le diagnostic est ailleurs
+
+Le retour était : *« le champ poids et taille, c'est pas sexy »*. Le réflexe serait d'ajouter
+un dégradé, des ombres, une animation. C'est presque toujours une erreur.
+
+L'écran posait quatre questions sous quatre rangées de pastilles identiques. Ce qui manquait
+n'était pas la décoration mais **la structure** : aucune hiérarchie, et surtout **aucun objet
+à manipuler**. Un tunnel de réservation doit donner quelque chose qu'on façonne ; celui-ci
+donnait un formulaire de réglages.
+
+Le test pour distinguer les deux : *si je retire toute la couleur, l'écran reste-t-il
+compréhensible et hiérarchisé ?* Si oui, le problème est cosmétique. Si non — et c'était le
+cas — il est structurel, et aucune ombre portée ne le réparera.
+
+### 2. Deux contrôles qui alimentent un seul calcul appartiennent au même bloc
+
+C'est la leçon la plus transposable du lot. Depuis D81 :
+
+```
+poidsFacturé = max(poidsRéel, plancher, minimumDeLaTaille)
+```
+
+Le poids et la taille **entrent dans le même `max`**. L'interface les séparait par un titre,
+une aide et vingt pixels de marge — soit le vocabulaire visuel de l'indépendance. Résultat :
+l'utilisateur change une taille, le prix saute, et rien ne relie les deux dans son champ de
+vision.
+
+> **La mise en page est une affirmation sur le modèle.** Deux champs côte à côte disent « ces
+> deux choses vont ensemble » ; deux sections séparées disent « elles n'ont rien à voir ». Si
+> l'affirmation contredit le calcul, l'utilisateur ne comprendra jamais le résultat.
+
+Le corollaire s'est vérifié dans le même lot, en sens inverse : la **valeur du contenu**
+était posée à côté du poids, par simple accident de grille à deux colonnes. Elle ne fait
+pourtant pas le prix du transport — elle fixe le plafond d'indemnisation. Elle a donc
+déménagé au contact de la protection, qu'elle commande.
+
+### 3. Le clavier virtuel est un élément d'interface, pas un détail
+
+```tsx
+<TextInput keyboardType="decimal-pad" … />   // AVANT
+```
+
+Toucher ce champ faisait monter un pavé numérique qui occupe environ **la moitié basse** de
+l'écran — précisément là où vit la barre « total + Continuer ». L'utilisateur modifiait le
+poids **sans jamais voir le prix changer**. La promesse du « prix vivant » s'effondrait à
+l'instant exact où elle devait payer.
+
+C'est un défaut qu'on ne voit pas en relisant du code, ni sur une maquette, ni sur un
+simulateur où l'on tape au clavier physique. **On le voit sur un téléphone, avec un pouce.**
+
+Le remède général : sur mobile, pour une valeur numérique bornée et à granularité connue,
+préférer un **pas** à une saisie libre.
+
+```tsx
+<StepperButton direction="minus" … />
+<Pressable onPress={() => setEditingWeight(true)}>{draft.weightKg} kg</Pressable>
+<StepperButton direction="plus" … />
+```
+
+La saisie libre reste accessible — en touchant la valeur — mais elle devient le chemin
+exceptionnel au lieu d'être le chemin par défaut.
+
+Deux détails de ce stepper méritent d'être copiés :
+
+- **le pas s'adapte** (`kg < 5 ? 0.5 : 1`) : fin là où vivent les colis réels, large
+  au-dessus où la précision n'apporte rien et où il faudrait vingt appuis ;
+- **le bouton se désactive, il ne disparaît pas.** Un bouton qui disparaît déplace son
+  voisin sous le doigt entre deux appuis — l'utilisateur appuie sur autre chose que ce
+  qu'il visait.
+
+### 4. `0.1 + 0.2 !== 0.3` : la virgule flottante arrive toujours par l'interface
+
+```ts
+const next = Math.round((current + direction * weightStep(current)) * 10) / 10;
+```
+
+Sans ce `Math.round(x * 10) / 10`, un utilisateur qui descend de 3 à 2,9 voit s'afficher
+**2.9000000000000004**. La représentation IEEE 754 ne peut pas coder 0,1 exactement, et les
+erreurs s'accumulent à chaque pas.
+
+C'est la raison pour laquelle le dépôt impose **les montants en cents entiers** — règle non
+négociable. Le poids, lui, est un `Float` légitime (un colis pèse 2,5 kg), donc l'arrondi
+doit être fait **au moment de l'écriture dans l'état**, pas seulement à l'affichage : sinon
+la valeur sale se propage dans le brouillon, puis dans le devis, puis dans la photographie
+serveur.
+
+> Règle pratique : dès qu'une valeur décimale est **incrémentée** plutôt que saisie,
+> arrondissez au pas d'affichage à chaque opération.
+
+### 5. L'échelle est une information que le texte ne peut pas porter
+
+Les icônes de taille avaient été retirées quelques jours plus tôt, et c'était justifié : une
+boîte à chaussures *dessinée* n'apprend rien de plus que les mots « une boîte à chaussures ».
+Elle coûtait une ligne de hauteur pour une redondance.
+
+Mais retirer l'icône avait aussi retiré **l'échelle**, et là on a perdu quelque chose de
+réel :
+
+```ts
+const SIZE_SILHOUETTES = {
+  S: { width: 26, height: 18 },   // 33 × 23 cm
+  M: { width: 36, height: 24 },   // 45 × 30 cm
+  L: { width: 44, height: 32 },   // 55 × 40 cm
+};
+```
+
+Trois rectangles nus, aux **proportions réelles des gabarits**. Ce ne sont pas des icônes :
+c'est une **mesure**. Et le détail qui fait tout fonctionner :
+
+```tsx
+<span className="flex h-9 items-end">   {/* ligne de base COMMUNE */}
+```
+
+Alignées au centre, les trois silhouettes perdraient la moitié de leur sens — la comparaison
+de hauteur deviendrait illisible. C'est exactement le principe d'un graphique en barres :
+**une base commune, sinon aucune comparaison**.
+
+La distinction générale à retenir : *une illustration qui redit le texte est du bruit ; une
+représentation qui encode une grandeur est de l'information.*
+
+### 6. Un champ calculé qu'on n'affiche pas est un champ inutile
+
+`billableReason` (`ACTUAL` / `FLOOR` / `SIZE_MIN`) avait été ajouté au devis par D81,
+précisément parce qu'un booléen « minimum appliqué » ne permettait pas d'expliquer *lequel*
+des minimums avait gagné. Il a ensuite traversé le moteur, le contrat, la photographie
+serveur… **et n'a été affiché nulle part**.
+
+Pendant ce temps, l'utilisateur voyait le prix ne pas suivre son poids, sans explication.
+
+```tsx
+{billedNote ?? sizeHint}
+```
+
+La leçon de méthode : quand on ajoute un champ « pour expliquer », **la tâche n'est pas finie
+tant qu'un écran ne l'affiche pas**. Sinon on a payé le coût du champ (contrat, snapshot,
+tests, migration mentale) sans jamais en toucher le bénéfice.
+
+### 7. Un nombre magique écrit deux fois
+
+```ts
+} else if (w > 30) {
+  errors.weightKg = isFr ? "30 kg maximum par colis" : "30 kg max per parcel";
+```
+
+La limite **et** son message. Changer l'une sans l'autre produit une interface qui refuse à
+30 en annonçant 25. Le remède tient en deux lignes :
+
+```ts
+export const MAX_PARCEL_KG = 30;
+…
+errors.weightKg = isFr ? `${MAX_PARCEL_KG} kg maximum par colis` : …
+```
+
+Et c'est l'écran qui a révélé le problème : il avait besoin de la limite pour borner son
+pas, et il n'y avait rien à importer. **Un besoin d'ailleurs est souvent ce qui révèle une
+constante mal rangée.**
+
+### Les pièges payés dans ce lot
+
+- Traiter « pas sexy » comme une demande de décoration au lieu de chercher la structure.
+- Séparer visuellement deux contrôles qui alimentent un même calcul.
+- Oublier que le clavier virtuel **recouvre** l'information qui justifie la saisie.
+- Incrémenter un décimal sans arrondir : la valeur sale se propage dans l'état.
+- Retirer une illustration sans distinguer ce qui était **redondant** (le dessin) de ce qui
+  était **informatif** (l'échelle).
+- Ajouter un champ explicatif et ne jamais l'afficher.
+
+### Aller plus loin
+
+- *Thinking with Type* et la notion de ligne de base commune ; les règles de comparabilité
+  des graphiques en barres (Cleveland & McGill sur la précision perceptive).
+- Les recommandations de taille de cible tactile (44 px côté Apple, 48 dp côté Material).
+- IEEE 754 et la représentation des décimaux, et pourquoi le dépôt impose les cents entiers.
+- Le livrable 12, § 5.1 : d'où viennent les proportions S/M/L et le diviseur 5000.
+
+### Post-scriptum au chapitre 217 — quand la structure est juste et la grammaire est à soi
+
+La première version de cette carte avait corrigé les cinq défauts décrits ci-dessus, et le
+retour est resté : « toujours moche ». Ce n'était pas une contradiction — c'étaient **deux
+problèmes différents**, et j'avais résolu le premier en inventant le second.
+
+- la **structure** (qu'est-ce qui va avec quoi, dans quel ordre, avec quelle hiérarchie) :
+  réglée, et c'est ce qui comptait le plus ;
+- la **grammaire visuelle** (à quoi ressemble une ligne, où vit un contrôle, comment on
+  sépare deux choix) : inventée au fil du clavier — un bloc centré ici, une jauge là, trois
+  colonnes plus loin. Trois idiomes différents dans un même écran.
+
+Trois captures de référence ont suffi à la fixer : « libellé gras · ligne grise · contrôle à
+droite », lignes pleine largeur, filets fins, pas de cadre imbriqué. **Une grammaire, répétée.**
+
+La leçon vaut au-delà de ce lot : *l'originalité n'a pas sa place au niveau du composant.*
+Inventer une façon de présenter un stepper ou un groupe de choix, c'est demander à
+l'utilisateur d'apprendre une convention qui n'existe que chez vous — pour aucun bénéfice.
+L'invention est utile sur ce qu'on montre et dans quel ordre ; sur **comment** on le montre,
+copier une grammaire éprouvée est presque toujours le bon choix.
+
+Deux arbitrages concrets de cette révision, parce qu'ils se reposeront ailleurs :
+
+- **une phrase bat une jauge** quand le chiffre compte. Une barre demande de décoder une
+  proportion, dépend de la couleur pour l'urgence, et ne dit pas *combien* il reste. « 3 kg
+  restants » donne le nombre, passe en mangue à l'approche de la limite, et se lit par un
+  lecteur d'écran sans travail supplémentaire ;
+- **un contrôle secondaire ne doit pas peser comme l'action principale.** Les boutons du pas
+  étaient des cercles pleins de 44 px : ils attiraient l'œil autant que le CTA « Continuer »,
+  pour une fonction d'ajustement. En cercles **bordés** de 34 px, ils disent « touchable »
+  sans entrer en concurrence.
+
+Et un détail qui fait le pont avec le chapitre : les silhouettes survivent au changement de
+disposition, mais **leur origine commune change d'axe**. En colonnes, c'était la ligne de base
+(`items-end`) ; empilées en lignes, c'est le bord gauche — d'où une gouttière de largeur fixe
+plutôt qu'un centrage. Le principe reste « une origine commune, sinon aucune comparaison ».
+
+**Addendum au post-scriptum — l'illustration qui perd sa raison d'être en changeant de
+disposition.** Les silhouettes à l'échelle étaient justifiées en colonnes : trois rectangles
+**adjacents** se comparent en une fixation du regard. En passant aux lignes, j'ai prétendu
+que le « bord gauche commun » remplaçait la ligne de base. C'était faux : l'œil compare ce
+qui est adjacent, et soixante pixels de texte entre deux formes suffisent à tuer la
+comparaison. On gardait une gouttière qui pousse le libellé pour une information que personne
+ne lisait.
+
+La règle générale : **une décision graphique n'est jamais valable « en soi »** — elle est
+valable *dans une disposition donnée*. Quand la disposition change, il faut re-justifier
+chaque élément plutôt que le transposer. Le test est simple : *qu'est-ce que je perds en le
+retirant ?* Ici, rien — « une boîte à chaussures » est déjà ordonné et concret.
+
+## Chapitre 218 — L'argument ICU qui ne formate rien, le module natif qu'on n'importe pas, et la pile qu'il faut dépiler
+
+### 1. Un argument ICU simple ne met rien en forme
+
+**Le symptôme.** Sur une capture du récapitulatif, deux lignes qui se suivent dans la même
+carte :
+
+```
+Transport · 2,3 kg · 3,50 €/kg · taille S      8,05 €
+Facturé au minimum du trajet : 2.3 kg.
+```
+
+**La théorie.** ICU MessageFormat distingue deux formes d'argument :
+
+- `{kg}` — un argument **simple**. La valeur est convertie en chaîne. Pour un nombre,
+  c'est `String(2.3)`, donc `"2.3"`, quelle que soit la locale ;
+- `{kg, number}` — un argument **typé**. La valeur passe par `Intl.NumberFormat` avec la
+  locale du message.
+
+On ne devine pas cette règle : elle ne se voit qu'avec un nombre **décimal**, dans une
+locale dont le séparateur n'est pas le point. Avec `3` au lieu de `2.3`, les deux formes
+donnent le même résultat et le défaut reste invisible des mois.
+
+**La mesure plutôt que la croyance** — trois lignes suffisent à trancher :
+
+```js
+const { IntlMessageFormat } = require('intl-messageformat');
+new IntlMessageFormat('… : {kg} kg.', 'fr').format({ kg: 2.3 });          // « 2.3 kg »
+new IntlMessageFormat('… : {kg, number} kg.', 'fr').format({ kg: 2.3 });  // « 2,3 kg »
+```
+
+**Le contournement qui cache le défaut.** La première ligne s'en tirait parce que le
+composant faisait le travail lui-même :
+
+```tsx
+kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+```
+
+C'est ce `locale === "fr" ? … : …` qui est le vrai signal : **quand un composant formate un
+nombre à la main, c'est que le message ne le fait pas.** La correction rend le travail au
+message (`{kg, number}`) et supprime la table de locales écrite en dur.
+
+**Le piège du balayage.** `{x, number}` nourri d'une **chaîne** lève au rendu. Avant de
+changer quinze messages, il faut vérifier quinze points d'appel — et dans ce dépôt, certains
+passent déjà une chaîne pré-formatée (`co2Saved.toFixed(1).replace(".", ",")`). D'où une
+correction limitée au domaine en cours, et un inventaire écrit pour les autres.
+
+**Pour aller plus loin.** La même famille de pièges : `{n, plural, …}` qui n'accorde rien si
+on passe une chaîne, et `{d, date, …}` qui dépend des données ICU embarquées dans le moteur
+— raison pour laquelle ce dépôt formate ses dates avec ses propres tables de mois plutôt
+qu'avec `toLocaleDateString` (voir `lib/trip-format.ts`).
+
+### 2. Un module natif ne s'importe pas, il se sonde
+
+**Le problème.** `@stripe/stripe-react-native` contient du code natif (iOS/Android). Expo Go
+est une app **déjà compilée** : elle embarque un jeu fixe de modules natifs, et celui-là n'y
+est pas. Ce qui surprend, c'est *quand* ça casse :
+
+```ts
+import { presentPaymentSheet } from '@stripe/stripe-react-native'; // ← lève DÈS l'évaluation
+```
+
+Le module appelle `TurboModuleRegistry.getEnforcing(...)` au moment où il s'évalue, pas au
+moment où on l'utilise. Et comme Metro hisse les imports, le fichier qui contient cette
+ligne fait tomber l'app **dès qu'une route voisine le charge** — à l'ouverture du tunnel,
+pas au paiement.
+
+**Le motif.** Un chargement paresseux dans un `try`, et une seule sonde mémorisée :
+
+```ts
+let cached: StripeNativeModule | null = null;
+let probed = false;
+
+function loadModule(): StripeNativeModule | null {
+  if (cached) return cached;
+  if (probed) return null;      // dans Expo Go, l'évaluation lève à CHAQUE appel
+  probed = true;
+  try {
+    cached = require('@stripe/stripe-react-native') as StripeNativeModule;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+```
+
+Trois points qui comptent :
+
+- **`require` et non `import`** : c'est tout l'objet du fichier. `import` est statique, donc
+  évalué au chargement du module ;
+- **le typage est local** (`type StripeNativeModule = { … }`) : on décrit les trois
+  fonctions qu'on utilise, pas la bibliothèque. Le code reste typé sans dépendre d'un
+  module dont on refuse justement de dépendre à la compilation ;
+- **la sonde est mémorisée**. Sans `probed`, un `require` qui lève recommence à chaque
+  rendu — et l'écran consulte la disponibilité à chaque rendu.
+
+**La conséquence de conception.** Le reste de l'app ne connaît de Stripe que deux fonctions :
+`isPaymentSheetAvailable()` et `confirmWithPaymentSheet()`. L'écran ne sait pas *pourquoi*
+la feuille est absente, seulement qu'elle l'est — et il le dit. C'est la même frontière que
+le serveur s'était donnée avec `PaymentProvider` (D11) : **le fournisseur de paiement est
+une dépendance remplaçable, y compris par rien du tout.**
+
+**Pour aller plus loin.** C'est le motif *optional peer dependency* appliqué au natif. Il
+vaut pour tout module non inclus dans Expo Go (paiement, Bluetooth, santé…) : tant que la
+porte existe, l'app reste testable dans Expo Go, et le build de développement devient une
+décision d'outillage — pas un prérequis pour écrire la fonctionnalité.
+
+### 3. Une pile de navigation se dépile, elle ne se remplace pas
+
+**Le problème.** Le tunnel est une pile de sept pages poussées. Après `POST /deals`, un
+`router.replace('/booking/confirmation')` remplace **la page courante** — les six autres
+restent dessous. Le geste de retour ramène alors sur « Ton engagement », avec un brouillon
+qui vient d'être effacé : un écran vide, après un paiement réussi.
+
+**Le geste juste** (expo-router v6, vérifié dans la doc SDK 57) :
+
+```ts
+if (router.canDismiss()) router.dismissAll(); // retour au premier écran de la pile la plus proche
+router.replace({ pathname: '/booking/confirmation', params: { … } });
+```
+
+`dismissAll()` ramène au premier écran de la pile ; le `replace` qui suit le remplace par la
+confirmation. La pile ne contient plus qu'un écran, et le retour **sort** de la réservation.
+
+**La leçon générale.** Chaque fois qu'un parcours se **termine**, il faut se demander ce que
+le bouton retour fera — c'est un geste que l'utilisateur fera, pas un cas limite. Trois
+questions suffisent : où est-ce qu'il atterrit, cet écran est-il encore vrai, et peut-il
+refaire l'action qu'il vient de faire ?
+
+### 4. Un ordre d'effets de bord est une règle métier
+
+Dans un chemin d'argent, l'ordre des appels **est** la spécification :
+
+```
+photos → autorisation → création de la demande
+```
+
+Inverser les deux premiers ne « marche » pas moins bien : ça laisse une empreinte bancaire
+sur la carte d'un membre pour une demande qui n'existera jamais, parce qu'une photo n'a pas
+pu partir. C'est invisible en test et très visible sur un relevé.
+
+Deux techniques accompagnent cet ordre :
+
+- **l'idempotence de l'étape coûteuse**. Les URLs téléversées sont gardées dans un
+  `useRef(new Map())` indexé par l'identité de la photo. Un réessai après un refus métier ne
+  repaie pas le téléversement. Un `useRef` et non un `useState` : cette valeur ne doit
+  **pas** provoquer de rendu, et elle doit survivre aux rendus ;
+- **la relecture des entrées après un refus**. Quand le serveur répond « ton total n'est pas
+  le mien », réessayer sans rien relire rejoue exactement le même calcul faux. L'écran relit
+  donc le trajet et les paramètres de plateforme avant de proposer un nouvel essai.
+
+### 5. Un libellé qui enveloppe un lien fait deux choses à la fois
+
+Trouvé sur le site, dans la case d'acceptation de la charte :
+
+```tsx
+<label htmlFor={id}>
+  <input type="checkbox" … />
+  <div>J'ai lu et j'accepte … <a href="/legal/cgv">CGV</a> …</div>
+</label>
+```
+
+Un `<label>` transmet l'activation à son champ. Un lien **à l'intérieur** du label navigue
+*et* coche la case : **lire les conditions revient à les accepter**. Ajouté à cela, le lien
+naviguait dans le même onglet alors que le brouillon du tunnel vit en mémoire de page : la
+saisie était perdue.
+
+La correction tient en deux gestes — sortir les liens du `<label>`, et les ouvrir dans un
+nouvel onglet. La règle à retenir : **un `<label>` ne contient que ce qui doit activer le
+champ.** Tout le reste est un frère, pas un enfant.
+
+### 6. Où placer une porte d'identité — et comment la mesurer avant de la déplacer
+
+**Le symptôme.** Un parcours de huit écrans se bloque sur le neuvième avec « reconnecte-toi ».
+
+**Le réflexe à ne pas avoir** : corriger le message d'erreur. Le message était juste — c'est
+sa *place* qui était fausse.
+
+**Mesurer d'abord.** Trois commandes avant toute hypothèse :
+
+```sh
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health   # les services répondent ?
+curl -s -X POST http://localhost:8080/api/deals/payment-intents -d '{}' -H 'content-type: application/json'
+# → {"message":"Unauthorized! Token missing.","details":{"code":"TOKEN_MISSING"}}
+```
+
+La route fonctionne, le refus est une **décision** du serveur, pas une panne. La question
+devient : *pourquoi ce refus arrive-t-il seulement ici ?* Réponse : parce que c'est le
+**premier appel authentifié du parcours**. Tout ce qui précède est anonyme.
+
+**La règle de placement.** Une porte d'identité se place là où elle coûte le moins à celui
+qui la franchit — pas là où elle gêne le moins à écrire :
+
+| Placement | Coût pour le membre si refus |
+|---|---|
+| À l'entrée | un geste |
+| Au milieu | la saisie faite jusque-là, si elle ne survit pas |
+| À la fin | **le parcours entier**, au moment où l'intention d'achat était formée |
+
+**Le signal de conception à repérer.** Le code portait ce commentaire :
+
+```
+un visiteur anonyme y entre librement, la porte d'identité tombera au destinataire.
+```
+
+Un commentaire au futur qui décrit un comportement **absent** n'est pas une documentation,
+c'est une dette non enregistrée. Et comme il contredisait le front jumeau sans qu'aucune
+décision ne l'ait tranché, ce n'était pas une divergence assumée : c'était un oubli. Le test
+qui les sépare tient en une question — *est-ce écrit quelque part que les deux fronts
+diffèrent, et pourquoi ?*
+
+**Le motif technique : reprendre le geste.** Une feuille modale d'authentification se referme
+sur l'écran qui l'a ouverte. Pour reprendre l'action interrompue, il faut une mémoire — et
+la borner :
+
+```ts
+// posée par l'écran qui ouvre la connexion
+setPendingBooking(trip.id);
+router.push('/login');
+
+// reprise, sur le MÊME écran, quand la session arrive
+useEffect(() => {
+  if (status !== 'authenticated') return;
+  if (!takePendingBooking(trip.id)) return;   // vrai une fois, pour CE trajet
+  router.push({ pathname: '/booking/parcel', params: { tripId: trip.id } });
+}, [status, trip.id]);
+
+// et elle meurt avec l'écran qui l'a posée
+useEffect(() => () => clearPendingBooking(trip.id), [trip.id]);
+```
+
+Les trois gestes comptent autant l'un que l'autre. Sans le `take` conditionnel, une connexion
+faite ailleurs consommerait une attente qui n'est pas la sienne. Sans le nettoyage au
+démontage, se connecter trois écrans plus loin pousserait un parcours que personne n'a
+demandé. C'est le même raisonnement que pour un `AbortController` : **une intention
+asynchrone appartient à ce qui l'a émise, et meurt avec.**
+
+**Sept codes, un seul geste.** Le middleware distingue `TOKEN_MISSING`, `TOKEN_EXPIRED`,
+`SESSION_REVOKED`… parce qu'un client doit pouvoir les distinguer. Mais côté écran, ils
+demandent tous la même chose. Les ramener à un état (`sessionBlocked`) n'est pas une perte
+d'information : c'est traduire une taxonomie technique en **un geste proposé**. Et le geste
+juste n'est pas « Réessayer » — qui rejouerait le même refus — mais « Se connecter ».
+
+**Enfin : un écran ne dit pas qu'il prépare ce qui a échoué.** La carte du haut annonçait
+« Préparation du paiement… » alors que la préparation avait échoué cinq lignes plus bas. Un
+état de chargement doit être conditionné à *en cours*, jamais à *pas encore de résultat* —
+« pas de résultat » couvre aussi l'échec.
+
+### 7. Un repli implicite n'est pas une configuration
+
+**Le motif fautif.** Une fabrique qui déduit son comportement de la présence d'un secret :
+
+```ts
+const key = env.STRIPE_SECRET_KEY?.trim();
+if (key) return new StripePaymentProvider(key);
+return new FakePaymentProvider();   // « pas de clé » = « mode développement »
+```
+
+C'est commode et c'est faux dès que la variable sert **aussi** à autre chose. Ici la clé vit
+dans le `.env` racine, lu par tous les services : pour obtenir le fournisseur simulé, il
+fallait *enlever* une information plutôt que *demander* un comportement — donc construire un
+bundle et le lancer à la main avec la variable vidée.
+
+**La règle.** *Un comportement qu'on veut pouvoir choisir mérite sa propre variable.* Déduire
+reste utile **en repli**, pas comme unique levier :
+
+```
+explicite ? explicite : (indice ? A : B)
+```
+
+**Les garde-fous ne se relâchent pas pour autant.** Rendre un mode demandable ne le rend pas
+permis partout :
+
+- le mode simulé reste **refusé en production**, qu'il soit déduit ou demandé — et le message
+  d'erreur dit *lequel* des deux refus s'applique, sinon on cherche la mauvaise cause ;
+- demander le mode réel sans son secret **lève** au lieu de se replier : un repli silencieux
+  vers le simulé est exactement le bug qu'on cherche à rendre impossible ;
+- une valeur inconnue (`paypal`) ne décide de rien et laisse le repli jouer — refuser de
+  démarrer sur une faute de frappe dans une variable facultative serait plus brutal
+  qu'utile.
+
+**Chercher le précédent avant d'inventer la forme.** Le dépôt avait déjà ce problème résolu
+pour l'e-mail (`resolveEmailProviderName` : explicite, puis indices, puis refus en
+production). Reprendre la forme coûte dix minutes de lecture et évite une deuxième mécanique
+à connaître. Deux chemins sensibles pilotés différemment, c'est une mécanique de trop.
+
+**Et un test vert n'est pas un type juste.** La première écriture redéclarait un type déjà
+exporté vingt lignes plus haut dans le même fichier. `nx test` était vert — jest transpile
+fichier par fichier sans contrôle global de types. C'est `nx run-many --target=typecheck --all`
+qui a sorti les deux `TS2300`. D'où la règle du dépôt : « CI OK » se compte, et un lot qui
+touche un paquet partagé se typecheck **en entier**, pas seulement dans le projet où on a
+écrit.

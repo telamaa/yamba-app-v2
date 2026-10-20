@@ -409,35 +409,54 @@ export function CharterCheckbox({
   const linkClass = "underline-offset-2 hover:underline";
   const linkStyle = { color: TIP_TEXT };
 
+  // Les liens vers les documents vivent HORS du <label> : cliqués à l'intérieur,
+  // ils cochaient la case en même temps qu'ils ouvraient le document — lire les CGV
+  // revenait à les accepter. Ils s'ouvrent aussi dans un nouvel onglet, sinon quitter
+  // le tunnel pour lire un document perd le brouillon (il vit en mémoire de page).
   return (
-    <label
-      htmlFor={id}
+    <div
       className={[
-        "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
-        "bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800",
+        "rounded-lg border p-4 transition-colors",
+        "bg-slate-50 dark:bg-slate-900",
         hasError
           ? "border-[#FF9900]"
           : "border-transparent hover:border-slate-200 dark:hover:border-slate-700",
       ].join(" ")}
     >
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChangeAction(e.target.checked)}
-        className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 cursor-pointer accent-[#FF9900]"
-      />
-      <div>
-        <div className="mb-1 text-[14px] font-medium">{title}</div>
-        <div className="text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
-          {descPrefix}
-          <a href={cgvHref} className={linkClass} style={linkStyle}>{cgvLabel}</a>
-          {descJoin}
-          <a href={contractHref} className={linkClass} style={linkStyle}>{contractLabel}</a>
-          {descSuffix}
-        </div>
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChangeAction(e.target.checked)}
+          className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 cursor-pointer accent-[#FF9900]"
+        />
+        <span className="text-[14px] font-medium">{title}</span>
+      </label>
+      <div className="mt-1 pl-[30px] text-[12px] leading-[1.5] text-slate-500 dark:text-slate-400">
+        {descPrefix}
+        <a
+          href={cgvHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+          style={linkStyle}
+        >
+          {cgvLabel}
+        </a>
+        {descJoin}
+        <a
+          href={contractHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+          style={linkStyle}
+        >
+          {contractLabel}
+        </a>
+        {descSuffix}
       </div>
-    </label>
+    </div>
   );
 }
 
@@ -580,21 +599,8 @@ export function LocationOption({
       role="radio"
       aria-checked={selected}
       onClick={onSelectAction}
-      className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity hover:opacity-80"
+      className="flex w-full items-center gap-3 py-4 text-left transition-opacity hover:opacity-80"
     >
-      <span
-        className={[
-          "inline-flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2",
-          selected
-            ? "border-[#FF9900]"
-            : hasError
-              ? "border-[#FF9900]/60"
-              : "border-slate-300 dark:border-slate-600",
-        ].join(" ")}
-        aria-hidden="true"
-      >
-        {selected && <span className="h-[8px] w-[8px] rounded-full" style={{ backgroundColor: MANGO }} />}
-      </span>
       <Icon
         size={17}
         strokeWidth={1.75}
@@ -625,16 +631,36 @@ export function LocationOption({
           {location.addressShort}
         </span>
       )}
+      {/* La pastille à DROITE — même grammaire que « Ton colis » et
+          « Protection du colis » : le libellé se lit d'abord, le choix se pose
+          au bout de la ligne, toujours au même endroit d'un bloc à l'autre. */}
+      <span
+        className={[
+          "inline-flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px]",
+          selected
+            ? "border-[#FF9900]"
+            : hasError
+              ? "border-[#FF9900]/60"
+              : "border-slate-300 dark:border-slate-600",
+        ].join(" ")}
+        aria-hidden="true"
+      >
+        {selected && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: MANGO }} />}
+      </span>
     </button>
   );
 }
 
-/** Le conteneur des lignes de lieu : un filet entre elles, aucune bordure autour. */
+/**
+ * Le conteneur des lignes de lieu : une CARTE bordée, un filet entre les lignes.
+ * Même objet que « Ton colis » — un bloc de choix se reconnaît à sa forme, pas
+ * à sa place dans la page.
+ */
 export function LocationList({ children }: { children: ReactNode }) {
   return (
     <div
       role="radiogroup"
-      className="divide-y divide-slate-200/80 dark:divide-slate-800"
+      className="divide-y divide-slate-100 rounded-2xl border border-slate-200 px-4 dark:divide-slate-800/70 dark:border-slate-800"
     >
       {children}
     </div>
@@ -662,7 +688,9 @@ export function LocationDisplay({ location, hint }: LocationDisplayProps) {
   if (!location) return null;
   const Icon = getLocationIcon(location.kind);
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    // Un seul lieu : pas de choix, donc pas de pastille — mais la même carte,
+    // pour que la page ne change pas de grammaire selon le trajet.
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-4 dark:border-slate-800">
       <Icon size={17} strokeWidth={1.75} className="flex-shrink-0 text-slate-400 dark:text-slate-500" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13.5px] font-medium text-slate-800 dark:text-slate-100">
