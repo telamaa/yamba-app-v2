@@ -13703,3 +13703,29 @@ silence aurait déplacé le défaut au lieu de le nommer.
 - `npx expo config --type introspect` → plugin exécuté, `wallet.api.enabled` injecté,
   identifiants posés, aucune erreur.
 - Aucun code applicatif touché : ce lot ne peut rien casser à l'exécution.
+
+## Complément — le projet EAS existe, et une permission à surveiller
+
+Le projet est lié au compte d'**organisation** (choisi le 21/10 pour pouvoir donner des
+accès par rôle, cohérent avec la recommandation du livrable 06) :
+
+```json
+// apps/mobile/app.json
+"owner": "telamas-team",
+"extra": { "eas": { "projectId": "78cf22fe-7ca9-4b1b-8d85-c24291659f45" } }
+```
+
+`npx eas init --force` crée le projet et écrit ces deux clés. Il a aussi **matérialisé**
+dans `app.json` un tableau `android.permissions` contenant
+`android.permission.RECORD_AUDIO`. Vérification faite en comparant les introspections
+**avant** et **après** : le manifeste Android est **identique** dans les deux cas — la
+permission était déjà injectée par le plugin `expo-image-picker` (qui prévoit la capture
+vidéo). `eas init` ne l'a donc pas ajoutée, il l'a écrite. Le tableau redondant a été
+retiré pour garder le diff honnête.
+
+**Point ouvert, à trancher avant le dépôt sur le Play Store** : Yamba ne capte jamais de
+son, et une permission micro se voit dans la fiche du magasin comme en revue. La parade est
+`android.blockedPermissions`, mais elle n'a pas été posée ici **sans mesure** : si la
+bibliothèque demande cette permission à l'exécution en ouvrant l'appareil photo, un blocage
+casserait les photos de colis — c'est-à-dire une règle métier (RG-MOB-85). À vérifier sur
+un appareil réel, au premier build de développement, puis à graver.
