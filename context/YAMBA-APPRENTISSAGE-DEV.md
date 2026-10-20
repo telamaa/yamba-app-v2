@@ -5116,3 +5116,45 @@ pour quoi faire ? ».
 - Une doublure de test (ici le fournisseur Fake) n'est utile que si elle peut simuler le
   passé : d'où `_setCreatedAtForTest`. Un faux sans horloge ne sait rien dire des règles
   temporelles.
+
+### 8. Complément du chapitre 220 — lire la documentation plutôt que la mémoire d'une décision
+
+Trois enseignements de l'implémentation de D82 7A, et le premier est méthodologique.
+
+**La décision écrite portait deux faits faux.** Elle affirmait qu'il fallait rendre le
+brouillon web durable (il l'était déjà) et retirer `redirect: "if_required"` (c'est le bon
+réglage). Les deux ont été démentis : l'un par la lecture du code, l'autre par la
+documentation Stripe.js, qui dit textuellement que `if_required` « ne redirige **que** si
+l'utilisateur choisit un moyen à redirection ».
+
+La règle du dépôt existe pour ça — *code + ses tests > registre* — mais elle ne sert à rien si
+personne ne relit. **Une décision d'architecture est une hypothèse de travail, pas une
+vérité** : la première tâche de l'implémentation est de la vérifier, et le registre se
+corrige visiblement quand elle est fausse. Coder pour tenir une phrase erronée aurait produit
+deux régressions : un stockage redondant, et tous les paiements par carte basculés dans un
+rechargement de page complet.
+
+**Ce qui se perd dans une redirection n'est pas ce qu'on croit.** Le brouillon est persisté ;
+ce sont les variables de la fonction en cours qui disparaissent — l'identifiant de
+l'autorisation et les URL des photos déjà téléversées. D'où un réflexe : avant de confier le
+contrôle à un tiers (redirection, feuille native, fenêtre OAuth), énumérer ce qui vit
+**uniquement** dans la pile d'appels, et le consigner.
+
+**Un garde qui bloque doit savoir se rouvrir.** La reprise lève un drapeau pour empêcher la
+création d'une seconde autorisation. Première version : le drapeau restait levé si la reprise
+échouait, et l'écran devenait définitivement inerte — *pire* que l'échec annoncé. Tout
+verrou posé pour empêcher un effet de bord doit avoir son chemin de libération dans le cas
+d'erreur, pas seulement dans le cas nominal.
+
+```ts
+} catch (e) {
+  toast.error(errorMessage(e));
+  clearPendingPayment(trip.tripId);
+  resumeStarted.current = false;   // sans cette ligne, l'écran est mort
+}
+```
+
+**Et un dernier réflexe, propre à ce dépôt** : `apps/mobile/AGENTS.md` exige de lire la
+documentation **versionnée** d'Expo avant d'écrire du code. Bien vu : `useURL()` est
+**déprécié** en SDK 57 au profit de `useLinkingURL()`. Une API « connue » est une API dont on
+se souvient d'une version antérieure.

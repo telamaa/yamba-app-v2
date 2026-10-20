@@ -13866,3 +13866,114 @@ codes de refus — ceux dont le dépôt garantit qu'ils atteignent le client —
 documentés nulle part dans le contrat public. Un client tiers ne peut les découvrir qu'en
 lisant notre code. Correction possible : exposer l'énumération dans le schéma d'erreur du
 contrat. Non fait ici (hors périmètre), signalé pour arbitrage.
+
+## Complément — le retour de redirection, et deux affirmations de D82 démenties par la mesure
+
+### ① « Rendre le brouillon durable » : il l'était déjà
+
+`useBookingDraft` (web) persiste **déjà** le brouillon ET l'étape en `sessionStorage`, scopés
+par `tripId`, versionnés, `photos` exclues (`usePersistedFormState`). D82 7A ① prescrivait
+donc un travail fait.
+
+Ce qui manquait réellement vivait en **mémoire du composant** :
+
+| Perdu au retour | Conséquence mesurée |
+|---|---|
+| `intent` (l'identifiant de l'autorisation) | L'étape 4 remontait sans lui et en créait **une autre** : une SECONDE empreinte sur le moyen de paiement du membre, la première laissée orpheline |
+| `photoUrls` (variable locale de `submit()`) | Les `File` ne sont pas sérialisables et sont perdus pour de bon : la réservation naîtrait **sans ses photos**, alors qu'elles sont déjà chez ImageKit |
+
+D'où `pending-payment.ts` : un **dossier d'attente** écrit juste AVANT de confirmer — le seul
+instant où la page peut disparaître. `sessionStorage` (il meurt avec l'onglet), TTL 30 min,
+version, jamais `localStorage`, et **aucun secret client dedans** : un identifiant
+d'intention, des URL d'images, un total.
+
+### ② `redirect: "if_required"` ne devait PAS disparaître
+
+D82 7A ② affirmait qu'il « échoue par construction sur un moyen qui redirige toujours ». La
+documentation Stripe.js dit l'inverse, mot pour mot :
+
+> « If you set `redirect: "if_required"`, then `stripe.confirmPayment` will only redirect
+> **if your user chooses a redirect-based payment method**. »
+
+C'est donc **le bon réglage, et il reste** : la carte ne quitte pas la page, Klarna et PayPal
+redirigent. Le retirer aurait fait basculer *tous* les paiements par carte — le cas le plus
+courant — dans un rechargement complet de page, pour rien.
+
+Le travail était ailleurs : **lire le retour**. Stripe revient sur `return_url` avec
+`payment_intent` et `redirect_status`. La reprise (`useBookingCheckout`) :
+
+1. lit l'URL (`readRedirectReturn`, fonction pure) ;
+2. refuse un retour qui ne correspond pas au dossier d'attente (onglet recyclé, URL collée)
+   ou dont `redirect_status` vaut `failed` (la banque a refusé : il faut repayer, pas créer
+   une réservation) ;
+3. nettoie l'URL de ses paramètres (`history.replaceState`), **y compris le secret client**
+   que Stripe y laisse ;
+4. crée la demande avec l'autorisation et les photos consignées, en respectant l'attente
+   `PAYMENT_PROCESSING` ;
+5. **bloque la création d'une nouvelle autorisation** pendant toute la reprise.
+
+### Le défaut que j'ai introduit, et corrigé avant de livrer
+
+Le garde de reprise (`resumeStarted`) empêche l'étape 4 de créer une autorisation. Première
+version : il restait levé si la reprise ÉCHOUAIT — le membre se retrouvait devant un bouton
+inerte, définitivement, c'est-à-dire **pire que l'échec qu'on venait de lui annoncer**. Le
+garde est désormais rouvert sur les deux chemins d'échec.
+
+### Mobile : pourquoi aucune persistance n'est posée
+
+D82 7A ① prescrivait `expo-secure-store`. Mesure faite, ce n'est pas ce qu'il faut :
+
+- la feuille native ouvre la redirection **dans l'app** (onglet système) : le processus reste
+  vivant, et le brouillon en mémoire survit — c'est la propriété voulue de
+  `booking-draft.ts` ;
+- si le système tue l'app (pression mémoire), elle repart **à froid à la racine** : il n'y a
+  plus de tunnel à reprendre. Restaurer un brouillon que personne ne voit ne sert à rien ;
+- et dans ce cas, **l'argent est déjà protégé** par le cron d'empreintes orphelines (9A).
+
+Une reprise du tunnel à froid (lien profond + réouverture de la pile à la bonne étape) est une
+**fonctionnalité à part**, pas un correctif de ce lot. Écrire une demi-persistance pour tenir
+la lettre de 7A aurait coûté des données personnelles au repos pour un gain nul.
+
+### Ce qui est ajouté côté mobile
+
+```ts
+// apps/mobile/src/lib/stripe-sheet.ts
+await stripe.initStripe({ publishableKey, urlScheme: 'yamba', ...(merchantIdentifier && { merchantIdentifier }) });
+await stripe.initPaymentSheet({
+  …,
+  googlePay: { merchantCountryCode: 'FR', testEnv: googlePayTestEnv() },
+  ...(appleMerchantId() ? { applePay: { merchantCountryCode: 'FR' } } : {}),
+});
+```
+
+- **`urlScheme`** : sans lui, l'authentification bancaire se perd dans le navigateur système.
+- **`handleURLCallback`**, relayé par `StripeRedirectRelay` à la racine, derrière la MÊME
+  porte paresseuse que le reste du fichier (dans Expo Go, le module n'existe pas, et une URL
+  étrangère n'est pas une erreur). `useLinkingURL` — SDK 57 ; `useURL` est **déprécié**
+  (vérifié dans la doc versionnée, comme l'exige `apps/mobile/AGENTS.md`).
+- **Apple Pay n'est envoyé que si un identifiant marchand existe** (`EXPO_PUBLIC_APPLE_MERCHANT_ID`) :
+  un identifiant inventé passerait la configuration pour échouer sous le doigt du membre.
+- **`googlePay.testEnv`** est une **configuration explicite**
+  (`EXPO_PUBLIC_GOOGLE_PAY_TEST_ENV`), par défaut le type de build. D82 1A interdit au code
+  de deviner son mode : l'environnement Google Pay n'est pas le mode Stripe, et aucun préfixe
+  de clé n'est lu.
+- **`allowsDelayedPaymentMethods: false` est MAINTENU et documenté** : il ne concerne que les
+  moyens à *notification différée* (comptes bancaires américains, prélèvements), dont l'issue
+  est inconnue à la fermeture de la feuille. Klarna et PayPal sont à notification immédiate :
+  ce réglage **ne les exclut pas**.
+
+### Les contrôles de ce complément
+
+`tsc --noEmit --project apps/user-ui` vert · `nx typecheck @yamba-app/mobile` vert ·
+`nx run-many --target=typecheck --all` vert · miroir i18n parfait. **Aucun test unitaire** :
+les deux fronts n'ont pas de harnais de test dans cette CI (les cinq jobs de tests portent sur
+auth, deal, notification, trip, message) — c'est une dette réelle, signalée ci-dessous.
+
+### Axe non demandé — les fronts n'ont aucun test automatisé
+
+`pending-payment.ts` est écrit en fonctions pures précisément pour être testable
+(`readRedirectReturn`, `matchesPendingPayment`, `readPendingPayment` avec son horloge
+injectée)… mais rien ne les exécute en CI. Un harnais Jest + RNTL sur la logique front
+partagée est déjà prévu par D36 ⑥ pour le mobile ; l'étendre au web coûterait un job de CI et
+rendrait vérifiable une classe de défauts qui, aujourd'hui, ne se voit qu'en recette
+manuelle — exactement la classe de défauts que ce lot vient de corriger.

@@ -7449,3 +7449,28 @@ par oubli technique, perd la confiance qu'il met des mois à construire.
 | MOB172 | Une empreinte d'une autre application sur le même compte de paiement | Jamais annulée, quel que soit son âge |
 | MOB173 | Un membre au milieu de son paiement pendant une passe de ménage | Son empreinte est épargnée (délai de grâce) |
 | MOB174 | Échec de paiement avec motif bancaire | Le motif est journalisé ; l'écran reste sur un message générique |
+
+## Complément — le retour de redirection (D82 7A)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-119** | Revenir d'un paiement par redirection ne fait **jamais** payer deux fois : l'autorisation déjà posée est reprise, jamais remplacée par une nouvelle. |
+| **RG-MOB-120** | Les photos déjà envoyées au retour d'une redirection **restent attachées** à la demande : le membre ne les reprend pas, et elles ne sont pas perdues. |
+| **RG-MOB-121** | Un retour de paiement **refusé par la banque** ne crée aucune demande : le message le dit, la saisie reste intacte, et le membre peut repayer. |
+| **RG-MOB-122** | Un retour qui ne correspond pas au paiement attendu (onglet recyclé, adresse recopiée) **ne déclenche rien**. |
+| **RG-MOB-123** | Pendant la reprise, l'écran est visiblement occupé et le bouton inerte : la page ne paraît jamais morte. |
+| **RG-MOB-124** | Une reprise qui échoue **ne condamne pas l'écran** : le membre peut relancer un paiement. |
+| **RG-MOB-125** | L'adresse de la page est nettoyée des paramètres laissés par le paiement, **secret de paiement compris**. |
+| **RG-MOB-126** | Les portefeuilles n'apparaissent que là où ils existent : Google Pay sur Android, Apple Pay sur iOS **et seulement** quand le compte marchand Apple est en place. Aucun bouton n'est promis sans être ouvrable. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB175 | Payer par Klarna sur le site, revenir après validation | La demande est créée avec les **mêmes** photos et la **même** autorisation ; aucune seconde empreinte |
+| MOB176 | Même parcours, paiement refusé par la banque | Aucune demande ; message d'échec ; brouillon et étape intacts ; on peut repayer |
+| MOB177 | Revenir avec une adresse recopiée d'un autre paiement | Rien ne se déclenche ; l'écran reste utilisable |
+| MOB178 | Fermer l'onglet puis rouvrir le tunnel | Aucun dossier d'attente (il meurt avec l'onglet) : parcours normal |
+| MOB179 | Revenir plus de 30 minutes après | Le dossier d'attente est périmé : parcours normal, et l'autorisation oubliée est libérée (MOB170) |
+| MOB180 | Observer l'adresse après un retour | Plus de paramètre de paiement, secret compris |
+| MOB181 | Payer par carte (sans redirection) sur le site | Comportement inchangé : on reste sur la page, rien ne clignote |
+| MOB182 | Ouvrir la feuille sur Android (build de développement) | Google Pay est proposé ; Apple Pay est absent |
+| MOB183 | Ouvrir la feuille sur iOS sans compte marchand Apple | Apple Pay est absent — et aucun message ne l'avait promis |
