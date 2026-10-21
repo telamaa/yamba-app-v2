@@ -14202,3 +14202,19 @@ TS2322 en local, alors que la CI — qui n'a jamais ce fichier — aurait passé
 `npx expo customize tsconfig.json` régénère les types **sans démarrer le serveur de
 développement** (documenté pour le SDK 57, vérifié : le `tsconfig.json` n'est pas modifié).
 À connaître : un typecheck local rouge sur une route n'est pas forcément un défaut de code.
+
+## Deux défauts trouvés à la relecture, corrigés dans le lot
+
+**① Un partage refusé par l'OS partait en promesse non gardée.** `Share.share` **rejette**
+sur Android quand aucune application ne sait traiter le message, ou quand le système ferme la
+feuille lui-même. Appelé en `void shareCode()`, le rejet n'avait pas de `catch`. Avalé : le
+code reste affiché à l'écran, et il se dicte aussi bien qu'il s'envoie.
+
+**② Rouvrir un geste affichait l'échec du précédent.** `setSheet('regenerate')` n'effaçait pas
+`sheetError` : après un refus (plafond de régénérations atteint, réseau), rouvrir la feuille
+rendait le message de l'échec **passé** comme s'il venait de se produire. Les trois ouvertures
+passent désormais par `openSheet`, qui efface d'abord.
+
+> **C'est le même défaut que le garde `resumeStarted` du lot D82 7A, à un jour d'intervalle** :
+> un verrou — ou un message — posé par un chemin d'erreur doit avoir son chemin d'effacement.
+> La leçon mérite d'être écrite deux fois, puisqu'elle a été commise deux fois.
