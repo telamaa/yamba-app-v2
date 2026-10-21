@@ -34,7 +34,7 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
-import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
+import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService, orphanHoldsService } from "./routes/deal.routes";
 import redis from "@packages/libs/redis";
 import prisma from "@packages/libs/prisma";
 import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
@@ -47,6 +47,7 @@ import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
 import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
 import { startOpsDigestCron } from "./cron/ops-digest.cron";
 import { startRatingCron } from "./cron/rating.cron";
+import { startOrphanHoldsCron } from "./cron/orphan-holds.cron";
 import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
@@ -207,6 +208,11 @@ const outboxRetentionEnabled = process.env.OUTBOX_RETENTION_CRON_ENABLED !== "fa
 const outboxRetentionCron = outboxRetentionEnabled ? startOutboxRetentionCron("booking", "deal-service", logger.child({ module: "outbox-retention-cron" })) : null;
 if (!outboxRetentionEnabled) logger.info("Outbox retention cron disabled (OUTBOX_RETENTION_CRON_ENABLED=false)");
 
+// ── D82 9A — les empreintes posées que personne n'a transformées en réservation sont libérées ──
+const orphanHoldsEnabled = process.env.ORPHAN_HOLD_CRON_ENABLED !== "false";
+const orphanHoldsCron = orphanHoldsEnabled ? startOrphanHoldsCron(orphanHoldsService, logger.child({ module: "orphan-holds-cron" })) : null;
+if (!orphanHoldsEnabled) logger.info("Orphan holds cron disabled (ORPHAN_HOLD_CRON_ENABLED=false)");
+
 // ── Cron notation : relances J+5/J+7, révélation à 14 j (B5, D53) ─────
 const ratingCronEnabled = process.env.RATING_CRON_ENABLED !== "false";
 const ratingCron = ratingCronEnabled ? startRatingCron(dealRatingService, logger.child({ module: "rating-cron" })) : null;
@@ -245,6 +251,9 @@ function shutdown(signal: string): void {
     }
     if (outboxRetentionCron) {
       outboxRetentionCron.stop();
+    }
+    if (orphanHoldsCron) {
+      orphanHoldsCron.stop();
     }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));

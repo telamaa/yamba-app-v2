@@ -128,6 +128,13 @@ export type Booking = {
   retentionDecision?: { outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER"; reason: string; decidedAt: string };
   /** Retenue d'annulation (centimes) — servie avec l'arbitrage. */
   retentionCents?: number;
+  /** Ce qui a été rendu (centimes). `null` quand rien ne l'a été — 0 et
+   *  `null` ne disent pas la même chose, on ne les confond pas. */
+  refundAmountCents?: number | null;
+  /** Pourquoi le Voyageur a refusé la demande. */
+  declineReason?: string;
+  /** Pourquoi le colis a été refusé au rendez-vous (B3/A40). */
+  pickupRefusalReason?: string;
 
   carrier: BookingCarrier;
   trip: BookingTrip;

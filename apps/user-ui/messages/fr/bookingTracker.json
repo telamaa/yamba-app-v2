@@ -497,6 +497,14 @@
       "title": "Clos par la médiation",
       "message": "Ton signalement a été tranché : la décision et son motif sont ci-dessous.",
       "dateLine": "Clos le {date}."
+    },
+    "refundLine": "Remboursé : {amount}.",
+    "retainedLine": "Retenu : {amount}.",
+    "reasonLine": "Motif indiqué : {reason}",
+    "pickupRefused": {
+      "title": "Colis refusé au rendez-vous",
+      "message": "Le Voyageur n'a pas pris le colis en charge. Cet envoi est clos.",
+      "dateLine": "Clos le {date}."
     }
   },
   "completed": {
