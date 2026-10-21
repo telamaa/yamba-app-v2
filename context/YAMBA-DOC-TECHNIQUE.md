@@ -13977,3 +13977,228 @@ injectée)… mais rien ne les exécute en CI. Un harnais Jest + RNTL sur la log
 partagée est déjà prévu par D36 ⑥ pour le mobile ; l'étendre au web coûterait un job de CI et
 rendrait vérifiable une classe de défauts qui, aujourd'hui, ne se voit qu'en recette
 manuelle — exactement la classe de défauts que ce lot vient de corriger.
+
+---
+
+# Lot A221 — « Mon envoi » : le suivi natif, et ce que le site n'osait pas dire sur l'argent
+
+> Branche `feat/mobile-shipment-tracker`, empilée sur `feat/payments-redirect-server` (#393).
+> Jalon 4 (mobile Android). Le tunnel de réservation natif se terminait sur une impasse : la
+> fiche de suivi n'existait pas. Elle existe.
+
+## Le point de départ, en une phrase
+
+L'écran de confirmation du tunnel (A218) portait ce commentaire, écrit par le lot précédent :
+
+> *« Le site, lui, redirige vers le suivi du deal (`/bookings/:id`). Ce suivi n'existe pas
+> encore en natif, et la doctrine interdit de renvoyer au site (A210 b). »*
+
+Son geste principal menait donc à l'onglet **Activité**, qui est une coquille : des compteurs,
+aucune liste. Un Expéditeur qui venait de payer n'avait **aucun moyen**, dans l'app, de savoir
+où en était son colis, de transmettre son code, ou d'annuler sa demande.
+
+## Ce qui a été construit
+
+| Fichier | Rôle |
+|---|---|
+| `apps/mobile/src/lib/api/shipment.api.ts` | Le DTO de la vue SHIPPER de `GET /deals/:id`, champ à champ, plus les **quatre écritures** (annuler, régénérer le code, confirmer la réception) |
+| `apps/mobile/src/lib/shipment-view.ts` | **Toute** la logique, en fonctions pures : la phase d'affichage, la frise, les décomptes, le texte de clôture, l'état de l'argent, l'heure dans le fuseau du LIEU |
+| `apps/mobile/src/components/shipment/shipment-kit.tsx` | La grammaire visuelle : `Section`, `Row`, `Overline`, `Steps`, `Notice`, `Action`, `ConfirmSheet`, le bandeau de retour |
+| `apps/mobile/src/app/shipment/_layout.tsx` | La pile du suivi — **séparée** de celle du tunnel |
+| `apps/mobile/src/app/shipment/[id].tsx` | La fiche : dix vues, les quatre gestes, les preuves photo |
+| `apps/mobile/messages/{fr,en}/shipment.json` | 209 clés, miroir parfait |
+
+Et côté site, l'alignement du jumeau (§ « Le jumeau web » plus bas).
+
+## ① Pourquoi une pile séparée du tunnel
+
+`booking/` est un **tunnel** : sept écrans qu'on pousse, qu'on termine ou qu'on quitte. Le
+suivi est une **destination** : on y revient pendant des jours. Mettre la fiche dans
+`booking/` aurait eu deux conséquences concrètes :
+
+1. la jauge de progression et la barre de prix du tunnel auraient cohabité avec une fiche de
+   suivi — deux grammaires dans la même pile ;
+2. surtout, **le retour depuis la fiche serait retombé sur l'écran de paiement**. Le tunnel
+   est dépilé (`dismissAll`) avant la confirmation précisément pour que personne ne revienne
+   sur une carte déjà autorisée ; une fiche dans la même pile aurait défait cette précaution.
+
+D'où `app/shipment/[id].tsx`, déclaré au `Stack` racine, et la confirmation qui l'ouvre en
+**remplacement** (`router.replace`), jamais en empilement.
+
+Le bandeau de retour de la fiche tient compte de ce chemin : la fiche s'ouvre parfois **sans
+pile derrière elle** (juste après un paiement, le parcours a été dépilé). `router.back()` ne
+mènerait alors nulle part — d'où `router.canGoBack()` et, à défaut, l'onglet Activité.
+
+## ② La grammaire : pourquoi le site n'est PAS transposé
+
+Le tracker du site compte **quarante composants et 6 549 lignes**, en deux arbres
+desktop/mobile (`views/accepted/`, `views/picked-up/`, `views/in-transit/`, `views/delivered/`,
+`views/completed/`, `views/disputed/`, `views/status/`). La tentation est de les transposer un
+pour un. Elle a déjà été payée : la **première** fiche trajet native était exactement cela, et
+le verdict utilisateur fut « pas très sexy et un peu trop chargé » (A213, refonte du 13/10).
+
+La règle retenue alors est reprise ici telle quelle :
+
+- une page **à plat** — des sections séparées par un filet (`StyleSheet.hairlineWidth`), pas
+  des boîtes empilées ;
+- **une seule carte** sur tout l'écran. Sur la fiche trajet, c'est le prix. Ici, c'est le
+  **code de livraison** : la seule chose qu'on sort du téléphone pour la montrer à quelqu'un.
+
+Une carte unique redevient un signal **parce qu'elle est unique**.
+
+## ③ Dix vues pour neuf statuts — et deux fins qui ne se racontent pas pareil
+
+`shipment-view.ts` traduit les neuf statuts du serveur en **dix phases** d'affichage. La seule
+dérivation client de tout l'écran :
+
+```ts
+case 'PICKED_UP':
+  // Le colis est pris en charge. Le code vient d'arriver → on parle du CODE.
+  // Le Voyageur a confirmé des étapes → on parle du VOYAGE.
+  return shipment.trackingEvents.length > 0 ? 'IN_TRANSIT' : 'PICKED_UP';
+```
+
+`IN_TRANSIT` **n'existe pas** côté serveur. C'est une dérivation d'affichage, assumée dans ce
+module et nulle part ailleurs — et elle ne change que le DISCOURS, jamais un droit : les deux
+vues lisent le même deal et les mêmes `allowedActions`.
+
+Ensuite, `closureKey()` tranche deux pièges que le statut seul ne dit pas :
+
+| Situation | Statut serveur | Ce qu'il ne faut PAS titrer | Ce qu'on titre |
+|---|---|---|---|
+| Remboursement total tranché par la médiation | `CANCELLED` | « Demande annulée » sur un colis livré | « Clos par la médiation » |
+| Colis refusé au rendez-vous (`pickupRefusalReason`) | `CANCELLED` | « Demande annulée » — l'Expéditeur ne s'est pas désisté | « Colis refusé au rendez-vous » |
+
+Le premier cas est l'**ANO-WEB-73** du site, trouvée en recette. Le second n'avait jamais été
+traité, ni sur le site ni ailleurs : la machine range le refus au rendez-vous dans `CANCELLED`,
+et tout le monde lisait donc une annulation.
+
+## ④ Les gestes : le serveur décide, l'écran reflète
+
+Quatre écritures, toutes gardées par la machine d'état du serveur :
+
+| Geste | Endpoint | Garde |
+|---|---|---|
+| Annuler | `POST /deals/:id/cancel` | `cancel` ∈ `allowedActions` |
+| Régénérer le code | `POST /deals/:id/code/regenerate` | **pas** une transition : plafond serveur (5) + colis en transit |
+| Confirmer la réception | `POST /deals/:id/confirm` | `confirmEarly` ∈ `allowedActions` |
+| Partager le code | — | la feuille de partage de l'OS, aucun réseau |
+
+Trois principes tenus :
+
+1. **Un geste non autorisé n'est pas grisé : il n'existe pas** (A209). Aucun `disabled` dans
+   tout l'écran — `Action` n'a même pas la propriété.
+2. **La préviz d'annulation est SERVIE** (`cancellationPreview`, non nulle exactement quand
+   `cancel` est permis), jamais recalculée. La feuille de confirmation affiche le remboursement
+   et la retenue ANN-01 avec leurs montants réels, **et dit que le serveur recalculera au
+   moment du geste** : la préviz est une photo, pas une promesse.
+3. **Après chaque geste, on RELIT.** Le montant affiché après l'annulation est celui que le
+   serveur a rendu dans sa réponse, pas celui de la préviz ; le nouveau code n'est pas affiché
+   depuis la réponse de régénération mais depuis la relecture de `GET /deals/:id` (A43).
+
+Et le refus 409 `TRANSITION_NOT_ALLOWED` n'est **pas** traité comme une erreur : entre la
+lecture et le clic, le Voyageur a pu accepter. L'écran le dit en une phrase et recharge.
+
+```ts
+if (code === 'TRANSITION_NOT_ALLOWED') {
+  setSheet(null);
+  setFlash(t('actions.errors.TRANSITION_NOT_ALLOWED')); // « on recharge ton suivi »
+  await load();
+}
+```
+
+## ⑤ La feuille de confirmation : le bouton plein n'est pas celui qui confirme
+
+`ConfirmSheet` porte les trois gestes qui engagent. Deux choix explicites :
+
+- **une feuille, pas une `Alert` native** : il y a des MONTANTS et des conséquences à lire, et
+  une alerte système ne sait afficher proprement ni l'un ni l'autre sur les deux OS ;
+- quand le geste est **définitif**, le ton plein (mangue) va au bouton qui **garde**, et le
+  bouton qui confirme est bordé. Confirmer une action irréversible ne doit pas être le geste
+  le plus facile de l'écran.
+
+## ⑥ L'heure se lit dans le fuseau du LIEU
+
+Le snapshot du deal porte `originTimezone` et `destinationTimezone` (D24). Un Expéditeur à
+Paris qui lit l'heure d'un décollage de Brazzaville doit lire **l'heure du billet** :
+
+```ts
+new Intl.DateTimeFormat(tag, { hour: '2-digit', minute: '2-digit', timeZone: timezone })
+```
+
+Enveloppé d'un `try/catch` : si le moteur n'a pas les données du fuseau, on retombe sur
+l'heure de l'appareil — jamais sur une heure inventée, jamais sur rien.
+
+## ⑦ Le lien de suivi du destinataire (D69) : absent, et pourquoi
+
+`POST /deals/:id/tracking-link` rend un **chemin** :
+
+```ts
+{ token: "…", path: "/track/{token}", recipientFirstName, recipientPhoneE164 }
+```
+
+Le site le complète avec `window.location.origin`. Une application native n'a pas de
+`window.location`, aucune variable d'environnement ne porte l'origine publique du site, et
+**rien n'est déployé**. Fabriquer une URL ici aurait produit un lien mort — pire que son
+absence. Le geste n'est donc pas livré, et **aucun texte ne renvoie au site** à la place.
+
+**Arbitrage à rendre** : que le serveur serve une URL **absolue** (il connaît son front par
+configuration) au lieu d'un chemin. C'est une correction de contrat, pas un correctif d'écran.
+
+## ⑧ Le jumeau web : trois faits que le site avait sous la main sans les lire
+
+`BookingStatusNotice` disait, sur l'argent d'un envoi clos :
+
+> *« Cette demande est close. Si un remboursement s'applique, il t'a été confirmé par email. »*
+
+Or `refundAmountCents` est **servi par le contrat depuis l'origine** — il n'était simplement
+jamais lu par cette vue. Idem pour `declineReason` et `pickupRefusalReason`. Les trois entrent
+dans `ShipperBookingViewDto`, dans l'adaptateur, dans le type `Booking`, et s'affichent :
+
+- le montant **réellement rendu** et la retenue, quand ils sont non nuls (0 et `null` ne disent
+  pas la même chose : on n'affiche que ce qui a vraiment été rendu) ;
+- le **motif** du refus, que le Voyageur a écrit et que l'Expéditeur ne voyait nulle part ;
+- et le titre « Colis refusé au rendez-vous » pour le `CANCELLED` qui n'est pas un désistement.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Signaler un problème** et **noter le Voyageur** : deux formulaires, donc deux écrans, comme
+  sur le site (`/bookings/:id/report`, `/bookings/:id/rate`). Lot suivant. Aucun bouton ne les
+  annonce : promettre un écran absent est le défaut A203.
+- **La liste « Mes envois »** dans l'onglet Activité : lot suivant également. La fiche vient
+  d'abord parce qu'elle est atteignable **immédiatement** depuis la confirmation de paiement —
+  une liste livrée seule aurait mené à des lignes sans destination.
+- **Une visionneuse de photos** : les vignettes ne sont pas cliquables. Un toucher sans effet se
+  remarque plus qu'une image fixe.
+- **La raison du poids facturé**, et c'est une mesure : **D81 (17/10) a cessé d'écrire**
+  `sizeCoef` et `minimumApplied`, qui restent au contrat et valent donc `null` sur toute
+  réservation récente ; ce qui les remplace (`billingFloorKg`, `sizeMinKg`, `billableReason`)
+  **n'est pas servi par la vue Shipper**. La fiche affiche le poids facturé quand il diffère du
+  poids déclaré, sans pouvoir en donner la cause — que le tunnel, lui, donne. À corriger au
+  contrat et au mappeur, pas dans un écran.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `tsc --noEmit --project apps/mobile` | vert (exit 0) |
+| `tsc --noEmit --project apps/user-ui` | vert (exit 0) |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 namespaces, 60 fichiers (+ mobile) |
+| Tests des cinq services | **inchangés** — aucun code serveur touché |
+
+## Deux pièges payés dans ce lot
+
+**① Le lexique refuse `{carrier}` comme nom de variable ICU.** La règle 6 du contrôle i18n
+(`scripts/lexique-yamba.json`) interdit les mots de rôle anglais dans une **valeur** de
+message — et un nom de variable est dans la valeur. `{carrier}` échoue sur
+`\b(…|carriers?|…)\b` ; `{carrierFirstName}` passe, parce que `\b` ne coupe pas avant un `F`.
+C'est précisément pour cette raison que le site nomme ses variables `carrierFirstName` depuis
+A144. Dix-huit messages corrigés d'un coup.
+
+**② Les routes typées d'expo-router rendaient le typecheck local rouge, et la CI verte.**
+`.expo/types/router.d.ts` est **généré** et non suivi par git. Une route neuve y est absente
+jusqu'à ce que Metro tourne : `router.replace({ pathname: '/shipment/[id]', … })` échouait en
+TS2322 en local, alors que la CI — qui n'a jamais ce fichier — aurait passé sans rien voir.
+`npx expo customize tsconfig.json` régénère les types **sans démarrer le serveur de
+développement** (documenté pour le SDK 57, vérifié : le `tsconfig.json` n'est pas modifié).
+À connaître : un typecheck local rouge sur une route n'est pas forcément un défaut de code.

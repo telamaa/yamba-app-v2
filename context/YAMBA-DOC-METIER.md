@@ -7474,3 +7474,92 @@ par oubli technique, perd la confiance qu'il met des mois à construire.
 | MOB181 | Payer par carte (sans redirection) sur le site | Comportement inchangé : on reste sur la page, rien ne clignote |
 | MOB182 | Ouvrir la feuille sur Android (build de développement) | Google Pay est proposé ; Apple Pay est absent |
 | MOB183 | Ouvrir la feuille sur iOS sans compte marchand Apple | Apple Pay est absent — et aucun message ne l'avait promis |
+
+---
+
+# Lot A221 — Suivre son envoi depuis l'app, du paiement à la livraison
+
+## Le besoin, dit simplement
+
+Une Expéditrice vient de payer. Elle ne reverra pas son colis avant plusieurs jours, et
+pendant ces jours elle va se poser exactement six questions :
+
+1. **Est-ce qu'il a accepté ?** Et s'il ne répond pas, qu'est-ce que je perds ?
+2. **Qu'est-ce que je dois préparer, et quand ?**
+3. **Où est mon code**, et à qui je le donne ?
+4. **Où est mon colis en ce moment ?**
+5. **C'est livré — et maintenant, mon argent ?**
+6. **Je change d'avis : comment j'annule, et combien ça me coûte ?**
+
+Jusqu'ici, l'application répondait à **zéro** de ces six questions. Le tunnel de réservation
+disait « ta demande est partie » et l'histoire s'arrêtait là : le geste suivant menait à un
+onglet qui affiche des compteurs et aucune liste. Le site répondait à tout cela depuis des
+mois ; l'app renvoyait au silence.
+
+Et le silence n'est pas neutre : **un envoi qu'on ne peut pas annuler depuis son téléphone est
+un envoi qu'on va annuler depuis un navigateur** — ou qu'on n'annulera pas du tout.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-127** | Le suivi d'un envoi est un **lieu**, pas la dernière page d'un formulaire : on y revient autant de fois qu'on veut, et en sortir ne ramène jamais sur un écran de paiement. |
+| **RG-MOB-128** | Le suivi dit **l'état réel** de l'envoi, y compris quand cet état est désagréable (refusé, expiré, en litige). Aucun écran ne se rabat sur un état « par défaut » qu'il ne connaît pas. |
+| **RG-MOB-129** | Un envoi **refusé au rendez-vous** ne se lit pas « demande annulée » : l'Expéditeur ne s'est pas désisté, et le motif du refus lui est montré. |
+| **RG-MOB-130** | Un envoi **clos par la médiation** ne se lit pas « demande annulée » non plus : la décision et son motif sont affichés. |
+| **RG-MOB-131** | Le **code de livraison** est l'information centrale de l'écran : il est lisible, dictable (groupé par trois) et partageable en un geste, par le canal que l'Expéditeur choisit. |
+| **RG-MOB-132** | Le code n'apparaît **jamais avant** que le Voyageur ait confirmé la prise en charge, et l'écran dit quand il arrivera plutôt que d'afficher une case vide. |
+| **RG-MOB-133** | Après la livraison, le code est montré comme **utilisé**, pas effacé : l'Expéditeur se souvient l'avoir vu. |
+| **RG-MOB-134** | Les **étapes du voyage** sont le miroir de ce que le Voyageur a confirmé — jamais une prédiction. Une étape non confirmée se dit « en attente ». |
+| **RG-MOB-135** | Les heures s'affichent dans le **fuseau du lieu** (celui du billet), pas dans celui du téléphone. |
+| **RG-MOB-136** | **Annuler** affiche, avant confirmation, le montant rendu et la retenue **calculés par Yamba** — et dit que le montant définitif est recalculé au moment du geste. |
+| **RG-MOB-137** | Un geste qui engage (annuler, régénérer le code, confirmer la réception) demande une **confirmation**, et sur un geste définitif le bouton le plus visible est celui qui **renonce**. |
+| **RG-MOB-138** | **Confirmer la réception** est annoncé comme définitif : après lui, aucun signalement n'est plus possible. |
+| **RG-MOB-139** | Un geste refusé parce que l'envoi a changé entre-temps n'est pas présenté comme une erreur : l'écran le dit et se remet à jour. |
+| **RG-MOB-140** | Un geste que Yamba n'autorise pas **n'apparaît pas**. Il n'est pas affiché grisé. |
+| **RG-MOB-141** | L'écran dit **ce qui est arrivé à l'argent** : autorisé sans débit, débité, gelé pendant un examen, rendu, retenu, versé. |
+| **RG-MOB-142** | Un **échec de versement** au Voyageur n'est jamais montré à l'Expéditeur : le colis est livré, et le versement est une affaire entre Yamba et le Voyageur. |
+| **RG-MOB-143** | L'app ne renvoie **jamais** au site, même par une phrase. Une fonctionnalité absente est absente en silence ; elle n'est pas sous-traitée à un navigateur. |
+
+## Ce que le site apprend de l'app
+
+| Règle | Énoncé |
+|---|---|
+| **RG-S-144** | Sur un envoi clos, le site affiche le **montant réellement remboursé** et la retenue appliquée — au lieu de renvoyer l'Expéditeur à sa boîte mail. |
+| **RG-S-145** | Le site affiche le **motif** du refus (refus de la demande, refus du colis au rendez-vous) : il était écrit par le Voyageur et n'était montré nulle part. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB184 | Payer une demande, puis toucher le geste principal de la confirmation | La fiche de suivi s'ouvre ; en sortir ne ramène **pas** sur l'écran de paiement |
+| MOB185 | Ouvrir le suivi d'une demande en attente de réponse | Le temps restant avant expiration ; « rien n'est débité » ; la possibilité d'annuler |
+| MOB186 | Ouvrir le suivi d'un envoi accepté | Le rendez-vous à venir, la préparation du colis, le code annoncé comme « à venir » |
+| MOB187 | Ouvrir le suivi juste après la prise en charge | Le **code à 6 chiffres**, groupé, avec le partage en un geste |
+| MOB188 | Partager le code | La feuille de partage de l'OS, message prérempli (destinataire, Voyageur, trajet, code) |
+| MOB189 | Régénérer le code | Confirmation demandée ; l'ancien code cesse de fonctionner ; le nouveau vient d'une **relecture** chez Yamba |
+| MOB190 | Régénérer une sixième fois | Refus de Yamba, dit en clair, sans que l'écran se bloque |
+| MOB191 | Suivre un colis en voyage | Les étapes confirmées par le Voyageur, horodatées **dans le fuseau du lieu** ; les autres « en attente » |
+| MOB192 | Ouvrir le suivi d'un colis livré | Le décompte avant versement automatique ; le geste « tout s'est bien passé » ; les photos de remise |
+| MOB193 | Confirmer la réception | Avertissement « définitif » ; après confirmation, l'envoi est terminé et le geste a disparu |
+| MOB194 | Annuler une demande avant la limite de remboursement total | Le montant **intégral** est annoncé, puis rendu ; la date limite est rappelée |
+| MOB195 | Annuler une demande acceptée après cette limite | Remboursement **partiel** annoncé avec la retenue et son pourcentage ; montant définitif recalculé par Yamba |
+| MOB196 | Annuler pendant que le Voyageur accepte | Refus annoncé comme un changement d'état, pas comme une panne ; la fiche se met à jour |
+| MOB197 | Ouvrir le suivi d'une demande refusée | Le motif du Voyageur ; « tu n'es pas débité » |
+| MOB198 | Ouvrir le suivi d'un colis refusé au rendez-vous | « Colis refusé au rendez-vous » + le motif — **jamais** « demande annulée » |
+| MOB199 | Ouvrir le suivi d'un envoi clos par la médiation | « Clos par la médiation », l'issue, le montant rendu, le motif |
+| MOB200 | Ouvrir le suivi d'un envoi en litige | Le dossier déposé en lecture, l'état de la procédure, le versement annoncé comme gelé |
+| MOB201 | Ouvrir le suivi d'un envoi qui n'est pas le sien | « Cet envoi n'existe pas » — aucune différence avec un identifiant inventé |
+| MOB202 | Ouvrir le suivi en étant le **Voyageur** du deal | L'écran le dit et n'affiche aucune donnée d'Expéditeur |
+| MOB203 | Couper le réseau et ouvrir le suivi | Un écran d'erreur avec la référence technique et un vrai bouton « Réessayer » |
+| WEB157 | Ouvrir sur le site un envoi annulé avec remboursement | Le montant rendu s'affiche — plus de renvoi à l'email |
+| WEB158 | Ouvrir sur le site un envoi refusé au rendez-vous | Le titre et le motif corrects, comme dans l'app |
+
+## Ce qui reste hors de ce lot (et se voit nulle part à l'écran)
+
+- **Signaler un problème** et **noter le Voyageur** : deux formulaires, donc deux écrans à
+  part — comme sur le site. Tant qu'ils n'existent pas, aucun bouton ne les annonce.
+- **La liste « Mes envois »** : la fiche d'abord, parce qu'elle s'atteint dès le paiement ;
+  une liste livrée seule aurait mené à des lignes sans destination.
+- **Partager le lien de suivi au destinataire** : Yamba fournit aujourd'hui un chemin dont
+  l'adresse publique n'est connue que d'un navigateur. Un lien mort serait pire que rien.
