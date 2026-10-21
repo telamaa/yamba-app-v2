@@ -179,6 +179,14 @@ export default function ShipmentScreen() {
     void load();
   }, [load]);
 
+  /** Ouvrir une feuille efface l'erreur de la tentative PRÉCÉDENTE : sans
+   *  cela, rouvrir le geste affichait le message de son échec passé comme
+   *  s'il venait de se produire. */
+  const openSheet = useCallback((geste: Geste) => {
+    setSheetError(null);
+    setSheet(geste);
+  }, []);
+
   const refresh = useCallback(() => {
     setFlash(null);
     void load();
@@ -303,6 +311,7 @@ export default function ShipmentScreen() {
   };
 
   const sheetProps = buildSheet(sheet);
+  const closedOn = closureLine(shipment, phase, closure, locale, t);
 
   return (
     <ThemedView style={styles.container}>
@@ -337,9 +346,9 @@ export default function ShipmentScreen() {
                 {t('reference', { ref: shipmentReference(shipment.id) })}
               </ThemedText>
             </View>
-            {closureLine(shipment, phase, closure, locale, t) ? (
+            {closedOn ? (
               <ThemedText type="small" themeColor="textSecondary">
-                {closureLine(shipment, phase, closure, locale, t)}
+                {closedOn}
               </ThemedText>
             ) : null}
             {shipment.pickupRefusalReason ? (
@@ -397,7 +406,7 @@ export default function ShipmentScreen() {
             carrierFirstName={carrierFirstName}
             recipientFirstName={recipientFirstName}
             onShareAction={shareCode}
-            onRegenerateAction={canRegenerate ? () => setSheet('regenerate') : undefined}
+            onRegenerateAction={canRegenerate ? () => openSheet('regenerate') : undefined}
           />
 
           {/* ── Le voyage, dès que le colis est parti ───────────────────── */}
@@ -709,10 +718,7 @@ export default function ShipmentScreen() {
               <Action
                 label={t('actions.cancel.label')}
                 tone="quiet"
-                onPressAction={() => {
-                  setSheetError(null);
-                  setSheet('cancel');
-                }}
+                onPressAction={() => openSheet('cancel')}
               />
             </Section>
           ) : null}
@@ -734,10 +740,7 @@ export default function ShipmentScreen() {
                   label={t('actions.confirmDelivery.label')}
                   tone="primary"
                   icon="checkmark-circle-outline"
-                  onPressAction={() => {
-                    setSheetError(null);
-                    setSheet('confirm');
-                  }}
+                  onPressAction={() => openSheet('confirm')}
                 />
               </>
             ) : (
