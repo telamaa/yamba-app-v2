@@ -497,6 +497,14 @@
       "title": "Closed by mediation",
       "message": "Your report has been decided: the decision and its reason are below.",
       "dateLine": "Closed on {date}."
+    },
+    "refundLine": "Refunded: {amount}.",
+    "retainedLine": "Retained: {amount}.",
+    "reasonLine": "Reason given: {reason}",
+    "pickupRefused": {
+      "title": "Parcel refused at the meeting",
+      "message": "The Traveler didn't take the parcel. This shipment is closed.",
+      "dateLine": "Closed on {date}."
     }
   },
   "completed": {
