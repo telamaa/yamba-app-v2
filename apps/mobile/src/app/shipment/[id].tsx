@@ -283,17 +283,23 @@ export default function ShipmentScreen() {
 
   const shareCode = async () => {
     if (!code) return;
-    await Share.share({
-      message: t('actions.shareCode.message', {
-        recipientFirstName,
-        carrierFirstName,
-        route: t('route', {
-          origin: shipment.trip.originCity,
-          destination: shipment.trip.destinationCity,
+    try {
+      await Share.share({
+        message: t('actions.shareCode.message', {
+          recipientFirstName,
+          carrierFirstName,
+          route: t('route', {
+            origin: shipment.trip.originCity,
+            destination: shipment.trip.destinationCity,
+          }),
+          code: groupDeliveryCode(code),
         }),
-        code: groupDeliveryCode(code),
-      }),
-    });
+      });
+    } catch {
+      // Un partage refusé par le système (aucune application capable, feuille
+      // fermée par l'OS) ne doit rien casser : le code reste affiché à
+      // l'écran, et il se dicte aussi bien qu'il s'envoie.
+    }
   };
 
   const sheetProps = buildSheet(sheet);
