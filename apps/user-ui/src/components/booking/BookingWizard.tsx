@@ -58,7 +58,9 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   });
   const [showErrors, setShowErrors] = useState(false);
   const checkout = useBookingCheckout({ draft, trip, step, clear });
-  const isSubmitting = checkout.isSubmitting;
+  // D82 7A — une reprise de redirection occupe l'écran exactement comme un envoi : le bouton
+  // reste inerte et l'attente se voit, sinon la page paraît morte au retour de Klarna.
+  const isSubmitting = checkout.isSubmitting || checkout.isResuming;
   // ANO-WEB-40 (D71) : à l'étape 4, « Payer » attend l'autorisation de paiement — et reste grisé quand elle a été
   // refusée (plafond du compte neuf) : le bouton ne contredit plus l'encadré de refus.
   const ctaDisabled = isSubmitting || (step === 4 && !checkout.intent);
