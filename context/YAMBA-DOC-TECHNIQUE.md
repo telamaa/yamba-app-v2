@@ -14218,3 +14218,268 @@ passent désormais par `openSheet`, qui efface d'abord.
 > **C'est le même défaut que le garde `resumeStarted` du lot D82 7A, à un jour d'intervalle** :
 > un verrou — ou un message — posé par un chemin d'erreur doit avoir son chemin d'effacement.
 > La leçon mérite d'être écrite deux fois, puisqu'elle a été commise deux fois.
+
+
+---
+
+# Lot A222 — Signaler un problème, noter le Voyageur : le recours en natif
+
+> PR `feat/mobile-recourse-rating`, empilée sur `feat/mobile-shipment-tracker` (#394).
+> Décision : **A222** au registre. Aucun code serveur touché — les deux endpoints existaient.
+
+## Le point de départ : un texte qui promettait un écran absent
+
+La fiche de suivi livrée par A221 affiche, sur un colis livré, une liste « ce qui arrive
+ensuite ». Sa troisième ligne dit, textuellement (`messages/fr/shipment.json`) :
+
+> « Si quelque chose ne va pas, signale-le avant la fin du délai : le paiement est gelé. »
+
+**Et aucun geste de l'écran ne le permettait.** Pendant les trois jours de vérification —
+le seul moment où un signalement est recevable — un Expéditeur dont le colis arrive abîmé
+lisait une promesse et ne trouvait pas de bouton. C'est le défaut **A203** (ne jamais
+promettre à l'écran une fonctionnalité absente) pris à l'envers : non pas un bouton mort,
+mais une phrase sans bouton.
+
+Même constat pour la notation : un envoi terminé depuis l'app ne nourrissait jamais la
+réputation visible du Voyageur (D29 ①), faute d'écran pour la saisir.
+
+## ① Deux écrans, et pourquoi pas deux feuilles
+
+| | Signalement | Notation |
+|---|---|---|
+| Champs | motif, description ≥ 50 car., ≤ 5 photos, solution souhaitée, engagement | note 1-5, 3 critères, commentaire ≤ 280 |
+| Endpoint | `POST /deals/:id/dispute` | `GET` + `POST /deals/:id/rating` |
+| Jumeau web | `components/booking/booking-tracker/views/report/` (10 fichiers) | `components/rating/` (11 fichiers) |
+| Route native | `app/shipment/[id]/report.tsx` | `app/shipment/[id]/rate.tsx` |
+
+Ce sont des **formulaires**, pas des confirmations : une feuille modale les aurait écrasés
+sous le clavier. L'app a déjà une feuille de signalement (`components/report-sheet.tsx`,
+D68) — mais elle sert à signaler **une annonce ou un membre** en dix secondes, avec un motif
+et deux phrases facultatives. Le litige, lui, est un dossier de médiation.
+
+### La restructuration de route, et ce qu'elle ne change pas
+
+Expo Router nomme les routes par les fichiers. Pour accrocher deux routes filles sous un
+segment dynamique, le fichier `[id].tsx` doit devenir un dossier :
+
+```
+app/shipment/[id].tsx          →  app/shipment/[id]/index.tsx
+                                  app/shipment/[id]/report.tsx
+                                  app/shipment/[id]/rate.tsx
+```
+
+**L'URL ne change pas** : `index.tsx` dans `[id]/` répond exactement à `/shipment/<id>`.
+Le `git mv` conserve l'historique, et le `_layout.tsx` de la pile `shipment/` couvre les
+trois écrans sans modification (même animation, même absence d'en-tête natif).
+
+## ② Les règles, hors de la vue : deux modules purs
+
+Comme `shipment-view.ts` pour la fiche (A221), toute la décision vit dans des fonctions
+sans React ni réseau — `src/lib/report-form.ts` (159 lignes) et `src/lib/rating-form.ts`
+(131 lignes) :
+
+| Fonction | Ce qu'elle tranche |
+|---|---|
+| `allowedCategories(status)` | **D51** : en transit, la liste des six motifs se réduit à `NOT_DELIVERED` |
+| `categoryLocked(status)` | le motif est-il imposé (un seul choix) ? |
+| `describeDescription(text)` | longueur **trimée**, ce qui manque, limite atteinte |
+| `photosReady(photos)` | toutes en ligne, aucune en vol, aucune en échec |
+| `reportBlockers(form)` | la LISTE de ce qui manque, dans l'ordre de lecture de l'écran |
+| `reportFailureKey(code, status)` | le refus serveur → une clé de message |
+| `ratingFace(input, now)` | lequel des **quatre** visages de la notation afficher |
+| `toggleCriterion(…)` | un pouce reposé s'**efface** |
+| `toRatingPayload(form)` | le corps du POST, sans clé vide ni commentaire blanc |
+
+Deux détails qui comptent :
+
+**`describeDescription` trime avant de compter.** Le contrat trime aussi
+(`z.string().trim().min(50)`) : compter les espaces aurait donné un compteur vert et un
+refus 400.
+
+**`reportBlockers` rend une liste, pas un booléen.** Le bouton d'envoi doit pouvoir **dire**
+pourquoi il n'envoie pas encore, sans que la vue re-déduise les mêmes conditions. A209
+interdit un bouton grisé : ici le bouton existe toujours, et une pression sans dossier
+complet affiche le premier manque.
+
+## ③ Les constantes du contrat sont recopiées, pas importées
+
+```ts
+// apps/mobile/src/lib/report-form.ts
+export const DESCRIPTION_MIN_LENGTH = 50;
+export const DESCRIPTION_MAX_LENGTH = 2000;
+export const PHOTOS_MAX = 5;
+```
+
+Elles existent déjà dans `packages/libs/api-contracts/src/booking/booking-settlement.schema.ts`
+(`DISPUTE_MIN_DESCRIPTION_LENGTH`, `DISPUTE_PHOTOS_MAX`). **Les importer tirerait zod dans
+le bundle Metro** — c'est la même limite que `shipment.api.ts` avait consignée pour les
+types. Le choix est donc assumé et écrit en tête de fichier : toute divergence est un bug
+*ici*, et le serveur reste seul juge — il refuse ce qui sort de ses listes.
+
+## ④ Les preuves montent à la SÉLECTION, pas à l'envoi
+
+`POST /deals/:id/dispute` n'accepte que des **URL** : le binaire ne traverse jamais le
+gateway (D42). Deux conséquences dans l'écran :
+
+1. une photo choisie part **immédiatement** (`uploadDisputePhoto`), apparaît en vol
+   (voile + indicateur), puis en ligne ou en échec ;
+2. un téléversement en échec **bloque** l'envoi (`photosReady`) au lieu de partir sans sa
+   preuve (RG-P-13 : rien à moitié fait).
+
+Sans cela, cinq téléversements se déclencheraient au moment précis où l'Expéditeur a fini
+d'écrire et appuie sur « Envoyer ».
+
+`upload.api.ts` gagne donc son **dossier en paramètre**, et deux usages nommés :
+
+```ts
+const FOLDER_DECLARED = '/bookings/declared';
+const FOLDER_DISPUTE = '/deals/dispute';
+
+export function uploadDeclaredPhoto(photo) { return uploadTo(photo, FOLDER_DECLARED); }
+export function uploadDisputePhoto(photo)  { return uploadTo(photo, FOLDER_DISPUTE);  }
+```
+
+Deux dossiers séparés, comme sur le site (A73) : une pièce de médiation n'est pas une photo
+de colis, et l'admin la lit par ce chemin.
+
+**Un détail payé à la relecture** : choisir deux fois la même photo de la photothèque donne
+le même `assetId`, donc **deux vignettes au même identifiant** — un seul téléversement les
+mettait toutes les deux à jour, et retirer l'une effaçait l'autre. Les assets déjà connus
+sont désormais filtrés à l'ajout.
+
+## ⑤ Le double-aveugle donne quatre visages à un seul écran
+
+`GET /deals/:id/rating` sert l'état complet ; `ratingFace` choisit :
+
+| Visage | Condition (toutes servies) | Ce que l'écran montre |
+|---|---|---|
+| `form` | `canRate` (verdict serveur) | le formulaire |
+| `sent` | j'ai noté, rien n'est révélé | ma note + « visible quand l'autre aura noté » |
+| `revealed` | `revealedAt` non nul | les **deux** avis |
+| `closed` | pas noté, `windowEndsAt` dépassée | « la notation est fermée » |
+| `unavailable` | le serveur dit non pour une autre raison | on le dit sans inventer laquelle |
+
+Trois principes :
+
+1. **`canRate` est le verdict du serveur**, jamais une déduction (RG-MOB-1). L'app ne
+   recompte pas les quatorze jours.
+2. **La note de l'autre n'arrive dans le contrat qu'une fois révélée** : `counterpartRating`
+   reste `null` avant. L'app n'a donc rien à cacher elle-même — *une vérité qu'un client
+   doit protéger est déjà fuitée*.
+3. **`cannotRateReason` ne s'affiche pas** : c'est une phrase anglaise destinée aux
+   journaux. L'écran a ses propres textes.
+
+Et les **critères du rôle Expéditeur ne sont pas déclarés**. Le contrat en porte trois
+(`SHIPPER_RATING_CRITERIA`), mais l'app n'a pas de mode Voyageur, donc pas de textes : une
+liste que rien ne sait afficher est un piège. Un deal dont le compte connecté est le
+Voyageur répond `WrongRatingSideError` et l'écran le dit.
+
+## ⑥ Un refus définitif ferme le formulaire ; un refus réessayable le garde
+
+C'est la distinction que D82 7A avait introduite côté paiement, appliquée ici à un
+formulaire :
+
+| Refus | Code | Ce que fait l'écran |
+|---|---|---|
+| Le deal a bougé entre la lecture et le clic | `TRANSITION_NOT_ALLOWED` | ferme la feuille, affiche **le refus reçu**, propose le retour au suivi |
+| Le motif n'est plus recevable (colis reparti) | `DISPUTE_CATEGORY_NOT_ALLOWED` | idem |
+| Validation, panne réseau | 400 / autre | garde la feuille **ouverte** sur son bouton d'envoi |
+
+Côté notation, un `TRANSITION_NOT_ALLOWED` (déjà noté, fenêtre fermée) **relit le
+contexte** : l'écran bascule alors de lui-même sur le visage que le serveur décrit, au lieu
+d'afficher un message sous un formulaire mort. Une relecture qui échoue laisse l'écran tel
+quel — on ne remplace pas un refus lisible par une panne.
+
+## ⑦ La fiche annonce les deux gestes, et relit au retour
+
+```tsx
+const canDispute = shipment.allowedActions.includes('dispute');
+const disputeOpensAt =
+  !canDispute && phase === 'PICKED_UP' && shipment.disputeOpensAt ? shipment.disputeOpensAt : null;
+const rating = shipment.rating;
+```
+
+- **Le recours** apparaît quand `dispute` est dans `allowedActions`, avec la date limite
+  (`payoutDueAt`). En transit, le serveur ne l'ouvre que 48 h après le départ (A72) : avant,
+  la fiche n'annonce pas un bouton, elle annonce **la date** (`disputeOpensAt`, servie).
+- **La notation** apparaît dès que l'objet `rating` est servi (donc `COMPLETED`, jamais
+  après une clôture par médiation), dans les quatre états. Fenêtre fermée **sans** ma
+  note : aucun bouton — il n'y a ni avis à lire ni note à poser (A209).
+
+Et la fiche **relit au retour de focus** :
+
+```tsx
+useFocusEffect(
+  useCallback(() => {
+    setFlash(null);
+    void load();
+  }, [load])
+);
+```
+
+`useFocusEffect` et non `useEffect` : la fiche est une **destination** (A221 a), on y revient
+— du signalement, de la notation, de l'onglet Activité. Sans cela, elle gardait son bouton
+« Signaler » après un signalement déposé : elle mentait sur ce qui était encore possible. Le
+chargement initial est le même appel, puisqu'un écran qui s'affiche est un écran focalisé.
+
+## ⑧ Le jumeau web : une divergence, trouvée en portant l'écran
+
+En lisant le service pour écrire `reportFailureKey`, un refus serveur s'est avéré **mal
+diagnostiqué par le site** :
+
+```ts
+// AVANT — apps/user-ui/.../booking-tracker.api.ts
+detailCode === "CODE_REGENERATION_LIMIT" || detailCode === "TRANSITION_NOT_ALLOWED"
+  ? detailCode
+  : status === 400 ? "VALIDATION" : …
+```
+
+`DISPUTE_CATEGORY_NOT_ALLOWED` arrive en **400 avec son code** : il retombait donc dans
+`VALIDATION`, dont le message dit « vérifie la description (50 caractères minimum) et
+l'engagement » — un diagnostic **faux** pour une cause qui n'a rien à voir. Il a maintenant
+son code, son texte (`report.cta.toastCategory`) et son retour au suivi.
+
+Le reste des deux pages web était complet : ce lot est un **rattrapage du natif**, pas une
+correction du site.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx run-many --target=typecheck --all --skip-sync` | **10 projets verts** |
+| `nx typecheck @yamba-app/mobile` **sans** `.expo/types/router.d.ts` | vert — c'est ce que voit la CI |
+| `nx typecheck @yamba-app/mobile` **avec** les routes typées complétées | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir fr/en parfait, lexique OK |
+| Chemins i18n construits à l'exécution | **142** vérifiés un par un, 0 manquant, 0 clé orpheline |
+| Anti-fuite (`git ls-files` + motif de la CI) | aucun fichier sensible suivi |
+| Tests | **1342** + auth **407**, inchangés : aucun code serveur touché |
+
+## Deux pièges d'outillage payés dans ce lot
+
+**① `npx expo customize tsconfig.json` ne régénère plus les routes typées.** Le handoff du
+21/10 le donnait comme la façon de régénérer `.expo/types/router.d.ts` sans démarrer Metro.
+Il échoue désormais :
+
+```
+Error: Cannot find module 'expo-router/_ctx-shared'
+Require stack: node_modules/@expo/router-server/build/typed-routes/index.js
+```
+
+`@expo/router-server` vit à la **racine**, `expo-router` sous `apps/mobile` : la résolution
+ne traverse pas. Le typecheck a donc été vérifié **des deux côtés** — avec les deux routes
+ajoutées à la main dans le fichier généré (non suivi, donc local), et **sans le fichier du
+tout**, qui est exactement l'état de la CI.
+
+**② `StyleSheet.absoluteFillObject` n'existe plus** dans les typages de React Native 0.86
+(`Did you mean 'absoluteFill'?`). Les quatre côtés s'écrivent à la main — c'est trois lignes
+et aucune ambiguïté.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Aucun test automatisé**, encore : `apps/mobile` n'a pas de harnais Jest. Ce lot ajoute
+  **290 lignes de logique pure** écrites exprès pour être exécutables, qui s'ajoutent aux
+  267 d'A221. Le harnais manquant coûte maintenant plus cher que son installation.
+- **Pas de visionneuse de photos** pour les preuves déposées : même raison qu'en A221 — un
+  toucher sans effet se remarque plus qu'une image fixe.
+- **Pas de brouillon** du formulaire de signalement. Un dossier de litige abandonné ne doit
+  pas survivre dans le téléphone : il contient le récit d'un incident et des photos.
