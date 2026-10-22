@@ -8,9 +8,9 @@
  * quelqu'un. Tout empiler dans des boîtes grises donnerait le même poids à
  * tout, donc du poids à rien.
  *
- * Les primitives vivent ici parce que trois écrans vont les partager (la
- * fiche, puis le signalement et la notation) : les dupliquer ferait diverger
- * les filets et les marges au premier correctif.
+ * Les primitives vivent ici parce que TROIS écrans les partagent (la fiche,
+ * le signalement et la notation) : les dupliquer ferait diverger les filets
+ * et les marges au premier correctif.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -160,6 +160,66 @@ export function Notice({
         {children}
       </ThemedText>
     </View>
+  );
+}
+
+/* ── Choix ───────────────────────────────────────────────────────────────── */
+
+/**
+ * Une ligne qu'on choisit : un motif de signalement (`radio`, un seul) ou un
+ * engagement qu'on coche (`check`). Toute la ligne est la cible — sur un
+ * téléphone, viser un cercle de vingt pixels est un défaut d'accessibilité,
+ * pas un détail de style.
+ *
+ * Pas d'état DÉSACTIVÉ ici non plus : un choix que le serveur n'accepterait
+ * pas n'est pas rendu (A209). Un motif IMPOSÉ par l'état du colis se rend
+ * donc seul, déjà sélectionné, avec le bandeau qui l'explique.
+ */
+export function Choice({
+  label,
+  hint,
+  selected,
+  kind = 'radio',
+  onToggleAction,
+}: {
+  label: string;
+  hint?: string;
+  selected: boolean;
+  kind?: 'radio' | 'check';
+  onToggleAction: () => void;
+}) {
+  const theme = useTheme();
+  const round = kind === 'radio';
+
+  return (
+    <Pressable
+      accessibilityRole={round ? 'radio' : 'checkbox'}
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
+      onPress={onToggleAction}
+      style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+      <View
+        style={[
+          styles.choiceMark,
+          round ? styles.choiceMarkRound : styles.choiceMarkSquare,
+          {
+            borderColor: selected ? Brand.teal : theme.backgroundSelected,
+            backgroundColor: selected ? Brand.teal : 'transparent',
+          },
+        ]}>
+        {selected ? (
+          <Ionicons name={round ? 'ellipse' : 'checkmark'} size={round ? 8 : 13} color="#FFFFFF" />
+        ) : null}
+      </View>
+      <View style={styles.flex}>
+        <ThemedText type="small">{label}</ThemedText>
+        {hint ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {hint}
+          </ThemedText>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -352,6 +412,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: Spacing.three,
   },
+
+  choice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    // 44 px de haut minimum : la cible tactile recommandée par les deux OS.
+    minHeight: 44,
+    paddingVertical: Spacing.one,
+  },
+  choiceMark: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  choiceMarkRound: { borderRadius: 11 },
+  choiceMarkSquare: { borderRadius: 6 },
 
   action: {
     flexDirection: 'row',

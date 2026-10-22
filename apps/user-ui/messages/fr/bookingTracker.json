@@ -355,6 +355,7 @@
       "confirmCancel": "Annuler",
       "toastError": "Erreur lors de l''envoi. Réessaye.",
       "toastConflict": "Ce deal a changé entre-temps — retour au suivi.",
+      "toastCategory": "Ce motif n'est plus recevable : le colis est reparti en transit. Retour au suivi.",
       "toastValidation": "Le serveur a refusé le signalement : vérifie la description (50 caractères minimum) et l'engagement."
     },
     "sidebar": {

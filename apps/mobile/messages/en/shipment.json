@@ -261,6 +261,200 @@
     "carrierPending": "We have asked {carrierFirstName} for their version (72 h).",
     "support": "Quote the case number in any exchange with us."
   },
+  "recourse": {
+    "title": "Something wrong?",
+    "body": "Parcel not handed over, contents missing or damaged: tell us. {carrierFirstName}'s payment stays frozen throughout the review.",
+    "deadline": "You can report until {date}.",
+    "opensAt": "Parcel never arrived? The « never delivered » report opens on {date}.",
+    "label": "Report a problem"
+  },
+  "report": {
+    "title": "Report a problem",
+    "subtitle": "Shipment {reference} · {route}",
+    "intro": "Tell us what happened, we take it from here. While we review it, {carrierFirstName}'s payment stays frozen.",
+    "category": {
+      "title": "What went wrong?",
+      "hint": "Pick the closest situation.",
+      "locked": "Your parcel is still in transit: only « never delivered » can be reported now. Missing or damaged contents can only be seen after handover."
+    },
+    "categories": {
+      "NOT_DELIVERED": "The parcel was never delivered to {recipientFirstName}",
+      "CONTENT_MISSING": "Contents missing or different from my declaration",
+      "DAMAGED": "Parcel or contents damaged",
+      "SIGNIFICANT_DELAY": "Far past the agreed time",
+      "RECIPIENT_ISSUE": "Another problem with {carrierFirstName}",
+      "OTHER": "Another problem"
+    },
+    "description": {
+      "title": "Tell us what happened",
+      "hint": "Be specific: when you found out, what is missing, what is wrong.",
+      "placeholder": "E.g. {recipientFirstName} called me this morning — the jumper I declared was not in the parcel, and a t-shirt is torn at the collar.",
+      "missing": "{count} more characters needed (minimum {min}).",
+      "ok": "{count} characters — that works.",
+      "full": "Limit of {max} characters reached."
+    },
+    "photos": {
+      "title": "Add evidence",
+      "hint": "Photos of what arrived, of the damage, of the packaging. Up to {max} photos, {maxMb} MB each.",
+      "add": "Add a photo",
+      "cancel": "Cancel",
+      "ask": "Ask {recipientFirstName} for them if you don't have any.",
+      "camera": "Take a photo",
+      "library": "Choose a photo",
+      "remove": "Remove this photo",
+      "uploading": "Uploading…",
+      "errors": {
+        "INVALID_TYPE": "Format not accepted — JPEG, PNG, HEIC or WebP.",
+        "TOO_LARGE": "Photo too heavy ({maxMb} MB maximum).",
+        "FAILED": "Upload failed. Remove it and try again."
+      },
+      "permissionTitle": "Photo access denied",
+      "permissionBody": "Allow photo access in your phone settings to attach evidence.",
+      "cameraDeniedTitle": "Camera denied",
+      "cameraDeniedBody": "Allow the camera in your phone settings, or choose a photo you already took."
+    },
+    "outcome": {
+      "title": "What would feel fair",
+      "hint": "Optional. It helps mediation understand your request — the decision stays ours."
+    },
+    "outcomes": {
+      "FULL_REFUND": "Full refund ({amount})",
+      "PARTIAL_REFUND": "Partial refund, for what is missing or damaged",
+      "CONTACT_CARRIER": "Yamba contacts {carrierFirstName} to understand",
+      "YAMBA_DECIDES": "I let Yamba decide from the evidence"
+    },
+    "process": {
+      "title": "What happens next",
+      "one": "You get an acknowledgement within 48 working hours, with your case number.",
+      "two": "We ask {carrierFirstName} for their side, evidence included, within 72 hours.",
+      "three": "We decide within five working days, and email you the outcome.",
+      "four": "Throughout the review, {carrierFirstName}'s payment stays frozen."
+    },
+    "pledge": {
+      "label": "I declare on my honour that what I wrote is accurate.",
+      "why": "A report freezes a real person's payment. This pledge protects honest Travelers, just as the Charter binds them to your parcel."
+    },
+    "submit": {
+      "label": "Send the report",
+      "blockers": {
+        "category": "Pick a reason first.",
+        "description": "The description is {count} characters short.",
+        "photos": "Wait for the photos to finish uploading, or remove the failed ones.",
+        "pledge": "Tick the honour declaration."
+      },
+      "confirmTitle": "Send this report?",
+      "confirmBody": "{carrierFirstName}'s payment will be frozen and our team will take the case over.",
+      "confirmIrreversible": "Once sent, a report cannot be edited.",
+      "confirm": "Yes, send it",
+      "keep": "No, go back",
+      "pending": "Sending…"
+    },
+    "errors": {
+      "conflict": "This shipment changed in the meantime: it can no longer be reported. Back to tracking.",
+      "categoryRefused": "That reason no longer applies: the parcel is in transit again.",
+      "validation": "The case was refused: check the description and the honour declaration.",
+      "generic": "Sending failed. Try again in a moment."
+    },
+    "notAllowed": {
+      "title": "Report unavailable",
+      "body": "This shipment cannot be reported: the window has passed, a case is already open, or the parcel has not been handed over yet."
+    },
+    "success": {
+      "title": "Case opened",
+      "ticket": "Case {ticket}",
+      "body": "Our team will contact you within 48 working hours. {carrierFirstName}'s payment is frozen until the decision.",
+      "keep": "Keep this number: it follows the whole case.",
+      "back": "Back to tracking"
+    }
+  },
+  "rating": {
+    "title": "Rate {carrierFirstName}",
+    "subtitle": "Shipment {reference} · {route}",
+    "intro": "Your review helps the community choose. It becomes public once {carrierFirstName} has rated too — or after fourteen days.",
+    "prompt": {
+      "title": "How did it go?",
+      "body": "Your review counts, and so does {carrierFirstName}'s: both are revealed together.",
+      "deadline": "You can rate until {date}.",
+      "label": "Rate {carrierFirstName}"
+    },
+    "state": {
+      "sentTitle": "Your review is in",
+      "sentBody": "It becomes visible once {carrierFirstName} has rated, or on {date} at the latest.",
+      "sentBodyNoDate": "It becomes visible once {carrierFirstName} has rated.",
+      "revealedTitle": "Both reviews are public",
+      "revealedBody": "Both reviews are published on your profiles.",
+      "closedTitle": "Rating closed",
+      "closedBody": "The fourteen days have passed: this shipment can no longer be rated.",
+      "view": "See the reviews"
+    },
+    "stars": {
+      "label": "Your overall rating",
+      "value1": "Disappointing",
+      "value2": "Average",
+      "value3": "Fine",
+      "value4": "Very good",
+      "value5": "Excellent",
+      "required": "Pick a rating to publish."
+    },
+    "criteria": {
+      "title": "On these specific points",
+      "hint": "Optional. Tapping a thumb again clears it.",
+      "up": "Good",
+      "down": "Could improve",
+      "PUNCTUALITY": {
+        "name": "Punctuality",
+        "desc": "On time at the meeting and at handover?"
+      },
+      "COMMUNICATION": {
+        "name": "Communication",
+        "desc": "Responsive, clear, easy to reach?"
+      },
+      "PARCEL_CARE": {
+        "name": "Care for the parcel",
+        "desc": "Parcel arrived intact, handled well?"
+      }
+    },
+    "comment": {
+      "title": "Your comment",
+      "hint": "Optional · {max} characters maximum",
+      "placeholder": "E.g. {carrierFirstName} kept me posted at every step, and the parcel arrived in perfect condition.",
+      "counter": "{count} / {max}"
+    },
+    "visibility": "Your rating and comment will be public on {carrierFirstName}'s profile, once you have both rated — or after fourteen days. Once published, a review cannot be edited.",
+    "publish": {
+      "label": "Publish my review",
+      "pending": "Publishing…"
+    },
+    "review": {
+      "mine": "Your rating for {carrierFirstName}",
+      "theirs": "{carrierFirstName}'s rating",
+      "theirsMissing": "{carrierFirstName} did not rate this shipment.",
+      "scale": "{rating} out of 5",
+      "on": "Published on {date}",
+      "noComment": "No comment."
+    },
+    "success": {
+      "title": "Thanks for your review",
+      "body": "{carrierFirstName} is invited to rate you too. Both reviews will be revealed once both are published, or on {date} at the latest.",
+      "bodyNoDate": "{carrierFirstName} is invited to rate you too. Both reviews will be revealed once both are published.",
+      "bothRated": "{carrierFirstName} had already rated you: both reviews are public now.",
+      "back": "Back to tracking"
+    },
+    "unavailable": {
+      "title": "Rating unavailable",
+      "body": "This shipment cannot be rated at the moment."
+    },
+    "wrongRole": {
+      "title": "Not this side",
+      "body": "On this shipment the signed-in account is the Traveler: rating from the Traveler side is not in the app yet."
+    },
+    "errors": {
+      "conflict": "This shipment can no longer be rated — already rated, or the window closed.",
+      "notFound": "This shipment does not exist, or cannot be rated.",
+      "validation": "The review was refused: check the rating and the comment.",
+      "generic": "Publishing failed. Try again in a moment."
+    }
+  },
   "actions": {
     "title": "Your options",
     "cancel": {

@@ -1,11 +1,15 @@
 /**
- * upload.api.ts — les photos déclarées montent chez ImageKit (A45, D42).
- * ======================================================================
+ * upload.api.ts — les photos montent chez ImageKit (A45, D42).
+ * =============================================================
  * Le serveur ne reçoit JAMAIS le fichier : il signe une autorisation courte
  * (`GET /uploads/imagekit-auth`, authentifiée), l'appareil envoie l'image
  * directement à ImageKit, et seule l'URL revient dans `POST /deals`. C'est
  * exactement ce que fait le site (`useImageKitUpload`) — la clé privée reste
  * côté serveur, le binaire ne traverse pas le gateway.
+ *
+ * Deux usages, deux dossiers : les photos du colis DÉCLARÉ (tunnel de
+ * réservation) et les PREUVES d'un signalement (A73). Le dossier est le seul
+ * paramètre qui change — la signature, elle, ne le mentionne pas.
  *
  * ORDRE IMPOSÉ PAR A45 : les photos partent AVANT l'autorisation bancaire.
  * Un échec de téléversement doit tout arrêter pendant qu'aucune empreinte
@@ -85,12 +89,16 @@ function resolveFileName(photo: UploadablePhoto, mimeType: string): string {
   return `yamba-${Date.now()}.${extension}`;
 }
 
+/** Les deux dossiers ImageKit de Yamba, les mêmes que ceux du site. */
+const FOLDER_DECLARED = '/bookings/declared';
+const FOLDER_DISPUTE = '/deals/dispute';
+
 /**
  * Téléverse UNE photo et rend son URL publique. Ne lève jamais : l'appelant
  * est au milieu d'un parcours d'argent, il a besoin d'un code à traduire, pas
  * d'une exception à rattraper.
  */
-export async function uploadDeclaredPhoto(photo: UploadablePhoto): Promise<UploadResult> {
+async function uploadTo(photo: UploadablePhoto, folder: string): Promise<UploadResult> {
   const mimeType = resolveMimeType(photo);
   if (!mimeType) return { ok: false, code: 'INVALID_TYPE' };
   if (photo.sizeBytes !== null && photo.sizeBytes > PHOTO_MAX_BYTES) {
@@ -113,7 +121,7 @@ export async function uploadDeclaredPhoto(photo: UploadablePhoto): Promise<Uploa
     form.append('expire', String(auth.expire));
     form.append('token', auth.token);
     form.append('useUniqueFileName', 'true');
-    form.append('folder', '/bookings/declared');
+    form.append('folder', folder);
 
     // Pas d'en-tête `content-type` : `fetch` doit poser lui-même la frontière
     // multipart. L'écrire à la main casse l'envoi (frontière absente).
@@ -128,4 +136,19 @@ export async function uploadDeclaredPhoto(photo: UploadablePhoto): Promise<Uploa
   } catch {
     return { ok: false, code: 'FAILED' };
   }
+}
+
+/** Une photo du colis DÉCLARÉ, au moment de créer la réservation (A45). */
+export function uploadDeclaredPhoto(photo: UploadablePhoto): Promise<UploadResult> {
+  return uploadTo(photo, FOLDER_DECLARED);
+}
+
+/**
+ * Une PREUVE de signalement (A73, D42). Dossier séparé à dessein : les
+ * photos d'un litige sont des pièces d'un dossier de médiation, pas des
+ * photos de colis — elles ne se rangent pas avec elles, et l'admin les lit
+ * par ce chemin.
+ */
+export function uploadDisputePhoto(photo: UploadablePhoto): Promise<UploadResult> {
+  return uploadTo(photo, FOLDER_DISPUTE);
 }
