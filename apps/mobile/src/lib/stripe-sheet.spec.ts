@@ -283,3 +283,16 @@ describe('handleStripeRedirect — le relais de lien d’iOS (D82 7A)', () => {
     await expect(loadSheet(withoutCallback).handleStripeRedirect('yamba://x')).resolves.toBe(false);
   });
 });
+
+/**
+ * Cette fiche n'a aucun `import` de tête : elle ne charge ses modules qu'à
+ * l'intérieur de `jest.isolateModules`, et ses seuls types viennent de
+ * `typeof import(...)`, qui est effacé à la compilation. Pour TypeScript,
+ * c'est donc un SCRIPT — ses `const` et ses `function` de tête tombent dans la
+ * portée GLOBALE, où elles se heurteront un jour à celles d'une fiche voisine
+ * (TS2451, rapporté sur l'autre fichier). `export {}` en fait un module.
+ *
+ * Attrapé par `fiches-sont-des-modules.spec.ts`, qui balaie tout le dépôt —
+ * le harnais du mobile entre donc aussi dans SON champ (A223).
+ */
+export {};

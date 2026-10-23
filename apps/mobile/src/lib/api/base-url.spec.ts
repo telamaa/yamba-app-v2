@@ -62,3 +62,16 @@ describe('apiBaseUrl — trois priorités, dans cet ordre', () => {
     expect(loadBaseUrl('192.168.1.23:8081').apiBaseUrl()).toBe('http://192.168.1.23:8080/api');
   });
 });
+
+/**
+ * Cette fiche n'a aucun `import` de tête : elle ne charge ses modules qu'à
+ * l'intérieur de `jest.isolateModules`, et ses seuls types viennent de
+ * `typeof import(...)`, qui est effacé à la compilation. Pour TypeScript,
+ * c'est donc un SCRIPT — ses `const` et ses `function` de tête tombent dans la
+ * portée GLOBALE, où elles se heurteront un jour à celles d'une fiche voisine
+ * (TS2451, rapporté sur l'autre fichier). `export {}` en fait un module.
+ *
+ * Attrapé par `fiches-sont-des-modules.spec.ts`, qui balaie tout le dépôt —
+ * le harnais du mobile entre donc aussi dans SON champ (A223).
+ */
+export {};
