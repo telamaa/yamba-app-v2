@@ -254,9 +254,55 @@
       "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
       "SESSION": "Your session has expired. Sign in again: your entries are kept.",
       "ACCOUNT_SUSPENDED": "Your account is suspended. Contact support to find out more.",
-      "GENERIC": "Something went wrong. Nothing was charged, you can try again."
+      "GENERIC": "Something went wrong. Nothing was charged, you can try again.",
+      "NO_METHOD": "Pick a payment method first."
     },
     "signIn": "Sign in"
+  },
+  "methods": {
+    "back": "Back",
+    "title": "How would you like to pay?",
+    "subtitle": "The amount is authorised now. Nothing is charged until the Traveler accepts.",
+    "none": "No payment method is available for this request. Go back and try again.",
+    "cta": "Next",
+    "change": "Change",
+    "card": {
+      "label": "Bank card",
+      "hint": "A form opens so you can enter your card."
+    },
+    "paypal": {
+      "label": "PayPal",
+      "hint": "PayPal opens, then you come back to the app."
+    },
+    "applePay": {
+      "label": "Apple Pay",
+      "hint": "The Apple Pay sheet opens on top of the app."
+    },
+    "googlePay": {
+      "label": "Google Pay",
+      "hint": "The Google Pay sheet opens on top of the app."
+    },
+    "flows": {
+      "form": "On the next step, you'll enter your card details.",
+      "redirect": "You'll leave Yamba for a moment, then come back here automatically.",
+      "sheet": "Your phone's sheet will open on top of this screen."
+    }
+  },
+  "card": {
+    "title": "Your bank card",
+    "subtitle": "The amount is authorised now. Nothing is charged until the Traveler accepts.",
+    "placeholder": "Card number",
+    "holder": "Cardholder name",
+    "holderPlaceholder": "As printed on the card",
+    "holderHint": "Optional. It helps your bank recognise the payment.",
+    "hold": "Your card details never go through Yamba: they go straight to our payment provider.",
+    "cta": "Authorise {amount}",
+    "expired": "This authorisation is no longer valid. Go back to the payment screen and it will be created again.",
+    "errors": {
+      "canceled": "Payment interrupted. Your card was not charged — you can try again.",
+      "unavailable": "Card payment is not available on this device.",
+      "failed": "The authorisation failed. Check your card details, or try another card."
+    }
   },
   "confirmation": {
     "title": "Request sent",

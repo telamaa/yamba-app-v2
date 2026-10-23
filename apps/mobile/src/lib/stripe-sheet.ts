@@ -36,6 +36,18 @@ type StripeNativeModule = {
   presentPaymentSheet: () => Promise<{ error?: StripeNativeError }>;
   /** iOS — rend `true` si l'URL était une redirection Stripe (D82 7A). */
   handleURLCallback: (url: string) => Promise<boolean>;
+  /** D83 — l'appareil sait-il ouvrir Apple Pay / Google Pay ? Appel NATIF. */
+  isPlatformPaySupported: (params?: Record<string, unknown>) => Promise<boolean>;
+  /** D83 — confirme l'empreinte avec le portefeuille du système. */
+  confirmPlatformPayPayment: (
+    clientSecret: string,
+    params: Record<string, unknown>
+  ) => Promise<{ error?: StripeNativeError }>;
+  /** D83 — confirme l'empreinte avec un moyen NOMMÉ (carte saisie, PayPal). */
+  confirmPayment: (
+    clientSecret: string,
+    params: Record<string, unknown>
+  ) => Promise<{ error?: StripeNativeError }>;
 };
 
 type StripeNativeError = { code?: string; message?: string };
@@ -124,6 +136,47 @@ export function isPaymentSheetAvailable(): boolean {
 }
 
 /**
+ * Initialise Stripe UNE fois, si c'est possible. Rendu à part parce que deux
+ * chemins en ont besoin : ouvrir une feuille, et interroger le portefeuille —
+ * `isPlatformPaySupported` ne répond rien de fiable tant que la clé publiable
+ * n'a pas été posée.
+ */
+async function ensureInitialised(stripe: StripeNativeModule, key: string): Promise<void> {
+  if (initialised) return;
+  const merchantIdentifier = appleMerchantId();
+  await stripe.initStripe({
+    publishableKey: key,
+    urlScheme: URL_SCHEME,
+    ...(merchantIdentifier ? { merchantIdentifier } : {}),
+  });
+  initialised = true;
+}
+
+/**
+ * D83 3A — l'appareil sait-il ouvrir un portefeuille (Apple Pay / Google Pay) ?
+ *
+ * C'est une MESURE, jamais une déduction de `Platform.OS`. Disent non : un
+ * simulateur sans portefeuille configuré, un iPhone sans carte enregistrée, un
+ * Android sans services Google — et, sur iOS, **Expo Go lui-même**, dont le
+ * binaire ne déclare aucun droit `com.apple.developer.in-app-payments`
+ * (mesuré le 23/10). Un `false` n'est donc pas une panne : c'est une ligne
+ * qu'il ne faut pas afficher, parce qu'elle ne pourrait pas marcher (A209).
+ *
+ * Ne lève jamais : l'appelant construit une liste de choix, pas un diagnostic.
+ */
+export async function isWalletSupported(): Promise<boolean> {
+  const key = stripePublishableKey();
+  const stripe = loadModule();
+  if (!key || !stripe?.isPlatformPaySupported) return false;
+  try {
+    await ensureInitialised(stripe, key);
+    return await stripe.isPlatformPaySupported();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Ouvre la feuille native et rend son issue. Ne lève jamais : l'appelant est
  * au milieu d'un chemin d'argent, il a besoin d'une issue à traduire.
  *
@@ -141,15 +194,7 @@ export async function confirmWithPaymentSheet(args: {
   if (!key || !stripe) return { ok: false, reason: 'UNAVAILABLE' };
 
   try {
-    if (!initialised) {
-      const merchantIdentifier = appleMerchantId();
-      await stripe.initStripe({
-        publishableKey: key,
-        urlScheme: URL_SCHEME,
-        ...(merchantIdentifier ? { merchantIdentifier } : {}),
-      });
-      initialised = true;
-    }
+    await ensureInitialised(stripe, key);
 
     const init = await stripe.initPaymentSheet({
       merchantDisplayName: args.merchantName,
@@ -199,5 +244,129 @@ export async function handleStripeRedirect(url: string): Promise<boolean> {
     return await stripe.handleURLCallback(url);
   } catch {
     return false;
+  }
+}
+
+
+/* ══ D83 — les trois autres chemins d'autorisation ═══════════════════════════
+   La feuille de Stripe reste là, mais elle n'est plus la porte d'entrée :
+   c'est l'écran de Yamba qui choisit, et chaque moyen a son chemin. Les trois
+   fonctions ci-dessous partagent les propriétés de `confirmWithPaymentSheet` —
+   elles ne lèvent JAMAIS, elles distinguent l'annulation de l'échec, et toute
+   absence devient `UNAVAILABLE`.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Le motif d'annulation, selon le chemin. Le SDK n'est pas constant : la
+ *  feuille rend `Canceled`, les autres appels rendent `Canceled` ou
+ *  `Failed` avec un message d'annulation. On ne retient que le code. */
+function outcomeFromError(error: StripeNativeError | undefined): SheetOutcome {
+  if (!error) return { ok: true };
+  if (error.code === 'Canceled') return { ok: false, reason: 'CANCELED' };
+  return { ok: false, reason: 'FAILED', message: error.message ?? null };
+}
+
+/**
+ * D83 — l'empreinte posée par le PORTEFEUILLE du système (Apple Pay, Google Pay).
+ *
+ * Le montant est re-déclaré ici parce que la feuille du système l'affiche
+ * elle-même : elle ne lit pas l'intention, elle montre ce qu'on lui dit. Le
+ * passer faux afficherait un prix que le serveur ne débitera pas — on le
+ * prend donc du DEVIS SERVEUR, jamais du calcul local.
+ */
+export async function confirmWithWallet(args: {
+  clientSecret: string;
+  amountCents: number;
+  currencyCode: string;
+  merchantName: string;
+}): Promise<SheetOutcome> {
+  const key = stripePublishableKey();
+  const stripe = loadModule();
+  if (!key || !stripe?.confirmPlatformPayPayment) return { ok: false, reason: 'UNAVAILABLE' };
+
+  try {
+    await ensureInitialised(stripe, key);
+    const { error } = await stripe.confirmPlatformPayPayment(args.clientSecret, {
+      googlePay: {
+        merchantCountryCode: MERCHANT_COUNTRY,
+        currencyCode: args.currencyCode,
+        testEnv: googlePayTestEnv(),
+        merchantName: args.merchantName,
+      },
+      applePay: {
+        merchantCountryCode: MERCHANT_COUNTRY,
+        currencyCode: args.currencyCode,
+        cartItems: [
+          {
+            label: args.merchantName,
+            amount: (args.amountCents / 100).toFixed(2),
+            paymentType: 'Immediate',
+          },
+        ],
+      },
+    });
+    return outcomeFromError(error);
+  } catch {
+    return { ok: false, reason: 'UNAVAILABLE' };
+  }
+}
+
+/**
+ * D83 — l'empreinte posée par un moyen à REDIRECTION (PayPal).
+ *
+ * L'app part chez le fournisseur et revient par son schéma (`yamba://`). Tout
+ * ce qui suit le retour est déjà en place depuis D82 7A : le dossier d'attente
+ * côté écran, le relais de lien à la racine, la relecture de l'état réel chez
+ * le fournisseur côté serveur, et le refus RÉESSAYABLE tant que l'empreinte
+ * se pose.
+ */
+export async function confirmWithRedirect(args: {
+  clientSecret: string;
+  /** Le type Stripe du moyen — « PayPal » aujourd'hui, et lui seul. */
+  paymentMethodType: 'PayPal';
+}): Promise<SheetOutcome> {
+  const key = stripePublishableKey();
+  const stripe = loadModule();
+  if (!key || !stripe?.confirmPayment) return { ok: false, reason: 'UNAVAILABLE' };
+
+  try {
+    await ensureInitialised(stripe, key);
+    const { error } = await stripe.confirmPayment(args.clientSecret, {
+      paymentMethodType: args.paymentMethodType,
+    });
+    return outcomeFromError(error);
+  } catch {
+    return { ok: false, reason: 'UNAVAILABLE' };
+  }
+}
+
+/**
+ * D83 — l'empreinte posée par la CARTE saisie dans notre page.
+ *
+ * Les données de la carte ne transitent jamais par notre JavaScript : elles
+ * restent dans le champ natif de Stripe (`CardField`), qui les envoie
+ * lui-même. Nous ne passons que le secret de l'intention et le nom du
+ * porteur — c'est ce qui garde Yamba hors du périmètre PCI.
+ *
+ * Le 3-D Secure est géré par le SDK : il ouvre la page de la banque et rend
+ * la main ici, sans que l'écran ait à le savoir.
+ */
+export async function confirmCardPayment(args: {
+  clientSecret: string;
+  holderName?: string | null;
+}): Promise<SheetOutcome> {
+  const key = stripePublishableKey();
+  const stripe = loadModule();
+  if (!key || !stripe?.confirmPayment) return { ok: false, reason: 'UNAVAILABLE' };
+
+  try {
+    await ensureInitialised(stripe, key);
+    const nom = args.holderName?.trim();
+    const { error } = await stripe.confirmPayment(args.clientSecret, {
+      paymentMethodType: 'Card',
+      ...(nom ? { paymentMethodData: { billingDetails: { name: nom } } } : {}),
+    });
+    return outcomeFromError(error);
+  } catch {
+    return { ok: false, reason: 'UNAVAILABLE' };
   }
 }
