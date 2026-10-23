@@ -1,0 +1,38 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/jest",
+    // `tsconfig.base.json` est écrit pour des projets COMPOSITES qui n'émettent
+    // que des déclarations ; ici le programme ne sert qu'à vérifier (et ts-jest
+    // transpile fiche par fiche, sans jamais lire ces options). `noEmit` est
+    // incompatible avec `emitDeclarationOnly` : les trois se neutralisent.
+    "composite": false,
+    "emitDeclarationOnly": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["jest", "node"],
+    "baseUrl": ".",
+    "rootDir": "../../",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0",
+    "jsx": "react-jsx",
+    "lib": ["es2022"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/assets/*": ["./assets/*"],
+      "@packages/api-contracts": ["../../packages/libs/api-contracts/src/index.ts"],
+      "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"],
+      "@packages/legal/versions": ["../../packages/libs/legal/versions.ts"],
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"]
+    }
+  },
+  "include": [
+    "jest.config.ts",
+    "jest.setup.ts",
+    "src/**/*.spec.ts",
+    "src/test-support/**/*.ts",
+    "src/test-support/**/*.d.ts"
+  ]
+}
