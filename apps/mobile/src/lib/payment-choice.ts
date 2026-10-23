@@ -92,7 +92,11 @@ export function getIntentMethods(): readonly string[] {
  * demande partirait sur un identifiant mort.
  */
 export function setPendingIntent(next: PendingIntent | null): void {
-  empreinte = next;
+  // La liste est COPIÉE : la mémoire ne partage pas son tableau avec
+  // l'appelant. Sans cela, une mutation du dehors changerait silencieusement
+  // les moyens proposés — et c'est le genre de lien invisible qu'on ne
+  // retrouve qu'à la recette.
+  empreinte = next === null ? null : { ...next, types: [...next.types] };
   autorisee = false;
   emit();
 }
@@ -122,19 +126,24 @@ export function subscribePaymentChoice(listener: () => void): () => void {
  * Entre le moment où l'Expéditeur a choisi et celui où l'écran se rouvre,
  * l'intention a pu être recréée avec d'autres moyens (changement au Dashboard,
  * montant différent, portefeuille devenu indisponible). On ne garde donc
- * jamais un choix que la liste ne porte plus — et le ramener au défaut vaut
- * mieux que d'afficher une ligne morte (A209).
+ * jamais un choix que la liste ne porte plus — le ramener au défaut vaut mieux
+ * que d'afficher une ligne morte (A209).
  *
- * La fonction NORMALISE aussi la mémoire au passage : si le choix a dû être
- * remplacé, c'est le remplaçant qui est mémorisé, pour que l'écran de choix
- * et l'écran de paiement ne se contredisent jamais.
+ * ELLE NE MÉMORISE RIEN, et c'est un choix payé : une première version
+ * normalisait la mémoire au passage. Les écrans l'appelaient pour AFFICHER,
+ * donc pendant leur rendu, donc elle prévenait les abonnés pendant un rendu —
+ * et React refuse : « Cannot update a component while rendering a different
+ * component ». La règle qui en sort vaut pour toutes les mémoires du dépôt :
+ *
+ *     une fonction qui RÉPOND à une question n'ÉCRIT jamais.
+ *
+ * La normalisation de la mémoire se fait donc dans un effet, par un appel
+ * explicite à `setPaymentChoice`.
  */
-export function resolvePaymentChoice(
+export function resolvedChoice(
   disponibles: readonly PaymentMethodKey[]
 ): PaymentMethodKey | null {
-  const retenu = keepOrDefault(choisi, disponibles);
-  if (retenu !== choisi) setPaymentChoice(retenu);
-  return retenu;
+  return keepOrDefault(choisi, disponibles);
 }
 
 export function usePaymentChoice(): PaymentMethodKey | null {

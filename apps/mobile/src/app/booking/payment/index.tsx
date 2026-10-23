@@ -60,7 +60,6 @@ import {
   getIntentMethods,
   isPaymentAuthorized,
   markPaymentAuthorized,
-  resolvePaymentChoice,
   setPendingIntent,
   usePaymentChoice,
 } from '@/lib/payment-choice';

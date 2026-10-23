@@ -39,12 +39,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getIntentMethods, resolvePaymentChoice, setPaymentChoice } from '@/lib/payment-choice';
+import { getIntentMethods, resolvedChoice, setPaymentChoice } from '@/lib/payment-choice';
 import {
   CARD_NETWORKS,
   availableMethods,
   flowOf,
   isWallet,
+  keepOrDefault,
   type PaymentMethodKey,
 } from '@/lib/payment-methods';
 import { isWalletSupported } from '@/lib/stripe-sheet';
@@ -84,18 +85,22 @@ export default function PaymentMethodScreen() {
     [serverTypes, walletSupported]
   );
 
-  // `resolve` NORMALISE au passage : un choix que la liste ne porte plus est
-  // remplacé par le défaut, ici et dans la mémoire — les deux écrans ne
-  // peuvent donc pas se contredire.
+  // Lecture PURE : `resolvedChoice` répond sans rien écrire. Écrire ici
+  // préviendrait les abonnés PENDANT le rendu, donc mettrait à jour l'écran de
+  // paiement en plein rendu de celui-ci — React le refuse, et c'est un défaut
+  // payé le 23/10. La mémoire se met à jour dans l'effet ci-dessous.
   const [selected, setSelected] = useState<PaymentMethodKey | null>(() =>
-    resolvePaymentChoice(methods)
+    resolvedChoice(methods)
   );
 
   // La liste GRANDIT quand le portefeuille répond : le choix est re-normalisé,
-  // sans jamais écraser un choix que l'Expéditeur vient de faire à la main.
+  // sans jamais écraser celui que l'Expéditeur vient de faire à la main. Et
+  // c'est ICI, dans un effet, que la mémoire est alignée sur l'affichage.
   useEffect(() => {
-    setSelected((actuel) => (actuel !== null && methods.includes(actuel) ? actuel : resolvePaymentChoice(methods)));
-  }, [methods]);
+    const retenu = keepOrDefault(selected, methods);
+    if (retenu !== selected) setSelected(retenu);
+    setPaymentChoice(retenu);
+  }, [methods, selected]);
 
   const choisir = useCallback((key: PaymentMethodKey) => {
     setSelected(key);
