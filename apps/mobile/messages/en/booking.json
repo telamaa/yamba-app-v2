@@ -248,6 +248,7 @@
       "OWN_TRIP": "You cannot book your own trip.",
       "NEW_ACCOUNT_CAP": "Your account is new: your shipments are still capped. The cap lifts with your first completed shipments.",
       "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorised yet. Try again.",
+      "PAYMENT_PROCESSING": "Your bank is still confirming the payment. Stay on this screen — nothing is lost, and your request goes out as soon as it clears.",
       "PAYMENT_MISMATCH": "The authorisation no longer matches your request. A new one is being prepared.",
       "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",
       "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
@@ -270,7 +271,7 @@
       "step3": "The recipient gives that code on arrival: it is what confirms the delivery."
     },
     "refused": "If they refuse or do not answer within 24 hours, the authorisation lapses on its own and you have paid nothing.",
-    "cta": "See my shipments",
+    "cta": "Follow my shipment",
     "secondary": "Explore other trips"
   }
 }

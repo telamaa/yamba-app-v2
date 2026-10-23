@@ -7401,3 +7401,323 @@ Deux contraintes de réalité commandent l'ordre des travaux, et aucune n'est te
 | MOB163 | Activer Klarna au Dashboard Stripe, relancer le parcours | Klarna apparaît dans la feuille **sans aucune livraison de code** |
 | MOB164 | Payer en Klarna puis abandonner sur la page Klarna | Aucune demande créée, aucune empreinte vivante laissée sans réservation |
 | MOB165 | Passer du mode test à l'argent réel | Seuls les identifiants changent ; aucun écran, aucun refus, aucun message ne diffère |
+
+---
+
+# Attendre n'est pas échouer, et l'argent retenu pour rien se rend (PR à venir, D82 7A/8A/9A)
+
+## Le besoin
+
+Deux situations que seuls les moyens de paiement à **redirection** (Klarna, PayPal) font
+apparaître, et qui touchent toutes les deux à l'argent du membre.
+
+**La première est une question de vérité à l'écran.** Un Expéditeur revient de sa banque,
+le paiement est accepté, mais l'empreinte n'a pas fini de se poser. Jusqu'ici l'app lui
+disait « le paiement n'a pas été autorisé » : un mensonge, qui l'invite à tout recommencer —
+et donc, au mieux, à payer une deuxième fois son attention, au pire à abandonner une demande
+qui était valide.
+
+**La seconde est une question d'argent.** Un Expéditeur part payer chez Klarna et ne revient
+pas. L'autorisation reste vivante sur son moyen de paiement : jusqu'à **7 jours** sur une
+carte, **28 jours** chez Klarna. Il n'a pas de réservation, personne ne le sait, et c'est sur
+son relevé qu'il le découvre. Un marketplace qui retient de l'argent sans contrepartie, même
+par oubli technique, perd la confiance qu'il met des mois à construire.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-111** | Une empreinte **en cours de pose** n'est pas un échec de paiement. L'app l'annonce comme une attente, conserve toute la saisie, et envoie la demande dès que l'empreinte est confirmée — sans aucun geste du membre. |
+| **RG-MOB-112** | Un membre n'est **jamais** invité à payer une seconde fois parce que le premier paiement était « en cours ». Une seule empreinte par demande, toujours. |
+| **RG-MOB-113** | L'attente est **bornée** : passé trois tentatives, l'app dit ce qui se passe au lieu de tourner indéfiniment — et garde la saisie intacte. |
+| **RG-MOB-114** | L'invariant ne bouge pas : **aucune réservation n'est créée sans empreinte réellement posée**, et l'état de l'empreinte est lu chez le fournisseur de paiement, jamais annoncé par le client. |
+| **RG-MOB-115** | Une empreinte posée que personne n'a transformée en réservation est **libérée d'elle-même** après un délai de grâce. On ne retient pas l'argent d'un membre qui n'a rien réservé. |
+| **RG-MOB-116** | Ce ménage ne touche **que** les empreintes de Yamba : une autorisation qui ne porte pas nos références de réservation n'est jamais annulée, quel que soit son âge. |
+| **RG-MOB-117** | Le délai de grâce protège le membre qui paie encore : une empreinte récente n'est jamais annulée, même sans réservation. |
+| **RG-MOB-118** | Un motif d'échec de paiement (« carte refusée », nom de la banque, adresse) reste **interne** : il part dans les journaux d'exploitation, jamais à l'écran. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB166 | Payer par Klarna et revenir dans l'app avant la confirmation bancaire | Message d'ATTENTE (pas d'échec) ; la demande part seule dès confirmation ; aucune saisie à refaire |
+| MOB167 | Même cas, la confirmation n'arrive pas après trois tentatives | L'app le dit, garde la saisie, et n'a posé qu'UNE empreinte |
+| MOB168 | Empreinte annulée par la banque, puis tentative de création | Refus terminal : il faut repasser par le paiement |
+| MOB169 | Empreinte déjà débitée (anomalie), puis tentative de création | Refus : une empreinte capturée ne devient pas une réservation |
+| MOB170 | Partir payer chez Klarna et ne jamais revenir | Au bout du délai de grâce, l'autorisation est annulée : plus rien n'est retenu |
+| MOB171 | Une réservation (même annulée) porte l'empreinte | L'empreinte n'est PAS annulée par le ménage : son sort suit la réservation |
+| MOB172 | Une empreinte d'une autre application sur le même compte de paiement | Jamais annulée, quel que soit son âge |
+| MOB173 | Un membre au milieu de son paiement pendant une passe de ménage | Son empreinte est épargnée (délai de grâce) |
+| MOB174 | Échec de paiement avec motif bancaire | Le motif est journalisé ; l'écran reste sur un message générique |
+
+## Complément — le retour de redirection (D82 7A)
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-119** | Revenir d'un paiement par redirection ne fait **jamais** payer deux fois : l'autorisation déjà posée est reprise, jamais remplacée par une nouvelle. |
+| **RG-MOB-120** | Les photos déjà envoyées au retour d'une redirection **restent attachées** à la demande : le membre ne les reprend pas, et elles ne sont pas perdues. |
+| **RG-MOB-121** | Un retour de paiement **refusé par la banque** ne crée aucune demande : le message le dit, la saisie reste intacte, et le membre peut repayer. |
+| **RG-MOB-122** | Un retour qui ne correspond pas au paiement attendu (onglet recyclé, adresse recopiée) **ne déclenche rien**. |
+| **RG-MOB-123** | Pendant la reprise, l'écran est visiblement occupé et le bouton inerte : la page ne paraît jamais morte. |
+| **RG-MOB-124** | Une reprise qui échoue **ne condamne pas l'écran** : le membre peut relancer un paiement. |
+| **RG-MOB-125** | L'adresse de la page est nettoyée des paramètres laissés par le paiement, **secret de paiement compris**. |
+| **RG-MOB-126** | Les portefeuilles n'apparaissent que là où ils existent : Google Pay sur Android, Apple Pay sur iOS **et seulement** quand le compte marchand Apple est en place. Aucun bouton n'est promis sans être ouvrable. |
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB175 | Payer par Klarna sur le site, revenir après validation | La demande est créée avec les **mêmes** photos et la **même** autorisation ; aucune seconde empreinte |
+| MOB176 | Même parcours, paiement refusé par la banque | Aucune demande ; message d'échec ; brouillon et étape intacts ; on peut repayer |
+| MOB177 | Revenir avec une adresse recopiée d'un autre paiement | Rien ne se déclenche ; l'écran reste utilisable |
+| MOB178 | Fermer l'onglet puis rouvrir le tunnel | Aucun dossier d'attente (il meurt avec l'onglet) : parcours normal |
+| MOB179 | Revenir plus de 30 minutes après | Le dossier d'attente est périmé : parcours normal, et l'autorisation oubliée est libérée (MOB170) |
+| MOB180 | Observer l'adresse après un retour | Plus de paramètre de paiement, secret compris |
+| MOB181 | Payer par carte (sans redirection) sur le site | Comportement inchangé : on reste sur la page, rien ne clignote |
+| MOB182 | Ouvrir la feuille sur Android (build de développement) | Google Pay est proposé ; Apple Pay est absent |
+| MOB183 | Ouvrir la feuille sur iOS sans compte marchand Apple | Apple Pay est absent — et aucun message ne l'avait promis |
+
+---
+
+# Lot A221 — Suivre son envoi depuis l'app, du paiement à la livraison
+
+## Le besoin, dit simplement
+
+Une Expéditrice vient de payer. Elle ne reverra pas son colis avant plusieurs jours, et
+pendant ces jours elle va se poser exactement six questions :
+
+1. **Est-ce qu'il a accepté ?** Et s'il ne répond pas, qu'est-ce que je perds ?
+2. **Qu'est-ce que je dois préparer, et quand ?**
+3. **Où est mon code**, et à qui je le donne ?
+4. **Où est mon colis en ce moment ?**
+5. **C'est livré — et maintenant, mon argent ?**
+6. **Je change d'avis : comment j'annule, et combien ça me coûte ?**
+
+Jusqu'ici, l'application répondait à **zéro** de ces six questions. Le tunnel de réservation
+disait « ta demande est partie » et l'histoire s'arrêtait là : le geste suivant menait à un
+onglet qui affiche des compteurs et aucune liste. Le site répondait à tout cela depuis des
+mois ; l'app renvoyait au silence.
+
+Et le silence n'est pas neutre : **un envoi qu'on ne peut pas annuler depuis son téléphone est
+un envoi qu'on va annuler depuis un navigateur** — ou qu'on n'annulera pas du tout.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-127** | Le suivi d'un envoi est un **lieu**, pas la dernière page d'un formulaire : on y revient autant de fois qu'on veut, et en sortir ne ramène jamais sur un écran de paiement. |
+| **RG-MOB-128** | Le suivi dit **l'état réel** de l'envoi, y compris quand cet état est désagréable (refusé, expiré, en litige). Aucun écran ne se rabat sur un état « par défaut » qu'il ne connaît pas. |
+| **RG-MOB-129** | Un envoi **refusé au rendez-vous** ne se lit pas « demande annulée » : l'Expéditeur ne s'est pas désisté, et le motif du refus lui est montré. |
+| **RG-MOB-130** | Un envoi **clos par la médiation** ne se lit pas « demande annulée » non plus : la décision et son motif sont affichés. |
+| **RG-MOB-131** | Le **code de livraison** est l'information centrale de l'écran : il est lisible, dictable (groupé par trois) et partageable en un geste, par le canal que l'Expéditeur choisit. |
+| **RG-MOB-132** | Le code n'apparaît **jamais avant** que le Voyageur ait confirmé la prise en charge, et l'écran dit quand il arrivera plutôt que d'afficher une case vide. |
+| **RG-MOB-133** | Après la livraison, le code est montré comme **utilisé**, pas effacé : l'Expéditeur se souvient l'avoir vu. |
+| **RG-MOB-134** | Les **étapes du voyage** sont le miroir de ce que le Voyageur a confirmé — jamais une prédiction. Une étape non confirmée se dit « en attente ». |
+| **RG-MOB-135** | Les heures s'affichent dans le **fuseau du lieu** (celui du billet), pas dans celui du téléphone. |
+| **RG-MOB-136** | **Annuler** affiche, avant confirmation, le montant rendu et la retenue **calculés par Yamba** — et dit que le montant définitif est recalculé au moment du geste. |
+| **RG-MOB-137** | Un geste qui engage (annuler, régénérer le code, confirmer la réception) demande une **confirmation**, et sur un geste définitif le bouton le plus visible est celui qui **renonce**. |
+| **RG-MOB-138** | **Confirmer la réception** est annoncé comme définitif : après lui, aucun signalement n'est plus possible. |
+| **RG-MOB-139** | Un geste refusé parce que l'envoi a changé entre-temps n'est pas présenté comme une erreur : l'écran le dit et se remet à jour. |
+| **RG-MOB-140** | Un geste que Yamba n'autorise pas **n'apparaît pas**. Il n'est pas affiché grisé. |
+| **RG-MOB-141** | L'écran dit **ce qui est arrivé à l'argent** : autorisé sans débit, débité, gelé pendant un examen, rendu, retenu, versé. |
+| **RG-MOB-142** | Un **échec de versement** au Voyageur n'est jamais montré à l'Expéditeur : le colis est livré, et le versement est une affaire entre Yamba et le Voyageur. |
+| **RG-MOB-143** | L'app ne renvoie **jamais** au site, même par une phrase. Une fonctionnalité absente est absente en silence ; elle n'est pas sous-traitée à un navigateur. |
+
+## Ce que le site apprend de l'app
+
+| Règle | Énoncé |
+|---|---|
+| **RG-S-144** | Sur un envoi clos, le site affiche le **montant réellement remboursé** et la retenue appliquée — au lieu de renvoyer l'Expéditeur à sa boîte mail. |
+| **RG-S-145** | Le site affiche le **motif** du refus (refus de la demande, refus du colis au rendez-vous) : il était écrit par le Voyageur et n'était montré nulle part. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB184 | Payer une demande, puis toucher le geste principal de la confirmation | La fiche de suivi s'ouvre ; en sortir ne ramène **pas** sur l'écran de paiement |
+| MOB185 | Ouvrir le suivi d'une demande en attente de réponse | Le temps restant avant expiration ; « rien n'est débité » ; la possibilité d'annuler |
+| MOB186 | Ouvrir le suivi d'un envoi accepté | Le rendez-vous à venir, la préparation du colis, le code annoncé comme « à venir » |
+| MOB187 | Ouvrir le suivi juste après la prise en charge | Le **code à 6 chiffres**, groupé, avec le partage en un geste |
+| MOB188 | Partager le code | La feuille de partage de l'OS, message prérempli (destinataire, Voyageur, trajet, code) |
+| MOB189 | Régénérer le code | Confirmation demandée ; l'ancien code cesse de fonctionner ; le nouveau vient d'une **relecture** chez Yamba |
+| MOB190 | Régénérer une sixième fois | Refus de Yamba, dit en clair, sans que l'écran se bloque |
+| MOB191 | Suivre un colis en voyage | Les étapes confirmées par le Voyageur, horodatées **dans le fuseau du lieu** ; les autres « en attente » |
+| MOB192 | Ouvrir le suivi d'un colis livré | Le décompte avant versement automatique ; le geste « tout s'est bien passé » ; les photos de remise |
+| MOB193 | Confirmer la réception | Avertissement « définitif » ; après confirmation, l'envoi est terminé et le geste a disparu |
+| MOB194 | Annuler une demande avant la limite de remboursement total | Le montant **intégral** est annoncé, puis rendu ; la date limite est rappelée |
+| MOB195 | Annuler une demande acceptée après cette limite | Remboursement **partiel** annoncé avec la retenue et son pourcentage ; montant définitif recalculé par Yamba |
+| MOB196 | Annuler pendant que le Voyageur accepte | Refus annoncé comme un changement d'état, pas comme une panne ; la fiche se met à jour |
+| MOB197 | Ouvrir le suivi d'une demande refusée | Le motif du Voyageur ; « tu n'es pas débité » |
+| MOB198 | Ouvrir le suivi d'un colis refusé au rendez-vous | « Colis refusé au rendez-vous » + le motif — **jamais** « demande annulée » |
+| MOB199 | Ouvrir le suivi d'un envoi clos par la médiation | « Clos par la médiation », l'issue, le montant rendu, le motif |
+| MOB200 | Ouvrir le suivi d'un envoi en litige | Le dossier déposé en lecture, l'état de la procédure, le versement annoncé comme gelé |
+| MOB201 | Ouvrir le suivi d'un envoi qui n'est pas le sien | « Cet envoi n'existe pas » — aucune différence avec un identifiant inventé |
+| MOB202 | Ouvrir le suivi en étant le **Voyageur** du deal | L'écran le dit et n'affiche aucune donnée d'Expéditeur |
+| MOB203 | Couper le réseau et ouvrir le suivi | Un écran d'erreur avec la référence technique et un vrai bouton « Réessayer » |
+| WEB157 | Ouvrir sur le site un envoi annulé avec remboursement | Le montant rendu s'affiche — plus de renvoi à l'email |
+| WEB158 | Ouvrir sur le site un envoi refusé au rendez-vous | Le titre et le motif corrects, comme dans l'app |
+
+## Ce qui reste hors de ce lot (et se voit nulle part à l'écran)
+
+- **Signaler un problème** et **noter le Voyageur** : deux formulaires, donc deux écrans à
+  part — comme sur le site. Tant qu'ils n'existent pas, aucun bouton ne les annonce.
+- **La liste « Mes envois »** : la fiche d'abord, parce qu'elle s'atteint dès le paiement ;
+  une liste livrée seule aurait mené à des lignes sans destination.
+- **Partager le lien de suivi au destinataire** : Yamba fournit aujourd'hui un chemin dont
+  l'adresse publique n'est connue que d'un navigateur. Un lien mort serait pire que rien.
+
+
+---
+
+# Lot A222 — Dire « ça ne va pas », et dire « ça s'est bien passé »
+
+## Le besoin, dit simplement
+
+Le colis est arrivé. Deux histoires commencent, et l'app n'en racontait aucune.
+
+**La première est mauvaise.** Le destinataire ouvre le colis et appelle : il manque le pull,
+ou le t-shirt est déchiré, ou rien n'est arrivé du tout. L'Expéditeur a **trois jours** pour
+le dire — après, Yamba verse l'argent au Voyageur et l'affaire est close. C'est le moment
+exact où la garantie qu'il a payée doit fonctionner. Or la fiche de suivi lui écrivait
+« si quelque chose ne va pas, signale-le avant la fin du délai » **sans lui donner de
+bouton**. Une promesse sans geste est pire qu'un silence : elle laisse croire que le recours
+existe quelque part, et elle le fait chercher.
+
+**La seconde est bonne.** Tout s'est bien passé, et l'Expéditeur voudrait le dire — parce que
+c'est ce qui fera choisir ce Voyageur par la personne suivante. Sans écran de notation, un
+envoi fait depuis l'app ne nourrissait jamais la réputation visible de qui l'a transporté.
+
+Un principe tient les deux : **l'app ne renvoie jamais au site, même par une phrase**
+(A210 b). Un recours sous-traité à un navigateur n'est pas un recours.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-144** | Tant qu'un signalement est possible, la fiche de suivi **l'annonce** et y mène. Un texte qui évoque un recours sans geste associé est un défaut. |
+| **RG-MOB-145** | Quand le signalement n'est **pas encore** ouvert (colis en vol, moins de 48 h après le départ), la fiche annonce **la date** à laquelle il s'ouvrira — pas un bouton qui serait refusé. |
+| **RG-MOB-146** | Tant que le colis est en transit, le seul problème signalable est « le colis n'a jamais été livré » : les autres se constatent après la remise. L'écran ne propose alors **qu'un** motif, déjà choisi, et dit pourquoi. |
+| **RG-MOB-147** | Un signalement demande un récit d'au moins **50 caractères**, et l'écran dit en continu combien il en manque. |
+| **RG-MOB-148** | Jusqu'à **cinq photos** peuvent être jointes comme preuves, prises sur le moment ou choisies dans le téléphone. L'autorisation d'accès est demandée **au geste**, séparément pour l'appareil photo et pour la photothèque. |
+| **RG-MOB-149** | Une preuve dont l'envoi a échoué **empêche** l'envoi du dossier : un signalement part avec toutes ses pièces, ou il ne part pas. |
+| **RG-MOB-150** | La « solution souhaitée » est **facultative** : elle informe la médiation, elle ne la décide pas. Un choix reposé s'efface. |
+| **RG-MOB-151** | Avant l'envoi, l'écran dit **ce qui va se passer** : accusé sous 48 h ouvrées, version du Voyageur demandée sous 72 h, décision sous cinq jours ouvrés, et **paiement gelé pendant tout l'examen**. |
+| **RG-MOB-152** | Un signalement est **signé sur l'honneur**. L'écran dit pourquoi : il gèle le paiement d'une vraie personne, et cet engagement protège les Voyageurs honnêtes. |
+| **RG-MOB-153** | L'envoi d'un signalement demande une confirmation, et il est annoncé comme **irréversible**. |
+| **RG-MOB-154** | Une fois le dossier ouvert, l'écran montre d'abord le **numéro de dossier** et invite à le garder : c'est la seule chose à retenir. |
+| **RG-MOB-155** | Un refus définitif de Yamba (délai passé, dossier déjà ouvert, motif devenu irrecevable) **ferme** le formulaire en disant la raison reçue. Un refus réessayable (panne, validation) le garde ouvert. |
+| **RG-MOB-156** | La note n'est visible qu'une fois que **les deux** ont noté — ou à la fin des quatorze jours. L'écran le dit avant la publication, et ne montre jamais la note de l'autre avant la révélation. |
+| **RG-MOB-157** | L'écran de notation ne montre **ni la moyenne ni le nombre d'envois** de la personne notée : un ancrage fausserait l'avis. |
+| **RG-MOB-158** | Seule la **note globale** est obligatoire. Les trois critères et le commentaire sont facultatifs, et un pouce reposé s'efface. |
+| **RG-MOB-159** | Un avis publié n'est plus modifiable, et l'écran le dit **avant** la publication. |
+| **RG-MOB-160** | Après la fenêtre de quatorze jours, la notation est **fermée** et l'écran le dit, sans proposer de geste. |
+| **RG-MOB-161** | Un envoi dont le compte connecté est le **Voyageur** le dit et s'arrête là : la notation côté Voyageur n'existe pas encore dans l'app, et aucun écran à moitié traduit ne s'affiche. |
+| **RG-MOB-162** | Après un signalement déposé ou une note publiée, la fiche de suivi **se met à jour d'elle-même** au retour : elle ne garde pas un bouton devenu faux. |
+
+## Ce que le site apprend de l'app
+
+| Règle | Énoncé |
+|---|---|
+| **RG-S-163** | Quand Yamba refuse un signalement parce que le motif choisi n'est plus recevable (colis reparti en transit), le site dit **cette** raison — il ne renvoie plus vers la description et l'engagement, qui n'ont rien à voir. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB204 | Ouvrir le suivi d'un colis livré | Une section « Un problème ? », la date limite, et un geste qui ouvre le formulaire |
+| MOB205 | Ouvrir le suivi d'un colis en vol depuis moins de 48 h | **Pas** de geste : la date à laquelle le signalement « jamais livré » s'ouvrira |
+| MOB206 | Ouvrir le formulaire sur un colis en transit | Un seul motif, déjà coché, et le bandeau qui explique pourquoi |
+| MOB207 | Ouvrir le formulaire sur un colis livré | Les six motifs, aucun coché |
+| MOB208 | Écrire 20 caractères et envoyer | Le dossier ne part pas ; l'écran dit combien de caractères manquent |
+| MOB209 | Envoyer sans cocher la déclaration sur l'honneur | Le dossier ne part pas ; l'écran dit laquelle des conditions manque |
+| MOB210 | Joindre une photo depuis l'appareil photo | L'autorisation est demandée **à ce moment-là** ; la photo part aussitôt et s'affiche |
+| MOB211 | Refuser l'autorisation | Un message qui dit où l'autoriser, et l'autre source reste proposée |
+| MOB212 | Joindre une sixième photo | Le geste d'ajout a disparu — cinq est la limite |
+| MOB213 | Envoyer pendant qu'une photo monte encore | Le dossier ne part pas ; l'écran dit d'attendre |
+| MOB214 | Envoyer avec une photo en échec | Le dossier ne part pas ; le motif de l'échec est lisible et la photo peut être retirée |
+| MOB215 | Choisir « remboursement intégral » | Le **montant payé** apparaît dans le libellé |
+| MOB216 | Reposer la solution souhaitée déjà choisie | Elle s'efface : « je ne demande rien de précis » reste possible |
+| MOB217 | Envoyer le signalement | Une confirmation annoncée comme irréversible, puis le **numéro de dossier** et le rappel du gel du paiement |
+| MOB218 | Revenir au suivi après le dépôt | La fiche s'est mise à jour : plus de geste « Signaler », le dossier déposé est lisible |
+| MOB219 | Envoyer un signalement sur un envoi versé entre-temps | Le formulaire se ferme en disant pourquoi, et ramène au suivi |
+| MOB220 | Ouvrir le formulaire sur un envoi qui ne peut pas être signalé | L'écran l'explique et ramène au suivi — aucun formulaire affiché |
+| MOB221 | Ouvrir le suivi d'un envoi terminé | Une section de notation, la date limite, et le geste « Noter … » |
+| MOB222 | Publier une note sans choisir d'étoile | Rien n'est publié ; l'écran demande la note globale |
+| MOB223 | Publier une note avec trois pouces et un commentaire | Publication confirmée ; l'écran dit que l'avis sera révélé quand l'autre aura noté |
+| MOB224 | Publier quand le Voyageur a **déjà** noté | L'écran dit que les deux avis sont publics **maintenant** |
+| MOB225 | Rouvrir la notation après avoir noté | Ma note en lecture ; la note de l'autre **absente** tant qu'elle n'est pas révélée |
+| MOB226 | Rouvrir après révélation | Les deux avis, avec leurs critères et leurs dates |
+| MOB227 | Rouvrir après les quatorze jours sans avoir noté | « La notation est fermée », et aucun geste |
+| MOB228 | Ouvrir la notation en étant le **Voyageur** du deal | L'écran le dit ; aucun critère affiché |
+| MOB229 | Couper le réseau et publier | Un message d'échec, le formulaire conservé avec sa saisie |
+| WEB159 | Sur le site, signaler avec un motif devenu irrecevable | Le message parle du **motif**, pas de la description ni de l'engagement |
+
+## Ce qui reste hors de ce lot
+
+- **La liste « Mes envois »** dans l'onglet Activité : la fiche et ses gestes d'abord, la
+  liste ensuite — chaque ligne aura alors une destination complète.
+- **Noter côté Voyageur** : l'app n'a pas de mode Voyageur. Les trois critères du rôle
+  Expéditeur existent au contrat et arriveront avec lui, avec leurs textes.
+- **Revoir les preuves en grand** : les vignettes ne s'ouvrent pas. Un toucher sans effet se
+  remarque plus qu'une image fixe.
+
+---
+
+# A223 — Le harnais de tests du mobile
+
+## Le besoin
+
+L'application mobile porte désormais de l'**argent** (la feuille de paiement et les
+redirections bancaires de D82) et du **recours** (le signalement d'A222, qui gèle le paiement
+d'une vraie personne). Un refus mal classé n'y coûte plus un affichage : il coûte un litige,
+un colis, ou un Voyageur payé à tort.
+
+Or **aucun des dix-huit contrôles de la CI ne voyait une ligne de cette application**. Cinq
+lots de suite avaient écrit leur logique en fonctions pures *exactement* pour qu'elle soit
+exécutable — 2 109 lignes — et rien ne l'exécutait. Ce lot n'ajoute aucune fonctionnalité :
+il rend vérifiable ce qui était déjà écrit, et devient le dix-neuvième contrôle.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-QA-01** | Toute règle métier de l'application mobile vit dans une fonction **pure**, hors écran. Un écran affiche ; il ne décide pas. Une règle qu'on veut tester se SORT de l'écran — on ne grossit pas le harnais pour l'y rejoindre. |
+| **RG-QA-02** | Une constante du contrat **recopiée** dans l'application (pour tenir zod hors du bundle Metro) doit être **confrontée au contrat réel par un test**. Une recopie sans garde-fou est une divergence à retardement. |
+| **RG-QA-03** | Ce que l'écran laisse envoyer doit être **accepté par le schéma du serveur**. Un formulaire qui autorise un envoi que le contrat refuse produit un 400 qu'aucun écran ne sait expliquer. |
+| **RG-QA-04** | Aucun fichier de source de l'application n'importe `@packages/api-contracts` ni `zod` : l'alias n'existe que dans le programme des fiches, donc le compilateur refuse l'import. La discipline est VÉRIFIÉE, pas demandée. |
+| **RG-QA-05** | Une fiche ne doit dépendre ni du fuseau horaire ni de l'horloge du poste. Les mises en forme de date lisent volontairement l'heure de l'**appareil** : leurs attendus se construisent donc localement, et le harnais n'épingle pas `TZ` (cela cacherait la propriété au lieu de la respecter). |
+| **RG-QA-06** | Un défaut connu **ne s'épingle jamais par un test vert** qui le décrit. Il s'épingle par l'attendu CORRECT en `it.failing` : vert tant que le défaut est là, **rouge le jour où il est corrigé**. Sinon le défaut devient la doctrine. |
+| **RG-QA-07** | « CI OK » se **compte**. Un contrôle ajouté au fichier de la CI n'est pas requis tant qu'il n'est pas coché dans la protection de branche. |
+
+## Le défaut métier trouvé par le harnais, le premier jour
+
+| # | Constat |
+|---|---|
+| **ANO-MOB-01** | **Le numéro du destinataire est amputé au Congo-Brazzaville et en Côte d'Ivoire.** La conversion en E.164 retire le zéro de tête comme s'il s'agissait toujours d'un préfixe d'acheminement. C'est vrai en France, en Belgique, au Royaume-Uni, au Maroc, en RD Congo — c'est **faux** au Congo (+242) et en Côte d'Ivoire (+225), où le 0 appartient au numéro de l'abonné. Conséquence métier : le destinataire d'un envoi Paris → Brazzaville — **le corridor de référence** — reçoit un numéro injoignable, alors que c'est par ce numéro que lui parvient le **code de livraison** (D43). Le serveur ne peut pas rattraper : il ne vérifie que la forme E.164, que le numéro amputé respecte. Présent **à l'identique sur le site**. Correction = une table de préfixes d'acheminement par pays, à graver, sur les deux fronts. |
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| MOB223-1 | Un envoi livré, clos par une médiation ayant remboursé en totalité | Le titre dit **la médiation**, jamais « demande annulée » (ANO-WEB-73) |
+| MOB223-2 | Un colis refusé au rendez-vous | Un texte propre, qui n'impute pas un désistement à l'Expéditeur |
+| MOB223-3 | Un envoi dont rien n'a été remboursé (`0`) vs un envoi où la question ne se pose pas (`null`) | Deux états distincts, jamais confondus |
+| MOB223-4 | Un signalement avec une description de 50 caractères exactement | Accepté par l'écran **et** par le contrat ; 49 refusé des deux côtés |
+| MOB223-5 | Un signalement déposé pendant que le colis est en transit | Un seul motif proposé (D51), et il est recevable par le contrat |
+| MOB223-6 | Une preuve photo dont le téléversement échoue | L'envoi est **bloqué** : jamais un dossier qui part sans sa preuve (RG-P-13) |
+| MOB223-7 | Une notation déposée, l'autre partie n'a pas noté | Rien n'est public, et l'écran le dit (D53) |
+| MOB223-8 | Un seul critère au pouce envoyé | Accepté par `SubmitRatingRequestSchema` (ANO-API-14) |
+| MOB223-9 | Un colis de 1 kg en taille L | Le devis facture le **minimum de taille** et en donne la raison (D81) |
+| MOB223-10 | Un colis de 30,1 kg sur un trajet où il reste 2 kg | Le message parle du **plafond par colis** (CAP-01), pas de la capacité |
+| MOB223-11 | « ex. colis 2 kg » sous un prix au kilo | Égal au devis réel d'un colis S, **jamais inférieur** en M ou L |
+| MOB223-12 | Un paiement dont le membre ferme la feuille | Une **annulation**, jamais une carte refusée |
+| MOB223-13 | Un paiement tenté dans Expo Go (sans module natif) | « Indisponible », jamais un écran blanc ni un plantage |
+| MOB223-14 | La même recherche lancée deux fois de suite | Deux événements distincts (le compteur, pas un booléen) |
+| MOB223-15 | Un retour de connexion trois écrans après un trajet | **Aucun** tunnel poussé : l'attente est bornée au trajet qui l'a posée (A58) |
+| MOB223-16 | La suite exécutée à UTC, Paris, Auckland, Los Angeles et Kiritimati | Le même résultat partout — 336/336 |
+
+## Ce qui reste hors de ce lot
+
+- **Les écrans ne sont pas rendus** : la frontière est assumée, et elle devient une règle
+  (RG-QA-01) plutôt qu'une dette.
+- **La correction d'ANO-MOB-01** : c'est une règle métier (table de préfixes par pays), à
+  graver au registre et à porter sur les **deux** fronts.
+- **Les clients d'API et les hooks React** : du réseau et du rendu, pas des règles.

@@ -1,0 +1,503 @@
+{
+  "title": "My shipment",
+  "back": "Back",
+  "route": "{origin} → {destination}",
+  "reference": "Ref. {ref}",
+  "refresh": "Refresh",
+  "loading": "Loading your shipment…",
+  "notFound": {
+    "title": "This shipment doesn't exist",
+    "body": "It may have been cancelled, or this link isn't yours."
+  },
+  "wrongRole": {
+    "title": "This isn't your shipment",
+    "body": "You are the Traveler on this request: follow it from your trips."
+  },
+  "error": {
+    "title": "Can't show your shipment",
+    "body": "Check your connection and try again.",
+    "retry": "Try again",
+    "reference": "Technical reference: {id}"
+  },
+  "status": {
+    "awaiting": {
+      "title": "Waiting for the Traveler",
+      "body": "Your request is on its way. Your payment is authorised — nothing is charged until {carrierFirstName} accepts."
+    },
+    "accepted": {
+      "title": "{carrierFirstName} accepted",
+      "body": "{carrierFirstName} will contact you to arrange the meeting. In the meantime, get your parcel ready."
+    },
+    "pickedUp": {
+      "title": "Your delivery code has arrived",
+      "body": "Pass it on to {recipientFirstName}. Without this code, {carrierFirstName} cannot hand over the parcel."
+    },
+    "inTransit": {
+      "title": "Your parcel is travelling",
+      "body": "{carrierFirstName} confirms each step. You can see them below."
+    },
+    "delivered": {
+      "title": "Delivered to {recipientFirstName}",
+      "body": "{carrierFirstName} entered the code on arrival. You have three days to make sure everything is fine."
+    },
+    "completed": {
+      "title": "Shipment complete",
+      "body": "Delivery is confirmed and {carrierFirstName}'s payment is released. Thank you for shipping with Yamba."
+    },
+    "disputed": {
+      "title": "Report under review",
+      "body": "The payout to {carrierFirstName} is frozen while we review. Our team replies within 48 working hours."
+    },
+    "declined": {
+      "title": "Request not accepted",
+      "body": "{carrierFirstName} couldn't accept your request. You are not charged: the authorisation is released in full."
+    },
+    "expired": {
+      "title": "Request expired",
+      "body": "{carrierFirstName} didn't reply within 24 hours. You are not charged: the authorisation is released in full."
+    },
+    "cancelled": {
+      "title": "Request cancelled",
+      "body": "This shipment is closed."
+    },
+    "pickupRefused": {
+      "title": "Parcel refused at the meeting",
+      "body": "{carrierFirstName} didn't take the parcel. The shipment is closed and the refund follows the reason below."
+    },
+    "cancelledByMediation": {
+      "title": "Closed by mediation",
+      "body": "Your report has been decided: the decision and its reason are below."
+    }
+  },
+  "closedOn": "Closed on {date}",
+  "completedOn": "Completed on {date}",
+  "openedOn": "Opened on {date}",
+  "refusalReason": "Reason: {reason}",
+  "countdown": {
+    "acceptanceTitle": "Reply expected",
+    "acceptanceBody": "Without a reply by then, the request expires and you are refunded in full.",
+    "payoutTitle": "Automatic payout",
+    "payoutBody": "After that, {carrierFirstName} is paid without anything else from you.",
+    "remainingDays": "{days, plural, =1 {# day} other {# days}} {hours}h",
+    "remainingHours": "{hours}h {minutes}min",
+    "remainingMinutes": "{minutes}min",
+    "elapsed": "Deadline passed"
+  },
+  "timeline": {
+    "title": "Shipment tracking",
+    "steps": {
+      "accepted": "Accepted",
+      "pickup": "Handover",
+      "transport": "Transport",
+      "delivery": "Delivery",
+      "verification": "Verification"
+    }
+  },
+  "journey": {
+    "title": "Journey steps",
+    "departure": "Scheduled departure",
+    "pickedUp": "Parcel picked up",
+    "AT_AIRPORT": "Arrived at the departure point",
+    "FLIGHT_DEPARTED": "Left for {destination}",
+    "FLIGHT_ARRIVED": "Arrived in {destination}",
+    "delivery": "Handover to {recipientFirstName}",
+    "deliveryPending": "Code to be entered by {carrierFirstName}",
+    "pending": "Awaiting confirmation"
+  },
+  "code": {
+    "title": "Your delivery code",
+    "waitingBadge": "Pending",
+    "waitingBody": "You'll get it as soon as {carrierFirstName} confirms picking up your parcel.",
+    "label": "To pass on to {recipientFirstName}",
+    "hint": "Keep it confidential: it stands as the delivery signature.",
+    "validatedBadge": "Validated",
+    "validatedBody": "{carrierFirstName} entered it at handover. It is no longer of any use.",
+    "unavailable": "This code isn't available for this shipment.",
+    "regenerationsLeft": "{count, plural, =0 {No regeneration left} =1 {# regeneration left} other {# regenerations left}}"
+  },
+  "parcel": {
+    "title": "Your parcel",
+    "summary": "{family} · {weight} kg",
+    "billedWeight": "Billed {weight} kg",
+    "declaredValue": "Declared value",
+    "description": "Your description",
+    "photos": "Your declaration photos",
+    "photosCount": "{count, plural, =1 {# photo} other {# photos}}"
+  },
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papers",
+    "CLOTHES_TEXTILE": "Clothes & textiles",
+    "FOOD_DRY_SEALED": "Dry sealed food",
+    "ELECTRONICS_DEVICES": "Electronics & devices",
+    "COSMETICS_CARE": "Cosmetics & care",
+    "PARTS_TOOLS": "Parts & tools",
+    "TOYS_CHILDCARE": "Toys & childcare",
+    "MISC_ACCESSORIES": "Misc accessories"
+  },
+  "places": {
+    "title": "The meetings",
+    "pickup": "Handover",
+    "delivery": "Delivery",
+    "kinds": {
+      "AIRPORT": "Airport",
+      "TRAIN_STATION": "Station",
+      "CITY_AREA": "In the city"
+    },
+    "agreed": "To agree with {carrierFirstName}"
+  },
+  "recipient": {
+    "title": "Recipient",
+    "inCity": "In {city}"
+  },
+  "carrier": {
+    "title": "Your Traveler",
+    "awaiting": "24 h to answer your request.",
+    "accepted": "Will contact you to arrange the meeting.",
+    "transit": "Has your parcel in hand."
+  },
+  "pickupProof": {
+    "title": "The pickup",
+    "confirmedAt": "Confirmed on {date} at {time}",
+    "photos": "Photos taken by {carrierFirstName}",
+    "notes": "Their note",
+    "checklist": "Checks made at the meeting"
+  },
+  "deliveryProof": {
+    "title": "The delivery",
+    "confirmedAt": "Code validated on {date} at {time}",
+    "photos": "Photos taken at handover"
+  },
+  "payment": {
+    "title": "Your payment",
+    "total": "Total",
+    "transport": "Transport",
+    "service": "Yamba service",
+    "protection": "Protection",
+    "authorized": "Authorised, not charged yet",
+    "capturedOn": "Charged on {date}",
+    "frozen": "Frozen while we review",
+    "released": "Paid out to {carrierFirstName}",
+    "refunded": "Refunded",
+    "retained": "Retained",
+    "noteAuthorized": "The hold is on your card. It only becomes a charge when {carrierFirstName} accepts.",
+    "noteHeld": "Yamba holds the funds. {carrierFirstName} is only paid three days after delivery is validated.",
+    "noteFrozen": "No payout will be made before the review ends. If a refund applies, we'll confirm it by email.",
+    "noteReleased": "The transaction is closed: the funds have gone to {carrierFirstName}."
+  },
+  "protectionTiers": {
+    "BASIC": "Included",
+    "EXTENDED_500": "Extended, €500 covered"
+  },
+  "next": {
+    "title": "What happens next",
+    "awaiting": {
+      "one": "{carrierFirstName} receives your request and answers within 24 h.",
+      "two": "If accepted, your card is charged and the meeting is arranged with {carrierFirstName}.",
+      "three": "If refused or unanswered, the authorisation is released: you pay nothing."
+    },
+    "accepted": {
+      "one": "{carrierFirstName} contacts you to set the exact date and time.",
+      "two": "At handover, {carrierFirstName} checks the parcel, photographs it and confirms the pickup.",
+      "three": "Your 6-digit code arrives at that moment: you pass it on to {recipientFirstName}."
+    },
+    "pickedUp": {
+      "one": "Pass the code to {recipientFirstName} — by message, by phone, in person.",
+      "two": "{carrierFirstName} travels; you see every step they confirm.",
+      "three": "On arrival, {recipientFirstName} gives them the code: delivery is validated."
+    },
+    "inTransit": {
+      "one": "{recipientFirstName} gives the code to {carrierFirstName} on arrival.",
+      "two": "Delivery is then validated in the app.",
+      "three": "Three verification days begin: you can report a problem."
+    },
+    "delivered": {
+      "one": "If all is well, you need do nothing: {carrierFirstName} is paid at the end of the three days.",
+      "two": "You can also confirm right away to pay them sooner.",
+      "three": "If something is wrong, report it before the deadline: the payment is frozen."
+    },
+    "disputed": {
+      "one": "We ask {carrierFirstName} for their version.",
+      "two": "We decide within five working days and you get the decision by email.",
+      "three": "Throughout the review, the payout stays frozen."
+    }
+  },
+  "mediation": {
+    "title": "The decision",
+    "ticket": "Case {ticket}",
+    "outcomes": {
+      "REJECTED": "Report dismissed",
+      "PARTIAL_REFUND": "Partial refund",
+      "FULL_REFUND": "Full refund",
+      "COMPENSATE_CARRIER": "Retention paid to the Traveler",
+      "RESTITUTE_SHIPPER": "Retention returned"
+    },
+    "refund": "Returned: {amount}",
+    "reason": "Reason",
+    "decidedOn": "Decided on {date}"
+  },
+  "dispute": {
+    "title": "Your report",
+    "ticket": "Case",
+    "category": "Reason",
+    "categories": {
+      "NOT_DELIVERED": "Parcel never delivered",
+      "CONTENT_MISSING": "Contents missing or different",
+      "DAMAGED": "Parcel or contents damaged",
+      "SIGNIFICANT_DELAY": "Significantly late",
+      "RECIPIENT_ISSUE": "Another problem with the Traveler",
+      "OTHER": "Other"
+    },
+    "description": "Your description",
+    "outcome": "Preferred outcome",
+    "outcomes": {
+      "FULL_REFUND": "Full refund",
+      "PARTIAL_REFUND": "Partial refund",
+      "CONTACT_CARRIER": "Yamba to contact the Traveler",
+      "YAMBA_DECIDES": "I let Yamba decide"
+    },
+    "photos": "Attachments",
+    "openedOn": "Sent on {date}",
+    "carrierResponded": "{carrierFirstName} has given their version. The decision comes within five working days.",
+    "carrierPending": "We have asked {carrierFirstName} for their version (72 h).",
+    "support": "Quote the case number in any exchange with us."
+  },
+  "recourse": {
+    "title": "Something wrong?",
+    "body": "Parcel not handed over, contents missing or damaged: tell us. {carrierFirstName}'s payment stays frozen throughout the review.",
+    "deadline": "You can report until {date}.",
+    "opensAt": "Parcel never arrived? The « never delivered » report opens on {date}.",
+    "label": "Report a problem"
+  },
+  "report": {
+    "title": "Report a problem",
+    "subtitle": "Shipment {reference} · {route}",
+    "intro": "Tell us what happened, we take it from here. While we review it, {carrierFirstName}'s payment stays frozen.",
+    "category": {
+      "title": "What went wrong?",
+      "hint": "Pick the closest situation.",
+      "locked": "Your parcel is still in transit: only « never delivered » can be reported now. Missing or damaged contents can only be seen after handover."
+    },
+    "categories": {
+      "NOT_DELIVERED": "The parcel was never delivered to {recipientFirstName}",
+      "CONTENT_MISSING": "Contents missing or different from my declaration",
+      "DAMAGED": "Parcel or contents damaged",
+      "SIGNIFICANT_DELAY": "Far past the agreed time",
+      "RECIPIENT_ISSUE": "Another problem with {carrierFirstName}",
+      "OTHER": "Another problem"
+    },
+    "description": {
+      "title": "Tell us what happened",
+      "hint": "Be specific: when you found out, what is missing, what is wrong.",
+      "placeholder": "E.g. {recipientFirstName} called me this morning — the jumper I declared was not in the parcel, and a t-shirt is torn at the collar.",
+      "missing": "{count} more characters needed (minimum {min}).",
+      "ok": "{count} characters — that works.",
+      "full": "Limit of {max} characters reached."
+    },
+    "photos": {
+      "title": "Add evidence",
+      "hint": "Photos of what arrived, of the damage, of the packaging. Up to {max} photos, {maxMb} MB each.",
+      "add": "Add a photo",
+      "cancel": "Cancel",
+      "ask": "Ask {recipientFirstName} for them if you don't have any.",
+      "camera": "Take a photo",
+      "library": "Choose a photo",
+      "remove": "Remove this photo",
+      "uploading": "Uploading…",
+      "errors": {
+        "INVALID_TYPE": "Format not accepted — JPEG, PNG, HEIC or WebP.",
+        "TOO_LARGE": "Photo too heavy ({maxMb} MB maximum).",
+        "FAILED": "Upload failed. Remove it and try again."
+      },
+      "permissionTitle": "Photo access denied",
+      "permissionBody": "Allow photo access in your phone settings to attach evidence.",
+      "cameraDeniedTitle": "Camera denied",
+      "cameraDeniedBody": "Allow the camera in your phone settings, or choose a photo you already took."
+    },
+    "outcome": {
+      "title": "What would feel fair",
+      "hint": "Optional. It helps mediation understand your request — the decision stays ours."
+    },
+    "outcomes": {
+      "FULL_REFUND": "Full refund ({amount})",
+      "PARTIAL_REFUND": "Partial refund, for what is missing or damaged",
+      "CONTACT_CARRIER": "Yamba contacts {carrierFirstName} to understand",
+      "YAMBA_DECIDES": "I let Yamba decide from the evidence"
+    },
+    "process": {
+      "title": "What happens next",
+      "one": "You get an acknowledgement within 48 working hours, with your case number.",
+      "two": "We ask {carrierFirstName} for their side, evidence included, within 72 hours.",
+      "three": "We decide within five working days, and email you the outcome.",
+      "four": "Throughout the review, {carrierFirstName}'s payment stays frozen."
+    },
+    "pledge": {
+      "label": "I declare on my honour that what I wrote is accurate.",
+      "why": "A report freezes a real person's payment. This pledge protects honest Travelers, just as the Charter binds them to your parcel."
+    },
+    "submit": {
+      "label": "Send the report",
+      "blockers": {
+        "category": "Pick a reason first.",
+        "description": "The description is {count} characters short.",
+        "photos": "Wait for the photos to finish uploading, or remove the failed ones.",
+        "pledge": "Tick the honour declaration."
+      },
+      "confirmTitle": "Send this report?",
+      "confirmBody": "{carrierFirstName}'s payment will be frozen and our team will take the case over.",
+      "confirmIrreversible": "Once sent, a report cannot be edited.",
+      "confirm": "Yes, send it",
+      "keep": "No, go back",
+      "pending": "Sending…"
+    },
+    "errors": {
+      "conflict": "This shipment changed in the meantime: it can no longer be reported. Back to tracking.",
+      "categoryRefused": "That reason no longer applies: the parcel is in transit again.",
+      "validation": "The case was refused: check the description and the honour declaration.",
+      "generic": "Sending failed. Try again in a moment."
+    },
+    "notAllowed": {
+      "title": "Report unavailable",
+      "body": "This shipment cannot be reported: the window has passed, a case is already open, or the parcel has not been handed over yet."
+    },
+    "success": {
+      "title": "Case opened",
+      "ticket": "Case {ticket}",
+      "body": "Our team will contact you within 48 working hours. {carrierFirstName}'s payment is frozen until the decision.",
+      "keep": "Keep this number: it follows the whole case.",
+      "back": "Back to tracking"
+    }
+  },
+  "rating": {
+    "title": "Rate {carrierFirstName}",
+    "subtitle": "Shipment {reference} · {route}",
+    "intro": "Your review helps the community choose. It becomes public once {carrierFirstName} has rated too — or after fourteen days.",
+    "prompt": {
+      "title": "How did it go?",
+      "body": "Your review counts, and so does {carrierFirstName}'s: both are revealed together.",
+      "deadline": "You can rate until {date}.",
+      "label": "Rate {carrierFirstName}"
+    },
+    "state": {
+      "sentTitle": "Your review is in",
+      "sentBody": "It becomes visible once {carrierFirstName} has rated, or on {date} at the latest.",
+      "sentBodyNoDate": "It becomes visible once {carrierFirstName} has rated.",
+      "revealedTitle": "Both reviews are public",
+      "revealedBody": "Both reviews are published on your profiles.",
+      "closedTitle": "Rating closed",
+      "closedBody": "The fourteen days have passed: this shipment can no longer be rated.",
+      "view": "See the reviews"
+    },
+    "stars": {
+      "label": "Your overall rating",
+      "value1": "Disappointing",
+      "value2": "Average",
+      "value3": "Fine",
+      "value4": "Very good",
+      "value5": "Excellent",
+      "required": "Pick a rating to publish."
+    },
+    "criteria": {
+      "title": "On these specific points",
+      "hint": "Optional. Tapping a thumb again clears it.",
+      "up": "Good",
+      "down": "Could improve",
+      "PUNCTUALITY": {
+        "name": "Punctuality",
+        "desc": "On time at the meeting and at handover?"
+      },
+      "COMMUNICATION": {
+        "name": "Communication",
+        "desc": "Responsive, clear, easy to reach?"
+      },
+      "PARCEL_CARE": {
+        "name": "Care for the parcel",
+        "desc": "Parcel arrived intact, handled well?"
+      }
+    },
+    "comment": {
+      "title": "Your comment",
+      "hint": "Optional · {max} characters maximum",
+      "placeholder": "E.g. {carrierFirstName} kept me posted at every step, and the parcel arrived in perfect condition.",
+      "counter": "{count} / {max}"
+    },
+    "visibility": "Your rating and comment will be public on {carrierFirstName}'s profile, once you have both rated — or after fourteen days. Once published, a review cannot be edited.",
+    "publish": {
+      "label": "Publish my review",
+      "pending": "Publishing…"
+    },
+    "review": {
+      "mine": "Your rating for {carrierFirstName}",
+      "theirs": "{carrierFirstName}'s rating",
+      "theirsMissing": "{carrierFirstName} did not rate this shipment.",
+      "scale": "{rating} out of 5",
+      "on": "Published on {date}",
+      "noComment": "No comment."
+    },
+    "success": {
+      "title": "Thanks for your review",
+      "body": "{carrierFirstName} is invited to rate you too. Both reviews will be revealed once both are published, or on {date} at the latest.",
+      "bodyNoDate": "{carrierFirstName} is invited to rate you too. Both reviews will be revealed once both are published.",
+      "bothRated": "{carrierFirstName} had already rated you: both reviews are public now.",
+      "back": "Back to tracking"
+    },
+    "unavailable": {
+      "title": "Rating unavailable",
+      "body": "This shipment cannot be rated at the moment."
+    },
+    "wrongRole": {
+      "title": "Not this side",
+      "body": "On this shipment the signed-in account is the Traveler: rating from the Traveler side is not in the app yet."
+    },
+    "errors": {
+      "conflict": "This shipment can no longer be rated — already rated, or the window closed.",
+      "notFound": "This shipment does not exist, or cannot be rated.",
+      "validation": "The review was refused: check the rating and the comment.",
+      "generic": "Publishing failed. Try again in a moment."
+    }
+  },
+  "actions": {
+    "title": "Your options",
+    "cancel": {
+      "label": "Cancel my request",
+      "confirmTitle": "Cancel this shipment?",
+      "fullRefund": "You are refunded in full: {amount}.",
+      "partialRefund": "You are refunded {refund}. {retention} is retained, i.e. {pct}% — {carrierFirstName} had reserved the space for your parcel.",
+      "deadline": "Until {date}, cancelling is still refunded in full.",
+      "recomputed": "The exact amount is recomputed by Yamba at the moment of cancellation.",
+      "confirm": "Yes, cancel",
+      "keep": "No, keep my request",
+      "pending": "Cancelling…",
+      "doneFull": "Request cancelled. {amount} is on its way back to you.",
+      "doneNone": "Request cancelled."
+    },
+    "regenerate": {
+      "label": "Regenerate the code",
+      "confirmTitle": "Regenerate the code?",
+      "confirmBody": "The old code will stop working. Remember to send the new one to {recipientFirstName}.",
+      "confirm": "Yes, regenerate",
+      "keep": "No, keep this one",
+      "pending": "Regenerating…",
+      "done": "New code generated. Don't forget to send it to {recipientFirstName}."
+    },
+    "confirmDelivery": {
+      "label": "Everything went well",
+      "hint": "Confirm receipt to pay {carrierFirstName} right away, without waiting the three days.",
+      "confirmTitle": "Confirm for good?",
+      "confirmBody": "{carrierFirstName} will be paid immediately and you won't be able to report a problem on this shipment.",
+      "confirm": "Yes, all good",
+      "keep": "Not yet",
+      "pending": "Confirming…",
+      "done": "Thank you. {carrierFirstName} will receive their payment.",
+      "tip": "Ask {recipientFirstName} to open the parcel before you confirm."
+    },
+    "shareCode": {
+      "label": "Send the code to {recipientFirstName}",
+      "message": "Hi {recipientFirstName}! Your parcel is coming with {carrierFirstName} ({route}). To collect it, give them this code: {code}"
+    },
+    "errors": {
+      "TRANSITION_NOT_ALLOWED": "This shipment changed in the meantime — we're reloading your tracking.",
+      "CODE_REGENERATION_LIMIT": "You've reached the regeneration limit for this shipment.",
+      "generic": "The action didn't go through. Try again in a moment."
+    }
+  }
+}

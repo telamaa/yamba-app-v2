@@ -14,6 +14,7 @@ import authEn from '../../messages/en/auth.json';
 import bookingEn from '../../messages/en/booking.json';
 import favoritesEn from '../../messages/en/favorites.json';
 import searchEn from '../../messages/en/search.json';
+import shipmentEn from '../../messages/en/shipment.json';
 import tabsEn from '../../messages/en/tabs.json';
 import tripDetailEn from '../../messages/en/tripDetail.json';
 import welcomeEn from '../../messages/en/welcome.json';
@@ -21,6 +22,7 @@ import authFr from '../../messages/fr/auth.json';
 import bookingFr from '../../messages/fr/booking.json';
 import favoritesFr from '../../messages/fr/favorites.json';
 import searchFr from '../../messages/fr/search.json';
+import shipmentFr from '../../messages/fr/shipment.json';
 import tabsFr from '../../messages/fr/tabs.json';
 import tripDetailFr from '../../messages/fr/tripDetail.json';
 import welcomeFr from '../../messages/fr/welcome.json';
@@ -31,6 +33,7 @@ export const MESSAGES = {
     booking: bookingFr,
     favorites: favoritesFr,
     search: searchFr,
+    shipment: shipmentFr,
     tabs: tabsFr,
     tripDetail: tripDetailFr,
     welcome: welcomeFr,
@@ -40,6 +43,7 @@ export const MESSAGES = {
     booking: bookingEn,
     favorites: favoritesEn,
     search: searchEn,
+    shipment: shipmentEn,
     tabs: tabsEn,
     tripDetail: tripDetailEn,
     welcome: welcomeEn,

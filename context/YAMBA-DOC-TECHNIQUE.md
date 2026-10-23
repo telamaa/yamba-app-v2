@@ -13703,3 +13703,1006 @@ silence aurait déplacé le défaut au lieu de le nommer.
 - `npx expo config --type introspect` → plugin exécuté, `wallet.api.enabled` injecté,
   identifiants posés, aucune erreur.
 - Aucun code applicatif touché : ce lot ne peut rien casser à l'exécution.
+
+## Complément — le projet EAS existe, et une permission à surveiller
+
+Le projet est lié au compte d'**organisation** (choisi le 21/10 pour pouvoir donner des
+accès par rôle, cohérent avec la recommandation du livrable 06) :
+
+```json
+// apps/mobile/app.json
+"owner": "telamas-team",
+"extra": { "eas": { "projectId": "78cf22fe-7ca9-4b1b-8d85-c24291659f45" } }
+```
+
+`npx eas init --force` crée le projet et écrit ces deux clés. Il a aussi **matérialisé**
+dans `app.json` un tableau `android.permissions` contenant
+`android.permission.RECORD_AUDIO`. Vérification faite en comparant les introspections
+**avant** et **après** : le manifeste Android est **identique** dans les deux cas — la
+permission était déjà injectée par le plugin `expo-image-picker` (qui prévoit la capture
+vidéo). `eas init` ne l'a donc pas ajoutée, il l'a écrite. Le tableau redondant a été
+retiré pour garder le diff honnête.
+
+**Point ouvert, à trancher avant le dépôt sur le Play Store** : Yamba ne capte jamais de
+son, et une permission micro se voit dans la fiche du magasin comme en revue. La parade est
+`android.blockedPermissions`, mais elle n'a pas été posée ici **sans mesure** : si la
+bibliothèque demande cette permission à l'exécution en ouvrant l'appareil photo, un blocage
+casserait les photos de colis — c'est-à-dire une règle métier (RG-MOB-85). À vérifier sur
+un appareil réel, au premier build de développement, puis à graver.
+
+---
+
+# « Attends » n'est pas « c'est raté », et l'argent retenu pour rien se libère (PR à venir, D82 7A/8A/9A — serveur)
+
+## Le besoin
+
+Klarna et PayPal **redirigent** : entre l'empreinte et la réservation, le membre quitte
+l'app ou la page. Deux conséquences, et aucune n'existait tant qu'on ne payait qu'à la carte.
+
+1. **Il peut revenir trop tôt.** L'intention est encore en `processing` : l'empreinte se
+   pose, mais n'est pas encore capturable.
+2. **Il peut ne jamais revenir.** L'autorisation reste vivante sur son moyen de paiement
+   pour une réservation qui n'existe pas — ~7 jours sur une carte, **28 jours chez Klarna**.
+
+## Ce qui existait déjà, et qu'il ne fallait pas réécrire
+
+D82 8A annonçait « le webhook promu de l'accusé simple à la vérité de l'empreinte ». La
+lecture du code a montré que **l'essentiel était déjà vrai** :
+`deal-request.service.ts` appelle `provider.retrieve(paymentIntentId)` et refuse tout ce qui
+n'est pas `AUTHORIZED`. La réservation n'a JAMAIS été créée sur la parole du client.
+
+Il n'y avait donc rien à « promouvoir » : écrire du code pour tenir une phrase déjà tenue
+aurait été du théâtre. Ce qui manquait réellement était ailleurs — dans la **nuance du
+refus**, et dans **l'empreinte que personne ne ramasse**.
+
+## ① Le refus réessayable (7A/8A)
+
+`PROCESSING` tombait dans le même refus que « cette autorisation n'existe pas » :
+`PAYMENT_NOT_AUTHORIZED`. Le front annonçait donc un échec de paiement à quelqu'un qui
+venait de payer, et lui faisait tout reprendre.
+
+La décision est sortie du service pour devenir une **règle pure** (`booking-request.ts`) :
+
+```ts
+export function assertAuthorizationUsable(status: PaymentAuthorizationStatus): void {
+  if (status === "AUTHORIZED") return;
+  if (status === "PROCESSING") {
+    throw new BookingRequestError("PAYMENT_PROCESSING", "The payment is still being processed.", {
+      paymentStatus: status,
+      retryAfterSeconds: PAYMENT_PROCESSING_RETRY_SECONDS, // 3
+    });
+  }
+  throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", "…", { paymentStatus: status });
+}
+```
+
+L'invariant ne bouge pas (**pas de réservation sans empreinte posée**, A45/D31) : c'est le
+*vocabulaire du non* qui s'enrichit. `PAYMENT_PROCESSING` entre au contrat
+(`BOOKING_REQUEST_ERROR_CODES`), donc en 409 avec son `details.code` qui atteint le client
+(A146).
+
+**Les deux fronts attendent au lieu d'annoncer un échec** : `useBookingCheckout.ts` (web) et
+`booking/payment.tsx` (mobile) rejouent `POST /deals` au plus **trois fois**, en respectant
+`retryAfterSeconds`. Jamais une seconde empreinte, jamais une saisie à refaire ; au-delà,
+l'écran le dit et garde tout. Messages FR/EN posés dans les quatre dictionnaires.
+
+## ② L'empreinte orpheline (9A) — et pourquoi la base ne peut pas la trouver
+
+La création de l'intention **n'écrit rien chez nous** (D37). Une empreinte posée sans
+réservation n'existe donc *nulle part* dans notre base : aucun cron ne pourrait la chercher
+en Mongo. Elle n'existe que chez le fournisseur — et c'est la doctrine D40 qui tranche :
+entre notre base et lui, c'est lui qui a l'argent.
+
+D'où une méthode nouvelle, **optionnelle** sur l'interface (même précédent que
+`findTransfers`) : un fournisseur qui ne l'offre pas n'est pas consulté, la chasse se tait
+au lieu de jeter.
+
+```ts
+listAuthorizedHolds?(input: { createdBefore: Date; limit?: number }): Promise<AuthorizedHold[]>;
+```
+
+Côté Stripe, `paymentIntents.list` ne sait pas filtrer par statut : le tri sur
+`requires_capture` se fait chez nous, la fenêtre est bornée par `created.lte`, et la limite
+de 100 est celle de l'API. Côté Fake, une date de création a été ajoutée (plus
+`_setCreatedAtForTest`) — sans passé, le Fake ne pouvait rien simuler.
+
+**Les trois conditions** (`lib/orphan-holds.rules.ts`, pures) :
+
+| Condition | Pourquoi elle existe |
+|---|---|
+| L'empreinte porte `metadata.tripId` **et** `shipperId` | Un compte de paiement peut servir plusieurs applications, un bac à sable est partagé. **Annuler l'empreinte d'un autre serait un vol, pas un ménage.** |
+| Elle a passé le **délai de grâce** (2 h par défaut) | En dessous, le membre est peut-être en train de payer. On ne coupe jamais sous les pieds de quelqu'un. La grâce reste l'argument par défaut d'une règle pure (D62 : pas de clé de catalogue sans consommateur). |
+| **Aucune réservation ne la porte** | C'est la définition. Une réservation annulée ou expirée compte comme « connue » : son sort appartient à la machine à états, pas à ce ménage. |
+
+Le service (`orphan-holds.service.ts`) fait **une seule** lecture en base pour toute la
+fenêtre, annule avec le motif `abandoned`, et compte `examined / canceled / kept / failed`.
+Une annulation refusée **n'échoue pas la passe** : la suivante réessaiera.
+
+## ③ Les deux événements de webhook qui manquaient
+
+`payment_intent.processing` (journalisé : c'est l'état qui EXPLIQUE un `PAYMENT_PROCESSING`
+côté client) et `payment_intent.payment_failed` (journalisé en avertissement, avec son
+motif). Le motif est désormais extrait par la lib (`last_payment_error.message`) et **ne sort
+jamais vers le client** — il peut nommer la banque, le moyen, l'adresse. La réponse à Stripe
+reste un accusé nu : `{ received: true }`.
+
+## Le garde-fou qui a attrapé une erreur réelle
+
+Le cron a d'abord été écrit sur `17,47 * * * *`. La suite auth-service a échoué : **A178**
+exige que tout fichier de cron figure au `CRON_CATALOGUE` lu par la page d'état admin — un
+cron absent du catalogue est un cron invisible. Au passage, `:17` était **déjà pris par le
+cron de notation**. Horaire corrigé en `23,53 * * * *`, entrée ajoutée au catalogue.
+
+C'est exactement la valeur d'un test de cohérence : il n'a pas trouvé un bug de logique, il
+a trouvé un oubli d'intégration que personne ne voit avant la production.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test deal-service` | **732** tests / 51 suites (**+40**, +3 suites) |
+| `nx test auth-service` | **407** / 54 — vert après l'ajout au catalogue (il était rouge à 406 : garde-fou A178) |
+| trip / notification / message | **409 / 122 / 79** — inchangés |
+| `nx run-many --target=typecheck --all --skip-sync` | 10 projets verts |
+| `tsc --noEmit --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 namespaces (mobile compris) |
+| `npm run generate:openapi` | **aucun contrat ne bouge** |
+| `bash scripts/smoke-services.sh` | **les six services démarrent**, cron compris |
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **La durabilité du brouillon et la page de reprise web** (le reste de D82 7A) : lot suivant.
+  Ce lot-ci rend le serveur juste ; l'autre rendra le retour de redirection sûr.
+- **`urlScheme` + `handleURLCallback` côté app** : même lot que ci-dessus (ils vont avec le
+  retour de redirection, et se vérifient sur un build de développement).
+- **Aucune clé de catalogue PlatformSettings** pour la grâce : elle n'aurait eu qu'un
+  consommateur, et D62 interdit une clé sans besoin réel.
+
+## Axe non demandé — les codes de refus métier sont absents de l'OpenAPI
+
+Constat fait en régénérant les contrats : ajouter `PAYMENT_PROCESSING` à
+`BOOKING_REQUEST_ERROR_CODES` **n'a produit aucun diff** dans les cinq `openapi.json`. Les
+codes de refus — ceux dont le dépôt garantit qu'ils atteignent le client — ne sont donc
+documentés nulle part dans le contrat public. Un client tiers ne peut les découvrir qu'en
+lisant notre code. Correction possible : exposer l'énumération dans le schéma d'erreur du
+contrat. Non fait ici (hors périmètre), signalé pour arbitrage.
+
+## Complément — le retour de redirection, et deux affirmations de D82 démenties par la mesure
+
+### ① « Rendre le brouillon durable » : il l'était déjà
+
+`useBookingDraft` (web) persiste **déjà** le brouillon ET l'étape en `sessionStorage`, scopés
+par `tripId`, versionnés, `photos` exclues (`usePersistedFormState`). D82 7A ① prescrivait
+donc un travail fait.
+
+Ce qui manquait réellement vivait en **mémoire du composant** :
+
+| Perdu au retour | Conséquence mesurée |
+|---|---|
+| `intent` (l'identifiant de l'autorisation) | L'étape 4 remontait sans lui et en créait **une autre** : une SECONDE empreinte sur le moyen de paiement du membre, la première laissée orpheline |
+| `photoUrls` (variable locale de `submit()`) | Les `File` ne sont pas sérialisables et sont perdus pour de bon : la réservation naîtrait **sans ses photos**, alors qu'elles sont déjà chez ImageKit |
+
+D'où `pending-payment.ts` : un **dossier d'attente** écrit juste AVANT de confirmer — le seul
+instant où la page peut disparaître. `sessionStorage` (il meurt avec l'onglet), TTL 30 min,
+version, jamais `localStorage`, et **aucun secret client dedans** : un identifiant
+d'intention, des URL d'images, un total.
+
+### ② `redirect: "if_required"` ne devait PAS disparaître
+
+D82 7A ② affirmait qu'il « échoue par construction sur un moyen qui redirige toujours ». La
+documentation Stripe.js dit l'inverse, mot pour mot :
+
+> « If you set `redirect: "if_required"`, then `stripe.confirmPayment` will only redirect
+> **if your user chooses a redirect-based payment method**. »
+
+C'est donc **le bon réglage, et il reste** : la carte ne quitte pas la page, Klarna et PayPal
+redirigent. Le retirer aurait fait basculer *tous* les paiements par carte — le cas le plus
+courant — dans un rechargement complet de page, pour rien.
+
+Le travail était ailleurs : **lire le retour**. Stripe revient sur `return_url` avec
+`payment_intent` et `redirect_status`. La reprise (`useBookingCheckout`) :
+
+1. lit l'URL (`readRedirectReturn`, fonction pure) ;
+2. refuse un retour qui ne correspond pas au dossier d'attente (onglet recyclé, URL collée)
+   ou dont `redirect_status` vaut `failed` (la banque a refusé : il faut repayer, pas créer
+   une réservation) ;
+3. nettoie l'URL de ses paramètres (`history.replaceState`), **y compris le secret client**
+   que Stripe y laisse ;
+4. crée la demande avec l'autorisation et les photos consignées, en respectant l'attente
+   `PAYMENT_PROCESSING` ;
+5. **bloque la création d'une nouvelle autorisation** pendant toute la reprise.
+
+### Le défaut que j'ai introduit, et corrigé avant de livrer
+
+Le garde de reprise (`resumeStarted`) empêche l'étape 4 de créer une autorisation. Première
+version : il restait levé si la reprise ÉCHOUAIT — le membre se retrouvait devant un bouton
+inerte, définitivement, c'est-à-dire **pire que l'échec qu'on venait de lui annoncer**. Le
+garde est désormais rouvert sur les deux chemins d'échec.
+
+### Mobile : pourquoi aucune persistance n'est posée
+
+D82 7A ① prescrivait `expo-secure-store`. Mesure faite, ce n'est pas ce qu'il faut :
+
+- la feuille native ouvre la redirection **dans l'app** (onglet système) : le processus reste
+  vivant, et le brouillon en mémoire survit — c'est la propriété voulue de
+  `booking-draft.ts` ;
+- si le système tue l'app (pression mémoire), elle repart **à froid à la racine** : il n'y a
+  plus de tunnel à reprendre. Restaurer un brouillon que personne ne voit ne sert à rien ;
+- et dans ce cas, **l'argent est déjà protégé** par le cron d'empreintes orphelines (9A).
+
+Une reprise du tunnel à froid (lien profond + réouverture de la pile à la bonne étape) est une
+**fonctionnalité à part**, pas un correctif de ce lot. Écrire une demi-persistance pour tenir
+la lettre de 7A aurait coûté des données personnelles au repos pour un gain nul.
+
+### Ce qui est ajouté côté mobile
+
+```ts
+// apps/mobile/src/lib/stripe-sheet.ts
+await stripe.initStripe({ publishableKey, urlScheme: 'yamba', ...(merchantIdentifier && { merchantIdentifier }) });
+await stripe.initPaymentSheet({
+  …,
+  googlePay: { merchantCountryCode: 'FR', testEnv: googlePayTestEnv() },
+  ...(appleMerchantId() ? { applePay: { merchantCountryCode: 'FR' } } : {}),
+});
+```
+
+- **`urlScheme`** : sans lui, l'authentification bancaire se perd dans le navigateur système.
+- **`handleURLCallback`**, relayé par `StripeRedirectRelay` à la racine, derrière la MÊME
+  porte paresseuse que le reste du fichier (dans Expo Go, le module n'existe pas, et une URL
+  étrangère n'est pas une erreur). `useLinkingURL` — SDK 57 ; `useURL` est **déprécié**
+  (vérifié dans la doc versionnée, comme l'exige `apps/mobile/AGENTS.md`).
+- **Apple Pay n'est envoyé que si un identifiant marchand existe** (`EXPO_PUBLIC_APPLE_MERCHANT_ID`) :
+  un identifiant inventé passerait la configuration pour échouer sous le doigt du membre.
+- **`googlePay.testEnv`** est une **configuration explicite**
+  (`EXPO_PUBLIC_GOOGLE_PAY_TEST_ENV`), par défaut le type de build. D82 1A interdit au code
+  de deviner son mode : l'environnement Google Pay n'est pas le mode Stripe, et aucun préfixe
+  de clé n'est lu.
+- **`allowsDelayedPaymentMethods: false` est MAINTENU et documenté** : il ne concerne que les
+  moyens à *notification différée* (comptes bancaires américains, prélèvements), dont l'issue
+  est inconnue à la fermeture de la feuille. Klarna et PayPal sont à notification immédiate :
+  ce réglage **ne les exclut pas**.
+
+### Les contrôles de ce complément
+
+`tsc --noEmit --project apps/user-ui` vert · `nx typecheck @yamba-app/mobile` vert ·
+`nx run-many --target=typecheck --all` vert · miroir i18n parfait. **Aucun test unitaire** :
+les deux fronts n'ont pas de harnais de test dans cette CI (les cinq jobs de tests portent sur
+auth, deal, notification, trip, message) — c'est une dette réelle, signalée ci-dessous.
+
+### Axe non demandé — les fronts n'ont aucun test automatisé
+
+`pending-payment.ts` est écrit en fonctions pures précisément pour être testable
+(`readRedirectReturn`, `matchesPendingPayment`, `readPendingPayment` avec son horloge
+injectée)… mais rien ne les exécute en CI. Un harnais Jest + RNTL sur la logique front
+partagée est déjà prévu par D36 ⑥ pour le mobile ; l'étendre au web coûterait un job de CI et
+rendrait vérifiable une classe de défauts qui, aujourd'hui, ne se voit qu'en recette
+manuelle — exactement la classe de défauts que ce lot vient de corriger.
+
+---
+
+# Lot A221 — « Mon envoi » : le suivi natif, et ce que le site n'osait pas dire sur l'argent
+
+> Branche `feat/mobile-shipment-tracker`, empilée sur `feat/payments-redirect-server` (#393).
+> Jalon 4 (mobile Android). Le tunnel de réservation natif se terminait sur une impasse : la
+> fiche de suivi n'existait pas. Elle existe.
+
+## Le point de départ, en une phrase
+
+L'écran de confirmation du tunnel (A218) portait ce commentaire, écrit par le lot précédent :
+
+> *« Le site, lui, redirige vers le suivi du deal (`/bookings/:id`). Ce suivi n'existe pas
+> encore en natif, et la doctrine interdit de renvoyer au site (A210 b). »*
+
+Son geste principal menait donc à l'onglet **Activité**, qui est une coquille : des compteurs,
+aucune liste. Un Expéditeur qui venait de payer n'avait **aucun moyen**, dans l'app, de savoir
+où en était son colis, de transmettre son code, ou d'annuler sa demande.
+
+## Ce qui a été construit
+
+| Fichier | Rôle |
+|---|---|
+| `apps/mobile/src/lib/api/shipment.api.ts` | Le DTO de la vue SHIPPER de `GET /deals/:id`, champ à champ, plus les **quatre écritures** (annuler, régénérer le code, confirmer la réception) |
+| `apps/mobile/src/lib/shipment-view.ts` | **Toute** la logique, en fonctions pures : la phase d'affichage, la frise, les décomptes, le texte de clôture, l'état de l'argent, l'heure dans le fuseau du LIEU |
+| `apps/mobile/src/components/shipment/shipment-kit.tsx` | La grammaire visuelle : `Section`, `Row`, `Overline`, `Steps`, `Notice`, `Action`, `ConfirmSheet`, le bandeau de retour |
+| `apps/mobile/src/app/shipment/_layout.tsx` | La pile du suivi — **séparée** de celle du tunnel |
+| `apps/mobile/src/app/shipment/[id].tsx` | La fiche : dix vues, les quatre gestes, les preuves photo |
+| `apps/mobile/messages/{fr,en}/shipment.json` | 209 clés, miroir parfait |
+
+Et côté site, l'alignement du jumeau (§ « Le jumeau web » plus bas).
+
+## ① Pourquoi une pile séparée du tunnel
+
+`booking/` est un **tunnel** : sept écrans qu'on pousse, qu'on termine ou qu'on quitte. Le
+suivi est une **destination** : on y revient pendant des jours. Mettre la fiche dans
+`booking/` aurait eu deux conséquences concrètes :
+
+1. la jauge de progression et la barre de prix du tunnel auraient cohabité avec une fiche de
+   suivi — deux grammaires dans la même pile ;
+2. surtout, **le retour depuis la fiche serait retombé sur l'écran de paiement**. Le tunnel
+   est dépilé (`dismissAll`) avant la confirmation précisément pour que personne ne revienne
+   sur une carte déjà autorisée ; une fiche dans la même pile aurait défait cette précaution.
+
+D'où `app/shipment/[id].tsx`, déclaré au `Stack` racine, et la confirmation qui l'ouvre en
+**remplacement** (`router.replace`), jamais en empilement.
+
+Le bandeau de retour de la fiche tient compte de ce chemin : la fiche s'ouvre parfois **sans
+pile derrière elle** (juste après un paiement, le parcours a été dépilé). `router.back()` ne
+mènerait alors nulle part — d'où `router.canGoBack()` et, à défaut, l'onglet Activité.
+
+## ② La grammaire : pourquoi le site n'est PAS transposé
+
+Le tracker du site compte **quarante composants et 6 549 lignes**, en deux arbres
+desktop/mobile (`views/accepted/`, `views/picked-up/`, `views/in-transit/`, `views/delivered/`,
+`views/completed/`, `views/disputed/`, `views/status/`). La tentation est de les transposer un
+pour un. Elle a déjà été payée : la **première** fiche trajet native était exactement cela, et
+le verdict utilisateur fut « pas très sexy et un peu trop chargé » (A213, refonte du 13/10).
+
+La règle retenue alors est reprise ici telle quelle :
+
+- une page **à plat** — des sections séparées par un filet (`StyleSheet.hairlineWidth`), pas
+  des boîtes empilées ;
+- **une seule carte** sur tout l'écran. Sur la fiche trajet, c'est le prix. Ici, c'est le
+  **code de livraison** : la seule chose qu'on sort du téléphone pour la montrer à quelqu'un.
+
+Une carte unique redevient un signal **parce qu'elle est unique**.
+
+## ③ Dix vues pour neuf statuts — et deux fins qui ne se racontent pas pareil
+
+`shipment-view.ts` traduit les neuf statuts du serveur en **dix phases** d'affichage. La seule
+dérivation client de tout l'écran :
+
+```ts
+case 'PICKED_UP':
+  // Le colis est pris en charge. Le code vient d'arriver → on parle du CODE.
+  // Le Voyageur a confirmé des étapes → on parle du VOYAGE.
+  return shipment.trackingEvents.length > 0 ? 'IN_TRANSIT' : 'PICKED_UP';
+```
+
+`IN_TRANSIT` **n'existe pas** côté serveur. C'est une dérivation d'affichage, assumée dans ce
+module et nulle part ailleurs — et elle ne change que le DISCOURS, jamais un droit : les deux
+vues lisent le même deal et les mêmes `allowedActions`.
+
+Ensuite, `closureKey()` tranche deux pièges que le statut seul ne dit pas :
+
+| Situation | Statut serveur | Ce qu'il ne faut PAS titrer | Ce qu'on titre |
+|---|---|---|---|
+| Remboursement total tranché par la médiation | `CANCELLED` | « Demande annulée » sur un colis livré | « Clos par la médiation » |
+| Colis refusé au rendez-vous (`pickupRefusalReason`) | `CANCELLED` | « Demande annulée » — l'Expéditeur ne s'est pas désisté | « Colis refusé au rendez-vous » |
+
+Le premier cas est l'**ANO-WEB-73** du site, trouvée en recette. Le second n'avait jamais été
+traité, ni sur le site ni ailleurs : la machine range le refus au rendez-vous dans `CANCELLED`,
+et tout le monde lisait donc une annulation.
+
+## ④ Les gestes : le serveur décide, l'écran reflète
+
+Quatre écritures, toutes gardées par la machine d'état du serveur :
+
+| Geste | Endpoint | Garde |
+|---|---|---|
+| Annuler | `POST /deals/:id/cancel` | `cancel` ∈ `allowedActions` |
+| Régénérer le code | `POST /deals/:id/code/regenerate` | **pas** une transition : plafond serveur (5) + colis en transit |
+| Confirmer la réception | `POST /deals/:id/confirm` | `confirmEarly` ∈ `allowedActions` |
+| Partager le code | — | la feuille de partage de l'OS, aucun réseau |
+
+Trois principes tenus :
+
+1. **Un geste non autorisé n'est pas grisé : il n'existe pas** (A209). Aucun `disabled` dans
+   tout l'écran — `Action` n'a même pas la propriété.
+2. **La préviz d'annulation est SERVIE** (`cancellationPreview`, non nulle exactement quand
+   `cancel` est permis), jamais recalculée. La feuille de confirmation affiche le remboursement
+   et la retenue ANN-01 avec leurs montants réels, **et dit que le serveur recalculera au
+   moment du geste** : la préviz est une photo, pas une promesse.
+3. **Après chaque geste, on RELIT.** Le montant affiché après l'annulation est celui que le
+   serveur a rendu dans sa réponse, pas celui de la préviz ; le nouveau code n'est pas affiché
+   depuis la réponse de régénération mais depuis la relecture de `GET /deals/:id` (A43).
+
+Et le refus 409 `TRANSITION_NOT_ALLOWED` n'est **pas** traité comme une erreur : entre la
+lecture et le clic, le Voyageur a pu accepter. L'écran le dit en une phrase et recharge.
+
+```ts
+if (code === 'TRANSITION_NOT_ALLOWED') {
+  setSheet(null);
+  setFlash(t('actions.errors.TRANSITION_NOT_ALLOWED')); // « on recharge ton suivi »
+  await load();
+}
+```
+
+## ⑤ La feuille de confirmation : le bouton plein n'est pas celui qui confirme
+
+`ConfirmSheet` porte les trois gestes qui engagent. Deux choix explicites :
+
+- **une feuille, pas une `Alert` native** : il y a des MONTANTS et des conséquences à lire, et
+  une alerte système ne sait afficher proprement ni l'un ni l'autre sur les deux OS ;
+- quand le geste est **définitif**, le ton plein (mangue) va au bouton qui **garde**, et le
+  bouton qui confirme est bordé. Confirmer une action irréversible ne doit pas être le geste
+  le plus facile de l'écran.
+
+## ⑥ L'heure se lit dans le fuseau du LIEU
+
+Le snapshot du deal porte `originTimezone` et `destinationTimezone` (D24). Un Expéditeur à
+Paris qui lit l'heure d'un décollage de Brazzaville doit lire **l'heure du billet** :
+
+```ts
+new Intl.DateTimeFormat(tag, { hour: '2-digit', minute: '2-digit', timeZone: timezone })
+```
+
+Enveloppé d'un `try/catch` : si le moteur n'a pas les données du fuseau, on retombe sur
+l'heure de l'appareil — jamais sur une heure inventée, jamais sur rien.
+
+## ⑦ Le lien de suivi du destinataire (D69) : absent, et pourquoi
+
+`POST /deals/:id/tracking-link` rend un **chemin** :
+
+```ts
+{ token: "…", path: "/track/{token}", recipientFirstName, recipientPhoneE164 }
+```
+
+Le site le complète avec `window.location.origin`. Une application native n'a pas de
+`window.location`, aucune variable d'environnement ne porte l'origine publique du site, et
+**rien n'est déployé**. Fabriquer une URL ici aurait produit un lien mort — pire que son
+absence. Le geste n'est donc pas livré, et **aucun texte ne renvoie au site** à la place.
+
+**Arbitrage à rendre** : que le serveur serve une URL **absolue** (il connaît son front par
+configuration) au lieu d'un chemin. C'est une correction de contrat, pas un correctif d'écran.
+
+## ⑧ Le jumeau web : trois faits que le site avait sous la main sans les lire
+
+`BookingStatusNotice` disait, sur l'argent d'un envoi clos :
+
+> *« Cette demande est close. Si un remboursement s'applique, il t'a été confirmé par email. »*
+
+Or `refundAmountCents` est **servi par le contrat depuis l'origine** — il n'était simplement
+jamais lu par cette vue. Idem pour `declineReason` et `pickupRefusalReason`. Les trois entrent
+dans `ShipperBookingViewDto`, dans l'adaptateur, dans le type `Booking`, et s'affichent :
+
+- le montant **réellement rendu** et la retenue, quand ils sont non nuls (0 et `null` ne disent
+  pas la même chose : on n'affiche que ce qui a vraiment été rendu) ;
+- le **motif** du refus, que le Voyageur a écrit et que l'Expéditeur ne voyait nulle part ;
+- et le titre « Colis refusé au rendez-vous » pour le `CANCELLED` qui n'est pas un désistement.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Signaler un problème** et **noter le Voyageur** : deux formulaires, donc deux écrans, comme
+  sur le site (`/bookings/:id/report`, `/bookings/:id/rate`). Lot suivant. Aucun bouton ne les
+  annonce : promettre un écran absent est le défaut A203.
+- **La liste « Mes envois »** dans l'onglet Activité : lot suivant également. La fiche vient
+  d'abord parce qu'elle est atteignable **immédiatement** depuis la confirmation de paiement —
+  une liste livrée seule aurait mené à des lignes sans destination.
+- **Une visionneuse de photos** : les vignettes ne sont pas cliquables. Un toucher sans effet se
+  remarque plus qu'une image fixe.
+- **La raison du poids facturé**, et c'est une mesure : **D81 (17/10) a cessé d'écrire**
+  `sizeCoef` et `minimumApplied`, qui restent au contrat et valent donc `null` sur toute
+  réservation récente ; ce qui les remplace (`billingFloorKg`, `sizeMinKg`, `billableReason`)
+  **n'est pas servi par la vue Shipper**. La fiche affiche le poids facturé quand il diffère du
+  poids déclaré, sans pouvoir en donner la cause — que le tunnel, lui, donne. À corriger au
+  contrat et au mappeur, pas dans un écran.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `tsc --noEmit --project apps/mobile` | vert (exit 0) |
+| `tsc --noEmit --project apps/user-ui` | vert (exit 0) |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 namespaces, 60 fichiers (+ mobile) |
+| Tests des cinq services | **inchangés** — aucun code serveur touché |
+
+## Deux pièges payés dans ce lot
+
+**① Le lexique refuse `{carrier}` comme nom de variable ICU.** La règle 6 du contrôle i18n
+(`scripts/lexique-yamba.json`) interdit les mots de rôle anglais dans une **valeur** de
+message — et un nom de variable est dans la valeur. `{carrier}` échoue sur
+`\b(…|carriers?|…)\b` ; `{carrierFirstName}` passe, parce que `\b` ne coupe pas avant un `F`.
+C'est précisément pour cette raison que le site nomme ses variables `carrierFirstName` depuis
+A144. Dix-huit messages corrigés d'un coup.
+
+**② Les routes typées d'expo-router rendaient le typecheck local rouge, et la CI verte.**
+`.expo/types/router.d.ts` est **généré** et non suivi par git. Une route neuve y est absente
+jusqu'à ce que Metro tourne : `router.replace({ pathname: '/shipment/[id]', … })` échouait en
+TS2322 en local, alors que la CI — qui n'a jamais ce fichier — aurait passé sans rien voir.
+`npx expo customize tsconfig.json` régénère les types **sans démarrer le serveur de
+développement** (documenté pour le SDK 57, vérifié : le `tsconfig.json` n'est pas modifié).
+À connaître : un typecheck local rouge sur une route n'est pas forcément un défaut de code.
+
+## Deux défauts trouvés à la relecture, corrigés dans le lot
+
+**① Un partage refusé par l'OS partait en promesse non gardée.** `Share.share` **rejette**
+sur Android quand aucune application ne sait traiter le message, ou quand le système ferme la
+feuille lui-même. Appelé en `void shareCode()`, le rejet n'avait pas de `catch`. Avalé : le
+code reste affiché à l'écran, et il se dicte aussi bien qu'il s'envoie.
+
+**② Rouvrir un geste affichait l'échec du précédent.** `setSheet('regenerate')` n'effaçait pas
+`sheetError` : après un refus (plafond de régénérations atteint, réseau), rouvrir la feuille
+rendait le message de l'échec **passé** comme s'il venait de se produire. Les trois ouvertures
+passent désormais par `openSheet`, qui efface d'abord.
+
+> **C'est le même défaut que le garde `resumeStarted` du lot D82 7A, à un jour d'intervalle** :
+> un verrou — ou un message — posé par un chemin d'erreur doit avoir son chemin d'effacement.
+> La leçon mérite d'être écrite deux fois, puisqu'elle a été commise deux fois.
+
+
+---
+
+# Lot A222 — Signaler un problème, noter le Voyageur : le recours en natif
+
+> PR `feat/mobile-recourse-rating`, empilée sur `feat/mobile-shipment-tracker` (#394).
+> Décision : **A222** au registre. Aucun code serveur touché — les deux endpoints existaient.
+
+## Le point de départ : un texte qui promettait un écran absent
+
+La fiche de suivi livrée par A221 affiche, sur un colis livré, une liste « ce qui arrive
+ensuite ». Sa troisième ligne dit, textuellement (`messages/fr/shipment.json`) :
+
+> « Si quelque chose ne va pas, signale-le avant la fin du délai : le paiement est gelé. »
+
+**Et aucun geste de l'écran ne le permettait.** Pendant les trois jours de vérification —
+le seul moment où un signalement est recevable — un Expéditeur dont le colis arrive abîmé
+lisait une promesse et ne trouvait pas de bouton. C'est le défaut **A203** (ne jamais
+promettre à l'écran une fonctionnalité absente) pris à l'envers : non pas un bouton mort,
+mais une phrase sans bouton.
+
+Même constat pour la notation : un envoi terminé depuis l'app ne nourrissait jamais la
+réputation visible du Voyageur (D29 ①), faute d'écran pour la saisir.
+
+## ① Deux écrans, et pourquoi pas deux feuilles
+
+| | Signalement | Notation |
+|---|---|---|
+| Champs | motif, description ≥ 50 car., ≤ 5 photos, solution souhaitée, engagement | note 1-5, 3 critères, commentaire ≤ 280 |
+| Endpoint | `POST /deals/:id/dispute` | `GET` + `POST /deals/:id/rating` |
+| Jumeau web | `components/booking/booking-tracker/views/report/` (10 fichiers) | `components/rating/` (11 fichiers) |
+| Route native | `app/shipment/[id]/report.tsx` | `app/shipment/[id]/rate.tsx` |
+
+Ce sont des **formulaires**, pas des confirmations : une feuille modale les aurait écrasés
+sous le clavier. L'app a déjà une feuille de signalement (`components/report-sheet.tsx`,
+D68) — mais elle sert à signaler **une annonce ou un membre** en dix secondes, avec un motif
+et deux phrases facultatives. Le litige, lui, est un dossier de médiation.
+
+### La restructuration de route, et ce qu'elle ne change pas
+
+Expo Router nomme les routes par les fichiers. Pour accrocher deux routes filles sous un
+segment dynamique, le fichier `[id].tsx` doit devenir un dossier :
+
+```
+app/shipment/[id].tsx          →  app/shipment/[id]/index.tsx
+                                  app/shipment/[id]/report.tsx
+                                  app/shipment/[id]/rate.tsx
+```
+
+**L'URL ne change pas** : `index.tsx` dans `[id]/` répond exactement à `/shipment/<id>`.
+Le `git mv` conserve l'historique, et le `_layout.tsx` de la pile `shipment/` couvre les
+trois écrans sans modification (même animation, même absence d'en-tête natif).
+
+## ② Les règles, hors de la vue : deux modules purs
+
+Comme `shipment-view.ts` pour la fiche (A221), toute la décision vit dans des fonctions
+sans React ni réseau — `src/lib/report-form.ts` (159 lignes) et `src/lib/rating-form.ts`
+(131 lignes) :
+
+| Fonction | Ce qu'elle tranche |
+|---|---|
+| `allowedCategories(status)` | **D51** : en transit, la liste des six motifs se réduit à `NOT_DELIVERED` |
+| `categoryLocked(status)` | le motif est-il imposé (un seul choix) ? |
+| `describeDescription(text)` | longueur **trimée**, ce qui manque, limite atteinte |
+| `photosReady(photos)` | toutes en ligne, aucune en vol, aucune en échec |
+| `reportBlockers(form)` | la LISTE de ce qui manque, dans l'ordre de lecture de l'écran |
+| `reportFailureKey(code, status)` | le refus serveur → une clé de message |
+| `ratingFace(input, now)` | lequel des **quatre** visages de la notation afficher |
+| `toggleCriterion(…)` | un pouce reposé s'**efface** |
+| `toRatingPayload(form)` | le corps du POST, sans clé vide ni commentaire blanc |
+
+Deux détails qui comptent :
+
+**`describeDescription` trime avant de compter.** Le contrat trime aussi
+(`z.string().trim().min(50)`) : compter les espaces aurait donné un compteur vert et un
+refus 400.
+
+**`reportBlockers` rend une liste, pas un booléen.** Le bouton d'envoi doit pouvoir **dire**
+pourquoi il n'envoie pas encore, sans que la vue re-déduise les mêmes conditions. A209
+interdit un bouton grisé : ici le bouton existe toujours, et une pression sans dossier
+complet affiche le premier manque.
+
+## ③ Les constantes du contrat sont recopiées, pas importées
+
+```ts
+// apps/mobile/src/lib/report-form.ts
+export const DESCRIPTION_MIN_LENGTH = 50;
+export const DESCRIPTION_MAX_LENGTH = 2000;
+export const PHOTOS_MAX = 5;
+```
+
+Elles existent déjà dans `packages/libs/api-contracts/src/booking/booking-settlement.schema.ts`
+(`DISPUTE_MIN_DESCRIPTION_LENGTH`, `DISPUTE_PHOTOS_MAX`). **Les importer tirerait zod dans
+le bundle Metro** — c'est la même limite que `shipment.api.ts` avait consignée pour les
+types. Le choix est donc assumé et écrit en tête de fichier : toute divergence est un bug
+*ici*, et le serveur reste seul juge — il refuse ce qui sort de ses listes.
+
+## ④ Les preuves montent à la SÉLECTION, pas à l'envoi
+
+`POST /deals/:id/dispute` n'accepte que des **URL** : le binaire ne traverse jamais le
+gateway (D42). Deux conséquences dans l'écran :
+
+1. une photo choisie part **immédiatement** (`uploadDisputePhoto`), apparaît en vol
+   (voile + indicateur), puis en ligne ou en échec ;
+2. un téléversement en échec **bloque** l'envoi (`photosReady`) au lieu de partir sans sa
+   preuve (RG-P-13 : rien à moitié fait).
+
+Sans cela, cinq téléversements se déclencheraient au moment précis où l'Expéditeur a fini
+d'écrire et appuie sur « Envoyer ».
+
+`upload.api.ts` gagne donc son **dossier en paramètre**, et deux usages nommés :
+
+```ts
+const FOLDER_DECLARED = '/bookings/declared';
+const FOLDER_DISPUTE = '/deals/dispute';
+
+export function uploadDeclaredPhoto(photo) { return uploadTo(photo, FOLDER_DECLARED); }
+export function uploadDisputePhoto(photo)  { return uploadTo(photo, FOLDER_DISPUTE);  }
+```
+
+Deux dossiers séparés, comme sur le site (A73) : une pièce de médiation n'est pas une photo
+de colis, et l'admin la lit par ce chemin.
+
+**Un détail payé à la relecture** : choisir deux fois la même photo de la photothèque donne
+le même `assetId`, donc **deux vignettes au même identifiant** — un seul téléversement les
+mettait toutes les deux à jour, et retirer l'une effaçait l'autre. Les assets déjà connus
+sont désormais filtrés à l'ajout.
+
+## ⑤ Le double-aveugle donne quatre visages à un seul écran
+
+`GET /deals/:id/rating` sert l'état complet ; `ratingFace` choisit :
+
+| Visage | Condition (toutes servies) | Ce que l'écran montre |
+|---|---|---|
+| `form` | `canRate` (verdict serveur) | le formulaire |
+| `sent` | j'ai noté, rien n'est révélé | ma note + « visible quand l'autre aura noté » |
+| `revealed` | `revealedAt` non nul | les **deux** avis |
+| `closed` | pas noté, `windowEndsAt` dépassée | « la notation est fermée » |
+| `unavailable` | le serveur dit non pour une autre raison | on le dit sans inventer laquelle |
+
+Trois principes :
+
+1. **`canRate` est le verdict du serveur**, jamais une déduction (RG-MOB-1). L'app ne
+   recompte pas les quatorze jours.
+2. **La note de l'autre n'arrive dans le contrat qu'une fois révélée** : `counterpartRating`
+   reste `null` avant. L'app n'a donc rien à cacher elle-même — *une vérité qu'un client
+   doit protéger est déjà fuitée*.
+3. **`cannotRateReason` ne s'affiche pas** : c'est une phrase anglaise destinée aux
+   journaux. L'écran a ses propres textes.
+
+Et les **critères du rôle Expéditeur ne sont pas déclarés**. Le contrat en porte trois
+(`SHIPPER_RATING_CRITERIA`), mais l'app n'a pas de mode Voyageur, donc pas de textes : une
+liste que rien ne sait afficher est un piège. Un deal dont le compte connecté est le
+Voyageur répond `WrongRatingSideError` et l'écran le dit.
+
+## ⑥ Un refus définitif ferme le formulaire ; un refus réessayable le garde
+
+C'est la distinction que D82 7A avait introduite côté paiement, appliquée ici à un
+formulaire :
+
+| Refus | Code | Ce que fait l'écran |
+|---|---|---|
+| Le deal a bougé entre la lecture et le clic | `TRANSITION_NOT_ALLOWED` | ferme la feuille, affiche **le refus reçu**, propose le retour au suivi |
+| Le motif n'est plus recevable (colis reparti) | `DISPUTE_CATEGORY_NOT_ALLOWED` | idem |
+| Validation, panne réseau | 400 / autre | garde la feuille **ouverte** sur son bouton d'envoi |
+
+Côté notation, un `TRANSITION_NOT_ALLOWED` (déjà noté, fenêtre fermée) **relit le
+contexte** : l'écran bascule alors de lui-même sur le visage que le serveur décrit, au lieu
+d'afficher un message sous un formulaire mort. Une relecture qui échoue laisse l'écran tel
+quel — on ne remplace pas un refus lisible par une panne.
+
+## ⑦ La fiche annonce les deux gestes, et relit au retour
+
+```tsx
+const canDispute = shipment.allowedActions.includes('dispute');
+const disputeOpensAt =
+  !canDispute && phase === 'PICKED_UP' && shipment.disputeOpensAt ? shipment.disputeOpensAt : null;
+const rating = shipment.rating;
+```
+
+- **Le recours** apparaît quand `dispute` est dans `allowedActions`, avec la date limite
+  (`payoutDueAt`). En transit, le serveur ne l'ouvre que 48 h après le départ (A72) : avant,
+  la fiche n'annonce pas un bouton, elle annonce **la date** (`disputeOpensAt`, servie).
+- **La notation** apparaît dès que l'objet `rating` est servi (donc `COMPLETED`, jamais
+  après une clôture par médiation), dans les quatre états. Fenêtre fermée **sans** ma
+  note : aucun bouton — il n'y a ni avis à lire ni note à poser (A209).
+
+Et la fiche **relit au retour de focus** :
+
+```tsx
+useFocusEffect(
+  useCallback(() => {
+    setFlash(null);
+    void load();
+  }, [load])
+);
+```
+
+`useFocusEffect` et non `useEffect` : la fiche est une **destination** (A221 a), on y revient
+— du signalement, de la notation, de l'onglet Activité. Sans cela, elle gardait son bouton
+« Signaler » après un signalement déposé : elle mentait sur ce qui était encore possible. Le
+chargement initial est le même appel, puisqu'un écran qui s'affiche est un écran focalisé.
+
+## ⑧ Le jumeau web : une divergence, trouvée en portant l'écran
+
+En lisant le service pour écrire `reportFailureKey`, un refus serveur s'est avéré **mal
+diagnostiqué par le site** :
+
+```ts
+// AVANT — apps/user-ui/.../booking-tracker.api.ts
+detailCode === "CODE_REGENERATION_LIMIT" || detailCode === "TRANSITION_NOT_ALLOWED"
+  ? detailCode
+  : status === 400 ? "VALIDATION" : …
+```
+
+`DISPUTE_CATEGORY_NOT_ALLOWED` arrive en **400 avec son code** : il retombait donc dans
+`VALIDATION`, dont le message dit « vérifie la description (50 caractères minimum) et
+l'engagement » — un diagnostic **faux** pour une cause qui n'a rien à voir. Il a maintenant
+son code, son texte (`report.cta.toastCategory`) et son retour au suivi.
+
+Le reste des deux pages web était complet : ce lot est un **rattrapage du natif**, pas une
+correction du site.
+
+## Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx run-many --target=typecheck --all --skip-sync` | **10 projets verts** |
+| `nx typecheck @yamba-app/mobile` **sans** `.expo/types/router.d.ts` | vert — c'est ce que voit la CI |
+| `nx typecheck @yamba-app/mobile` **avec** les routes typées complétées | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir fr/en parfait, lexique OK |
+| Chemins i18n construits à l'exécution | **142** vérifiés un par un, 0 manquant, 0 clé orpheline |
+| Anti-fuite (`git ls-files` + motif de la CI) | aucun fichier sensible suivi |
+| Tests | **1342** + auth **407**, inchangés : aucun code serveur touché |
+
+## Deux pièges d'outillage payés dans ce lot
+
+**① `npx expo customize tsconfig.json` ne régénère plus les routes typées.** Le handoff du
+21/10 le donnait comme la façon de régénérer `.expo/types/router.d.ts` sans démarrer Metro.
+Il échoue désormais :
+
+```
+Error: Cannot find module 'expo-router/_ctx-shared'
+Require stack: node_modules/@expo/router-server/build/typed-routes/index.js
+```
+
+`@expo/router-server` vit à la **racine**, `expo-router` sous `apps/mobile` : la résolution
+ne traverse pas. Le typecheck a donc été vérifié **des deux côtés** — avec les deux routes
+ajoutées à la main dans le fichier généré (non suivi, donc local), et **sans le fichier du
+tout**, qui est exactement l'état de la CI.
+
+**② `StyleSheet.absoluteFillObject` n'existe plus** dans les typages de React Native 0.86
+(`Did you mean 'absoluteFill'?`). Les quatre côtés s'écrivent à la main — c'est trois lignes
+et aucune ambiguïté.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Aucun test automatisé**, encore : `apps/mobile` n'a pas de harnais Jest. Ce lot ajoute
+  **290 lignes de logique pure** écrites exprès pour être exécutables, qui s'ajoutent aux
+  267 d'A221. Le harnais manquant coûte maintenant plus cher que son installation.
+- **Pas de visionneuse de photos** pour les preuves déposées : même raison qu'en A221 — un
+  toucher sans effet se remarque plus qu'une image fixe.
+- **Pas de brouillon** du formulaire de signalement. Un dossier de litige abandonné ne doit
+  pas survivre dans le téléphone : il contient le récit d'un incident et des photos.
+
+---
+
+# A223 — Le harnais de tests du mobile : 336 fiches, deux programmes TypeScript, le 19ᵉ contrôle
+
+> Branche `chore/mobile-test-harness`. Aucune dépendance ajoutée, aucun écran modifié :
+> ce lot n'ajoute que de la VÉRIFICATION. Lire d'abord `apps/mobile/jest.config.ts`, qui
+> porte en commentaire la frontière du harnais, puis `apps/mobile/src/lib/alias.spec.ts`,
+> qui la garde.
+
+## ① Le trou, chiffré
+
+Les dix-huit contrôles de la CI ne voyaient **pas une ligne** de l'application mobile. Ce
+n'est pas un oubli, c'est une conséquence mécanique :
+
+| Contrôle | Pourquoi il ne voit pas le mobile |
+|---|---|
+| `TypeScript (×8)` | Ils vérifient des **types**, pas des comportements. Et aucun des huit ne cible `apps/mobile` |
+| `TypeScript (fiches de test)` | `nx run-many --target=typecheck --all` prenait bien la cible du mobile — mais elle ne vérifiait qu'un `tsc --noEmit` sans aucune fiche à vérifier |
+| `Tests unitaires (×5)` | Les cinq services. Le mobile n'avait pas de cible `test` |
+| `Build des services (webpack)` | Le mobile est bâti par **Metro**, jamais par webpack |
+| `Contrats OpenAPI` | Le mobile n'expose aucun contrat |
+| `i18n` / `Anti-fuite` | Ils voient les messages et les fichiers sensibles, pas la logique |
+
+Pendant ce temps, **cinq lots de suite** ont écrit leur logique en fonctions pures
+*exactement* pour être testables — A205 (page trajet), A213 (grammaire de la fiche), A217
+(tunnel), A221 (suivi d'un envoi), A222 (recours et notation) — et ont consigné chaque fois
+« le harnais manquant » comme axe. Mesuré avant ce lot : **2 109 lignes** dans
+`apps/mobile/src/lib/`, dont 267 pour `shipment-view.ts` et 290 pour les deux modules
+d'A222.
+
+## ② Le harnais, et ce qu'il n'exécute pas
+
+```ts
+// apps/mobile/jest.config.ts
+export default {
+  displayName: '@yamba-app/mobile',
+  preset: '../../jest.preset.js',
+  testEnvironment: 'node',
+  transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }] },
+  moduleNameMapper: { /* @/… et les quatre alias @packages/… */ },
+  setupFiles: ['<rootDir>/jest.setup.ts'],
+};
+```
+
+**Aucune dépendance nouvelle** : `jest@30`, `ts-jest` et `@types/jest` sont déjà à la racine
+du dépôt pour les cinq services.
+
+Il n'exécute **pas les écrans**, et c'est une frontière assumée, pas une économie. Rendre un
+composant react-native demanderait `jest-expo` (preset Babel + `react-test-renderer`), donc
+trois dépendances de plus sur un poste contraint, et un bundle de test qui n'a rien à voir
+avec ce que Metro produit. La règle qui en découle est plus utile qu'une couverture
+d'écrans : **le jour où un écran portera une règle qu'on veut tester, c'est la règle qu'il
+faudra sortir de l'écran** — pas le harnais qu'il faudra grossir.
+
+`jest.setup.ts` ne fait qu'une chose : poser `__DEV__` à `false`. C'est un global que Metro
+injecte dans tous ses bundles et que `stripe-sheet.ts` lit pour choisir l'environnement de
+Google Pay (D82 1A). Sans cette ligne, sa lecture lèverait une `ReferenceError` **avalée par
+le `try` du fichier** et travestie en « indisponible » : la fiche serait passée en mesurant
+autre chose que la règle. On le pose à `false`, l'état d'un build **publié** — celui où une
+erreur coûte de l'argent réel.
+
+## ③ Deux programmes TypeScript : le cœur du lot
+
+C'est la partie à comprendre avant de toucher à quoi que ce soit.
+
+| Programme | Pour qui | Connaît `@packages/api-contracts` ? |
+|---|---|---|
+| `apps/mobile/tsconfig.json` | **Metro** (`module: preserve`, `moduleResolution: bundler`, conditions `react-native`) | **NON** |
+| `apps/mobile/tsconfig.spec.json` | **ts-jest** (`module: commonjs`, `moduleResolution: node10`) | **OUI** |
+
+Pourquoi deux, et pourquoi cette asymétrie précise : A222 a recopié à la main les constantes
+du contrat (les six motifs, 50 / 2 000 caractères, 5 photos, 280 caractères, les trois
+critères) parce que `@packages/api-contracts` embarque **zod**, que Metro n'a pas à tirer
+dans le bundle. En ne déclarant PAS l'alias dans le programme de l'app, on rend cette
+discipline **vérifiée par le compilateur** : un écran qui importerait le contrat ne compile
+pas. Et en le déclarant dans celui des fiches, on rend la recopie **tenable** : sous Node,
+zod est gratuit, donc la copie peut être confrontée à l'original.
+
+Conséquences concrètes, toutes payées dans ce lot :
+
+- `tsconfig.spec.json` **n'étend pas** `expo/tsconfig.base` mais `tsconfig.base.json`, comme
+  les services : la base d'Expo pose `customConditions: ["react-native"]`, incompatible avec
+  `moduleResolution: node10`, et un `module: preserve` que ts-jest ne sait pas émettre ;
+- il neutralise `composite` / `emitDeclarationOnly` / `declarationMap` de la base, qui sont
+  faits pour des projets composites et se heurtent à `noEmit` ;
+- il ne charge que `jest` et `node` comme types, donc `__DEV__` est redéclaré dans
+  `src/test-support/globals.d.ts` (le programme de l'app le reçoit, lui, par `expo/types`) ;
+- `apps/mobile/tsconfig.json` reçoit un bloc `exclude` qui **doit** relister `node_modules`,
+  `android` et `ios` : la base d'Expo déclarant déjà un `exclude`, le redéfinir REMPLACE le
+  sien — et un `include: ["**/*.ts"]` sans exclusion de `node_modules` aspirerait tout le
+  contenu de `apps/mobile/node_modules`.
+
+Et la cible Nx vérifie désormais les deux programmes :
+
+```json
+"typecheck": { "command": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json" }
+```
+
+C'est ce qui fait entrer les fiches du mobile dans le check **TypeScript (fiches de test)**.
+
+## ④ `alias.spec.ts` — garder l'équilibre au lieu de l'espérer
+
+Trois choses pouvaient défaire cet équilibre **sans bruit** : un alias ajouté d'un côté et
+pas de l'autre (jest résout, tsc non — ou l'inverse), l'alias du contrat qui fuit dans le
+programme de l'app, un `import ... from 'zod'` glissé dans un écran. La fiche lit les
+fichiers de configuration du dépôt et les compare :
+
+- tout alias `@packages/*` du programme des fiches a son entrée dans `moduleNameMapper`, et
+  **réciproquement** (jest ne résout rien que tsc ignorerait) ;
+- le joker `@/*` est identique des trois côtés ;
+- `@packages/api-contracts` est **absent** du programme de l'app, mais
+  `@packages/api-contracts/locale` y est (il ne tire pas zod — c'est la source unique des
+  langues, D44) ;
+- aucun fichier de source — hors fiches et hors `test-support` — n'importe le contrat ni zod,
+  et la sonde vérifie qu'elle a bien inspecté des fichiers (une sonde muette ne prouve rien).
+
+## ⑤ Ce que les 336 fiches couvrent
+
+| Fiche | Ce qu'elle tient |
+|---|---|
+| `shipment-view.spec.ts` | Les dix vues pour neuf statuts, la frise (une seule étape courante, aucune sur un envoi clos), les décomptes, **les deux mensonges déjà payés sur le site** (ANO-WEB-73 : une médiation titrée « demande annulée » ; un colis refusé au rendez-vous présenté comme un désistement), la frontière `null` / `0` sur l'argent |
+| `report-form.spec.ts` | Les constantes **confrontées au contrat Zod réel**, D51 (motif imposé en transit), le compteur qui trime comme le serveur, les preuves « rien à moitié fait » (RG-P-13), les quatre blocages dans l'ordre, les refus définitifs |
+| `rating-form.spec.ts` | Les **quatre visages** du double-aveugle (D53) et leurs priorités, le pouce qu'on repose, et le corps de `POST /deals/:id/rating` **parsé** par `SubmitRatingRequestSchema` — ANO-API-14 comprise |
+| `booking-rules.spec.ts` | CAP-01 (30 kg) et sa priorité sur la capacité restante, l'absence de condition qui n'est pas un refus, le devis **comparé au moteur** `@packages/pricing` (D81 : plancher en kilos, minimum de taille, `billableReason`), les quatre validations d'étape |
+| `pricing-example.spec.ts` | Les trois paramètres recopiés **égaux** à ceux du moteur, et la seule promesse de l'ancre : jamais moins cher que le devis réel (égale en S, inférieure ou égale en M et L) |
+| `search-date.spec.ts` | Les deux modes, les trois fenêtres, lundi en FR / dimanche en EN, la fenêtre déjà commencée ramenée à aujourd'hui, la grille de calendrier (février 2028 a 29 jours) |
+| `trip-format.spec.ts` | Les durées, le CO₂ **au poids** du colis, Haversine, les tables de mois (jamais `toLocaleDateString`), les seuils de badge qui sont de la présentation |
+| `stripe-sheet.spec.ts` | La porte devant le module **natif** : `UNAVAILABLE` dans Expo Go, l'annulation distinguée de l'échec, Apple Pay non envoyé sans identifiant, `urlScheme` et `returnURL` présents, et la promesse « ne lève jamais » |
+| `booking-draft` · `search-draft` · `auth-flow-state` · `welcome-state` | Les brouillons en mémoire de processus : **référence stable** (contrat de `useSyncExternalStore`), abonnés prévenus et désabonnés, `submitNonce` qui n'a pas besoin d'acquittement, attente de réservation bornée au trajet qui l'a posée (A58) |
+| `base-url.spec.ts` | Les trois priorités de l'URL de l'API — la variable, l'adresse du poste qui sert Metro, `localhost` |
+| `password-rules` · `email` · `phone-prefixes` · `country-name` · `location-format` · `locale-state` | Les huit critères et leurs paliers, les regex permissives, E.164, les replis d'`Intl` |
+
+**Mesuré : 99,09 % des instructions et 93,99 % des branches** des 17 modules de
+`apps/mobile/src/lib/`. 20 suites, 4,7 s.
+
+## ⑥ Le défaut trouvé le premier jour
+
+`toE164` **ampute les numéros congolais et ivoiriens**.
+
+Le « zéro national » n'existe pas partout. En France, en Belgique, au Royaume-Uni, au Maroc
+ou en RD Congo, c'est un préfixe d'**acheminement** qu'on retire pour passer en E.164 — la
+règle qu'applique la fonction. Mais au **Congo-Brazzaville (+242)** et en **Côte d'Ivoire
+(+225)**, il n'y a pas de préfixe d'acheminement : le 0 appartient au numéro de l'abonné.
+
+```
+toE164('+242', '06 000 0000')  →  '+24260000000'   (mesuré, FAUX)
+                                  '+242060000000'  (attendu)
+```
+
+Pourquoi c'est grave et pourquoi rien ne l'avait vu :
+
+- **Brazzaville est le corridor de référence** de Yamba, présent dans tous les jeux d'essai ;
+- c'est par ce numéro que le **destinataire** reçoit le code de livraison (D43) ;
+- le serveur ne rattrape pas : il ne contrôle que la **forme** E.164
+  (`^\+[1-9]\d{6,14}$`, `booking-request.schema.ts`), que le numéro amputé respecte ;
+- le défaut est dans le miroir **web** autant que dans l'app —
+  `apps/user-ui/src/components/booking/booking.config.ts` porte la même fonction, ligne pour
+  ligne.
+
+Le corriger demande une **table de préfixes d'acheminement par pays**, c'est-à-dire une règle
+métier : un lot à part, sur les deux fronts, avec son entrée au registre. En attendant, deux
+fiches portent l'attendu **correct** en `it.failing` — elles restent vertes tant que le défaut
+est là et deviennent **rouges le jour où il est corrigé**, ce qui obligera à retirer le
+`.failing` plutôt qu'à l'oublier. *Un défaut épinglé par un test vert deviendrait la
+doctrine ; celui-ci ne peut pas.*
+
+## ⑦ Deux mesures d'outillage à ne pas repayer
+
+**① Le harnais est déterministe sous tous les fuseaux — vérifié, pas supposé.** Une première
+rédaction passait à Paris et tombait à **Auckland** (UTC+13) : `2027-03-20T12:00:00Z` y est
+déjà le 21 mars. Les mises en forme de date lisent l'heure de l'**appareil**
+(`getDate`/`getMonth`/`getDay`) et c'est l'intention — « samedi 20 mars » est le samedi de
+celui qui regarde l'écran. Les attendus se construisent donc **localement** :
+
+```ts
+const LOCAL_NOON = new Date(2027, 2, 20, 12, 0, 0).toISOString();
+```
+
+Plutôt que d'épingler `TZ=UTC` dans le harnais, ce qui aurait **caché** la propriété au lieu
+de la respecter. Vérifié ensuite sous cinq fuseaux : UTC, Europe/Paris, Pacific/Auckland,
+America/Los_Angeles et Pacific/Kiritimati (UTC+14) — 336/336 partout.
+
+**② `Intl.DisplayNames` NOMME « ZZ ».** CLDR définit `ZZ` comme « région inconnue » : le
+garde-fou de `country-name.ts` (« si le nom rendu est égal au code, c'est que la région est
+inconnue ») ne peut donc pas l'attraper. Mesuré : `QQ` → `QQ` (donc `null`, correct), `ZZ` →
+« région inconnue », `XK` → « Kosovo ». Aucun chemin ne sert `ZZ` (les codes viennent de
+l'autocomplétion de lieux) et une liste noire coûterait plus que ce qu'elle éviterait : la
+mesure est consignée dans la fiche pour que personne ne la refasse.
+
+## ⑧ La CI
+
+```yaml
+# .github/workflows/ci.yml — matrice `tests`
+- project: mobile
+  nx_project: "@yamba-app/mobile"
+```
+
+C'est le **dix-neuvième** contrôle, `Tests unitaires (mobile)`. Il faut le **cocher dans la
+protection de branche** : un job ajouté au fichier ne devient pas requis tout seul — « CI
+OK » se compte, il ne se regarde pas.
+
+## Les contrôles passés
+
+- `nx test @yamba-app/mobile` → **336 fiches, 20 suites, 4,7 s**, et sous cinq fuseaux ;
+- `nx typecheck @yamba-app/mobile` → les **deux** programmes, exit 0 ;
+- `nx run-many --target=typecheck --all --skip-sync` → **10 projets**, exit 0 (le check
+  « fiches de test » de la CI) ;
+- `node scripts/check-i18n-messages.mjs` → miroir parfait (aucun message touché) ;
+- l'anti-fuite → aucun fichier sensible suivi ;
+- couverture mesurée : **99,09 % / 93,99 %** sur `src/lib/*.ts`.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Les écrans ne sont pas rendus** : frontière assumée (§②). La conséquence est une règle,
+  pas une dette : une règle qu'on veut tester sort de l'écran.
+- **Les clients d'API (`src/lib/api/*.api.ts`) ne sont pas couverts** : ce sont des appels
+  réseau, pas des règles. Les tester demanderait de simuler `fetch`, c'est-à-dire de tester
+  notre simulation. Seul `base-url.ts`, qui porte une vraie règle de résolution, l'est.
+- **Les hooks React ne sont pas couverts** (`use-countdown`, `use-tab-badges`) : il faudrait
+  un moteur de rendu, donc `jest-expo`.
+- **Le défaut `toE164` n'est pas corrigé ici** : c'est une règle métier à graver, sur les
+  deux fronts, dans son propre lot.

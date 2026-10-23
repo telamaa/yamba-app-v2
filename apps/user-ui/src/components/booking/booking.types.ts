@@ -242,6 +242,7 @@ export type BookingApiErrorCode =
   | "TRIP_NOT_BOOKABLE"
   | "OWN_TRIP"
   | "PAYMENT_NOT_AUTHORIZED"
+  | "PAYMENT_PROCESSING" // D82 7A — empreinte en cours de pose (Klarna, PayPal) : RÉESSAYABLE
   | "PAYMENT_MISMATCH"
   | "PAYMENT_ALREADY_USED"
   | "NEW_ACCOUNT_CAP" // D71 — plafond progressif d'un compte neuf

@@ -1,0 +1,503 @@
+{
+  "title": "Mon envoi",
+  "back": "Retour",
+  "route": "{origin} → {destination}",
+  "reference": "Réf. {ref}",
+  "refresh": "Actualiser",
+  "loading": "Chargement de ton envoi…",
+  "notFound": {
+    "title": "Cet envoi n'existe pas",
+    "body": "Il a peut-être été annulé, ou ce lien ne t'appartient pas."
+  },
+  "wrongRole": {
+    "title": "Ce n'est pas ton envoi",
+    "body": "Tu es le Voyageur de cette demande : elle se suit depuis tes trajets."
+  },
+  "error": {
+    "title": "Impossible d'afficher ton envoi",
+    "body": "Vérifie ta connexion et réessaie.",
+    "retry": "Réessayer",
+    "reference": "Référence technique : {id}"
+  },
+  "status": {
+    "awaiting": {
+      "title": "En attente du Voyageur",
+      "body": "Ta demande est partie. Ton paiement est autorisé — rien n'est débité tant que {carrierFirstName} n'a pas accepté."
+    },
+    "accepted": {
+      "title": "{carrierFirstName} a accepté",
+      "body": "{carrierFirstName} va te contacter pour fixer le rendez-vous. En attendant, prépare ton colis."
+    },
+    "pickedUp": {
+      "title": "Ton code de livraison est arrivé",
+      "body": "Transmets-le à {recipientFirstName}. Sans ce code, {carrierFirstName} ne peut pas lui remettre le colis."
+    },
+    "inTransit": {
+      "title": "Ton colis voyage",
+      "body": "{carrierFirstName} confirme chaque étape. Tu les vois ci-dessous."
+    },
+    "delivered": {
+      "title": "Livré à {recipientFirstName}",
+      "body": "{carrierFirstName} a saisi le code à l'arrivée. Tu as trois jours pour t'assurer que tout va bien."
+    },
+    "completed": {
+      "title": "Envoi terminé",
+      "body": "La livraison est confirmée et le paiement de {carrierFirstName} est libéré. Merci d'avoir expédié avec Yamba."
+    },
+    "disputed": {
+      "title": "Signalement en cours",
+      "body": "Le versement à {carrierFirstName} est gelé le temps de l'examen. Notre équipe te répond sous 48 h ouvrées."
+    },
+    "declined": {
+      "title": "Demande non acceptée",
+      "body": "{carrierFirstName} n'a pas pu accepter ta demande. Tu n'es pas débité·e : l'autorisation est levée intégralement."
+    },
+    "expired": {
+      "title": "Demande expirée",
+      "body": "{carrierFirstName} n'a pas répondu dans les 24 heures. Tu n'es pas débité·e : l'autorisation est levée intégralement."
+    },
+    "cancelled": {
+      "title": "Demande annulée",
+      "body": "Cet envoi est clos."
+    },
+    "pickupRefused": {
+      "title": "Colis refusé au rendez-vous",
+      "body": "{carrierFirstName} n'a pas pris le colis en charge. L'envoi est clos et le remboursement suit le motif ci-dessous."
+    },
+    "cancelledByMediation": {
+      "title": "Clos par la médiation",
+      "body": "Ton signalement a été tranché : la décision et son motif sont plus bas."
+    }
+  },
+  "closedOn": "Clos le {date}",
+  "completedOn": "Terminé le {date}",
+  "openedOn": "Ouvert le {date}",
+  "refusalReason": "Motif : {reason}",
+  "countdown": {
+    "acceptanceTitle": "Réponse attendue",
+    "acceptanceBody": "Sans réponse d'ici là, la demande expire et tu es intégralement remboursé·e.",
+    "payoutTitle": "Versement automatique",
+    "payoutBody": "Passé ce délai, {carrierFirstName} est payé sans autre geste de ta part.",
+    "remainingDays": "{days, plural, =1 {# jour} other {# jours}} {hours} h",
+    "remainingHours": "{hours} h {minutes} min",
+    "remainingMinutes": "{minutes} min",
+    "elapsed": "Délai écoulé"
+  },
+  "timeline": {
+    "title": "Suivi de l'envoi",
+    "steps": {
+      "accepted": "Accepté",
+      "pickup": "Remise",
+      "transport": "Transport",
+      "delivery": "Livraison",
+      "verification": "Vérification"
+    }
+  },
+  "journey": {
+    "title": "Étapes du voyage",
+    "departure": "Départ prévu",
+    "pickedUp": "Colis pris en charge",
+    "AT_AIRPORT": "Arrivé au point de départ",
+    "FLIGHT_DEPARTED": "Parti vers {destination}",
+    "FLIGHT_ARRIVED": "Arrivé à {destination}",
+    "delivery": "Remise à {recipientFirstName}",
+    "deliveryPending": "Code à saisir par {carrierFirstName}",
+    "pending": "En attente de confirmation"
+  },
+  "code": {
+    "title": "Ton code de livraison",
+    "waitingBadge": "En attente",
+    "waitingBody": "Tu le recevras dès que {carrierFirstName} confirmera la prise en charge de ton colis.",
+    "label": "À transmettre à {recipientFirstName}",
+    "hint": "Garde-le confidentiel : il vaut signature de la livraison.",
+    "validatedBadge": "Validé",
+    "validatedBody": "{carrierFirstName} l'a saisi à la remise. Il ne sert plus à rien.",
+    "unavailable": "Ce code n'est pas disponible pour cet envoi.",
+    "regenerationsLeft": "{count, plural, =0 {Aucune régénération restante} =1 {# régénération restante} other {# régénérations restantes}}"
+  },
+  "parcel": {
+    "title": "Ton colis",
+    "summary": "{family} · {weight} kg",
+    "billedWeight": "Facturé {weight} kg",
+    "declaredValue": "Valeur déclarée",
+    "description": "Ta description",
+    "photos": "Tes photos de déclaration",
+    "photosCount": "{count, plural, =1 {# photo} other {# photos}}"
+  },
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papiers",
+    "CLOTHES_TEXTILE": "Vêtements & textile",
+    "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+    "ELECTRONICS_DEVICES": "Électronique & appareils",
+    "COSMETICS_CARE": "Cosmétiques & soins",
+    "PARTS_TOOLS": "Pièces & outillage",
+    "TOYS_CHILDCARE": "Jouets & puériculture",
+    "MISC_ACCESSORIES": "Accessoires divers"
+  },
+  "places": {
+    "title": "Les rendez-vous",
+    "pickup": "Remise",
+    "delivery": "Livraison",
+    "kinds": {
+      "AIRPORT": "Aéroport",
+      "TRAIN_STATION": "Gare",
+      "CITY_AREA": "Dans la ville"
+    },
+    "agreed": "À convenir avec {carrierFirstName}"
+  },
+  "recipient": {
+    "title": "Destinataire",
+    "inCity": "À {city}"
+  },
+  "carrier": {
+    "title": "Ton Voyageur",
+    "awaiting": "24 h pour répondre à ta demande.",
+    "accepted": "Va te contacter pour fixer le rendez-vous.",
+    "transit": "A ton colis en main."
+  },
+  "pickupProof": {
+    "title": "La prise en charge",
+    "confirmedAt": "Confirmée le {date} à {time}",
+    "photos": "Photos prises par {carrierFirstName}",
+    "notes": "Sa note",
+    "checklist": "Points vérifiés au rendez-vous"
+  },
+  "deliveryProof": {
+    "title": "La livraison",
+    "confirmedAt": "Code validé le {date} à {time}",
+    "photos": "Photos prises à la remise"
+  },
+  "payment": {
+    "title": "Ton paiement",
+    "total": "Total",
+    "transport": "Transport",
+    "service": "Service Yamba",
+    "protection": "Protection",
+    "authorized": "Autorisé, pas encore débité",
+    "capturedOn": "Débité le {date}",
+    "frozen": "Gelé le temps de l'examen",
+    "released": "Versé à {carrierFirstName}",
+    "refunded": "Remboursé",
+    "retained": "Retenu",
+    "noteAuthorized": "L'empreinte est posée sur ta carte. Elle ne devient un débit qu'à l'acceptation de {carrierFirstName}.",
+    "noteHeld": "Yamba garde les fonds. {carrierFirstName} n'est payé que trois jours après la livraison validée.",
+    "noteFrozen": "Aucun versement ne sera fait avant la fin de l'examen. Si un remboursement s'applique, il te sera confirmé par email.",
+    "noteReleased": "La transaction est close : les fonds sont partis chez {carrierFirstName}."
+  },
+  "protectionTiers": {
+    "BASIC": "Incluse",
+    "EXTENDED_500": "Étendue, 500 € couverts"
+  },
+  "next": {
+    "title": "Ce qui arrive ensuite",
+    "awaiting": {
+      "one": "{carrierFirstName} reçoit ta demande et répond sous 24 h.",
+      "two": "En cas d'acceptation, ta carte est débitée et le rendez-vous se fixe avec {carrierFirstName}.",
+      "three": "En cas de refus ou sans réponse, l'autorisation est levée : tu ne paies rien."
+    },
+    "accepted": {
+      "one": "{carrierFirstName} te contacte pour fixer la date et l'heure précises.",
+      "two": "À la remise, {carrierFirstName} vérifie le colis, le photographie et confirme la prise en charge.",
+      "three": "Ton code à 6 chiffres arrive à cet instant : tu le transmets à {recipientFirstName}."
+    },
+    "pickedUp": {
+      "one": "Transmets le code à {recipientFirstName} — par message, par téléphone, de vive voix.",
+      "two": "{carrierFirstName} voyage ; tu vois chaque étape qu'il confirme.",
+      "three": "À l'arrivée, {recipientFirstName} donne le code à {carrierFirstName} : la livraison est validée."
+    },
+    "inTransit": {
+      "one": "{recipientFirstName} donne le code à {carrierFirstName} à l'arrivée.",
+      "two": "La livraison est alors validée dans l'app.",
+      "three": "Trois jours de vérification commencent : tu peux signaler un problème."
+    },
+    "delivered": {
+      "one": "Si tout va bien, tu n'as rien à faire : {carrierFirstName} est payé à la fin des trois jours.",
+      "two": "Tu peux aussi confirmer tout de suite pour le payer plus tôt.",
+      "three": "Si quelque chose ne va pas, signale-le avant la fin du délai : le paiement est gelé."
+    },
+    "disputed": {
+      "one": "Nous demandons sa version à {carrierFirstName}.",
+      "two": "Nous tranchons sous cinq jours ouvrés et tu reçois la décision par email.",
+      "three": "Pendant tout l'examen, le versement reste gelé."
+    }
+  },
+  "mediation": {
+    "title": "La décision",
+    "ticket": "Dossier {ticket}",
+    "outcomes": {
+      "REJECTED": "Signalement écarté",
+      "PARTIAL_REFUND": "Remboursement partiel",
+      "FULL_REFUND": "Remboursement intégral",
+      "COMPENSATE_CARRIER": "Retenue versée au Voyageur",
+      "RESTITUTE_SHIPPER": "Retenue rendue"
+    },
+    "refund": "Rendu : {amount}",
+    "reason": "Motif",
+    "decidedOn": "Rendue le {date}"
+  },
+  "dispute": {
+    "title": "Ton signalement",
+    "ticket": "Dossier",
+    "category": "Motif",
+    "categories": {
+      "NOT_DELIVERED": "Colis jamais livré",
+      "CONTENT_MISSING": "Contenu manquant ou différent",
+      "DAMAGED": "Colis ou contenu endommagé",
+      "SIGNIFICANT_DELAY": "Délai largement dépassé",
+      "RECIPIENT_ISSUE": "Autre problème avec le Voyageur",
+      "OTHER": "Autre"
+    },
+    "description": "Ta description",
+    "outcome": "Solution souhaitée",
+    "outcomes": {
+      "FULL_REFUND": "Remboursement intégral",
+      "PARTIAL_REFUND": "Remboursement partiel",
+      "CONTACT_CARRIER": "Que Yamba contacte le Voyageur",
+      "YAMBA_DECIDES": "Je laisse Yamba décider"
+    },
+    "photos": "Pièces jointes",
+    "openedOn": "Envoyé le {date}",
+    "carrierResponded": "{carrierFirstName} a donné sa version. La décision arrive sous cinq jours ouvrés.",
+    "carrierPending": "Nous avons demandé sa version à {carrierFirstName} (72 h).",
+    "support": "Pour tout échange avec nous, rappelle le numéro de dossier."
+  },
+  "recourse": {
+    "title": "Un problème ?",
+    "body": "Colis non remis, contenu manquant ou abîmé : dis-le-nous. Le paiement de {carrierFirstName} reste gelé pendant tout l'examen.",
+    "deadline": "Tu peux signaler jusqu'au {date}.",
+    "opensAt": "Le colis n'est pas arrivé ? Le signalement « jamais livré » s'ouvre le {date}.",
+    "label": "Signaler un problème"
+  },
+  "report": {
+    "title": "Signaler un problème",
+    "subtitle": "Envoi {reference} · {route}",
+    "intro": "Décris ce qui s'est passé, on s'occupe du reste. Pendant l'examen, le paiement de {carrierFirstName} reste gelé.",
+    "category": {
+      "title": "Quel est le problème ?",
+      "hint": "Choisis la situation la plus proche.",
+      "locked": "Ton colis est encore en transit : seul « jamais livré » peut être signalé maintenant. Le contenu et l'état du colis se constatent après la remise."
+    },
+    "categories": {
+      "NOT_DELIVERED": "Le colis n'a jamais été livré à {recipientFirstName}",
+      "CONTENT_MISSING": "Contenu manquant ou différent de ma déclaration",
+      "DAMAGED": "Colis ou contenu endommagé",
+      "SIGNIFICANT_DELAY": "Délai largement dépassé",
+      "RECIPIENT_ISSUE": "Autre problème avec {carrierFirstName}",
+      "OTHER": "Autre problème"
+    },
+    "description": {
+      "title": "Raconte-nous ce qui s'est passé",
+      "hint": "Sois précis·e : quand l'as-tu su, ce qui manque, ce qui ne va pas.",
+      "placeholder": "Ex : {recipientFirstName} m'a appelé ce matin — le pull que j'avais déclaré n'était pas dans le colis, et un t-shirt est déchiré au col.",
+      "missing": "Encore {count} caractères (minimum {min}).",
+      "ok": "{count} caractères — c'est bon.",
+      "full": "Limite de {max} caractères atteinte."
+    },
+    "photos": {
+      "title": "Ajoute des preuves",
+      "hint": "Photos du contenu reçu, du dommage, de l'emballage. Jusqu'à {max} photos, {maxMb} Mo chacune.",
+      "add": "Ajouter une photo",
+      "cancel": "Annuler",
+      "ask": "Demande-les à {recipientFirstName} si tu ne les as pas.",
+      "camera": "Prendre une photo",
+      "library": "Choisir une photo",
+      "remove": "Retirer cette photo",
+      "uploading": "Envoi…",
+      "errors": {
+        "INVALID_TYPE": "Format non accepté — JPEG, PNG, HEIC ou WebP.",
+        "TOO_LARGE": "Photo trop lourde ({maxMb} Mo maximum).",
+        "FAILED": "Envoi échoué. Retire-la et réessaie."
+      },
+      "permissionTitle": "Accès aux photos refusé",
+      "permissionBody": "Autorise l'accès aux photos dans les réglages du téléphone pour joindre une preuve.",
+      "cameraDeniedTitle": "Appareil photo refusé",
+      "cameraDeniedBody": "Autorise l'appareil photo dans les réglages du téléphone, ou choisis une photo déjà prise."
+    },
+    "outcome": {
+      "title": "Ce qui te paraîtrait juste",
+      "hint": "Facultatif. Cela aide la médiation à comprendre ta demande — la décision reste la nôtre."
+    },
+    "outcomes": {
+      "FULL_REFUND": "Remboursement intégral ({amount})",
+      "PARTIAL_REFUND": "Remboursement partiel, pour le manque ou le dommage",
+      "CONTACT_CARRIER": "Que Yamba contacte {carrierFirstName} pour comprendre",
+      "YAMBA_DECIDES": "Je laisse Yamba décider au vu des éléments"
+    },
+    "process": {
+      "title": "Ce qui se passe ensuite",
+      "one": "Tu reçois un accusé de réception sous 48 h ouvrées, avec ton numéro de dossier.",
+      "two": "On demande sa version à {carrierFirstName}, preuves comprises, sous 72 h.",
+      "three": "On tranche sous cinq jours ouvrés, et la décision t'arrive par email.",
+      "four": "Pendant tout l'examen, le paiement de {carrierFirstName} reste gelé."
+    },
+    "pledge": {
+      "label": "Je déclare sur l'honneur que ce que j'écris est exact.",
+      "why": "Un signalement gèle le paiement d'une vraie personne. Cet engagement protège les Voyageurs honnêtes, comme la Charte les engage envers ton colis."
+    },
+    "submit": {
+      "label": "Envoyer le signalement",
+      "blockers": {
+        "category": "Choisis d'abord un motif.",
+        "description": "Il manque {count} caractères à la description.",
+        "photos": "Attends la fin de l'envoi des photos, ou retire celles qui ont échoué.",
+        "pledge": "Coche la déclaration sur l'honneur."
+      },
+      "confirmTitle": "Envoyer ce signalement ?",
+      "confirmBody": "Le paiement de {carrierFirstName} sera gelé et notre équipe prendra le dossier en main.",
+      "confirmIrreversible": "Une fois envoyé, un signalement ne se modifie plus.",
+      "confirm": "Oui, envoyer",
+      "keep": "Non, revenir",
+      "pending": "Envoi…"
+    },
+    "errors": {
+      "conflict": "Cet envoi a changé entre-temps : il ne peut plus être signalé. Retour au suivi.",
+      "categoryRefused": "Ce motif n'est plus recevable : le colis est reparti en transit.",
+      "validation": "Le dossier a été refusé : vérifie la description et la déclaration sur l'honneur.",
+      "generic": "L'envoi n'a pas abouti. Réessaie dans un instant."
+    },
+    "notAllowed": {
+      "title": "Signalement impossible",
+      "body": "Cet envoi ne peut pas être signalé : le délai est passé, un dossier est déjà ouvert, ou le colis n'a pas encore été remis."
+    },
+    "success": {
+      "title": "Dossier ouvert",
+      "ticket": "Dossier {ticket}",
+      "body": "Notre équipe te contacte sous 48 h ouvrées. Le paiement de {carrierFirstName} est gelé jusqu'à la décision.",
+      "keep": "Garde ce numéro : il suit tout le dossier.",
+      "back": "Retour au suivi"
+    }
+  },
+  "rating": {
+    "title": "Noter {carrierFirstName}",
+    "subtitle": "Envoi {reference} · {route}",
+    "intro": "Ton avis aide la communauté à choisir. Il devient public quand {carrierFirstName} aura noté de son côté — ou à la fin des quatorze jours.",
+    "prompt": {
+      "title": "Comment ça s'est passé ?",
+      "body": "Ton avis compte, et celui de {carrierFirstName} aussi : les deux sont révélés ensemble.",
+      "deadline": "Tu peux noter jusqu'au {date}.",
+      "label": "Noter {carrierFirstName}"
+    },
+    "state": {
+      "sentTitle": "Ta note est partie",
+      "sentBody": "Elle sera visible quand {carrierFirstName} aura noté, ou le {date} au plus tard.",
+      "sentBodyNoDate": "Elle sera visible quand {carrierFirstName} aura noté.",
+      "revealedTitle": "Vos avis sont publics",
+      "revealedBody": "Les deux avis sont publiés sur vos profils.",
+      "closedTitle": "Notation fermée",
+      "closedBody": "Les quatorze jours sont passés : cet envoi ne peut plus être noté.",
+      "view": "Voir les avis"
+    },
+    "stars": {
+      "label": "Ta note globale",
+      "value1": "Décevant",
+      "value2": "Moyen",
+      "value3": "Correct",
+      "value4": "Très bien",
+      "value5": "Excellent",
+      "required": "Choisis une note pour publier."
+    },
+    "criteria": {
+      "title": "Sur ces points précis",
+      "hint": "Facultatif. Un pouce reposé s'efface.",
+      "up": "Bien",
+      "down": "À améliorer",
+      "PUNCTUALITY": {
+        "name": "Ponctualité",
+        "desc": "À l'heure au rendez-vous et à la remise ?"
+      },
+      "COMMUNICATION": {
+        "name": "Communication",
+        "desc": "Réactif, clair, facile à joindre ?"
+      },
+      "PARCEL_CARE": {
+        "name": "Soin du colis",
+        "desc": "Colis arrivé intact, bien manipulé ?"
+      }
+    },
+    "comment": {
+      "title": "Ton commentaire",
+      "hint": "Facultatif · {max} caractères maximum",
+      "placeholder": "Ex : {carrierFirstName} a prévenu à chaque étape, et le colis est arrivé en parfait état.",
+      "counter": "{count} / {max}"
+    },
+    "visibility": "Ta note et ton commentaire seront publics sur le profil de {carrierFirstName}, une fois que tous les deux aurez noté — ou à la fin des quatorze jours. Après publication, un avis ne se modifie plus.",
+    "publish": {
+      "label": "Publier mon avis",
+      "pending": "Publication…"
+    },
+    "review": {
+      "mine": "Ta note pour {carrierFirstName}",
+      "theirs": "La note de {carrierFirstName}",
+      "theirsMissing": "{carrierFirstName} n'a pas noté cet envoi.",
+      "scale": "{rating} sur 5",
+      "on": "Publié le {date}",
+      "noComment": "Sans commentaire."
+    },
+    "success": {
+      "title": "Merci pour ton retour",
+      "body": "{carrierFirstName} est invité à te noter aussi. Vos deux avis seront révélés une fois les deux publiés, ou le {date} au plus tard.",
+      "bodyNoDate": "{carrierFirstName} est invité à te noter aussi. Vos deux avis seront révélés une fois les deux publiés.",
+      "bothRated": "{carrierFirstName} t'avait déjà noté : vos deux avis sont maintenant publics.",
+      "back": "Retour au suivi"
+    },
+    "unavailable": {
+      "title": "Notation indisponible",
+      "body": "Cet envoi ne peut pas être noté pour le moment."
+    },
+    "wrongRole": {
+      "title": "Pas de ce côté-ci",
+      "body": "Sur cet envoi, le compte connecté est le Voyageur : la notation côté Voyageur n'est pas encore dans l'app."
+    },
+    "errors": {
+      "conflict": "Cet envoi ne peut plus être noté — déjà noté, ou fenêtre fermée.",
+      "notFound": "Cet envoi n'existe pas, ou ne peut pas être noté.",
+      "validation": "L'avis a été refusé : vérifie la note et le commentaire.",
+      "generic": "La publication n'a pas abouti. Réessaie dans un instant."
+    }
+  },
+  "actions": {
+    "title": "Tes gestes",
+    "cancel": {
+      "label": "Annuler ma demande",
+      "confirmTitle": "Annuler cet envoi ?",
+      "fullRefund": "Tu es remboursé·e intégralement : {amount}.",
+      "partialRefund": "Tu es remboursé·e de {refund}. {retention} sont retenus, soit {pct} % — {carrierFirstName} avait réservé la place de ton colis.",
+      "deadline": "Jusqu'au {date}, l'annulation reste intégralement remboursée.",
+      "recomputed": "Le montant exact est recalculé par Yamba au moment de l'annulation.",
+      "confirm": "Oui, annuler",
+      "keep": "Non, garder ma demande",
+      "pending": "Annulation…",
+      "doneFull": "Demande annulée. {amount} te sont rendus.",
+      "doneNone": "Demande annulée."
+    },
+    "regenerate": {
+      "label": "Régénérer le code",
+      "confirmTitle": "Régénérer le code ?",
+      "confirmBody": "L'ancien code ne fonctionnera plus. Pense à envoyer le nouveau à {recipientFirstName}.",
+      "confirm": "Oui, régénérer",
+      "keep": "Non, garder celui-ci",
+      "pending": "Régénération…",
+      "done": "Nouveau code généré. N'oublie pas de l'envoyer à {recipientFirstName}."
+    },
+    "confirmDelivery": {
+      "label": "Tout s'est bien passé",
+      "hint": "Confirme la réception pour payer {carrierFirstName} tout de suite, sans attendre les trois jours.",
+      "confirmTitle": "Confirmer définitivement ?",
+      "confirmBody": "{carrierFirstName} sera payé immédiatement et tu ne pourras plus signaler de problème sur cet envoi.",
+      "confirm": "Oui, tout est OK",
+      "keep": "Pas encore",
+      "pending": "Confirmation…",
+      "done": "Merci. {carrierFirstName} va recevoir son paiement.",
+      "tip": "Demande à {recipientFirstName} d'ouvrir le colis avant de confirmer."
+    },
+    "shareCode": {
+      "label": "Envoyer le code à {recipientFirstName}",
+      "message": "Bonjour {recipientFirstName} ! Ton colis arrive avec {carrierFirstName} ({route}). Pour le récupérer, donne-lui ce code : {code}"
+    },
+    "errors": {
+      "TRANSITION_NOT_ALLOWED": "Cet envoi a changé entre-temps — on recharge ton suivi.",
+      "CODE_REGENERATION_LIMIT": "Tu as atteint la limite de régénérations pour cet envoi.",
+      "generic": "L'action n'a pas abouti. Réessaie dans un instant."
+    }
+  }
+}

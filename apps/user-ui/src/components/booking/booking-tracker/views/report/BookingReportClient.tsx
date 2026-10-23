@@ -136,6 +136,12 @@ export default function BookingReportClient({ bookingId }: Props) {
       if (code === "TRANSITION_NOT_ALLOWED") {
         toast.error(t("report.cta.toastConflict"));
         router.replace("/bookings/" + booking.id);
+      } else if (code === "DISPUTE_CATEGORY_NOT_ALLOWED") {
+        // Le colis est (re)parti en transit : le motif choisi n'est plus
+        // recevable (D51). On le dit, et on renvoie au suivi — le formulaire
+        // se réouvrira avec le motif imposé.
+        toast.error(t("report.cta.toastCategory"));
+        router.replace("/bookings/" + booking.id);
       } else if (code === "VALIDATION") {
         toast.error(t("report.cta.toastValidation"));
       } else {
