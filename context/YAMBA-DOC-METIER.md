@@ -7658,3 +7658,66 @@ Un principe tient les deux : **l'app ne renvoie jamais au site, même par une ph
   Expéditeur existent au contrat et arriveront avec lui, avec leurs textes.
 - **Revoir les preuves en grand** : les vignettes ne s'ouvrent pas. Un toucher sans effet se
   remarque plus qu'une image fixe.
+
+---
+
+# A223 — Le harnais de tests du mobile
+
+## Le besoin
+
+L'application mobile porte désormais de l'**argent** (la feuille de paiement et les
+redirections bancaires de D82) et du **recours** (le signalement d'A222, qui gèle le paiement
+d'une vraie personne). Un refus mal classé n'y coûte plus un affichage : il coûte un litige,
+un colis, ou un Voyageur payé à tort.
+
+Or **aucun des dix-huit contrôles de la CI ne voyait une ligne de cette application**. Cinq
+lots de suite avaient écrit leur logique en fonctions pures *exactement* pour qu'elle soit
+exécutable — 2 109 lignes — et rien ne l'exécutait. Ce lot n'ajoute aucune fonctionnalité :
+il rend vérifiable ce qui était déjà écrit, et devient le dix-neuvième contrôle.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-QA-01** | Toute règle métier de l'application mobile vit dans une fonction **pure**, hors écran. Un écran affiche ; il ne décide pas. Une règle qu'on veut tester se SORT de l'écran — on ne grossit pas le harnais pour l'y rejoindre. |
+| **RG-QA-02** | Une constante du contrat **recopiée** dans l'application (pour tenir zod hors du bundle Metro) doit être **confrontée au contrat réel par un test**. Une recopie sans garde-fou est une divergence à retardement. |
+| **RG-QA-03** | Ce que l'écran laisse envoyer doit être **accepté par le schéma du serveur**. Un formulaire qui autorise un envoi que le contrat refuse produit un 400 qu'aucun écran ne sait expliquer. |
+| **RG-QA-04** | Aucun fichier de source de l'application n'importe `@packages/api-contracts` ni `zod` : l'alias n'existe que dans le programme des fiches, donc le compilateur refuse l'import. La discipline est VÉRIFIÉE, pas demandée. |
+| **RG-QA-05** | Une fiche ne doit dépendre ni du fuseau horaire ni de l'horloge du poste. Les mises en forme de date lisent volontairement l'heure de l'**appareil** : leurs attendus se construisent donc localement, et le harnais n'épingle pas `TZ` (cela cacherait la propriété au lieu de la respecter). |
+| **RG-QA-06** | Un défaut connu **ne s'épingle jamais par un test vert** qui le décrit. Il s'épingle par l'attendu CORRECT en `it.failing` : vert tant que le défaut est là, **rouge le jour où il est corrigé**. Sinon le défaut devient la doctrine. |
+| **RG-QA-07** | « CI OK » se **compte**. Un contrôle ajouté au fichier de la CI n'est pas requis tant qu'il n'est pas coché dans la protection de branche. |
+
+## Le défaut métier trouvé par le harnais, le premier jour
+
+| # | Constat |
+|---|---|
+| **ANO-MOB-01** | **Le numéro du destinataire est amputé au Congo-Brazzaville et en Côte d'Ivoire.** La conversion en E.164 retire le zéro de tête comme s'il s'agissait toujours d'un préfixe d'acheminement. C'est vrai en France, en Belgique, au Royaume-Uni, au Maroc, en RD Congo — c'est **faux** au Congo (+242) et en Côte d'Ivoire (+225), où le 0 appartient au numéro de l'abonné. Conséquence métier : le destinataire d'un envoi Paris → Brazzaville — **le corridor de référence** — reçoit un numéro injoignable, alors que c'est par ce numéro que lui parvient le **code de livraison** (D43). Le serveur ne peut pas rattraper : il ne vérifie que la forme E.164, que le numéro amputé respecte. Présent **à l'identique sur le site**. Correction = une table de préfixes d'acheminement par pays, à graver, sur les deux fronts. |
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| MOB223-1 | Un envoi livré, clos par une médiation ayant remboursé en totalité | Le titre dit **la médiation**, jamais « demande annulée » (ANO-WEB-73) |
+| MOB223-2 | Un colis refusé au rendez-vous | Un texte propre, qui n'impute pas un désistement à l'Expéditeur |
+| MOB223-3 | Un envoi dont rien n'a été remboursé (`0`) vs un envoi où la question ne se pose pas (`null`) | Deux états distincts, jamais confondus |
+| MOB223-4 | Un signalement avec une description de 50 caractères exactement | Accepté par l'écran **et** par le contrat ; 49 refusé des deux côtés |
+| MOB223-5 | Un signalement déposé pendant que le colis est en transit | Un seul motif proposé (D51), et il est recevable par le contrat |
+| MOB223-6 | Une preuve photo dont le téléversement échoue | L'envoi est **bloqué** : jamais un dossier qui part sans sa preuve (RG-P-13) |
+| MOB223-7 | Une notation déposée, l'autre partie n'a pas noté | Rien n'est public, et l'écran le dit (D53) |
+| MOB223-8 | Un seul critère au pouce envoyé | Accepté par `SubmitRatingRequestSchema` (ANO-API-14) |
+| MOB223-9 | Un colis de 1 kg en taille L | Le devis facture le **minimum de taille** et en donne la raison (D81) |
+| MOB223-10 | Un colis de 30,1 kg sur un trajet où il reste 2 kg | Le message parle du **plafond par colis** (CAP-01), pas de la capacité |
+| MOB223-11 | « ex. colis 2 kg » sous un prix au kilo | Égal au devis réel d'un colis S, **jamais inférieur** en M ou L |
+| MOB223-12 | Un paiement dont le membre ferme la feuille | Une **annulation**, jamais une carte refusée |
+| MOB223-13 | Un paiement tenté dans Expo Go (sans module natif) | « Indisponible », jamais un écran blanc ni un plantage |
+| MOB223-14 | La même recherche lancée deux fois de suite | Deux événements distincts (le compteur, pas un booléen) |
+| MOB223-15 | Un retour de connexion trois écrans après un trajet | **Aucun** tunnel poussé : l'attente est bornée au trajet qui l'a posée (A58) |
+| MOB223-16 | La suite exécutée à UTC, Paris, Auckland, Los Angeles et Kiritimati | Le même résultat partout — 336/336 |
+
+## Ce qui reste hors de ce lot
+
+- **Les écrans ne sont pas rendus** : la frontière est assumée, et elle devient une règle
+  (RG-QA-01) plutôt qu'une dette.
+- **La correction d'ANO-MOB-01** : c'est une règle métier (table de préfixes par pays), à
+  graver au registre et à porter sur les **deux** fronts.
+- **Les clients d'API et les hooks React** : du réseau et du rendu, pas des règles.

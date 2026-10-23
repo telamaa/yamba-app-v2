@@ -5701,3 +5701,267 @@ arrive deux fois ? », et la réponse coûte une ligne.
   deal-rating.service.ts` et le contrat `packages/libs/api-contracts/src/booking/
   booking-rating.schema.ts` (dont le commentaire ANO-API-14 explique pourquoi `partialRecord`
   et non `record` — un enum en clé rend un `record` **exhaustif** depuis Zod 4).
+
+## Chapitre 223 — Deux programmes TypeScript pour un seul dossier, le test qui importe ce que le bundle ne peut pas, et le défaut qu'on épingle à l'envers
+
+Lot `chore/mobile-test-harness` (A223) : installer un harnais de tests dans une application
+Expo qui n'en avait aucun, et lui faire exécuter 2 109 lignes déjà écrites. Huit techniques,
+dont cinq se transposent à n'importe quel projet TypeScript — monorepo ou pas.
+
+### 1. Commencer par mesurer le trou, pas par choisir l'outil
+
+Le réflexe est de chercher « comment tester une app React Native ». La bonne première
+question est **« qu'est-ce qui n'est pas vu, et par quel contrôle ? »**. Mesure faite avant
+toute installation :
+
+```sh
+find apps/mobile/src -name "*.spec.ts" | wc -l     # → 0
+wc -l apps/mobile/src/lib/*.ts | tail -1           # → 2109 total
+node -e "console.log(require('./apps/mobile/package.json').nx)"
+# → { targets: { typecheck: { command: 'tsc --noEmit' } } }  ← une seule cible
+```
+
+Et surtout l'inventaire de ce que **chacun** des dix-huit contrôles de la CI voit : les huit
+`typecheck` ne vérifient que des types, le build est webpack (le mobile est bâti par Metro),
+les contrats OpenAPI n'existent pas côté app. Cet inventaire a décidé la forme du lot : il ne
+manquait pas « des tests », il manquait **un exécuteur**.
+
+**À retenir :** avant d'ajouter un outil, écrire noir sur blanc ce que chaque contrôle
+existant couvre. Le trou est souvent plus petit — ou tout autre — que l'intuition.
+
+### 2. Le coût réel d'un harnais : regarder d'abord ce qui est déjà installé
+
+```sh
+node -e "const d={...require('./package.json').dependencies,...require('./package.json').devDependencies};
+         for(const k of ['jest','ts-jest','@types/jest']) console.log(k,'=',d[k])"
+# jest = ^30.0.2   ts-jest = ^29.4.0   @types/jest = ^30.0.0
+```
+
+Tout était là, pour les cinq services. Le harnais du mobile a donc coûté **zéro
+dépendance** — là où le réflexe (`jest-expo`, `@testing-library/react-native`,
+`react-test-renderer`) en aurait ajouté trois et un pipeline Babel.
+
+Ce qui a rendu ce choix possible, c'est que la logique était **déjà pure**. Le lien est à
+double sens, et il vaut comme principe de conception : *écrire la logique hors des composants
+rend le harnais trivial ; un harnais trivial n'a pas besoin de dépendances ; pas de
+dépendances, pas d'arbitrage à rendre.*
+
+### 3. Deux programmes TypeScript dans un seul dossier — et l'asymétrie VOULUE
+
+Le cœur du lot. Le problème : les modules du mobile **recopient** des constantes du contrat
+(les six motifs de litige, 50 / 2 000 caractères, 280 caractères…) parce que
+`@packages/api-contracts` embarque zod, que Metro n'a pas à tirer dans le bundle. Le commentaire
+du fichier dit « toute divergence serait un bug ici » — mais rien ne la détectait.
+
+La solution n'est pas un test qui fait confiance. C'est **deux programmes** :
+
+```jsonc
+// apps/mobile/tsconfig.json — celui de METRO
+{ "extends": "expo/tsconfig.base",
+  "compilerOptions": { "paths": {
+      "@/*": ["./src/*"],
+      "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"],
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"]
+      // PAS de "@packages/api-contracts" : un écran NE PEUT PAS l'importer
+  }},
+  "exclude": ["node_modules", "android", "ios", "**/*.spec.ts", "src/test-support"] }
+
+// apps/mobile/tsconfig.spec.json — celui des FICHES
+{ "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "module": "commonjs", "moduleResolution": "node10",
+    "paths": { "@packages/api-contracts": ["../../packages/libs/api-contracts/src/index.ts"] }},
+  "include": ["jest.config.ts", "jest.setup.ts", "src/**/*.spec.ts", "src/test-support/**/*.ts"] }
+```
+
+L'idée générale, qui dépasse largement ce dépôt : **une interdiction d'import se tient mieux
+par la résolution de modules que par la discipline**. Un alias absent n'est pas une
+convention qu'on peut oublier, c'est une compilation qui échoue. Et le même alias, présent
+dans le programme des tests, transforme la recopie en invariant vérifiable.
+
+Trois pièges payés en montant ces deux fichiers :
+
+```
+// ① On ne peut PAS étendre expo/tsconfig.base pour les fiches :
+error TS5098: Option 'customConditions' can only be used when 'moduleResolution'
+              is set to 'node16', 'nodenext', or 'bundler'.
+// (la base d'Expo pose customConditions: ["react-native"] et module: "preserve")
+// → les fiches étendent tsconfig.base.json, comme les services.
+
+// ② tsconfig.base.json est fait pour des projets COMPOSITES :
+error TS5074: Option '--incremental' … / 'emitDeclarationOnly' cannot be specified with 'noEmit'
+// → "composite": false, "emitDeclarationOnly": false, "declarationMap": false, "noEmit": true
+
+// ③ Redéfinir `exclude` REMPLACE celui de la base — node_modules compris.
+// Avec "include": ["**/*.ts"], l'oublier aspire apps/mobile/node_modules en entier.
+```
+
+**Concept général :** `extends` en TypeScript fusionne les `compilerOptions` **clé par clé**,
+mais `include` / `exclude` / `files` se **remplacent en bloc**. Toute redéfinition d'`exclude`
+doit relister ce que la base excluait.
+
+### 4. Faire vérifier les deux programmes par une seule cible
+
+```json
+// apps/mobile/package.json
+"typecheck": { "command": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json" }
+```
+
+Deux programmes, une cible — parce que la CI appelle
+`nx run-many --target=typecheck --all`. Si le second `tsc` avait vécu dans une cible à part,
+il aurait fallu l'ajouter à la CI ; là, le contrôle « TypeScript (fiches de test) » le prend
+sans rien savoir du mobile. **Le bon endroit pour brancher une vérification est celui que la
+CI appelle déjà.**
+
+### 5. Le test qui lit la configuration du dépôt
+
+Un équilibre entre deux fichiers de configuration se défait sans bruit. D'où une fiche qui
+les **lit** :
+
+```ts
+// apps/mobile/src/lib/alias.spec.ts
+import jestConfig from '../../jest.config';
+
+function readTsconfig(name: string) {
+  const raw = readFileSync(join(MOBILE_ROOT, name), 'utf8');
+  return JSON.parse(raw.replace(/^\s*\/\/.*$/gm, ''));   // les tsconfig ont des commentaires
+}
+
+it('aucun fichier de source n’importe le contrat ni zod', () => {
+  const offenders = appSourceFiles().filter((f) =>
+    /from\s+['"]@packages\/api-contracts['"]|from\s+['"]zod['"]/.test(readFileSync(f, 'utf8')));
+  expect(offenders).toEqual([]);
+});
+
+it('la liste des sources inspectées n’est pas vide — une sonde muette ne prouve rien', () => {
+  expect(appSourceFiles().length).toBeGreaterThan(20);
+});
+```
+
+Deux leçons transposables :
+
+- **un test peut porter sur l'outillage**, pas seulement sur le métier. Il coûte vingt lignes
+  et remplace une ligne de documentation que personne ne relit ;
+- **toute sonde qui parcourt des fichiers doit vérifier qu'elle en a trouvé.** Un
+  `filter(...)` sur une liste vide rend une liste vide, donc un test vert : le défaut
+  classique du test « il n'y a aucun problème » qui ne regardait rien.
+
+### 6. Tester un module qui charge du NATIF — `jest.isolateModules` + `doMock`
+
+`stripe-sheet.ts` est une porte : il fait `require('@stripe/stripe-react-native')` **au
+moment d'ouvrir une feuille**, pas à l'import, parce que dans Expo Go le module lève à
+l'évaluation. Et il garde un état de module (`probed`, `cached`, `initialised`).
+
+Deux difficultés, une seule technique :
+
+```ts
+function loadSheet(native: FakeNative | null): SheetModule {
+  let sheet = {} as SheetModule;
+  jest.isolateModules(() => {                       // ← registre de modules NEUF
+    jest.doMock('@stripe/stripe-react-native', () => {
+      if (!native) throw new Error('native module not linked (Expo Go)');
+      return native;                                 // ← ou le faux module piloté
+    });
+    sheet = require('@/lib/stripe-sheet') as SheetModule;
+  });
+  return sheet;
+}
+```
+
+- `jest.isolateModules` donne un **registre de modules vierge** : l'état de module de la
+  fiche précédente (la sonde déjà faite, Stripe déjà initialisé) ne fuit pas dans la
+  suivante ;
+- `jest.doMock` (et non `jest.mock`) n'est **pas remonté** en tête de fichier par le
+  transformeur : il s'applique donc à l'intérieur du bloc, ce qui permet de **changer le faux
+  module d'une fiche à l'autre** ;
+- une fabrique de mock qui **lève** simule exactement Expo Go — le module JavaScript existe,
+  le pendant natif non.
+
+Ce qu'on peut alors prouver sans aucun téléphone : `UNAVAILABLE` dans Expo Go, l'annulation
+distinguée d'une carte refusée, Apple Pay non envoyé sans identifiant marchand, `urlScheme`
+et `returnURL` présents (sans eux, le 3-D Secure se perd dans le navigateur), et la promesse
+de l'en-tête — **« ne lève jamais »**.
+
+### 7. `it.failing` : épingler un défaut à l'ENVERS
+
+Le harnais a trouvé un vrai défaut dès le premier jour : `toE164` retire le zéro de tête de
+tout numéro, comme s'il s'agissait partout d'un préfixe d'acheminement. C'est vrai en France
+ou en RD Congo ; c'est **faux** au Congo-Brazzaville (+242) et en Côte d'Ivoire (+225), où ce
+zéro appartient au numéro de l'abonné.
+
+La correction est une règle métier (une table par pays), sur **deux** fronts : hors du lot.
+Restait la question de méthode — comment consigner un défaut connu ?
+
+```ts
+// ✗ Ce qu'il ne faut PAS faire : un test vert qui DÉCRIT le défaut.
+it('ampute le zéro congolais', () => {
+  expect(toE164('+242', '06 000 0000')).toBe('+24260000000');  // devient la doctrine
+});
+
+// ✓ L'attendu CORRECT, en `it.failing` (jest ≥ 29.6) :
+it.failing('AXE — un numéro congolais garde son zéro (+242)', () => {
+  expect(toE164('+242', '06 000 0000')).toBe('+242060000000');
+});
+```
+
+`it.failing` **passe quand son corps échoue** et **échoue quand il réussit**. Le jour où
+quelqu'un corrige `toE164`, la suite devient rouge sur cette fiche — ce qui l'oblige à
+retirer le `.failing`. Le défaut est donc consigné, visible dans le rapport, **et il ne peut
+pas se figer en comportement attendu**.
+
+**Le principe :** un test décrit ce qui **doit** être vrai, jamais ce qui l'est par accident.
+Quand les deux divergent, c'est l'inversion du verdict qu'on épingle, pas l'attendu.
+
+### 8. Un test qui dépend du fuseau est un test faux — mais `TZ=UTC` est la mauvaise réponse
+
+Première rédaction, verte sur le poste (Europe/Paris) :
+
+```ts
+const NOON_UTC = '2027-03-20T12:00:00.000Z';
+expect(formatLongDate(NOON_UTC, 'fr')).toBe('Samedi 20 mars 2027');
+```
+
+```sh
+TZ=Pacific/Auckland npx jest   # → 1 failed : « Dimanche 21 mars 2027 »
+```
+
+À UTC+13, midi UTC est **le lendemain**. Deux corrections possibles, et le choix compte :
+
+| Réponse | Effet |
+|---|---|
+| Épingler `process.env.TZ = 'UTC'` dans le harnais | Vert partout… et la dépendance au fuseau devient **invisible**, y compris quand elle sera un bug |
+| Construire l'attendu **localement** | Vert partout, et la propriété reste exprimée |
+
+```ts
+const LOCAL_NOON = new Date(2027, 2, 20, 12, 0, 0).toISOString();
+expect(formatLongDate(LOCAL_NOON, 'fr')).toBe('Samedi 20 mars 2027');
+```
+
+La seconde a été retenue parce que ces fonctions lisent **volontairement** l'heure de
+l'appareil : « samedi 20 mars » est le samedi de celui qui regarde l'écran. Vérification
+finale sous cinq fuseaux, dont les deux extrêmes :
+
+```sh
+for tz in UTC Europe/Paris Pacific/Auckland America/Los_Angeles Pacific/Kiritimati; do
+  TZ=$tz npx jest --ci | grep "^Tests:"
+done
+# → 336 passed, cinq fois
+```
+
+**À retenir :** quand un test dépend de l'environnement, demander d'abord si cette dépendance
+est **intentionnelle dans le code**. Si oui, l'attendu doit l'exprimer ; si non, c'est le code
+qu'il faut corriger. Figer l'environnement ne règle que le symptôme — et supprime le capteur.
+
+### Pour aller plus loin
+
+- **La couverture comme mesure, pas comme objectif.** Mesuré ici : 99,09 % des instructions
+  et 93,99 % des branches sur `src/lib/*.ts`. Le chiffre n'a servi qu'à **chercher les
+  oublis** (`jest --coverage --coverageReporters=text` et lire la colonne « Uncovered Line
+  #s »), jamais de cible. Une couverture d'écrans à 90 % aurait coûté trois dépendances et
+  prouvé beaucoup moins que 336 fiches sur des règles.
+- **Tests de conformité au contrat.** Le motif « la copie est confrontée à l'original » vaut
+  partout où une valeur est dupliquée pour une raison technique (taille de bundle, frontière
+  de service, langage différent). Le test n'est pas « la copie est juste » mais « la copie est
+  **égale** à la source », ce qui ne demande aucune maintenance.
+- **`jest.isolateModules` vs `jest.resetModules`.** Le second remet le registre à zéro pour la
+  suite du fichier ; le premier **borne** l'isolation à un bloc. Pour un module à état, le
+  premier est plus sûr : il ne dépend pas de l'ordre des fiches.

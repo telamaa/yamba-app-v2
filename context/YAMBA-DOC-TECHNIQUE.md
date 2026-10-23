@@ -14483,3 +14483,226 @@ et aucune ambiguïté.
   toucher sans effet se remarque plus qu'une image fixe.
 - **Pas de brouillon** du formulaire de signalement. Un dossier de litige abandonné ne doit
   pas survivre dans le téléphone : il contient le récit d'un incident et des photos.
+
+---
+
+# A223 — Le harnais de tests du mobile : 336 fiches, deux programmes TypeScript, le 19ᵉ contrôle
+
+> Branche `chore/mobile-test-harness`. Aucune dépendance ajoutée, aucun écran modifié :
+> ce lot n'ajoute que de la VÉRIFICATION. Lire d'abord `apps/mobile/jest.config.ts`, qui
+> porte en commentaire la frontière du harnais, puis `apps/mobile/src/lib/alias.spec.ts`,
+> qui la garde.
+
+## ① Le trou, chiffré
+
+Les dix-huit contrôles de la CI ne voyaient **pas une ligne** de l'application mobile. Ce
+n'est pas un oubli, c'est une conséquence mécanique :
+
+| Contrôle | Pourquoi il ne voit pas le mobile |
+|---|---|
+| `TypeScript (×8)` | Ils vérifient des **types**, pas des comportements. Et aucun des huit ne cible `apps/mobile` |
+| `TypeScript (fiches de test)` | `nx run-many --target=typecheck --all` prenait bien la cible du mobile — mais elle ne vérifiait qu'un `tsc --noEmit` sans aucune fiche à vérifier |
+| `Tests unitaires (×5)` | Les cinq services. Le mobile n'avait pas de cible `test` |
+| `Build des services (webpack)` | Le mobile est bâti par **Metro**, jamais par webpack |
+| `Contrats OpenAPI` | Le mobile n'expose aucun contrat |
+| `i18n` / `Anti-fuite` | Ils voient les messages et les fichiers sensibles, pas la logique |
+
+Pendant ce temps, **cinq lots de suite** ont écrit leur logique en fonctions pures
+*exactement* pour être testables — A205 (page trajet), A213 (grammaire de la fiche), A217
+(tunnel), A221 (suivi d'un envoi), A222 (recours et notation) — et ont consigné chaque fois
+« le harnais manquant » comme axe. Mesuré avant ce lot : **2 109 lignes** dans
+`apps/mobile/src/lib/`, dont 267 pour `shipment-view.ts` et 290 pour les deux modules
+d'A222.
+
+## ② Le harnais, et ce qu'il n'exécute pas
+
+```ts
+// apps/mobile/jest.config.ts
+export default {
+  displayName: '@yamba-app/mobile',
+  preset: '../../jest.preset.js',
+  testEnvironment: 'node',
+  transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }] },
+  moduleNameMapper: { /* @/… et les quatre alias @packages/… */ },
+  setupFiles: ['<rootDir>/jest.setup.ts'],
+};
+```
+
+**Aucune dépendance nouvelle** : `jest@30`, `ts-jest` et `@types/jest` sont déjà à la racine
+du dépôt pour les cinq services.
+
+Il n'exécute **pas les écrans**, et c'est une frontière assumée, pas une économie. Rendre un
+composant react-native demanderait `jest-expo` (preset Babel + `react-test-renderer`), donc
+trois dépendances de plus sur un poste contraint, et un bundle de test qui n'a rien à voir
+avec ce que Metro produit. La règle qui en découle est plus utile qu'une couverture
+d'écrans : **le jour où un écran portera une règle qu'on veut tester, c'est la règle qu'il
+faudra sortir de l'écran** — pas le harnais qu'il faudra grossir.
+
+`jest.setup.ts` ne fait qu'une chose : poser `__DEV__` à `false`. C'est un global que Metro
+injecte dans tous ses bundles et que `stripe-sheet.ts` lit pour choisir l'environnement de
+Google Pay (D82 1A). Sans cette ligne, sa lecture lèverait une `ReferenceError` **avalée par
+le `try` du fichier** et travestie en « indisponible » : la fiche serait passée en mesurant
+autre chose que la règle. On le pose à `false`, l'état d'un build **publié** — celui où une
+erreur coûte de l'argent réel.
+
+## ③ Deux programmes TypeScript : le cœur du lot
+
+C'est la partie à comprendre avant de toucher à quoi que ce soit.
+
+| Programme | Pour qui | Connaît `@packages/api-contracts` ? |
+|---|---|---|
+| `apps/mobile/tsconfig.json` | **Metro** (`module: preserve`, `moduleResolution: bundler`, conditions `react-native`) | **NON** |
+| `apps/mobile/tsconfig.spec.json` | **ts-jest** (`module: commonjs`, `moduleResolution: node10`) | **OUI** |
+
+Pourquoi deux, et pourquoi cette asymétrie précise : A222 a recopié à la main les constantes
+du contrat (les six motifs, 50 / 2 000 caractères, 5 photos, 280 caractères, les trois
+critères) parce que `@packages/api-contracts` embarque **zod**, que Metro n'a pas à tirer
+dans le bundle. En ne déclarant PAS l'alias dans le programme de l'app, on rend cette
+discipline **vérifiée par le compilateur** : un écran qui importerait le contrat ne compile
+pas. Et en le déclarant dans celui des fiches, on rend la recopie **tenable** : sous Node,
+zod est gratuit, donc la copie peut être confrontée à l'original.
+
+Conséquences concrètes, toutes payées dans ce lot :
+
+- `tsconfig.spec.json` **n'étend pas** `expo/tsconfig.base` mais `tsconfig.base.json`, comme
+  les services : la base d'Expo pose `customConditions: ["react-native"]`, incompatible avec
+  `moduleResolution: node10`, et un `module: preserve` que ts-jest ne sait pas émettre ;
+- il neutralise `composite` / `emitDeclarationOnly` / `declarationMap` de la base, qui sont
+  faits pour des projets composites et se heurtent à `noEmit` ;
+- il ne charge que `jest` et `node` comme types, donc `__DEV__` est redéclaré dans
+  `src/test-support/globals.d.ts` (le programme de l'app le reçoit, lui, par `expo/types`) ;
+- `apps/mobile/tsconfig.json` reçoit un bloc `exclude` qui **doit** relister `node_modules`,
+  `android` et `ios` : la base d'Expo déclarant déjà un `exclude`, le redéfinir REMPLACE le
+  sien — et un `include: ["**/*.ts"]` sans exclusion de `node_modules` aspirerait tout le
+  contenu de `apps/mobile/node_modules`.
+
+Et la cible Nx vérifie désormais les deux programmes :
+
+```json
+"typecheck": { "command": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json" }
+```
+
+C'est ce qui fait entrer les fiches du mobile dans le check **TypeScript (fiches de test)**.
+
+## ④ `alias.spec.ts` — garder l'équilibre au lieu de l'espérer
+
+Trois choses pouvaient défaire cet équilibre **sans bruit** : un alias ajouté d'un côté et
+pas de l'autre (jest résout, tsc non — ou l'inverse), l'alias du contrat qui fuit dans le
+programme de l'app, un `import ... from 'zod'` glissé dans un écran. La fiche lit les
+fichiers de configuration du dépôt et les compare :
+
+- tout alias `@packages/*` du programme des fiches a son entrée dans `moduleNameMapper`, et
+  **réciproquement** (jest ne résout rien que tsc ignorerait) ;
+- le joker `@/*` est identique des trois côtés ;
+- `@packages/api-contracts` est **absent** du programme de l'app, mais
+  `@packages/api-contracts/locale` y est (il ne tire pas zod — c'est la source unique des
+  langues, D44) ;
+- aucun fichier de source — hors fiches et hors `test-support` — n'importe le contrat ni zod,
+  et la sonde vérifie qu'elle a bien inspecté des fichiers (une sonde muette ne prouve rien).
+
+## ⑤ Ce que les 336 fiches couvrent
+
+| Fiche | Ce qu'elle tient |
+|---|---|
+| `shipment-view.spec.ts` | Les dix vues pour neuf statuts, la frise (une seule étape courante, aucune sur un envoi clos), les décomptes, **les deux mensonges déjà payés sur le site** (ANO-WEB-73 : une médiation titrée « demande annulée » ; un colis refusé au rendez-vous présenté comme un désistement), la frontière `null` / `0` sur l'argent |
+| `report-form.spec.ts` | Les constantes **confrontées au contrat Zod réel**, D51 (motif imposé en transit), le compteur qui trime comme le serveur, les preuves « rien à moitié fait » (RG-P-13), les quatre blocages dans l'ordre, les refus définitifs |
+| `rating-form.spec.ts` | Les **quatre visages** du double-aveugle (D53) et leurs priorités, le pouce qu'on repose, et le corps de `POST /deals/:id/rating` **parsé** par `SubmitRatingRequestSchema` — ANO-API-14 comprise |
+| `booking-rules.spec.ts` | CAP-01 (30 kg) et sa priorité sur la capacité restante, l'absence de condition qui n'est pas un refus, le devis **comparé au moteur** `@packages/pricing` (D81 : plancher en kilos, minimum de taille, `billableReason`), les quatre validations d'étape |
+| `pricing-example.spec.ts` | Les trois paramètres recopiés **égaux** à ceux du moteur, et la seule promesse de l'ancre : jamais moins cher que le devis réel (égale en S, inférieure ou égale en M et L) |
+| `search-date.spec.ts` | Les deux modes, les trois fenêtres, lundi en FR / dimanche en EN, la fenêtre déjà commencée ramenée à aujourd'hui, la grille de calendrier (février 2028 a 29 jours) |
+| `trip-format.spec.ts` | Les durées, le CO₂ **au poids** du colis, Haversine, les tables de mois (jamais `toLocaleDateString`), les seuils de badge qui sont de la présentation |
+| `stripe-sheet.spec.ts` | La porte devant le module **natif** : `UNAVAILABLE` dans Expo Go, l'annulation distinguée de l'échec, Apple Pay non envoyé sans identifiant, `urlScheme` et `returnURL` présents, et la promesse « ne lève jamais » |
+| `booking-draft` · `search-draft` · `auth-flow-state` · `welcome-state` | Les brouillons en mémoire de processus : **référence stable** (contrat de `useSyncExternalStore`), abonnés prévenus et désabonnés, `submitNonce` qui n'a pas besoin d'acquittement, attente de réservation bornée au trajet qui l'a posée (A58) |
+| `base-url.spec.ts` | Les trois priorités de l'URL de l'API — la variable, l'adresse du poste qui sert Metro, `localhost` |
+| `password-rules` · `email` · `phone-prefixes` · `country-name` · `location-format` · `locale-state` | Les huit critères et leurs paliers, les regex permissives, E.164, les replis d'`Intl` |
+
+**Mesuré : 99,09 % des instructions et 93,99 % des branches** des 17 modules de
+`apps/mobile/src/lib/`. 20 suites, 4,7 s.
+
+## ⑥ Le défaut trouvé le premier jour
+
+`toE164` **ampute les numéros congolais et ivoiriens**.
+
+Le « zéro national » n'existe pas partout. En France, en Belgique, au Royaume-Uni, au Maroc
+ou en RD Congo, c'est un préfixe d'**acheminement** qu'on retire pour passer en E.164 — la
+règle qu'applique la fonction. Mais au **Congo-Brazzaville (+242)** et en **Côte d'Ivoire
+(+225)**, il n'y a pas de préfixe d'acheminement : le 0 appartient au numéro de l'abonné.
+
+```
+toE164('+242', '06 000 0000')  →  '+24260000000'   (mesuré, FAUX)
+                                  '+242060000000'  (attendu)
+```
+
+Pourquoi c'est grave et pourquoi rien ne l'avait vu :
+
+- **Brazzaville est le corridor de référence** de Yamba, présent dans tous les jeux d'essai ;
+- c'est par ce numéro que le **destinataire** reçoit le code de livraison (D43) ;
+- le serveur ne rattrape pas : il ne contrôle que la **forme** E.164
+  (`^\+[1-9]\d{6,14}$`, `booking-request.schema.ts`), que le numéro amputé respecte ;
+- le défaut est dans le miroir **web** autant que dans l'app —
+  `apps/user-ui/src/components/booking/booking.config.ts` porte la même fonction, ligne pour
+  ligne.
+
+Le corriger demande une **table de préfixes d'acheminement par pays**, c'est-à-dire une règle
+métier : un lot à part, sur les deux fronts, avec son entrée au registre. En attendant, deux
+fiches portent l'attendu **correct** en `it.failing` — elles restent vertes tant que le défaut
+est là et deviennent **rouges le jour où il est corrigé**, ce qui obligera à retirer le
+`.failing` plutôt qu'à l'oublier. *Un défaut épinglé par un test vert deviendrait la
+doctrine ; celui-ci ne peut pas.*
+
+## ⑦ Deux mesures d'outillage à ne pas repayer
+
+**① Le harnais est déterministe sous tous les fuseaux — vérifié, pas supposé.** Une première
+rédaction passait à Paris et tombait à **Auckland** (UTC+13) : `2027-03-20T12:00:00Z` y est
+déjà le 21 mars. Les mises en forme de date lisent l'heure de l'**appareil**
+(`getDate`/`getMonth`/`getDay`) et c'est l'intention — « samedi 20 mars » est le samedi de
+celui qui regarde l'écran. Les attendus se construisent donc **localement** :
+
+```ts
+const LOCAL_NOON = new Date(2027, 2, 20, 12, 0, 0).toISOString();
+```
+
+Plutôt que d'épingler `TZ=UTC` dans le harnais, ce qui aurait **caché** la propriété au lieu
+de la respecter. Vérifié ensuite sous cinq fuseaux : UTC, Europe/Paris, Pacific/Auckland,
+America/Los_Angeles et Pacific/Kiritimati (UTC+14) — 336/336 partout.
+
+**② `Intl.DisplayNames` NOMME « ZZ ».** CLDR définit `ZZ` comme « région inconnue » : le
+garde-fou de `country-name.ts` (« si le nom rendu est égal au code, c'est que la région est
+inconnue ») ne peut donc pas l'attraper. Mesuré : `QQ` → `QQ` (donc `null`, correct), `ZZ` →
+« région inconnue », `XK` → « Kosovo ». Aucun chemin ne sert `ZZ` (les codes viennent de
+l'autocomplétion de lieux) et une liste noire coûterait plus que ce qu'elle éviterait : la
+mesure est consignée dans la fiche pour que personne ne la refasse.
+
+## ⑧ La CI
+
+```yaml
+# .github/workflows/ci.yml — matrice `tests`
+- project: mobile
+  nx_project: "@yamba-app/mobile"
+```
+
+C'est le **dix-neuvième** contrôle, `Tests unitaires (mobile)`. Il faut le **cocher dans la
+protection de branche** : un job ajouté au fichier ne devient pas requis tout seul — « CI
+OK » se compte, il ne se regarde pas.
+
+## Les contrôles passés
+
+- `nx test @yamba-app/mobile` → **336 fiches, 20 suites, 4,7 s**, et sous cinq fuseaux ;
+- `nx typecheck @yamba-app/mobile` → les **deux** programmes, exit 0 ;
+- `nx run-many --target=typecheck --all --skip-sync` → **10 projets**, exit 0 (le check
+  « fiches de test » de la CI) ;
+- `node scripts/check-i18n-messages.mjs` → miroir parfait (aucun message touché) ;
+- l'anti-fuite → aucun fichier sensible suivi ;
+- couverture mesurée : **99,09 % / 93,99 %** sur `src/lib/*.ts`.
+
+## Ce qui n'a PAS été fait, et pourquoi
+
+- **Les écrans ne sont pas rendus** : frontière assumée (§②). La conséquence est une règle,
+  pas une dette : une règle qu'on veut tester sort de l'écran.
+- **Les clients d'API (`src/lib/api/*.api.ts`) ne sont pas couverts** : ce sont des appels
+  réseau, pas des règles. Les tester demanderait de simuler `fetch`, c'est-à-dire de tester
+  notre simulation. Seul `base-url.ts`, qui porte une vraie règle de résolution, l'est.
+- **Les hooks React ne sont pas couverts** (`use-countdown`, `use-tab-badges`) : il faudrait
+  un moteur de rendu, donc `jest-expo`.
+- **Le défaut `toE164` n'est pas corrigé ici** : c'est une règle métier à graver, sur les
+  deux fronts, dans son propre lot.
