@@ -140,3 +140,44 @@ describe("FakePaymentProvider — findTransfers (recette § 5.14, A164)", () => 
     expect(b.transferId).not.toBe(a.transferId);
   });
 });
+
+/**
+ * D83 — les moyens de paiement SERVIS avec l'empreinte.
+ * =====================================================
+ * L'écran de paiement du mobile n'invente aucune ligne : il affiche
+ * l'intersection de ce que l'empreinte accepte et de ce qu'il sait conduire
+ * (D83 4A). Encore faut-il que l'empreinte le DISE — et c'est ce que ces
+ * fiches tiennent, des deux côtés de l'abstraction.
+ *
+ * Pourquoi la question ne peut pas se trancher côté client : la liste ne
+ * dépend pas que de la configuration du compte, elle dépend AUSSI du mode de
+ * capture. Yamba autorise d'abord et ne débite qu'à l'acceptation du Voyageur
+ * (D31, `capture_method: "manual"`), ce qui écarte chez le fournisseur tous
+ * les moyens incapables de faire « empreinte puis débit ». Deviner cette
+ * liste dans l'app reviendrait à proposer des moyens qui refuseront.
+ */
+describe("D83 — les moyens de paiement voyagent avec l'autorisation", () => {
+  it("le Fake n'en annonce AUCUN : il n'y a pas de feuille à ouvrir", async () => {
+    const p = new FakePaymentProvider();
+    const a = await p.authorize({ amountCents: 1105, currencyCode: "EUR", description: "t", metadata: {} });
+    expect(a.paymentMethodTypes).toEqual([]);
+  });
+
+  it("…et une liste VIDE n'est pas une absence de champ — l'écran peut la lire sans garde", async () => {
+    const p = new FakePaymentProvider();
+    const a = await p.authorize({ amountCents: 1105, currencyCode: "EUR", description: "t", metadata: {} });
+    expect(Array.isArray(a.paymentMethodTypes)).toBe(true);
+  });
+
+  it("un intent SEEDÉ adopté en annonce une liste vide lui aussi, jamais `undefined`", async () => {
+    const p = new FakePaymentProvider();
+    const adopte = await p.retrieve("pi_fake_seed_42");
+    expect(adopte.paymentMethodTypes).toEqual([]);
+  });
+
+  it("le Fake reste stable d'une lecture à l'autre (la liste n'est pas regénérée)", async () => {
+    const p = new FakePaymentProvider();
+    const a = await p.authorize({ amountCents: 1105, currencyCode: "EUR", description: "t", metadata: {} });
+    expect((await p.retrieve(a.intentId)).paymentMethodTypes).toEqual(a.paymentMethodTypes);
+  });
+});
