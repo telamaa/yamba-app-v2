@@ -416,6 +416,28 @@ export default function BookingPaymentScreen() {
     uploadPhotos,
   ]);
 
+  /* D83 — la REPRISE. Ce hook est ici, et PAS plus bas : les deux retours
+     anticipés qui suivent (`failed`, `!trip`) changeraient le NOMBRE de hooks
+     d'un rendu à l'autre, et React refuse — « Rendered more hooks than during
+     the previous render ». Tout hook vit donc au-dessus de la première sortie.
+
+     La page carte pose l'empreinte puis se referme : une page poussée ne
+     retourne rien à celle qui l'a poussée. L'écran reprend
+     donc la main au retour de focus et ENCHAÎNE tout seul — l'Expéditeur
+     vient d'autoriser son paiement, lui redemander d'appuyer sur « Payer »
+     serait incompréhensible.
+
+     Les photos ne repartent pas : leurs URLs sont mémorisées (A45). Et si le
+     serveur refuse, c'est le refus qui s'affiche — jamais une seconde
+     empreinte, puisque `isPaymentAuthorized()` fait désormais autorité. */
+  useFocusEffect(
+    useCallback(() => {
+      if (!isPaymentAuthorized() || cardAuthorized || submitting) return;
+      setCardAuthorized(true);
+      void onPay();
+    }, [cardAuthorized, onPay, submitting])
+  );
+
   if (failed) {
     return (
       <ThemedView style={styles.centered}>
@@ -439,23 +461,6 @@ export default function BookingPaymentScreen() {
   }
 
   const localQuote = quoteDraft(draft, trip, params);
-  /* D83 — la REPRISE. La page carte pose l'empreinte puis se referme : une
-     page poussée ne retourne rien à celle qui l'a poussée. L'écran reprend
-     donc la main au retour de focus et ENCHAÎNE tout seul — l'Expéditeur
-     vient d'autoriser son paiement, lui redemander d'appuyer sur « Payer »
-     serait incompréhensible.
-
-     Les photos ne repartent pas : leurs URLs sont mémorisées (A45). Et si le
-     serveur refuse, c'est le refus qui s'affiche — jamais une seconde
-     empreinte, puisque `isPaymentAuthorized()` fait désormais autorité. */
-  useFocusEffect(
-    useCallback(() => {
-      if (!isPaymentAuthorized() || cardAuthorized || submitting) return;
-      setCardAuthorized(true);
-      void onPay();
-    }, [cardAuthorized, onPay, submitting])
-  );
-
   // La barre du bas suit le devis du serveur dès qu'il est là ; avant, le
   // calcul local — le même moteur, les mêmes paramètres.
   const totalCents =
