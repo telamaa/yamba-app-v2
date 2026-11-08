@@ -6200,3 +6200,127 @@ la bonne chose ». C'est la frontière entre vérification et recette, et elle n
   trouvés par un simulateur, pas par un test. Un harnais de rendu (`jest-expo` +
   `@testing-library/react-native`) les aurait attrapés ; il coûte trois dépendances et change le
   rapport coût/bénéfice du harnais. L'axe est ouvert, à trancher **avec une mesure**.
+
+---
+
+## Chapitre 225 — La ressource chargée qui n'est pas appliquée, le `.variable` qui ne pose rien, et la mesure qui descend jusqu'au CSS servi
+
+> Lot D84 (`chore/web-brand-font`). Quatre lignes de configuration, et un défaut qui vivait
+> depuis la génération du projet sans qu'aucun outil ne s'en plaigne.
+
+### 1. `next/font` : `.variable` et `.className` ne font PAS la même chose
+
+```tsx
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
+
+<html className={plusJakarta.variable}>   // ← déclare --font-sans. N'applique RIEN.
+<html className={plusJakarta.className}>  // ← applique font-family. Pas de variable.
+```
+
+**La théorie**, et elle est simple une fois dite : une variable CSS est une *valeur nommée*,
+pas une *déclaration*. `--font-sans: "Plus Jakarta Sans"` ne change pas plus l'apparence de la
+page que `const police = "Plus Jakarta Sans"` ne change un rendu en JavaScript. Il faut que
+**quelqu'un la lise** :
+
+```css
+font-family: var(--font-sans), …;
+```
+
+Le motif `variable` existe précisément pour qu'un **autre système** fasse cette lecture —
+typiquement Tailwind, pour que `font-sans`, `font-medium` et toutes les variantes restent
+disponibles. C'est le bon motif. Mais il est en **deux temps**, et le second peut manquer sans
+que rien ne le signale.
+
+### 2. Tailwind : `extend: {}` ne garde pas « la valeur du projet », il garde CELLE DE TAILWIND
+
+```js
+theme: { extend: {} },     // ← ce qu'il y avait
+```
+
+On lit facilement cette ligne comme « ne change rien à ce qui existe ». Elle dit en réalité
+« n'ajoute rien **aux valeurs par défaut de Tailwind** ». Et la valeur par défaut de
+`fontFamily.sans`, dans Tailwind 3.4, se lit directement dans le paquet :
+
+```sh
+node -p "require('tailwindcss/defaultTheme').fontFamily.sans.join(', ')"
+# → ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", …
+```
+
+L'utilitaire `font-sans` posé sur le `<body>` émettait donc cette pile — la police système.
+Le branchement :
+
+```js
+const defaultTheme = require("tailwindcss/defaultTheme");
+fontFamily: { sans: ["var(--font-sans)", ...defaultTheme.fontFamily.sans] },
+```
+
+Le `...defaultTheme` n'est pas de la politesse : c'est le **repli** affiché pendant le
+`display: "swap"` et conservé si la police n'arrive jamais. Une police de marque ne doit jamais
+être la condition de lisibilité d'une page.
+
+### 3. Pourquoi RIEN n'a attrapé ce défaut
+
+C'est la partie à retenir, parce qu'elle se reproduira ailleurs.
+
+| Outil | Pourquoi il est aveugle |
+|---|---|
+| `tsc` | Le code TypeScript est parfait : l'objet est bien construit, la variable bien passée en `className` |
+| Le build | Il compile et émet le CSS demandé. Un `font-family` **absent** n'est pas une erreur |
+| La CI | Dix-neuf contrôles, aucun ne rend une page |
+| Les tests | Aucun ne regarde du CSS calculé |
+| L'œil, sur le poste | **Piège subtil** : le développeur est sur un Mac, où la pile système commence par San Francisco — une très belle police. Rien n'a l'air cassé |
+
+Le défaut a été trouvé par **une question d'utilisateur**, puis par la comparaison entre ce que
+le code *dit* et ce que le navigateur *affiche*. C'est la définition même de la recette, et
+c'est la deuxième fois dans la même journée (voir chapitre 224 §4c, le titre emprunté).
+
+### 4. La méthode : mesurer en descendant les couches, pas en lisant le code source
+
+La première réponse donnée — « c'est Plus Jakarta Sans » — venait de la lecture de
+`layout.tsx`. Elle était fausse. La bonne méthode descend **jusqu'à l'octet servi** :
+
+```sh
+# Couche 1 — la configuration RÉSOLUE (pas le fichier source : le résultat du merge)
+node -e "const r=require('tailwindcss/resolveConfig')(require('./apps/user-ui/tailwind.config.js'));
+         console.log(r.theme.fontFamily.sans.join(', '))"
+
+# Couche 2 — le HTML réellement servi
+curl -s http://localhost:3000/fr | grep -o '<html[^>]*>'
+
+# Couche 3 — la feuille de style réellement servie
+curl -s "http://localhost:3000/_next/static/chunks/….css" | grep -A2 '^\.font-sans'
+#   .font-sans { font-family: var(--font-sans), ui-sans-serif, …; }
+#   --font-sans: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback"
+```
+
+`resolveConfig` mérite d'être connu : il applique `extend`, les préréglages et les valeurs par
+défaut, et rend l'objet **final**. Lire `tailwind.config.js` ne dit pas ce que Tailwind
+utilisera ; `resolveConfig` le dit.
+
+Et même lui ne suffit pas : il prouve la configuration, pas la page. Seule la couche 3 prouve
+la chaîne complète — variable définie, utilitaire qui la lit, élément qui porte l'utilitaire.
+
+### 5. Une décision gravée vaut mieux qu'une intuition de cohérence
+
+L'intuition « une seule police partout » est bonne — pour le **web**. Sur le mobile, D36 ③
+dit l'inverse **exprès** : « typographie iOS sur iOS […] pas d'UI clone ». Une police de marque
+imposée au corps de texte d'une application native coûte le Dynamic Type (la taille de texte
+que le membre a choisie dans ses réglages d'accessibilité), l'idiome de la plateforme et le
+poids du fichier dans le bundle.
+
+La leçon n'est pas « le mobile a raison » : c'est qu'avant d'unifier au nom de la cohérence, on
+va **lire si une décision existe déjà**. Ici elle existait, elle était argumentée, et elle n'a
+pas été balayée — elle a été **citée** dans la nouvelle décision, qui en délimite la portée.
+
+### Pour aller plus loin
+
+- **`font-display: swap`** et le FOUT (*flash of unstyled text*) : le compromis entre « texte
+  invisible » et « texte qui saute ». `next/font` génère en plus une police de repli **ajustée
+  métriquement** (`"Plus Jakarta Sans Fallback"`, visible dans le CSS servi) dont les
+  proportions imitent la vraie — c'est ce qui réduit le saut au moment de la bascule.
+- **Les variables CSS comme protocole entre outils** : `next/font` ne sait rien de Tailwind,
+  Tailwind ne sait rien de `next/font`. La variable est le contrat. Un contrat a toujours deux
+  côtés — et c'est le deuxième qui manquait.
+- **`resolveConfig`**, et plus généralement : pour toute configuration qui fusionne (tsconfig
+  avec `extends`, ESLint, Babel, Tailwind), il existe une commande qui rend l'état **résolu**.
+  La lire coûte dix secondes et évite de raisonner sur un fichier qui n'est qu'un fragment.

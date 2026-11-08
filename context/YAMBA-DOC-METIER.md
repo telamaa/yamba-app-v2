@@ -7795,3 +7795,46 @@ le fait simplement dans une page qui lui parle.
   est exactement le comportement attendu.
 - **Klarna reste désactivé** au Dashboard : hors maquette.
 - Le passage en **mode réel** reste un changement de clés (D82 1A).
+
+---
+
+# D84 — La police de marque de Yamba
+
+## Le besoin
+
+Une marque qui n'a pas de typographie décidée **n'a pas de typographie** : elle a celle du
+système d'exploitation du visiteur, c'est-à-dire celle de tout le monde. C'était le cas de
+Yamba sans que personne ne le sache — et le pire des deux mondes : la police de marque était
+**téléchargée à chaque page** du site membre, et **affichée nulle part**.
+
+Le constat est venu d'une question posée en recette, « quelle est ma police ? », et d'un
+utilisateur qui a comparé la réponse à ce que son navigateur affichait vraiment.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-UI-01** | La police de marque de Yamba est **Plus Jakarta Sans**. Elle s'applique au **site membre** et au **back-office** — même marque, même navigateur, aucune raison de diverger |
+| **RG-UI-02** | La **pile système reste en repli**, derrière la police de marque. C'est ce que lit le visiteur pendant le chargement, et ce qui reste si le fichier n'arrive jamais. Une page n'attend jamais une police pour être lisible |
+| **RG-UI-03** | L'**application mobile garde la typographie du système** — San Francisco sur iPhone, Roboto sur Android. C'est l'exigence ③ de D36 (« typographie iOS sur iOS »), et c'est ce qui préserve la taille de texte choisie par le membre dans ses réglages d'accessibilité |
+| **RG-UI-04** | Une police **chargée** n'est pas une police **appliquée**. Toute police ajoutée doit être vérifiée **dans la page servie**, pas dans le fichier qui l'importe |
+| **RG-UI-05** | La **famille** et l'**échelle** sont deux décisions distinctes. L'échelle (tailles, graisses) est A46 et ne bouge pas avec la famille |
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| UI84-01 | Une page du site membre, chargée dans un navigateur | Le texte s'affiche en **Plus Jakarta Sans** |
+| UI84-02 | Une page du back-office | **La même police** que le site membre |
+| UI84-03 | Le fichier de police n'arrive pas (réseau coupé, bloqueur) | La page reste **entièrement lisible** en police système — jamais de texte invisible ni de page blanche |
+| UI84-04 | Un écran de l'application mobile | La police du **système**, et la taille de texte choisie dans les réglages d'accessibilité est respectée |
+| UI84-05 | Une carte (Leaflet) sur le site | La même police que le reste de la page — elle l'avait déjà, elle n'est simplement plus la seule |
+
+## Ce qui reste hors de ce lot
+
+- **Le choix de la famille** : Plus Jakarta Sans n'a jamais été choisie, elle a été posée par le
+  générateur du projet. Elle est ratifiée ici faute de raison d'en changer ; en changer coûte
+  désormais une ligne par front.
+- **La police de marque dans les titres du mobile** : la voie des applications à marque forte
+  (marque dans les titres, système dans l'interface). Ce serait un amendement à D36 ③, à
+  instruire séparément.

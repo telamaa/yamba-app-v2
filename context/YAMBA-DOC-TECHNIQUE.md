@@ -14946,3 +14946,146 @@ Tous MESURÉS le **08/11/2026**, sur la branche, avant d'ouvrir la PR :
 - **Les écrans ne sont toujours pas rendus** : la frontière d'A223 tient, mais elle a coûté deux
   défauts en deux écrans. L'axe est instruit au § des axes du suivi — à réévaluer **avec une
   mesure**, pas au sentiment.
+
+---
+
+# D84 — La police de marque, enfin branchée : un `font-family` qui n'existait pas
+
+> Branche `chore/web-brand-font`. Quatre lignes de configuration, et une leçon qui vaut plus
+> que le lot : **une ressource chargée n'est pas une ressource appliquée**.
+
+## ① La question qui a tout déclenché
+
+« Rappelle-moi quelle est ma police ? » — posée en pleine recette, sans arrière-pensée.
+
+Première réponse, donnée en lisant `apps/user-ui/src/app/layout.tsx` : **Plus Jakarta Sans**.
+Le fichier est pourtant sans ambiguïté :
+
+```tsx
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+…
+<html lang={locale} className={plusJakarta.variable}>
+  <body className="min-h-screen … font-sans …">
+```
+
+Réponse **fausse**, et c'est l'utilisateur qui l'a relevée en citant ce qu'il voyait vraiment
+dans son navigateur :
+
+```css
+font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", …
+```
+
+## ② Le chaînon manquant, mesuré
+
+Trois pièces, et une qui n'était pas posée.
+
+| Pièce | État avant |
+|---|---|
+| `next/font` charge la police et **définit la variable** `--font-sans` | ✅ fait |
+| La variable est posée sur le `<html>` (`plusJakarta.variable`) | ✅ fait |
+| **Un `font-family` LIT la variable** | ❌ **absent** |
+
+Le point à comprendre, et il n'est pas évident : **`plusJakarta.variable` ne pose aucun
+`font-family`.** Il ne fait que déclarer une variable CSS. C'est
+`plusJakarta.className` qui applique la police — et ce n'est pas lui qui est utilisé ici.
+
+Côté Tailwind, `font-sans` est un utilitaire dont la valeur vient de `theme.fontFamily.sans`.
+Or `apps/user-ui/tailwind.config.js` portait :
+
+```js
+theme: { extend: {} },     // ← aucune redéfinition de fontFamily
+```
+
+Donc `font-sans` émettait la pile **par défaut** de Tailwind 3.4, vérifiée dans le paquet
+lui-même :
+
+```sh
+node -p "require('tailwindcss/defaultTheme').fontFamily.sans.join(', ')"
+# → ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", …
+```
+
+**Conséquence** : le site tournait en police **système** (San Francisco sur Mac, Segoe UI sur
+Windows, Roboto sur Android), pendant que le fichier Plus Jakarta Sans était téléchargé **et
+préchargé** sur chaque page. La seule règle du dépôt qui lisait la variable était celle de
+Leaflet (`global.css:130`) : **seules les cartes étaient à la marque.** Le coût réseau sans
+l'identité.
+
+Le back-office, lui, ne déclarait aucune police du tout.
+
+## ③ Le correctif
+
+Quatre lignes par front, et la pile système conservée **derrière** :
+
+```js
+// apps/user-ui/tailwind.config.js (et apps/admin-ui/tailwind.config.js)
+const defaultTheme = require("tailwindcss/defaultTheme");
+…
+fontFamily: { sans: ["var(--font-sans)", ...defaultTheme.fontFamily.sans] },
+```
+
+Le repli n'est pas décoratif : c'est ce qui s'affiche pendant le `display: "swap"`, et ce qui
+reste si le fichier de police ne part jamais (réseau coupé, bloqueur, échec de préchargement).
+
+Le back-office reçoit en plus le `next/font` qu'il n'avait pas, strictement calqué sur l'autre
+front — même police, même `variable`, même `display: "swap"`.
+
+## ④ La vérification — et pourquoi un typecheck ne suffisait PAS
+
+C'est le cœur méthodologique du lot. `tsc` ne sait rien du CSS, et la configuration résolue ne
+prouve pas ce que le navigateur reçoit. Trois niveaux ont donc été mesurés, **de bas en haut** :
+
+```sh
+# 1. la configuration RÉSOLUE de Tailwind
+node -e "…resolveConfig(require('./apps/user-ui/tailwind.config.js')).theme.fontFamily.sans…"
+# → var(--font-sans), ui-sans-serif …
+
+# 2. le HTML réellement SERVI
+curl -s http://localhost:3000/fr | grep -o '<html[^>]*>'
+# → <html lang="fr" class="plus_jakarta_sans_…__variable">
+
+# 3. la feuille de style réellement SERVIE
+--font-sans: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback"
+.font-sans { font-family: var(--font-sans), ui-sans-serif, system-ui, …; }
+```
+
+Les trois niveaux, sur **les deux fronts** (`:3000` et `:3001`). C'est seulement au troisième
+que la chaîne est prouvée : la variable est définie, l'utilitaire la lit, le `<body>` porte
+l'utilitaire.
+
+> **La règle à emporter** : une ressource chargée n'est pas une ressource appliquée. Entre
+> « j'ai importé la police » et « la page s'affiche avec », il y a un `font-family` — et rien
+> dans la chaîne d'outils ne se plaint quand il manque. Ni le compilateur, ni le build, ni la
+> CI. Le défaut a vécu depuis la génération du projet et n'a été vu que **parce que quelqu'un
+> a regardé son navigateur**.
+
+## ⑤ Le mobile n'est PAS concerné, et c'est une décision
+
+`apps/mobile/src/constants/theme.ts` garde `system-ui` / `ui-serif` / `ui-rounded` /
+`ui-monospace` — San Francisco sur iOS, Roboto sur Android. Ce n'est pas un oubli : c'est
+l'exigence ③ de **D36**, gravée le 29/08/2026 :
+
+> « UI idiomatique par OS : composants, **typographie** et gestes iOS sur iOS […] et Material 3
+> sur Android — pas d'UI "clone" identique sur les deux. »
+
+Imposer la police de marque au corps de texte mobile coûterait le Dynamic Type, l'idiome natif
+et le poids du fichier dans le bundle, **pour contredire une décision gravée**. La porte reste
+ouverte sur les **titres** seulement (la voie des applications à marque forte) : ce serait un
+amendement à D36 ③, à instruire, pas une violation à commettre en passant.
+
+## ⑥ Un piège d'outillage repayé, et bien documenté
+
+`nx dev admin-ui` a **réécrit `apps/admin-ui/next-env.d.ts`** — `./.next/types/…` devenu
+`./.next/dev/types/…`. C'est exactement l'avertissement de `CLAUDE.md`, vérifié par
+`git status --short` juste après et rendu par `git restore`. À noter au passage : les deux
+fronts ont aujourd'hui des versions **suivies différentes** de ce fichier (user-ui en
+`dev/types`, admin-ui en `types`), selon la dernière commande qui l'a écrit avant le commit.
+
+## ⑦ Ce que ce lot ne touche pas
+
+- **L'échelle typographique** (tailles, graisses) : c'est A46, et elle ne bouge pas. Ce lot ne
+  change que la **famille**.
+- **Le choix de la famille lui-même** : Plus Jakarta Sans n'a jamais été *choisie*, c'est le
+  générateur Next qui l'a posée. Elle est ratifiée par défaut assumé (en place, libre, graisses
+  suffisantes). En changer coûte désormais **une ligne par front**.
+- **La règle Leaflet** : elle lit toujours la même variable — simplement, elle n'est plus la
+  seule.
