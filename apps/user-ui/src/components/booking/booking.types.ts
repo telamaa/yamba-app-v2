@@ -223,6 +223,18 @@ export type PaymentIntentInfo = {
   clientSecret: string | null;
   amountCents: number;
   currencyCode: string;
+  /**
+   * D83 4A — les moyens que CETTE empreinte accepte, tels que le fournisseur
+   * les a résolus : la configuration du compte MOINS ce que la capture
+   * manuelle (D31) écarte. Miroir de `CreatePaymentIntentResponse`
+   * (@packages/api-contracts, `booking-request.schema.ts`), que ce front
+   * n'aliase pas — même convention que les autres miroirs structurels d'ici.
+   *
+   * Optionnel à la LECTURE et jamais à l'usage : le contrat le sert avec un
+   * défaut `[]`, mais un front déployé devant un serveur plus ancien lirait
+   * `undefined`, et ce champ décide de ce qu'on affiche.
+   */
+  paymentMethodTypes?: string[];
 };
 
 /** Réponse de POST /deals */
