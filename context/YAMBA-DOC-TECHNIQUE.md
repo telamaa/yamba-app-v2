@@ -15234,9 +15234,13 @@ diverger.
 
 ## ⑧ Ce qui n'est PAS fait, et pourquoi
 
-- **Les emails** : un seul gabarit affiche encore le carré « Y » —
-  `apps/trip-service/src/utils/templates/trip-notifications/trip-published.ejs`, lignes 20-21.
-  Proposition faite, **non appliquée** (voir le document métier).
+- **Les emails** : FAIT, mais par SOUSTRACTION. Un seul gabarit sur quinze portait encore le
+  carré « Y » (`trip-notifications/trip-published.ejs`) ; il a été retiré, le mot « Yamba »
+  reste en texte, comme dans les quatorze autres. Aucun symbole à la place : une image dans un
+  email suppose une pièce jointe inline (`cid`), donc étendre la lib partagée et ses trois
+  fournisseurs — et si le symbole doit y entrer un jour, il entrera par la **mise en page
+  partagée**, pour les quinze d'un coup. Rendu vérifié avec des données réelles (10 191
+  caractères, plus aucun `<td>Y</td>`). Détail et raisons : document métier.
 - **L'application native** : `apps/mobile` garde ses icônes d'origine. Le kit affirmait « pas
   d'application native dans le repo aujourd'hui » — c'est **faux** depuis D36/D73.
   `yamba-icon-1024.png` est la source prévue, le lot reste à faire.

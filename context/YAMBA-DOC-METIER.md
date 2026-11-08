@@ -7867,27 +7867,38 @@ utilisateur qui a comparé la réponse à ce que son navigateur affichait vraime
 
 ## Ce qui reste hors de ce lot
 
-### Les emails — proposition, non appliquée
+### Les emails — le carré « Y » est RETIRÉ, et rien ne le remplace
 
-**Un seul** gabarit affiche encore le carré « Y » :
-`apps/trip-service/src/utils/templates/trip-notifications/trip-published.ejs`, lignes 20-21 —
-une cellule blanche arrondie portant un « Y » mango, dans le bandeau dégradé mango → teal.
+**Un seul** gabarit sur quinze affichait encore le carré « Y » :
+`apps/trip-service/src/utils/templates/trip-notifications/trip-published.ejs` — une cellule
+blanche arrondie portant un « Y » mango, dans le bandeau dégradé mango → teal.
 
-Tous les autres (les douze de notification-service, les deux autres de trip-service, le gabarit
-partagé de `packages/libs/email`) n'affichent la marque **qu'en texte** : il n'y a rien à y
-remplacer.
+**Les quatorze autres** (les douze de notification-service, les deux autres de trip-service, et
+la mise en page partagée de `packages/libs/email` qui sert tous les emails récents) n'affichent
+la marque **qu'en texte**. Ce gabarit était donc l'exception, héritée d'avant.
 
-Le remplacement proposé respecte la règle **« zéro image externe »** — aucune URL distante, donc
-aucun pixel espion et aucun blocage par le client de messagerie :
+**La décision : la cohérence se fait en ENLEVANT.** Le carré disparaît, le mot « Yamba » reste
+en texte blanc sur le bandeau — comme partout ailleurs. La table imbriquée part avec lui :
+elle n'avait plus qu'une cellule à servir, et chaque table en moins est une bizarrerie Outlook
+en moins.
 
-1. joindre `yamba-email-logo.png` en **pièce jointe inline** Nodemailer
-   (`attachments: [{ filename, path, cid: "yamba-logo" }]`) ;
-2. remplacer la cellule par `<img src="cid:yamba-logo" width="36" height="37" alt="Yamba">` ;
-3. **garder un repli texte** : certains clients (Outlook en mode strict, les webmails qui
-   bloquent les pièces jointes inline) n'affichent pas l'image — le `alt` doit donc suffire,
-   et la cellule garder son fond blanc.
+**Pourquoi aucun symbole à la place**, alors que le site en a un :
 
-**Non appliqué** : les emails ne sont pas modifiés sans accord explicite.
+| Raison | Détail |
+|---|---|
+| **Le coût réel** | Une image dans un email suppose une **pièce jointe inline** (`cid`) — donc étendre `OutgoingEmail`, l'interface `EmailProvider` et **les trois** fournisseurs (Resend en HTTP, SMTP, Fake), une bibliothèque partagée par quatre services |
+| **Le risque** | L'affichage *inline* dépend du support de `content_id` côté Resend ; mal câblé, l'image part en **pièce jointe attachée** au lieu de s'afficher — pire que pas d'image |
+| **La portée** | Si le symbole entre dans les emails, il entre par la **mise en page partagée**, pour les quinze d'un coup. L'ajouter à un seul gabarit ne supprimerait pas l'incohérence : elle changerait de sens |
+| **Ce qui marche partout** | Le texte. Un `alt` n'est lu que si l'image est bloquée, et beaucoup de clients la bloquent par défaut |
+
+`yamba-email-logo.png` est versionné dans `public/brand/` : il est prêt le jour où ce lot se
+fera.
+
+### Test d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| MRQ85-10 | L'email « nouveau trajet publié », dans n'importe quel client | Le bandeau mango → teal porte « **Yamba** » en texte. Aucun carré « Y », aucune image à charger |
 
 ### L'application native
 
