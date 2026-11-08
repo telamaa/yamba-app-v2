@@ -1,6 +1,19 @@
 {
-  "tagline": "Le colis voyage avec quelqu'un qui part déjà.",
+  "slides": {
+    "shipper": {
+      "headline": "Plus vite.\nMoins cher.\nEn main propre.",
+      "body": "Des Voyageurs vérifiés ont de la place dans leurs bagages."
+    },
+    "traveler": {
+      "headline": "Ta valise\na de la place,\nelle a de la valeur.",
+      "body": "Emporte un colis sur un trajet que tu fais déjà."
+    },
+    "model": {
+      "headline": "Un colis de plus,\npas un trajet\nde plus.",
+      "body": "Le trajet existe déjà, ton colis évite un transport dédié et le carbone qui va avec."
+    }
+  },
   "createAccount": "Créer un compte",
   "login": "Me connecter",
-  "close": "Passer et parcourir les trajets"
+  "browse": "Voir les trajets sans compte"
 }

@@ -1,6 +1,19 @@
 {
-  "tagline": "Parcels travel with someone already going.",
+  "slides": {
+    "shipper": {
+      "headline": "Faster.\nCheaper.\nHand to hand.",
+      "body": "Verified Travelers have room in their luggage."
+    },
+    "traveler": {
+      "headline": "Your suitcase\nhas room,\nand room has value.",
+      "body": "Carry a parcel on a trip you are already making."
+    },
+    "model": {
+      "headline": "One more parcel,\nnot one more\njourney.",
+      "body": "The trip already exists, your parcel avoids a dedicated shipment and the carbon that comes with it."
+    }
+  },
   "createAccount": "Create an account",
   "login": "Log in",
-  "close": "Skip and browse trips"
+  "browse": "Browse trips without an account"
 }
