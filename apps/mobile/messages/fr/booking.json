@@ -262,7 +262,6 @@
   "methods": {
     "back": "Retour",
     "title": "Comment veux-tu payer ?",
-    "subtitle": "Le montant est autorisé maintenant. Rien n'est débité tant que le Voyageur n'a pas accepté.",
     "none": "Aucun moyen de paiement n'est disponible pour cette demande. Reviens en arrière et réessaie.",
     "cta": "Suivant",
     "change": "Changer",
@@ -302,6 +301,19 @@
       "canceled": "Paiement interrompu. Ta carte n'a pas été débitée — tu peux réessayer.",
       "unavailable": "Le paiement par carte n'est pas disponible sur cet appareil.",
       "failed": "L'autorisation a échoué. Vérifie les informations de ta carte, ou essaie une autre carte."
+    }
+  },
+  "confirm": {
+    "opening": {
+      "redirect": "Ouverture de PayPal…",
+      "wallet": "Ouverture de la feuille de paiement…"
+    },
+    "retry": "Réessayer",
+    "retryHint": "Rien n'a été débité. Tu peux réessayer, ou revenir en arrière pour changer de moyen.",
+    "errors": {
+      "canceled": "Paiement interrompu. Rien n'a été débité.",
+      "unavailable": "Ce moyen de paiement n'est pas disponible sur cet appareil.",
+      "failed": "L'autorisation a échoué. Essaie un autre moyen de paiement."
     }
   },
   "confirmation": {

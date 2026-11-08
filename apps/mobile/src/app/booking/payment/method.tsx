@@ -110,7 +110,10 @@ export default function PaymentMethodScreen() {
   const valider = useCallback(() => {
     if (selected === null) return;
     setPaymentChoice(selected);
-    router.back();
+    // La page du moyen REMPLACE celle-ci : la pile reste « paiement → page du
+    // moyen », et un retour depuis la saisie ramène à l'écran de paiement, pas
+    // à une liste de choix qu'on vient de quitter.
+    router.replace(flowOf(selected) === 'form' ? '/booking/payment/card' : '/booking/payment/confirm');
   }, [selected]);
 
   return (
@@ -137,11 +140,11 @@ export default function PaymentMethodScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.six }]}
           keyboardShouldPersistTaps="handled">
+          {/* Le titre, et rien d'autre : ce que le paiement engage est déjà
+              dit sur l'écran de paiement, juste avant. Le répéter ici
+              repousserait la liste vers le bas sans rien apprendre. */}
           <ThemedText type="title" style={styles.title}>
             {t('methods.title')}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t('methods.subtitle')}
           </ThemedText>
 
           {methods.length === 0 ? (
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
   topBar: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.one,
   },
@@ -266,7 +269,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     gap: Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
@@ -309,7 +312,7 @@ const styles = StyleSheet.create({
   flowHint: { paddingHorizontal: Spacing.one },
   bottomBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
   },
   cta: {

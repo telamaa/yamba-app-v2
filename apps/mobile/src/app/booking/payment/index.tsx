@@ -64,12 +64,7 @@ import {
   usePaymentChoice,
 } from '@/lib/payment-choice';
 import { availableMethods, flowOf, keepOrDefault, type PaymentMethodKey } from '@/lib/payment-methods';
-import {
-  confirmWithRedirect,
-  confirmWithWallet,
-  isPaymentSheetAvailable,
-  isWalletSupported,
-} from '@/lib/stripe-sheet';
+import { isPaymentSheetAvailable, isWalletSupported } from '@/lib/stripe-sheet';
 import { formatPrice } from '@/lib/trip-format';
 
 const AFTER_KEYS = ['step1', 'step2', 'step3', 'step4', 'step5'] as const;
@@ -324,39 +319,13 @@ export default function BookingPaymentScreen() {
           setError(t('payment.errors.NO_METHOD'));
           return;
         }
-        // La CARTE se saisit dans NOTRE page : elle autorise, puis se referme.
-        // On s'arrête donc ici — l'écran reprendra la main au retour de focus,
-        // avec les photos déjà téléversées (elles sont mémorisées).
-        if (flowOf(methode) === 'form') {
-          router.push('/booking/payment/card');
-          return;
-        }
-        const outcome =
-          methode === 'paypal'
-            ? await confirmWithRedirect({
-                clientSecret: intent.clientSecret,
-                paymentMethodType: 'PayPal',
-              })
-            : await confirmWithWallet({
-                clientSecret: intent.clientSecret,
-                // Le MONTANT du devis serveur : la feuille du système affiche
-                // ce qu'on lui dit, pas ce que l'intention contient.
-                amountCents: intent.quote.totalShipperCents,
-                currencyCode: intent.quote.currencyCode,
-                merchantName: 'Yamba',
-              });
-        if (!outcome.ok) {
-          setError(
-            outcome.reason === 'CANCELED'
-              ? t('payment.errors.CANCELED')
-              : outcome.reason === 'UNAVAILABLE'
-                ? t('payment.unavailableBody')
-                : t('payment.errors.SHEET_FAILED')
-          );
-          return;
-        }
-        setCardAuthorized(true);
-        markPaymentAuthorized();
+        // D83 — « Payer » ouvre L'ÉCRAN DE CHOIX, pas directement un moyen.
+        // C'est le parcours demandé : une page de choix, puis une page par
+        // moyen. L'écran s'arrête donc ici ; il reprendra la main au retour de
+        // focus, une fois l'empreinte posée, avec les photos déjà téléversées
+        // (leurs URLs sont mémorisées).
+        router.push('/booking/payment/method');
+        return;
       }
 
       // 3. La demande elle-même. Le serveur relit l'état RÉEL de l'empreinte chez le

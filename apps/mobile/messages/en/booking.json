@@ -262,7 +262,6 @@
   "methods": {
     "back": "Back",
     "title": "How would you like to pay?",
-    "subtitle": "The amount is authorised now. Nothing is charged until the Traveler accepts.",
     "none": "No payment method is available for this request. Go back and try again.",
     "cta": "Next",
     "change": "Change",
@@ -302,6 +301,19 @@
       "canceled": "Payment interrupted. Your card was not charged — you can try again.",
       "unavailable": "Card payment is not available on this device.",
       "failed": "The authorisation failed. Check your card details, or try another card."
+    }
+  },
+  "confirm": {
+    "opening": {
+      "redirect": "Opening PayPal…",
+      "wallet": "Opening the payment sheet…"
+    },
+    "retry": "Try again",
+    "retryHint": "Nothing was charged. You can try again, or go back and pick another method.",
+    "errors": {
+      "canceled": "Payment interrupted. Nothing was charged.",
+      "unavailable": "This payment method is not available on this device.",
+      "failed": "The authorisation failed. Try another payment method."
     }
   },
   "confirmation": {

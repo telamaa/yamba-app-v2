@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   topBar: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.one,
   },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.six,
     gap: Spacing.three,
     maxWidth: MaxContentWidth,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   error: { color: '#B91C1C' },
   bottomBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
   },
   cta: {
