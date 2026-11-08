@@ -14897,6 +14897,8 @@ pas `@packages/api-contracts` — même convention que ses autres miroirs.
 
 ## ⑦ Les contrôles passés
 
+Tous MESURÉS le **08/11/2026**, sur la branche, avant d'ouvrir la PR :
+
 - `nx test @yamba-app/mobile` → **461 fiches, 24 suites** (405 → 461 : les 56 du garde-fou i18n) ;
 - `nx typecheck @yamba-app/mobile` → les **deux** programmes, exit 0 ;
 - `npx tsc --noEmit --project apps/user-ui` → exit 0 (ce que fait la CI pour ce front) ;
