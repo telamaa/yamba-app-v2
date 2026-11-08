@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import YambaSymbol from "@/components/brand/YambaSymbol";
 import { HEADER_COLORS } from "./header.constants";
 
 type Props = {
@@ -11,27 +12,20 @@ type Props = {
 };
 
 /**
- * Logo Yamba + badge BETA en exposant discret.
+ * Logo Yamba (symbole M1 « Porter ») + mot « Yamba » + badge BETA en exposant.
  *
- * Le badge BETA est affiché en exposant orange (`Yamba^BETA`) aussi bien en
- * desktop qu'en mobile pour cohérence avec le footer. Pas de pill encombrant.
+ * Le mot reste du texte dans la police système du site (SF Pro sur Mac,
+ * Segoe UI sur Windows, Roboto sur Android) pour coller au reste de l'interface.
+ * Le badge BETA est en exposant orange, comme dans le footer.
  */
 export default function HeaderLogo({ compact = false, mobile = false }: Props) {
-  const squareSize = compact ? "h-8 w-8" : mobile ? "h-[30px] w-[30px]" : "h-9 w-9";
-  const squareRadius = mobile ? "rounded-[7px]" : "rounded-xl";
+  const symbolSize = compact ? 28 : mobile ? 26 : 32;
   const labelSize = mobile ? "text-[15px]" : "text-xl";
   const betaSize = mobile ? "text-[8px]" : "text-[10px]";
 
   return (
-    <Link href="/" className="flex items-center gap-2 md:gap-3" aria-label="Yamba">
-      <div
-        className={`grid place-items-center ${squareSize} ${squareRadius} text-slate-950 transition-all`}
-        style={{ backgroundColor: HEADER_COLORS.mango }}
-      >
-        <span className="font-bold leading-none" style={{ fontSize: mobile ? 15 : 14 }}>
-          Y
-        </span>
-      </div>
+    <Link href="/" className="flex items-center gap-2 md:gap-2.5" aria-label="Yamba">
+      <YambaSymbol size={symbolSize} className="shrink-0 transition-all" />
 
       <span
         className={`${labelSize} font-semibold tracking-tight text-slate-900 dark:text-white`}

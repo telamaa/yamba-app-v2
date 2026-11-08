@@ -6324,3 +6324,176 @@ pas été balayée — elle a été **citée** dans la nouvelle décision, qui e
 - **`resolveConfig`**, et plus généralement : pour toute configuration qui fusionne (tsconfig
   avec `extends`, ESLint, Babel, Tailwind), il existe une commande qui rend l'état **résolu**.
   La lire coûte dix secondes et évite de raisonner sur un fichier qui n'est qu'un fragment.
+## Chapitre 226 — Le SVG qui est un composant, les trois cadrages d'une icône, et le canal alpha qui dit deux choses opposées
+
+> Lot D85 (`feat/new-logo`). Numéroté 226 : les chapitres 220 à 225 sont écrits dans les PR
+> #393 à #398, encore en vol au moment d'écrire.
+
+### 1. Avant de remplacer « partout », MESURER où c'est
+
+L'énoncé du lot listait sept emplacements à corriger : footer, pages auth, `AuthHeroVisual`,
+skeletons, pages d'erreur, menus mobiles, bottom sheets. La mesure dit autre chose :
+
+```sh
+# première tentative, trop large : la couleur de marque est partout
+grep -rln "FF9900" apps/user-ui/src | wc -l        # → 40 fichiers
+
+# la bonne requête : la LETTRE isolée, telle que le JSX la met en forme
+grep -rn "^\s*Y\s*$" apps/user-ui/src --include="*.tsx"
+# → HeaderLogo.tsx:32    …et c'est tout
+```
+
+Deux leçons de recherche, plus utiles que le lot lui-même :
+
+1. **Chercher la forme, pas le thème.** `FF9900` est la couleur de marque : elle est dans
+   quarante fichiers qui ne dessinent aucun logo. Le motif discriminant était la **lettre
+   seule**, et le JSX la met sur sa propre ligne — d'où l'ancre `^\s*Y\s*$`.
+2. **Suivre les importateurs.** `HeaderSkeleton.tsx` *importe* `HeaderLogo`. Il a donc reçu le
+   nouveau symbole sans qu'une ligne le concernant ne change. Un `grep` sur le composant
+   (`grep -rn "HeaderLogo"`) a répondu en une seconde à « qui d'autre est touché ? ».
+
+### 2. SVG en ligne vs `<img>` : ce qui décide, c'est le THÈME
+
+Le réflexe est de mettre un logo dans un fichier et de l'afficher avec `<img>`. Ici, c'est le
+mauvais choix, pour une raison précise : **le colis change de couleur en mode sombre.**
+
+```tsx
+// SVG en ligne : CSS s'applique à l'intérieur du dessin
+<circle cx="120" cy="70" r={17} className="fill-[#0F766E] dark:fill-[#2DD4BF]" />
+```
+
+Avec un `<img src="logo.svg">`, le CSS de la page **ne franchit pas la frontière** du fichier :
+il faudrait deux fichiers et une bascule, donc deux fichiers à garder synchrones. Le SVG en
+ligne coûte quelques centaines d'octets répétés à chaque rendu ; c'est le prix d'un dessin qui
+obéit au thème.
+
+**Le corollaire, qui vaut pour tout composant de présentation :**
+
+```tsx
+// ✗ un hook rend le composant CLIENT, et contamine tout ce qui l'affiche
+const theme = useTheme();
+// ✓ une classe CSS fait le même travail, et reste utilisable côté serveur
+className="fill-[#0F766E] dark:fill-[#2DD4BF]"
+```
+
+### 3. Une icône n'est pas un logo mis à l'échelle
+
+Trois cadrages, trois contraintes **du système d'exploitation**, pas du goût :
+
+| Cadrage | Contrainte |
+|---|---|
+| Favicon | Vu à **16 px**. Trait épaissi, colis grossi : à cette taille, un trait fin devient une tache grise |
+| Icône d'app | Fond **plein, sans arrondi**. C'est iOS qui masque les coins — un arrondi déjà dessiné donne un **double arrondi** visible |
+| Maskable Android | Android rogne **jusqu'à 20 % de chaque bord** (cercle, goutte, carré selon le lanceur). Le dessin doit tenir dans les **80 % centraux**, sinon les bras du Y sont coupés |
+
+Et dans le composant, le même raisonnement à petite échelle :
+
+```tsx
+const small = size < 28;
+strokeWidth={small ? 30 : 24}
+r={small ? 22 : 17}
+```
+
+**Un dessin vectoriel n'est pas indépendant de sa taille.** L'épaisseur optique, elle, ne suit
+pas l'échelle : c'est le principe des polices à *optical sizing*, appliqué ici à la main.
+
+### 4. Le `.ico`, un format plus simple qu'il n'en a l'air
+
+Ajouter `png-to-ico` pour écrire un favicon aurait coûté une dépendance. Le format tient en
+trois morceaux :
+
+```
+[en-tête 6 octets] [entrée 16 octets × N] [les images, bout à bout]
+```
+
+Et depuis Vista, **les images peuvent être des PNG tels quels** — on n'a donc rien à encoder
+soi-même, juste à les compter et à écrire leurs décalages :
+
+```js
+e.writeUInt8(taille >= 256 ? 0 : taille, 0); // 256 px s'écrit 0 : le champ fait un octet
+e.writeUInt32LE(png.length, 8);
+e.writeUInt32LE(decalage, 12);
+```
+
+Quarante lignes contre une dépendance : à ce ratio, écrire gagne. (À l'inverse, personne ne
+devrait réécrire un encodeur PNG — `sharp` reste indispensable.)
+
+### 5. Deux contraintes VRAIES et OPPOSÉES sur le même champ
+
+Le moment intéressant du lot. Premier correctif, justifié :
+
+> l'App Store **refuse** une icône qui porte un canal alpha.
+
+```js
+.flatten({ background: MANGO })   // enlève l'alpha : RGBA → RGB
+```
+
+Appliqué partout. Et le site entier est tombé :
+
+```
+./apps/user-ui/src/app/favicon.ico
+Error: Processing image failed
+Caused by:
+- Format error decoding Ico: The PNG is not in RGBA format!
+```
+
+Le décodeur `.ico` de Next (la caisse Rust `image`) **exige** l'alpha dans les PNG embarqués.
+Les deux contraintes sont vraies, et elles portent sur le même champ. La seule issue est de les
+**séparer explicitement** :
+
+```js
+const rendu = (source, taille, { alpha = false } = {}) => { … };
+//                                ↑ false pour les PNG autonomes (stores)
+//                                  true pour ceux embarqués dans le .ico (Next)
+```
+
+**La leçon générale** : quand deux exigences se contredisent sur un même attribut, la faute est
+de chercher un réglage unique. Il faut nommer le contexte et faire porter la différence par un
+paramètre — avec, en commentaire, **les deux mesures qui l'ont imposé**, sans quoi quelqu'un
+« simplifiera » le drapeau dans six mois.
+
+### 6. Un typecheck vert pendant que le site répond 500
+
+```sh
+npx tsc --noEmit --project apps/user-ui   # exit 0
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/fr   # 500
+```
+
+`tsc` ne traite pas les images. Les fichiers de convention de Next (`icon.svg`, `favicon.ico`,
+`apple-icon.png`) sont transformés **au build**, et un fichier illisible y devient une erreur
+de compilation qui sort en **page d'erreur**, pas en avertissement.
+
+C'est le même enseignement que le piège `esModuleInterop` consigné dans `CLAUDE.md` : **un
+build vert n'est pas un service qui démarre, et un typecheck vert n'est pas une page qui
+s'affiche.** La vérification de ce lot a donc été faite sur la page SERVIE :
+
+```sh
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/fr        # 200
+curl -s http://localhost:3000/manifest.webmanifest                      # le manifeste complet
+curl -s http://localhost:3000/fr | grep -o 'viewBox="24 24 192 200"'    # le symbole est là
+curl -s http://localhost:3000/fr | grep -oE '<link rel="(icon|apple-touch-icon|manifest)"[^>]*>'
+```
+
+### 7. Les conventions de fichier de Next : une source, pas deux
+
+`icon.svg`, `favicon.ico`, `apple-icon.png` et `manifest.ts` posés aux bons endroits suffisent :
+Next génère les balises, avec une empreinte de contenu dans l'URL (`?icon.3ss509b6y9r89.svg`)
+qui règle la mise en cache. Y ajouter un `metadata.icons` manuel donnerait **deux** sources pour
+la même balise — et deux sources finissent toujours par diverger.
+
+Le vrai piège était ailleurs : `public/favicon.ico` **existait encore**, oublié d'un ancien
+commit. Deux fichiers répondant à la même URL, c'est une question de priorité implicite que
+personne n'a envie de déboguer. Supprimé.
+
+### Pour aller plus loin
+
+- **Les icônes maskables** (spécification W3C *Web App Manifest*, `purpose: "maskable"`) : la
+  « zone de sécurité » est un cercle de diamètre 80 % centré. L'outil `maskable.app` permet de
+  prévisualiser les masques des différents lanceurs Android.
+- **Un script de génération doit être IDEMPOTENT.** Mêmes sources, mêmes octets : on le relance
+  sans crainte, et un `git status` propre après exécution prouve qu'aucune retouche manuelle ne
+  s'est glissée dans un fichier généré.
+- **Installer une dépendance hors du dépôt pour la tester** : `npm i sharp` dans un dossier
+  temporaire puis `NODE_PATH=…/node_modules node script.mjs` prouve qu'un script marche sans
+  toucher au `package.json` ni au verrou — utile quand la dépendance doit partir dans une PR
+  `chore/deps` séparée.
