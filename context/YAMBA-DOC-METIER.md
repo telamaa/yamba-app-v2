@@ -7784,6 +7784,7 @@ le fait simplement dans une page qui lui parle.
 | PAY83-09 | Un membre lit Yamba en français depuis un navigateur en anglais | Le paiement est **en français** sur le site |
 | PAY83-10 | Mode test (aucun prestataire configuré) | Le bandeau « mode test » et une autorisation simulée — aucune liste de moyens |
 | PAY83-11 | Un moyen est activé au Dashboard du fournisseur | Il est proposé **sans redéploiement** dès que le front sait le conduire ; sinon il est simplement absent, jamais cassé |
+| PAY83-12 | La page d'un moyen rouverte alors que l'autorisation a disparu | Elle annonce **« Autorisation expirée »** et dit quoi faire. Jamais le titre de l'écran de choix — poser « Comment veux-tu payer ? » au-dessus d'un refus ne veut rien dire |
 
 ## Ce qui reste hors de ce lot
 

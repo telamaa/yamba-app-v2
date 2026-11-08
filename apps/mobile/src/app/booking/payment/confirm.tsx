@@ -85,7 +85,17 @@ export default function PaymentConfirmScreen() {
     void confirmer(methode);
   }, [confirmer, intent, methode]);
 
-  const titre = methode ? t(`methods.${methode}.label`) : t('methods.title');
+  /**
+   * Le titre NOMME la page : le moyen qu'on est en train d'ouvrir.
+   *
+   * Le repli ne peut pas être `methods.title` (« Comment veux-tu payer ? ») :
+   * c'est le titre de l'écran de CHOIX, et le reprendre ici ferait poser à la
+   * page une question à laquelle elle ne répond pas — pire, elle la poserait
+   * juste au-dessus d'un texte qui annonce que l'autorisation a expiré. Vu en
+   * recette au simulateur le 08/11. Le repli décrit donc l'ÉTAT de la page,
+   * comme `card.tsx` qui garde son propre titre en toute circonstance.
+   */
+  const titre = methode ? t(`methods.${methode}.label`) : t('confirm.expiredTitle');
 
   return (
     <ThemedView style={styles.container}>

@@ -89,6 +89,10 @@ function clesAttendues(): string[] {
   // deux seulement : `confirm.tsx` choisit par `isWallet`, pas par le flux.
   cles.push('confirm.opening.wallet', 'confirm.opening.redirect');
   cles.push('confirm.retry', 'confirm.retryHint');
+  // Le titre de repli de `confirm.tsx` quand l'empreinte a disparu. Il a sa
+  // PROPRE clé depuis la recette du 08/11 : emprunter `methods.title` faisait
+  // demander « Comment veux-tu payer ? » au-dessus d'un refus.
+  cles.push('confirm.expiredTitle');
 
   // Le reste de l'écran de choix et de la page carte.
   cles.push('methods.title', 'methods.back', 'methods.cta', 'methods.change', 'methods.none');

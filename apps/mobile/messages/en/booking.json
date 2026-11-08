@@ -304,6 +304,7 @@
     }
   },
   "confirm": {
+    "expiredTitle": "Authorisation expired",
     "opening": {
       "redirect": "Opening PayPal…",
       "wallet": "Opening the payment sheet…"

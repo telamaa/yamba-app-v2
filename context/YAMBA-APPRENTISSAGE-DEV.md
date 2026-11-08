@@ -6169,6 +6169,22 @@ liste de choix que le membre vient de quitter : il reculerait d'un cran et croir
 perdu. Choisir entre `push` et `replace` n'est donc pas un détail d'API — c'est **décider ce
 que « retour » veut dire** pour l'utilisateur.
 
+**c) Un repli de texte se choisit dans le vocabulaire de SA page.** Trouvé en affichant enfin
+l'écran dans le simulateur :
+
+```tsx
+const titre = methode ? t(`methods.${methode}.label`) : t('methods.title');
+//                                                        ↑ « Comment veux-tu payer ? »
+//                                                          le titre de l'écran d'À CÔTÉ
+```
+
+Le repli faisait poser à la page une question à laquelle elle ne répond pas, juste au-dessus
+d'un texte annonçant que l'autorisation avait expiré. Ce qui rend le cas intéressant, c'est
+**tout ce qui le laisse passer** : il compile, il passe le miroir FR/EN de la CI, il passe même
+le garde-fou des clés calculées écrit le jour même — la clé existe, elle est traduite, elle est
+juste **mauvaise ici**. Aucun test automatique ne distingue « la clé existe » de « la clé dit
+la bonne chose ». C'est la frontière entre vérification et recette, et elle ne bougera pas.
+
 ### Pour aller plus loin
 
 - **Les règles des hooks**, dans la documentation React (« Rules of Hooks ») : la liste par

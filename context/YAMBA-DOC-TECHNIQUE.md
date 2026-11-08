@@ -14804,7 +14804,7 @@ seul — les photos ne repartent pas, leurs URL sont mémorisées (A45). Et le d
 une preuve** : le serveur relit l'état réel de l'empreinte chez le fournisseur avant de créer
 la demande (D82 8A), donc un `true` menteur ne fait pas de dégât, il fait un refus.
 
-## ④ Les deux défauts que le simulateur a rendus, et les deux gardes qui en sortent
+## ④ Les défauts que le simulateur a rendus, et les gardes qui en sortent
 
 Tous deux **invisibles au typage et au harnais de tests** — qui ne rend aucun composant
 (frontière assumée d'A223). C'est le prix de cette frontière, payé en deux écrans.
@@ -14848,6 +14848,34 @@ sort vaut pour toutes les mémoires de processus du dépôt :
 
 Verrouillée en **comptant les notifications** de la mémoire : une lecture n'en produit aucune.
 
+### c) Un titre EMPRUNTÉ à l'écran d'à côté (recette du 08/11)
+
+Troisième défaut, trouvé en affichant enfin `confirm.tsx` dans le simulateur — et celui-là
+n'aurait fait planter personne : il se lisait, simplement.
+
+```tsx
+// AVANT
+const titre = methode ? t(`methods.${methode}.label`) : t('methods.title');
+```
+
+`methods.title`, c'est **« Comment veux-tu payer ? »** : le titre de l'écran de CHOIX. Repris en
+repli sur la page d'un moyen, il fait poser à la page une question à laquelle elle ne répond
+pas — et il la pose **juste au-dessus** du texte qui annonce que l'autorisation a expiré. Le
+membre lit donc « Comment veux-tu payer ? » puis « Cette autorisation n'est plus valable ».
+
+La correction est une **clé à soi**, `confirm.expiredTitle` (« Autorisation expirée »), qui
+décrit l'**état de la page** au lieu d'emprunter la question du voisin. `card.tsx` faisait déjà
+ainsi : il garde `card.title` en toute circonstance et met l'expiration dans le corps.
+
+> **La règle qui en sort** : un repli de texte se choisit dans le vocabulaire de SA page. Une
+> clé empruntée à un autre écran marche à la compilation, passe le miroir FR/EN, passe le
+> garde-fou des clés calculées — et ment à l'écran. Seul l'œil l'attrape ; c'est exactement ce
+> que la recette est là pour faire.
+
+Le cas ne se produit pas sur le parcours normal (le moyen vient d'être choisi) : c'est un repli
+de démarrage à froid. Il n'en est pas moins le texte que le membre lit quand quelque chose a
+déjà mal tourné — le pire moment pour une phrase qui ne veut rien dire.
+
 ## ⑤ Le garde-fou des clés i18n CALCULÉES
 
 Les trois écrans ne demandent presque aucun texte par une clé écrite en clair : ils la
@@ -14869,7 +14897,7 @@ diverger. Mais cela ouvrait un angle mort que **rien** ne couvrait :
 
 Et une clé absente **ne casse pas le bundle** : `use-intl` rend le CHEMIN de la clé.
 L'Expéditeur lirait « confirm.errors.canceled » là où on lui devait « Rien n'a été débité » —
-sur l'écran qui porte l'argent. D'où `src/lib/payment-i18n.spec.ts` : **56 fiches**, aucune
+sur l'écran qui porte l'argent. D'où `src/lib/payment-i18n.spec.ts` : **58 fiches**, aucune
 liste à tenir à jour (les clés sortent des fonctions pures `PAYMENT_METHODS`, `flowOf`,
 `authFailureKey`), cherchées dans les fichiers **réels** des deux langues. Non-régression
 mesurée : en retirant `confirm.errors.canceled` de l'anglais, **une** fiche passe au rouge.
@@ -14899,7 +14927,7 @@ pas `@packages/api-contracts` — même convention que ses autres miroirs.
 
 Tous MESURÉS le **08/11/2026**, sur la branche, avant d'ouvrir la PR :
 
-- `nx test @yamba-app/mobile` → **461 fiches, 24 suites** (405 → 461 : les 56 du garde-fou i18n) ;
+- `nx test @yamba-app/mobile` → **463 fiches, 24 suites** (405 → 463 : les 58 du garde-fou i18n) ;
 - `nx typecheck @yamba-app/mobile` → les **deux** programmes, exit 0 ;
 - `npx tsc --noEmit --project apps/user-ui` → exit 0 (ce que fait la CI pour ce front) ;
 - `node scripts/check-i18n-messages.mjs` → miroir parfait, 30 espaces, 60 fichiers + mobile ;
