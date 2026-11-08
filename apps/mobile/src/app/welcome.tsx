@@ -16,6 +16,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Image } from 'expo-image';
+
+import YambaSymbol from '@/components/yamba-symbol';
 import { useTranslations } from 'use-intl';
 
 import { Brand, Spacing } from '@/constants/theme';
@@ -58,6 +60,11 @@ export default function WelcomeScreen() {
           </Pressable>
         </View>
 
+        {/* D85 — le symbole AU-DESSUS du mot : la porte d'entrée de la marque.
+            Variante sombre, parce que cet écran est sur fond marine : le colis
+            doit rester visible. Décoratif (pas de `label`) — le mot « Yamba »
+            juste en dessous est déjà lu par VoiceOver et TalkBack. */}
+        <YambaSymbol size={56} variant="dark" style={styles.symbol} />
         <Text style={styles.wordmark}>Yamba</Text>
         <Text style={styles.tagline}>{t('tagline')}</Text>
 
@@ -115,12 +122,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 600,
   },
+  symbol: {
+    alignSelf: 'center',
+    marginTop: Spacing.three,
+  },
   wordmark: {
     color: Brand.mango,
     fontSize: 40,
     fontWeight: 800,
     textAlign: 'center',
-    marginTop: Spacing.three,
+    marginTop: Spacing.two,
   },
   tagline: {
     color: 'rgba(255, 255, 255, 0.72)',

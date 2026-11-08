@@ -10,6 +10,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import YambaSymbol from '@/components/yamba-symbol';
 import { Brand } from '@/constants/theme';
 
 const ARC = 'rgba(255, 255, 255, 0.18)';
@@ -17,6 +18,9 @@ const ARC = 'rgba(255, 255, 255, 0.18)';
 export function AppSplash() {
   return (
     <View style={styles.container} pointerEvents="auto">
+      {/* D85 — variante BLANCHE : le fond est mango, un Y mango n'existerait
+          pas dessus. Décoratif : le mot juste en dessous porte le nom. */}
+      <YambaSymbol size={52} variant="white" style={styles.symbol} />
       <ThemedText style={styles.wordmark}>Yamba</ThemedText>
       {/* Le « globe » : deux cercles immenses qui débordent du bas d'écran. */}
       <View style={[styles.arc, styles.arcOuter]} />
@@ -37,6 +41,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     zIndex: 10,
+  },
+  symbol: {
+    marginBottom: 12,
   },
   wordmark: {
     color: '#ffffff',
