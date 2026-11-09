@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import GoogleSignInButton from "@/components/auth/shared/GoogleSignInButton";
-import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import {
   getApiErrorData,
@@ -33,7 +34,6 @@ import {
   registerCodeMessage,
 } from "@/lib/auth/auth-error-codes";
 import PasswordStrengthIndicator from "../shared/PasswordStrengthIndicator";
-import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 
 type RegisterFormData = {
@@ -41,7 +41,6 @@ type RegisterFormData = {
   lastName: string;
   email: string;
   password: string;
-  passwordConfirm: string;
   termsAccepted: boolean;
 };
 
@@ -61,13 +60,12 @@ function FacebookIcon() {
 function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
-    trust: fr ? "Inscription sécurisée" : "Secure signup",
-    title: fr ? "Deviens Voyageur" : "Become a Traveler",
+    title: fr ? "Crée ton compte Yamba" : "Create your Yamba account",
     subtitle: fr
       ? "Envoie ou transporte des colis, en toute simplicité."
       : "Send or transport parcels, simply.",
     facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
-    orMail: fr ? "ou par e-mail" : "or with email",
+    orSocial: fr ? "ou continue avec" : "or continue with",
     firstName: fr ? "Prénom" : "First name",
     firstNamePh: fr ? "Aminata" : "Aminata",
     lastName: fr ? "Nom" : "Last name",
@@ -75,7 +73,6 @@ function buildCopy(lang: string) {
     email: fr ? "E-mail" : "Email",
     emailPh: fr ? "prenom@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
-    passwordConfirm: fr ? "Confirmer le mot de passe" : "Confirm password",
     cta: fr ? "Créer mon compte" : "Create my account",
     ctaLoading: fr ? "Création…" : "Creating…",
     haveAccount: fr ? "Déjà membre ?" : "Already a member?",
@@ -87,10 +84,6 @@ function buildCopy(lang: string) {
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
     invalidEmail: fr ? "Saisis un e-mail valide." : "Please enter a valid email.",
     requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
-    requiredPasswordConfirm: fr
-      ? "Confirme le mot de passe."
-      : "Please confirm the password.",
-    passwordMismatch: fr ? "Les mots de passe ne correspondent pas." : "Passwords do not match.",
     requiredTerms: fr
       ? "Tu dois accepter les conditions pour continuer."
       : "You must accept the terms to continue.",
@@ -103,10 +96,6 @@ function buildCopy(lang: string) {
     configError: fr
       ? "La configuration de l'application est incomplète."
       : "Application configuration is incomplete.",
-    pasteBlockedTitle: fr ? "Collage désactivé" : "Paste disabled",
-    pasteBlocked: fr
-      ? "Pour ta sécurité, ressaisis le mot de passe."
-      : "For your security, please retype the password.",
     pwdPopover: {
       title: fr ? "Sécurité du mot de passe" : "Password security",
       level: fr ? "Niveau" : "Level",
@@ -132,9 +121,12 @@ function buildCopy(lang: string) {
 export default function RegisterForm({ heroVisual }: Props) {
   const router = useRouter();
   const { lang } = useUiPreferences();
-  const { toast } = useToast();
+  /** La seule chaîne NEUVE de cette passe passe par le dictionnaire et non par
+   *  `buildCopy` : ce fichier porte encore 60 ternaires `fr ? … : …` — une
+   *  dette connue, invisible au contrôle i18n de la CI, et traitée à part. On
+   *  n'en ajoute pas une de plus. */
+  const tAuth = useTranslations("auth");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
@@ -151,7 +143,6 @@ export default function RegisterForm({ heroVisual }: Props) {
     setError,
     clearErrors,
     watch,
-    getValues,
     formState: { errors },
   } = useForm<RegisterFormData>({
     mode: "onBlur",
@@ -161,7 +152,6 @@ export default function RegisterForm({ heroVisual }: Props) {
       lastName: "",
       email: "",
       password: "",
-      passwordConfirm: "",
       termsAccepted: false,
     },
   });
@@ -175,16 +165,6 @@ export default function RegisterForm({ heroVisual }: Props) {
     firstName: watchedFirstName,
     lastName: watchedLastName,
     email: watchedEmail,
-  };
-
-  // 🔒 Bloque le coller sur le champ "Confirmer le mot de passe"
-  const handleBlockPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    toast({
-      type: "info",
-      title: copy.pasteBlockedTitle,
-      message: copy.pasteBlocked,
-    });
   };
 
   const registerMutation = useMutation<RegisterResponse, unknown, RegisterPayload>({
@@ -276,11 +256,6 @@ export default function RegisterForm({ heroVisual }: Props) {
       return;
     }
 
-    if (values.password !== values.passwordConfirm) {
-      setError("passwordConfirm", { type: "validate", message: copy.passwordMismatch });
-      return;
-    }
-
     try {
       await registerMutation.mutateAsync({
         firstName: values.firstName.trim(),
@@ -304,15 +279,17 @@ export default function RegisterForm({ heroVisual }: Props) {
     "dark:focus:border-[#FFAE33] dark:focus:ring-[#FF9900]/15";
   const inputError =
     "border-red-300 focus:border-red-400 focus:ring-red-200 dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40";
-  const labelBase = "text-xs font-semibold text-slate-800 dark:text-slate-100";
+  // D91 — 13 px / 500 en gris moyen, et non 12 px / 600 en quasi-blanc : huit
+  // libellés à la graisse du titre faisaient une page où rien ne recule.
+  const labelBase = "text-[13px] font-medium text-slate-500 dark:text-slate-400";
   const oauthBtn =
     "flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 " +
-    "text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 " +
+    "text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50 " +
     "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:hover:bg-slate-900/50";
 
   // 🎨 Style des liens CGU/Privacy — teal plus vif + underline subtil avec offset (pattern Stripe)
   const cguLinkClass =
-    "font-semibold text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 " +
+    "font-medium text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 " +
     "hover:decoration-[#0D9488] " +
     "dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]";
 
@@ -326,40 +303,20 @@ export default function RegisterForm({ heroVisual }: Props) {
       {/* RIGHT — formulaire */}
       <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
         <div className="w-full max-w-[380px]">
-          {/* Trust pill */}
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0F766E] bg-white px-2.5 py-1 text-[11px] font-medium text-[#0F766E] dark:border-[#2DD4BF] dark:bg-slate-950 dark:text-[#2DD4BF]">
-            <ShieldCheck size={12} />
-            <span>{copy.trust}</span>
-          </div>
-
-          <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
+          {/* D91 — plus de pilule de sécurité en tête de colonne. Une affirmation de
+              sécurité que l'on se décerne à soi-même n'ajoute aucune preuve :
+              elle installe la question que personne ne se posait, et elle
+              occupait le premier point de fixation de la colonne. La réassurance
+              VÉRIFIABLE est sous le bouton, et les trois garanties concrètes
+              sont dans la colonne de gauche. */}
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
             {copy.title}
           </h1>
           <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
 
-          {/* OAuth */}
-          <div className="mt-6 space-y-2">
-            {/* D47 — bouton officiel Google Identity Services (inerte sans client ID) */}
-            <GoogleSignInButton redirectTo={redirectTo} text="signup_with" />
-            <button
-              type="button"
-              onClick={() => console.log("facebook oauth")}
-              className={oauthBtn}
-            >
-              <FacebookIcon />
-              {copy.facebook}
-            </button>
-          </div>
-
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {copy.orMail}
-            </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
+          {/* `mt-6` : le bloc social créait cette respiration quand il était au
+              dessus. Sans lui, le premier libellé collait au sous-titre. */}
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-3">
             {/* Prénom + Nom */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -517,59 +474,13 @@ export default function RegisterForm({ heroVisual }: Props) {
               )}
             </div>
 
-            {/* Confirm password — paste désactivé */}
-            <div>
-              <label htmlFor="passwordConfirm" className={labelBase}>
-                {copy.passwordConfirm}
-              </label>
-              <div className="relative">
-                <input
-                  id="passwordConfirm"
-                  type={confirmVisible ? "text" : "password"}
-                  autoComplete="new-password"
-                  enterKeyHint="done"
-                  aria-invalid={!!errors.passwordConfirm}
-                  aria-describedby={
-                    errors.passwordConfirm ? "passwordConfirm-error" : undefined
-                  }
-                  // 🔒 Sécurité UX : empêche le coller, le drop, et l'auto-fill par les password managers
-                  // Force l'utilisateur à retaper son mot de passe pour valider qu'il s'en souvient
-                  onPaste={handleBlockPaste}
-                  onDrop={(e) => e.preventDefault()}
-                  data-1p-ignore
-                  data-lpignore="true"
-                  data-form-type="other"
-                  className={`${inputBase} pr-11 ${errors.passwordConfirm ? inputError : ""}`}
-                  {...register("passwordConfirm", {
-                    required: copy.requiredPasswordConfirm,
-                    validate: (v) =>
-                      v === getValues("password") || copy.passwordMismatch,
-                    onChange: () => {
-                      clearErrors("passwordConfirm");
-                      clearErrors("root.serverError");
-                    },
-                  })}
-                />
-                <button
-                  type="button"
-                  onClick={() => setConfirmVisible((v) => !v)}
-                  aria-label={
-                    confirmVisible ? copy.hidePasswordAria : copy.showPasswordAria
-                  }
-                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400"
-                >
-                  {confirmVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              {errors.passwordConfirm?.message && (
-                <p
-                  id="passwordConfirm-error"
-                  className="mt-1 text-xs text-red-600 dark:text-red-400"
-                >
-                  {errors.passwordConfirm.message}
-                </p>
-              )}
-            </div>
+            {/* D91 — PAS de champ « Confirmer le mot de passe ».
+                Le mobile l'avait déjà retiré et motivé (A208) : le trousseau
+                remplit les deux champs d'un coup, donc la confirmation ne
+                confirme rien, et l'œil du champ fait le travail. Avec lui
+                disparaît le blocage du collage, que le NCSC et le NIST
+                déconseillent explicitement — il casse les gestionnaires de
+                mots de passe et pousse vers des mots de passe tapables. */}
 
             {/* CGU — liens avec teal-600 + underline subtil */}
             <div className="pt-2">
@@ -631,9 +542,43 @@ export default function RegisterForm({ heroVisual }: Props) {
                 copy.cta
               )}
             </button>
+
+            {/* La seule réassurance de l'écran, et elle est vérifiable (D91) :
+                elle répond à « est-ce que je m'engage ? », là où la question se
+                pose — sous le bouton, et non en haut de page. */}
+            <p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+              {tAuth("register.reassurance")}
+            </p>
           </form>
 
-          <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+          {/* D91 — le social passe APRÈS le formulaire, comme sur le mobile.
+              Il occupait la meilleure place de la page avec, en premier bouton
+              actionnable, une porte qui ne s'ouvre pas encore. Les deux
+              fournisseurs RESTENT offerts (arbitrage du 09/11 : « laisse la
+              connexion Google active dans les interfaces, on paramétrera
+              après ») — ils sont simplement servis après le chemin qui, lui,
+              fonctionne. */}
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {copy.orSocial}
+            </span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+
+          <div className="space-y-2">
+            <GoogleSignInButton redirectTo={redirectTo} text="signup_with" />
+            <button
+              type="button"
+              onClick={() => console.log("facebook oauth")}
+              className={oauthBtn}
+            >
+              <FacebookIcon />
+              {copy.facebook}
+            </button>
+          </div>
+
+          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
             {copy.haveAccount}{" "}
             <Link
               href={loginHref}
