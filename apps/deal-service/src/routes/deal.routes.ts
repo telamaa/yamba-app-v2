@@ -21,6 +21,7 @@ import { getMyWallet } from "../controllers/wallet.controller";
 import { makeDealRatingController } from "../controllers/deal-rating.controller";
 import { makeDealRatingService } from "../services/deal-rating.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
+import { makeOrphanHoldsService } from "../services/orphan-holds.service";
 import { makeAdminDisputeController } from "../controllers/admin-dispute.controller";
 import { makeAdminDisputeService } from "../services/admin-dispute.service";
 import { makeDealMediationController } from "../controllers/deal-mediation.controller";
@@ -69,6 +70,9 @@ const dealLifecycle = makeDealLifecycleController(dealLifecycleService);
 const dealTransport = makeDealTransportController(makeDealTransportService(paymentProvider));
 const dealSettlement = makeDealSettlementController(dealSettlementService);
 export const dealRatingService = makeDealRatingService();
+// D82 9A — la chasse aux empreintes orphelines partage le MÊME fournisseur : elle lit et
+// annule chez celui qui a l'argent, jamais chez un autre.
+export const orphanHoldsService = makeOrphanHoldsService(paymentProvider);
 const dealRating = makeDealRatingController(dealRatingService);
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)

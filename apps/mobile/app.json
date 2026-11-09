@@ -2,6 +2,7 @@
   "expo": {
     "name": "Yamba",
     "slug": "yamba",
+    "owner": "telamas-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -53,6 +54,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "78cf22fe-7ca9-4b1b-8d85-c24291659f45"
+      }
     }
   }
 }

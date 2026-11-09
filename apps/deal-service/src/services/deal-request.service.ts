@@ -48,6 +48,7 @@ import {
   capacityReservationWhere,
   checkCapacity,
   checkTripBookable,
+  assertAuthorizationUsable,
   kgToReserve,
   quoteForTrip,
   type TripForBooking,
@@ -195,11 +196,9 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       } catch {
         throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", "Unknown payment authorization.");
       }
-      if (auth.status !== "AUTHORIZED") {
-        throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", "The payment has not been authorized yet.", {
-          paymentStatus: auth.status,
-        });
-      }
+      // D82 7A — un « non » n'est plus un seul « non » : avec Klarna et PayPal, `PROCESSING`
+      // veut dire « attends », pas « c'est raté ». La règle est pure et testée à part.
+      assertAuthorizationUsable(auth.status);
       if (
         auth.amountCents !== quote.totalShipperCents ||
         auth.currencyCode !== quote.currencyCode ||

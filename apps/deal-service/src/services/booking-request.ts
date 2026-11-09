@@ -33,6 +33,7 @@ import type {
   ParcelFamily,
 } from "@packages/api-contracts";
 import { effectiveAccountStatus, type SanctionState } from "@packages/middleware/account-status";
+import type { PaymentAuthorizationStatus } from "@packages/payments";
 
 /* ══ Erreur métier 409 avec code (le front traduit) ═══════════ */
 
@@ -203,6 +204,44 @@ export function checkCapacity(trip: TripForBooking, kg: number): void {
 }
 
 export const ACCEPTANCE_WINDOW_HOURS = 24; // DEA-01
+
+/**
+ * D82 7A — délai proposé au client avant de rejouer `POST /deals` quand l'empreinte est
+ * encore en cours de pose. Les moyens à redirection (Klarna, PayPal) reviennent souvent en
+ * `processing` : trois secondes suffisent dans l'immense majorité des cas, et un réessai
+ * trop prompt ne coûte qu'une lecture chez le fournisseur.
+ */
+export const PAYMENT_PROCESSING_RETRY_SECONDS = 3;
+
+/**
+ * D82 7A/8A — cette autorisation permet-elle de créer la réservation ?
+ *
+ * L'invariant ne bouge pas : **pas de réservation sans empreinte posée** (A45, D31). Ce qui
+ * change avec les moyens à REDIRECTION, c'est qu'un « non » cesse d'être un seul « non » :
+ *
+ *   • `AUTHORIZED` → l'empreinte est là, on continue ;
+ *   • `PROCESSING` → le membre revient de Klarna ou de PayPal avant que l'empreinte n'ait
+ *     fini de se poser. Rien n'est perdu, rien n'est à ressaisir : refus **RÉESSAYABLE**,
+ *     avec le délai à attendre. Confondre ce cas avec le suivant, c'est annoncer un échec à
+ *     quelqu'un qui a payé ;
+ *   • tout le reste (`REQUIRES_PAYMENT_METHOD`, `CANCELED`, `CAPTURED`, `UNKNOWN`) → refus
+ *     terminal : il faut repasser par le paiement.
+ *
+ * Fonction pure : elle ne lit ni la base ni le fournisseur, elle juge un statut déjà lu
+ * chez lui — jamais un statut annoncé par le client.
+ */
+export function assertAuthorizationUsable(status: PaymentAuthorizationStatus): void {
+  if (status === "AUTHORIZED") return;
+  if (status === "PROCESSING") {
+    throw new BookingRequestError("PAYMENT_PROCESSING", "The payment is still being processed.", {
+      paymentStatus: status,
+      retryAfterSeconds: PAYMENT_PROCESSING_RETRY_SECONDS,
+    });
+  }
+  throw new BookingRequestError("PAYMENT_NOT_AUTHORIZED", "The payment has not been authorized yet.", {
+    paymentStatus: status,
+  });
+}
 
 /* ══ Snapshots (D17 : immuables, jamais recalculés) ═══════════ */
 

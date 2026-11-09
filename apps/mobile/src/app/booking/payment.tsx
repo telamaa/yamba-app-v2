@@ -71,6 +71,7 @@ const KNOWN_CODES = new Set([
   'OWN_TRIP',
   'NEW_ACCOUNT_CAP',
   'PAYMENT_NOT_AUTHORIZED',
+  'PAYMENT_PROCESSING', // D82 7A — empreinte en cours de pose (Klarna, PayPal) : RÉESSAYABLE
   'PAYMENT_MISMATCH',
   'PAYMENT_ALREADY_USED',
   'ACCOUNT_DELETED',
@@ -94,6 +95,16 @@ const SESSION_CODES = new Set([
 
 /** Après ces deux-là, l'autorisation ne vaut plus : on en refait une. */
 const REFRESHES_INTENT = new Set(['QUOTE_DIVERGENCE', 'PAYMENT_MISMATCH']);
+
+/**
+ * D82 7A — les moyens à REDIRECTION (Klarna, PayPal) ramènent le membre dans l'app avant
+ * que l'empreinte n'ait fini de se poser : le serveur répond alors `PAYMENT_PROCESSING` avec
+ * le délai à attendre. On attend et on redemande, au plus trois fois — jamais une seconde
+ * empreinte, jamais une saisie à refaire. Au-delà, l'écran le DIT et garde tout.
+ */
+const PROCESSING_MAX_ATTEMPTS = 3;
+const PROCESSING_FALLBACK_DELAY_MS = 3000;
+const attendre = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export default function BookingPaymentScreen() {
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
@@ -259,8 +270,21 @@ export default function BookingPaymentScreen() {
         setCardAuthorized(true);
       }
 
-      // 3. La demande elle-même.
-      const booking = await createBooking(draft, trip, intent.paymentIntentId, photos, params);
+      // 3. La demande elle-même. Le serveur relit l'état RÉEL de l'empreinte chez le
+      //    fournisseur (D82 8A) : tant qu'elle se pose, il dit « attends », pas « c'est raté ».
+      let booking: Awaited<ReturnType<typeof createBooking>> | null = null;
+      for (let tentative = 1; tentative <= PROCESSING_MAX_ATTEMPTS; tentative += 1) {
+        try {
+          booking = await createBooking(draft, trip, intent.paymentIntentId, photos, params);
+          break;
+        } catch (e) {
+          const encoreEnCours = e instanceof ApiError && e.code === 'PAYMENT_PROCESSING';
+          if (!encoreEnCours || tentative === PROCESSING_MAX_ATTEMPTS) throw e;
+          const secondes = Number(e.details?.retryAfterSeconds);
+          await attendre(Number.isFinite(secondes) && secondes > 0 ? secondes * 1000 : PROCESSING_FALLBACK_DELAY_MS);
+        }
+      }
+      if (!booking) return;
       clearBookingDraft();
       // On DÉPILE le tunnel avant d'afficher la confirmation : `replace` seul
       // laisserait les six écrans précédents dessous, et le retour ramènerait

@@ -15,9 +15,20 @@
  *   - payment_intent.canceled          → l'empreinte est morte (expiration
  *     ~7 j, annulation fournisseur) : un Booking PENDING qui la porte est
  *     annulé par SYSTEM (machine, D40). Idempotent.
- *   - payment_intent.amount_capturable_updated → accusé simple :
- *     l'autorisation est posée ; la création du deal reste pilotée par
- *     POST /deals (D37).
+ *   - payment_intent.amount_capturable_updated → l'autorisation est posée.
+ *     Accusé, et non commande : la PREUVE de l'empreinte est lue chez le
+ *     fournisseur par `POST /deals` lui-même (`provider.retrieve`, refus
+ *     PAYMENT_NOT_AUTHORIZED / PAYMENT_PROCESSING) — on ne crée jamais une
+ *     réservation sur la parole du client (D37, D82 8A). Et l'empreinte qui
+ *     se pose APRÈS un abandon est ramassée par le cron d'orphelines (D82 9A).
+ *   - payment_intent.processing → moyen à REDIRECTION (Klarna, PayPal) : le
+ *     membre a validé, l'empreinte n'est pas encore capturable. Rien à
+ *     écrire, mais à voir dans les journaux — c'est l'état qui explique un
+ *     PAYMENT_PROCESSING côté client (D82 7A).
+ *   - payment_intent.payment_failed → la tentative a échoué. Aucun deal ne
+ *     peut exister (il en faut une AUTORISÉE pour en créer un) : on journalise
+ *     le motif pour l'exploitation, et il ne sort JAMAIS vers le client — il
+ *     peut nommer la banque, le moyen, l'adresse.
  *
  * Réponses : 2xx = traité (Stripe ne renverra pas) ; 4xx = signature ou
  * requête invalide (pas de retry utile) ; 5xx = échec transitoire (base
@@ -85,6 +96,19 @@ export function makeStripeWebhookHandler(service: DealLifecycleService, logger: 
         logger.info(
           { eventId: event.id, paymentIntentId: event.paymentIntentId },
           "Stripe webhook: authorization confirmed"
+        );
+      } else if (event.type === "payment_intent.processing") {
+        // D82 7A — Klarna/PayPal : l'empreinte est en cours de pose. Aucune écriture : la
+        // réservation naîtra du retour du membre, qui relira l'état réel.
+        logger.info(
+          { eventId: event.id, paymentIntentId: event.paymentIntentId },
+          "Stripe webhook: authorization is still processing (redirect payment method)"
+        );
+      } else if (event.type === "payment_intent.payment_failed") {
+        // D82 8A — le motif part dans les journaux, jamais vers le client.
+        logger.warn(
+          { eventId: event.id, paymentIntentId: event.paymentIntentId, failureMessage: event.failureMessage },
+          "Stripe webhook: payment attempt failed"
         );
       } else if (event.type === "account.updated" && event.accountFlags && event.objectId) {
         // A87 — les drapeaux du Voyageur suivent Stripe sans qu'il repasse par l'onboarding ;

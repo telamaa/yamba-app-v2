@@ -134,6 +134,10 @@ export const BOOKING_REQUEST_ERROR_CODES = [
   "TRIP_NOT_BOOKABLE",
   "OWN_TRIP",
   "PAYMENT_NOT_AUTHORIZED",
+  // D82 7A/8A — l'empreinte n'est pas ENCORE posée mais rien n'est perdu : les moyens à
+  // redirection (Klarna, PayPal) repassent par `processing` au retour. Refus RÉESSAYABLE,
+  // distinct de PAYMENT_NOT_AUTHORIZED qui, lui, est terminal. `details.retryAfterSeconds`.
+  "PAYMENT_PROCESSING",
   "PAYMENT_MISMATCH",
   "PAYMENT_ALREADY_USED",
   "NEW_ACCOUNT_CAP", // D71 — plafond progressif CNF-06 (details.cap, limit, value)

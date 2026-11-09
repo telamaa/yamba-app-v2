@@ -180,6 +180,7 @@
       "OWN_TRIP": "You cannot book your own trip.",
       "NEW_ACCOUNT_CAP": "Your account is recent: for now your shipments are capped (declared value, weight and number per month). The cap lifts with your first completed shipments.",
       "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorized yet. Please try again.",
+      "PAYMENT_PROCESSING": "Your bank is still confirming the payment. Stay on this page — nothing is lost, and we''ll send your request as soon as it clears.",
       "PAYMENT_MISMATCH": "The authorization no longer matches your request. A new one is being prepared.",
       "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",
       "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
