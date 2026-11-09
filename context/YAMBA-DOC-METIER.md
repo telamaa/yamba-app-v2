@@ -7904,3 +7904,79 @@ fera.
 
 `apps/mobile` garde ses icônes d'origine. `yamba-icon-1024.png` est la source prévue pour les
 stores ; le lot reste à faire.
+
+---
+
+# D86 — L'app native porte la marque, et sa porte d'entrée parle aux deux publics
+
+## Le besoin
+
+Deux manques, de nature différente.
+
+**Le premier est une négligence visible.** L'icône de l'application était encore celle du
+gabarit Expo — un chevron bleu sur fond dégradé, jamais remplacé depuis le socle du
+19/09/2026. Sur l'écran d'accueil d'un téléphone, c'est la toute première chose qu'un testeur
+voit de Yamba, et elle disait « projet non terminé ».
+
+**Le second est un problème de fond.** L'écran de bienvenue ne parlait qu'à l'**Expéditeur** :
+il promettait un envoi, et rien d'autre. Or Yamba est une place de marché à deux côtés, et le
+**Voyageur est la ressource rare** — sans lui, aucune promesse d'envoi ne tient. Une porte
+d'entrée qui ne nomme qu'un seul des deux rôles dit à l'autre « ce n'est pas pour toi », au
+moment précis où il décide de rester ou de partir.
+
+S'y ajoutait une illustration de stock qui occupait la moitié de l'écran, ne montrait aucun
+écran du produit, et faisait ressembler l'application à un site web.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-MRQ-09** | Les icônes de l'app native se **génèrent depuis la même source vectorielle que le web**. Le mobile et le site ne peuvent pas porter deux dessins différents du même logo |
+| **RG-MRQ-10** | L'icône **adaptative** d'Android tient son dessin dans les **66 % centraux** : le système ne garantit que les 72 dp centraux sur 108. L'icône **monochrome** d'Android 13+ est d'une **seule couleur**, colis compris — elle n'est qu'une silhouette recolorée par le fond d'écran |
+| **RG-MOB-9** | L'écran d'ouverture nomme **les deux rôles**. Un seul argument par écran : l'Expéditeur, le Voyageur, puis le modèle |
+| **RG-MOB-10** | Les **gestes ne défilent jamais**. « Créer un compte », « Me connecter » et « Voir les trajets sans compte » restent accessibles en permanence, quel que soit le volet affiché : l'écran d'ouverture n'est pas un tutoriel qu'il faut finir pour entrer |
+| **RG-MOB-11** | Le défilement automatique **s'arrête définitivement au premier geste**, et **ne démarre pas** si « Réduire les animations » est actif sur l'appareil |
+| **RG-MOB-12** | Le nombre de volets est **visible et navigable** : trois points cliquables, annoncés « 2 / 3 » aux lecteurs d'écran |
+| **RG-MOB-13** | L'écran reste **public** : on peut voir les trajets sans compte, et le libellé le dit explicitement — il nomme la récompense (« Voir les trajets »), pas le renoncement (« Passer ») |
+| **RG-MRQ-11** | **Aucune allégation environnementale non étayée.** Le produit peut affirmer que le colis **évite un transport dédié** — c'est un fait mécanique. Il ne peut écrire ni « zéro émission », ni « neutre en carbone », ni aucune réduction chiffrée : la loi Climat et Résilience exige une étude à l'appui, et D45 interdit déjà les statistiques inventées |
+
+## Les trois volets
+
+| | Titre | Corps | À qui il parle |
+|---|---|---|---|
+| 1 | Plus vite. / Moins cher. / En main propre. | Des Voyageurs vérifiés ont de la place dans leurs bagages. | L'Expéditeur |
+| 2 | Ta valise / a de la place, / elle a de la valeur. | Emporte un colis sur un trajet que tu fais déjà. | Le Voyageur |
+| 3 | Un colis de plus, / pas un trajet / de plus. | Le trajet existe déjà, ton colis évite un transport dédié et le carbone qui va avec. | Les deux — c'est le modèle |
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| MRQ86-01 | L'icône de l'app sur l'écran d'accueil iOS | Le symbole Yamba, pas le chevron du gabarit Expo |
+| MRQ86-02 | L'icône adaptative sur Android, masque rond puis en goutte | Le Y et le colis survivent aux deux masques, rien n'est rogné |
+| MRQ86-03 | L'icône monochrome sur Android 13+ | La silhouette entière prend la couleur du fond d'écran ; le colis ne disparaît pas |
+| MRQ86-04 | Premier lancement à froid, non connecté | L'écran d'ouverture s'affiche, volet 1 |
+| MRQ86-05 | On ne touche à rien pendant 20 s | Les trois volets défilent, environ 8 s chacun, et la boucle reprend au premier |
+| MRQ86-06 | On balaye le texte vers la gauche | Le volet change **et le défilement automatique ne reprend plus** |
+| MRQ86-07 | « Réduire les animations » activé sur l'appareil, puis lancement | **Aucun** défilement automatique ; les points et le balayage fonctionnent toujours |
+| MRQ86-08 | On touche le troisième point | Le volet 3 s'affiche ; le point actif devient une barrette mango |
+| MRQ86-09 | Pendant tout le défilement | Les trois gestes du bas **ne bougent pas d'un pixel** |
+| MRQ86-10 | Un lecteur d'écran sur les points | Il annonce « 1 / 3 », « 2 / 3 », « 3 / 3 », et l'état sélectionné |
+| MRQ86-11 | « Voir les trajets sans compte » | L'app s'ouvre sur une **recherche large** avec de vrais trajets, pas un formulaire vide |
+| MRQ86-12 | Les trois volets, en français comme en anglais | Les titres tiennent sur trois lignes, sans mot orphelin ni débordement |
+| MRQ86-13 | Relecture juridique des trois volets | Aucun chiffre d'économie, aucune mention « neutre en carbone » ou « zéro émission » |
+
+## Ce qui reste hors de ce lot
+
+### Les textes ne sont pas pilotables depuis le back-office
+
+Les trois volets vivent dans les dictionnaires du dépôt. Changer la promesse d'ouverture
+suppose donc une **publication sur les stores** : plusieurs jours de délai, et une adoption
+qui s'étale sur des semaines. C'est l'objet de **D87** (contenus éditoriaux pilotés depuis le
+back-office), dont cet écran sera le premier consommateur.
+
+Condition non négociable de ce futur lot : la validation du lexique (tutoiement D45, mots de
+rôle, interdiction du mot « assurance ») doit être **rejouée côté serveur à l'écriture**.
+Aujourd'hui la CI garde chaque texte à chaque PR ; un texte saisi en back-office y échapperait
+entièrement, et le back-office deviendrait le seul endroit du produit où le vouvoiement peut
+passer.

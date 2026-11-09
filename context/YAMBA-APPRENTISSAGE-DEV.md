@@ -6497,3 +6497,201 @@ personne n'a envie de déboguer. Supprimé.
   temporaire puis `NODE_PATH=…/node_modules node script.mjs` prouve qu'un script marche sans
   toucher au `package.json` ni au verrou — utile quand la dépendance doit partir dans une PR
   `chore/deps` séparée.
+
+---
+
+## Chapitre 227 — Un carrousel qui ne se bat pas avec l'utilisateur, et la hauteur qu'on n'a pas besoin d'écrire
+
+> Le lot D86 : les icônes de l'app native, puis la refonte de l'écran d'ouverture en carrousel
+> ancré. Les techniques utilisées sont modestes — un `ScrollView` horizontal, un `setInterval`,
+> une lecture d'`AccessibilityInfo`. Ce qui mérite un chapitre, ce sont les trois fois où la
+> solution évidente était fausse.
+
+### 1. Pourquoi le défilement automatique est presque toujours une mauvaise idée — et ce qui le sauve
+
+Un carrousel qui tourne tout seul a mauvaise réputation, et elle est méritée. Les reproches
+classiques : il déplace le contenu pendant qu'on le lit, il impose du mouvement à qui n'en
+veut pas, et il cache des informations derrière une attente.
+
+Les trois se traitent, et c'est ça la leçon : **un motif n'est pas bon ou mauvais, il est bien
+ou mal borné.**
+
+```tsx
+// ① Il ne démarre pas du tout si l'appareil a demandé moins de mouvement.
+useEffect(() => {
+  let monte = true;
+  AccessibilityInfo.isReduceMotionEnabled()
+    .then((reduit) => { if (monte && reduit) setAutoplay(false); })
+    .catch(() => { /* réglage illisible : on garde le défaut */ });
+  return () => { monte = false; };
+}, []);
+
+// ② Il s'arrête DÉFINITIVEMENT au premier geste — pas « il reprend dans 10 s ».
+<ScrollView onScrollBeginDrag={() => setAutoplay(false)} …>
+```
+
+Deux détails de métier dans ce petit bout de code. **`isReduceMotionEnabled()` est
+asynchrone** : elle revient après que le composant peut avoir été démonté, d'où le drapeau
+`monte` — sans lui, un `setState` sur un composant mort. Et le `.catch()` n'est pas de la
+superstition : si le réglage est illisible, on ne veut ni planter, ni désactiver par excès de
+prudence une fonctionnalité qui marche.
+
+Le troisième reproche — « il déplace le contenu pendant qu'on lit » — ne se corrige pas par du
+code mais par **un chiffre qu'on calcule au lieu de le deviner** :
+
+```tsx
+/** ~15 mots sur le volet le plus chargé ; 200 mots/minute en lecture attentive
+ *  = 4,5 s de lecture pure, + la prise d'écran à froid + la transition. */
+const SLIDE_MS = 8000;
+```
+
+La première valeur, 5 s, coupait la lecture en cours — **constaté à l'écran**, pas déduit. La
+règle générale : une constante de temps dans une interface est une hypothèse sur un humain ;
+elle doit porter son calcul en commentaire, sinon le prochain qui la lit ne saura jamais si
+8000 est un raisonnement ou un chiffre rond.
+
+### 2. Ce qui défile et ce qui ne défile pas : une décision de produit, pas de mise en page
+
+Le réflexe est de faire défiler l'écran entier, boutons compris. C'est ce que font les
+onboardings qui se terminent par « Commencer » sur le dernier volet.
+
+Mais sur une **porte d'entrée**, c'est un piège : si les gestes participent au défilé,
+l'écran dit « finis mon tutoriel avant d'entrer ». Les boutons sortent donc du carrousel :
+
+```tsx
+<ScrollView horizontal pagingEnabled …>{/* seuls les TEXTES sont ici */}</ScrollView>
+<View style={styles.dots}>…</View>
+<View style={styles.actions}>{/* fixes, hors du pager */}</View>
+```
+
+Corollaire technique immédiat : le `ScrollView` doit occuper **toute la largeur de l'écran**
+pour que la pagination tombe juste. La gouttière latérale ne peut donc pas vivre sur le
+conteneur parent — chaque bloc la reprend à son compte :
+
+```tsx
+const GUTTER = Spacing.four;
+// safeArea n'a PAS de paddingHorizontal ; lockup, slide, dots et actions l'ont chacun.
+```
+
+C'est une erreur fréquente et silencieuse : avec une gouttière sur le parent, `pagingEnabled`
+s'arrête à côté de la page, et le décalage grandit à chaque volet.
+
+### 3. La hauteur partagée : deux fausses pistes, et une propriété qu'on avait désactivée soi-même
+
+Le problème : les trois volets n'ont pas le même nombre de lignes, donc les boutons remontaient
+d'un cran à chaque passage. Trois tentatives, dans l'ordre.
+
+**Fausse piste n° 1 — la hauteur en dur.**
+
+```tsx
+slide: { minHeight: 206 }   // ✗
+```
+
+206 est la hauteur du plus grand volet **en français, aujourd'hui**. La première traduction la
+rend fausse. Une constante de mise en page qui dépend du contenu est une dette datée.
+
+**Fausse piste n° 2 — caler le contenu en bas.**
+
+```tsx
+slide: { minHeight: 206, justifyContent: 'flex-end' }   // ✗ pire
+```
+
+L'intention était bonne (que le corps soit toujours à la même distance des points), le résultat
+non : le corps collait aux points et le verrou de marque s'orphelinait tout en haut. Leçon
+générale — **quand une correction déplace le défaut au lieu de le supprimer, c'est que le
+diagnostic était faux.**
+
+**La bonne réponse était déjà dans le moteur.** Les volets sont les enfants d'une **rangée**
+(un `ScrollView` horizontal pose ses enfants en `flexDirection: 'row'`), et la valeur par
+défaut d'`alignItems` en flexbox est `stretch` : tous les enfants prennent déjà la hauteur du
+plus grand. Il n'y avait rien à ajouter — il fallait **arrêter de l'empêcher** :
+
+```tsx
+// La cause, écrite de ma main au premier jet :
+contentContainerStyle={{ alignItems: 'flex-start' }}   // ✗ chaque volet reprend sa hauteur
+// La correction : retirer la ligne. C'est tout.
+slide: { paddingHorizontal: GUTTER }                   // ✓
+```
+
+C'est le genre de bug qu'on ne trouve pas en lisant la documentation du composant, mais en se
+demandant **« qu'est-ce que j'ai désactivé sans le vouloir ? »**. Le réflexe à prendre : avant
+d'ajouter une propriété pour obtenir un comportement, vérifier qu'on ne l'a pas supprimé trois
+lignes plus haut.
+
+### 4. Les retours à la ligne d'un grand titre sont du contenu, pas de la mise en forme
+
+React Native n'a pas d'équivalent de `text-wrap: balance`. À 34 px, une ligne porte environ
+**24 caractères** sur un iPhone 15 — mesuré sur capture : « a de la place. », 14 caractères,
+occupe 198 pt, soit 14,2 pt par caractère pour 345 pt utiles.
+
+Laisser le moteur couper produit des orphelins : « Ton colis cherche une place. Quelqu'un en a
+une. » laissait « une. » seul sur la seconde ligne. Deux façons de régler ça, et une seule est
+durable :
+
+- **Jouer sur `maxWidth`** jusqu'à ce que la coupure tombe bien. Marche pour une langue, un
+  jour. C'est ce qu'on avait fait d'abord (240, puis 272, puis 300 — chaque valeur mesurée).
+- **Écrire les retours dans le dictionnaire** (`"Ta valise\na de la place,\nelle a de la
+  valeur."`). Le traducteur les voit, les déplace, et la mise en page n'a plus de constante
+  à maintenir.
+
+La seconde revient à dire : *où coupe une accroche de marque relève de la rédaction, pas du
+CSS.* Une fois ce principe posé, un bénéfice tombe sans l'avoir cherché — les trois volets ont
+un titre de trois lignes, donc la hauteur du bloc ne bouge plus du tout.
+
+### 5. Une règle de conformité qu'on code comme les autres
+
+Le volet « modèle » parle d'écologie. La tentation est d'écrire « zéro émission » ou « −80 %
+de CO₂ ». Deux interdits s'y opposent, et ils sont de nature différente :
+
+- **D45** (règle du projet) interdit les statistiques inventées.
+- La **loi Climat et Résilience** interdit les allégations environnementales non étayées —
+  « neutre en carbone » en tête.
+
+Ce qui reste dicible est ce qui décrit le **mécanisme** : « ton colis évite un transport
+dédié ». C'est vérifiable par construction — aucun véhicule n'est affrété — là où « aucune
+émission supplémentaire » serait faux (ajouter du poids consomme un peu plus de carburant).
+
+La leçon dépasse le cas : **une contrainte juridique se traite comme une contrainte technique.**
+Elle s'écrit dans le registre, elle devient une règle métier numérotée (`RG-MRQ-11`), et elle
+se relit en test d'acceptation (`MRQ86-13`). Laissée à la mémoire du rédacteur, elle tombe à la
+première promotion marketing.
+
+### 6. Un détail de poste qui coûte dix minutes à chaque redémarrage
+
+Après un redémarrage du Mac, `expo start --ios` échoue :
+
+```
+Error: osascript -e tell app "System Events" to count processes whose name is "Simulator"
+  exited with non-zero code: 1
+```
+
+Ce n'est pas un bug du projet : Expo demande à AppleScript si le Simulateur tourne, et la
+permission « Automatisation » du terminal a été perdue. Le contournement ne touche à rien :
+
+```sh
+# 1. Démarrer le simulateur à la main
+xcrun simctl boot "iPhone 15" && open -a Simulator
+# 2. Metro SEUL, sans ouverture automatique
+cd apps/mobile && NODE_PATH=./node_modules npx expo start --go
+# 3. Ouvrir le projet dans Expo Go par l'URL
+xcrun simctl openurl booted "exp://127.0.0.1:8081"
+# 4. Et pour une capture d'écran sans toucher à la souris
+xcrun simctl io booted screenshot capture.png
+```
+
+La dernière ligne vaut d'être retenue au-delà de l'incident : **une capture prise en ligne de
+commande rend une itération de design reproductible.** Modifier un dictionnaire, relancer,
+capturer, comparer — sans jamais quitter le clavier.
+
+### Pour aller plus loin
+
+- **`AccessibilityInfo`** expose aussi `isScreenReaderEnabled`, `isBoldTextEnabled` et
+  `isGrayscaleEnabled`, et chacune a un événement associé (`addEventListener`). Notre lecture
+  est ponctuelle, au montage : suffisante pour un écran vu quelques secondes, insuffisante pour
+  un écran durable où le réglage peut changer sous les pieds.
+- **`pagingEnabled` contre `snapToInterval`** : le premier cale sur la largeur du `ScrollView`,
+  le second sur une valeur qu'on choisit. Pour des volets plein écran, le premier suffit ;
+  pour des cartes qui laissent voir la suivante, c'est `snapToInterval` qu'il faut.
+- **Un carrousel de plus de cinq volets** ne devrait plus être un `ScrollView` : tous les
+  enfants sont montés d'un coup. `FlatList` avec `pagingEnabled` ne monte que ce qui est
+  visible.

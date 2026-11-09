@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const UI = resolve(ICI, "..", "apps", "user-ui");
+const MOBILE = resolve(ICI, "..", "apps", "mobile");
 
 /* ── Les sources vectorielles ─────────────────────────────────────────────── */
 
@@ -63,7 +64,58 @@ const MASKABLE = svg(
     colis(94, 12)
 );
 
+/* ── Les sources de l'application native (D86) ────────────────────────────── */
+
+/**
+ * Android compose son icône adaptative en DEUX couches : un fond et un
+ * premier plan, chacun en 108 dp dont seuls les **72 dp centraux** sont
+ * garantis visibles (le système anime et masque le reste). Le premier plan
+ * est donc TRANSPARENT et son dessin tient dans ces 66 % centraux — plus
+ * resserré encore que le maskable du web.
+ */
+const ANDROID_PREMIER_PLAN = svg(
+  trait("M78 78 C84 114 100 129 120 129 C140 129 156 114 162 78 M120 129 V168", 16) +
+    colis(98, 11)
+);
+
+/** Le fond : une couleur pleine, rien d'autre. C'est la règle d'Android. */
+const ANDROID_FOND = svg(`<rect width="240" height="240" fill="${MANGO}"/>`);
+
+/**
+ * L'icône MONOCHROME d'Android 13+ (« icônes thématiques ») : le système ne
+ * lit QUE la silhouette et la recolore avec le fond d'écran. Tout doit donc
+ * être de la même couleur — le colis compris, sans quoi il disparaîtrait.
+ */
+const ANDROID_MONOCHROME = svg(
+  `<path fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" ` +
+    `stroke-linejoin="round" d="M78 78 C84 114 100 129 120 129 C140 129 156 114 162 78 M120 129 V168"/>` +
+    `<circle cx="120" cy="98" r="11" fill="#FFFFFF"/>`
+);
+
+/**
+ * L'écran de démarrage : `app.json` l'affiche à **76 px de large** sur un fond
+ * mango plein. Le symbole est donc rendu BLANC et sans fond à lui — le fond
+ * est celui de l'écran.
+ */
+const SPLASH = svg(
+  trait("M60 60 C69 108 91 130 120 130 C149 130 171 108 180 60 M120 130 V186", 22) +
+    `<circle cx="120" cy="86" r="15" fill="${TEAL}"/>`
+);
+
 /* ── Ce qu'on produit ─────────────────────────────────────────────────────── */
+
+/** Les PNG de l'application native. `alpha` quand la couche doit se superposer. */
+const PNGS_MOBILE = [
+  // iOS et le repli : fond plein, aucun arrondi (le système masque).
+  { src: APP, taille: 1024, sortie: "assets/images/icon.png" },
+  // Android adaptatif : deux couches qui se superposent, donc alpha des deux côtés.
+  { src: ANDROID_PREMIER_PLAN, taille: 432, sortie: "assets/images/android-icon-foreground.png", alpha: true },
+  { src: ANDROID_FOND, taille: 432, sortie: "assets/images/android-icon-background.png" },
+  { src: ANDROID_MONOCHROME, taille: 432, sortie: "assets/images/android-icon-monochrome.png", alpha: true },
+  // L'écran de démarrage et le favicon de l'export web d'Expo.
+  { src: SPLASH, taille: 512, sortie: "assets/images/splash-icon.png", alpha: true },
+  { src: APP, taille: 64, sortie: "assets/images/favicon.png" },
+];
 
 const PNGS = [
   { src: APP, taille: 180, sortie: "src/app/apple-icon.png" },
@@ -158,6 +210,13 @@ async function main() {
     mkdirSync(dirname(chemin), { recursive: true });
     writeFileSync(chemin, await rendu(src, taille));
     console.log(`  ✓ ${sortie.padEnd(42)} ${taille}×${taille}`);
+  }
+
+  for (const { src, taille, sortie, alpha } of PNGS_MOBILE) {
+    const chemin = join(MOBILE, sortie);
+    mkdirSync(dirname(chemin), { recursive: true });
+    writeFileSync(chemin, await rendu(src, taille, { alpha: Boolean(alpha) }));
+    console.log(`  ✓ mobile/${sortie.padEnd(34)} ${taille}×${taille}`);
   }
 
   const images = [];

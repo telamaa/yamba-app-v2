@@ -15246,3 +15246,140 @@ diverger.
   `yamba-icon-1024.png` est la source prévue, le lot reste à faire.
 - **`apps/yamba-logo-kit`** : dossier de livraison, laissé **non versionné**. Il a servi, il
   peut être supprimé.
+
+---
+
+# D86 — La marque entre dans l'app native, et la porte d'entrée est recomposée autour d'elle
+
+> Branche `feat/mobile-logo`. Suite directe de D85 : le web porte le logo « Porter » depuis
+> la veille, l'app native portait encore **le gabarit Expo**. Le lot fait deux choses — le jeu
+> d'icônes natif, puis la refonte complète de l'écran de bienvenue. Tout a été vérifié à
+> l'écran dans le simulateur iOS, et chaque arbitrage de texte a été validé avant d'être posé.
+
+## ① Le constat, chiffré
+
+`apps/mobile/assets/images/icon.png` : **799 Ko de modèle par défaut** — le chevron bleu sur
+fond dégradé livré par `create-expo-app`, jamais remplacé depuis le socle du 19/09/2026. Une
+application qui s'appelle Yamba et qui s'affiche sur l'écran d'accueil avec l'icône d'un
+gabarit, c'est la première chose que voit un testeur.
+
+Second constat, sur l'écran de bienvenue lui-même : il portait une **illustration de stock**
+(`home-hero-yamba.svg`, la même que le hero du site) qui occupait la moitié de la hauteur, ne
+montrait aucun écran du produit, et entrait en concurrence directe avec le symbole de marque
+posé juste au-dessus — deux images pour une seule idée.
+
+## ② Un seul script pour les icônes des deux fronts
+
+`scripts/generate-brand-icons.mjs` produisait les icônes du web (D85) ; il produit désormais
+aussi **les six fichiers du mobile**, depuis la même source vectorielle. La règle de D85 est
+reconduite telle quelle : *une icône retouchée à la main est une icône qui dérive*.
+
+Trois contraintes d'Android valent d'être connues, et sont gravées dans le script :
+
+- **L'icône adaptative est en DEUX couches de 108 dp dont seuls les 72 dp centraux sont
+  garantis visibles.** Le premier plan est donc transparent et son dessin tient dans ces 66 %
+  — plus resserré encore que le maskable du web (80 %). Vérifié en COMPOSANT les deux couches :
+  Y blanc, colis teal, fond mango, bien dans la zone sûre.
+- **L'icône monochrome d'Android 13+ ne garde que la SILHOUETTE** et la recolore avec le fond
+  d'écran. Tout y est donc d'une seule couleur, colis compris — sans quoi il disparaîtrait.
+- **Le fond adaptatif est une couleur PLEINE**, rien d'autre.
+
+## ③ Le symbole dans l'app : le même fichier SVG que le site
+
+`apps/mobile/src/components/yamba-symbol.tsx` rend **le fichier SVG servi par le site**, via
+`expo-image` — qui rend déjà du SVG dans cet écran depuis A205. Conséquence directe : **zéro
+dépendance nouvelle** (`react-native-svg` est absent du dépôt et ce symbole ne justifiait pas
+de l'ajouter), et une seule source de vérité pour le dessin.
+
+Une différence avec le web, et elle est structurelle : **trois variantes explicites**
+(`light` / `dark` / `white`) là où le web en a une automatique. Une image ne reçoit pas les
+styles de l'écran : c'est l'appelant qui connaît son fond.
+
+## ④ L'écran de bienvenue : ancré en bas, et non plus centré
+
+`apps/mobile/src/app/welcome.tsx` est réécrit. Le créneau ne change pas (lancement à FROID en
+anonyme seulement, jamais un membre connecté, jamais deux fois par session via `welcome-state`).
+La composition, elle, change entièrement.
+
+La version centrée se lisait comme une **page de garde**. Tout le contenu est désormais poussé
+**en bas, aligné à gauche**, le vide rejeté d'un bloc vers le haut — la composition des
+onboardings d'application. Mécaniquement, c'est un seul espaceur :
+
+```tsx
+<View style={styles.spacer} />   // flex: 1 — tout le vide est ICI
+<View style={styles.lockup}>…</View>
+<ScrollView horizontal pagingEnabled …/>
+<View style={styles.dots}>…</View>
+<View style={styles.actions}>…</View>
+```
+
+Il n'y a plus de « centre optique » à corriger : une composition ancrée n'a pas ce problème.
+
+## ⑤ Pourquoi un carrousel, et pourquoi il est structurel
+
+Le fond reste le **marine plein** : pas de photographie. Ce choix a une conséquence directe —
+sans image, **un seul argument peut tenir l'écran à la fois**. Or Yamba a deux publics
+(Expéditeur, Voyageur) et trois arguments. Les empiler sur un écran unique redonne exactement
+la liste à puces qu'on venait de retirer. D'où trois volets, un par argument.
+
+Quatre règles le rendent civilisé, et chacune répond à un défaut connu des carrousels :
+
+| Règle | Le défaut qu'elle évite |
+|---|---|
+| Les **boutons ne défilent pas** — seul le texte bouge | Un écran d'ouverture dont les gestes participent au défilé devient un tutoriel qu'il faut finir avant d'entrer |
+| Le défilement automatique s'arrête **définitivement** au premier geste | Se battre avec quelqu'un qui a pris la main |
+| Il **ne démarre pas** si « Réduire les animations » est actif (`AccessibilityInfo`) | Du mouvement imposé à qui l'a explicitement refusé |
+| **Trois points cliquables**, annoncés « 2 / 3 » | Ne pas savoir qu'il y a une suite, ni pouvoir y revenir |
+
+La cadence (`SLIDE_MS = 8000`) se **calcule** et le calcul est dans le code : ~15 mots sur le
+volet le plus chargé, 200 mots/minute en lecture attentive = 4,5 s de lecture pure, plus la
+prise d'écran à froid et la transition. 5 s coupaient la lecture en cours — mesuré à l'écran.
+
+## ⑥ Les coupures de titre sont écrites, pas subies
+
+À 34 px, une ligne porte **~24 caractères sur un iPhone 15** et ~23 sur un SE (mesuré sur
+capture : « a de la place. », 14 caractères, occupe 198 pt). Laisser le moteur couper produit
+des mots orphelins — constaté sur « Ton colis cherche une place. Quelqu'un en a une. », dont
+le « une. » tombait seul sur la seconde ligne.
+
+Les retours sont donc **écrits dans les dictionnaires** (`\n` dans les valeurs), ce qui les
+rend visibles au traducteur et déplaçables par lui. Corollaire mesuré : les trois volets ont
+un titre de **trois lignes**, ce qui stabilise la hauteur du bloc.
+
+## ⑦ Le piège de la hauteur partagée — deux fausses pistes avant la bonne
+
+Les volets n'ont pas le même nombre de lignes, donc les boutons remontaient d'un cran à chaque
+passage — exactement ce qu'on s'interdit. Deux tentatives écartées :
+
+1. **`minHeight: 206` en dur.** Juste pour le français d'aujourd'hui, fausse dès la traduction
+   suivante.
+2. **`justifyContent: 'flex-end'`** sur le volet. Collait le corps aux points et orphelinait le
+   verrou de marque en haut : pire que le défaut d'origine.
+
+La bonne réponse était déjà dans le moteur : **les volets sont les enfants d'une rangée**, donc
+`alignItems: 'stretch'` (le défaut) leur donne à tous la hauteur du plus grand. Il suffisait de
+ne pas l'empêcher — l'ancien `contentContainerStyle={{ alignItems: 'flex-start' }}` était la
+cause. La hauteur s'adapte maintenant à la langue servie, sans constante à maintenir.
+
+## ⑧ Les contrôles passés
+
+- `npx nx typecheck @yamba-app/mobile --skip-nx-cache` : **vert**.
+- `node scripts/check-i18n-messages.mjs` : **vert** — 2 locales, 30 namespaces, miroir parfait,
+  lexique respecté (tutoiement D45, « Voyageurs » majuscule, aucun « carrier »).
+- **Vérifié à l'écran** dans le simulateur iPhone 15 (Expo Go, bundle de 1 605 modules) : les
+  trois volets, le défilement automatique, les points, et la stabilité des boutons.
+
+Note de poste, sans rapport avec le code : après un redémarrage du Mac, `expo start --ios`
+échoue sur `osascript … tell app "System Events"` (permission Automatisation perdue). Contournement :
+démarrer Metro seul (`expo start --go`) puis `xcrun simctl openurl booted "exp://127.0.0.1:8081"`.
+
+## ⑨ Ce qui n'est PAS fait, et pourquoi
+
+- **Les textes des volets sont figés dans le dépôt.** Changer la promesse d'ouverture exige
+  donc une publication sur les stores. C'est l'objet de **D87** (contenus éditoriaux pilotés
+  depuis le back-office), dont cet écran sera le premier consommateur. Condition non
+  négociable de ce futur lot : rejouer `scripts/lexique-yamba.json` **côté serveur** à
+  l'écriture — sinon le back-office devient le seul endroit du produit où le vouvoiement peut
+  passer, alors que la CI le refuse partout ailleurs.
+- **Le rendu anglais des trois volets n'a pas été vérifié à l'écran.** La structure est
+  identique et les retours sont écrits, donc le risque de débordement est nul par construction.
