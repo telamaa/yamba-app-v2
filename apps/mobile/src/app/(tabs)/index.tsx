@@ -48,6 +48,7 @@ import { TripResultCard } from '@/components/trip-result-card';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { shouldRefetchForLocale } from '@/lib/locale-refetch';
 import { dateBounds, summaryLabel, type SearchDate } from '@/lib/search-date';
 import { cityLabel } from '@/lib/trip-format';
 import { getSearchDraft, setSearchDraft, subscribeSearchDraft } from '@/lib/search-draft';
@@ -281,6 +282,24 @@ export default function SearchScreen() {
     servedNonce.current = draft.submitNonce;
     void runSearchRef.current();
   }, [draft.submitNonce]);
+
+  /**
+   * La langue a changé (connexion, déconnexion, réglage) → on REDEMANDE la
+   * page. La règle, le défaut d'origine et le piège qu'elle évite sont dans
+   * `lib/locale-refetch.ts` ; ici on ne tient que la mémoire de la langue
+   * servie, initialisée à celle du MONTAGE pour qu'une ouverture d'écran ne
+   * coûte jamais un aller-retour de plus.
+   */
+  const servedLocale = useRef(locale);
+  useEffect(() => {
+    const refetch = shouldRefetchForLocale({
+      served: servedLocale.current,
+      current: locale,
+      state: state.kind === 'idle' ? 'idle' : state.kind === 'results' ? 'served' : 'pending',
+    });
+    servedLocale.current = locale;
+    if (refetch) void runSearchRef.current();
+  }, [locale, state.kind]);
 
   // Une pastille = la MÊME recherche, filtrée par transport côté serveur.
   const pickMode = useCallback(

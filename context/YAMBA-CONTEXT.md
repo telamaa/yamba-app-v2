@@ -2374,6 +2374,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Qualite : tests Jest/RNTL sur la logique partagee, Detox ou Maestro E2E sur
   les 2 parcours critiques, CI EAS Build, Play Console (internal testing ->
   production), politique de confidentialite / data safety.
+- Recette ANDROID ouverte le 09/11/2026 (D89, premiere execution sur emulateur
+  Pixel 6 API 33) : authentification, cinq onglets, porte d'identite et
+  connexion / deconnexion VUS sur Android ; deux defauts corriges (icones
+  Apple-seules remplacees par Ionicons, et la page redemandee quand la langue
+  change). RESTE a ouvrir sur Android : le tunnel de reservation, l'ecran de
+  paiement (il faut un build de developpement, Expo Go n'a aucun module natif),
+  le suivi d'envoi et la notation.
 
 ## Ce qui RESTE — Jalon 5 (iOS)
 

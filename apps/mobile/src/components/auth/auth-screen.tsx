@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -52,12 +52,7 @@ export function AuthScreen({ badge, title, subtitle, dismissGlyph = 'back', chil
             showsVerticalScrollIndicator={false}>
             <View style={styles.topRow}>
               <View style={[styles.badge, { borderColor: palette.teal }]}>
-                <SymbolView
-                  name="checkmark.shield"
-                  size={14}
-                  tintColor={palette.teal}
-                  fallback={<Text style={[styles.badgeGlyph, { color: palette.teal }]}>✓</Text>}
-                />
+                <Ionicons name="shield-checkmark" size={14} color={palette.teal} />
                 <Text style={[styles.badgeLabel, { color: palette.teal }]}>{badge}</Text>
               </View>
               <Pressable
@@ -66,15 +61,10 @@ export function AuthScreen({ badge, title, subtitle, dismissGlyph = 'back', chil
                 accessibilityRole="button"
                 accessibilityLabel={t('common.back')}
                 style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}>
-                <SymbolView
-                  name={dismissGlyph === 'close' ? 'xmark' : 'chevron.left'}
+                <Ionicons
+                  name={dismissGlyph === 'close' ? 'close' : 'chevron-back'}
                   size={17}
-                  tintColor={palette.muted}
-                  fallback={
-                    <Text style={[styles.dismissFallback, { color: palette.muted }]}>
-                      {dismissGlyph === 'close' ? '✕' : '‹'}
-                    </Text>
-                  }
+                  color={palette.muted}
                 />
               </Pressable>
             </View>
@@ -125,20 +115,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 7,
   },
-  badgeGlyph: {
-    fontSize: 12,
-    fontWeight: 700,
-  },
   badgeLabel: {
     fontSize: 13,
     fontWeight: 600,
   },
   dismiss: {
     paddingHorizontal: Spacing.two,
-  },
-  dismissFallback: {
-    fontSize: 22,
-    fontWeight: 500,
   },
   title: {
     fontSize: 28,

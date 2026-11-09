@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import { AuthCta, AuthError, TealLink } from '@/components/auth/auth-kit';
@@ -175,12 +175,7 @@ export function OtpVerifyView({
       </View>
 
       <View style={[styles.validityChip, { borderColor: palette.border }]}>
-        <SymbolView
-          name="clock"
-          size={14}
-          tintColor={palette.muted}
-          fallback={<Text style={{ color: palette.muted, fontSize: 12 }}>◷</Text>}
-        />
+        <Ionicons name="time-outline" size={14} color={palette.muted} />
         <Text style={[styles.validityLabel, { color: palette.text }]}>
           {expired ? (
             t('otp.expired')

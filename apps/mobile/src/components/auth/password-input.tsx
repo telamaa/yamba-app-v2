@@ -1,14 +1,18 @@
 /**
  * password-input.tsx — le champ mot de passe avec œil (refonte sur captures).
  * ===========================================================================
- * Le champ bordé des pages auth du site : l'œil (SF Symbol, repli texte) à
- * droite, et la teinte lavande quand le champ est REMPLI — le repère visuel
- * des captures. 16 px minimum : sous ce seuil, iOS zoome au focus (A60).
+ * Le champ bordé des pages auth du site : l'œil à droite, et la teinte
+ * lavande quand le champ est REMPLI — le repère visuel des captures. 16 px
+ * minimum : sous ce seuil, iOS zoome au focus (A60).
+ *
+ * L'œil est un Ionicons et non un SF Symbol (D89) : le repli texte servi à
+ * Android affichait « Afficher » / « Masquer » en toutes lettres dans un
+ * champ dimensionné pour un glyphe.
  */
 import { useState, type Ref } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import { Spacing } from '@/constants/theme';
@@ -47,15 +51,10 @@ export function PasswordInput({ style, value, ...rest }: Props) {
         hitSlop={Spacing.two}
         accessibilityRole="button"
         accessibilityLabel={visible ? t('common.hidePassword') : t('common.showPassword')}>
-        <SymbolView
-          name={visible ? 'eye.slash' : 'eye'}
+        <Ionicons
+          name={visible ? 'eye-off-outline' : 'eye-outline'}
           size={20}
-          tintColor={palette.muted}
-          fallback={
-            <Text style={[styles.eyeFallback, { color: palette.muted }]}>
-              {visible ? t('common.hide') : t('common.show')}
-            </Text>
-          }
+          color={palette.muted}
         />
       </Pressable>
     </View>
@@ -76,9 +75,5 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingHorizontal: Spacing.three,
     fontSize: 16,
-  },
-  eyeFallback: {
-    fontSize: 13,
-    fontWeight: 600,
   },
 });

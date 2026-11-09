@@ -18,7 +18,7 @@ import { useCallback, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import {
@@ -108,12 +108,7 @@ export default function LoginScreen() {
 
       <MethodButton
         icon={
-          <SymbolView
-            name="key.fill"
-            size={18}
-            tintColor={palette.title}
-            fallback={<Text style={{ fontSize: 15 }}>🔑</Text>}
-          />
+          <Ionicons name="key" size={18} color={palette.title} />
         }
         label={t('login.methodPassword')}
         onPressAction={openPasswordMethod}
