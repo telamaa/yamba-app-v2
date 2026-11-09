@@ -72,10 +72,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string, rememberMe = false) => {
       const sessionUser = await login(email, password, rememberMe);
-      setUser(sessionUser);
-      setPreferredLocale(sessionUser.preferredLocale ?? null);
+      // La réponse de `/auth/login` est une liste blanche COURTE : ni langue
+      // du compte, ni photo. On la complète donc par `/auth/me` dès que la
+      // session est ouverte — sans quoi, juste après la connexion, l'app
+      // parlerait la langue de l'APPAREIL (D44) et la pastille d'identité
+      // afficherait des initiales alors qu'une photo existe (D88 5A). Un
+      // échec ici ne casse PAS la connexion : on garde ce que le login a dit.
+      const fullUser = await me().catch(() => null);
+      const resolved = fullUser ?? sessionUser;
+      setUser(resolved);
+      setPreferredLocale(resolved.preferredLocale ?? null);
       setStatus('authenticated');
-      return sessionUser;
+      return resolved;
     },
     [setPreferredLocale]
   );

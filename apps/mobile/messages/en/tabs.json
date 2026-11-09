@@ -1,16 +1,36 @@
 {
   "bar": {
-    "search": "Explore",
+    "home": "Home",
     "favorites": "Saved",
     "publish": "Publish",
     "activity": "Activity",
     "messages": "Messages"
   },
   "gate": {
-    "title": "Log in to continue",
+    "title": "Log in\nto continue",
     "body": "This area is for members: your trips, messages and profile are waiting behind the login.",
     "cta": "Log in",
-    "registerLink": "Create an account"
+    "registerLink": "Create an account",
+    "favorites": {
+      "title": "Everything you saved is waiting",
+      "body": "The trips you bookmarked, your route alerts and the Travelers you follow."
+    },
+    "activity": {
+      "title": "Your parcels and your trips, here",
+      "body": "Your parcels on their way, the trips you published and the requests you get."
+    },
+    "messages": {
+      "title": "Your conversations are waiting",
+      "body": "Agree on the time and place of the meeting with your shipper or your Traveler."
+    },
+    "publish": {
+      "title": "Your spare kilos can earn",
+      "body": "Announce your next journey and receive parcel requests along your route."
+    },
+    "profile": {
+      "title": "Your Yamba account",
+      "body": "Your details, your payment methods and your preferences, all in one place."
+    }
   },
   "publish": {
     "title": "Publish your trip",

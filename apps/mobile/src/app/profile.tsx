@@ -51,7 +51,7 @@ function ProfileContent() {
 
 export default function ProfileScreen() {
   return (
-    <IdentityGate>
+    <IdentityGate destination="profile">
       <ProfileContent />
     </IdentityGate>
   );

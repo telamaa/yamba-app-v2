@@ -225,7 +225,27 @@ export const MIN_SHOWN_VIEWS = 15;
 export const showsViews = (viewsCount: number | null | undefined): viewsCount is number =>
   typeof viewsCount === 'number' && viewsCount >= MIN_SHOWN_VIEWS;
 
-export function getInitials(firstName: string, lastInitial: string): string {
-  const first = firstName?.charAt(0).toUpperCase() ?? '';
-  return `${first}${lastInitial}`.trim() || '?';
+/**
+ * Les initiales d'une personne : UNE lettre de prénom, UNE lettre de nom.
+ *
+ * Le second argument accepte aussi bien une initiale DÉJÀ tronquée qu'un nom
+ * entier, et c'est délibéré : l'app reçoit les deux. Les DTO publics ne
+ * donnent que l'initiale du nom (`lastInitial` — une carte de résultat
+ * affiche « Marven M. », jamais le patronyme), tandis que `/auth/me` renvoie
+ * le nom COMPLET du membre connecté, qui est chez lui.
+ *
+ * La version précédente concaténait le second argument TEL QUEL. Avec les
+ * trois appelants publics elle était juste ; avec la pastille d'identité, qui
+ * lui passe `user.lastName`, « Marven MABIALA » donnait « MMABIALA » dans un
+ * rond de 44 pt (constaté le 08/11). Tronquer ICI plutôt que chez l'appelant :
+ * un seul endroit à tenir, et le prochain appelant ne retombera pas dedans.
+ *
+ * `trim()` avant `charAt(0)` : un prénom composé de plusieurs mots
+ * (« Marven Claude ») donne la lettre du PREMIER, et un espace de tête ne
+ * produit pas une initiale vide.
+ */
+export function getInitials(firstName: string, lastNameOrInitial: string): string {
+  const first = firstName?.trim().charAt(0).toUpperCase() ?? '';
+  const last = lastNameOrInitial?.trim().charAt(0).toUpperCase() ?? '';
+  return `${first}${last}` || '?';
 }
