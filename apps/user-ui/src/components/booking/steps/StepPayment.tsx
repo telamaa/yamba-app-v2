@@ -1,13 +1,23 @@
 /**
- * StepPayment.tsx — étape 4 : UN seul Payment Element (B2, A30)
- * ==============================================================
- * Carte, Apple Pay et Google Pay vivent DANS le Payment Element de Stripe
- * (automatic_payment_methods côté serveur) : plus de radios maison — moins
- * de code, moins d'erreurs, et le wallet natif apparaît tout seul sur mobile.
+ * StepPayment.tsx — étape 4 : UN seul Payment Element (B2, A30 ; D83 7A)
+ * =======================================================================
+ * Carte, PayPal, Apple Pay et Google Pay vivent DANS le Payment Element de
+ * Stripe (automatic_payment_methods côté serveur) : plus de radios maison —
+ * moins de code, moins d'erreurs, et le portefeuille du navigateur apparaît
+ * tout seul là où il est disponible.
  *
  * Le bouton « Payer » est dans le récap (sidebar / bottom sheet) : l'étape
  * enregistre auprès du hook une fonction `confirm` qui appelle
- * stripe.confirmPayment sans redirection (sauf 3-D Secure : return_url).
+ * stripe.confirmPayment sans redirection (sauf 3-D Secure et les moyens à
+ * redirection — PayPal : return_url, puis D82 7A au retour).
+ *
+ * D83 7A — le jumeau web de l'écran mobile de choix. Le site GARDE le Payment
+ * Element (il dessine déjà ses onglets : lui superposer une liste maison
+ * dédoublerait le choix), mais il lui devait trois choses que l'écran mobile
+ * s'est données, et que `../payment-methods.ts` porte en fonctions pures :
+ * la LANGUE de Yamba plutôt que celle du navigateur, NOTRE ordre (la carte
+ * d'abord, comme sur mobile), et l'HONNÊTETÉ quand l'empreinte n'accepte
+ * aucun moyen — un message, pas un cadre vide.
  */
 
 "use client";
@@ -15,10 +25,11 @@
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { FlaskConical, RefreshCw, Route as RouteIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { MANGO, TipBlock, TrustBadge } from "../BookingFormUi";
 import type { PaymentIntentInfo, PriceBreakdown } from "../booking.types";
+import { acceptedMethods, elementsLocale, hasPayableMethod } from "../payment-methods";
 import type { ConfirmPaymentFn } from "../useBookingCheckout";
 
 type Props = {
@@ -43,6 +54,7 @@ function getStripePromise(): Promise<Stripe | null> | null {
 
 export default function StepPayment({ price, intent, intentLoading, intentError, onRetryAction, registerConfirmAction }: Props) {
   const t = useTranslations("booking");
+  const locale = useLocale();
   const stripePromise = useMemo(() => getStripePromise(), []);
   const isDark = useIsDarkMode();
   const afterPayment = AFTER_PAYMENT_KEYS.map((key) => t(`step4.afterPayment.${key}`));
@@ -85,12 +97,30 @@ export default function StepPayment({ price, intent, intentLoading, intentError,
             </span>
             <p>{t("step4.testMode", { amount: amountLabel })}</p>
           </div>
+        ) : !hasPayableMethod(intent) ? (
+          // D83 4A — l'empreinte a été posée, mais le fournisseur n'a résolu
+          // AUCUN moyen compatible. Le Payment Element rendrait un cadre vide ;
+          // on le dit, et on propose de réessayer (une intention recréée peut
+          // très bien en porter, si la configuration du compte a changé).
+          <div className="space-y-3">
+            <p className="text-[13px] text-slate-700 dark:text-slate-300">{t("step4.noMethod")}</p>
+            <button
+              type="button"
+              onClick={onRetryAction}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-300 px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <RefreshCw size={15} /> {t("step4.retry")}
+            </button>
+          </div>
         ) : stripePromise && intent.clientSecret ? (
           <Elements
             key={intent.paymentIntentId}
             stripe={stripePromise}
             options={{
               clientSecret: intent.clientSecret,
+              // La langue de YAMBA. Sans elle, le Payment Element suit le
+              // navigateur : lu en français, payé en anglais (D83 7A).
+              locale: elementsLocale(locale),
               appearance: {
                 theme: isDark ? "night" : "stripe",
                 variables: { colorPrimary: MANGO, borderRadius: "8px", fontSizeBase: "14px" },
@@ -98,6 +128,7 @@ export default function StepPayment({ price, intent, intentLoading, intentError,
             }}
           >
             <PaymentForm
+              methodOrder={acceptedMethods(intent.paymentMethodTypes)}
               registerConfirmAction={registerConfirmAction}
               onLoadErrorAction={() => setElementError(true)}
             />
@@ -118,9 +149,11 @@ export default function StepPayment({ price, intent, intentLoading, intentError,
 
 /** Dans le contexte <Elements> : expose `confirm` au hook de checkout. */
 function PaymentForm({
+  methodOrder,
   registerConfirmAction,
   onLoadErrorAction,
 }: {
+  methodOrder: string[];
   registerConfirmAction: (fn: ConfirmPaymentFn | null) => void;
   onLoadErrorAction: () => void;
 }) {
@@ -147,7 +180,18 @@ function PaymentForm({
 
   return (
     <PaymentElement
-      options={{ layout: { type: "tabs", defaultCollapsed: false } }}
+      options={{
+        layout: { type: "tabs", defaultCollapsed: false },
+        // NOTRE ordre : la carte d'abord, comme les lignes de l'écran mobile.
+        // `paymentMethodOrder` se règle ICI, sur l'élément — et non dans les
+        // options d'`Elements`, où il n'existe pas en mode `clientSecret`
+        // (mesuré : TS2353). Ce qu'on abandonne en le forçant, Stripe le dit :
+        // par défaut l'élément ordonne DYNAMIQUEMENT, par utilisateur. On
+        // préfère qu'un membre qui passe du site à l'app retrouve le même
+        // premier choix. Une liste vide laisse l'ordre de Stripe intact, donc
+        // un serveur plus ancien ne change rien.
+        paymentMethodOrder: methodOrder,
+      }}
       onLoadError={(event) => {
         // La vraie cause (ex. « No such payment_intent » = clé publiable d'un
         // AUTRE compte Stripe que la clé secrète du serveur) est pour le dev ;

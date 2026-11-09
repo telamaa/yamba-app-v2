@@ -7721,3 +7721,77 @@ il rend vérifiable ce qui était déjà écrit, et devient le dix-neuvième con
 - **La correction d'ANO-MOB-01** : c'est une règle métier (table de préfixes par pays), à
   graver au registre et à porter sur les **deux** fronts.
 - **Les clients d'API et les hooks React** : du réseau et du rendu, pas des règles.
+
+---
+
+# D83 — Le choix du moyen de paiement devient un écran de Yamba
+
+## Le besoin
+
+**Le moment du paiement est celui où l'on perd les gens.** Tout le tunnel de réservation a été
+construit pour y arriver : la recherche, le trajet, la carte du colis, le destinataire, le
+devis. La dernière marche était, jusqu'ici, une feuille de Stripe — et la première recette
+réelle, sur simulateur, a montré ce qu'elle disait à l'Expéditeur :
+
+- elle s'ouvre **par le bas**, basse, sur un fond gris : ce n'est pas une page de Yamba ;
+- elle est en **anglais** lorsque l'appareil est en anglais, même si le membre lit Yamba en
+  français — elle suit la langue de l'appareil, pas celle de l'application ;
+- elle propose des moyens que **Yamba n'a jamais choisis** : Link, Klarna et Amazon Pay étaient
+  activés par défaut sur le compte.
+
+La demande est donc métier, pas technique : « je dois avoir une page de paiement qui ressemble
+à la maquette, avec Carte bancaire, PayPal, Apple Pay sur iOS et Carte bancaire + PayPal +
+Google Pay sur Android ; pour chacun des choix une nouvelle page s'ouvre. »
+
+**Ce que ce lot ne touche pas, et c'est essentiel :** le chemin de l'argent. L'empreinte est
+posée maintenant, le débit a lieu à l'acceptation du Voyageur (D31), le remboursement et les
+litiges sont inchangés. Un Expéditeur qui payait hier paie de la même façon aujourd'hui — il
+le fait simplement dans une page qui lui parle.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-PAY-20** | Le choix du moyen de paiement est un **écran de Yamba**, plein écran, dans la langue du membre. La feuille du fournisseur cesse d'être la porte d'entrée : elle devient l'outil d'**un** des moyens |
+| **RG-PAY-21** | **Chaque moyen a sa page.** Choisir ouvre une page, jamais une action invisible. Y compris pour les moyens qui s'ouvrent ailleurs (PayPal, portefeuilles) : leur page dit ce qui s'ouvre, et c'est là qu'on revient si l'on annule |
+| **RG-PAY-22** | La liste affichée est l'**intersection** de ce que l'autorisation accepte et de ce que l'application sait conduire. Afficher un moyen que l'autorisation ne porte pas fabrique un refus ; afficher un moyen sans page promet un écran absent ; cacher un moyen qu'on saurait servir appauvrit le parcours sans raison |
+| **RG-PAY-23** | **Une seule ligne « Carte bancaire »**, et jamais « carte de crédit » : c'est un anglicisme, et c'est faux pour la majorité des cartes françaises, qui sont des cartes de débit — le dire promettrait un paiement différé qui n'existe pas. Les réseaux (CB, Visa, Mastercard) sont **cités en réassurance**, jamais proposés comme des choix : une carte co-badgée se traite dans le même formulaire, où le porteur choisit son réseau |
+| **RG-PAY-24** | Une ligne de portefeuille (Apple Pay, Google Pay) n'apparaît que si l'appareil répond **oui à l'exécution**. Jamais déduite du système d'exploitation : un appareil sans carte enregistrée, un simulateur sans portefeuille, un Android sans services Google disent tous non. **Un bouton qui ne peut pas marcher ne doit pas exister** |
+| **RG-PAY-25** | Fermer une feuille de paiement est une **annulation**, jamais un refus. Le membre lit « Rien n'a été débité », pas « votre carte a été refusée » — accuser la banque du membre à tort est une faute |
+| **RG-PAY-26** | Quand aucun moyen n'est disponible, l'écran le **dit** et propose de réessayer. Jamais un cadre vide, jamais un bouton qui n'ouvre rien |
+| **RG-PAY-27** | Le site et l'application disent la **même chose avec les mêmes mots**, et dans le même ordre (la carte d'abord). Un membre qui passe de l'un à l'autre retrouve son parcours |
+
+## Ce que l'Expéditeur voit, moyen par moyen
+
+| Moyen | Où se fait la saisie | Ce qui lui est dit avant |
+|---|---|---|
+| **Carte bancaire** | Dans une page de Yamba | « Tu saisis ta carte ici » — les réseaux cités dessous |
+| **PayPal** | Dans un navigateur, hors de l'app | Une page qui annonce l'ouverture de PayPal, et où il revient s'il annule |
+| **Apple Pay / Google Pay** | Dans la feuille du système | Une page qui annonce l'ouverture de la feuille, et où il revient s'il annule |
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| PAY83-01 | L'autorisation accepte `card` et `paypal` | Deux lignes, carte en premier |
+| PAY83-02 | L'autorisation accepte `card` seul, appareil avec portefeuille | Deux lignes : carte et le portefeuille **de cette plateforme** — jamais celui de l'autre |
+| PAY83-03 | L'autorisation accepte `card`, appareil **sans** portefeuille configuré | Une seule ligne : carte |
+| PAY83-04 | L'autorisation n'accepte **aucun** moyen | Un message, et « Réessayer » — jamais un cadre vide, sur le site comme dans l'app |
+| PAY83-05 | Le membre choisit un moyen, l'autorisation est recréée entre-temps avec d'autres moyens | Le choix mémorisé est **abandonné** au profit d'un moyen réellement disponible — jamais une feuille ouverte au hasard |
+| PAY83-06 | Le membre ferme la feuille du système ou renonce dans PayPal | « Rien n'a été débité », et un bouton pour réessayer sur la **même** page |
+| PAY83-07 | Le membre revient de PayPal après avoir autorisé | La demande part **sans** qu'il ait à réappuyer sur « Payer », et **sans** reverser les photos |
+| PAY83-08 | Un retour en arrière depuis la saisie de carte | Il ramène à l'écran de paiement, **pas** à la liste de choix qu'il vient de quitter |
+| PAY83-09 | Un membre lit Yamba en français depuis un navigateur en anglais | Le paiement est **en français** sur le site |
+| PAY83-10 | Mode test (aucun prestataire configuré) | Le bandeau « mode test » et une autorisation simulée — aucune liste de moyens |
+| PAY83-11 | Un moyen est activé au Dashboard du fournisseur | Il est proposé **sans redéploiement** dès que le front sait le conduire ; sinon il est simplement absent, jamais cassé |
+| PAY83-12 | La page d'un moyen rouverte alors que l'autorisation a disparu | Elle annonce **« Autorisation expirée »** et dit quoi faire. Jamais le titre de l'écran de choix — poser « Comment veux-tu payer ? » au-dessus d'un refus ne veut rien dire |
+
+## Ce qui reste hors de ce lot
+
+- **Apple Pay est écrit mais restera invisible tant que l'app passe par Expo Go** : iOS exige
+  que l'identifiant marchand figure dans les droits de l'application, et ces droits n'existent
+  pas dans Expo Go. Il faut un build de développement iOS — donc un compte développeur Apple,
+  un identifiant marchand et un certificat. La règle RG-PAY-24 la rend donc invisible, ce qui
+  est exactement le comportement attendu.
+- **Klarna reste désactivé** au Dashboard : hors maquette.
+- Le passage en **mode réel** reste un changement de clés (D82 1A).

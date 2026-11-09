@@ -84,6 +84,16 @@ export const CreatePaymentIntentResponseSchema = z
     amountCents: z.number().int(),
     currencyCode: z.string(),
     quote: ShipperPricingSchema.meta({ description: "Server-side quote — what will be frozen (D17/D34)" }),
+    paymentMethodTypes: z
+      .array(z.string())
+      .default([])
+      .meta({
+        description:
+          "D83 — payment methods this authorization accepts, as the provider resolved them: the account " +
+          "configuration MINUS whatever manual capture (D31) rules out. A client shows only the intersection " +
+          "of this list and what it can actually drive; showing a method absent from it manufactures a refusal. " +
+          "Empty for the FAKE provider — there is no sheet to open.",
+      }),
   })
   .meta({ id: "CreatePaymentIntentResponse" });
 export type CreatePaymentIntentResponse = z.infer<typeof CreatePaymentIntentResponseSchema>;

@@ -61,6 +61,20 @@ export type PaymentAuthorization = {
   metadata: Record<string, string>;
   /** charge créée par la capture (Stripe `latest_charge`) — null tant que rien n'est débité (A69) */
   chargeId: string | null;
+  /**
+   * D83 — les moyens de paiement que CETTE empreinte accepte, tels que le
+   * fournisseur les a résolus. Ils viennent de la configuration du compte
+   * (`automatic_payment_methods`) ET du filtrage que le fournisseur applique
+   * lui-même : une empreinte à capture MANUELLE (D31) écarte les moyens qui
+   * ne savent pas autoriser puis débiter, et il n'y a aucun moyen de le
+   * deviner côté client.
+   *
+   * L'écran de paiement du mobile n'affiche que l'INTERSECTION de cette liste
+   * et de ce qu'il sait conduire (D83 4A) : afficher un moyen absent d'ici,
+   * c'est fabriquer un refus. Vide chez le Fake — il n'y a aucune feuille à
+   * ouvrir, et l'écran a sa propre branche pour le dire.
+   */
+  paymentMethodTypes: string[];
 };
 
 /** Versement sortant (B4) — charges et transferts SÉPARÉS (Stripe Connect). */
@@ -199,6 +213,9 @@ function fromStripe(pi: Stripe.PaymentIntent): PaymentAuthorization {
     currencyCode: pi.currency.toUpperCase(),
     metadata: (pi.metadata ?? {}) as Record<string, string>,
     chargeId: typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null,
+    // D83 — Stripe RÉSOUT la liste à la création : avec `automatic_payment_methods`,
+    // elle reflète le Dashboard, moins ce que la capture manuelle interdit.
+    paymentMethodTypes: [...(pi.payment_method_types ?? [])],
   };
 }
 
@@ -351,6 +368,9 @@ export class FakePaymentProvider implements PaymentProvider {
       currencyCode: input.currencyCode,
       metadata: { ...input.metadata },
       chargeId: null,
+      // Aucune feuille à ouvrir : le Fake auto-confirme. Une liste vide dit la
+      // vérité — l'écran ne propose alors aucun moyen, il annonce le mode test.
+      paymentMethodTypes: [],
     };
     this.intents.set(intentId, auth);
     this.createdAt.set(intentId, new Date());
@@ -376,6 +396,7 @@ export class FakePaymentProvider implements PaymentProvider {
       currencyCode: "EUR",
       metadata: { seeded: "true" },
       chargeId: null,
+      paymentMethodTypes: [],
     };
     this.intents.set(intentId, auth);
     return auth;

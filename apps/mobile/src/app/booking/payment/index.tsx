@@ -29,9 +29,9 @@
  * la vraie carte attend le build de développement.
  */
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { useLocale, useTranslations } from 'use-intl';
 
@@ -56,10 +56,26 @@ import { PHOTO_MAX_MB, uploadDeclaredPhoto } from '@/lib/api/upload.api';
 import { clearBookingDraft, getBookingDraft, useBookingDraft } from '@/lib/booking-draft';
 import { quoteDraft } from '@/lib/booking-rules';
 import { useSession } from '@/lib/session-context';
-import { confirmWithPaymentSheet, isPaymentSheetAvailable } from '@/lib/stripe-sheet';
+import {
+  getIntentMethods,
+  isPaymentAuthorized,
+  markPaymentAuthorized,
+  setPendingIntent,
+  usePaymentChoice,
+} from '@/lib/payment-choice';
+import { availableMethods, flowOf, keepOrDefault, type PaymentMethodKey } from '@/lib/payment-methods';
+import { isPaymentSheetAvailable, isWalletSupported } from '@/lib/stripe-sheet';
 import { formatPrice } from '@/lib/trip-format';
 
 const AFTER_KEYS = ['step1', 'step2', 'step3', 'step4', 'step5'] as const;
+
+/** L'icône du moyen retenu — les mêmes que la page de choix. */
+const METHOD_ICONS: Record<PaymentMethodKey, keyof typeof Ionicons.glyphMap> = {
+  card: 'card-outline',
+  paypal: 'logo-paypal',
+  applePay: 'logo-apple',
+  googlePay: 'logo-google',
+};
 
 /** Les refus métier que l'écran SAIT nommer (contrat deal-service). */
 const KNOWN_CODES = new Set([
@@ -152,6 +168,35 @@ export default function BookingPaymentScreen() {
     };
   }, [tripId]);
 
+  /* ── Le moyen de paiement (D83) ────────────────────────────────────────
+     Le choix vit en mémoire de processus (la page de choix est POUSSÉE et ne
+     retourne rien), et la liste vient de l'empreinte. Ici, on ne fait que
+     LIRE : la normalisation (un choix devenu impossible) se fait dans la page
+     de choix, avec `keepOrDefault` — pure, donc les deux écrans calculent la
+     même chose sans se contredire. */
+  const choix = usePaymentChoice();
+  const [walletSupported, setWalletSupported] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    void isWalletSupported().then((ok) => {
+      if (vivant) setWalletSupported(ok);
+    });
+    return () => {
+      vivant = false;
+    };
+  }, []);
+
+  const methods = useMemo(
+    () =>
+      availableMethods({
+        serverTypes: intent ? intent.paymentMethodTypes : getIntentMethods(),
+        walletSupported,
+        platform: Platform.OS,
+      }),
+    [intent, walletSupported]
+  );
+  const methode: PaymentMethodKey | null = keepOrDefault(choix, methods);
+
   /** Le code d'un refus, ramené à une clé que l'écran sait traduire. */
   const codeOf = useCallback((e: unknown): string => {
     if (e instanceof QuoteUnavailableError) return 'QUOTE_UNAVAILABLE';
@@ -176,6 +221,20 @@ export default function BookingPaymentScreen() {
       try {
         const created = await createPaymentIntent(getBookingDraft(), current, params);
         setIntent(created);
+        // D83 4A — l'empreinte devient la source de la page de choix et de la
+        // page carte : ses moyens, son montant, son secret. Une intention
+        // neuve remet le drapeau d'autorisation à zéro — la précédente
+        // n'existe plus, et une demande partirait sur un identifiant mort.
+        setPendingIntent(
+          created.clientSecret
+            ? {
+                clientSecret: created.clientSecret,
+                amountCents: created.quote.totalShipperCents,
+                currencyCode: created.quote.currencyCode,
+                types: created.paymentMethodTypes,
+              }
+            : null
+        );
       } catch (e) {
         const code = codeOf(e);
         setIntent(null);
@@ -245,29 +304,28 @@ export default function BookingPaymentScreen() {
         return;
       }
 
-      // 2. L'autorisation. Chez FAKE il n'y a rien à ouvrir : le serveur a
-      //    déjà posé une empreinte simulée en créant l'intention.
-      if (intent.provider === 'STRIPE' && !cardAuthorized) {
+      // 2. L'autorisation, par le moyen CHOISI (D83). Chez FAKE il n'y a rien
+      //    à ouvrir : le serveur a déjà posé une empreinte simulée en créant
+      //    l'intention.
+      if (intent.provider === 'STRIPE' && !cardAuthorized && !isPaymentAuthorized()) {
         if (!intent.clientSecret) {
           setError(t('payment.errors.PAYMENT_NOT_AUTHORIZED'));
           return;
         }
-        const outcome = await confirmWithPaymentSheet({
-          clientSecret: intent.clientSecret,
-          merchantName: 'Yamba',
-          dark: scheme === 'dark',
-        });
-        if (!outcome.ok) {
-          setError(
-            outcome.reason === 'CANCELED'
-              ? t('payment.errors.CANCELED')
-              : outcome.reason === 'UNAVAILABLE'
-                ? t('payment.unavailableBody')
-                : t('payment.errors.SHEET_FAILED')
-          );
+        if (methode === null) {
+          // Aucun moyen retenu : la page de choix n'a rien à proposer, ou son
+          // choix a disparu avec une intention recréée. On y renvoie plutôt
+          // que d'ouvrir une feuille au hasard.
+          setError(t('payment.errors.NO_METHOD'));
           return;
         }
-        setCardAuthorized(true);
+        // D83 — « Payer » ouvre L'ÉCRAN DE CHOIX, pas directement un moyen.
+        // C'est le parcours demandé : une page de choix, puis une page par
+        // moyen. L'écran s'arrête donc ici ; il reprendra la main au retour de
+        // focus, une fois l'empreinte posée, avec les photos déjà téléversées
+        // (leurs URLs sont mémorisées).
+        router.push('/booking/payment/method');
+        return;
       }
 
       // 3. La demande elle-même. Le serveur relit l'état RÉEL de l'empreinte chez le
@@ -325,6 +383,28 @@ export default function BookingPaymentScreen() {
     requestIntent,
     uploadPhotos,
   ]);
+
+  /* D83 — la REPRISE. Ce hook est ici, et PAS plus bas : les deux retours
+     anticipés qui suivent (`failed`, `!trip`) changeraient le NOMBRE de hooks
+     d'un rendu à l'autre, et React refuse — « Rendered more hooks than during
+     the previous render ». Tout hook vit donc au-dessus de la première sortie.
+
+     La page carte pose l'empreinte puis se referme : une page poussée ne
+     retourne rien à celle qui l'a poussée. L'écran reprend
+     donc la main au retour de focus et ENCHAÎNE tout seul — l'Expéditeur
+     vient d'autoriser son paiement, lui redemander d'appuyer sur « Payer »
+     serait incompréhensible.
+
+     Les photos ne repartent pas : leurs URLs sont mémorisées (A45). Et si le
+     serveur refuse, c'est le refus qui s'affiche — jamais une seconde
+     empreinte, puisque `isPaymentAuthorized()` fait désormais autorité. */
+  useFocusEffect(
+    useCallback(() => {
+      if (!isPaymentAuthorized() || cardAuthorized || submitting) return;
+      setCardAuthorized(true);
+      void onPay();
+    }, [cardAuthorized, onPay, submitting])
+  );
 
   if (failed) {
     return (
@@ -485,17 +565,44 @@ export default function BookingPaymentScreen() {
               {t('payment.testMode', { amount: amountLabel ?? '' })}
             </ThemedText>
           </View>
-        ) : sheetAvailable ? (
-          <View style={styles.row}>
+        ) : methode !== null ? (
+          /* D83 — le moyen RETENU, et le geste pour en changer. La ligne est
+             tout entière un bouton : sur un téléphone, un « Changer » discret
+             à droite se rate une fois sur deux. */
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(`methods.${methode}.label`)}
+            accessibilityHint={t('methods.change')}
+            onPress={() => router.push('/booking/payment/method')}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
             <Ionicons
-              name={cardAuthorized ? 'checkmark-circle' : 'card-outline'}
+              name={cardAuthorized ? 'checkmark-circle' : METHOD_ICONS[methode]}
               size={18}
               color={cardAuthorized ? Brand.teal : theme.textSecondary}
             />
             <View style={styles.flex}>
+              <ThemedText type="small">{t(`methods.${methode}.label`)}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {cardAuthorized
+                  ? t('payment.cardAuthorized')
+                  : t(`methods.flows.${flowOf(methode)}`)}
+              </ThemedText>
+            </View>
+            {/* Un seul moyen disponible : rien à changer, donc pas de chevron
+                qui promettrait un choix (A209). */}
+            {methods.length > 1 && !cardAuthorized ? (
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                {t('methods.change')}
+              </ThemedText>
+            ) : null}
+          </Pressable>
+        ) : sheetAvailable ? (
+          <View style={styles.row}>
+            <Ionicons name="card-outline" size={18} color={theme.textSecondary} />
+            <View style={styles.flex}>
               <ThemedText type="small">{t('payment.card')}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {cardAuthorized ? t('payment.cardAuthorized') : t('payment.cardPending')}
+                {t('payment.cardPending')}
               </ThemedText>
             </View>
           </View>
@@ -564,5 +671,6 @@ const styles = StyleSheet.create({
   totalLine: { borderTopWidth: 1, paddingTop: Spacing.three, alignItems: 'center' },
   bullet: { flexDirection: 'row', gap: Spacing.two },
   retry: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderWidth: 1, borderRadius: 12, paddingVertical: Spacing.two, paddingHorizontal: Spacing.three, alignSelf: 'flex-start' },
+  pressed: { opacity: 0.6 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
 });

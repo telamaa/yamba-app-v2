@@ -5965,3 +5965,238 @@ qu'il faut corriger. Figer l'environnement ne règle que le symptôme — et sup
 - **`jest.isolateModules` vs `jest.resetModules`.** Le second remet le registre à zéro pour la
   suite du fichier ; le premier **borne** l'isolation à un bloc. Pour un module à état, le
   premier est plus sûr : il ne dépend pas de l'ordre des fiches.
+
+---
+
+## Chapitre 224 — La règle d'or des hooks, la fonction qui écrit en répondant, et la clé de traduction que personne n'a jamais appelée
+
+> Lot D83 (`feat/mobile-payment-methods`) : le paiement devient un écran de Yamba. Trois
+> concepts à emporter, tous payés par un défaut RÉEL — deux trouvés par le simulateur, un
+> trouvé en cherchant ce que le simulateur ne pourrait jamais montrer.
+
+### 1. Les hooks de React : une règle d'ORDRE, pas de place dans le fichier
+
+Le défaut, dans le simulateur, s'affiche en rouge plein écran :
+
+```
+Render Error — Rendered more hooks than during the previous render.
+```
+
+La cause tient en trois lignes de notre écran de paiement :
+
+```tsx
+export default function BookingPaymentScreen() {
+  const [intent, setIntent] = useState(null);     // hook 1
+  // … cinq autres hooks …
+  if (failed) return <Erreur />;                  // ← sortie anticipée
+  if (!trip) return <Chargement />;               // ← sortie anticipée
+  useFocusEffect(…);                              // ← hook 7, parfois
+}
+```
+
+**La théorie.** React ne connaît pas le NOM de vos hooks. Il tient une liste par composant et
+avance dedans à chaque appel : le premier `useState` rencontré est la case 1, le deuxième la
+case 2, et ainsi de suite. Cette liste est reconstruite à **chaque rendu**, en comptant. D'où
+la règle, qui n'est pas une convention de style mais une contrainte d'implémentation :
+
+> Les hooks doivent être appelés dans le **même ordre** et en même **nombre** à chaque rendu.
+
+Un rendu qui sort tôt appelle six hooks ; le rendu suivant, où `trip` est arrivé, en appelle
+sept. React compare, trouve une case de trop, et jette. **Et il le fait au rendu suivant**,
+donc loin de la ligne fautive : le message ne pointe pas vers `useFocusEffect`.
+
+**La correction** est mécanique : tout hook vit **au-dessus** de la première sortie anticipée.
+Cela veut parfois dire déplacer un `useEffect` au-dessus d'un `if (!data) return …` et lui
+donner une garde à l'intérieur — ce qui est toujours possible, puisqu'un effet peut ne rien
+faire.
+
+**L'outil qui aurait dû le voir, et pourquoi il n'était pas là.** `eslint-plugin-react-hooks`
+connaît cette règle et l'applique. Mais le dépôt n'a **aucun** linter (`linter: none`, choix de
+génération Nx). Plutôt que d'ajouter ESLint dans un lot d'écran — une dépendance, une
+configuration, et un flot de signalements sur 300 fichiers écrits sans lui — on a écrit la
+sonde minimale, dans le harnais qui existait déjà :
+
+```ts
+// apps/mobile/src/lib/hooks-avant-sortie.spec.ts (extrait)
+const HOOK = /^ {2}(?:(?:const|let)\s+[^=]+=\s*)?use[A-Z]\w*\s*\(/;
+```
+
+Trois leçons dans ce choix, qui valent pour toute sonde écrite à la main sur du texte :
+
+1. **L'indentation EST l'information.** Deux espaces = premier niveau du composant, donc
+   concerné par la règle. Plus profond = dans une fonction ou une JSX, donc hors sujet. Un
+   analyseur syntaxique le dirait mieux ; un `grep` bien choisi le dit assez.
+2. **Découper par UNITÉ de la règle, sinon la sonde est inutilisable.** La règle vaut par
+   **composant**, et un fichier en contient plusieurs. Sans ce découpage : 17 faux positifs,
+   et une sonde à 17 faux positifs est une sonde qu'on désactive.
+3. **Une sonde se vérifie elle-même.** La fiche contient le défaut exact, en chaîne de
+   caractères, et exige que la sonde l'attrape. Sans cela, une expression régulière cassée fait
+   une suite verte et silencieuse — le pire des deux mondes.
+
+### 2. CQS : une fonction qui répond à une question n'écrit jamais
+
+Le deuxième défaut du simulateur :
+
+```
+Cannot update a component while rendering a different component.
+```
+
+La fonction coupable faisait une chose très naturelle :
+
+```ts
+// AVANT — elle lit, elle corrige, elle répond
+export function resolvedChoice(disponibles) {
+  const garde = keepOrDefault(choix, disponibles);
+  if (garde !== choix) {
+    choix = garde;        // ← une ÉCRITURE
+    emit();               // ← qui notifie les abonnés React
+  }
+  return garde;           // ← et une réponse
+}
+```
+
+Appelée dans le corps d'un composant — ce qui est l'usage normal d'une fonction qui *répond* —
+elle déclenche une mise à jour d'état **pendant un rendu**. React proteste, et il a raison : à
+ce moment-là, il est au milieu de la construction d'un arbre.
+
+**La théorie porte un nom : *Command-Query Separation*** (Bertrand Meyer). Une opération est
+soit une **commande** (elle change l'état, elle ne retourne rien), soit une **requête** (elle
+retourne une valeur, elle ne change rien). Jamais les deux. La règle a l'air académique jusqu'au
+jour où l'on découvre que React en dépend : son modèle suppose que lire est sans effet.
+
+**La correction a été une suppression**, pas un verrou :
+
+```ts
+// APRÈS — il n'y a plus de fonction qui fait les deux.
+// La normalisation est PURE, et les deux écrans l'appellent.
+const methode = keepOrDefault(choix, disponibles);
+```
+
+Deux écrans qui appellent la même fonction pure obtiennent le même résultat sans avoir besoin
+de se synchroniser : il n'y a plus d'état à corriger, donc plus rien à écrire. **Le meilleur
+correctif d'une fonction qui en fait trop est souvent de constater qu'elle n'a pas besoin
+d'exister.**
+
+Et pour que cela ne revienne pas, la fiche **compte les notifications** :
+
+```ts
+const vues: number[] = [];
+subscribePaymentChoice(() => vues.push(1));
+getPaymentChoice();            // une LECTURE
+expect(vues).toHaveLength(0);  // n'a notifié personne
+```
+
+Compter est plus fort que vérifier une valeur : une écriture qui remet la même valeur
+passerait un `toBe`, mais pas un compteur.
+
+### 3. Les clés de traduction CALCULÉES : l'angle mort que trois contrôles laissent passer
+
+Nos écrans de paiement demandent leurs textes comme ceci :
+
+```tsx
+t(`confirm.errors.${authFailureKey(outcome.reason)}`)
+```
+
+C'est le bon choix — un `switch` sur quatre moyens recopié sur trois écrans finit par
+diverger — mais posons la question qui compte : **qui vérifie que la clé existe ?**
+
+| Contrôle | Ce qu'il voit |
+|---|---|
+| `tsc` | Un `string`. Un gabarit se type **toujours**. Rien à signaler |
+| Le contrôle i18n de la CI | Il compare FR et EN **entre eux**. Deux dictionnaires qui ont oublié la même clé sont un **miroir parfait** |
+| Le harnais de tests | Il ne rend aucun composant, donc n'appelle jamais `t()` |
+
+Trois contrôles, zéro couverture. Et le symptôme n'est pas un plantage : `use-intl` rend le
+**chemin de la clé**. L'Expéditeur lit « confirm.errors.canceled » à l'endroit où on lui devait
+« Rien n'a été débité ».
+
+**Le motif qui ferme le trou** est le même qu'au chapitre 223 (« la copie confrontée à
+l'original »), appliqué dans l'autre sens : au lieu de comparer une constante recopiée à sa
+source, on fait **produire les clés par le code** et on va les chercher dans le fichier réel.
+
+```ts
+// Les clés sortent des fonctions PURES, jamais d'une liste écrite à la main
+for (const key of PAYMENT_METHODS) cles.push(labelKey(key), hintKey(key));
+for (const f of new Set(PAYMENT_METHODS.map(flowOf))) cles.push(`methods.flows.${f}`);
+for (const motif of ['CANCELED', 'UNAVAILABLE', 'FAILED', 'INCONNU', null, undefined]) {
+  cles.push(`confirm.errors.${authFailureKey(motif)}`);
+}
+```
+
+Trois propriétés à retenir de cette forme de test :
+
+- **aucune maintenance** : ajouter un cinquième moyen de paiement ajoute ses clés à la
+  vérification tout seul, et un flux inédit amène la sienne ;
+- **les cas qui n'en sont pas sont couverts** : on passe à `authFailureKey` un motif inconnu,
+  `null` et `undefined` — ce qu'un SDK rend vraiment un jour de panne ;
+- **la traversée est écrite à la main**, segment par segment sur le point, pour imiter
+  exactement `use-intl` et refuser un chemin qui continue sous une chaîne.
+
+**Et la non-régression se MESURE.** Une fiche qui n'a jamais été rouge ne garde rien :
+
+```sh
+# on retire confirm.errors.canceled du dictionnaire anglais
+npx nx test @yamba-app/mobile -- --testPathPatterns=payment-i18n
+# → 1 failed, 55 passed   ← la sonde sait échouer, et sur la bonne fiche
+```
+
+### 4. Deux pièges d'intégration rencontrés en chemin
+
+**a) La bonne option, au mauvais niveau.** Sur le site, forcer l'ordre des moyens dans le
+Payment Element de Stripe :
+
+```ts
+<Elements options={{ clientSecret, paymentMethodOrder: [...] }}>   // ✗ TS2353
+<PaymentElement options={{ paymentMethodOrder: [...] }} />          // ✓
+```
+
+`paymentMethodOrder` appartient aux options de l'**élément**, pas à celles d'`Elements` — où il
+n'existe pas en mode `clientSecret`. Leçon générale : quand une bibliothèque a deux niveaux de
+configuration, le typage sait lequel porte quoi, et c'est plus rapide à lui demander qu'à
+chercher dans la documentation. `node_modules/@stripe/stripe-js/dist/**/*.d.ts` est consultable
+avec un `grep` ; la réponse y était, avec le commentaire d'origine en prime — lequel nous a
+appris ce qu'on abandonnait (l'ordre par défaut est **dynamique, par utilisateur**).
+
+**b) Une navigation a une pile, et un retour est une opération dessus.** `push` empile,
+`replace` remplace :
+
+```
+paiement ──push──▶ choix ──replace──▶ page du moyen ──back──▶ paiement
+```
+
+Si la page du moyen était **poussée**, un retour depuis la saisie de carte ramènerait à la
+liste de choix que le membre vient de quitter : il reculerait d'un cran et croirait son choix
+perdu. Choisir entre `push` et `replace` n'est donc pas un détail d'API — c'est **décider ce
+que « retour » veut dire** pour l'utilisateur.
+
+**c) Un repli de texte se choisit dans le vocabulaire de SA page.** Trouvé en affichant enfin
+l'écran dans le simulateur :
+
+```tsx
+const titre = methode ? t(`methods.${methode}.label`) : t('methods.title');
+//                                                        ↑ « Comment veux-tu payer ? »
+//                                                          le titre de l'écran d'À CÔTÉ
+```
+
+Le repli faisait poser à la page une question à laquelle elle ne répond pas, juste au-dessus
+d'un texte annonçant que l'autorisation avait expiré. Ce qui rend le cas intéressant, c'est
+**tout ce qui le laisse passer** : il compile, il passe le miroir FR/EN de la CI, il passe même
+le garde-fou des clés calculées écrit le jour même — la clé existe, elle est traduite, elle est
+juste **mauvaise ici**. Aucun test automatique ne distingue « la clé existe » de « la clé dit
+la bonne chose ». C'est la frontière entre vérification et recette, et elle ne bougera pas.
+
+### Pour aller plus loin
+
+- **Les règles des hooks**, dans la documentation React (« Rules of Hooks ») : la liste par
+  composant y est expliquée, et c'est ce qui rend l'ordre obligatoire.
+- **Command-Query Separation**, Bertrand Meyer, *Object-Oriented Software Construction*. Sa
+  cousine pratique est la règle « un `get` ne mute jamais », que tous les cadres réactifs
+  supposent sans la dire.
+- **Les tests qui dérivent leurs cas du code** plutôt que de les réciter : c'est la porte
+  d'entrée du *property-based testing*. On n'a pas besoin de `fast-check` pour en tirer
+  l'essentiel — il suffit d'énumérer un ensemble que le code possède déjà (`PAYMENT_METHODS`)
+  au lieu de le recopier dans la fiche.
+- **Ce que le harnais ne voit pas reste à voir.** Deux des trois défauts de ce chapitre ont été
+  trouvés par un simulateur, pas par un test. Un harnais de rendu (`jest-expo` +
+  `@testing-library/react-native`) les aurait attrapés ; il coûte trois dépendances et change le
+  rapport coût/bénéfice du harnais. L'axe est ouvert, à trancher **avec une mesure**.

@@ -254,9 +254,68 @@
       "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
       "SESSION": "Ta session a expiré. Reconnecte-toi : ta saisie est gardée.",
       "ACCOUNT_SUSPENDED": "Ton compte est suspendu. Contacte le support pour en savoir plus.",
-      "GENERIC": "Une erreur est survenue. Rien n'a été débité, tu peux réessayer."
+      "GENERIC": "Une erreur est survenue. Rien n'a été débité, tu peux réessayer.",
+      "NO_METHOD": "Choisis d'abord un moyen de paiement."
     },
     "signIn": "Se connecter"
+  },
+  "methods": {
+    "back": "Retour",
+    "title": "Comment veux-tu payer ?",
+    "none": "Aucun moyen de paiement n'est disponible pour cette demande. Reviens en arrière et réessaie.",
+    "cta": "Suivant",
+    "change": "Changer",
+    "card": {
+      "label": "Carte bancaire",
+      "hint": "Un formulaire s'ouvre pour saisir ta carte."
+    },
+    "paypal": {
+      "label": "PayPal",
+      "hint": "PayPal s'ouvre, puis tu reviens dans l'app."
+    },
+    "applePay": {
+      "label": "Apple Pay",
+      "hint": "La feuille Apple Pay s'ouvre par-dessus l'app."
+    },
+    "googlePay": {
+      "label": "Google Pay",
+      "hint": "La feuille Google Pay s'ouvre par-dessus l'app."
+    },
+    "flows": {
+      "form": "À l'étape suivante, tu saisiras les informations de ta carte.",
+      "redirect": "Tu vas quitter Yamba un instant, puis revenir ici automatiquement.",
+      "sheet": "La feuille de ton téléphone s'ouvrira par-dessus cet écran."
+    }
+  },
+  "card": {
+    "title": "Ta carte bancaire",
+    "subtitle": "Le montant est autorisé maintenant. Rien n'est débité tant que le Voyageur n'a pas accepté.",
+    "placeholder": "Numéro de carte",
+    "holder": "Nom du porteur",
+    "holderPlaceholder": "Comme sur la carte",
+    "holderHint": "Facultatif. Il aide ta banque à reconnaître le paiement.",
+    "hold": "Tes informations de carte ne passent jamais par Yamba : elles vont directement à notre prestataire de paiement.",
+    "cta": "Autoriser {amount}",
+    "expired": "Cette autorisation n'est plus valable. Reviens à l'écran de paiement, elle sera recréée.",
+    "errors": {
+      "canceled": "Paiement interrompu. Ta carte n'a pas été débitée — tu peux réessayer.",
+      "unavailable": "Le paiement par carte n'est pas disponible sur cet appareil.",
+      "failed": "L'autorisation a échoué. Vérifie les informations de ta carte, ou essaie une autre carte."
+    }
+  },
+  "confirm": {
+    "expiredTitle": "Autorisation expirée",
+    "opening": {
+      "redirect": "Ouverture de PayPal…",
+      "wallet": "Ouverture de la feuille de paiement…"
+    },
+    "retry": "Réessayer",
+    "retryHint": "Rien n'a été débité. Tu peux réessayer, ou revenir en arrière pour changer de moyen.",
+    "errors": {
+      "canceled": "Paiement interrompu. Rien n'a été débité.",
+      "unavailable": "Ce moyen de paiement n'est pas disponible sur cet appareil.",
+      "failed": "L'autorisation a échoué. Essaie un autre moyen de paiement."
+    }
   },
   "confirmation": {
     "title": "Demande envoyée",

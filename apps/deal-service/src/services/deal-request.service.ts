@@ -173,6 +173,11 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
         amountCents: auth.amountCents,
         currencyCode: auth.currencyCode,
         quote: toShipperPricing(quote),
+        // D83 4A — l'écran de paiement n'invente aucun moyen : il affiche ce que
+        // CETTE empreinte accepte, et rien d'autre. La liste est celle que le
+        // fournisseur a résolue (configuration du compte moins ce que la capture
+        // manuelle écarte) ; vide chez le Fake, qui n'ouvre aucune feuille.
+        paymentMethodTypes: auth.paymentMethodTypes,
       };
     },
 

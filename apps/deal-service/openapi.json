@@ -13091,6 +13091,14 @@
           "quote": {
             "description": "Server-side quote — what will be frozen (D17/D34)",
             "$ref": "#/components/schemas/ShipperPricing"
+          },
+          "paymentMethodTypes": {
+            "default": [],
+            "description": "D83 — payment methods this authorization accepts, as the provider resolved them: the account configuration MINUS whatever manual capture (D31) rules out. A client shows only the intersection of this list and what it can actually drive; showing a method absent from it manufactures a refusal. Empty for the FAKE provider — there is no sheet to open.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -13099,7 +13107,8 @@
           "clientSecret",
           "amountCents",
           "currencyCode",
-          "quote"
+          "quote",
+          "paymentMethodTypes"
         ],
         "additionalProperties": false
       },

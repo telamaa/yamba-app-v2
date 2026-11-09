@@ -1,4 +1,4 @@
-import { CreatePaymentIntentRequestSchema } from "@packages/api-contracts";
+import { CreatePaymentIntentRequestSchema, CreatePaymentIntentResponseSchema } from "@packages/api-contracts";
 
 /**
  * ANO-API-12 (recette API 08/09/2026, fiche API-DEAL-02, bloquante) — le plafond
@@ -40,5 +40,80 @@ describe("CreatePaymentIntentRequest — la valeur déclarée voyage dès l'auto
 
   it("accepte zéro (aucune valeur déclarée n'est un cas légitime)", () => {
     expect(CreatePaymentIntentRequestSchema.safeParse({ ...base, declaredValueCents: 0 }).success).toBe(true);
+  });
+});
+
+/**
+ * D83 — la réponse PORTE les moyens de paiement que l'empreinte accepte.
+ * =======================================================================
+ * L'écran de paiement du mobile n'affiche que l'intersection de cette liste et
+ * de ce qu'il sait conduire (D83 4A). Deux propriétés du contrat comptent donc
+ * autant que la liste elle-même :
+ *
+ *   • le DÉFAUT est une liste vide, jamais `undefined` : un client n'a pas à
+ *     écrire un garde-fou pour un champ que le contrat promet ;
+ *   • le champ est RÉTRO-COMPATIBLE : une réponse produite avant D83 (sans le
+ *     champ) reste valide, et rend une liste vide — soit « aucun moyen à
+ *     proposer », ce qui est exactement le comportement prudent.
+ */
+const reponse = {
+  provider: "STRIPE",
+  paymentIntentId: "pi_3ABC",
+  clientSecret: "pi_3ABC_secret_xyz",
+  amountCents: 1105,
+  currencyCode: "EUR",
+  // Instantané de prix COMPLET : le contrat exige le modèle, la commission en
+  // pourcentage et le total — un devis à moitié rempli n'existe pas côté serveur.
+  quote: {
+    pricingModel: "PER_KG",
+    product: "PARCEL",
+    weightKg: 2,
+    billableWeightKg: 2.3,
+    sizeClass: "S",
+    pricePerKgCents: 350,
+    transportCents: 805,
+    commissionPct: 12,
+    commissionCents: 300,
+    premiumCents: 0,
+    totalShipperCents: 1105,
+    currencyCode: "EUR",
+    protectionTier: "BASIC",
+  },
+};
+
+describe("CreatePaymentIntentResponse — les moyens de paiement servis (D83)", () => {
+  it("accepte la liste résolue par le fournisseur", () => {
+    const r = CreatePaymentIntentResponseSchema.safeParse({
+      ...reponse,
+      paymentMethodTypes: ["card", "paypal"],
+    });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.paymentMethodTypes).toEqual(["card", "paypal"]);
+  });
+
+  it("RÉTRO-COMPATIBLE : une réponse sans le champ reste valide et rend une liste VIDE", () => {
+    const r = CreatePaymentIntentResponseSchema.safeParse(reponse);
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.paymentMethodTypes).toEqual([]);
+  });
+
+  it("le fournisseur FAKE n'en annonce aucun, et c'est une liste explicite", () => {
+    const r = CreatePaymentIntentResponseSchema.safeParse({
+      ...reponse,
+      provider: "FAKE",
+      clientSecret: null,
+      paymentMethodTypes: [],
+    });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.paymentMethodTypes).toEqual([]);
+  });
+
+  it("refuse autre chose qu'une liste de chaînes — un moyen n'est jamais un objet", () => {
+    expect(
+      CreatePaymentIntentResponseSchema.safeParse({ ...reponse, paymentMethodTypes: "card" }).success
+    ).toBe(false);
+    expect(
+      CreatePaymentIntentResponseSchema.safeParse({ ...reponse, paymentMethodTypes: [{ type: "card" }] }).success
+    ).toBe(false);
   });
 });

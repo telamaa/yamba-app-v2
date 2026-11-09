@@ -26,6 +26,9 @@ type FakeNative = {
   initPaymentSheet: jest.Mock;
   presentPaymentSheet: jest.Mock;
   handleURLCallback: jest.Mock;
+  isPlatformPaySupported: jest.Mock;
+  confirmPlatformPayPayment: jest.Mock;
+  confirmPayment: jest.Mock;
 };
 
 function fakeNative(overrides: Partial<FakeNative> = {}): FakeNative {
@@ -34,6 +37,9 @@ function fakeNative(overrides: Partial<FakeNative> = {}): FakeNative {
     initPaymentSheet: jest.fn().mockResolvedValue({}),
     presentPaymentSheet: jest.fn().mockResolvedValue({}),
     handleURLCallback: jest.fn().mockResolvedValue(true),
+    isPlatformPaySupported: jest.fn().mockResolvedValue(true),
+    confirmPlatformPayPayment: jest.fn().mockResolvedValue({}),
+    confirmPayment: jest.fn().mockResolvedValue({}),
     ...overrides,
   };
 }
@@ -296,3 +302,187 @@ describe('handleStripeRedirect — le relais de lien d’iOS (D82 7A)', () => {
  * le harnais du mobile entre donc aussi dans SON champ (A223).
  */
 export {};
+
+/* ══ D83 — les trois autres chemins d'autorisation ═══════════════════════════
+   La feuille n'est plus la porte d'entrée : l'écran de Yamba choisit, et
+   chaque moyen a son chemin. Les trois partagent les propriétés de la
+   feuille, et ce sont elles qu'on tient ici — ne jamais lever, distinguer
+   l'annulation de l'échec, et traduire toute absence en « indisponible ».
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('isWalletSupported — une MESURE, jamais une déduction (D83 3A)', () => {
+  it('rend le verdict de l’appareil quand il répond oui', async () => {
+    const native = fakeNative();
+    await expect(loadSheet(native).isWalletSupported()).resolves.toBe(true);
+    expect(native.isPlatformPaySupported).toHaveBeenCalled();
+  });
+
+  it('un appareil sans portefeuille dit non, et ce n’est pas une panne', async () => {
+    const native = fakeNative({ isPlatformPaySupported: jest.fn().mockResolvedValue(false) });
+    await expect(loadSheet(native).isWalletSupported()).resolves.toBe(false);
+  });
+
+  it('sans module natif (Expo Go sur iOS), non — ses droits Apple Pay n’existent pas', async () => {
+    await expect(loadSheet(null).isWalletSupported()).resolves.toBe(false);
+  });
+
+  it('sans clé publiable, non — et on ne touche pas au natif', async () => {
+    delete process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const native = fakeNative();
+    await expect(loadSheet(native).isWalletSupported()).resolves.toBe(false);
+    expect(native.isPlatformPaySupported).not.toHaveBeenCalled();
+  });
+
+  it('un appel natif qui LÈVE vaut non — une liste de choix, pas un diagnostic', async () => {
+    const native = fakeNative({
+      isPlatformPaySupported: jest.fn().mockRejectedValue(new Error('no wallet')),
+    });
+    await expect(loadSheet(native).isWalletSupported()).resolves.toBe(false);
+  });
+
+  it('initialise Stripe avant d’interroger : la clé doit être posée', async () => {
+    const native = fakeNative();
+    await loadSheet(native).isWalletSupported();
+    expect(native.initStripe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('confirmWithWallet — la feuille du système', () => {
+  const ARGS = { clientSecret: 'pi_1_secret_2', amountCents: 1105, currencyCode: 'EUR', merchantName: 'Yamba' };
+
+  it('confirme et rend un succès', async () => {
+    const native = fakeNative();
+    await expect(loadSheet(native).confirmWithWallet(ARGS)).resolves.toEqual({ ok: true });
+    expect(native.confirmPlatformPayPayment).toHaveBeenCalledWith('pi_1_secret_2', expect.any(Object));
+  });
+
+  it('affiche le MONTANT du devis serveur — la feuille du système ne lit pas l’intention', async () => {
+    const native = fakeNative();
+    await loadSheet(native).confirmWithWallet(ARGS);
+    const params = native.confirmPlatformPayPayment.mock.calls[0][1] as {
+      applePay: { cartItems: { amount: string }[]; merchantCountryCode: string };
+      googlePay: { currencyCode: string; merchantCountryCode: string };
+    };
+    expect(params.applePay.cartItems[0].amount).toBe('11.05');
+    expect(params.applePay.merchantCountryCode).toBe('FR');
+    expect(params.googlePay.currencyCode).toBe('EUR');
+    expect(params.googlePay.merchantCountryCode).toBe('FR');
+  });
+
+  it('fermer la feuille du système est une ANNULATION', async () => {
+    const native = fakeNative({
+      confirmPlatformPayPayment: jest.fn().mockResolvedValue({ error: { code: 'Canceled' } }),
+    });
+    await expect(loadSheet(native).confirmWithWallet(ARGS)).resolves.toEqual({
+      ok: false,
+      reason: 'CANCELED',
+    });
+  });
+
+  // Un seul chargement de module par fiche : `isolateModules` donne un registre
+  // neuf, mais deux chargements dans la MÊME fiche se marchent dessus — mesuré.
+  it('un refus porte son message', async () => {
+    const refus = fakeNative({
+      confirmPlatformPayPayment: jest.fn().mockResolvedValue({ error: { code: 'Failed', message: 'Carte refusée' } }),
+    });
+    await expect(loadSheet(refus).confirmWithWallet(ARGS)).resolves.toEqual({
+      ok: false,
+      reason: 'FAILED',
+      message: 'Carte refusée',
+    });
+  });
+
+  it('sans module natif, c’est indisponible', async () => {
+    await expect(loadSheet(null).confirmWithWallet(ARGS)).resolves.toEqual({
+      ok: false,
+      reason: 'UNAVAILABLE',
+    });
+  });
+});
+
+describe('confirmWithRedirect — PayPal part et revient', () => {
+  const ARGS = { clientSecret: 'pi_1_secret_2', paymentMethodType: 'PayPal' as const };
+
+  it('confirme avec le type nommé', async () => {
+    const native = fakeNative();
+    await expect(loadSheet(native).confirmWithRedirect(ARGS)).resolves.toEqual({ ok: true });
+    expect(native.confirmPayment).toHaveBeenCalledWith('pi_1_secret_2', {
+      paymentMethodType: 'PayPal',
+    });
+  });
+
+  it('un retour annulé n’est pas un refus de paiement', async () => {
+    const native = fakeNative({
+      confirmPayment: jest.fn().mockResolvedValue({ error: { code: 'Canceled' } }),
+    });
+    await expect(loadSheet(native).confirmWithRedirect(ARGS)).resolves.toEqual({
+      ok: false,
+      reason: 'CANCELED',
+    });
+  });
+
+  it('ne lève jamais, même si l’appel natif explose', async () => {
+    const native = fakeNative({
+      confirmPayment: jest.fn().mockRejectedValue(new Error('boom')),
+    });
+    await expect(loadSheet(native).confirmWithRedirect(ARGS)).resolves.toEqual({
+      ok: false,
+      reason: 'UNAVAILABLE',
+    });
+  });
+});
+
+describe('confirmCardPayment — la carte saisie dans NOTRE page', () => {
+  it('n’envoie que le secret et le type : les données de carte restent dans le champ natif', async () => {
+    const native = fakeNative();
+    await expect(
+      loadSheet(native).confirmCardPayment({ clientSecret: 'pi_1_secret_2' })
+    ).resolves.toEqual({ ok: true });
+    expect(native.confirmPayment).toHaveBeenCalledWith('pi_1_secret_2', {
+      paymentMethodType: 'Card',
+    });
+  });
+
+  it('joint le nom du porteur quand il est saisi, TRIMÉ', async () => {
+    const avec = fakeNative();
+    await loadSheet(avec).confirmCardPayment({ clientSecret: 's', holderName: '  Awa Nkounkou  ' });
+    expect(avec.confirmPayment).toHaveBeenCalledWith('s', {
+      paymentMethodType: 'Card',
+      paymentMethodData: { billingDetails: { name: 'Awa Nkounkou' } },
+    });
+  });
+
+  it('…et n’envoie PAS la clé quand il est vide : un nom blanc n’est pas un nom', async () => {
+    const sans = fakeNative();
+    await loadSheet(sans).confirmCardPayment({ clientSecret: 's', holderName: '   ' });
+    expect(sans.confirmPayment).toHaveBeenCalledWith('s', { paymentMethodType: 'Card' });
+  });
+
+  it('une carte refusée porte son message', async () => {
+    const refus = fakeNative({
+      confirmPayment: jest.fn().mockResolvedValue({ error: { code: 'Failed', message: 'Votre carte a été refusée.' } }),
+    });
+    await expect(loadSheet(refus).confirmCardPayment({ clientSecret: 's' })).resolves.toEqual({
+      ok: false,
+      reason: 'FAILED',
+      message: 'Votre carte a été refusée.',
+    });
+  });
+
+  it('…et une annulation reste une annulation, jamais un refus de carte', async () => {
+    const annule = fakeNative({
+      confirmPayment: jest.fn().mockResolvedValue({ error: { code: 'Canceled' } }),
+    });
+    await expect(loadSheet(annule).confirmCardPayment({ clientSecret: 's' })).resolves.toEqual({
+      ok: false,
+      reason: 'CANCELED',
+    });
+  });
+
+  it('sans module natif, indisponible — et l’écran le DIT', async () => {
+    await expect(loadSheet(null).confirmCardPayment({ clientSecret: 's' })).resolves.toEqual({
+      ok: false,
+      reason: 'UNAVAILABLE',
+    });
+  });
+});

@@ -14706,3 +14706,243 @@ OK » se compte, il ne se regarde pas.
   un moteur de rendu, donc `jest-expo`.
 - **Le défaut `toE164` n'est pas corrigé ici** : c'est une règle métier à graver, sur les
   deux fronts, dans son propre lot.
+
+---
+
+# D83 — Le paiement devient un écran de Yamba : un choix, une page par moyen, et le jumeau web
+
+> Branche `feat/mobile-payment-methods`. Ce lot ne touche **ni la machine d'état, ni le
+> snapshot de prix, ni l'outbox** : le chemin de l'argent est celui de D31 (empreinte
+> maintenant, débit à l'acceptation du Voyageur) et le retour des moyens à redirection est
+> celui de D82 7A/8A/9A. C'est un lot d'**écran**, plus un champ de contrat.
+>
+> Lire dans cet ordre : `packages/libs/api-contracts/src/booking/booking-request.schema.ts`
+> (le champ qui sert la liste), `apps/mobile/src/lib/payment-methods.ts` (toute la décision,
+> en fonctions pures), puis les trois écrans `apps/mobile/src/app/booking/payment/`.
+
+## ① D'où vient ce lot : la première recette RÉELLE de la feuille de paiement
+
+Jusqu'ici, « payer » sur le mobile ouvrait la **feuille de Stripe** (`PaymentSheet`). C'était
+le choix de D82, et il tenait tant que personne ne l'avait vue. Le 23/10, l'app a tourné dans
+le simulateur iOS sous les yeux de son auteur, et la feuille a montré ce qu'elle était : une
+feuille **basse**, en **anglais** (elle suit la langue de l'APPAREIL, pas celle de l'app),
+proposant des moyens que Yamba n'avait jamais choisis — Link, Klarna et Amazon Pay étaient
+activés par défaut sur le compte Stripe.
+
+Quatre mesures ont suivi, et c'est elles qui fondent D83 :
+
+| Mesure | Résultat |
+|---|---|
+| Peut-on mettre la feuille en plein écran ? | **Non.** Le SDK React Native n'expose aucun mode plein écran, et `appearance` ne règle que couleurs, polices et arrondis — jamais la mise en page. Le plein écran demandé n'est pas un réglage, c'est un écran à écrire |
+| « Carte bancaire » ou deux lignes CB / Visa ? | **Une ligne.** Chez Stripe, CB est un **réseau** de carte (`cartes_bancaires`), pas un moyen de paiement : une carte co-badgée CB/Visa se traite dans le même formulaire, où le porteur choisit son réseau. Deux lignes promettraient un choix que l'intégration ne fait pas. Et jamais « carte de crédit » : c'est un anglicisme, et c'est FAUX pour la majorité des cartes françaises, qui sont des cartes de débit |
+| D'où vient la ligne Apple Pay / Google Pay ? | De `isPlatformPaySupported()`, **mesuré à l'exécution** — jamais de `Platform.OS`. Un simulateur sans portefeuille, un téléphone sans carte enregistrée, un Android sans services Google disent tous non, et un bouton qui ne peut pas marcher ne doit pas exister |
+| Quels moyens afficher ? | L'**intersection** de ce que l'empreinte accepte et de ce que l'app sait conduire. En afficher un que l'intention ne porte pas fabrique un refus ; en afficher un dont nous n'avons pas la page promet un écran absent |
+
+## ② Le serveur : l'empreinte SERT les moyens qu'elle accepte (D83 4A)
+
+La liste ne peut pas se deviner côté client, et la raison est précise : elle ne dépend pas
+seulement de la configuration du compte, elle dépend **aussi du mode de capture**. Yamba
+autorise d'abord et ne débite qu'à l'acceptation (D31, `capture_method: "manual"`), ce qui
+fait écarter **par le fournisseur** tous les moyens incapables de faire « empreinte puis
+débit ». Un client qui lirait le Dashboard afficherait donc des lignes mortes.
+
+```ts
+// packages/libs/api-contracts/src/booking/booking-request.schema.ts
+paymentMethodTypes: z.array(z.string()).default([])
+//  « D83 — payment methods this authorization accepts, as the provider resolved them:
+//    the account configuration MINUS whatever manual capture (D31) rules out. »
+```
+
+`POST /deals/payment-intents` la remonte telle que le fournisseur l'a résolue. Deux
+conséquences à connaître :
+
+- **le Fake répond `[]`** — il n'a aucune feuille à ouvrir, et les deux fronts traitent ce cas
+  avant d'arriver à la liste (bandeau « mode test ») ;
+- **un moyen activé au Dashboard apparaît sans redéploiement**, dès que le front sait le
+  conduire. C'est le compromis assumé de D83 : on reprend la main sur l'écran, mais pas sur la
+  liste.
+
+Mesure du 23/10 : avec Link, Klarna et Amazon Pay désactivés et PayPal activé, l'intention
+réelle a servi exactement `card` et `paypal`. **PayPal EST donc compatible avec notre empreinte
+à capture manuelle** — c'était la réserve de D83, elle est levée.
+
+## ③ Le mobile : un choix, puis une page — et pourquoi la pile se construit ainsi
+
+Trois écrans sous `apps/mobile/src/app/booking/payment/` :
+
+| Fichier | Rôle |
+|---|---|
+| `index.tsx` | L'étape ⑦ du tunnel. « Payer » **n'ouvre plus rien directement** : il pousse l'écran de choix |
+| `method.tsx` | La liste, plein écran, en français. « Carte bancaire » en UNE ligne, les réseaux CB / Visa / Mastercard cités dessous en réassurance |
+| `card.tsx` | La saisie de carte, dans NOTRE page |
+| `confirm.tsx` | La page des moyens qui s'ouvrent **ailleurs** : PayPal dans un navigateur, Apple/Google Pay dans la feuille du système |
+
+**Pourquoi `confirm.tsx` existe alors qu'il n'a aucun champ.** Parce qu'un écran qui ne
+contient rien peut quand même porter trois choses : il **dit** ce qui est en train de s'ouvrir,
+pendant la seconde où l'app semble ne rien faire ; il est **l'endroit où l'on revient** si l'on
+annule, avec un bouton pour réessayer — sans lui, une annulation renverrait à l'écran de
+paiement sans rien expliquer ; et il donne au parcours **la même forme** pour les trois moyens.
+Il déclenche au montage (le membre vient d'appuyer sur « Suivant » ; lui redemander de
+confirmer serait un clic pour rien), mais **une seule fois** : un `useRef` garde le
+déclenchement, parce qu'un réessai est un geste et jamais l'effet de bord d'un nouveau rendu.
+
+**La pile : `push` pour le choix, `replace` pour la page du moyen.**
+
+```
+paiement ──push──▶ choix ──replace──▶ page du moyen ──back──▶ paiement
+```
+
+`method.tsx` se **remplace** par la page du moyen choisi. Si elle la poussait, un retour depuis
+la saisie de carte ramènerait à la liste qu'on vient de quitter — l'Expéditeur reculerait d'un
+cran et croirait son choix perdu.
+
+**Comment une page poussée rend un résultat : elle ne le rend pas.** Elle n'a aucun moyen de
+retourner une valeur en se refermant. D'où `src/lib/payment-choice.ts`, une **mémoire de
+processus** (hors React, hors stockage disque) qui porte le choix, l'empreinte en cours et un
+drapeau « autorisée ». L'écran de paiement reprend la main au retour de focus et enchaîne tout
+seul — les photos ne repartent pas, leurs URL sont mémorisées (A45). Et le drapeau n'est **pas
+une preuve** : le serveur relit l'état réel de l'empreinte chez le fournisseur avant de créer
+la demande (D82 8A), donc un `true` menteur ne fait pas de dégât, il fait un refus.
+
+## ④ Les défauts que le simulateur a rendus, et les gardes qui en sortent
+
+Tous deux **invisibles au typage et au harnais de tests** — qui ne rend aucun composant
+(frontière assumée d'A223). C'est le prix de cette frontière, payé en deux écrans.
+
+### a) « Rendered more hooks than during the previous render »
+
+Un `useFocusEffect` posé **après** deux sorties anticipées :
+
+```tsx
+if (failed) return <Erreur />;        // ← sortie anticipée
+if (!trip) return <Chargement />;
+useFocusEffect(…);                    // ← ce hook ne s'exécute pas toujours
+```
+
+React exige que les hooks soient appelés dans le **même ordre** et en même **nombre** à chaque
+rendu. L'écran en appelait tantôt six, tantôt sept — et tombait en marche au rendu SUIVANT,
+loin de la ligne fautive. L'outil normal serait `eslint-plugin-react-hooks`, mais le dépôt n'a
+pas de linter (`linter: none`). D'où `src/lib/hooks-avant-sortie.spec.ts`, qui balaie `src/app`
+et attrape la **forme** du défaut : un appel de hook au premier niveau d'un composant, situé
+après une sortie anticipée de premier niveau. Trois détails qui le rendent utilisable :
+
+- **le découpage par composant** — un fichier en contient plusieurs (l'écran, ses sous-vues),
+  et la règle vaut par composant : sans ce découpage, 17 faux positifs ;
+- **les hooks imbriqués sont ignorés** (plus profonds que deux espaces) : la règle d'ordre ne
+  les concerne pas ;
+- **la sonde se vérifie elle-même** sur le défaut exact, dans la fiche.
+
+Aucune liste d'exceptions : la règle est vraie pour tout écran, sans dérogation possible.
+
+### b) « Cannot update a component while rendering a different component »
+
+Une fonction de mémoire qui **normalisait en répondant** — elle lisait le choix mémorisé,
+constatait qu'il n'était plus disponible, l'écrivait corrigé, puis répondait. Appelée pendant
+le rendu, elle déclenchait donc une mise à jour pendant un rendu.
+
+Corrigée par **suppression** : la fonction qui lit et écrit disparaît ; la normalisation est
+`keepOrDefault`, **pure**, que les deux écrans appellent sans se contredire. La règle qui en
+sort vaut pour toutes les mémoires de processus du dépôt :
+
+> **Une fonction qui répond à une question n'écrit jamais.**
+
+Verrouillée en **comptant les notifications** de la mémoire : une lecture n'en produit aucune.
+
+### c) Un titre EMPRUNTÉ à l'écran d'à côté (recette du 08/11)
+
+Troisième défaut, trouvé en affichant enfin `confirm.tsx` dans le simulateur — et celui-là
+n'aurait fait planter personne : il se lisait, simplement.
+
+```tsx
+// AVANT
+const titre = methode ? t(`methods.${methode}.label`) : t('methods.title');
+```
+
+`methods.title`, c'est **« Comment veux-tu payer ? »** : le titre de l'écran de CHOIX. Repris en
+repli sur la page d'un moyen, il fait poser à la page une question à laquelle elle ne répond
+pas — et il la pose **juste au-dessus** du texte qui annonce que l'autorisation a expiré. Le
+membre lit donc « Comment veux-tu payer ? » puis « Cette autorisation n'est plus valable ».
+
+La correction est une **clé à soi**, `confirm.expiredTitle` (« Autorisation expirée »), qui
+décrit l'**état de la page** au lieu d'emprunter la question du voisin. `card.tsx` faisait déjà
+ainsi : il garde `card.title` en toute circonstance et met l'expiration dans le corps.
+
+> **La règle qui en sort** : un repli de texte se choisit dans le vocabulaire de SA page. Une
+> clé empruntée à un autre écran marche à la compilation, passe le miroir FR/EN, passe le
+> garde-fou des clés calculées — et ment à l'écran. Seul l'œil l'attrape ; c'est exactement ce
+> que la recette est là pour faire.
+
+Le cas ne se produit pas sur le parcours normal (le moyen vient d'être choisi) : c'est un repli
+de démarrage à froid. Il n'en est pas moins le texte que le membre lit quand quelque chose a
+déjà mal tourné — le pire moment pour une phrase qui ne veut rien dire.
+
+## ⑤ Le garde-fou des clés i18n CALCULÉES
+
+Les trois écrans ne demandent presque aucun texte par une clé écrite en clair : ils la
+**calculent**.
+
+```tsx
+t(`methods.${methode}.label`)
+t(`methods.flows.${flowOf(methode)}`)
+t(`confirm.errors.${authFailureKey(outcome.reason)}`)
+```
+
+C'est voulu — un `switch` sur quatre moyens, recopié sur trois écrans, finit toujours par
+diverger. Mais cela ouvrait un angle mort que **rien** ne couvrait :
+
+- `tsc` voit un `string`, jamais une clé : un gabarit se type toujours ;
+- le contrôle i18n de la CI compare FR et EN **entre eux** — deux dictionnaires qui ont oublié
+  la même clé forment un miroir parfait ;
+- le harnais ne rend aucun composant, donc personne n'avait jamais appelé `t()`.
+
+Et une clé absente **ne casse pas le bundle** : `use-intl` rend le CHEMIN de la clé.
+L'Expéditeur lirait « confirm.errors.canceled » là où on lui devait « Rien n'a été débité » —
+sur l'écran qui porte l'argent. D'où `src/lib/payment-i18n.spec.ts` : **58 fiches**, aucune
+liste à tenir à jour (les clés sortent des fonctions pures `PAYMENT_METHODS`, `flowOf`,
+`authFailureKey`), cherchées dans les fichiers **réels** des deux langues. Non-régression
+mesurée : en retirant `confirm.errors.canceled` de l'anglais, **une** fiche passe au rouge.
+
+## ⑥ Le jumeau web (D83 7A)
+
+Le site **garde son Payment Element**, et c'est un choix : il dessine déjà ses onglets, lui
+superposer la liste maison du mobile dédoublerait le choix. Mais il lui devait les trois choses
+que l'écran mobile s'est données — portées par `apps/user-ui/src/components/booking/payment-methods.ts`,
+en fonctions pures, sans React.
+
+| # | Ce que le site gagne | Détail |
+|---|---|---|
+| 1 | **La langue de Yamba** | Sans `locale`, le Payment Element suit les préférences du NAVIGATEUR : un membre qui lit Yamba en français depuis un Chrome anglais payait en anglais. C'est exactement le grief de D83 contre la feuille mobile ; ici Stripe l'expose, donc cela se corrige par un réglage |
+| 2 | **Notre ordre** | La carte d'abord, comme sur mobile. Deux choses mesurées en le posant : `paymentMethodOrder` n'existe **pas** dans les options d'`Elements` en mode `clientSecret` (TS2353) — il se règle sur l'**élément** ; et ce qu'on abandonne en le forçant, Stripe le dit : par défaut l'élément ordonne **dynamiquement**, par utilisateur. On préfère qu'un membre qui passe du site à l'app retrouve le même premier choix |
+| 3 | **L'aveu quand il n'y a rien à ouvrir** | Une empreinte STRIPE dont le fournisseur n'a résolu **aucun** moyen affichait un cadre vide ; elle affiche désormais un message et « Réessayer » |
+
+Un point de prudence écrit dans le code : `paymentMethodTypes` est lu **optionnel**.
+`undefined` est un OUI — c'est un serveur plus ancien que ce front, et Stripe reste seul juge ;
+`[]` sur une empreinte STRIPE est un NON franc. Ne pas distinguer les deux refuserait un
+paiement que Stripe saurait conduire.
+
+`PaymentIntentInfo` est un **miroir structurel** du contrat, pas un import : ce front n'aliase
+pas `@packages/api-contracts` — même convention que ses autres miroirs.
+
+## ⑦ Les contrôles passés
+
+Tous MESURÉS le **08/11/2026**, sur la branche, avant d'ouvrir la PR :
+
+- `nx test @yamba-app/mobile` → **463 fiches, 24 suites** (405 → 463 : les 58 du garde-fou i18n) ;
+- `nx typecheck @yamba-app/mobile` → les **deux** programmes, exit 0 ;
+- `npx tsc --noEmit --project apps/user-ui` → exit 0 (ce que fait la CI pour ce front) ;
+- `node scripts/check-i18n-messages.mjs` → miroir parfait, 30 espaces, 60 fichiers + mobile ;
+- `nx test @yamba-app/deal-service` → la référence du service, inchangée par le jumeau web.
+
+## ⑧ Ce qui n'est PAS dans ce lot, et pourquoi
+
+- **Apple Pay restera invisible sur le poste.** Mesuré : le binaire d'Expo Go ne déclare aucun
+  droit `com.apple.developer.in-app-payments`, et iOS exige que l'identifiant marchand figure
+  dans les droits de l'**application**. Aucun code, aucune clé, aucun réglage Dashboard ne la
+  fera apparaître tant qu'on passe par Expo Go : il faut un build de développement iOS, donc un
+  compte développeur Apple, un identifiant marchand et un certificat. La ligne est donc
+  construite et testée **par ses règles pures**, pas par l'œil.
+- **Le 3-D Secure** se délègue au SDK et n'est pas re-testé ici.
+- **Le mode *live*** reste un changement de clés (D82 1A), rien d'autre.
+- **Les écrans ne sont toujours pas rendus** : la frontière d'A223 tient, mais elle a coûté deux
+  défauts en deux écrans. L'axe est instruit au § des axes du suivi — à réévaluer **avec une
+  mesure**, pas au sentiment.

@@ -61,6 +61,16 @@ export type PaymentIntentInfo = {
   amountCents: number;
   currencyCode: string;
   quote: ServerQuote;
+  /**
+   * D83 4A — les moyens que CETTE empreinte accepte, résolus par le
+   * fournisseur : la configuration du compte MOINS ce que la capture manuelle
+   * écarte (D31). L'écran n'affiche que l'intersection de cette liste et de ce
+   * qu'il sait conduire — en afficher un qui n'y est pas fabrique un refus.
+   *
+   * Le contrat lui donne `[]` par défaut : un serveur antérieur à D83 ne casse
+   * pas le client, il ne propose simplement aucun moyen.
+   */
+  paymentMethodTypes: string[];
 };
 
 export type CreatedBooking = {
