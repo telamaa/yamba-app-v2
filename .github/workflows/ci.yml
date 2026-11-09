@@ -138,6 +138,16 @@ jobs:
             nx_project: "@yamba-app/notification-service"
           - project: message-service
             nx_project: "@yamba-app/message-service"
+          # A223 — le DIX-NEUVIEME controle. `apps/mobile` portait 2 109 lignes de
+          # logique PURE (regles de reservation, suivi d'un envoi, signalement,
+          # notation, devis d'ancrage, calendrier de recherche, brouillons en
+          # memoire de processus) qu'aucun des dix-huit autres n'executait : les
+          # jobs `typecheck` ne verifient que des TYPES, et le mobile n'a ni build
+          # webpack ni contrat OpenAPI. Le harnais est volontairement en
+          # environnement `node` (aucun rendu de composant), donc aussi rapide que
+          # celui d'un service.
+          - project: mobile
+            nx_project: "@yamba-app/mobile"
     steps:
       - uses: actions/checkout@v4
 
