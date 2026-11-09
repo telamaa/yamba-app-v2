@@ -15876,3 +15876,141 @@ seule.
 - **`sharp` n'entre pas dans les dépendances.** Le générateur documente son installation à la
   demande ; il a été lancé avec `npm install --no-save sharp`, et `package.json` comme
   `package-lock.json` sont restés intacts (vérifié au `git status`).
+
+---
+
+# D91 — Finitions, page 1 : l'inscription, et les quatre écarts qu'elle portait
+
+> PR `feat/finitions-inscription`. Première page de la passe « page par page », instruite
+> capture en main sur les deux fronts. Quatre arbitrages tranchés **avant** le code.
+
+## ① Ce qui a été mesuré, pas ressenti
+
+La demande de départ tenait en une phrase : « la version web n'est pas épurée, la police des
+textes n'est pas fine, il manque quelque chose ». Voici ce que le code disait :
+
+| Élément | Avant |
+|---|---|
+| Titre | `font-extrabold` → **800** |
+| Les **8 libellés** | `text-xs font-semibold text-slate-100` → 12 px / **600**, quasi-blanc |
+| CTA | `font-bold` → **700** |
+| Liens CGU | `font-semibold` → **600** |
+
+**Aucune graisse sous 600**, et les libellés dans la même famille de couleur que le titre. Rien
+ne recule, donc tout crie : c'est cela que « pas épuré » désigne, et non un excès d'éléments.
+
+Après : titre **600**, libellés **13 px / 500** en `slate-500/400`, corps **400**, et **un seul
+élément en 700 — le bouton**.
+
+## ② La mention de sécurité, et la règle qui en sort
+
+« Inscription sécurisée » était une affirmation que Yamba se décernait à elle-même. Trois
+défauts :
+
+- elle **installe** la question que personne ne se posait ;
+- elle occupait le premier point de fixation, en repoussant le titre ;
+- sur le web, c'était la version abstraite d'un bloc **concret** déjà présent (les trois
+  garanties de la colonne de gauche).
+
+**La règle, valable pour tout le produit : un signal de confiance nomme un tiers ou un fait
+vérifiable, sinon il ne dit rien.** « Paiement sécurisé par Stripe » nomme quelqu'un ;
+« Inscription sécurisée » ne nomme personne.
+
+La preuve qu'elle n'était pas lue est dans les fichiers : `RegisterForm.tsx` écrivait
+**« Secure signup »**, `apps/mobile/messages/en/auth.json` **« Secure sign-up »**. Deux
+orthographes pour quatre mots, et aucun contrôle pour le dire.
+
+À sa place, une ligne **vérifiable**, posée là où le doute existe — sous le bouton :
+
+```tsx
+<p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+  {tAuth("register.reassurance")}        {/* « Gratuit, sans engagement. » */}
+</p>
+```
+
+`AuthScreen.badge` devient **optionnel** côté mobile (il était requis) : les cinq autres écrans
+d'auth le passent encore, et leur revue se fera écran par écran.
+
+## ③ Les divergences web ↔ mobile, closes
+
+| | Avant web | Avant mobile | Après (les deux) |
+|---|---|---|---|
+| Ordre | social → formulaire | formulaire → social | **formulaire → social** |
+| Social | boutons libellés | pastilles rondes | **boutons libellés** |
+| Confirmer le mot de passe | **oui** | non | **non** |
+| Titre | « Deviens Voyageur » | « Deviens Voyageur » | **« Crée ton compte Yamba »** |
+
+Le troisième cas est le plus net : **le mobile avait déjà tranché et écrit pourquoi**
+(`register.tsx:6-8`, A208) — *« le trousseau remplit les deux champs d'un coup, la confirmation
+ne confirme rien »*. Le web ne l'avait pas suivi, et y ajoutait un `onPaste` bloquant que le
+NCSC et le NIST déconseillent explicitement.
+
+Sur les fournisseurs sociaux, l'arbitrage a changé **en cours de lot** : Google avait d'abord
+été retiré tant qu'il n'est pas branché ; l'utilisateur a demandé le soir même de le garder à
+l'écran des deux côtés, le paramétrage viendra après. La règle tenue par les fiches n'est donc
+pas « branché ou caché » mais **la parité**.
+
+## ④ La colonne de gauche et l'illustration
+
+Les trois garanties étaient ancrées **en bas**, sous ~400 px de vide (`justify-between` + une
+illustration en `flex-1`) : le meilleur contenu de la page arrivait hors du premier regard.
+Elles passent **sous l'accroche** ; l'illustration descend et redevient un décor.
+
+Et le visuel **cesse d'être tiré au hasard** :
+
+```tsx
+const heroVisual = getHeroVisualById("illu-route");
+if (heroVisual === undefined) throw new Error("Visuel auth introuvable : illu-route");
+```
+
+Un visuel différent à chaque chargement prive la page d'identité et fait varier sa qualité
+selon le tirage. Le garde-fou qui lève est volontaire : sans lui, un identifiant faux
+afficherait une colonne vide, en silence. `export const dynamic = "force-dynamic"` disparaît au
+passage — il n'existait que pour le tirage aléatoire ; le build confirme que la page se rend
+désormais en statique.
+
+**`illu-map.svg` est redessiné.** Sa grille pleine page derrière des courbes en pointillés le
+faisait lire « graphique de tableau de bord » : la grille sort, un colis prend la route
+principale, les nœuds gardent le dessin des deux autres visuels.
+
+## ⑤ Les fiches — 9, qui lisent les DEUX fronts
+
+`auth-register-parite.spec.ts` est inhabituel : le harnais du **mobile** lit une page du
+**site**. C'est assumé, et c'est le seul endroit du dépôt où un test voit les deux à la fois —
+or la règle porte justement sur leur accord (`splash.spec.ts` lit déjà un script de la racine
+pour la même raison).
+
+| # | Ce qu'elle tient |
+|---|---|
+| 0 | le formulaire web est bien au chemin lu — sans quoi tout le reste passerait au vert en ne lisant rien |
+| ① | la mention de sécurité ne revient ni au dictionnaire mobile, ni dans le composant web |
+| ② | `register.reassurance` existe dans les **quatre** dictionnaires **et dit la même chose par langue** |
+| ③ | plus de `passwordConfirm`, plus d'`onPaste` côté web |
+| ④ | les deux fronts offrent les **mêmes** fournisseurs sociaux |
+
+La fiche ① a été vue **rouge** au premier essai — et pour une bonne raison : un commentaire que
+je venais d'écrire citait la chaîne interdite. Le balayage ne distingue pas un commentaire d'un
+rendu ; le commentaire a été reformulé.
+
+## ⑥ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **494** (+9), 28 suites (+1) |
+| `nx run-many --target=typecheck --all --skip-sync` | 10/10 vert |
+| `tsc --noEmit --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait |
+| `nx build @yamba-app/user-ui` | vert (`next-env.d.ts` réécrit puis **restauré**) |
+| Rendu | émulateur Android + Chrome 1440×900, thèmes clair **et** sombre |
+
+## ⑦ La dette nommée, non traitée
+
+Les six formulaires d'auth du web portent **140 `fr ? … : …`** dans leurs composants. C'est une
+violation frontale d'une règle non négociable du dépôt, et surtout **la cause mécanique** de
+l'angle mort : le contrôle i18n de la CI ne lit que les dictionnaires, donc ces pages lui sont
+invisibles — d'où « Secure signup » contre « Secure sign-up », et « Send or transport parcels »
+contre « Send or carry parcels, with ease ».
+
+La seule chaîne **neuve** de ce lot (`register.reassurance`) passe par le dictionnaire, et le
+composant gagne un `useTranslations("auth")` qui marque le point d'entrée de la migration. Le
+reste est un lot à part.

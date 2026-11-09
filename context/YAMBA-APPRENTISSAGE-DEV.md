@@ -7345,3 +7345,176 @@ la documentation du script qui l'utilise.
 - `apps/mobile/src/lib/splash.spec.ts` — l'accord des deux moitiés.
 - Chapitre 229 — *une application qui démarre n'est pas une application qu'on a regardée*.
   Celui-ci ajoute : **et ce qu'on regarde n'est pas toujours son application.**
+
+---
+
+## Chapitre 231 — Nommer ce qu'on ressent, le test qui lit deux applications, et la fiche qui attrape son auteur
+
+> PR `feat/finitions-inscription` (D91). Une revue d'écran qui commence par « ça manque quelque
+> chose » et finit par six changements dont aucun n'est une préférence.
+
+### 1. Traduire une impression en mesure
+
+La demande était : *« je trouve que la version web n'est pas épurée, la police des textes n'est
+pas fine, ça manque quelque chose »*. Trois impressions, zéro instruction.
+
+Le réflexe tentant est de répondre par du goût : alléger « un peu », espacer « un peu ». Le
+réflexe utile est d'aller chercher **les chiffres dans le code** :
+
+```
+Titre          font-extrabold      → 800
+8 libellés     text-xs font-semibold text-slate-100 → 12 px / 600, quasi-blanc
+CTA            font-bold           → 700
+Liens          font-semibold       → 600
+```
+
+Et la phrase apparaît toute seule : **il n'y a aucune graisse sous 600, et les libellés sont
+dans la même famille de couleur que le titre.** « Pas épuré » ne voulait pas dire « trop
+d'éléments » — ça voulait dire **rien ne recule**.
+
+Une hiérarchie typographique tient en trois niveaux, pas en cinq :
+
+| Rôle | Graisse |
+|---|---|
+| Ce qu'on lit en premier (titre) | 600 |
+| Ce qui guide (libellés) | 500, en gris moyen |
+| Ce qu'on lit vraiment (corps) | 400 |
+| **Une seule exception** : l'action | 700 |
+
+**La leçon** : quand quelqu'un décrit un malaise visuel, ne négociez pas sur le ressenti —
+allez lire les valeurs. Elles disent presque toujours la même chose que l'œil, en plus
+actionnable.
+
+### 2. Le même malaise, côté contenu : une affirmation n'est pas une preuve
+
+« Inscription sécurisée », en pilule, au-dessus du titre. Qu'est-ce qui cloche ?
+
+Un principe, et il dépasse largement cette page : **un signal de confiance doit nommer un tiers
+ou un fait vérifiable.** Comparez, dans le même produit :
+
+```
+« Paiement sécurisé par Stripe »   → nomme un tiers que le lecteur connaît     ✅
+« Inscription sécurisée »          → ne nomme personne, ne promet rien de contrôlable  ❌
+```
+
+Le second ne rassure pas : il **installe** la question. Personne n'arrive sur un formulaire
+d'inscription en se demandant s'il est sécurisé.
+
+Et il y avait une preuve matérielle que personne ne la lisait : le même badge s'écrivait
+« Secure signup » sur le site et « Secure sign-up » sur le téléphone. **Un texte que personne ne
+lit est un texte que personne ne corrige.**
+
+Ce qui l'a remplacé n'est pas « rien » : c'est une phrase **vérifiable**, posée là où le doute
+existe réellement. À l'inscription, la peur n'est pas cryptographique, elle est contractuelle —
+« est-ce que je m'engage ? ». D'où : *« Gratuit, sans engagement. »*, sous le bouton.
+
+### 3. Rendre une prop optionnelle plutôt que supprimer une fonctionnalité
+
+Le badge disparaît de l'inscription. Mais cinq autres écrans d'auth en portent un, et leur revue
+n'a pas eu lieu. Trois options :
+
+1. supprimer le badge partout → on modifie cinq écrans jamais examinés ;
+2. laisser l'inscription le porter → on garde un défaut qu'on vient de nommer ;
+3. **rendre la prop optionnelle** → l'écran revu s'en passe, les autres continuent, et la
+   migration se fait au rythme de la revue.
+
+```tsx
+badge?: string;
+…
+<View style={[styles.topRow, badge === undefined && styles.topRowBare]}>
+  {badge !== undefined && ( … )}
+</View>
+```
+
+Le détail qui compte est `topRowBare` : la rangée était en `space-between` avec deux enfants.
+Un enfant en moins, et `space-between` colle la fermeture **à gauche**. Une suppression
+conditionnelle oblige presque toujours à revoir la règle de disposition qui l'entourait.
+
+### 4. Un test qui lit deux applications
+
+Comment empêcher deux écrans jumeaux de se re-dédoubler ? Les fiches du mobile lisent… le
+composant du site :
+
+```ts
+const WEB = resolve(MOBILE, '../user-ui');
+const FORMULAIRE_WEB = join(WEB, 'src/components/auth/forms/RegisterForm.tsx');
+```
+
+C'est inhabituel, et c'est justifié : **la règle porte sur l'accord entre les deux**, et c'est
+le seul harnais du dépôt qui peut voir les deux à la fois. La fiche la plus utile n'est d'ailleurs
+pas celle qui vérifie une absence, mais celle qui vérifie une **égalité** :
+
+```ts
+for (const locale of ['fr', 'en']) {
+  expect(registre(MOBILE, locale).reassurance).toBe(registre(WEB, locale).reassurance);
+}
+```
+
+Le défaut d'origine, pris à l'envers : deux écrans qui promettent la même chose doivent la
+promettre **avec les mêmes mots**.
+
+#### Et toujours la fiche zéro
+
+```ts
+it('le formulaire web est bien au chemin que ces fiches lisent', () => {
+  expect(existsSync(FORMULAIRE_WEB)).toBe(true);
+});
+```
+
+Un simple déplacement de fichier rendrait toutes les autres vertes **en ne lisant plus rien**.
+C'est le même garde-fou qu'au chapitre 229 (« le détecteur sait-il voir ? ») : un balayage doit
+toujours prouver qu'il regarde quelque chose.
+
+### 5. La fiche qui attrape son propre auteur
+
+Premier lancement : rouge.
+
+```
+● ① la mention de sécurité ne revient pas › le formulaire web ne porte plus la pilule
+```
+
+La chaîne interdite était… dans le **commentaire** que je venais d'écrire pour expliquer sa
+suppression. Un balayage textuel ne distingue pas un commentaire d'un rendu.
+
+Deux réponses possibles : rendre le test « intelligent » (ignorer les commentaires), ou
+reformuler le commentaire. **La deuxième est la bonne.** Un test de balayage tire sa valeur de
+sa simplicité ; chaque exception qu'on lui apprend est une porte par laquelle le vrai défaut
+pourra repasser. Quand un test grossier dit non, c'est presque toujours au code de s'adapter.
+
+### 6. Deux pièges Next.js rencontrés en passant
+
+**`force-dynamic` qui n'existait que pour `Math.random()`.** La page tirait son illustration au
+hasard, donc ne pouvait pas être pré-rendue. Le tirage supprimé, l'export l'est aussi — et c'est
+le **build** qui le prouve, pas le raisonnement : `useSearchParams` dans un composant client
+impose ses propres conditions au rendu statique.
+
+**`nx build` réécrit `next-env.d.ts`, qui est versionné.** Un build de production y écrit
+`./.next/types/…`, `next dev` y écrit `./.next/dev/types/…`. Après chaque build :
+
+```sh
+git status --short apps/user-ui/next-env.d.ts   # modifié ?
+git checkout -- apps/user-ui/next-env.d.ts      # on restaure
+```
+
+### 7. Un arbitrage qui change en cours de route
+
+Google avait été retiré du bloc social tant qu'il n'est pas branché — un bouton qui annonce
+« bientôt disponible » à la meilleure place de la page. L'utilisateur a tranché l'inverse en
+cours de lot : on le garde à l'écran, le paramétrage viendra après.
+
+Ce qui compte ici n'est pas qui avait raison, c'est **ce que devient la fiche**. Elle testait
+« Google est derrière son drapeau ». Elle teste maintenant **la parité** :
+
+> un front qui perdrait un fournisseur que l'autre garde est une divergence.
+
+La règle de départ était contingente (« branché ou caché »), la nouvelle est structurelle
+(« les deux fronts disent la même chose »). **Un changement d'avis est souvent l'occasion de
+découvrir que la règle qu'on testait n'était pas la bonne.**
+
+### Pour aller plus loin
+
+- `apps/mobile/src/lib/auth-register-parite.spec.ts` — les neuf fiches.
+- `apps/mobile/src/app/(auth)/register.tsx:6-8` — la motivation d'A208, écrite un mois avant,
+  et qui a servi d'argument décisif.
+- Chapitres 229 et 230 — la même famille : des défauts qui ne cassent rien, donc qu'aucun
+  contrôle ne regarde.
