@@ -355,6 +355,7 @@
       "confirmCancel": "Cancel",
       "toastError": "Error sending. Try again.",
       "toastConflict": "This deal changed in the meantime — back to tracking.",
+      "toastCategory": "That reason no longer applies: the parcel is in transit again. Back to tracking.",
       "toastValidation": "The server rejected the report: check the description (50 characters minimum) and the pledge."
     },
     "sidebar": {

@@ -7563,3 +7563,98 @@ un envoi qu'on va annuler depuis un navigateur** — ou qu'on n'annulera pas du 
   une liste livrée seule aurait mené à des lignes sans destination.
 - **Partager le lien de suivi au destinataire** : Yamba fournit aujourd'hui un chemin dont
   l'adresse publique n'est connue que d'un navigateur. Un lien mort serait pire que rien.
+
+
+---
+
+# Lot A222 — Dire « ça ne va pas », et dire « ça s'est bien passé »
+
+## Le besoin, dit simplement
+
+Le colis est arrivé. Deux histoires commencent, et l'app n'en racontait aucune.
+
+**La première est mauvaise.** Le destinataire ouvre le colis et appelle : il manque le pull,
+ou le t-shirt est déchiré, ou rien n'est arrivé du tout. L'Expéditeur a **trois jours** pour
+le dire — après, Yamba verse l'argent au Voyageur et l'affaire est close. C'est le moment
+exact où la garantie qu'il a payée doit fonctionner. Or la fiche de suivi lui écrivait
+« si quelque chose ne va pas, signale-le avant la fin du délai » **sans lui donner de
+bouton**. Une promesse sans geste est pire qu'un silence : elle laisse croire que le recours
+existe quelque part, et elle le fait chercher.
+
+**La seconde est bonne.** Tout s'est bien passé, et l'Expéditeur voudrait le dire — parce que
+c'est ce qui fera choisir ce Voyageur par la personne suivante. Sans écran de notation, un
+envoi fait depuis l'app ne nourrissait jamais la réputation visible de qui l'a transporté.
+
+Un principe tient les deux : **l'app ne renvoie jamais au site, même par une phrase**
+(A210 b). Un recours sous-traité à un navigateur n'est pas un recours.
+
+## Les règles
+
+| Règle | Énoncé |
+|---|---|
+| **RG-MOB-144** | Tant qu'un signalement est possible, la fiche de suivi **l'annonce** et y mène. Un texte qui évoque un recours sans geste associé est un défaut. |
+| **RG-MOB-145** | Quand le signalement n'est **pas encore** ouvert (colis en vol, moins de 48 h après le départ), la fiche annonce **la date** à laquelle il s'ouvrira — pas un bouton qui serait refusé. |
+| **RG-MOB-146** | Tant que le colis est en transit, le seul problème signalable est « le colis n'a jamais été livré » : les autres se constatent après la remise. L'écran ne propose alors **qu'un** motif, déjà choisi, et dit pourquoi. |
+| **RG-MOB-147** | Un signalement demande un récit d'au moins **50 caractères**, et l'écran dit en continu combien il en manque. |
+| **RG-MOB-148** | Jusqu'à **cinq photos** peuvent être jointes comme preuves, prises sur le moment ou choisies dans le téléphone. L'autorisation d'accès est demandée **au geste**, séparément pour l'appareil photo et pour la photothèque. |
+| **RG-MOB-149** | Une preuve dont l'envoi a échoué **empêche** l'envoi du dossier : un signalement part avec toutes ses pièces, ou il ne part pas. |
+| **RG-MOB-150** | La « solution souhaitée » est **facultative** : elle informe la médiation, elle ne la décide pas. Un choix reposé s'efface. |
+| **RG-MOB-151** | Avant l'envoi, l'écran dit **ce qui va se passer** : accusé sous 48 h ouvrées, version du Voyageur demandée sous 72 h, décision sous cinq jours ouvrés, et **paiement gelé pendant tout l'examen**. |
+| **RG-MOB-152** | Un signalement est **signé sur l'honneur**. L'écran dit pourquoi : il gèle le paiement d'une vraie personne, et cet engagement protège les Voyageurs honnêtes. |
+| **RG-MOB-153** | L'envoi d'un signalement demande une confirmation, et il est annoncé comme **irréversible**. |
+| **RG-MOB-154** | Une fois le dossier ouvert, l'écran montre d'abord le **numéro de dossier** et invite à le garder : c'est la seule chose à retenir. |
+| **RG-MOB-155** | Un refus définitif de Yamba (délai passé, dossier déjà ouvert, motif devenu irrecevable) **ferme** le formulaire en disant la raison reçue. Un refus réessayable (panne, validation) le garde ouvert. |
+| **RG-MOB-156** | La note n'est visible qu'une fois que **les deux** ont noté — ou à la fin des quatorze jours. L'écran le dit avant la publication, et ne montre jamais la note de l'autre avant la révélation. |
+| **RG-MOB-157** | L'écran de notation ne montre **ni la moyenne ni le nombre d'envois** de la personne notée : un ancrage fausserait l'avis. |
+| **RG-MOB-158** | Seule la **note globale** est obligatoire. Les trois critères et le commentaire sont facultatifs, et un pouce reposé s'efface. |
+| **RG-MOB-159** | Un avis publié n'est plus modifiable, et l'écran le dit **avant** la publication. |
+| **RG-MOB-160** | Après la fenêtre de quatorze jours, la notation est **fermée** et l'écran le dit, sans proposer de geste. |
+| **RG-MOB-161** | Un envoi dont le compte connecté est le **Voyageur** le dit et s'arrête là : la notation côté Voyageur n'existe pas encore dans l'app, et aucun écran à moitié traduit ne s'affiche. |
+| **RG-MOB-162** | Après un signalement déposé ou une note publiée, la fiche de suivi **se met à jour d'elle-même** au retour : elle ne garde pas un bouton devenu faux. |
+
+## Ce que le site apprend de l'app
+
+| Règle | Énoncé |
+|---|---|
+| **RG-S-163** | Quand Yamba refuse un signalement parce que le motif choisi n'est plus recevable (colis reparti en transit), le site dit **cette** raison — il ne renvoie plus vers la description et l'engagement, qui n'ont rien à voir. |
+
+## Tests d'acceptation
+
+| Fiche | Scénario | Attendu |
+|---|---|---|
+| MOB204 | Ouvrir le suivi d'un colis livré | Une section « Un problème ? », la date limite, et un geste qui ouvre le formulaire |
+| MOB205 | Ouvrir le suivi d'un colis en vol depuis moins de 48 h | **Pas** de geste : la date à laquelle le signalement « jamais livré » s'ouvrira |
+| MOB206 | Ouvrir le formulaire sur un colis en transit | Un seul motif, déjà coché, et le bandeau qui explique pourquoi |
+| MOB207 | Ouvrir le formulaire sur un colis livré | Les six motifs, aucun coché |
+| MOB208 | Écrire 20 caractères et envoyer | Le dossier ne part pas ; l'écran dit combien de caractères manquent |
+| MOB209 | Envoyer sans cocher la déclaration sur l'honneur | Le dossier ne part pas ; l'écran dit laquelle des conditions manque |
+| MOB210 | Joindre une photo depuis l'appareil photo | L'autorisation est demandée **à ce moment-là** ; la photo part aussitôt et s'affiche |
+| MOB211 | Refuser l'autorisation | Un message qui dit où l'autoriser, et l'autre source reste proposée |
+| MOB212 | Joindre une sixième photo | Le geste d'ajout a disparu — cinq est la limite |
+| MOB213 | Envoyer pendant qu'une photo monte encore | Le dossier ne part pas ; l'écran dit d'attendre |
+| MOB214 | Envoyer avec une photo en échec | Le dossier ne part pas ; le motif de l'échec est lisible et la photo peut être retirée |
+| MOB215 | Choisir « remboursement intégral » | Le **montant payé** apparaît dans le libellé |
+| MOB216 | Reposer la solution souhaitée déjà choisie | Elle s'efface : « je ne demande rien de précis » reste possible |
+| MOB217 | Envoyer le signalement | Une confirmation annoncée comme irréversible, puis le **numéro de dossier** et le rappel du gel du paiement |
+| MOB218 | Revenir au suivi après le dépôt | La fiche s'est mise à jour : plus de geste « Signaler », le dossier déposé est lisible |
+| MOB219 | Envoyer un signalement sur un envoi versé entre-temps | Le formulaire se ferme en disant pourquoi, et ramène au suivi |
+| MOB220 | Ouvrir le formulaire sur un envoi qui ne peut pas être signalé | L'écran l'explique et ramène au suivi — aucun formulaire affiché |
+| MOB221 | Ouvrir le suivi d'un envoi terminé | Une section de notation, la date limite, et le geste « Noter … » |
+| MOB222 | Publier une note sans choisir d'étoile | Rien n'est publié ; l'écran demande la note globale |
+| MOB223 | Publier une note avec trois pouces et un commentaire | Publication confirmée ; l'écran dit que l'avis sera révélé quand l'autre aura noté |
+| MOB224 | Publier quand le Voyageur a **déjà** noté | L'écran dit que les deux avis sont publics **maintenant** |
+| MOB225 | Rouvrir la notation après avoir noté | Ma note en lecture ; la note de l'autre **absente** tant qu'elle n'est pas révélée |
+| MOB226 | Rouvrir après révélation | Les deux avis, avec leurs critères et leurs dates |
+| MOB227 | Rouvrir après les quatorze jours sans avoir noté | « La notation est fermée », et aucun geste |
+| MOB228 | Ouvrir la notation en étant le **Voyageur** du deal | L'écran le dit ; aucun critère affiché |
+| MOB229 | Couper le réseau et publier | Un message d'échec, le formulaire conservé avec sa saisie |
+| WEB159 | Sur le site, signaler avec un motif devenu irrecevable | Le message parle du **motif**, pas de la description ni de l'engagement |
+
+## Ce qui reste hors de ce lot
+
+- **La liste « Mes envois »** dans l'onglet Activité : la fiche et ses gestes d'abord, la
+  liste ensuite — chaque ligne aura alors une destination complète.
+- **Noter côté Voyageur** : l'app n'a pas de mode Voyageur. Les trois critères du rôle
+  Expéditeur existent au contrat et arriveront avec lui, avec leurs textes.
+- **Revoir les preuves en grand** : les vignettes ne s'ouvrent pas. Un toucher sans effet se
+  remarque plus qu'une image fixe.

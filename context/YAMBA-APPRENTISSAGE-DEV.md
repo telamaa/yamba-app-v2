@@ -5448,3 +5448,256 @@ reconstituer l'adresse publique d'un autre client.
   import React. C'est le fichier à exécuter en premier le jour où `apps/mobile` aura un
   harnais de tests (jalon 4, « Qualité » encore à ⬜) : phase, frise, décomptes, clôture et
   état de l'argent y sont tous des fonctions pures à entrée unique.
+
+## Chapitre 222 — Le texte qui promet un bouton, le refus qui ferme la porte, et l'écran qui relit en revenant
+
+Lot `feat/mobile-recourse-rating` (A222) : le signalement d'un problème et la notation du
+Voyageur, en natif. Sept techniques — et aucune n'est propre au mobile : les sept se
+transposent à n'importe quel formulaire branché sur une machine d'état.
+
+### 1. Le défaut A203 a une face cachée : la phrase sans bouton
+
+La règle du dépôt dit « ne jamais promettre à l'écran une fonctionnalité absente ». On la lit
+d'habitude comme « pas de bouton mort ». Elle a une seconde face, plus discrète :
+
+```json
+// messages/fr/shipment.json — la fiche de suivi, livrée au lot précédent
+"next": { "delivered": {
+  "three": "Si quelque chose ne va pas, signale-le avant la fin du délai : le paiement est gelé."
+}}
+```
+
+Ce texte était **vrai** (le serveur accepte le signalement) et **inutilisable** (aucun geste
+de l'écran ne le déclenchait). Un bouton mort se remarque en trois secondes ; une phrase sans
+bouton envoie chercher pendant trois minutes, puis sur le site — c'est-à-dire exactement là
+où la doctrine interdit d'envoyer.
+
+**À retenir :** quand on écrit un texte d'interface qui emploie un verbe à l'impératif
+(« signale », « confirme », « partage »), la revue doit pouvoir pointer le geste. Sinon le
+texte est une dette, et le grep qui la trouve est un grep sur les verbes, pas sur les
+`onPress`.
+
+### 2. Accrocher une route fille sous un segment dynamique
+
+Expo Router nomme les routes d'après les fichiers. Pour obtenir `/shipment/<id>/report`
+alors que `/shipment/<id>` existe déjà, le fichier doit devenir un dossier :
+
+```
+app/shipment/[id].tsx     →   app/shipment/[id]/index.tsx   ← MÊME URL
+                              app/shipment/[id]/report.tsx
+                              app/shipment/[id]/rate.tsx
+```
+
+`index.tsx` dans un dossier répond à l'URL du dossier : la route publique ne change pas, et
+`git mv` garde l'historique du fichier. Le `_layout.tsx` du dossier parent couvre les trois
+écrans — une pile, trois destinations, aucune duplication d'options.
+
+Le piège, lui, est au typage. Les routes typées d'expo-router vivent dans
+`.expo/types/router.d.ts`, **généré par Metro et non suivi par git**. Deux conséquences :
+
+```
+# Avec un fichier PÉRIMÉ (routes neuves absentes) :
+TS2820: Type '"/shipment/[id]/report"' is not assignable to type …
+        Did you mean '"/shipment/[id]"'?
+
+# Sans le fichier (ce que voit la CI, qui n'a jamais tourné Metro) :
+→ aucune erreur : l'augmentation globale est absente, Href redevient permissif
+```
+
+Le typecheck local est donc **plus strict** que la CI, et il ment dans les deux sens. Le
+réflexe documenté au lot précédent (`npx expo customize tsconfig.json`, qui régénérait les
+types sans démarrer Metro) **ne fonctionne plus** dans ce monorepo :
+
+```
+Error: Cannot find module 'expo-router/_ctx-shared'
+Require stack: node_modules/@expo/router-server/build/typed-routes/index.js
+```
+
+`@expo/router-server` est hoisté à la racine, `expo-router` est **niché** sous `apps/mobile`
+(volontairement, pour Metro) : la résolution ne traverse pas. La parade tenue ici : compléter
+le fichier généré à la main (il est local et jetable) pour vérifier **avec** les types, puis
+le déplacer et vérifier **sans**. Un lot de routes neuves se valide des deux côtés, sinon on
+livre à l'aveugle sur l'un des deux.
+
+### 3. Un formulaire branché sur une machine d'état n'a pas trois états, il en a six
+
+Le réflexe est `loading` / `error` / `ready`. Insuffisant dès que le droit d'agir vient du
+serveur :
+
+```ts
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'notFound' }                       // 404 et 403 confondus à dessein
+  | { kind: 'wrongRole' }                      // le deal existe, mais pour l'autre face
+  | { kind: 'notAllowed' }                     // le serveur n'autorise PAS le geste
+  | { kind: 'error'; correlationId: string | null }
+  | { kind: 'loaded'; shipment: ShipperShipmentDto };
+```
+
+`notAllowed` est le cas intéressant : le formulaire **n'est pas rendu**. Le site, lui, affiche
+un toast et redirige (`router.replace`) — acceptable dans un navigateur où la barre d'adresse
+explique d'où l'on vient ; agressif sur un téléphone, où un écran qui s'ouvre et se referme
+tout seul passe pour un bug. L'écran natif dit donc **pourquoi**, et propose le retour.
+
+Et `correlationId` n'est pas de la décoration : le client génère l'identifiant **avant**
+d'émettre (`client.ts`), donc l'app le connaît même quand la réponse ne revient jamais. Un
+écran d'erreur qui l'affiche transforme « ça ne marche pas » en une ligne de journal
+retrouvable.
+
+### 4. Les constantes d'un contrat partagé : importer ou recopier ?
+
+Les bornes du litige vivent dans `@packages/api-contracts` — et ce paquet importe zod. Sur
+un bundle React Native, l'importer tire zod dans l'application pour **trois nombres**. Le
+choix a donc été de recopier, en l'écrivant noir sur blanc :
+
+```ts
+/** Paramètres serveur (`DISPUTE_MIN_DESCRIPTION_LENGTH`, `DISPUTE_PHOTOS_MAX`). */
+export const DESCRIPTION_MIN_LENGTH = 50;
+export const DESCRIPTION_MAX_LENGTH = 2000;
+export const PHOTOS_MAX = 5;
+```
+
+Ce n'est défendable que sous trois conditions, et il faut les tenir ensemble :
+
+1. **le serveur revérifie tout** — la copie est une courtoisie d'interface, jamais une
+   garantie ;
+2. **le commentaire nomme la source** — celui qui change la valeur côté serveur trouve la
+   copie par un grep sur le nom d'origine ;
+3. **la copie ne décide de rien d'autre** — elle ne sert qu'à afficher et à pré-valider.
+
+Le contre-exemple serait de recopier un barème de remboursement : là, une divergence
+fabriquerait un **montant faux à l'écran**, et c'est exactement pour cela que la préviz
+d'annulation est servie par le serveur (A221).
+
+### 5. Un booléen `canSubmit` ne sait pas dire pourquoi il dit non
+
+```ts
+export type ReportBlocker = 'category' | 'description' | 'photos' | 'pledge';
+
+export function reportBlockers(form: ReportForm): ReportBlocker[] {
+  const blockers: ReportBlocker[] = [];
+  if (form.category === null) blockers.push('category');
+  if (!describeDescription(form.description).ok) blockers.push('description');
+  if (!photosReady(form.photos)) blockers.push('photos');
+  if (!form.pledgeAccepted) blockers.push('pledge');
+  return blockers;
+}
+
+export function canSubmitReport(form: ReportForm): boolean {
+  return reportBlockers(form).length === 0;
+}
+```
+
+Une **liste ordonnée** plutôt qu'un booléen, pour une raison d'interface : la règle du dépôt
+interdit les boutons grisés (A209). Le bouton existe donc toujours, et une pression sur un
+dossier incomplet doit **dire le premier manque**. Avec un booléen, la vue aurait réécrit les
+quatre conditions pour choisir le message — deux sources de vérité pour une seule règle, qui
+divergent au premier correctif.
+
+Variante utile : `canSubmitReport` est dérivé de `reportBlockers`, pas l'inverse. L'ordre de
+dérivation évite qu'un jour une condition n'existe que dans l'un des deux.
+
+### 6. Trimer **avant** de compter, parce que le serveur trime
+
+```ts
+export function describeDescription(text: string): DescriptionState {
+  const length = text.trim().length;   // le contrat trime aussi
+  …
+}
+```
+
+Le contrat est `z.string().trim().min(50)`. Compter la chaîne brute aurait donné un compteur
+vert à 50 caractères dont 6 espaces, et un **400** à l'envoi : le pire des deux mondes, où
+l'interface certifie ce que le serveur refuse. Règle générale : **la validation du client
+copie la NORMALISATION du serveur, pas seulement son seuil.**
+
+### 7. Tous les refus ne se valent pas : certains ferment le formulaire
+
+C'est la leçon de D82 7A (« attends » n'est pas « c'est raté ») appliquée à un formulaire :
+
+```ts
+const key = reportFailureKey(error.code, error.status);
+if (key === 'conflict' || key === 'categoryRefused') {
+  setConfirming(false);
+  setFatal(message);          // définitif : l'écran dit pourquoi et ramène au suivi
+} else {
+  setSendError(message);      // réessayable : la feuille reste ouverte sur son bouton
+}
+```
+
+Un refus **définitif** (le deal a été versé entre-temps, le motif n'est plus recevable) ne se
+corrige pas en réessayant : garder le formulaire ouvert invite à cogner contre un mur. Un
+refus **réessayable** (panne, validation) doit au contraire garder la saisie sous les yeux.
+
+Et sur l'écran de notation, la même distinction prend une forme plus élégante : un conflit
+**relit le contexte**, et comme le choix du visage est une fonction pure…
+
+```ts
+export function ratingFace(input: RatingFaceInput, nowMs: number): RatingFace {
+  if (input.canRate) return 'form';
+  if (input.revealedAt !== null) return 'revealed';
+  if (input.ratedByMe) return 'sent';
+  if (input.windowEndsAt !== null && Date.parse(input.windowEndsAt) <= nowMs) return 'closed';
+  return 'unavailable';
+}
+```
+
+…l'écran bascule **de lui-même** sur « ta note est partie » ou « la notation est fermée ».
+Aucune branche d'erreur n'a eu à décider quoi afficher : elle a seulement rafraîchi les
+faits. *Quand l'état est dérivé d'une fonction pure, corriger une erreur se réduit à relire
+la vérité.*
+
+### 8. `useFocusEffect` : un écran qu'on quitte doit relire en revenant
+
+```tsx
+// AVANT — la fiche chargeait une fois
+useEffect(() => { void load(); }, [load]);
+
+// APRÈS
+useFocusEffect(
+  useCallback(() => {
+    setFlash(null);
+    void load();
+  }, [load])
+);
+```
+
+Le défaut que cela corrige est subtil et certain : après un signalement déposé sur un **autre
+écran**, la fiche gardait son bouton « Signaler » — elle affirmait un droit que le serveur
+venait de retirer. Trois points de technique :
+
+- le rappel est exécuté **à chaque focus**, et le premier affichage en est un : le
+  chargement initial n'a pas besoin d'un `useEffect` en plus ;
+- le rappel doit être **mémoïsé** par `useCallback` — le typage d'expo-router l'écrit
+  lui-même (« should be wrapped in `React.useCallback` to avoid running the effect too
+  often ») : sans lui, une nouvelle fonction à chaque rendu relance l'effet à chaque rendu ;
+- le message du dernier geste est effacé au retour : un verrou — ou un message — posé par un
+  chemin doit avoir son chemin d'effacement. **C'est la troisième fois en trois jours que
+  cette même leçon se paie** (le garde `resumeStarted` de D82 7A, le `sheetError` d'A221,
+  ce `flash`). Quand une leçon revient trois fois, ce n'est plus une étourderie : c'est un
+  point de revue à ajouter à sa propre liste.
+
+### 9. Un identifiant qui n'est unique que par hasard
+
+```ts
+const known = new Set(photos.map((p) => p.id));
+const chosen = result.assets.filter((asset) => !known.has(photoId(asset))).slice(0, slots);
+```
+
+L'identité d'une photo avant son téléversement est `asset.assetId ?? asset.uri` : la seule
+dont on dispose. Mais choisir **deux fois la même image** dans la photothèque rend le même
+`assetId` — donc deux vignettes au même identifiant. Conséquences, toutes silencieuses : le
+`map` de mise à jour touche les deux entrées, et retirer l'une efface l'autre. Dès qu'un
+identifiant vient d'une source externe, la question à poser est « que se passe-t-il s'il
+arrive deux fois ? », et la réponse coûte une ligne.
+
+### Pour aller plus loin
+
+- `useFocusEffect` — https://docs.expo.dev/versions/v57.0.0/sdk/router/ (et la raison du
+  `useCallback` obligatoire, écrite dans le typage lui-même).
+- `expo-image-picker` et les permissions demandées **au geste** :
+  https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/
+- Le double-aveugle de la notation, côté serveur : `apps/deal-service/src/services/
+  deal-rating.service.ts` et le contrat `packages/libs/api-contracts/src/booking/
+  booking-rating.schema.ts` (dont le commentaire ANO-API-14 explique pourquoi `partialRecord`
+  et non `record` — un enum en clé rend un `record` **exhaustif** depuis Zod 4).

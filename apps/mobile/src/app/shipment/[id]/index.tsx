@@ -24,16 +24,20 @@
  *     le montant rendu est celui que le serveur a décidé à l'instant T, pas
  *     celui que la préviz annonçait avant le clic.
  *
- * Ce que cette fiche ne fait PAS encore, et qui ne se devine donc nulle part
- * à l'écran : signaler un problème et noter le Voyageur. Ce sont deux
- * formulaires — deux écrans à part, comme sur le site (`/report`, `/rate`) —
- * et promettre ici un écran absent serait le défaut A203. Le lot suivant les
- * ouvre ; aucun texte de cet écran ne renvoie au site en attendant.
+ * Deux gestes vivent sur leurs propres écrans, parce que ce sont des
+ * FORMULAIRES et non des confirmations : `report` (signaler un problème) et
+ * `rate` (noter le Voyageur), comme sur le site. La fiche les ANNONCE et y
+ * mène — jusqu'au lot A222 elle ne le faisait pas, alors que son texte
+ * « signale-le avant la fin du délai » le promettait déjà (défaut A203).
+ *
+ * Elle RELIT au retour de focus : un signalement déposé ou une note publiée
+ * change l'état ailleurs, et une fiche qui garderait son bouton « Signaler »
+ * après coup mentirait sur ce qui est encore possible.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -175,9 +179,16 @@ export default function ShipmentScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // `useFocusEffect` et non `useEffect` : la fiche est une DESTINATION, on y
+  // revient — du signalement, de la notation, de l'onglet Activité. Au
+  // premier affichage elle est focalisée, donc le chargement initial est le
+  // même appel. Le message du dernier geste, lui, n'a plus cours au retour.
+  useFocusEffect(
+    useCallback(() => {
+      setFlash(null);
+      void load();
+    }, [load])
+  );
 
   /** Ouvrir une feuille efface l'erreur de la tentative PRÉCÉDENTE : sans
    *  cela, rouvrir le geste affichait le message de son échec passé comme
@@ -283,6 +294,17 @@ export default function ShipmentScreen() {
 
   const canCancel = shipment.allowedActions.includes('cancel');
   const canConfirm = shipment.allowedActions.includes('confirmEarly');
+  // Le signalement est une TRANSITION de la machine : son droit est servi,
+  // jamais déduit d'un statut ni d'une date. En transit, le serveur ne
+  // l'ouvre que 48 h après le départ (A72) — avant, `disputeOpensAt` dit
+  // quand, et c'est tout ce que la fiche a le droit d'annoncer.
+  const canDispute = shipment.allowedActions.includes('dispute');
+  const disputeOpensAt =
+    !canDispute && phase === 'PICKED_UP' && shipment.disputeOpensAt ? shipment.disputeOpensAt : null;
+  // La notation n'est pas une transition : l'état complet est servi dans
+  // `rating`, et il n'existe qu'une fois l'envoi terminé (jamais après une
+  // clôture par médiation).
+  const rating = shipment.rating;
   // La régénération n'est PAS une transition de la machine : son garde est
   // le plafond serveur et le colis en transit. On ne propose donc le geste
   // que là où il a un sens, et le serveur reste seul juge.
@@ -709,6 +731,85 @@ export default function ShipmentScreen() {
                   t(`next.${NEXT_KEY[phase]}.${n}`, { carrierFirstName, recipientFirstName })
                 )}
               />
+            </Section>
+          ) : null}
+
+          {/* ── Le recours : signaler un problème ───────────────────────── */}
+          {canDispute || disputeOpensAt ? (
+            <Section title={t('recourse.title')}>
+              {canDispute ? (
+                <>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('recourse.body', { carrierFirstName })}
+                  </ThemedText>
+                  {shipment.payoutDueAt ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {t('recourse.deadline', {
+                        date: formatLongDate(shipment.payoutDueAt, locale),
+                      })}
+                    </ThemedText>
+                  ) : null}
+                  <Action
+                    label={t('recourse.label')}
+                    icon="alert-circle-outline"
+                    onPressAction={() =>
+                      router.push({ pathname: '/shipment/[id]/report', params: { id: shipment.id } })
+                    }
+                  />
+                </>
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('recourse.opensAt', { date: formatLongDate(disputeOpensAt, locale) })}
+                </ThemedText>
+              )}
+            </Section>
+          ) : null}
+
+          {/* ── La notation : quatre états, tous SERVIS ─────────────────── */}
+          {rating ? (
+            <Section
+              title={t(
+                rating.canRate
+                  ? 'rating.prompt.title'
+                  : rating.revealedAt
+                    ? 'rating.state.revealedTitle'
+                    : rating.ratedByMe
+                      ? 'rating.state.sentTitle'
+                      : 'rating.state.closedTitle'
+              )}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {rating.canRate
+                  ? t('rating.prompt.body', { carrierFirstName })
+                  : rating.revealedAt
+                    ? t('rating.state.revealedBody')
+                    : rating.ratedByMe
+                      ? rating.windowEndsAt
+                        ? t('rating.state.sentBody', {
+                            carrierFirstName,
+                            date: formatLongDate(rating.windowEndsAt, locale),
+                          })
+                        : t('rating.state.sentBodyNoDate', { carrierFirstName })
+                      : t('rating.state.closedBody')}
+              </ThemedText>
+              {rating.canRate && rating.windowEndsAt ? (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('rating.prompt.deadline', {
+                    date: formatLongDate(rating.windowEndsAt, locale),
+                  })}
+                </ThemedText>
+              ) : null}
+              {/* La fenêtre close SANS note de ma part n'ouvre rien : il n'y
+                  a ni avis à lire ni note à poser (A209). */}
+              {rating.canRate || rating.revealedAt || rating.ratedByMe ? (
+                <Action
+                  label={rating.canRate ? t('rating.prompt.label', { carrierFirstName }) : t('rating.state.view')}
+                  tone={rating.canRate ? 'primary' : 'quiet'}
+                  icon={rating.canRate ? 'star-outline' : undefined}
+                  onPressAction={() =>
+                    router.push({ pathname: '/shipment/[id]/rate', params: { id: shipment.id } })
+                  }
+                />
+              ) : null}
             </Section>
           ) : null}
 

@@ -31,7 +31,13 @@ export async function issueTrackingLink(bookingId: string): Promise<TrackingLink
 export type BookingApiErrorCode =
   | "CODE_REGENERATION_LIMIT" // plafond 5 atteint, ou colis plus en transit (B3)
   | "TRANSITION_NOT_ALLOWED" // deux clics : un seul gagne — relire
-  | "VALIDATION" // 400 : corps refusé par le serveur (B4 : description, pledge, catégorie en transit)
+  // D51 — en transit, seul « jamais livré » est recevable. Le serveur le dit
+  // par son propre code ; sans cette ligne, le refus retombait dans
+  // « VALIDATION », dont le message parle de la description et de
+  // l'engagement — un diagnostic FAUX pour une cause qui n'a rien à voir
+  // (divergence trouvée en portant l'écran en natif, A222).
+  | "DISPUTE_CATEGORY_NOT_ALLOWED"
+  | "VALIDATION" // 400 : corps refusé par le serveur (B4 : description, pledge)
   | "NOT_FOUND"
   | "UNAUTHENTICATED"
   | "GENERIC";
@@ -53,7 +59,9 @@ function toBookingApiError(e: unknown): BookingApiError {
   const status = err.response?.status ?? 0;
   const detailCode = err.response?.data?.details?.code;
   const code: BookingApiErrorCode =
-    detailCode === "CODE_REGENERATION_LIMIT" || detailCode === "TRANSITION_NOT_ALLOWED"
+    detailCode === "CODE_REGENERATION_LIMIT" ||
+    detailCode === "TRANSITION_NOT_ALLOWED" ||
+    detailCode === "DISPUTE_CATEGORY_NOT_ALLOWED"
       ? detailCode
       : status === 400
         ? "VALIDATION"
