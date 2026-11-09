@@ -1,12 +1,14 @@
 /**
- * publish.tsx — l'écran « Publier », HORS de la barre d'onglets (A210).
- * =====================================================================
- * Il n'est plus un onglet : un onglet permanent pour un écran qui ne fait
- * rien ne se justifiait pas. La route VIT toujours et reste atteignable par
- * `router.push('/publish')` (doc Expo v57 : une route sans Trigger quitte la
- * barre sans cesser d'être navigable) ; sa porte est la carte CTA en tête
- * d'Activité. Il reviendra en « + » central avec le lot de publication
- * NATIVE.
+ * publish.tsx — l'écran « Publier », le « + » central de la barre (A210).
+ * =======================================================================
+ * Il est le cinquième élément de la barre, au MILIEU, et le seul qui ne soit
+ * pas une destination mais une ACTION — le motif de Vinted, Leboncoin,
+ * Instagram (le pourquoi est dans `(tabs)/_layout.tsx`). Sa seconde porte
+ * est la carte CTA en tête d'Activité.
+ *
+ * L'en-tête de ce fichier a dit un temps « HORS de la barre d'onglets » :
+ * c'était vrai d'une passe intermédiaire d'A210, plus du code — le « + » est
+ * revenu au centre. Corrigé ici le 08/11/2026.
  *
  * Coquille HONNÊTE (A203) : elle dit que le parcours arrive, et ne renvoie
  * NULLE PART — l'app est full mobile et native (A210 b). L'ancienne ligne
@@ -22,7 +24,7 @@ import { useTranslations } from 'use-intl';
 import { IdentityGate } from '@/components/identity-gate';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 function PublishContent() {
   const t = useTranslations('tabs');
@@ -43,7 +45,7 @@ function PublishContent() {
 
 export default function PublishScreen() {
   return (
-    <IdentityGate>
+    <IdentityGate destination="publish">
       <PublishContent />
     </IdentityGate>
   );
@@ -59,6 +61,10 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
+    // La barre d'onglets FLOTTE au-dessus du contenu (D88) : cet écran ne
+    // défile pas, c'est donc ici qu'il lui réserve sa place — sans quoi son
+    // bas se centrerait SOUS la pilule.
+    paddingBottom: BottomTabInset,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.three,

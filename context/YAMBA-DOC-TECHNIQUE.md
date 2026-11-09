@@ -15383,3 +15383,207 @@ démarrer Metro seul (`expo start --go`) puis `xcrun simctl openurl booted "exp:
   passer, alors que la CI le refuse partout ailleurs.
 - **Le rendu anglais des trois volets n'a pas été vérifié à l'écran.** La structure est
   identique et les retours sont écrits, donc le risque de débordement est nul par construction.
+
+# D88 — La barre d'onglets quitte le natif, et la porte d'identité cesse de servir le même mur
+
+> Branche `feat/mobile-tabbar`. Trois demandes de revue convergentes — une barre trop bavarde,
+> un escamotage attendu au défilement, une rupture de thème entre l'ouverture et la première
+> page — ont fait tomber un choix de D36 : `NativeTabs`. Le lot a ensuite dérivé, à l'écran,
+> vers un second chantier que personne n'avait prévu : la **porte d'identité**, qui servait le
+> même mur aux cinq endroits où l'app réclame une session. Tout a été instruit capture en main.
+
+## ① Pourquoi la barre native est abandonnée — mesuré, pas supposé
+
+D36 avait choisi `NativeTabs` d'expo-router (la vraie `UITabBar` d'iOS, la barre Material 3
+d'Android) en écartant explicitement « une imitation JS ». Les trois demandes de la revue sont
+hors d'atteinte de ce choix, et chacune pour une raison précise :
+
+| Demande | Ce que le natif sait faire |
+|---|---|
+| Escamotage au défilement | `minimizeBehavior: 'onScrollDown'` existe — **iOS 26+ uniquement**, aucun équivalent Android |
+| Icônes sans libellé | `labelVisibilityMode` — **Android uniquement** ; `UITabBar` affiche toujours le titre |
+| Barre flottante | impossible : une barre système est ancrée au bas de l'écran |
+
+**Ce que l'on paie**, et qui est réécrit à la main dans `components/tab-bar.tsx` : le flou (natif
+sur iOS, repli translucide sur Android), la sémantique d'onglet pour les lecteurs d'écran
+(`tablist` / `tab` + position annoncée « 2 / 5 »), la borne du Dynamic Type, l'évitement du
+clavier, les pastilles de badge. **Ce que l'on ne récupère pas** : les retours haptiques
+idiomatiques et les comportements Material 3 d'Android.
+
+## ② L'escamotage : une valeur partagée, jamais un état React
+
+`src/lib/tab-bar-visibility.tsx` tient **une** valeur partagée Reanimated (`hidden` : 0 = posée,
+1 = sortie) au niveau du groupe d'onglets. Les écrans ne la touchent pas : ils branchent
+`useTabBarHideOnScroll()` sur leur conteneur défilant, qui doit être un conteneur **Reanimated**
+(`Animated.FlatList` sur l'accueil, `Animated.ScrollView` sur les favoris) — un conteneur
+ordinaire ne sait pas appeler un worklet.
+
+Deux points de conception à ne pas défaire :
+
+- **Le seuil est CUMULÉ.** Un doigt posé sur une liste produit des micro-mouvements de un ou
+  deux points dans les deux sens ; un seuil appliqué par événement laisse la barre papilloter.
+  On additionne le déplacement tant qu'il va dans le même sens (un changement de sens remet le
+  compteur à zéro) et on ne bascule qu'au-delà de 12 pt. Le haut de liste (`y <= 0`) reforce
+  toujours la barre visible.
+- **Partir est plus rapide que revenir** (180 ms contre 240) : on dégage vite pour rendre la
+  place, on remonte posément pour ne pas surprendre le pouce qui vise une carte.
+
+## ③ La géométrie de la barre, et comment elle a été trouvée
+
+La forme finale n'a pas été devinée : elle vient de mesures prises sur les captures de
+référence (YouTube pour la barre, Airbnb pour la porte), converties en points.
+
+| | Référence (YouTube) | Yamba |
+|---|---|---|
+| Marge latérale | 25 pt | **24 pt** (`Spacing.four` — celle de la rangée de recherche du haut) |
+| Hauteur de barre | 45 pt | **52 pt** (il faut loger un libellé) |
+| Indicateur / cellule | 73 pt sur 85 = **86 %** | 68,2 pt sur 68,2 = **100 %** |
+| Forme de l'indicateur | stade, rayon 19 | **stade, rayon 21** (`PILL_HEIGHT / 2`) |
+
+Trois leçons méritent d'être retenues :
+
+1. **Le remplissage n'était pas le problème.** Quand l'utilisateur a demandé « large comme sur
+   YouTube », l'indicateur occupait déjà 94 % de sa cellule contre 86 % chez la référence. Ce
+   qui manquait était la **forme** : 63 × 44 avec un rayon de 14 se lit carré, donc court.
+2. **Le rayon de l'indicateur suit une LOI, pas une valeur.** Descendu à 16 à la demande, le
+   décalage ne s'est vu qu'aux **deux bouts** (Accueil et Messages) : la barre qui le contient
+   est elle-même un stade (rayon 26), et aux extrémités il ne reste que 2 pt de marge — l'œil
+   compare alors directement deux courbures qui ne se répondent pas. D'où `PILL_HEIGHT / 2`
+   écrit en dur dans le code : un futur changement de hauteur ne recréera pas le défaut.
+3. **Les cellules sont `flex: 1`.** C'est ce qui fige la rangée : la pilule active grandit pour
+   prendre son mot, mais DANS sa cellule — les quatre autres icônes ne bougent pas d'un point.
+
+## ④ La sélection se dit en encre, jamais en mangue
+
+La pilule active portait d'abord la teinte des pastilles transport (crème `#FFF6E8` sur clair,
+mangue à 15 % sur sombre) avec le mot en `#CC7A00`. Trois défauts, dont deux mesurables :
+
+- **l'indicateur ne se voyait pas** : `#FFF6E8` sur une barre à `rgba(255,255,255,0.94)`, c'est
+  3 % d'écart de luminance. La teinte venait des pastilles transport, qui vivent sur le fond
+  **blanc de la page** — un même jeton ne vaut pas sur deux supports ;
+- **le mot ne passait pas l'AA** : `#CC7A00` sur `#FFF6E8` plafonne vers 4,0:1, sous les 4,5:1
+  qu'exige un texte de 10 px, fût-il gras ;
+- **deux mangues se disputaient la barre.** Le squircle « Publier » doit rester LA seule tache
+  chaude et saturée (A210) : c'est à cette condition que l'œil le lit comme une action.
+
+La sélection se dit donc en **encre** : glyphe plein + encre pleine + le mot, contre contour +
+gris de second plan. Trois signaux, zéro couleur dépensée. L'indicateur est un **lavis** de
+l'encre du support (8 % sur clair, 14 % sur sombre — non symétriques, l'œil perd plus vite un
+éclaircissement sur fond sombre), jamais un aplat opaque : une barre translucide ne porte pas
+une vignette collée, elle se composerait mal dès que du contenu passe derrière.
+
+## ⑤ « Accueil », et la maison sans porte
+
+`index` s'appelait « Explorer » ; l'écran est un flux d'atterrissage localisé (D80) et la
+recherche vit DANS la page — « Accueil » dit la vérité, et la maison est la seule icône que tout
+le monde lit sans libellé, ce qui compte double quand quatre onglets sur cinq n'en ont plus.
+
+La maison retenue est celle de **Material Community** (`home-variant`), seule maison SANS PORTE
+des jeux embarqués : celle d'Ionicons en a une, et à 22 px cette porte est un pâté qui salit le
+glyphe. **Aucune police ajoutée** — `@expo/vector-icons` est un baril qui les embarque toutes
+dès le premier import, vérifié dans le bundle (le TTF de Material Community y était déjà quand
+seul Ionicons était utilisé).
+
+## ⑥ La porte d'identité : cinq destinations, cinq discours
+
+`IdentityGate` sert Favoris, Activité, Messages, Publier **et** Profil. Elle servait le même
+mur partout : « Connecte-toi pour continuer » + « tes trajets, tes messages et ton profil
+t'attendent ». Le texte était donc **faux quatre fois sur cinq** (il énumérait trois
+destinations quand on en touchait une quatrième), et le titre donnait un ordre que le bouton
+posé trois lignes plus bas répétait déjà.
+
+Chaque appelant déclare maintenant sa destination — `<IdentityGate destination="favorites">` —
+et la porte va chercher sa paire de clés dans `messages/{fr,en}/tabs.json`. `GateDestination`
+est une **union fermée** : un onglet ajouté sans son texte se voit à la compilation.
+
+## ⑦ Et sa composition passe à celle d'Airbnb — trois inversions
+
+Elle avait d'abord repris le modèle de l'écran de bienvenue (ancré en bas, verrou de marque,
+deux boutons pleine largeur). Posé sur un onglet, il ne tenait pas.
+
+| | Référence (Airbnb) | Avant | Après |
+|---|---|---|---|
+| Ancrage | contenu en **haut** | en bas | **en haut** |
+| Titre de page | ~33 pt | 20 pt | **30 pt** (`title`) |
+| Accroche | ~23 pt | 34 pt — *plus grosse que le titre* | **20 pt** (`subtitle`) |
+| Boutons | un, qui épouse son texte | deux pleine largeur | **deux côte à côte, qui épousent leur texte** |
+
+La hiérarchie était littéralement à l'envers : le nom de la destination — qui dit **où l'on
+est** — pesait trois fois moins que l'argument. Les écrans CONNECTÉS passent au même cran
+(`type="title"`), sinon le titre saute de 30 à 20 au moment où la session s'ouvre.
+
+Le **verrou de marque sort de l'app** : « Yamba » sous le symbole est la porte d'entrée (l'écran
+de bienvenue), pas un rappel à servir cinq fois. Ces ~58 pt portent le nom de la destination.
+
+Deux corollaires mesurés :
+
+- **les coupures écrites (`\n`) sont retirées** des cinq titres : taillées pour du 34 pt, elles
+  cassaient à 20 une ligne qui tient entière ;
+- **le plafond `maxWidth: 330` du corps est supprimé.** Réglé pour le carrousel de la
+  bienvenue, il rendait la mise en page **dépendante de l'appareil** : 345 pt disponibles sur un
+  iPhone 15, le corps revenait donc à la ligne 15 pt avant le titre ; sur un SE (327 pt) le
+  plafond ne mordait pas du tout. Sans lui, la mesure vaut ~42 caractères à 16 pt, au cœur de la
+  fourchette lisible. Vérifié : aucun volet de la bienvenue ne change de nombre de lignes.
+
+## ⑧ La règle qui évite qu'on « harmonise » les deux écrans par erreur
+
+Bienvenue : trois gestes **empilés, pleine largeur**. Porte : deux gestes **côte à côte, qui
+épousent leur texte**. Ce n'est pas une incohérence, et la règle tient en une phrase, écrite
+dans l'en-tête de `identity-gate.tsx` :
+
+> **LE POIDS DU BOUTON ÉPOUSE LE POIDS DU MOMENT.**
+
+La bienvenue est un écran de DÉCISION : il n'existe que pour ça, les gestes SONT le contenu, et
+pleine largeur est l'affordance maximale. La porte est une INTERRUPTION : l'utilisateur voulait
+ses favoris et trouve un mur ; les gestes y sont un remède, pas le propos. Deux contraintes
+matérielles le verrouillent : la bienvenue a **trois** actions (trois sur une rangée est
+impossible) et son bloc est ancré en bas ; la porte en a deux, dans une colonne ancrée en haut.
+
+Conséquence d'architecture : `components/invite-kit.tsx` ne prétend plus porter « le modèle
+servi partout ». Il garde ce que les deux écrans partagent vraiment — **les teintes** (une seule
+encre pour toute l'app) et la typographie du corps — et la grammaire de la bienvenue, qui
+n'appartient qu'à elle. `InviteCopy` et `useTabBarReserve`, devenus sans appelant, ont été
+retirés dans le même mouvement.
+
+## ⑨ Deux correctifs de session, et un défaut d'initiales
+
+- **La pastille d'identité montre la photo** quand le compte en a une, les initiales sinon, la
+  silhouette pour un visiteur anonyme. Rien à ouvrir côté serveur : `/auth/me` projetait **déjà**
+  `avatar: { url }` (liste blanche `me-projection.ts`).
+- **`signIn` enchaîne un `/auth/me`.** La réponse de `/auth/login` est une liste blanche courte :
+  ni langue du compte, ni photo. Sans ce second appel, l'app parlait la langue de l'**appareil**
+  juste après la connexion (D44 non respecté jusqu'au lancement suivant) et la pastille affichait
+  des initiales alors qu'une photo existait. Un échec n'interrompt pas la connexion.
+- **`getInitials` tronquait mal.** Sa signature disait `(firstName, lastInitial)` : le second
+  argument devait être une initiale **déjà tronquée**, et il était collé tel quel. Les trois
+  appelants publics respectaient ce contrat (les DTO publics ne donnent que l'initiale du nom —
+  une carte affiche « Marven M. », jamais le patronyme), mais la pastille lit `/auth/me`, qui
+  renvoie le nom COMPLET : « Marven MABIALA » donnait **`MMABIALA`** dans un rond de 44 pt. La
+  troncature se fait désormais DANS le helper — un seul endroit à tenir — avec un `trim()` avant
+  le `charAt(0)`, ce qui traite aussi les prénoms composés et les espaces de tête.
+
+## ⑩ Les contrôles passés
+
+- `npx nx typecheck @yamba-app/mobile` — vert à chaque étape.
+- `node scripts/check-i18n-messages.mjs` — miroir FR/EN parfait, 30 espaces de noms.
+- **Bundle iOS complet reconstruit** à chaque passe (`/.expo/.virtual-metro-entry.bundle`,
+  HTTP 200, ~11,6 Mo) : c'est le seul contrôle qui prouve que les imports se résolvent et que le
+  plugin de worklets a tourné (551 worklets compilés). Un typecheck vert n'est pas un bundle qui
+  se construit — la leçon `esModuleInterop` du 05/09 vaut aussi ici.
+- Vérifié à l'écran dans le simulateur iOS, avec gateway + trip-service + auth-service lancés.
+
+## ⑪ Ce qui n'est PAS fait, et pourquoi
+
+- **Le rendu Android n'a pas été vu.** Aucun simulateur iOS ne le dit, et c'est là que les
+  animations de layout (`LinearTransition`) sont le plus risquées. Le flou y est un repli
+  translucide, assumé : la barre flotte au-dessus de n'importe quel écran et ne peut donc pas
+  désigner de `BlurTargetView`.
+- **Les retours haptiques à la sélection** ne sont pas câblés.
+- **Le vide du bas de la porte (~50 % de la hauteur)** reste vide. C'est la place exacte où
+  MONTRER ce qu'il y a derrière — deux ou trois cartes réelles estompées convertiraient mieux
+  qu'une phrase. Lot à part.
+- **Le bouton secondaire est plus large que le primaire** (« Créer un compte » 165 pt contre
+  « Se connecter » 135) : l'œil pèse la taille autant que l'aplat. Défaut connu, non corrigé —
+  changer le mot coûterait la cohérence avec le reste de l'app.
+- **La pastille de badge reste mangue.** Par la règle du ④ elle devrait être rouge (la convention
+  des compteurs) ; elle fait 17 px et porte une sémantique différente. Arbitrage non rendu.

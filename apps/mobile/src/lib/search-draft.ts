@@ -23,7 +23,7 @@ export type SearchDraft = {
   from: string;
   to: string;
   date: SearchDate | null;
-  /** Incrémenté par « Rechercher » dans la feuille. L'écran Explorer compare
+  /** Incrémenté par « Rechercher » dans la feuille. L'écran Accueil compare
    *  ce compteur au dernier qu'il a servi : c'est le SIGNAL de lancement.
    *  Un booléen aurait demandé un acquittement (donc une seconde écriture, et
    *  une boucle de rendu) ; un compteur se lit sans rien remettre à zéro. */

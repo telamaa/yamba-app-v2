@@ -7980,3 +7980,85 @@ rôle, interdiction du mot « assurance ») doit être **rejouée côté serveur
 Aujourd'hui la CI garde chaque texte à chaque PR ; un texte saisi en back-office y échapperait
 entièrement, et le back-office deviendrait le seul endroit du produit où le vouvoiement peut
 passer.
+
+# D88 — La barre d'onglets dessinée, et une porte d'identité qui parle de sa destination
+
+## Le besoin
+
+**Trois demandes de revue, convergentes.** Une barre d'onglets trop bavarde (cinq mots en
+permanence), un escamotage attendu quand on défile, et une rupture de thème entre l'écran
+d'ouverture — figé en sombre — et la première page, blanche. Les deux premières ne sont pas des
+caprices de forme : une barre qui occupe 90 pt en permanence sur un écran de liste, c'est 10 %
+de la surface utile rendue au contenu dès qu'on défile.
+
+**Puis un second besoin, découvert à l'écran.** Les cinq espaces réservés aux membres —
+Favoris, Activité, Messages, Publier, Profil — servaient le **même mur** : « Connecte-toi pour
+continuer », suivi de « tes trajets, tes messages et ton profil t'attendent ». Or on touche
+Favoris, et l'écran répond par une phrase qui ne mentionne même pas les favoris. Ce qui donne
+envie de se connecter, c'est la chose **précise** qu'on vient de réclamer, pas un statut
+d'adhésion ; et le texte était **faux quatre fois sur cinq**.
+
+## Les règles
+
+| # | Règle |
+|---|---|
+| **RG-MOB-111** | La barre d'onglets n'affiche le **libellé que de l'onglet actif** ; les quatre autres sont des icônes seules. Deux destinations sur cinq sont indevinables sans leur mot (le colis = « Activité », le squircle mango = « Publier »), le compromis porte donc sur la destination où l'on se trouve |
+| **RG-MOB-112** | La barre **s'escamote au geste, jamais au minuteur**. Défilement vers le bas → elle sort ; vers le haut → elle revient ; en haut de liste → elle est toujours visible. Une barre qui disparaît sans qu'on ait rien fait est une barre qu'on croit cassée |
+| **RG-MOB-113** | La **mangue est la propriété exclusive de « Publier »**. L'onglet actif se signale en **encre** (glyphe plein + encre pleine + le mot), jamais par une teinte de marque : le squircle doit rester la seule tache chaude et saturée, c'est à cette condition que l'œil le lit comme une **action** et non comme une destination |
+| **RG-MOB-114** | L'onglet d'atterrissage s'appelle **« Accueil »** et porte une **maison**. L'écran est un flux localisé et la recherche vit dans la page : « Explorer » mentait, et la maison est la seule icône que tout le monde lit sans libellé |
+| **RG-MOB-115** | La **pastille d'identité** montre la **photo** du compte quand il y en a une, les **initiales** sinon, une **silhouette** pour un visiteur anonyme. Les initiales valent **une** lettre de prénom et **une** lettre de nom, quelle que soit la forme reçue du serveur |
+| **RG-MOB-116** | L'écran d'ouverture **suit le thème du système**. Ouvrir sur un marine profond pour atterrir sur un fond blanc est une rupture que rien ne justifie |
+| **RG-MOB-117** | Un espace réservé aux membres **nomme la destination réclamée** : son titre dit ce qu'on y gagne, jamais « connecte-toi » — le bouton le dit déjà. Le texte générique n'est qu'un repli |
+| **RG-MOB-118** | **Le poids du bouton épouse le poids du moment.** Un écran de **décision** (la bienvenue : il n'existe que pour ça) porte des boutons empilés pleine largeur ; une **interruption** (la porte d'identité : l'utilisateur voulait autre chose) porte des boutons compacts. Harmoniser les deux formes reviendrait à dire que tous les moments se valent |
+| **RG-MOB-119** | Le **verrou de marque** (« Yamba » sous le symbole) vit à la **porte d'entrée** de l'app, et nulle part ailleurs. À l'intérieur, l'utilisateur sait où il est ; répété, il coûte de la place et ne dit rien |
+
+## Les cinq portes
+
+| Destination | Titre | Corps |
+|---|---|---|
+| Favoris | Tes favoris t'attendent | Tes trajets enregistrés, tes alertes de route et les Voyageurs que tu suis. |
+| Activité | Tes envois et tes trajets, ici | Tes colis en route, les trajets que tu as publiés et les demandes reçues. |
+| Messages | Tes conversations t'attendent | Conviens de l'heure et du lieu du rendez-vous avec ton Expéditeur ou ton Voyageur. |
+| Publier | Tes kilos libres peuvent rapporter | Annonce ton prochain voyage et reçois des demandes de colis sur ton trajet. |
+| Profil | Ton compte Yamba | Tes informations, tes moyens de paiement et tes préférences, au même endroit. |
+
+Aucun des cinq titres ne dit « connecte-toi » : le bouton le dit, trois lignes plus bas.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je défile vers le bas dans les résultats d'Accueil | La barre glisse hors de l'écran après ~12 pt de mouvement continu |
+| 2 | Je défile vers le haut | Elle revient ; en haut de liste elle est toujours posée |
+| 3 | Je pose le doigt sans bouger franchement | Elle ne papillote pas (seuil cumulé, pas par événement) |
+| 4 | Je change d'onglet | La barre est reposée, et les quatre icônes inactives n'ont pas bougé d'un point |
+| 5 | J'ouvre un clavier | La barre ne se dessine pas tant qu'il est ouvert |
+| 6 | VoiceOver parcourt la barre | Chaque onglet est annoncé avec son libellé **et** sa position (« 2 sur 5 »), même sans mot affiché |
+| 7 | Je touche Favoris sans être connecté | L'écran dit « Favoris » en haut, puis « Tes favoris t'attendent » — jamais un texte qui parle d'autre chose |
+| 8 | Je me connecte depuis cette porte | Le titre « Favoris » **ne change pas de taille** : il était déjà au cran des écrans connectés |
+| 9 | Mon compte s'appelle Marven MABIALA, sans photo | La pastille affiche **MM** |
+| 10 | Mon compte a une photo de profil | La pastille affiche la photo, qui remplace les initiales |
+| 11 | Je me connecte alors que mon compte est en anglais sur un téléphone en français | L'app passe en anglais **immédiatement**, pas au lancement suivant |
+| 12 | Mon téléphone est en thème clair | L'écran de bienvenue est clair, et la variante du symbole suit |
+
+## Ce qui reste hors de ce lot
+
+### Montrer ce qu'il y a derrière la porte
+
+La porte occupe le haut de l'écran et laisse ~50 % de vide en bas. C'est la place exacte où
+**montrer** deux ou trois trajets réels, estompés ou tronqués, plutôt que de se contenter de
+les promettre. Une porte qui laisse entrevoir convertit mieux qu'une porte qui décrit. Lot à
+part, non chiffré.
+
+### Les textes des portes ne sont pas pilotables depuis le back-office
+
+Dix textes (cinq destinations × titre et corps), par langue, vivent dans les dictionnaires du
+dépôt. Les changer suppose une **publication sur les stores**. C'est le même manque que celui
+identifié pour l'écran de bienvenue, et le même futur lot : **D87**.
+
+### Le recours Android n'a pas été vu
+
+Les comportements de la barre dessinée — animations de disposition, flou de repli, retours
+haptiques — n'ont été vérifiés que sur simulateur iOS. Le flou y est un repli translucide sur
+Android, et c'est assumé : une barre qui flotte au-dessus de n'importe quel écran ne peut pas
+désigner la vue qu'elle doit flouter.

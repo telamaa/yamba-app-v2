@@ -16,6 +16,14 @@ export type SessionUser = {
   roles: string[];
   /** Langue du COMPTE (D44) — prime sur celle de l'appareil quand elle existe. */
   preferredLocale?: string | null;
+  /**
+   * La photo de profil (D88 5A), telle que `/auth/me` la projette déjà
+   * (`avatar: { url }` — liste blanche `me-projection.ts`, rien à ouvrir côté
+   * serveur). Facultative à double titre : tout le monde n'en a pas, et la
+   * réponse de `/auth/login` ne la porte PAS — la pastille montre donc les
+   * initiales jusqu'au premier `/auth/me`.
+   */
+  avatar?: { url: string } | null;
 };
 
 type LoginResponse = {

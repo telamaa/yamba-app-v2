@@ -75,5 +75,35 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/**
+ * La barre d'onglets DESSINÉE (D88) — ses deux mesures, en un seul endroit.
+ * La barre n'est plus celle de l'OS : c'est une pilule flottante, et sa
+ * géométrie est lue à la fois par la barre elle-même et par ce que les
+ * écrans réservent en bas.
+ */
+export const TabBar = {
+  /**
+   * Hauteur de la barre. 52 et non 56 : l'indicateur de sélection fait 42
+   * (`PILL_HEIGHT` dans `components/tab-bar.tsx`), il lui reste donc 5 de
+   * chaque côté. La référence de composition est aussi serrée — 38 dans 45
+   * chez YouTube, mesuré sur la capture du 08/11 — et c'est cette étroitesse
+   * qui fait lire l'indicateur comme un bandeau plutôt que comme un bouton
+   * perdu au milieu d'une barre.
+   */
+  height: 52,
+  /** Son écart au bas de la zone sûre : c'est ce vide qui la fait FLOTTER. */
+  gap: Spacing.two,
+} as const;
+
+/**
+ * Ce qu'un contenu défilant réserve en bas pour que la barre flotte sans
+ * masquer sa dernière carte.
+ *
+ * La zone sûre varie d'un appareil à l'autre (34 pt sous un iPhone à encoche,
+ * 0 sur un SE) et une constante ne la connaît pas : on prend le cas le plus
+ * haut. Du vide en fin de liste ne coûte rien ; une carte coincée sous la
+ * barre coûte un geste à chaque fois.
+ */
+export const BottomTabInset =
+  TabBar.height + TabBar.gap + (Platform.select({ ios: 34, android: 24 }) ?? 0);
 export const MaxContentWidth = 800;

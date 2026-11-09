@@ -1,16 +1,36 @@
 {
   "bar": {
-    "search": "Explorer",
+    "home": "Accueil",
     "favorites": "Favoris",
     "publish": "Publier",
     "activity": "Activité",
     "messages": "Messages"
   },
   "gate": {
-    "title": "Connecte-toi pour continuer",
+    "title": "Connecte-toi\npour continuer",
     "body": "Cet espace est réservé aux membres : tes trajets, tes messages et ton profil t'attendent derrière la connexion.",
     "cta": "Se connecter",
-    "registerLink": "Créer un compte"
+    "registerLink": "Créer un compte",
+    "favorites": {
+      "title": "Tes favoris t'attendent",
+      "body": "Tes trajets enregistrés, tes alertes de route et les Voyageurs que tu suis."
+    },
+    "activity": {
+      "title": "Tes envois et tes trajets, ici",
+      "body": "Tes colis en route, les trajets que tu as publiés et les demandes reçues."
+    },
+    "messages": {
+      "title": "Tes conversations t'attendent",
+      "body": "Conviens de l'heure et du lieu du rendez-vous avec ton Expéditeur ou ton Voyageur."
+    },
+    "publish": {
+      "title": "Tes kilos libres peuvent rapporter",
+      "body": "Annonce ton prochain voyage et reçois des demandes de colis sur ton trajet."
+    },
+    "profile": {
+      "title": "Ton compte Yamba",
+      "body": "Tes informations, tes moyens de paiement et tes préférences, au même endroit."
+    }
   },
   "publish": {
     "title": "Publie ton trajet",

@@ -24,7 +24,7 @@ import { IdentityGate } from '@/components/identity-gate';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTabBadges } from '@/hooks/use-tab-badges';
 import { useSession } from '@/lib/session-context';
 
@@ -38,7 +38,10 @@ function ActivityContent() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.titleRow}>
-          <ThemedText type="subtitle" style={styles.title}>
+          {/* `title` et non `subtitle` : le même cran que la porte
+              d'identité, pour que le nom de la page ne saute pas d'une taille
+              à l'autre au moment où la session s'ouvre. */}
+          <ThemedText type="title" style={styles.title}>
             {t('activity.title')}
           </ThemedText>
           <ProfileAvatarButton />
@@ -77,7 +80,7 @@ function ActivityContent() {
 
 export default function ActivityScreen() {
   return (
-    <IdentityGate>
+    <IdentityGate destination="activity">
       <ActivityContent />
     </IdentityGate>
   );
@@ -94,6 +97,10 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
+    // La barre d'onglets FLOTTE au-dessus du contenu (D88) : cet écran ne
+    // défile pas, c'est donc ici qu'il lui réserve sa place — sans quoi son
+    // bas se centrerait SOUS la pilule.
+    paddingBottom: BottomTabInset,
   },
   titleRow: {
     flexDirection: 'row',

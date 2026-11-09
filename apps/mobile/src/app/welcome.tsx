@@ -53,7 +53,10 @@
  *    (« il va falloir s'inscrire ») au lieu de la contourner. L'app reste
  *    publique (A203) : recherche large à l'arrivée.
  *
- * Couleurs FIXES, hors thème : cet écran est toujours sombre.
+ * D88 — L'ÉCRAN SUIT LE THÈME. Il était figé en sombre « hors thème » : ouvrir
+ * sur un marine profond pour atterrir sur une première page blanche est une
+ * rupture que rien ne justifie. Il obéit désormais au réglage du système comme
+ * tout le reste de l'app — fond, textes, contours ET variante du symbole.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
@@ -64,7 +67,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -72,14 +74,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StatusBar } from 'expo-status-bar';
 
-import YambaSymbol from '@/components/yamba-symbol';
 import { useTranslations } from 'use-intl';
 
+import {
+  InviteActions,
+  InviteBody,
+  InviteHeadline,
+  InviteLockup,
+  InvitePrimary,
+  InviteSecondary,
+  InviteTertiary,
+  InviteGutter,
+  useInviteColors,
+} from '@/components/invite-kit';
 import { Brand, Spacing } from '@/constants/theme';
 import { useSession } from '@/lib/session-context';
 import { dismissWelcome, requestBrowseOnLanding } from '@/lib/welcome-state';
-
-const BG = '#0B1120';
 
 /** L'ordre des volets EST la hiérarchie du discours : qui envoie, qui porte, pourquoi ça tient. */
 const SLIDES = ['shipper', 'traveler', 'model'] as const;
@@ -100,6 +110,9 @@ export default function WelcomeScreen() {
   const t = useTranslations('welcome');
   const { status } = useSession();
   const { width } = useWindowDimensions();
+  // Les teintes du modèle (`invite-kit`) : cet écran les a définies, la porte
+  // d'identité les partage désormais.
+  const c = useInviteColors();
 
   const pager = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
@@ -165,22 +178,17 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Fond marine : la barre d'état doit passer en clair, sinon l'heure et
-          la batterie s'écrivent en noir sur du bleu nuit. */}
-      <StatusBar style="light" />
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      {/* `auto` et non une valeur figée : l'heure et la batterie doivent
+          s'inverser avec le fond, sinon elles disparaissent dans l'un des
+          deux thèmes. */}
+      <StatusBar style="auto" />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         {/* TOUT le vide est ici : c'est lui qui ancre le bloc en bas. */}
         <View style={styles.spacer} />
 
-        {/* Le verrou de marque : le symbole ne se suffit pas à lui-même pour
-            qui découvre Yamba — le mot reste à côté. Décoratif, le texte dit
-            déjà « Yamba » à VoiceOver et TalkBack. */}
-        <View style={styles.lockup}>
-          <YambaSymbol size={34} variant="dark" />
-          <Text style={styles.wordmark}>Yamba</Text>
-        </View>
+        <InviteLockup />
 
         <ScrollView
           ref={pager}
@@ -192,8 +200,8 @@ export default function WelcomeScreen() {
           style={styles.pager}>
           {SLIDES.map((slide) => (
             <View key={slide} style={[styles.slide, { width }]}>
-              <Text style={styles.headline}>{t(`slides.${slide}.headline`)}</Text>
-              <Text style={styles.body}>{t(`slides.${slide}.body`)}</Text>
+              <InviteHeadline>{t(`slides.${slide}.headline`)}</InviteHeadline>
+              <InviteBody>{t(`slides.${slide}.body`)}</InviteBody>
             </View>
           ))}
         </ScrollView>
@@ -207,34 +215,28 @@ export default function WelcomeScreen() {
               accessibilityLabel={`${i + 1} / ${SLIDES.length}`}
               accessibilityState={{ selected: i === index }}
               hitSlop={Spacing.three}>
-              <View style={[styles.dot, i === index && styles.dotActive]} />
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: c.dotIdle },
+                  i === index && styles.dotActive,
+                ]}
+              />
             </Pressable>
           ))}
         </View>
 
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.push('/register')}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-            <Text style={styles.primaryLabel}>{t('createAccount')}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/login')}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-            <Text style={styles.secondaryLabel}>{t('login')}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={browse}
-            accessibilityRole="button"
-            hitSlop={Spacing.two}
-            style={({ pressed }) => [styles.browse, pressed && styles.pressed]}>
-            <Text style={styles.browseLabel}>{t('browse')}</Text>
-          </Pressable>
-        </View>
+        <InviteActions>
+          {/* Créer un compte d'ABORD : ici on accueille un inconnu. La porte
+              d'identité inverse les deux — qui bute sur une porte a presque
+              toujours un compte. */}
+          <InvitePrimary
+            label={t('createAccount')}
+            onPressAction={() => router.push('/register')}
+          />
+          <InviteSecondary label={t('login')} onPressAction={() => router.push('/login')} />
+          <InviteTertiary label={t('browse')} onPressAction={browse} />
+        </InviteActions>
       </SafeAreaView>
     </View>
   );
@@ -242,33 +244,18 @@ export default function WelcomeScreen() {
 
 /** La gouttière de l'écran. Elle n'est PAS sur `safeArea` : le carrousel doit
  *  pouvoir occuper toute la largeur, sinon la pagination s'arrête à côté de la
- *  page. Chaque bloc la reprend donc pour son compte. */
-const GUTTER = Spacing.four;
+ *  page. Chaque bloc la reprend donc pour son compte — et c'est CELLE du
+ *  modèle partagé, pas une constante locale qui dériverait de son côté. */
+const GUTTER = InviteGutter;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG,
   },
   safeArea: {
     flex: 1,
   },
   spacer: { flex: 1 },
-
-  /* ── Le verrou de marque ──────────────────────────────────────────────── */
-  lockup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: GUTTER,
-    marginBottom: Spacing.four,
-  },
-  wordmark: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: 800,
-    letterSpacing: -0.5,
-  },
 
   /* ── Le carrousel ─────────────────────────────────────────────────────── */
   // `flexGrow: 0` : sans lui, le ScrollView réclamerait la hauteur restante et
@@ -294,22 +281,6 @@ const styles = StyleSheet.create({
   slide: {
     paddingHorizontal: GUTTER,
   },
-  headline: {
-    color: '#ffffff',
-    fontSize: 34,
-    lineHeight: 39,
-    fontWeight: 800,
-    letterSpacing: -0.8,
-  },
-  body: {
-    color: 'rgba(255, 255, 255, 0.58)',
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: 500,
-    marginTop: Spacing.three,
-    maxWidth: 330,
-  },
-
   /* ── Les points ───────────────────────────────────────────────────────── */
   dots: {
     flexDirection: 'row',
@@ -323,65 +294,11 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
   },
   // Le volet courant est une barrette mango, pas un point plus clair : la
   // forme se distingue même pour un œil qui ne sépare pas les deux teintes.
   dotActive: {
     width: 20,
     backgroundColor: Brand.mango,
-  },
-
-  /* ── Les gestes, inchangés : pile, pleine largeur, lien centré ────────── */
-  actions: {
-    gap: Spacing.two,
-    paddingHorizontal: GUTTER,
-    paddingBottom: Spacing.three,
-  },
-  // Rayon 12, comme les boutons des écrans auth (l'identité web) — les
-  // pilules 999 juraient avec le reste du parcours.
-  primary: {
-    backgroundColor: Brand.mango,
-    borderRadius: 12,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryLabel: {
-    color: '#0B1120',
-    fontSize: 16,
-    fontWeight: 700,
-  },
-  // Contour plutôt qu'aplat : deux blocs pleins l'un sur l'autre se disputent
-  // l'attention, et le second geste n'est pas celui qu'on pousse.
-  secondary: {
-    borderRadius: 12,
-    minHeight: 52,
-    borderWidth: 1,
-    // 0,32 et non 0,24 : à 24 % le contour disparaissait sur le marine dès
-    // qu'on sortait au soleil — mesuré à l'écran.
-    borderColor: 'rgba(255, 255, 255, 0.32)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 600,
-  },
-  browse: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.one,
-  },
-  browseLabel: {
-    color: 'rgba(255, 255, 255, 0.64)',
-    fontSize: 15,
-    fontWeight: 600,
-  },
-
-  pressed: {
-    opacity: 0.75,
   },
 });
