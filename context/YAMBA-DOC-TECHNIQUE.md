@@ -15587,3 +15587,169 @@ retirés dans le même mouvement.
   changer le mot coûterait la cohérence avec le reste de l'app.
 - **La pastille de badge reste mangue.** Par la règle du ④ elle devrait être rouge (la convention
   des compteurs) ; elle fait 17 px et porte une sémantique différente. Arbitrage non rendu.
+
+---
+
+# D89 — La parité Android : un module Apple-seul, et une date que le serveur avait déjà écrite
+
+> PR `fix/mobile-android-parite`. Premier passage de l'application sur un **émulateur Android**
+> (Pixel 6, API 33), le 09/11/2026. D88 avait laissé la chose ouverte en toutes lettres :
+> « la vérification au poste Android, qu'aucun simulateur iOS ne peut faire ». Deux défauts
+> trouvés en vingt minutes, aucun des deux visible autrement.
+
+## ① Le contexte : une seule base de code, sept branches de plateforme
+
+Avant de chercher un défaut, il faut savoir ce qui diffère. `apps/mobile` n'a **aucun fichier
+`.ios.tsx` / `.android.tsx`** et aucun écran dupliqué : tout ce qu'on écrit part dans les deux
+applications. Les divergences tiennent en sept branches explicites, toutes cosmétiques ou
+liées à une API système :
+
+| Endroit | iOS | Android |
+|---|---|---|
+| `components/tab-bar.tsx:250` | `BlurView` | pas de flou — le fond de pilule à 92–94 % porte seul |
+| `components/tab-bar.tsx:193` | `keyboardWillShow` | `keyboardDidShow` |
+| `app/search/edit.tsx:69` | flou 32, voile 0,18 | flou **0**, voile **0,42** |
+| `constants/theme.ts:108` | réserve basse 34 pt | 24 pt |
+| `components/themed-text.tsx:72` | graisse 500 | **700** (Android ne synthétise pas les demi-graisses) |
+| `components/auth/otp-input.tsx:64` | `textContentType="oneTimeCode"` | `autoComplete="sms-otp"` |
+| `lib/payment-methods.ts` | Apple Pay | Google Pay — et c'est **mesuré**, jamais déduit de `Platform.OS` |
+
+C'est peu, et c'est voulu. Le défaut ① ci-dessous est la **huitième** divergence : celle que
+personne n'avait écrite.
+
+## ② Défaut 1 — `expo-symbols` est Apple-seul, et son repli dégrade en silence
+
+Le manifeste du paquet ne laisse aucune place au doute :
+
+```json
+// node_modules/expo-symbols/expo-module.config.json
+{ "platforms": ["apple"], "apple": { "modules": ["SymbolModule"] } }
+```
+
+`SymbolView` accepte un `fallback`, rendu partout où les SF Symbols n'existent pas. Les quatre
+écrans d'authentification en servaient un, correctement écrit — et c'est **exactement le
+problème** : rien ne cassait. Sur Android, l'écran de connexion affichait
+
+- 🔑 devant « Continuer avec e-mail et mot de passe » ;
+- ✓ dans le badge « Connexion sécurisée » ;
+- ✕ et ‹ pour fermer et revenir ;
+- et le **mot** « Afficher » / « Masquer » à la place de l'œil du champ mot de passe.
+
+Un émoji jaune et un mot au milieu de boutons sobres, sur la première page que voit un Android,
+alors que D73 publie **Android d'abord**.
+
+Les six glyphes passent à Ionicons :
+
+```tsx
+// apps/mobile/src/components/auth/password-input.tsx
+<Ionicons
+  name={visible ? 'eye-off-outline' : 'eye-outline'}
+  size={20}
+  color={palette.muted}
+/>
+```
+
+**Aucune dépendance nouvelle.** `@expo/vector-icons` est un baril qui embarque toutes les
+polices dès le premier import, et la barre d'onglets de D88 s'en sert déjà
+(`tab-bar.tsx:65`) : zéro octet de plus dans le bundle.
+
+## ③ Défaut 2 — une date que le serveur avait déjà écrite
+
+Parcours mesuré : appareil en anglais, flux d'accueil affiché, puis connexion d'un compte dont
+`preferredLocale` vaut `fr` (D44 — la préférence du compte l'emporte sur celle de l'appareil).
+Toute l'application bascule en français… et les cartes continuent d'annoncer
+**« November 13, 2026 »** à côté de « 9,50 € » et « Nouveau Voyageur ».
+
+Ce n'est pas un oubli de traduction. `travelDate` n'est pas calculé par le client :
+
+```ts
+// apps/trip-service/src/lib/trip-mappers.ts:311
+const travelDate = formatTripDate(trip.departureAt, trip.originTimezone, locale);
+```
+
+Le serveur le met en forme d'après l'en-tête `x-locale`, **parce que lui seul connaît le fuseau
+d'ORIGINE du trajet** — un départ à 23 h 30 à Paris n'est pas le même jour vu de Montréal. La
+carte ne fait que l'afficher (`trip-result-card.tsx:146`). C'est donc une **donnée**, et une
+donnée ne change pas parce qu'un rendu a eu lieu.
+
+Le flux d'accueil garde ses résultats dans un `useState` alimenté par des gestes (recherche,
+pastille, corridor) : rien ne les redemande quand la langue change.
+
+### La règle, sortie de l'écran
+
+```ts
+// apps/mobile/src/lib/locale-refetch.ts
+export function shouldRefetchForLocale({ served, current, state }: LocaleRefetchInput): boolean {
+  if (served === current) return false;
+  return state !== 'idle';
+}
+```
+
+Trois décisions tiennent dans ces deux lignes :
+
+1. **`served` est initialisée à la langue DU MONTAGE**, jamais à vide — sans quoi chaque
+   ouverture d'onglet coûterait un aller-retour « de rattrapage ».
+2. **`idle` ne déclenche rien** : l'écran est vide, la prochaine demande portera la bonne
+   langue d'elle-même. Redemander ici serait un appel pour remplacer du néant.
+3. **`pending` déclenche** : la requête en vol est partie avec l'ANCIEN en-tête, sa réponse
+   arriverait dans l'ancienne langue et plus rien ne viendrait la corriger.
+
+Le câblage, dans `app/(tabs)/index.tsx` :
+
+```tsx
+const servedLocale = useRef(locale);
+useEffect(() => {
+  const refetch = shouldRefetchForLocale({
+    served: servedLocale.current,
+    current: locale,
+    state: state.kind === 'idle' ? 'idle' : state.kind === 'results' ? 'served' : 'pending',
+  });
+  servedLocale.current = locale;
+  if (refetch) void runSearchRef.current();
+}, [locale, state.kind]);
+```
+
+## ④ Les fiches : douze, dont un balayage qui LIT les manifestes
+
+`locale-refetch.spec.ts` (9) épingle les quatre moments de la vie de l'écran et les deux
+aller-retours qu'il ne faut pas faire, puis rejoue le parcours de la capture.
+
+`modules-ios-seuls.spec.ts` (3) est le plus intéressant : il **ne connaît aucun nom de paquet
+par cœur**. Il lit les `expo-module.config.json` des dépendances déclarées, en tire la liste de
+celles qui annoncent `apple` sans `android`, et vérifie qu'aucun fichier partagé de `src/` ne
+les importe. Il est donc déjà vrai pour `expo-glass-effect` (Apple-seul, pas encore utilisé) et
+pour les modules qui n'existent pas encore.
+
+Deux précautions, parce qu'un balayage qui ne trouve jamais rien passe au vert pour de
+mauvaises raisons :
+
+- une fiche vérifie qu'il **sait voir** (`expo-symbols` est bien classé Apple-seul) ;
+- une autre qu'il ne range pas à tort un module multi-plateforme (`expo-blur`,
+  `expo-localization`).
+
+Et le rouge a été **mesuré** avant d'être annoncé : un fichier temporaire important
+`expo-symbols` fait échouer le balayage, qui nomme le fichier fautif.
+
+Les variantes `*.ios.tsx` sont exclues du balayage : c'est l'échappatoire du moteur, pas une
+dérogation de confiance — Metro ne sert ces fichiers qu'à iOS et exige un jumeau en face.
+
+## ⑤ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **479** (+12), 26 suites (+2) |
+| `nx typecheck @yamba-app/mobile` | vert (les deux programmes : Metro et fiches) |
+| Rouge du balayage, provoqué | nomme `lib/tmp-violation.ts → expo-symbols` |
+| Recette émulateur Android | connexion, mot de passe, cinq onglets, porte d'identité, connexion/déconnexion |
+
+## ⑥ Ce qui n'est PAS fait, et pourquoi
+
+- **`expo-symbols` et `expo-glass-effect` restent déclarés** dans `apps/mobile/package.json`
+  alors que plus rien ne les importe. Retirer une dépendance touche `package-lock.json` : c'est
+  un `chore/deps` à part, jamais dans une PR de correction.
+- **L'onglet Favoris n'a pas été recâblé.** Il se rafraîchit aujourd'hui par accident — son
+  chargement dépend de `t`, dont l'identité change avec la langue. C'est écrit en toutes lettres
+  dans `locale-refetch.ts` : mémoriser `t`, optimisation parfaitement légitime, rétablirait le
+  défaut en silence.
+- **La recette Android s'est arrêtée aux onglets et à l'authentification.** Le tunnel de
+  réservation et l'écran de paiement n'ont jamais été ouverts sur Android.

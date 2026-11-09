@@ -7013,3 +7013,202 @@ de magie qu'on veut vérifier plutôt que croire.
   certains systèmes — iOS en tête — utilisent en plus une **courbure continue** (squircle) que
   `borderRadius` n'imite qu'approximativement. Sur iOS, `cornerCurve: 'continuous'` existe en
   natif et n'est pas exposé par React Native sans bibliothèque.
+
+---
+
+## Chapitre 229 — Le repli qui dégrade en silence, la donnée qui ne se re-rend pas, et le test qui lit les manifestes
+
+> PR `fix/mobile-android-parite` (D89). Deux défauts trouvés en vingt minutes au premier
+> lancement sur émulateur Android. Ils n'ont rien en commun côté code — et tout en commun côté
+> méthode.
+
+### 1. Un « fallback » n'est pas une compatibilité
+
+React Native donne plusieurs moyens de dire « ici, ça dépend du système ». Ils ne se valent pas.
+
+```tsx
+// ① La branche explicite : on VOIT les deux cas, on les écrit tous les deux.
+const BLUR_INTENSITY = Platform.OS === 'ios' ? 32 : 0;
+
+// ② L'extension de fichier : Metro choisit, et EXIGE un jumeau.
+//    search-bar.ios.tsx  +  search-bar.tsx
+
+// ③ Le repli d'un composant : un seul cas est pensé, l'autre est… toléré.
+<SymbolView name="eye" fallback={<Text>Afficher</Text>} />
+```
+
+Les trois compilent. Les trois « marchent ». Mais ① et ② obligent à décider pour les deux
+systèmes, tandis que ③ permet de n'en concevoir qu'un seul et de laisser l'autre se débrouiller.
+C'est un **défaut de conception déguisé en robustesse** : plus le repli est bien écrit, moins on
+a de chances de le voir un jour.
+
+Comment l'a-t-on vu ? En ouvrant l'application sur un Android. Pas autrement : `tsc` type
+parfaitement un repli, la CI ne compile aucun bundle Android, et le harnais du mobile ne rend
+aucun écran (A223).
+
+**La leçon qui dépasse le cas** : quand une API vous propose un comportement « par défaut » pour
+un cas que vous n'avez pas traité, demandez-vous toujours *à quoi ressemble ce défaut pour un
+utilisateur*. S'il ressemble à une panne, il vous préviendra. S'il ressemble à un écran un peu
+moche, il ne vous préviendra jamais.
+
+### 2. Une donnée n'est pas une traduction
+
+Le deuxième défaut est plus subtil, et il est universel — il n'a rien de propre à React Native.
+
+Dans une application traduite, on finit par croire que « changer la langue » suffit à retraduire
+l'écran. C'est vrai pour tout ce qui passe par le moteur de traduction :
+
+```tsx
+const t = useTranslations('search');
+<Text>{t('results.count', { n })}</Text>   // ← re-rendu = retraduit
+```
+
+Ce n'est **pas** vrai pour ce qui est arrivé mis en forme du serveur :
+
+```tsx
+<Text>{trip.travelDate}</Text>   // ← « November 13, 2026 », pour toujours
+```
+
+La différence tient en une phrase : **`t(…)` est un calcul, `trip.travelDate` est une donnée.**
+Un calcul se refait à chaque rendu ; une donnée reste ce qu'elle était quand on l'a reçue.
+
+Et pourquoi cette date vient-elle du serveur ? Parce qu'elle dépend d'une information que le
+client n'a pas :
+
+```ts
+formatTripDate(trip.departureAt, trip.originTimezone, locale)
+//                               ^^^^^^^^^^^^^^^^^^
+```
+
+Un avion qui décolle à 23 h 30 à Paris part un mardi pour qui habite Paris. Formaté avec le
+fuseau du téléphone, il partirait un mercredi à Montréal. Déplacer ce calcul côté client
+règlerait la langue et casserait la date — on échangerait un défaut cosmétique contre un défaut
+métier. **Le bon réflexe n'est pas de rapatrier le calcul, c'est de redemander la donnée.**
+
+### 3. Écrire la règle là où elle se teste
+
+Le correctif tient en un `useEffect`. On aurait pu s'arrêter là. On ne l'a pas fait, et la
+raison est la rareté :
+
+> Un changement de langue est un évènement rare — connexion, déconnexion, réglage. Personne ne
+> le rejoue en recette courante.
+
+Une règle rare qui vit dans un composant est une règle qui se cassera sans bruit. On la sort
+donc dans une fonction pure :
+
+```ts
+export function shouldRefetchForLocale({ served, current, state }: LocaleRefetchInput): boolean {
+  if (served === current) return false;
+  return state !== 'idle';
+}
+```
+
+Deux lignes, et **trois** décisions qui se discutent — c'est à ça qu'on reconnaît qu'elles
+méritaient une fonction :
+
+| Cas | Décision | Pourquoi |
+|---|---|---|
+| Au montage | ne rien faire | `served` est initialisée à la langue du montage : sans ça, chaque ouverture d'onglet paierait un aller-retour « de rattrapage » |
+| Écran vide (`idle`) | ne rien faire | la prochaine demande portera la bonne langue toute seule |
+| Requête en vol (`pending`) | **redemander** | elle est partie avec l'ancien en-tête ; sa réponse remplirait l'écran dans la langue d'avant, et plus rien ne viendrait la corriger |
+
+Le troisième cas est celui qu'on oublie. « En vol » ressemble à « vide » — et n'en est pas un.
+
+C'est la même logique que la règle gravée au chapitre précédent (*une fonction qui répond à une
+question n'écrit jamais*) : **plus une règle est rare, plus elle doit être lisible hors de son
+contexte d'exécution.**
+
+### 4. Un test qui ne connaît aucun nom par cœur
+
+Le réflexe, pour empêcher le retour du défaut ① :
+
+```ts
+expect(fichiers).not.toContain("expo-symbols");   // ← ne protège que du passé
+```
+
+Ce test attrape le défaut d'hier. Il ne dira rien le jour où quelqu'un importera
+`expo-glass-effect` (Apple-seul lui aussi, déjà dans les dépendances) ou un module qui n'existe
+pas encore.
+
+Le test écrit ici **déduit la liste** au lieu de la réciter :
+
+```ts
+function modulesAppleSeuls(): string[] {
+  const pkg = JSON.parse(readFileSync(join(APP_RACINE, 'package.json'), 'utf8'));
+  return Object.keys(pkg.dependencies ?? {}).filter((nom) => {
+    const plateformes = manifeste(nom)?.platforms;
+    if (plateformes === undefined) return false;
+    return plateformes.includes('apple') && !plateformes.includes('android');
+  });
+}
+```
+
+Chaque module Expo publie un `expo-module.config.json` qui déclare ses plateformes. Le test lit
+cette **source de vérité** — celle que l'auteur du paquet maintient — au lieu d'en tenir une
+copie.
+
+#### Deux précautions, et elles valent pour tout balayage
+
+Un test qui parcourt des fichiers à la recherche d'une faute a un mode de panne vicieux : il
+peut passer au vert **parce qu'il ne cherche plus rien**. Un chemin qui change, un filtre trop
+strict, et il ne lit plus aucun fichier — en annonçant « tout va bien ».
+
+D'où, systématiquement, deux fiches en plus de la règle :
+
+```ts
+it('reconnaît `expo-symbols` comme Apple-seul', () => {
+  expect(modulesAppleSeuls()).toContain('expo-symbols');   // le détecteur SAIT voir
+});
+
+it('ne range PAS un module qui tourne aussi sur Android', () => {
+  expect(modulesAppleSeuls()).not.toContain('expo-blur');  // et il ne voit pas n'importe quoi
+});
+```
+
+Et une troisième vérification, qui ne vit pas dans le fichier : **provoquer le rouge**. Un
+fichier temporaire important `expo-symbols`, le test relancé, et la sortie attendue :
+
+```
++   "lib/tmp-violation.ts → expo-symbols"
+Tests: 1 failed, 2 passed
+```
+
+Un test qu'on n'a jamais vu échouer n'est pas un test, c'est une opinion.
+
+#### Laisser une porte de sortie, mais une porte sûre
+
+Interdire sans échappatoire pousse à contourner. Le balayage exclut donc les fichiers
+`*.ios.tsx` — non par confiance, mais parce que le **moteur** garantit la sécurité : Metro ne
+sert ces fichiers qu'à iOS et exige un jumeau générique à côté. La dérogation est vérifiée par
+l'outil, pas par la bonne volonté de celui qui la demande.
+
+### 5. Piloter un émulateur Android sans toucher la souris
+
+Utile bien au-delà de ce lot :
+
+```sh
+~/Library/Android/sdk/emulator/emulator -avd Pixel_6_API_33 &   # le binaire n'est PAS dans le PATH
+adb exec-out screencap -p > ecran.png                           # une capture
+adb shell input tap 539 1364                                    # un toucher (coordonnées de l'image)
+adb shell input text 'prenom@exemple.fr'                        # une saisie
+adb shell am start -a android.intent.action.VIEW \
+  -d "exp://192.168.1.155:8081/--/favorites"                    # un lien profond vers une route
+```
+
+Trois pièges payés au passage :
+
+1. **Un `tap` pendant l'inertie d'une liste part dans la liste**, pas dans la barre d'onglets.
+   Un lien profond est déterministe, un toucher ne l'est pas.
+2. **`npm run android` et `npm run ios` ne portent pas `--go`** (contrairement à `npm start`) :
+   depuis l'installation d'`expo-dev-client`, ils cherchent un build de développement
+   inexistant. On passe par `npx nx start @yamba-app/mobile` puis `a`.
+3. **L'image `google_apis` n'a pas de Play Store** — ce n'est pas un problème : Expo pousse
+   l'APK d'Expo Go par `adb` tout seul.
+
+### Pour aller plus loin
+
+- `apps/mobile/src/lib/locale-refetch.ts` — la règle, son défaut d'origine et les trois cas.
+- `apps/mobile/src/lib/modules-ios-seuls.spec.ts` — le balayage qui lit les manifestes.
+- `apps/trip-service/src/lib/trip-mappers.ts:311` — pourquoi la date est écrite côté serveur.
+- Chapitre 228 § 9 — *un typecheck vert n'est pas une application qui démarre*. Celui-ci en est
+  le pendant : **une application qui démarre n'est pas une application qu'on a regardée.**

@@ -8062,3 +8062,83 @@ Les comportements de la barre dessinée — animations de disposition, flou de r
 haptiques — n'ont été vérifiés que sur simulateur iOS. Le flou y est un repli translucide sur
 Android, et c'est assumé : une barre qui flotte au-dessus de n'importe quel écran ne peut pas
 désigner la vue qu'elle doit flouter.
+
+---
+
+# D89 — Android doit montrer la même chose qu'iOS, et dans la bonne langue
+
+## Le besoin
+
+Yamba publie **Android d'abord** (D73). L'application est écrite une fois pour les deux
+systèmes — mais « une seule base de code » ne veut pas dire « le même écran ». Tant que
+personne n'ouvre l'application sur un Android, les endroits où elle se dégrade restent
+invisibles : ils ne provoquent ni erreur, ni page blanche, ni alerte.
+
+Le 09/11/2026, premier passage sur émulateur Android. Deux choses que l'Expéditeur d'Android
+voyait et que personne n'avait vues.
+
+### Ce qu'il voyait, ① : une page de connexion qui n'a pas l'air finie
+
+Sur l'écran de connexion — la **première** page d'un compte neuf — un émoji clé jaune devant
+« Continuer avec e-mail et mot de passe », une coche de traitement de texte dans le badge
+« Connexion sécurisée », et le mot « Afficher » écrit en toutes lettres là où iOS montre un
+œil. Rien ne tombait en panne. C'est précisément ce qui rend le défaut coûteux : une
+application qui a l'air bâclée au premier écran n'obtient pas de deuxième chance.
+
+### Ce qu'il voyait, ② : une date dans la mauvaise langue
+
+Un visiteur dont le téléphone est en anglais parcourt les trajets, puis se connecte avec un
+compte français. L'application passe en français — titres, prix, « Nouveau Voyageur » — et les
+dates des trajets restent en anglais : « November 13, 2026 » à côté de « 9,50 € ».
+
+Ce n'est pas une traduction oubliée. La date d'un trajet est écrite **par le serveur**, parce
+que lui seul sait dans quel fuseau part le trajet : un vol qui décolle à 23 h 30 de Paris n'est
+pas le même jour selon qu'on le regarde de Paris ou de Montréal. Afficher la bonne date est
+donc un service rendu par le serveur — et il faut la lui redemander quand la langue change.
+
+## Les règles
+
+**RG-D89-1 — Un écran rend la même chose sur les deux systèmes.** Une fonctionnalité qui
+n'existe que sur l'un des deux ne peut pas être servie depuis un écran partagé : soit elle a un
+équivalent écrit pour l'autre, soit elle n'est pas utilisée. Un « repli » qui dégrade
+l'affichage sans prévenir est un défaut, pas une solution.
+
+**RG-D89-2 — Les icônes de l'application sont les mêmes partout.** Une icône est du dessin de
+marque : elle ne change pas de forme selon le téléphone. (Conséquence assumée : Yamba renonce
+aux symboles natifs d'Apple sur ces écrans, et à leur adaptation automatique à la taille de
+texte choisie par la personne.)
+
+**RG-D89-3 — Un texte écrit par le serveur suit la langue de la personne, à tout moment.**
+Quand la langue change — connexion, déconnexion, changement de préférence — tout contenu déjà
+affiché qui vient du serveur est **redemandé**. Une page qui vient de changer de langue ne
+garde aucune phrase de la précédente.
+
+**RG-D89-4 — Mais jamais un appel pour rien.** Si l'écran n'affiche encore aucun résultat, le
+changement de langue ne déclenche aucune demande : la suivante partira dans la bonne langue
+d'elle-même. Sur un téléphone, un aller-retour réseau inutile se paie en batterie et en
+données.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Écran de connexion ouvert sur Android | Les six icônes sont des dessins, aucun émoji, aucun mot à la place d'une icône |
+| 2 | Visiteur en anglais, liste affichée, il se connecte avec un compte français | Les dates passent en français sans aucun geste |
+| 3 | Membre français connecté, il se déconnecte sur un téléphone en anglais | Les dates repassent en anglais sans aucun geste |
+| 4 | Écran d'accueil jamais lancé, la langue change | Aucune demande au serveur |
+| 5 | Une recherche est en cours quand la langue change | La recherche est relancée (sa réponse serait arrivée dans l'ancienne langue) |
+| 6 | Une dépendance réservée à Apple est importée par un écran partagé | Le contrôle automatique refuse la modification et nomme le fichier |
+
+## Ce qui reste hors de ce lot
+
+### Le reste du parcours n'a pas été vu sur Android
+
+La recette a couvert l'authentification, les cinq onglets et la porte d'identité. Le tunnel de
+réservation et l'écran de paiement n'ont jamais été ouverts sur un Android — et le paiement
+réclame de toute façon un build de développement (Expo Go ne contient aucun module natif).
+
+### L'onglet Favoris tient par accident
+
+Il se rafraîchit aujourd'hui pour une raison détournée, pas parce que la règle y est écrite.
+Le comportement est juste ; sa cause ne l'est pas. C'est noté dans le code, à l'endroit où
+quelqu'un le lira avant d'optimiser.
