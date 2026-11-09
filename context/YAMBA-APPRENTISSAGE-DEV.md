@@ -5158,3 +5158,293 @@ d'erreur, pas seulement dans le cas nominal.
 documentation **versionnée** d'Expo avant d'écrire du code. Bien vu : `useURL()` est
 **déprécié** en SDK 57 au profit de `useLinkingURL()`. Une API « connue » est une API dont on
 se souvient d'une version antérieure.
+
+## Chapitre 221 — La dérivation qu'on assume à UN endroit, la carte qui n'est unique que si elle est seule, et le fichier généré qui mentait au typecheck
+
+Lot `feat/mobile-shipment-tracker` (A221) : la fiche de suivi d'un envoi, en natif. Six
+techniques, et deux pièges qui valent chacun une demi-heure la première fois.
+
+### 1. Une pile n'est pas un dossier : c'est une promesse de navigation
+
+Expo Router dérive le routage de l'arborescence de fichiers. La tentation est donc de ranger
+les écrans par domaine : tout ce qui concerne une réservation dans `app/booking/`. C'est un
+mauvais critère — **le bon critère est le comportement du bouton Retour.**
+
+```
+app/booking/        ← un TUNNEL : on pousse, on termine ou on quitte
+  parcel.tsx  …  payment.tsx  confirmation.tsx
+app/shipment/       ← une DESTINATION : on y revient pendant des jours
+  [id].tsx
+```
+
+Pourquoi deux piles et pas une ? Parce que l'écran de paiement **dépile tout** avant d'ouvrir
+la confirmation :
+
+```ts
+router.dismissAll();
+router.replace({ pathname: '/booking/confirmation', params: { … } });
+```
+
+Ce `dismissAll` existe pour une raison précise : empêcher qu'un retour en arrière ramène sur
+une carte bancaire déjà autorisée. Si la fiche de suivi vivait dans la même pile, elle aurait
+hérité de cette pile — et le retour depuis le suivi serait retombé sur une étape de paiement.
+**Une décision de navigation prise dans un écran se propage à tous ceux qui partagent sa
+pile.** Le dossier est l'endroit où on l'écrit ; ce n'est pas elle.
+
+Corollaire moins évident : un écran ouvert par `replace` **n'a pas de pile derrière lui**.
+`router.back()` n'y mène nulle part. D'où :
+
+```ts
+const goBack = () => {
+  if (router.canGoBack()) router.back();
+  else router.replace('/(tabs)/activity');   // le lieu d'où l'on VIENDRAIT normalement
+};
+```
+
+À retenir : dès qu'un écran est atteignable par `replace` **et** par `push`, son retour doit
+gérer les deux cas. Sinon le bouton Retour est mort une fois sur deux, et personne ne le voit
+en développement parce qu'on y arrive toujours par le même chemin.
+
+### 2. Une dérivation d'affichage s'assume à UN seul endroit
+
+Le serveur connaît neuf statuts. L'écran en montre dix : `PICKED_UP` se dédouble selon que le
+Voyageur a confirmé des étapes de voyage. C'est légitime — le discours change (« voilà ton
+code » vs « ton colis vole ») — mais c'est une **invention du client**, et une invention de
+client est une dette si elle se disperse.
+
+```ts
+// shipment-view.ts — fonction pure, zéro React, zéro react-native
+export function shipmentPhase(shipment: ShipperShipmentDto): ShipmentPhase {
+  switch (shipment.status) {
+    case 'PICKED_UP':
+      return shipment.trackingEvents.length > 0 ? 'IN_TRANSIT' : 'PICKED_UP';
+    …
+  }
+}
+```
+
+La règle qu'on se donne : **une dérivation d'affichage vit dans un module pur, et elle ne
+change jamais un DROIT.** Les deux vues lisent le même deal et la même liste
+`allowedActions` ; seuls les mots diffèrent. Le jour où le serveur ajoutera un vrai statut
+`IN_TRANSIT`, il y a exactement une ligne à supprimer.
+
+Le contre-exemple à ne pas écrire :
+
+```tsx
+// NON : la dérivation se répète, et un jour l'une des deux oublie une condition
+{booking.status === 'PICKED_UP' && booking.trackingEvents.length > 0 ? <Vol /> : null}
+{booking.status === 'PICKED_UP' && booking.trackingEvents.length === 0 ? <Code /> : null}
+```
+
+### 3. Deux états que la machine confond, et que l'utilisateur ne doit pas confondre
+
+La machine d'état range trois situations différentes sous `CANCELLED` :
+
+| Situation réelle | Statut | Ce que « Demande annulée » raconterait |
+|---|---|---|
+| L'Expéditeur s'est désisté | `CANCELLED` | la vérité |
+| Le Voyageur a refusé le colis au rendez-vous | `CANCELLED` | un désistement qui n'a pas eu lieu |
+| La médiation a tout remboursé sur un colis **livré** | `CANCELLED` | une annulation sur un colis arrivé |
+
+Un statut est une donnée technique : il dit **où** l'objet est dans la machine, pas **ce qui
+est arrivé**. Pour choisir un texte, il faut souvent regarder les champs voisins :
+
+```ts
+export function closureKey(shipment, phase): ClosureKey {
+  if (phase !== 'CANCELLED') return …;
+  if (shipment.dispute?.resolution || shipment.retentionDecision) return 'cancelledByMediation';
+  if (shipment.pickupRefusalReason) return 'pickupRefused';
+  return 'cancelled';
+}
+```
+
+Le premier cas avait déjà été payé sur le site, en recette (ANO-WEB-73). Le second ne l'avait
+jamais été : personne ne s'était demandé ce que lisait un Expéditeur dont le colis avait été
+refusé. **Technique transférable** : quand plusieurs histoires finissent sur le même statut,
+la fonction qui choisit le texte est une fonction à part, testable, avec un nom.
+
+### 4. « Le front reflète, ne décide jamais » — ce que ça change dans le code
+
+Le serveur sert `allowedActions` : la liste des gestes permis **maintenant**, calculée par la
+machine d'état. Trois conséquences dans l'écran :
+
+```tsx
+const canCancel  = shipment.allowedActions.includes('cancel');
+const canConfirm = shipment.allowedActions.includes('confirmEarly');
+
+{canCancel ? <Action label={t('actions.cancel.label')} … /> : null}
+```
+
+**① Pas de bouton désactivé.** Le composant `Action` n'a même pas de propriété `disabled` :
+le rendre impossible est plus simple que le rendre inerte. Un bouton grisé que rien n'explique
+est une question sans réponse posée à l'utilisateur.
+
+**② Ne pas recalculer la règle.** Il serait facile d'écrire
+`status === 'PENDING' || status === 'ACCEPTED'` pour l'annulation. Ce serait une seconde
+implémentation de la règle ANN-01, qui divergera. La seule exception de ce lot est assumée :
+la régénération du code **n'est pas une transition** de la machine, donc elle n'est pas dans
+`allowedActions` ; l'écran la propose là où elle a un sens (colis en transit, compteur non
+épuisé) et **le serveur reste seul juge** — il refuse, et ce refus est traduit.
+
+**③ Un refus de transition n'est pas une erreur.** Entre la lecture et le clic, le monde
+bouge : le Voyageur accepte à la seconde où l'on annule.
+
+```ts
+if (code === 'TRANSITION_NOT_ALLOWED') {
+  setFlash(t('actions.errors.TRANSITION_NOT_ALLOWED')); // « on recharge ton suivi »
+  await load();                                        // on RELIT, on ne devine pas
+}
+```
+
+C'est la différence entre un conflit d'optimisme et une panne. Les présenter pareil apprend à
+l'utilisateur à se méfier de l'app.
+
+### 5. De l'argent à l'écran : la préviz est une photo, pas une promesse
+
+Le serveur sert `cancellationPreview` — non nulle **exactement** quand `cancel` est permis :
+
+```ts
+{ refundCents, retentionCents, retentionPct, fullRefundUntil, currencyCode }
+```
+
+La feuille de confirmation l'affiche en toutes lettres (montant rendu, retenue, pourcentage,
+date limite du remboursement intégral) **et** ajoute une phrase :
+
+> « Le montant exact est recalculé par Yamba au moment de l'annulation. »
+
+Parce qu'entre la lecture et le clic, la date limite des 48 h peut être franchie. Et après le
+geste, on affiche ce que la **réponse** du serveur a renvoyé, jamais la préviz :
+
+```ts
+const result = await cancelShipment(shipment.id);
+return result.refundAmountCents && result.refundAmountCents > 0
+  ? t('actions.cancel.doneFull', { amount: formatPrice(result.refundAmountCents, …) })
+  : t('actions.cancel.doneNone');
+```
+
+**Règle générale : un montant affiché après une action vient de la réponse de cette action.**
+Pas d'un calcul local, pas d'un cache, pas d'une préviz.
+
+Détail qui compte aussi : sur un geste définitif, le bouton **plein** est celui qui renonce.
+
+```tsx
+<Action label={confirmLabel} tone={destructive ? 'neutral' : 'primary'} … />
+<Action label={keepLabel}    tone={destructive ? 'primary' : 'quiet'}  … />
+```
+
+L'affordance visuelle est une forme de consentement : la rendre symétrique sur une action
+irréversible, c'est laisser le hasard décider.
+
+### 6. L'heure d'un vol n'est pas l'heure du téléphone
+
+Le snapshot du deal porte les fuseaux IANA des deux villes (`originTimezone`,
+`destinationTimezone` — décision D24). Un décollage de Brazzaville doit se lire à l'heure du
+billet, pas à celle de Paris où se trouve l'Expéditrice.
+
+```ts
+new Intl.DateTimeFormat(tag, {
+  hour: '2-digit', minute: '2-digit', timeZone: timezone,
+}).format(date);
+```
+
+Sous React Native, `Intl` est fourni par l'ICU de la plateforme (Hermes y délègue) : ça marche
+sur les deux OS, mais les données de fuseau peuvent manquer selon la version. D'où le
+`try/catch` qui retombe sur l'heure de l'appareil — **jamais rien, jamais une heure
+inventée**. C'est le même parti que `formatPrice` prend déjà pour les devises exotiques.
+
+À noter : le reste du dépôt mobile évite délibérément `Intl.DateTimeFormat` pour les MOIS
+(tables FR/EN écrites à la main, pour être indépendant du moteur). Le fuseau, lui, n'est pas
+tabulable : il faut l'ICU, donc il faut le filet.
+
+### 7. Piège payé ① — un garde-fou de vocabulaire qui lit aussi les noms de variables
+
+Le contrôle i18n du dépôt (règle 6, lexique `scripts/lexique-yamba.json`) interdit les mots de
+rôle anglais dans une **valeur** de message : le rôle s'appelle « Voyageur » / « Traveler »
+(A144), jamais « carrier ». Le motif est `\b(…|carriers?|shippers?|…)\b`.
+
+Or un nom de variable ICU **est dans la valeur** :
+
+```jsonc
+"body": "{carrier} a accepté"            // ❌ 18 messages refusés par la CI
+"body": "{carrierFirstName} a accepté"   // ✅ `\b` ne coupe pas avant un « F »
+```
+
+C'est pour cette raison exacte que le site nomme ses variables `carrierFirstName` et
+`recipientFirstName` depuis A144 — ce qui ressemblait à une verbosité inutile était la
+conséquence d'un garde-fou. **Leçon transférable : avant de nommer des variables dans un
+fichier de messages, lire les règles qui liront ce fichier.** Et quand une convention
+existante paraît bavarde, chercher la contrainte avant de la « simplifier ».
+
+### 8. Piège payé ② — un fichier généré qui rend le typecheck LOCAL plus strict que la CI
+
+Expo Router génère des types de routes dans `.expo/types/router.d.ts`, **non suivi par git**
+(il est dans le `.gitignore`). Ce fichier transforme `Href` en union littérale de toutes les
+routes existantes. Conséquence sur une route neuve :
+
+```
+apps/mobile/src/app/booking/confirmation.tsx(133,36): error TS2322:
+  Type '"/shipment/[id]"' is not assignable to type '"/" | … | "/trip/[id]"'.
+```
+
+Le fichier datait du dernier `expo start`, donc d'avant la création de `app/shipment/`. Et le
+plus intéressant : **la CI, qui n'a jamais ce fichier, serait passée au vert.** Le typecheck
+local était donc *plus* strict que le contrôle — l'inverse de ce qu'on suppose toujours.
+
+La solution documentée (SDK 57, page « Typed Routes ») régénère les types sans démarrer Metro,
+ce qui est exactement ce qu'il faut sur une machine contrainte :
+
+```sh
+cd apps/mobile && npx expo customize tsconfig.json
+```
+
+Vérifié : le `tsconfig.json` suivi n'est **pas** modifié par la commande (`git status` reste
+propre), seul `.expo/types/router.d.ts` est réécrit.
+
+Deux enseignements :
+1. **un artefact généré et non suivi crée une asymétrie entre les postes et la CI** — dans les
+   deux sens. Savoir lequel des deux est le juge est une question à se poser explicitement ;
+2. `apps/mobile/AGENTS.md` dit « lire la doc Expo **versionnée** avant tout code Expo ». Cette
+   commande en est la deuxième récolte, après la dépréciation de `useURL` au profit de
+   `useLinkingURL`. La mémoire d'une API vaut moins qu'une page de documentation datée.
+
+### 9. Une fonctionnalité qu'on NE livre pas, et comment on l'écrit
+
+`POST /deals/:id/tracking-link` rend un **chemin** :
+
+```ts
+{ token: "…", path: "/track/{token}", recipientFirstName, recipientPhoneE164 }
+```
+
+Le site le complète par `window.location.origin`. Une app native n'a pas de
+`window.location` ; aucune variable ne porte l'origine publique du site ; rien n'est déployé.
+Trois façons de réagir :
+
+| Option | Verdict |
+|---|---|
+| Inventer une origine (`https://yamba.app`) | Un lien **mort** envoyé à un tiers. Pire que rien. |
+| Écrire « partage le lien depuis le site » | Interdit : l'app ne renvoie jamais au site (A210 b) — **y compris par une phrase** |
+| Ne pas livrer le geste, et consigner la correction de contrat | Retenu |
+
+Ce troisième choix est le plus difficile à assumer parce qu'il **ne se voit pas** : l'écran est
+simplement silencieux. Il se documente donc ailleurs — registre (A221 e), documents métier et
+technique, handoff. **Une absence non écrite est une absence qui sera redécouverte.**
+
+La correction proposée est au bon étage : que le **serveur** serve une URL absolue, puisque
+c'est lui qui connaît son front par configuration. Un client ne devrait jamais avoir à
+reconstituer l'adresse publique d'un autre client.
+
+### 10. Pour aller plus loin
+
+- **Expo Router — Typed Routes** : https://docs.expo.dev/router/reference/typed-routes/
+  (génération, et la commande de régénération sans serveur).
+- **`Share` de React Native** : https://reactnative.dev/docs/share — la feuille de partage de
+  l'OS. Préférée à une liste de boutons WhatsApp/SMS/Email écrite à la main (ce que fait le
+  site) : l'utilisateur partage par le canal qu'il utilise vraiment, et l'app n'a aucune
+  autorisation à demander.
+- **`Intl.DateTimeFormat` et `timeZone`** :
+  https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat
+  — lire la section sur la disponibilité des données, c'est elle qui justifie le `try/catch`.
+- **Dans ce dépôt** : `apps/mobile/src/lib/shipment-view.ts` est volontairement sans aucun
+  import React. C'est le fichier à exécuter en premier le jour où `apps/mobile` aura un
+  harnais de tests (jalon 4, « Qualité » encore à ⬜) : phase, frise, décomptes, clôture et
+  état de l'argent y sont tous des fonctions pures à entrée unique.

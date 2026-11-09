@@ -271,7 +271,7 @@
       "step3": "The recipient gives that code on arrival: it is what confirms the delivery."
     },
     "refused": "If they refuse or do not answer within 24 hours, the authorisation lapses on its own and you have paid nothing.",
-    "cta": "See my shipments",
+    "cta": "Follow my shipment",
     "secondary": "Explore other trips"
   }
 }

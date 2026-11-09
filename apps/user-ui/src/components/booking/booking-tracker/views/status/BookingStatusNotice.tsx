@@ -59,12 +59,27 @@ const MESSAGE_KEYS: Record<NoticeStatus, string> = {
 export default function BookingStatusNotice({ booking, onBackAction }: Props) {
   const t = useTranslations("bookingTracker.statusNotice");
   const format = useFormatter();
+  // Les montants sont des CENTS entiers (A2) : la conversion n'a lieu qu'ici.
+  // EUR en dur suit le view-model de ce module, qui ne porte pas la devise
+  // (`payment.totalPaidEur`, et « {value} € » partout ailleurs). Ce n'est pas
+  // une décision : c'est la dette de ce module, et elle se solde en faisant
+  // remonter `pricing.currencyCode` jusqu'ici — pas dans cette ligne.
+  const formatCents = (cents: number) =>
+    format.number(cents / 100, { style: "currency", currency: "EUR" });
   const status = booking.status as NoticeStatus;
   // ANO-WEB-73 (5.21) : un remboursement total tranché par la médiation clôt le deal en CANCELLED — « Demande
   // annulée · Cette demande est close » titrait une décision rendue sur un colis livré. La clôture par la
   // médiation a son propre texte.
   const closParLaMediation = status === "CANCELLED" && !!(booking.dispute?.resolution || booking.retentionDecision);
-  const key = closParLaMediation ? "cancelledByMediation" : MESSAGE_KEYS[status];
+  // Jumeau natif (A221) : un colis REFUSÉ au rendez-vous est un `CANCELLED`
+  // côté machine, mais ce n'est pas l'Expéditeur qui s'est désisté. Lui
+  // titrer « Demande annulée » lui impute un geste qu'il n'a pas fait.
+  const refuseAuRendezVous = status === "CANCELLED" && !closParLaMediation && !!booking.pickupRefusalReason;
+  const key = closParLaMediation
+    ? "cancelledByMediation"
+    : refuseAuRendezVous
+      ? "pickupRefused"
+      : MESSAGE_KEYS[status];
   const Icon = ICONS[status];
 
   const dateIso =
@@ -101,6 +116,28 @@ export default function BookingStatusNotice({ booking, onBackAction }: Props) {
           {t(`${key}.message`)}
           {date ? " " + t(`${key}.dateLine`, { date }) : ""}
         </p>
+        {/* A221 — « si un remboursement s'applique, il t'a été confirmé par
+            email » était la seule information donnée sur l'argent d'un envoi
+            clos : le montant est SERVI (`refundAmountCents`), il se lit ici.
+            0 et `null` ne disent pas la même chose — on n'affiche que ce qui
+            a vraiment été rendu. */}
+        {typeof booking.refundAmountCents === "number" && booking.refundAmountCents > 0 ? (
+          <p className="mt-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
+            {t("refundLine", { amount: formatCents(booking.refundAmountCents) })}
+          </p>
+        ) : null}
+        {typeof booking.retentionCents === "number" && booking.retentionCents > 0 ? (
+          <p className="mt-1 text-[13px] text-slate-600 dark:text-slate-400">
+            {t("retainedLine", { amount: formatCents(booking.retentionCents) })}
+          </p>
+        ) : null}
+        {/* Le motif du refus : le Voyageur l'a écrit, l'Expéditeur ne le
+            voyait nulle part. Il explique une fin qui, sans lui, est muette. */}
+        {booking.pickupRefusalReason || booking.declineReason ? (
+          <p className="mt-2 text-[13px] text-slate-600 dark:text-slate-400">
+            {t("reasonLine", { reason: booking.pickupRefusalReason ?? booking.declineReason ?? "" })}
+          </p>
+        ) : null}
         {status === "DISPUTED" && booking.disputeTicket ? (
           <p className="mt-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
             {t("ticketLine", { ticket: booking.disputeTicket })}

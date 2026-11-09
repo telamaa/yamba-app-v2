@@ -2,10 +2,11 @@
  * booking/confirmation.tsx — LA DEMANDE EST PARTIE (fin de l'étape ⑦, A218).
  * ===========================================================================
  * Le site, lui, redirige vers le suivi du deal (`/bookings/:id`). Ce suivi
- * n'existe pas encore en natif, et la doctrine interdit de renvoyer au site
- * (A210 b) : cet écran dit donc TOUT ce que l'Expéditeur a besoin de savoir à
- * la seconde où il a payé — ce qui a été autorisé, jusqu'à quand, et ce qui
- * arrive ensuite — plutôt que de promettre un ailleurs.
+ * EXISTE maintenant en natif (`shipment/[id]`) : le geste principal l'ouvre.
+ * L'écran garde pourtant tout ce qu'il disait — ce qui a été autorisé, jusqu'à
+ * quand, et ce qui arrive ensuite — parce qu'il reste le seul endroit où ces
+ * trois faits sont lisibles à la seconde où l'on a payé, sans un aller-retour
+ * réseau. Il INVITE au suivi, il ne s'y substitue plus.
  *
  * Il n'appartient plus au tunnel : pas de barre de prix, pas de jauge, pas de
  * retour en arrière. L'écran de paiement l'ouvre après avoir dépilé le
@@ -123,7 +124,15 @@ export default function BookingConfirmationScreen() {
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.replace('/(tabs)/activity')}
+            // La fiche en REMPLACEMENT : revenir en arrière depuis le suivi
+            // ne doit jamais ramener sur cet écran-ci, encore moins sur une
+            // carte déjà autorisée. Sans identifiant (cas qui ne devrait pas
+            // arriver), on rend l'activité plutôt qu'une route creuse.
+            onPress={() =>
+              bookingId
+                ? router.replace({ pathname: '/shipment/[id]', params: { id: bookingId } })
+                : router.replace('/(tabs)/activity')
+            }
             style={({ pressed }) => [styles.cta, { opacity: pressed ? 0.85 : 1 }]}>
             <ThemedText type="smallBold" style={styles.ctaLabel}>
               {t('confirmation.cta')}

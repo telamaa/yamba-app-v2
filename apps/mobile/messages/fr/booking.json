@@ -271,7 +271,7 @@
       "step3": "Le destinataire donne ce code à l'arrivée : c'est lui qui valide la livraison."
     },
     "refused": "S'il refuse ou ne répond pas sous 24 h, l'autorisation tombe d'elle-même et tu n'as rien payé.",
-    "cta": "Voir mes envois",
+    "cta": "Suivre mon envoi",
     "secondary": "Explorer d'autres trajets"
   }
 }

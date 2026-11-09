@@ -110,6 +110,15 @@ export type ShipperBookingViewDto = {
   } | null;
   retentionDecision?: Booking["retentionDecision"] | null;
   retentionCents?: number | null;
+  /** Ce qui a VRAIMENT été rendu (barème ANN-01, décision de médiation,
+   *  restitution). `null` = rien n'a été remboursé. Servi depuis l'origine,
+   *  jamais lu jusqu'ici : la vue d'état renvoyait l'Expéditeur à son email. */
+  refundAmountCents?: number | null;
+  /** Le motif du refus du Voyageur, quand il a décliné la demande. */
+  declineReason?: string | null;
+  /** Le motif du refus AU RENDEZ-VOUS (B3/A40) — le colis n'était pas
+   *  conforme. Un `CANCELLED` qui n'est PAS un désistement de l'Expéditeur. */
+  pickupRefusalReason?: string | null;
   deliveryCode: string | null;
   codeRegenerationsLeft: number;
   pickup?: {
@@ -202,6 +211,9 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     dispute: toDisputeFile(view.dispute),
     retentionDecision: view.retentionDecision ?? undefined,
     retentionCents: view.retentionCents ?? undefined,
+    refundAmountCents: view.refundAmountCents ?? null,
+    declineReason: view.declineReason ?? undefined,
+    pickupRefusalReason: view.pickupRefusalReason ?? undefined,
     payoutStatus: view.payoutStatus ?? undefined,
     // ADMIN aussi : un deal clos par la médiation ne doit pas se lire « sans signalement de ta part » (ANO-WEB-04).
     completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" || view.completedBy === "ADMIN" ? view.completedBy : undefined,

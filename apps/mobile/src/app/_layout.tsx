@@ -115,6 +115,10 @@ export default function RootLayout() {
                 l'autre, par-dessus l'app. On le termine ou on le quitte — ce
                 n'est pas une destination où l'on navigue. */}
             <Stack.Screen name="booking" />
+            {/* Le SUIVI d'un envoi : une destination, pas un tunnel. On y
+                revient pendant des jours — d'où sa pile à part de `booking`,
+                dont le retour retomberait sur une étape de paiement. */}
+            <Stack.Screen name="shipment" />
             {/* Profil n'est plus un onglet (A210) : il se pousse par-dessus. */}
             <Stack.Screen name="profile" />
           </Stack>

@@ -120,3 +120,104 @@ empêcher un effet de bord doit avoir son chemin de libération dans le cas d'er
 **Non fait volontairement** : `YAMBA-CONTEXT.md` et `YAMBA-SUIVI-PROJET.md` — la PR **#390**
 est précisément le report d'état et les modifie ; les toucher ici créerait un conflit. Ils
 suivront après les merges.
+
+---
+
+# Mise à jour — fin de journée du 21/10 : trois PR mergées, le suivi natif ouvert
+
+> **Cette section SUPERSÈDE le § 1 ci-dessus**, dont le tableau décrit l'état du matin.
+
+## 1bis. L'état en une page
+
+| Quoi | Où | État |
+|---|---|---|
+| `origin/dev` | — | `09acc6b` — **#390, #391 et #392 sont mergées** (report d'état, tunnel natif ①→⑦ + jumeau web, build de développement + D82 gravée) |
+| **PR #393** | `feat/payments-redirect-server` | D82 7A/8A/9A en entier (+40 tests). **18/18, MERGEABLE, CLEAN** — il ne manque que le merge |
+| **PR #394** | `feat/mobile-shipment-tracker` | **A221 — « Mon envoi » : le suivi natif, ses quatre gestes, le jumeau web aligné.** Empilée sur #393 |
+| Décision gravée | registre v1.3 | **A221** (arbitrage). La prochaine DÉCISION reste **D83** |
+| Tests | — | **1342** + auth **407** — **inchangés** : A221 ne touche aucun code serveur |
+
+**Ordre de merge : #393 → #394.** Le diff de #394 se réduit dès que #393 est dans `dev`.
+C'est l'utilisateur qui merge.
+
+## 2bis. Ce que fait A221, en cinq lignes
+
+Le tunnel natif se terminait sur une impasse : sa confirmation menait à l'onglet **Activité**,
+qui est une coquille. `app/shipment/[id]` donne enfin la fiche de suivi — dix vues pour neuf
+statuts, le code de livraison en carte unique, la frise, les étapes du voyage, les preuves
+photo, l'argent (autorisé / débité / gelé / rendu / retenu), et **quatre gestes** : annuler
+(préviz ANN-01 servie), régénérer le code, partager le code par la feuille de l'OS, confirmer
+la réception. L'écran reflète `allowedActions` et relit après chaque geste.
+
+Le site, lui, gagne ce que le natif a rendu visible : le **montant réellement remboursé** et
+les **motifs de refus**, qui étaient servis par le contrat et que `BookingStatusNotice` ne
+lisait pas (il renvoyait l'Expéditeur à sa boîte mail).
+
+## 3bis. Ce qui reste à faire, et par qui
+
+### Côté utilisateur — INCHANGÉ, et toujours non fait (vérifié dans le `.env` racine)
+
+Aucun des six gestes du § 4 ci-dessus n'a été posé. Mesuré : ni
+`EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`, ni `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, ni
+`STRIPE_WEBHOOK_SECRET`, ni `PAYMENT_PROVIDER` ; et `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` est
+toujours là alors que `.env.example` la déclare **RETIRÉE**. Conséquences inchangées : aucune
+feuille réelle, `POST /webhooks/stripe` répond **501**, et la recette Expo Go répond
+`UNAVAILABLE` faute de `PAYMENT_PROVIDER=fake`.
+
+### Côté code — la suite immédiate, dans cet ordre
+
+1. **Signaler un problème** et **noter le Voyageur** en natif : deux formulaires, deux écrans,
+   comme sur le site (`/bookings/:id/report`, `/bookings/:id/rate`). Aujourd'hui **rien ne les
+   annonce** à l'écran (A203) — mais un Expéditeur dont le colis arrive abîmé n'a donc aucun
+   recours dans l'app pendant les trois jours de vérification. C'est le trou le plus urgent.
+2. **La liste « Mes envois »** dans l'onglet Activité (`GET /me/bookings`, déjà servi ; le
+   module web `components/dashboard/shipments/` est le jumeau et il est complet). La fiche
+   ayant été livrée d'abord, chaque ligne aura une destination.
+3. **Un report d'état** `chore/etat-394` : `YAMBA-CONTEXT.md` et `YAMBA-SUIVI-PROJET.md` sont
+   en retard de **quatre lots** (#391, #392, #393, #394) — la ligne du jalon 4 s'arrête à
+   #388 et annonce encore « restent les écrans ② à ⑦ », qui sont faits. **Volontairement pas
+   fait ici** : un report d'état sur du travail non mergé est un report faux.
+
+## 4bis. Axes non demandés, nés de ce lot
+
+1. **Le contrat ne sert plus la raison du poids facturé.** D81 (17/10) a cessé d'écrire
+   `sizeCoef` et `minimumApplied` ; ils restent au `ShipperPricingSchema` et valent donc
+   `null` sur toute réservation récente. Ce qui les remplace — `billingFloorKg`, `sizeMinKg`,
+   `billableReason` — **n'est servi par aucune des deux vues**. Le tunnel explique « facturé
+   2 kg, le minimum de ce trajet » ; la fiche de suivi, elle, ne peut que constater l'écart.
+   Correction au mappeur + au contrat + `npm run generate:openapi`.
+2. **Le lien de suivi du destinataire (D69) rend un CHEMIN, pas une URL.**
+   `POST /deals/:id/tracking-link` répond `path: "/track/{token}"` : seul un navigateur peut
+   le compléter. Le geste est donc absent de l'app, et aucune variable ne porte l'origine
+   publique du site. **Candidat D83** : que le serveur serve une URL absolue.
+3. **Le mobile n'a aucun client de requêtes.** La fiche relit à la main (`load()`), sans cache
+   partagé ni invalidation croisée avec les badges d'onglets. Dès que la liste « Mes envois »
+   existera, deux écrans liront le même deal sans se synchroniser. À trancher **avant** la
+   liste, pas après.
+4. **Rien ne se rafraîchit tout seul.** Un colis qui bouge pendant qu'on regarde l'écran exige
+   un appui sur « Actualiser ». Un rafraîchissement au retour au premier plan et à la reprise
+   de focus coûterait peu. Et le vrai canal pour « ton Voyageur a accepté » reste la
+   **notification push**, toujours à ⬜ au jalon 4.
+5. **L'axe 2 du matin a pris du poids** : `apps/mobile` n'a toujours aucun test, et ce lot
+   vient d'ajouter **267 lignes de logique pure** (`shipment-view.ts`) écrites exprès pour être
+   exécutables. Phase, frise, décomptes, clôture, état de l'argent : tout y est à entrée
+   unique. Le harnais manquant coûte maintenant plus cher que son installation.
+
+## 5bis. Deux pièges d'outillage à ne pas repayer
+
+1. **Le lexique i18n refuse le mot `carrier` dans une VALEUR de message — nom de variable ICU
+   compris.** `{carrier}` échoue sur la règle 6 (`scripts/lexique-yamba.json`), `{carrierFirstName}`
+   passe. C'est la raison d'être de cette verbosité côté web depuis A144.
+2. **`.expo/types/router.d.ts` est généré et non suivi** : une route neuve y est absente
+   jusqu'à ce que Metro tourne, donc le typecheck **local** est rouge là où la CI — qui n'a
+   jamais ce fichier — passe. `cd apps/mobile && npx expo customize tsconfig.json` régénère les
+   types **sans démarrer Metro** (vérifié : le `tsconfig.json` suivi n'est pas modifié).
+   Vérifié aussi dans l'autre sens : le code de ce lot passe **avec et sans** les types générés.
+
+## 6bis. Ce qui n'a pas été essayé
+
+**La fiche n'a pas tourné sur appareil** : la machine (MBP 2017, 16 Go) ne peut pas lancer
+Metro et la pile de services en même temps. Les contrôles passés sont les typechecks (mobile
+et user-ui, exit 0), le miroir i18n, et une vérification clé par clé des **60 chemins i18n
+construits à l'exécution**. La recette se fait avec `seed-deals.ts`, qui donne un envoi dans
+chaque état et pose le code réel `742891` sur chaque réservation post-pickup.
