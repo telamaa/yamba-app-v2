@@ -7674,6 +7674,15 @@ Or **aucun des dix-huit contrôles de la CI ne voyait une ligne de cette applica
 lots de suite avaient écrit leur logique en fonctions pures *exactement* pour qu'elle soit
 exécutable — 2 109 lignes — et rien ne l'exécutait. Ce lot n'ajoute aucune fonctionnalité :
 il rend vérifiable ce qui était déjà écrit, et devient le dix-neuvième contrôle.
+# D85 — Le logo « Porter »
+
+## Le besoin
+
+L'ancien logo était **une lettre dans une boîte** : un carré mango portant un « Y ». Il ne
+disait rien du métier et ne se distinguait d'aucune autre marque commençant par Y.
+
+Le symbole « Porter » dit ce que Yamba fait : **quelqu'un porte un colis**. Un Y tracé d'un
+seul trait, dont les bras tiennent un point — et qui reste lisible à 16 px dans un onglet.
 
 ## Les règles
 
@@ -7768,6 +7777,14 @@ le fait simplement dans une page qui lui parle.
 | **Carte bancaire** | Dans une page de Yamba | « Tu saisis ta carte ici » — les réseaux cités dessous |
 | **PayPal** | Dans un navigateur, hors de l'app | Une page qui annonce l'ouverture de PayPal, et où il revient s'il annule |
 | **Apple Pay / Google Pay** | Dans la feuille du système | Une page qui annonce l'ouverture de la feuille, et où il revient s'il annule |
+| **RG-MRQ-01** | Le symbole est un **Y d'un seul trait portant un colis**. Il ne se déforme pas, ne s'incline pas, ne se recolore pas. Taille minimale : **24 px** à l'écran, 10 mm en impression |
+| **RG-MRQ-02** | Le **Y est mango** (`#FF9900`) en clair comme en sombre. Le **colis est teal** (`#0F766E`), et `#2DD4BF` en mode sombre — c'est le seul élément qui change avec le thème |
+| **RG-MRQ-03** | Sur fond mango, le symbole passe en **variante blanche** (Y blanc, colis teal). En monochrome, tout prend la couleur du texte environnant |
+| **RG-MRQ-04** | Le mot « **Yamba** » est **du TEXTE**, jamais une image ni un SVG. Il reste donc sélectionnable, lisible par un lecteur d'écran, net à toute taille et traduisible |
+| **RG-MRQ-05** | Sous **28 px**, le trait et le colis s'épaississent. En dessous, un trait fin tombe sous le pixel et le colis disparaît : le symbole ne dirait plus ce qu'il raconte |
+| **RG-MRQ-06** | Une **icône n'est pas le logo mis à l'échelle** : trois cadrages distincts (onglet, application, maskable Android), parce que le système rogne les bords différemment dans chaque cas |
+| **RG-MRQ-07** | Les icônes se **génèrent** depuis la source vectorielle. Une icône retouchée à la main est une icône qui dérive |
+| **RG-MRQ-08** | Quand le symbole est **décoratif** (le lien porte déjà le nom de la marque), il est masqué aux lecteurs d'écran. Annoncer « Yamba » deux fois de suite est du bruit, pas de l'accessibilité |
 
 ## Tests d'acceptation
 
@@ -7838,3 +7855,52 @@ utilisateur qui a comparé la réponse à ce que son navigateur affichait vraime
 - **La police de marque dans les titres du mobile** : la voie des applications à marque forte
   (marque dans les titres, système dans l'interface). Ce serait un amendement à D36 ③, à
   instruire séparément.
+| MRQ85-01 | Le header, en clair | Y mango, colis **teal foncé** |
+| MRQ85-02 | Le header, en sombre | Y mango, colis **turquoise clair** — le Y ne change pas |
+| MRQ85-03 | Le header après défilement (mode compact) et sur mobile | Le symbole **rétrécit** (32 → 28 → 26 px) sans se déformer |
+| MRQ85-04 | Le squelette du header pendant le chargement de la session | Le **vrai** logo, jamais une pastille qui scintille |
+| MRQ85-05 | L'onglet du navigateur | L'icône arrondie mango, lisible à 16 px |
+| MRQ85-06 | « Ajouter à l'écran d'accueil » sur Android | L'icône **maskable** : le dessin survit au masque rond, en goutte ou en carré |
+| MRQ85-07 | « Ajouter à l'écran d'accueil » sur iPhone | L'icône 180 px, **sans double arrondi** |
+| MRQ85-08 | Un lecteur d'écran sur le header | Il annonce « Yamba » **une seule fois** |
+| MRQ85-09 | Le mot « Yamba » dans la page | Il peut être **sélectionné à la souris** — c'est du texte |
+
+## Ce qui reste hors de ce lot
+
+### Les emails — le carré « Y » est RETIRÉ, et rien ne le remplace
+
+**Un seul** gabarit sur quinze affichait encore le carré « Y » :
+`apps/trip-service/src/utils/templates/trip-notifications/trip-published.ejs` — une cellule
+blanche arrondie portant un « Y » mango, dans le bandeau dégradé mango → teal.
+
+**Les quatorze autres** (les douze de notification-service, les deux autres de trip-service, et
+la mise en page partagée de `packages/libs/email` qui sert tous les emails récents) n'affichent
+la marque **qu'en texte**. Ce gabarit était donc l'exception, héritée d'avant.
+
+**La décision : la cohérence se fait en ENLEVANT.** Le carré disparaît, le mot « Yamba » reste
+en texte blanc sur le bandeau — comme partout ailleurs. La table imbriquée part avec lui :
+elle n'avait plus qu'une cellule à servir, et chaque table en moins est une bizarrerie Outlook
+en moins.
+
+**Pourquoi aucun symbole à la place**, alors que le site en a un :
+
+| Raison | Détail |
+|---|---|
+| **Le coût réel** | Une image dans un email suppose une **pièce jointe inline** (`cid`) — donc étendre `OutgoingEmail`, l'interface `EmailProvider` et **les trois** fournisseurs (Resend en HTTP, SMTP, Fake), une bibliothèque partagée par quatre services |
+| **Le risque** | L'affichage *inline* dépend du support de `content_id` côté Resend ; mal câblé, l'image part en **pièce jointe attachée** au lieu de s'afficher — pire que pas d'image |
+| **La portée** | Si le symbole entre dans les emails, il entre par la **mise en page partagée**, pour les quinze d'un coup. L'ajouter à un seul gabarit ne supprimerait pas l'incohérence : elle changerait de sens |
+| **Ce qui marche partout** | Le texte. Un `alt` n'est lu que si l'image est bloquée, et beaucoup de clients la bloquent par défaut |
+
+`yamba-email-logo.png` est versionné dans `public/brand/` : il est prêt le jour où ce lot se
+fera.
+
+### Test d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| MRQ85-10 | L'email « nouveau trajet publié », dans n'importe quel client | Le bandeau mango → teal porte « **Yamba** » en texte. Aucun carré « Y », aucune image à charger |
+
+### L'application native
+
+`apps/mobile` garde ses icônes d'origine. `yamba-icon-1024.png` est la source prévue pour les
+stores ; le lot reste à faire.

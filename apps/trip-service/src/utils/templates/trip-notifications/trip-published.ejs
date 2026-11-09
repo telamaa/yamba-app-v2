@@ -13,15 +13,28 @@
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.06);">
 
                 <!-- ─── HEADER GRADIENT MANGO → TEAL ─── -->
+                <!--
+                    D85 — le carré blanc portant un « Y » a été RETIRÉ.
+
+                    C'était l'ancien logo, et ce gabarit était le SEUL des quinze à en
+                    afficher un : les douze de notification-service, les deux autres
+                    d'ici et la mise en page partagée (packages/libs/email) n'ont
+                    jamais montré que le mot « Yamba », en texte. La cohérence se fait
+                    donc en ENLEVANT.
+
+                    Pas de nouveau symbole à la place, et c'est un choix : une image
+                    dans un email suppose une pièce jointe inline (cid) — donc étendre
+                    la lib partagée et ses trois fournisseurs — et elle ne s'affiche de
+                    toute façon pas chez tout le monde. La marque en texte, elle, arrive
+                    partout. Si le symbole doit entrer dans les emails un jour, il
+                    entrera par la mise en page PARTAGÉE, pour les quinze d'un coup.
+
+                    La table imbriquée disparaît avec le carré : elle n'avait qu'une
+                    cellule à servir, et chaque table en moins est une bizarrerie
+                    Outlook en moins.
+                -->
                 <tr>
-                    <td style="background:linear-gradient(135deg,#FF9900 0%,#0F766E 100%);padding:28px 32px;">
-                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                            <tr>
-                                <td style="width:36px;height:36px;background-color:#ffffff;border-radius:10px;text-align:center;vertical-align:middle;font-size:18px;font-weight:900;color:#FF9900;line-height:36px;">Y</td>
-                                <td style="padding-left:12px;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;vertical-align:middle;">Yamba</td>
-                            </tr>
-                        </table>
-                    </td>
+                    <td style="background:linear-gradient(135deg,#FF9900 0%,#0F766E 100%);padding:28px 32px;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">Yamba</td>
                 </tr>
 
                 <!-- ─── TITRE DE L'EMAIL ─── -->

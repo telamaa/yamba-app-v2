@@ -15089,3 +15089,160 @@ fronts ont aujourd'hui des versions **suivies différentes** de ce fichier (user
   suffisantes). En changer coûte désormais **une ligne par front**.
 - **La règle Leaflet** : elle lit toujours la même variable — simplement, elle n'est plus la
   seule.
+---
+
+# D85 — Le logo « Porter » : un composant, trois cadrages, et un canal alpha qui dit deux choses opposées
+
+> Branche `feat/new-logo`. Le carré mango avec la lettre « Y » disparaît du site au profit du
+> symbole « Porter » : un Y tracé d'un seul trait dont les bras portent un colis.
+>
+> Lire d'abord `apps/user-ui/src/components/brand/YambaSymbol.tsx` (tout le symbole tient
+> dedans), puis `scripts/generate-brand-icons.mjs` (les icônes se génèrent, elles ne se
+> retouchent pas).
+
+## ① L'inventaire, qui a démenti l'énoncé
+
+La demande supposait l'ancien logo dispersé « partout » — footer, pages auth, `AuthHeroVisual`,
+skeletons, pages d'erreur, menus mobiles, bottom sheets. **Mesuré : il n'existait qu'à UN seul
+endroit.**
+
+```sh
+grep -rn "^\s*Y\s*$" apps/user-ui/src --include="*.tsx"
+# → apps/user-ui/src/components/layout/header/HeaderLogo.tsx:32
+```
+
+Tous les autres emplacements cités affichent le mot « Yamba » en **texte** (« © 2026 Yamba »,
+des titres, une pastille « ! » sur la page d'erreur globale) — aucune marque graphique. Et
+`HeaderSkeleton.tsx` **importe `HeaderLogo`** : il a donc reçu le nouveau symbole sans qu'une
+ligne le concernant ne change.
+
+> La leçon tient en une phrase : **un inventaire se mesure avant de se planifier.** Remplacer
+> « partout » aurait voulu dire toucher quarante fichiers qui citent la couleur mango sans
+> jamais dessiner le logo.
+
+## ② Le symbole est un COMPOSANT, pas un fichier
+
+`YambaSymbol.tsx` rend du SVG en ligne. Trois raisons, dans l'ordre d'importance :
+
+1. **Le thème sans second fichier.** Le colis passe de `#0F766E` à `#2DD4BF` en mode sombre par
+   une classe Tailwind (`fill-[#0F766E] dark:fill-[#2DD4BF]`). Avec un `<img>`, il faudrait deux
+   fichiers et une bascule — donc deux fichiers à garder synchrones.
+2. **Aucune requête réseau**, et aucun saut de mise en page au chargement.
+3. **Pas de hook** : le composant est utilisable en composant *serveur* comme *client*. Un
+   `useTheme()` l'aurait rendu client, et aurait contaminé tout ce qui l'affiche.
+
+```tsx
+const small = size < 28;                       // sous 28 px, le trait s'épaissit
+const height = Math.round((size * 200) / 192); // le ratio du symbole, jamais deviné
+…
+strokeWidth={small ? 30 : 24}
+<circle cx="120" cy="70" r={small ? 22 : 17} className={dotClass} />
+```
+
+Le seuil des 28 px n'est pas cosmétique : en dessous, un trait de 24 sur un symbole de 192 de
+large tombe sous le pixel et le colis disparaît.
+
+**Le mot « Yamba » reste du TEXTE**, dans la police de marque (D84). C'est ce qui le rend
+sélectionnable, lisible par un lecteur d'écran, net à toute taille et traduisible. Un logotype
+en image serait la seule chose du site qu'on ne pourrait ni chercher ni agrandir.
+
+### L'accessibilité, en une règle
+
+```tsx
+role={title ? "img" : undefined}
+aria-hidden={title ? undefined : true}
+```
+
+Sans `title`, le symbole est **décoratif** et disparaît pour les lecteurs d'écran. C'est le cas
+dans le header : le `<Link>` porte déjà `aria-label="Yamba"`, et annoncer deux fois la marque
+serait du bruit.
+
+## ③ Trois cadrages, parce qu'une icône n'est pas un logo mis à l'échelle
+
+| Usage | Fond | Trait | Pourquoi ce cadrage |
+|---|---|---|---|
+| **Favicon** (`src/app/icon.svg`) | arrondi `rx=52` | 28 | Vu à **16 px** : tout est grossi, sinon il n'en reste qu'une tache |
+| **Icône d'app** (apple-icon, 192/512/1024) | **plein, sans arrondi** | 22 | C'est le **système** qui masque les coins. Un arrondi déjà dessiné produirait un **double arrondi** sur iOS |
+| **Maskable Android** (512) | plein | 18 | Android peut rogner **jusqu'à 20 % de chaque bord** (cercle, goutte, carré) : le dessin tient dans les 80 % centraux |
+
+## ④ Les icônes se GÉNÈRENT
+
+`scripts/generate-brand-icons.mjs`, **idempotent** (mêmes sources → mêmes octets, le relancer ne
+produit aucun diff), une seule dépendance (`sharp`, à installer en `devDependency`).
+
+L'encodeur `.ico` est **écrit à la main**, une quarantaine de lignes : un `.ico` est un en-tête
+de 6 octets, une entrée de 16 octets par image, puis les PNG bout à bout. `png-to-ico` aurait
+ajouté une dépendance pour cela.
+
+`icon.svg` n'est **pas** régénéré : c'est une source écrite à la main, et le script le dit en
+clair à la fin de son exécution.
+
+## ⑤ Le canal alpha : deux règles vraies et OPPOSÉES, les deux payées
+
+C'est le point technique du lot, et la deuxième règle a été découverte **en cassant le site**.
+
+**Règle 1 — les PNG autonomes ne doivent PAS porter d'alpha.** L'App Store refuse une icône qui
+en porte un, et `yamba-icon-1024.png` est justement la source des stores. Le premier jet du
+script rendait du RGBA ; `flatten({ background: MANGO })` l'a corrigé.
+
+**Règle 2 — les PNG EMBARQUÉS dans le `.ico` en EXIGENT un.** Le `flatten` ayant été appliqué
+partout, le site entier est tombé :
+
+```
+./apps/user-ui/src/app/favicon.ico
+Error: Processing image failed
+Caused by:
+- Format error decoding Ico: The PNG is not in RGBA format!
+```
+
+Ce n'est pas le favicon qui manque : c'est **la page qui répond 500**, parce que Next traite les
+fichiers de convention au build. D'où le drapeau `{ alpha }` dans `rendu()`, et un commentaire
+qui interdit de le « simplifier ».
+
+> **Et c'est la troisième fois de la journée qu'un défaut n'est trouvé qu'en regardant le
+> résultat.** Le typecheck de `user-ui` était vert pendant que le site répondait 500 : `tsc` ne
+> traite pas les images.
+
+## ⑥ Les conventions de Next, et rien d'autre
+
+`icon.svg`, `favicon.ico`, `apple-icon.png` et `manifest.ts` sont des **conventions de fichier**
+de l'App Router : Next génère lui-même les balises, avec une empreinte de contenu dans l'URL.
+Vérifié sur la page servie :
+
+```html
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="icon" href="/favicon.ico?favicon.24h1ujhofuyt0.ico" sizes="48x48" type="image/x-icon"/>
+<link rel="icon" href="/icon.svg?icon.3ss509b6y9r89.svg" sizes="any" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="/apple-icon.png?apple-icon.1huf542ofqdxg.png" sizes="180x180"/>
+```
+
+Les deux layouts ne déclaraient **aucune** icône manuellement — rien à nettoyer, vérifié plutôt
+que supposé. En revanche `apps/user-ui/public/favicon.ico` existait encore (datant de
+`443e4d8`) : **supprimé**, parce que deux sources pour la même balise finissent toujours par
+diverger.
+
+## ⑦ Les contrôles passés
+
+- `npx tsc --noEmit --project apps/user-ui` → exit 0 (ce que fait la CI pour ce front) ;
+- **aucun linter** n'est configuré dans ce dépôt (`linter: none`, choix de génération Nx) — il
+  n'y a donc rien à lancer, et le dire vaut mieux que de prétendre l'avoir fait ;
+- le site **servi** : page `200`, manifeste complet, les quatre assets en `200`, le symbole
+  présent dans le HTML rendu par le serveur (`viewBox="24 24 192 200"` et la classe
+  `dark:fill-[#2DD4BF]`) ;
+- `tailwind.config.js` couvre déjà `src/components/brand` (`content: ["./src/**/*.{…}"]`) —
+  vérifié, aucune modification nécessaire.
+
+## ⑧ Ce qui n'est PAS fait, et pourquoi
+
+- **Les emails** : FAIT, mais par SOUSTRACTION. Un seul gabarit sur quinze portait encore le
+  carré « Y » (`trip-notifications/trip-published.ejs`) ; il a été retiré, le mot « Yamba »
+  reste en texte, comme dans les quatorze autres. Aucun symbole à la place : une image dans un
+  email suppose une pièce jointe inline (`cid`), donc étendre la lib partagée et ses trois
+  fournisseurs — et si le symbole doit y entrer un jour, il entrera par la **mise en page
+  partagée**, pour les quinze d'un coup. Rendu vérifié avec des données réelles (10 191
+  caractères, plus aucun `<td>Y</td>`). Détail et raisons : document métier.
+- **L'application native** : `apps/mobile` garde ses icônes d'origine. Le kit affirmait « pas
+  d'application native dans le repo aujourd'hui » — c'est **faux** depuis D36/D73.
+  `yamba-icon-1024.png` est la source prévue, le lot reste à faire.
+- **`apps/yamba-logo-kit`** : dossier de livraison, laissé **non versionné**. Il a servi, il
+  peut être supprimé.
