@@ -34,6 +34,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import Reanimated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -61,6 +62,7 @@ import {
   type SearchTransportFilter,
   type TripSearchResult,
 } from '@/lib/api/search.api';
+import { useTabBarHideOnScroll } from '@/lib/tab-bar-visibility';
 import { consumeBrowseOnLanding } from '@/lib/welcome-state';
 
 const PAGE_SIZE = 20;
@@ -179,6 +181,10 @@ export default function SearchScreen() {
   // visible. Reanimated est installé mais jamais importé dans l'app : on
   // n'inaugure pas un moteur non éprouvé pour un fondu.
   const listRef = useRef<FlatList<TripSearchResult>>(null);
+  // D88 — c'est le DÉFILEMENT de cette liste qui escamote la barre
+  // d'onglets. Le gestionnaire est un worklet : il écrit une valeur
+  // partagée sur le fil d'interface, l'écran ne se rend jamais pour ça.
+  const onListScroll = useTabBarHideOnScroll();
   const pendingScrollTop = useRef(false);
   const listOpacity = useRef(new Animated.Value(1)).current;
   const sweep = useRef(new Animated.Value(0)).current;
@@ -495,7 +501,9 @@ export default function SearchScreen() {
                 Sur iOS c'est un simple View, le flou est natif. */}
             <BlurTargetView ref={blurTargetRef} style={styles.listArea}>
               <Animated.View style={[styles.listArea, { opacity: listOpacity }]}>
-              <FlatList<TripSearchResult>
+              {/* `Reanimated.FlatList` et non `FlatList` : seul un
+                  conteneur animé sait appeler le worklet de défilement. */}
+              <Reanimated.FlatList<TripSearchResult>
                 ref={listRef}
                 data={state.page.trips}
                 keyExtractor={(trip) => trip.id}
@@ -552,6 +560,8 @@ export default function SearchScreen() {
                 ]}
                 scrollIndicatorInsets={{ top: Math.max(0, headerHeight - insets.top) }}
                 keyboardShouldPersistTaps="handled"
+                onScroll={onListScroll}
+                scrollEventThrottle={16}
               />
               </Animated.View>
             </BlurTargetView>

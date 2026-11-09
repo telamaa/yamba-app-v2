@@ -18,7 +18,7 @@
  * (clavier + liste de suggestions, douze mois de calendrier).
  *
  * Elle n'applique RIEN elle-même : elle écrit dans le brouillon partagé et
- * lève le signal `requestSearch()` — l'écran Explorer reste seul maître de
+ * lève le signal `requestSearch()` — l'écran Accueil reste seul maître de
  * l'appel serveur (il porte les pastilles, le tri et la pagination).
  */
 import { Ionicons } from '@expo/vector-icons';
@@ -64,7 +64,7 @@ import {
  *  un voile discret. Un matériau « thick » à 72 effaçait la liste — trop.
  *  Android ne sait pas flouter à travers une fenêtre (le `blurTarget`
  *  d'expo-blur vit dans UNE hiérarchie de vues, l'en-tête collant
- *  d'Explorer en est la preuve) : seul son voile recule l'arrière-plan,
+ *  de l'onglet Accueil en est la preuve) : seul son voile recule l'arrière-plan,
  *  donc il est un peu plus dense — sans jamais le masquer. */
 const BLUR_INTENSITY = Platform.OS === 'ios' ? 32 : 0;
 const VEIL_OPACITY = Platform.OS === 'ios' ? 0.18 : 0.42;

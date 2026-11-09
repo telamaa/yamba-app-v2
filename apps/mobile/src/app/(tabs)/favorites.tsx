@@ -22,7 +22,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import Reanimated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -36,6 +37,7 @@ import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
 import { Brand, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTabBarHideOnScroll } from '@/lib/tab-bar-visibility';
 import { ApiError } from '@/lib/api/client';
 import {
   listFavoriteTrips,
@@ -63,7 +65,7 @@ type LoadState =
 
 export default function FavoritesScreen() {
   return (
-    <IdentityGate>
+    <IdentityGate destination="favorites">
       <FavoritesContent />
     </IdentityGate>
   );
@@ -73,6 +75,8 @@ function FavoritesContent() {
   const t = useTranslations('favorites');
   const [segment, setSegment] = useState<Segment>('trips');
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  // D88 — le défilement escamote la barre d'onglets (worklet, fil d'interface).
+  const onScroll = useTabBarHideOnScroll();
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' });
@@ -105,7 +109,10 @@ function FavoritesContent() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.titleRow}>
-          <ThemedText type="subtitle" style={styles.title}>
+          {/* `title` et non `subtitle` : le même cran que la porte
+              d'identité, pour que le nom de la page ne saute pas d'une taille
+              à l'autre au moment où la session s'ouvre. */}
+          <ThemedText type="title" style={styles.title}>
             {t('title')}
           </ThemedText>
           <ProfileAvatarButton />
@@ -129,14 +136,18 @@ function FavoritesContent() {
           </View>
         )}
 
+        {/* `Reanimated.ScrollView` et non `ScrollView` : seul un conteneur
+            animé sait appeler le worklet de défilement. */}
         {state.kind === 'loaded' && (
-          <ScrollView
+          <Reanimated.ScrollView
             contentContainerStyle={styles.scroll}
-            showsVerticalScrollIndicator={false}>
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}>
             {segment === 'trips' && <TripsSegment trips={state.data.trips} />}
             {segment === 'wishes' && <WishesSegment wishes={state.data.wishes} />}
             {segment === 'carriers' && <CarriersSegment carriers={state.data.carriers} />}
-          </ScrollView>
+          </Reanimated.ScrollView>
         )}
       </SafeAreaView>
     </ThemedView>
