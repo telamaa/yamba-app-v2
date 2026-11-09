@@ -6695,3 +6695,321 @@ capturer, comparer — sans jamais quitter le clavier.
 - **Un carrousel de plus de cinq volets** ne devrait plus être un `ScrollView` : tous les
   enfants sont montés d'un coup. `FlatList` avec `pagingEnabled` ne monte que ce qui est
   visible.
+
+## Chapitre 228 — Le fil d'interface, les rayons concentriques, et trois contrats cassés par un nom de paramètre
+
+> Le lot D88 : la barre d'onglets quitte le natif pour une barre dessinée, puis la porte
+> d'identité est refaite. Deux sujets très différents — l'un est de l'animation à 60 images
+> par seconde, l'autre de la typographie — et pourtant les trois erreurs du lot ont la même
+> forme : **un réglage juste dans un contexte, faux dans un autre.**
+
+### 1. Pourquoi un `useState` ne peut pas animer un défilement
+
+C'est le point le plus important du chapitre, et il vaut bien au-delà de React Native.
+
+Une application React Native a **deux fils** d'exécution. Le fil **JS** exécute votre code :
+les composants, les `useState`, les effets. Le fil **d'interface** (UI thread) dessine. En
+temps normal ils dialoguent par messages — c'est le « pont ».
+
+Un doigt qui défile émet **des dizaines d'événements par seconde**. Si chacun passe par un
+`useState` :
+
+```tsx
+// ❌ Ce qu'on NE fait pas
+const [cachee, setCachee] = useState(false);
+<FlatList onScroll={(e) => setCachee(e.nativeEvent.contentOffset.y > 100)} />
+```
+
+… alors chaque événement traverse le pont, provoque un rendu React de toute la barre, et
+l'animation **saute dès que le fil JS travaille** — par exemple pendant qu'une page de
+résultats arrive du serveur. Et c'est précisément à ce moment-là qu'on défile.
+
+Reanimated propose une autre monnaie : la **valeur partagée**. C'est une case mémoire lisible
+et inscriptible par les **deux** fils, et une fonction marquée *worklet* qui s'exécute **sur le
+fil d'interface**.
+
+```tsx
+// src/lib/tab-bar-visibility.tsx
+const hidden = useSharedValue(0);          // 0 = barre posée, 1 = sortie
+
+return useAnimatedScrollHandler({
+  onScroll: (event) => {                   // ← ce corps tourne sur le fil d'INTERFACE
+    const y = event.contentOffset.y;
+    …
+    hidden.value = withTiming(1, { duration: 180 });
+  },
+});
+```
+
+Trois conséquences qu'il faut avoir en tête :
+
+- **Le composant ne se rend jamais** pendant tout le défilement. Zéro rendu React.
+- **Le corps du worklet ne peut pas tout faire** : il tourne dans un autre contexte JS. Pas de
+  `setState`, pas d'appel réseau ; pour revenir côté JS il faut `runOnJS`.
+- **Il faut un conteneur animé.** `onScroll` d'un `FlatList` ordinaire attend une fonction JS :
+  il ne sait pas appeler un worklet. D'où `Animated.FlatList` / `Animated.ScrollView` importés
+  depuis `react-native-reanimated` — et c'est une erreur silencieuse si on l'oublie.
+
+Chez nous le worklet est partagé par un **contexte React** : la valeur vit au niveau du groupe
+d'onglets, la barre la lit, les écrans l'écrivent. Un écran sans liste défilante n'appelle
+simplement rien, et la barre y reste posée — ce qui est la seule chose juste.
+
+### 2. Un seuil se mesure en distance CUMULÉE, pas par événement
+
+Première version, évidente et fausse :
+
+```tsx
+if (delta > 12) hidden.value = withTiming(1);   // ❌ papillote
+```
+
+Un doigt posé sur une liste n'est pas immobile : il produit des micro-mouvements de un ou deux
+points **dans les deux sens**. Avec un seuil par événement, il suffit d'un sursaut à +13 pour
+masquer la barre, puis d'un à −13 pour la rappeler. La barre clignote.
+
+La bonne mesure est le déplacement **cumulé tant qu'il va dans le même sens**, remis à zéro dès
+que le sens change :
+
+```tsx
+cumul.value = cumul.value > 0 === delta > 0 ? cumul.value + delta : delta;
+if (cumul.value > SEUIL)       hidden.value = withTiming(1, { duration: 180 });
+else if (cumul.value < -SEUIL) hidden.value = withTiming(0, { duration: 240 });
+```
+
+Notez l'asymétrie des durées : **180 ms pour partir, 240 pour revenir**. On dégage vite pour
+rendre la place, on remonte posément pour ne pas surprendre un pouce qui visait une carte. Une
+animation symétrique n'est pas une animation neutre, c'est une animation qu'on n'a pas pensée.
+
+### 3. Une barre d'onglets « maison » dans expo-router
+
+`expo-router`'s `Tabs` (importé depuis `expo-router/js-tabs` — la version exportée par
+`expo-router` est dépréciée) n'est qu'une enveloppe autour du navigateur à onglets de
+react-navigation. Il accepte une prop `tabBar` :
+
+```tsx
+<Tabs tabBar={(props) => <YambaTabBar {...props} />} screenOptions={{ headerShown: false }}>
+  <Tabs.Screen name="index" />
+  …
+</Tabs>
+```
+
+Deux choses à savoir avant de s'y lancer.
+
+**Comment il est rendu.** Le navigateur empile, dans une colonne flex : le conteneur d'écrans
+(`flex: 1`), puis votre barre. Si votre barre a une hauteur, elle rogne les écrans ; si elle est
+`position: 'absolute'`, elle **n'occupe aucune place de disposition** et flotte par-dessus. C'est
+ce qui rend une barre flottante possible — et c'est aussi pourquoi les écrans doivent réserver
+eux-mêmes de quoi ne pas finir dessous.
+
+**L'ordre vient de vous.** Sans les `<Tabs.Screen>`, expo-router suit l'ordre **alphabétique des
+fichiers** : la barre dirait « Activité · Favoris · Accueil · Messages · Publier ». Les
+déclarations ne servent qu'à ça, et c'est suffisant pour les justifier.
+
+Ce que vous **perdez** en quittant le natif mérite d'être listé avant de décider, pas après :
+le flou système, les retours haptiques idiomatiques, la sémantique d'onglet des lecteurs
+d'écran, le Dynamic Type, l'évitement du clavier, les pastilles. Chacun redevient une ligne de
+code à écrire — et à re-tester à chaque version majeure d'OS.
+
+### 4. `flex: 1` sur les cellules : figer une rangée sans rien calculer
+
+La barre affiche le libellé du **seul** onglet actif. L'élément actif est donc plus large que
+les autres, et il change d'identité à chaque navigation. Si les éléments s'auto-dimensionnent,
+**toute la rangée se réorganise** à chaque toucher.
+
+La réponse tient en trois niveaux et aucun calcul :
+
+```tsx
+<View style={{ flex: 1 }}>                 // la CELLULE : une part égale, immuable
+  <Pressable style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+    <Animated.View layout={LinearTransition.duration(220)} style={[pilule, actif && etire]}>
+      …icône + mot…
+    </Animated.View>
+  </Pressable>
+</View>
+```
+
+- la **cellule** vaut un cinquième de la largeur, quoi qu'il arrive ;
+- la **cible tactile** remplit la cellule — ~68 pt au lieu des 48 de la pilule dessinée, un
+  tiers de surface tapable gagnée gratuitement ;
+- la **pilule** grandit *dans* sa cellule, et `LinearTransition` anime ce changement. Reanimated
+  respecte seul « Réduire les animations » du système (`ReduceMotion.System` par défaut) : rien
+  à brancher, mais c'est une raison de passer par lui plutôt que par un calcul maison.
+
+### 5. Deux arrondis imbriqués doivent suivre la même LOI, pas la même valeur
+
+Le défaut le plus instructif du lot, parce qu'il ne se voyait **qu'aux deux extrémités**.
+
+L'indicateur de sélection avait un rayon de 16. Sur les trois onglets du milieu : parfait. Sur
+Accueil et Messages : un décalage visible. Pourquoi ?
+
+La barre qui le contient est elle-même un **stade** — son rayon vaut la moitié de sa hauteur
+(52 / 2 = 26). Aux extrémités, l'indicateur n'a plus que 2 pt de marge contre ce bord : l'œil
+compare alors **directement** un angle de 16 logé dans un arrondi de 26, et les deux courbures
+ne se répondent pas. Au milieu, l'indicateur ne touche aucun bord et la comparaison n'a pas lieu.
+
+C'est la règle générale des **rayons concentriques** : pour que deux arrondis imbriqués aient
+l'air parallèles, `rayon intérieur = rayon extérieur − écart`. Ici l'écart n'est pas le même
+horizontalement (2 pt) et verticalement (5 pt), donc la concentricité parfaite est impossible —
+mais la **même loi** suffit à faire disparaître la dissonance :
+
+```tsx
+const PILL_HEIGHT = 42;
+const PILL_RADIUS = PILL_HEIGHT / 2;    // la loi, pas la valeur
+```
+
+Écrire `21` aurait marché aujourd'hui et recréé le défaut le jour où quelqu'un change la
+hauteur. Écrire la **loi** est ce qui rend la correction durable.
+
+### 6. Une union discriminée pour deux jeux d'icônes
+
+Quatre onglets utilisent Ionicons, un utilise Material Community (la seule maison **sans
+porte** des jeux embarqués), et un cinquième n'a pas de glyphe du tout — c'est une image.
+
+```ts
+type Onglet =
+  | { labelKey: string; set: 'ion';   off: IonName; on: IonName }
+  | { labelKey: string; set: 'mci';   off: MciName; on: MciName }
+  | { labelKey: string; set: 'image' };
+```
+
+L'intérêt n'est pas cosmétique : TypeScript **rétrécit** le type dans chaque branche du rendu.
+Dans la branche `set === 'mci'`, `onglet.on` est un `MciName` et pas un `IonName` — une faute de
+frappe de nom d'icône échoue à la compilation. Et dans la branche `'image'`, les champs `on` /
+`off` **n'existent pas** : impossible de les lire par mégarde.
+
+Au passage, une mesure qui a évité une fausse économie : on a failli renoncer à Material
+Community pour ne pas embarquer une police de 1,3 Mo. Vérification faite **dans le bundle**,
+son TTF y était déjà — `@expo/vector-icons` est un baril qui importe tous les jeux dès le
+premier import. Coût réel de l'ajout : zéro. *Mesurer avant de renoncer.*
+
+### 7. Trois contrats cassés — et ils ont la même forme
+
+Voilà le fil rouge annoncé en tête de chapitre.
+
+**① Un jeton de couleur emprunté à un autre support.** La pilule active reprenait la teinte des
+pastilles de transport (`#FFF6E8`). Ces pastilles vivent sur le fond **blanc de la page**, où la
+teinte se voit. Posée sur une barre à `rgba(255,255,255,0.94)`, elle offrait **3 % d'écart de
+luminance** : invisible. Un jeton de design n'est pas valide dans l'absolu, il est valide **sur
+un support**.
+
+Corollaire : sur une surface **translucide**, un indicateur doit être un **lavis** de l'encre du
+support (`rgba(17,24,39,0.08)`), jamais un aplat opaque — sinon il se lit comme une vignette
+collée dès que du contenu passe derrière.
+
+**② Un plafond de mesure emprunté à un autre écran.** `InviteBody` portait `maxWidth: 330`,
+réglé pour le carrousel de l'écran de bienvenue. Réutilisé dans la porte d'identité, il rendait
+la mise en page **dépendante de l'appareil** :
+
+| Appareil | Largeur utile | Effet du plafond |
+|---|---|---|
+| iPhone 15 | 345 pt | le corps casse **15 pt avant** le titre : pas de bord droit commun |
+| iPhone SE | 327 pt | le plafond ne mord pas : défaut invisible |
+
+Un réglage qui ne se déclenche que sur certains écrans est pire qu'un réglage faux : il échappe
+à la relecture. Retiré, la mesure vaut la laisse de l'écran — ~42 caractères à 16 pt, au cœur de
+la fourchette lisible (45–75 avec les espaces).
+
+**③ Un contrat écrit dans un NOM de paramètre, et rien d'autre.** Le plus coûteux :
+
+```ts
+// Avant
+export function getInitials(firstName: string, lastInitial: string): string {
+  const first = firstName?.charAt(0).toUpperCase() ?? '';
+  return `${first}${lastInitial}`.trim() || '?';   // ← le 2e argument est collé TEL QUEL
+}
+```
+
+Le nom `lastInitial` annonce « donne-moi une initiale déjà tronquée ». Les trois appelants
+publics respectaient le contrat — les DTO publics ne livrent que l'initiale du nom, parce
+qu'une carte de résultat affiche « Marven M. » et jamais le patronyme. Mais la pastille
+d'identité lit `/auth/me`, qui renvoie le nom **complet** du membre : il est chez lui.
+
+Résultat : `"M" + "MABIALA"` = **`MMABIALA`** dans un rond de 44 pt.
+
+`string` et `string` : le compilateur n'avait rien à dire. **Un contrat qui ne vit que dans un
+nom de paramètre n'est pas un contrat, c'est un espoir.** Deux sorties :
+
+- le typer (`type Initiale = string & { readonly __initiale: unique symbol }`) — correct, et
+  lourd pour un helper d'affichage ;
+- le rendre **indifférent** à la forme reçue, ce qu'on a fait :
+
+```ts
+export function getInitials(firstName: string, lastNameOrInitial: string): string {
+  const first = firstName?.trim().charAt(0).toUpperCase() ?? '';
+  const last  = lastNameOrInitial?.trim().charAt(0).toUpperCase() ?? '';
+  return `${first}${last}` || '?';
+}
+```
+
+Le `trim()` avant le `charAt(0)` n'est pas décoratif : il traite les espaces de tête (qui
+produisaient une initiale vide) et donne la lettre du **premier** mot d'un prénom composé.
+Tronquer dans le helper plutôt que chez l'appelant, c'est **un** endroit à tenir au lieu de
+quatre — et le prochain appelant ne retombera pas dedans.
+
+### 8. Quand DEUX compositions valent mieux qu'un modèle unique
+
+Le lot a commencé par une consigne claire : « applique le modèle de l'écran de bienvenue partout
+où l'app invite à se connecter ». Première réaction correcte : **extraire** la composition dans
+un kit partagé plutôt que la recopier cinq fois.
+
+Deuxième réaction, après l'avoir vue à l'écran : **le modèle ne tenait pas** sur un onglet. La
+bienvenue est ancrée en bas, sans barre d'onglets, avec un verrou de marque — c'est une page de
+garde. Une porte d'identité posée sur un onglet a un titre de page, et un titre de page est en
+haut.
+
+La tentation, à ce moment-là, est de tordre le modèle commun pour qu'il couvre les deux cas. On
+a fait l'inverse, et c'est la leçon :
+
+> **Le kit garde ce que les deux écrans partagent VRAIMENT** — les teintes (une seule encre pour
+> toute l'app) et la typographie du corps. La grammaire de la bienvenue reste à la bienvenue.
+
+Pour que la divergence ne soit pas prise pour une négligence, elle est justifiée par une règle
+écrite dans le code :
+
+> **Le poids du bouton épouse le poids du moment.** Un écran de DÉCISION (la bienvenue : il
+> n'existe que pour ça, les gestes SONT le contenu) porte des boutons empilés pleine largeur,
+> l'affordance maximale. Une INTERRUPTION (la porte : l'utilisateur voulait ses favoris et
+> trouve un mur) porte des boutons compacts.
+
+Sans cette phrase, quelqu'un « harmonisera » les deux écrans dans six mois, de bonne foi.
+
+Dernier geste d'hygiène : `InviteCopy` et `useTabBarReserve`, devenus sans appelant après la
+refonte, ont été **supprimés dans le même commit**. Une abstraction à moitié utilisée coûte plus
+cher qu'une duplication assumée : elle fait croire qu'une règle existe.
+
+### 9. Un typecheck vert n'est pas une application qui démarre
+
+Rappel de la leçon `esModuleInterop` du 05/09, qui vaut aussi pour le mobile. `tsc` ne résout
+pas les modules comme Metro, et il ne voit pas du tout les transformations Babel. Le seul
+contrôle qui prouve qu'une application React Native **se construit** est de lui demander son
+paquet :
+
+```sh
+curl -s -o /tmp/b.js -w "%{http_code}\n" \
+  "http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false"
+```
+
+Deux détails. L'entrée **n'est pas** `/index.bundle` : avec `expo-router`, le point d'entrée est
+une entrée **virtuelle** (`.expo/.virtual-metro-entry`), demander `index` renvoie une 404
+d'introuvable. Et on peut vérifier dans le résultat que le plugin de worklets a bien tourné :
+
+```sh
+grep -o "__workletHash" /tmp/b.js | wc -l     # 551 — les worklets sont compilés
+```
+
+Ce projet n'a **aucun** `babel.config.js` : `babel-preset-expo` ajoute seul le plugin
+`react-native-worklets/plugin` dès que le paquet est installé. Pratique — et exactement le genre
+de magie qu'on veut vérifier plutôt que croire.
+
+### Pour aller plus loin
+
+- **`useAnimatedScrollHandler` accepte plus que `onScroll`** : `onBeginDrag`, `onEndDrag`,
+  `onMomentumEnd`. Pour un escamotage plus fin, on peut n'agir qu'à la fin du geste.
+- **`runOnJS`** est le passage obligé pour appeler du code React depuis un worklet (naviguer,
+  déclencher un `setState`). À utiliser avec parcimonie : chaque appel retraverse le pont.
+- **`LinearTransition` n'est qu'une des transitions de disposition** de Reanimated
+  (`FadingTransition`, `SequencedTransition`, `CurvedTransition`). Elles sont connues pour être
+  plus fragiles sur Android : à vérifier au poste avant de s'y reposer.
+- **Les rayons concentriques** ont une formule de design system (`inner = outer − padding`), et
+  certains systèmes — iOS en tête — utilisent en plus une **courbure continue** (squircle) que
+  `borderRadius` n'imite qu'approximativement. Sur iOS, `cornerCurve: 'continuous'` existe en
+  natif et n'est pas exposé par React Native sans bibliothèque.
