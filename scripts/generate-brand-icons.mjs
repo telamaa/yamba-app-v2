@@ -37,8 +37,8 @@ const TEAL = "#0F766E";
 /** Le fond PLEIN, sans arrondi : c'est le système qui masque les coins. */
 const fond = `<rect width="240" height="240" fill="${MANGO}"/>`;
 
-const trait = (d, w) =>
-  `<path fill="none" stroke="#FFFFFF" stroke-width="${w}" stroke-linecap="round" ` +
+const trait = (d, w, couleur = "#FFFFFF") =>
+  `<path fill="none" stroke="${couleur}" stroke-width="${w}" stroke-linecap="round" ` +
   `stroke-linejoin="round" d="${d}"/>`;
 
 const colis = (cy, r) => `<circle cx="120" cy="${cy}" r="${r}" fill="${TEAL}"/>`;
@@ -93,14 +93,27 @@ const ANDROID_MONOCHROME = svg(
 );
 
 /**
- * L'écran de démarrage : `app.json` l'affiche à **76 px de large** sur un fond
- * mango plein. Le symbole est donc rendu BLANC et sans fond à lui — le fond
- * est celui de l'écran.
+ * L'écran de démarrage (revu le 09/11/2026, D90) : **le symbole seul**, sans
+ * pastille mango derrière lui et sans le mot. Le Y est donc MANGO — il n'est
+ * plus posé sur du mango — et le fond est celui de la PAGE, pas une couleur
+ * de marque.
+ *
+ * Deux fichiers et non un, pour la même raison que `yamba-symbol.svg` et son
+ * jumeau sombre : seul le COLIS change. Le teal #0F766E est illisible sur du
+ * noir, le turquoise #2DD4BF est la valeur que l'app utilise déjà partout
+ * ailleurs en thème sombre (`Colors.dark.tint`, `yamba-symbol-dark.svg`). Le Y
+ * mango, lui, tient sur les deux fonds et ne change jamais.
  */
-const SPLASH = svg(
-  trait("M60 60 C69 108 91 130 120 130 C149 130 171 108 180 60 M120 130 V186", 22) +
-    `<circle cx="120" cy="86" r="15" fill="${TEAL}"/>`
-);
+const TEAL_SOMBRE = "#2DD4BF";
+
+const symboleSeul = (colisTeinte) =>
+  svg(
+    trait("M60 60 C69 108 91 130 120 130 C149 130 171 108 180 60 M120 130 V186", 22, MANGO) +
+      `<circle cx="120" cy="86" r="15" fill="${colisTeinte}"/>`
+  );
+
+const SPLASH = symboleSeul(TEAL);
+const SPLASH_SOMBRE = symboleSeul(TEAL_SOMBRE);
 
 /* ── Ce qu'on produit ─────────────────────────────────────────────────────── */
 
@@ -114,6 +127,7 @@ const PNGS_MOBILE = [
   { src: ANDROID_MONOCHROME, taille: 432, sortie: "assets/images/android-icon-monochrome.png", alpha: true },
   // L'écran de démarrage et le favicon de l'export web d'Expo.
   { src: SPLASH, taille: 512, sortie: "assets/images/splash-icon.png", alpha: true },
+  { src: SPLASH_SOMBRE, taille: 512, sortie: "assets/images/splash-icon-dark.png", alpha: true },
   { src: APP, taille: 64, sortie: "assets/images/favicon.png" },
 ];
 
