@@ -74,8 +74,11 @@ main non. Sans elle, l'écran de paiement répond `UNAVAILABLE` — et le dit.
   vérifiés par LE MÊME contrôle CI que le web ; langue = préférence du compte sinon
   l'appareil (D44), envoyée en `x-locale`. Pas de `metro.config.js` : la « sticky
   resolution » d'Expo 57 dédoublonne react, les `paths` du tsconfig suffisent à Metro.
-- **Restent des placeholders** : icônes et splash (images du template Expo) — vrais
-  assets à produire avant tout build de store ; identifiant applicatif
-  (`android.package` / `ios.bundleIdentifier`) à trancher avant le premier `prebuild`.
+- Icônes et écran de démarrage : générés depuis UNE source vectorielle
+  (`scripts/generate-brand-icons.mjs`, D85/D86 pour les icônes, **D90** pour le
+  splash — le symbole seul sur le fond de la page, clair et sombre). Plus aucun
+  asset du template Expo. Identifiant applicatif tranché : `com.telama.yamba`.
+  Attention : Expo Go N'AFFICHE PAS l'écran de démarrage de l'app (il montre
+  l'icône et le nom du projet) — il ne se vérifie que dans un build.
 - Onglets natifs faits (A203) ; `expo-dev-client` + `eas.json` posés (D82, build de
   développement ci-dessus). À venir (socle) : push et liens profonds.

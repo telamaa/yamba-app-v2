@@ -15753,3 +15753,126 @@ dérogation de confiance — Metro ne sert ces fichiers qu'à iOS et exige un ju
   défaut en silence.
 - **La recette Android s'est arrêtée aux onglets et à l'authentification.** Le tunnel de
   réservation et l'écran de paiement n'ont jamais été ouverts sur Android.
+
+---
+
+# D90 — L'écran de démarrage : le symbole seul, et les deux moitiés qu'il faut accorder
+
+> PR `feat/mobile-splash-symbole`. Revue d'écran du 09/11/2026 : « supprimer le fond orange, ne
+> laisser que le Y aux couleurs Yamba et le point à la couleur actuelle, supprimer le texte
+> Yamba », sur iOS **et** Android.
+
+## ① D'abord : la capture ne montrait pas le splash de Yamba
+
+La capture envoyée montre un fond blanc, la pastille mango avec le Y blanc, et « Yamba » en
+dessous. Ce n'est **pas** l'écran de démarrage de l'application — c'est l'écran de chargement
+d'**Expo Go**, qui affiche l'icône du projet et son nom pendant qu'il récupère le bundle.
+
+La preuve tient en une ligne de configuration. Avant ce lot, `app.json` déclarait :
+
+```json
+{ "backgroundColor": "#FF9900", "image": "./assets/images/splash-icon.png", "imageWidth": 76 }
+```
+
+— un fond **mango plein** avec un petit Y blanc. La capture montre l'inverse : fond blanc, gros
+carré orange. Les deux ne peuvent pas être le même écran. (Et sur l'émulateur Android, la même
+image portait la barre « Bundling 41 % ».)
+
+**Conséquence pratique, et elle vaut pour toute la recette mobile** : tant qu'on travaille dans
+Expo Go, l'écran de démarrage réel n'est **jamais** affiché. Il ne se vérifie que dans un build
+de développement ou de store.
+
+## ② Le démarrage est dessiné à DEUX endroits
+
+| | Qui l'affiche | D'où il vient |
+|---|---|---|
+| Splash **natif** | le système, avant toute ligne de JavaScript | `app.json` → compilé dans l'app |
+| Splash **JS** | React, pendant l'amorçage de la session | `components/app-splash.tsx` |
+
+L'utilisateur n'en voit **qu'un**. S'ils divergent — une couleur, une taille — le logo saute ou
+le fond clignote à la bascule, et personne ne sait dire pourquoi : chacun des deux fichiers est
+juste, pris séparément.
+
+C'est la vraie décision d'architecture de ce lot, et elle explique le reste.
+
+## ③ Ce qui change
+
+**Le dessin.** Le symbole passe en mango (il n'est plus posé sur du mango), le colis garde son
+teal. Dans le générateur, le tracé accepte désormais une couleur — blanc par défaut, pour que
+les autres icônes ne bougent pas d'un octet :
+
+```js
+const trait = (d, w, couleur = "#FFFFFF") => …
+
+const symboleSeul = (colisTeinte) =>
+  svg(trait("M60 60 C69 108 …", 22, MANGO) + `<circle cx="120" cy="86" r="15" fill="${colisTeinte}"/>`);
+
+const SPLASH = symboleSeul(TEAL);          // #0F766E — « la couleur actuelle »
+const SPLASH_SOMBRE = symboleSeul("#2DD4BF");
+```
+
+**Le thème.** Le fond devient celui de la page, déclaré pour les deux modes :
+
+```json
+{
+  "backgroundColor": "#ffffff",
+  "image": "./assets/images/splash-icon.png",
+  "imageWidth": 76,
+  "dark": { "backgroundColor": "#000000", "image": "./assets/images/splash-icon-dark.png" }
+}
+```
+
+Deux fichiers et non un, pour la raison déjà écrite dans `yamba-symbol.tsx` : seul le **colis**
+change (le teal `#0F766E` est illisible sur du noir, `#2DD4BF` est la valeur que l'app utilise
+déjà en thème sombre). Le Y mango, lui, tient sur les deux fonds.
+
+**Le splash JS** perd le fond mango, le mot et les deux arcs. Les arcs sortent pour une raison
+structurelle et non esthétique : **le splash natif ne sait pas les dessiner**. Ils n'existaient
+que côté JS et apparaissaient donc à la bascule.
+
+## ④ La taille : deux nombres différents pour le même dessin
+
+C'est le piège de ce lot, et il n'est pas devinable.
+
+- `imageWidth: 76` s'applique à `splash-icon.png`, dessiné dans un carré de **240** où le Y ne
+  s'étend que de x=49 à x=191 (demi-trait compris) : **142 / 240**, soit ~45 px de glyphe.
+- `YambaSymbol` rend `yamba-symbol.svg`, cadré **serré** : fenêtre de 192, Y de x=28 à x=212,
+  soit **184 / 192**.
+
+Donc `47 × (184/192) = 45,04` contre `76 × (142/240) = 44,97` : **0,07 px d'écart**. Changer
+l'un sans l'autre fait sauter le logo au passage du natif au JS.
+
+## ⑤ Les fiches — 6, et celle qui compte est la ⑤
+
+`splash.spec.ts` lit les **deux** fichiers comme du texte (le harnais ne rend rien, et `tsc` ne
+lit pas `app.json`) :
+
+| # | Ce qu'elle tient |
+|---|---|
+| ① | le fond n'est jamais le mango — ni en clair, ni en sombre |
+| ② | les deux thèmes sont déclarés (un splash blanc devant une app sombre éblouit) |
+| ③ | les deux images déclarées existent vraiment (un chemin faux ne casse rien : le splash s'affiche **vide**) |
+| ④ | le tracé n'a pas bougé sous les deux rapports de cadrage |
+| ⑤ | **76 natif et 47 JS rendent le même glyphe à 1 px près** |
+| ⑥ | le splash JS suit le thème au lieu de figer une couleur de marque |
+
+La ⑤ a été vue **rouge** avant d'être annoncée : `imageWidth` passé à 90 la fait tomber, et elle
+seule.
+
+## ⑥ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **485** (+6), 27 suites (+1) |
+| `nx typecheck @yamba-app/mobile` | vert |
+| `node scripts/generate-brand-icons.mjs` | idempotent : **seul** `splash-icon.png` change, `splash-icon-dark.png` est créé, les onze autres réécrivent les mêmes octets |
+| Rendu émulateur Android | splash JS : Y mango, colis teal, fond blanc, aucun mot |
+
+## ⑦ Ce qui n'est PAS touché, et pourquoi
+
+- **L'icône d'application** (`icon.png`) garde son fond mango plein. L'App Store **refuse** une
+  icône à canal alpha, et une icône transparente sur un écran d'accueil n'existe pas. Le fond
+  orange disparaît du **démarrage**, pas de l'**icône** — et c'est l'icône que montre Expo Go.
+- **`sharp` n'entre pas dans les dépendances.** Le générateur documente son installation à la
+  demande ; il a été lancé avec `npm install --no-save sharp`, et `package.json` comme
+  `package-lock.json` sont restés intacts (vérifié au `git status`).

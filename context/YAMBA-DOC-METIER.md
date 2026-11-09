@@ -8142,3 +8142,64 @@ réclame de toute façon un build de développement (Expo Go ne contient aucun m
 Il se rafraîchit aujourd'hui pour une raison détournée, pas parce que la règle y est écrite.
 Le comportement est juste ; sa cause ne l'est pas. C'est noté dans le code, à l'endroit où
 quelqu'un le lira avant d'optimiser.
+
+---
+
+# D90 — L'écran de démarrage ne porte plus que le symbole
+
+## Le besoin
+
+Une application s'ouvre sur un écran que personne ne peut fermer et que tout le monde voit, à
+chaque lancement. Celui de Yamba affichait un aplat orange plein, le symbole en blanc dessus et
+le mot « Yamba » en très gros — puis l'application s'ouvrait sur une page blanche.
+
+Deux problèmes, et le second est le vrai.
+
+1. **La rupture.** Passer d'un aplat de marque à une page blanche en une fraction de seconde est
+   exactement ce qui avait été corrigé sur l'écran de bienvenue : l'ouverture doit ressembler à
+   l'application, pas à une affiche.
+2. **La répétition.** Le nom « Yamba » est déjà écrit par le téléphone lui-même, sous l'icône, au
+   lancement comme dans la liste des applications. L'écrire une troisième fois en 44 points
+   n'apprend rien à personne.
+
+## Les règles
+
+**RG-D90-1 — L'écran de démarrage montre le symbole, et rien d'autre.** Pas de fond de marque,
+pas de nom, pas de décor.
+
+**RG-D90-2 — Il suit le thème du téléphone.** Fond clair en mode clair, sombre en mode sombre,
+comme tout le reste de l'application. C'est le seul écran qu'on ne peut pas fermer : il ne doit
+jamais éblouir.
+
+**RG-D90-3 — Le symbole garde ses couleurs.** Le Y est mango sur les deux fonds. Seul le colis
+change de teinte en mode sombre, pour rester visible — même règle que partout ailleurs dans
+l'application.
+
+**RG-D90-4 — Ce qu'on voit au lancement et ce qu'on voit juste après sont le même écran.**
+L'ouverture est dessinée à deux endroits techniques différents ; pour la personne qui lance
+l'application, c'est une seule image, qui ne doit ni bouger ni changer de taille.
+
+**RG-D90-5 — L'icône de l'application ne change pas.** Elle garde son fond orange plein : c'est
+une contrainte des magasins d'applications, et une icône transparente sur un écran d'accueil
+n'existe pas.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Lancement en mode clair | Y mango, colis teal, fond blanc, aucun texte |
+| 2 | Lancement en mode sombre | Y mango, colis turquoise, fond noir, aucun texte |
+| 3 | Pendant le chargement de la session | Rien ne bouge : même symbole, même taille, même fond |
+| 4 | Écran d'accueil du téléphone | L'icône est inchangée (carré orange, Y blanc) |
+| 5 | Quelqu'un modifie une des deux moitiés de l'écran de démarrage | Le contrôle automatique refuse et dit laquelle |
+
+## Ce qui reste hors de ce lot
+
+### L'écran de démarrage réel ne se vérifie pas dans l'outil de recette
+
+La capture à l'origine de cette demande montrait en fait l'écran de chargement d'**Expo Go**,
+l'application compagnon utilisée pour tester — qui affiche l'icône et le nom du projet, et
+qu'aucun réglage de Yamba ne gouverne. L'écran de démarrage de Yamba n'apparaît que dans une
+application compilée. Il a donc été vérifié ici par son jumeau (celui qui prend le relais juste
+après, pixel pour pixel identique) et en aperçu ; sa version compilée attend le premier build de
+développement.
