@@ -280,4 +280,32 @@ describe('getInitials', () => {
   it('ne rend jamais du vide — « ? » plutôt qu’un cercle muet', () => {
     expect(getInitials('', '')).toBe('?');
   });
+
+  /**
+   * D88 — le défaut du 08/11, épinglé.
+   *
+   * La signature disait `(firstName, lastInitial)` : le second argument devait
+   * être une initiale DÉJÀ tronquée, et il était collé tel quel. Les appelants
+   * publics respectaient ce contrat — un DTO public ne livre que l'initiale du
+   * nom, parce qu'une carte affiche « Serge M. » et jamais le patronyme. Mais
+   * la pastille d'identité lit `/auth/me`, qui renvoie le nom COMPLET du
+   * membre : « Marven MABIALA » donnait `MMABIALA` dans un rond de 44 pt.
+   *
+   * Un contrat qui ne vit que dans un nom de paramètre n'est pas un contrat.
+   */
+  it('tronque le NOM COMPLET, pas seulement une initiale déjà coupée', () => {
+    expect(getInitials('Marven', 'MABIALA')).toBe('MM');
+  });
+
+  it('prend la lettre du PREMIER mot d’un prénom ou d’un nom composé', () => {
+    expect(getInitials('Marven Claude', 'Mabiala Ngoma')).toBe('MM');
+  });
+
+  it('garde l’accent et met en capitale', () => {
+    expect(getInitials('émile', 'ngoma')).toBe('ÉN');
+  });
+
+  it('ignore les espaces de tête — sinon l’initiale sort vide', () => {
+    expect(getInitials('  Marven', '  Mabiala')).toBe('MM');
+  });
 });
