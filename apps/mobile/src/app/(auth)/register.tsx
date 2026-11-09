@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 
+import { Image } from 'expo-image';
 import { useTranslations } from 'use-intl';
 
 import { LEGAL_VERSIONS } from '@packages/legal/versions';
@@ -25,7 +26,7 @@ import {
   AuthError,
   AuthTextField,
   FieldLabel,
-  SocialLogosRow,
+  MethodButton,
 } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, useAuthPalette } from '@/components/auth/auth-theme';
@@ -116,7 +117,6 @@ export default function RegisterScreen() {
 
   return (
     <AuthScreen
-      badge={t('register.badge')}
       title={t('register.title')}
       subtitle={t('register.subtitle')}>
       <View style={styles.nameRow}>
@@ -194,8 +194,27 @@ export default function RegisterScreen() {
 
       <AuthCta label={t('register.submit')} onPressAction={onSubmit} pending={pending} />
 
+      {/* La seule réassurance de l'écran, et elle est VÉRIFIABLE (D91). Elle
+          répond à l'inquiétude réelle du moment — « est-ce que je m'engage ? »
+          — là où elle se pose, sous le bouton, et non en haut de page. */}
+      <Text style={[styles.reassurance, { color: palette.muted }]}>
+        {t('register.reassurance')}
+      </Text>
+
       <AuthDivider label={t('common.orContinueWith')} />
-      <SocialLogosRow />
+      {/* Boutons LIBELLÉS et non pastilles rondes (D91) : une pastille ne dit
+          ni le verbe, ni ce qui va se passer. Les deux fournisseurs sont
+          offerts sur les DEUX fronts — inertes tant que les flux natifs
+          n'existent pas (arbitrage du 09/11 : on les garde à l'écran, le
+          paramétrage vient après). L'ordre suit celui du site. */}
+      <MethodButton
+        icon={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} />}
+        label={t('social.google')}
+      />
+      <MethodButton
+        icon={<Image source={require('@/assets/images/facebook-f.svg')} style={styles.logo} />}
+        label={t('social.facebook')}
+      />
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('register.hasAccount')}</Text>
@@ -208,6 +227,15 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
+  reassurance: {
+    marginTop: Spacing.two,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  logo: {
+    width: 20,
+    height: 20,
+  },
   nameRow: {
     flexDirection: 'row',
     gap: Spacing.three,

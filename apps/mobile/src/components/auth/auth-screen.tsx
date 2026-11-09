@@ -27,8 +27,16 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 type Props = {
-  /** Libellé du badge pilule (« Connexion sécurisée »…). */
-  badge: string;
+  /**
+   * Libellé du badge pilule (« Connexion sécurisée »…).
+   *
+   * OPTIONNEL depuis D91 : l'inscription n'en porte plus. Une affirmation de
+   * sécurité que l'on se décerne à soi-même ne rassure pas — elle installe la
+   * question que personne ne se posait, et elle occupe la première ligne de
+   * l'écran pour ne rien dire de vérifiable. Les écrans qui en gardent un le
+   * passent encore ; sans lui, la rangée du haut ne porte que la fermeture.
+   */
+  badge?: string;
   title: string;
   subtitle?: string;
   /** Croix (premier écran de la feuille) ou chevron (étape poussée). */
@@ -50,11 +58,13 @@ export function AuthScreen({ badge, title, subtitle, dismissGlyph = 'back', chil
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            <View style={styles.topRow}>
-              <View style={[styles.badge, { borderColor: palette.teal }]}>
-                <Ionicons name="shield-checkmark" size={14} color={palette.teal} />
-                <Text style={[styles.badgeLabel, { color: palette.teal }]}>{badge}</Text>
-              </View>
+            <View style={[styles.topRow, badge === undefined && styles.topRowBare]}>
+              {badge !== undefined && (
+                <View style={[styles.badge, { borderColor: palette.teal }]}>
+                  <Ionicons name="shield-checkmark" size={14} color={palette.teal} />
+                  <Text style={[styles.badgeLabel, { color: palette.teal }]}>{badge}</Text>
+                </View>
+              )}
               <Pressable
                 onPress={() => router.back()}
                 hitSlop={Spacing.two}
@@ -105,6 +115,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.three,
+  },
+  /** Sans badge, la fermeture reste à droite — `space-between` la collerait à gauche. */
+  topRowBare: {
+    justifyContent: 'flex-end',
   },
   badge: {
     flexDirection: 'row',

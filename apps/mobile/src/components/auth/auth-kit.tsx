@@ -243,40 +243,6 @@ export function AuthDivider({ label }: { label: string }) {
   );
 }
 
-/* ── Rangée sociale en logos seuls (sous le CTA — itération UX du 28/09) ── */
-
-export function SocialLogosRow() {
-  const t = useTranslations('auth');
-  const palette = useAuthPalette();
-  return (
-    <View style={styles.socialRow}>
-      {/* Les VRAIS logos (SVG officiels, rendus par expo-image — le canal de
-          l'illustration de bienvenue) : le G quadricolore est obligatoire
-          dans la charte Google. Inertes tant que les flux natifs n'existent
-          pas (Google : lot A201) — le câblage viendra sans changer l'écran. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('social.google')}
-        style={({ pressed }) => [
-          styles.socialDot,
-          { backgroundColor: palette.card, borderColor: palette.border },
-          pressed && styles.dimmed,
-        ]}>
-        <Image source={require('@/assets/images/google-g.svg')} style={styles.socialLogo} />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('social.facebook')}
-        style={({ pressed }) => [
-          styles.socialDot,
-          { backgroundColor: palette.card, borderColor: palette.border },
-          pressed && styles.dimmed,
-        ]}>
-        <Image source={require('@/assets/images/facebook-f.svg')} style={styles.socialLogo} />
-      </Pressable>
-    </View>
-  );
-}
 
 /* ── Case à cocher ───────────────────────────────────────────────────────── */
 
@@ -402,23 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: 1.5,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.three,
-  },
-  socialDot: {
-    width: AuthFieldHeight,
-    height: AuthFieldHeight,
-    borderRadius: AuthFieldHeight / 2,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialLogo: {
-    width: 24,
-    height: 24,
   },
   methodButton: {
     flexDirection: 'row',
