@@ -7212,3 +7212,136 @@ Trois pièges payés au passage :
 - `apps/trip-service/src/lib/trip-mappers.ts:311` — pourquoi la date est écrite côté serveur.
 - Chapitre 228 § 9 — *un typecheck vert n'est pas une application qui démarre*. Celui-ci en est
   le pendant : **une application qui démarre n'est pas une application qu'on a regardée.**
+
+---
+
+## Chapitre 230 — L'écran qu'on croyait regarder, le même dessin à deux tailles, et le générateur idempotent
+
+> PR `feat/mobile-splash-symbole` (D90). Une demande de trois lignes — « enlève le fond orange
+> et le texte » — qui oblige d'abord à répondre à une autre question : *quel écran, exactement ?*
+
+### 1. Vérifier QUEL écran on regarde, avant de le modifier
+
+La demande arrive avec une capture : fond blanc, pastille orange, « Yamba » en dessous. Le
+réflexe est d'ouvrir la configuration du splash et de la changer. Le bon réflexe est de vérifier
+que la configuration **décrit** la capture :
+
+```json
+{ "backgroundColor": "#FF9900", "image": "./assets/images/splash-icon.png", "imageWidth": 76 }
+```
+
+Fond **mango plein**, petit Y de 76 px. La capture montre un fond **blanc** et un **gros** carré
+orange. Ce n'est pas le même écran — c'est celui d'Expo Go, qui affiche l'icône et le nom du
+projet pendant qu'il télécharge le bundle.
+
+Sans cette vérification, on modifie la bonne configuration, on relance dans Expo Go, **rien ne
+change** à l'écran, et on passe une heure à chercher une erreur qui n'existe pas.
+
+**La leçon** : une capture d'écran prouve ce qu'on voit, jamais ce qui le produit. Avant de
+toucher à un réglage, confrontez-le à l'image : s'il ne la décrit pas, vous ne regardez pas le
+même objet.
+
+Corollaire pour tout le chantier mobile : **ce qu'un outil de développement affiche à sa place
+n'est pas votre application.** Expo Go remplace l'écran de démarrage, l'icône et le nom. Ces
+trois-là ne se recettent que dans un build.
+
+### 2. Le même dessin, deux tailles différentes — et c'est correct
+
+Le démarrage est dessiné deux fois : une fois en natif (avant tout JavaScript), une fois en JS
+(pour couvrir le chargement de la session). Pour que la bascule soit invisible, les deux doivent
+rendre le **même glyphe à la même taille**. Le piège : les deux nombres ne sont pas égaux.
+
+```
+splash-icon.png      carré de 240, le Y occupe 142   → 142/240 = 0,592
+yamba-symbol.svg     fenêtre de 192, le Y occupe 184 → 184/192 = 0,958
+
+natif : 76 × 0,592 = 44,97 px de glyphe
+JS    : 47 × 0,958 = 45,04 px de glyphe
+```
+
+Un même dessin exporté avec deux **marges** différentes demande deux tailles différentes. Écrire
+`size={76}` côté JS « pour faire pareil » produirait un logo 1,6 fois trop gros, et le saut
+serait d'autant plus visible que les deux écrans se succèdent sans transition.
+
+**C'est une forme générale** : deux assets qui « contiennent le même dessin » ne sont
+comparables que si l'on connaît leur cadrage. Le ratio fait partie de l'asset, au même titre que
+sa couleur.
+
+### 3. Tester un accord entre deux fichiers qui ne se connaissent pas
+
+Comment vérifier cet accord ? Les deux nombres vivent dans un JSON de configuration et dans un
+composant React. Le harnais du mobile ne rend aucun écran (A223) et `tsc` ne lit pas `app.json`.
+
+On lit donc les deux fichiers **comme du texte** :
+
+```ts
+const natif = nombre('app.json', /"imageWidth":\s*(\d+)/);
+const js = nombre('src/components/app-splash.tsx', /TAILLE_SYMBOLE\s*=\s*(\d+)/);
+
+expect(Math.abs(natif * CADRAGE_PNG - js * CADRAGE_SVG)).toBeLessThanOrEqual(1);
+```
+
+Trois remarques, et elles valent pour toute fiche de ce genre :
+
+1. **La tolérance est explicite** (`≤ 1 px`) et non pas une égalité : les deux calculs sont des
+   réels, et exiger l'égalité stricte rendrait la fiche fausse pour une raison qui n'intéresse
+   personne.
+2. **Les deux rapports de cadrage sont des constantes documentées**, avec leur dérivation en
+   commentaire — un nombre magique dans un test est un nombre magique de plus.
+3. **Une fiche de plus protège les rapports eux-mêmes** : elle vérifie que le tracé du symbole
+   n'a pas changé sous eux. Sans elle, redessiner le Y rendrait la fiche ⑤ silencieusement
+   fausse — elle continuerait à passer en comparant deux cadrages périmés.
+
+Et, comme toujours : **la fiche a été vue rouge**. `imageWidth` passé de 76 à 90, relance, une
+seule fiche tombe — la bonne.
+
+### 4. Un générateur idempotent, et la preuve qu'il l'est
+
+Les douze icônes de Yamba viennent d'un script unique. Modifier l'une d'elles suppose de relancer
+le script entier — donc de réécrire les onze autres. Le script promet d'être idempotent (« le
+lancer deux fois ne produit aucun diff »), et cette promesse se **vérifie** :
+
+```
+$ node scripts/generate-brand-icons.mjs
+$ git status --short apps/mobile/assets
+ M apps/mobile/assets/images/splash-icon.png
+?? apps/mobile/assets/images/splash-icon-dark.png
+```
+
+Un seul fichier modifié, un seul créé. Les dix autres ont été réécrits **octet pour octet**.
+C'est ce qui permet de régénérer sans relire douze images à l'œil — et c'est pour cela que la
+couleur du tracé a été ajoutée en **paramètre optionnel** :
+
+```js
+const trait = (d, w, couleur = "#FFFFFF") => …
+```
+
+Une valeur par défaut qui reproduit l'ancien comportement : les appels existants ne changent pas
+de résultat, et le diff reste lisible. Changer la signature sans défaut aurait obligé à toucher
+cinq appels et à reprouver cinq images.
+
+### 5. Installer un outil sans l'inscrire dans le projet
+
+`sharp` pèse plusieurs dizaines de mégaoctets de binaires natifs et ne sert qu'à régénérer des
+images, à la main, quelques fois par an. Il n'a rien à faire dans `package.json`.
+
+```sh
+npm install --no-save sharp        # pose le paquet, ne touche NI package.json NI le lock
+node scripts/generate-brand-icons.mjs
+git status --short package.json package-lock.json   # attendu : vide
+```
+
+La dernière ligne n'est pas décorative : `--no-save` laisse `package.json` tranquille, mais rien
+ne garantit a priori que le fichier de verrouillage le reste. On vérifie.
+
+**La règle** : un outil de *construction d'asset* n'est pas une dépendance du *produit*. S'il
+n'est pas importé par le code livré, il n'a pas sa place dans le manifeste — il a sa place dans
+la documentation du script qui l'utilise.
+
+### Pour aller plus loin
+
+- `scripts/generate-brand-icons.mjs` — les trois cadrages d'une icône, et les deux contraintes
+  opposées sur le canal alpha (chapitre 226).
+- `apps/mobile/src/lib/splash.spec.ts` — l'accord des deux moitiés.
+- Chapitre 229 — *une application qui démarre n'est pas une application qu'on a regardée*.
+  Celui-ci ajoute : **et ce qu'on regarde n'est pas toujours son application.**
