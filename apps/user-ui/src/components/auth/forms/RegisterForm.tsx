@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
+import { setPendingPassword } from "@/lib/auth/register-flow-state";
 import GoogleSignInButton from "@/components/auth/shared/GoogleSignInButton";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -180,6 +181,12 @@ export default function RegisterForm({ heroVisual }: Props) {
       // 🔒 SÉCURITÉ : token + email écrits en sessionStorage AVANT la redirection
       sessionStorage.setItem("register_verification_token", String(data.verificationToken));
       sessionStorage.setItem("register_verification_email", normalizedEmail);
+
+      // D92 3A — le mot de passe reste en MÉMOIRE DE MODULE (jamais en
+      // stockage, jamais dans l'URL) pour que l'écran de vérification puisse
+      // enchaîner la connexion, comme le fait le téléphone. Un rechargement
+      // le perd : le repli est la connexion préremplie.
+      setPendingPassword(normalizedEmail, variables.password);
       if (redirectTo) sessionStorage.setItem(REGISTER_REDIRECT_KEY, redirectTo);
       else sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
 

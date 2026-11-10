@@ -21,7 +21,6 @@ import {
 } from "@/services/auth.api";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
-import { maskEmail } from "@/lib/auth/email-mask";
 import { useToast } from "@/components/ui/Toast";
 import PasswordStrengthIndicator from "@/components/auth/shared/PasswordStrengthIndicator";
 
@@ -296,10 +295,8 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
     });
   };
 
-  const maskedEmail = useMemo(
-    () => (resetEmail ? maskEmail(resetEmail) : ""),
-    [resetEmail]
-  );
+  // D92 2A — en clair : c'est l'adresse que l'utilisateur vient de saisir.
+  const maskedEmail = resetEmail;
 
   // ── Render placeholder pendant hydration ──
   if (!hydrated) {

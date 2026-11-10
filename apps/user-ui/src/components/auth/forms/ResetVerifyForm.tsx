@@ -25,7 +25,6 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 import {HeroVisual} from "@/lib/auth/hero-visuals";
-import {maskEmail} from "@/lib/auth/email-mask";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_SECONDS = 600;
@@ -457,7 +456,9 @@ export default function ResetVerifyForm({ heroVisual }: Props) {
     router.push("/password/forgot");
   };
 
-  const maskedEmail = useMemo(() => maskEmail(email), [email]);
+  // D92 2A — l'adresse s'affiche EN CLAIR : elle vient d'être tapée sur
+  // l'écran précédent, le masque ne protégeait de rien et empêchait de voir
+  // la faute de frappe qui explique presque tous les « je n'ai rien reçu ».
   const expiryWarning = expiryTimer > 0 && expiryTimer <= 60;
   const expired = expiryTimer === 0;
   const isLocked = errorContext?.locked === true && lockTimer > 0;
@@ -490,7 +491,7 @@ export default function ResetVerifyForm({ heroVisual }: Props) {
           {email && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
               <span className="font-mono text-sm text-slate-900 dark:text-white">
-                {maskedEmail}
+                {email}
               </span>
             </div>
           )}
