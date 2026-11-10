@@ -104,6 +104,54 @@ describe('③ tout niveau déclaré est un niveau CHARGÉ', () => {
   });
 });
 
+describe('④ aucun interligne ne rogne la police', () => {
+  /**
+   * Conséquence directe de D95, et trouvée en recette : Plus Jakarta Sans a
+   * des ascendantes et des jambages plus généreux que SF Pro. Une boîte de
+   * ligne réglée pour l'ancienne police ROGNE les accents (« É », « À ») et
+   * les descendantes (« g », « j », « ç ») — c'est ce que la revue a appelé
+   * « des textes hachés ».
+   *
+   * Le seuil : lineHeight ≥ 1,35 × fontSize. En dessous, Android coupe.
+   *
+   * Les exceptions sont NOMMÉES et chacune a sa raison : un glyphe centré
+   * dans un disque (des initiales) ou dans une pastille de taille fixe ne se
+   * lit pas en lignes — y augmenter l'interligne le décentrerait au lieu de
+   * le dégager.
+   */
+  const RATIO_MINIMAL = 1.35;
+  const EXCEPTIONS = [
+    // Géométrie mesurée de D88 : la barre fait 52, sa pilule 42, et la fente
+    // du libellé 11. Toucher à l'interligne sans toucher à la fente ne
+    // dégagerait rien — et toucher à la fente rouvre D88.
+    'components/tab-bar.tsx',
+    // Un caractère centré dans un disque.
+    'components/profile-avatar-button.tsx',
+  ];
+  /** Styles qui portent un glyphe centré, pas une ligne de texte. */
+  const STYLES_GLYPHES = ['avatarInitials', 'initials', 'badgeLabel'];
+
+  it('tout style de TEXTE respecte 1,35 (hors exceptions nommées)', () => {
+    const fautifs: string[] = [];
+    for (const fichier of sources()) {
+      const rel = relative(SRC, fichier);
+      if (EXCEPTIONS.includes(rel)) continue;
+      const source = readFileSync(fichier, 'utf8');
+      for (const m of source.matchAll(/(\w+):\s*\{([^{}]*fontSize:\s*(\d+)[^{}]*)\}/g)) {
+        const [, nom, corps, taille] = m;
+        if (STYLES_GLYPHES.includes(nom)) continue;
+        const lh = /lineHeight:\s*(\d+)/.exec(corps);
+        if (!lh) continue; // sans interligne, la police décide : jamais rogné
+        const ratio = Number(lh[1]) / Number(taille);
+        if (ratio < RATIO_MINIMAL) {
+          fautifs.push(`${rel} ${nom} ${taille}/${lh[1]} (${ratio.toFixed(2)})`);
+        }
+      }
+    }
+    expect(fautifs).toEqual([]);
+  });
+});
+
 describe('le site et le téléphone composent dans la MÊME police', () => {
   it('le nom de la famille du web se retrouve côté mobile', () => {
     const web = readFileSync(resolve(SRC, '../../user-ui/src/app/layout.tsx'), 'utf8');

@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   reasonLabel: {
     flex: 1,
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   details: {
     minHeight: 96,

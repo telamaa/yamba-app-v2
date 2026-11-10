@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontFamily: Font.extrabold,
-    lineHeight: 36,
+    lineHeight: 41,
   },
   subtitle: {
     fontSize: 20,

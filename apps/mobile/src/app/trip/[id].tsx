@@ -1071,7 +1071,7 @@ const styles = StyleSheet.create({
   },
   route: {
     fontSize: 26,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   routeArrow: {
     color: Brand.mango,
@@ -1171,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   dotHollow: {
     width: 12,
@@ -1190,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   placeCity: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   /* Voyageur */
   tripperRow: {
@@ -1240,7 +1240,7 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontSize: 26,
-    lineHeight: 32,
+    lineHeight: 36,
   },
   familyWrap: {
     flexDirection: 'row',
@@ -1338,7 +1338,7 @@ const styles = StyleSheet.create({
   },
   bottomPriceValue: {
     fontSize: 22,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   bottomCta: {
     backgroundColor: Brand.mango,

@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   // bienvenue, bloc de contenu pour la porte d'identité.
   headline: {
     fontSize: 34,
-    lineHeight: 39,
+    lineHeight: 46,
     fontFamily: Font.extrabold,
     letterSpacing: -0.8,
   },

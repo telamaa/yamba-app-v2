@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
   },
   alertText: {
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   heart: {
     width: 36,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   route: {
     fontSize: 16,
-    lineHeight: 21,
+    lineHeight: 22,
     fontFamily: Font.semibold,
     letterSpacing: -0.2,
   },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   metaSecond: {
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 17,
     marginTop: 1,
   },
   plusOne: {
@@ -522,19 +522,19 @@ const styles = StyleSheet.create({
   },
   fromLabel: {
     fontSize: 11,
-    lineHeight: 13,
+    lineHeight: 15,
   },
   // Le prix et la route portaient deux foyers concurrents sur la même ligne
   // (18/700 contre 16/600) : c'est la ROUTE qui décide, le prix la qualifie.
   // Même corps, plus de graisse — il reste le premier chiffre lu.
   price: {
     fontSize: 16,
-    lineHeight: 21,
+    lineHeight: 22,
     fontFamily: Font.bold,
   },
   example: {
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 15,
     fontFamily: Font.medium,
   },
   priceUnit: {
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   },
   remainingKg: {
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 15,
     fontFamily: Font.medium,
   },
   footer: {
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 13,
-    lineHeight: 17,
+    lineHeight: 18,
     fontFamily: Font.semibold,
   },
   travelerMeta: {
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   viewsText: {
     fontSize: 10,
-    lineHeight: 13,
+    lineHeight: 14,
     fontFamily: Font.semibold,
   },
   pressed: {

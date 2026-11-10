@@ -1402,7 +1402,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroTitle: { fontSize: 24, lineHeight: 32 },
+  heroTitle: { fontSize: 24, lineHeight: 33 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.one },
 
   friseRow: { flexDirection: 'row', gap: Spacing.one },
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  friseLabel: { fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  friseLabel: { fontSize: 11, lineHeight: 15, textAlign: 'center' },
 
   /* LA carte de l'écran */
   card: {
@@ -1426,7 +1426,7 @@ const styles = StyleSheet.create({
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pill: { borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 2 },
-  code: { fontSize: 38, lineHeight: 46, fontFamily: Font.extrabold, letterSpacing: 4 },
+  code: { fontSize: 38, lineHeight: 52, fontFamily: Font.extrabold, letterSpacing: 4 },
   cardActions: { gap: Spacing.two, paddingTop: Spacing.one },
 
   journeyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },

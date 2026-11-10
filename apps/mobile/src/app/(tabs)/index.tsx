@@ -856,7 +856,7 @@ const styles = StyleSheet.create({
   },
   tabCount: {
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 15,
     fontFamily: Font.bold,
     fontVariant: ['tabular-nums'],
   },

@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   dayLabel: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
     fontFamily: Font.medium,
   },
   dayStrong: {

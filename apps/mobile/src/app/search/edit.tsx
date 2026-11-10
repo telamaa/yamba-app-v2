@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   },
   fieldValue: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

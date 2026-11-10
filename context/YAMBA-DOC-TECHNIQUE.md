@@ -16824,3 +16824,42 @@ chose.
   posé sur une famille non italique donnerait un faux italique penché.
 - **La dépendance est entrée par une PR de fonctionnalité**, ce que le dépôt réserve d'ordinaire
   aux PR `chore/deps`. Arbitrage assumé : la dépendance **est** le lot.
+
+## ⑧ Amendement du 10/11/2026 — « plusieurs textes sont hachés »
+
+Retour de recette immédiatement après la bascule de police : **des textes rognés**, et les
+libellés Google / Facebook à l'étroit.
+
+### La cause, et elle découle de D95
+
+Plus Jakarta Sans a des **ascendantes et des jambages plus généreux** que SF Pro. Une boîte de
+ligne réglée pour l'ancienne police rogne les accents (« É », « À ») et les descendantes
+(« g », « j », « ç »). Les `lineHeight` n'avaient pas bougé — **la police, si.**
+
+Mesure : **24 styles sous le ratio 1,35**, dont `34/39` (1,15), `11/13` (1,18) et `28/34`
+(1,21). Vingt-deux ont été dégagés ; le seuil retenu est **lineHeight ≥ 1,35 × fontSize**, en
+dessous duquel Android coupe.
+
+| Exception | Pourquoi elle est nommée |
+|---|---|
+| `tab-bar.tsx` | géométrie **mesurée** de D88 (barre 52, pilule 42, fente du libellé 11). Augmenter l'interligne sans toucher à la fente ne dégagerait rien, et toucher à la fente rouvre D88 |
+| `profile-avatar-button.tsx`, `avatarInitials`, `badgeLabel` | un **glyphe centré dans un disque** ne se lit pas en lignes : y augmenter l'interligne le décentrerait au lieu de le dégager |
+
+**Ce que cela enseigne :** changer de police n'est pas un changement de style, c'est un
+changement de **métriques**. Tout ce qui a été dimensionné à la main autour de l'ancienne
+police doit être re-mesuré — et la bonne unité de mesure est le **ratio**, pas le pixel.
+
+### Les libellés Google / Facebook
+
+`methodLabel` passe de **16 à 14 px**. Sur l'inscription ces boutons vont par **deux, côte à
+côte** (D91 7A) : chacun n'a que la moitié de la colonne, et « Facebook » y tenait de justesse —
+il suffisait d'une langue plus longue ou d'une taille de texte système augmentée pour que le
+mot se coupe. 14 rend la marge que la disposition à deux colonnes avait prise, et **le logo
+porte l'identification de toute façon.**
+
+### La fiche
+
+`typography.spec.ts` ④ balaie tous les styles de `src/` et refuse tout ratio sous 1,35, les
+exceptions étant **nommées dans le fichier avec leur raison**. Elle a trouvé 13 fautifs de plus
+que la revue — sur des écrans que personne n'avait rouverts depuis la bascule. Mobile :
+**570 → 571** fiches.

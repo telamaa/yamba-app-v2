@@ -383,7 +383,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   methodLabel: {
-    fontSize: 16,
+    // 14 et non 16 (revue du 10/11) : sur l'inscription ces boutons vont par
+    // DEUX, côte à côte (D91 7A), et chacun n'a donc que la moitié de la
+    // colonne. « Facebook » y tenait de justesse — il suffisait d'une langue
+    // plus longue, ou d'une taille de texte système augmentée, pour que le
+    // mot se coupe. 14 rend la marge que la disposition à deux colonnes avait
+    // prise, et le logo porte l'identification de toute façon.
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: Font.medium,
   },
   failure: {
@@ -409,7 +416,7 @@ const styles = StyleSheet.create({
   },
   failureTitle: {
     fontSize: 26,
-    lineHeight: 32,
+    lineHeight: 36,
     fontFamily: Font.semibold,
     textAlign: 'center',
   },

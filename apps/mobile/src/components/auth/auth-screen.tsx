@@ -138,8 +138,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   title: {
+    // D95 — l'interligne suit la POLICE, pas l'inverse. Plus Jakarta Sans a
+    // des hauteurs d'ascendantes et de jambages plus généreuses que SF Pro :
+    // la boîte de ligne réglée pour l'ancienne police ROGNAIT les accents
+    // (« É », « À ») et les descendantes (« g », « j », « ç »). Ratio tenu :
+    // au moins 1,35 × la taille, seuil sous lequel Android coupe.
     fontSize: 28,
-    lineHeight: 34,
+    lineHeight: 38,
     // D91 5A, appliquée ici par la revue du 10/11 : le titre RECULE à 600.
     // À 800 il ne laissait rien derrière lui — quand tout crie, rien ne porte.
     // Le seul 700 de l'écran est le bouton, et c'est ce qui le fait avancer.

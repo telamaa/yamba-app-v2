@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   },
   suggestionMain: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   pressed: {
     opacity: 0.6,
