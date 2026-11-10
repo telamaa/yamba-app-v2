@@ -464,12 +464,17 @@ export default function LoginForm({ heroVisual, variant = "page", redirectOverri
       </button>
     </form>
 
-    {/* Footer signup — texte simple sur une ligne, lien orange */}
-    <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+    {/* Footer signup — le MÊME gabarit que le pied de l'inscription (13 px,
+        graisse de corps, mangue) : les deux lignes offrent la même sortie vers
+        l'écran jumeau, elles ne peuvent pas se composer autrement. Avant la
+        revue du 10/11 celle-ci était en 14 px gras, et l'écart ne cassait rien
+        — c'est pourquoi il a tenu si longtemps. Son jumeau natif :
+        `FooterLine` dans apps/mobile/src/constants/typography.ts. */}
+    <p className="mt-5 text-center text-[13px] text-slate-500 dark:text-slate-400">
       {copy.notMemberYet}{" "}
       <Link
         href={registerHref}
-        className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+        className="text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
       >
         {copy.signup}
       </Link>

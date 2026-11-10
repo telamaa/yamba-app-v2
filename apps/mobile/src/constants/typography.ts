@@ -97,3 +97,29 @@ export function fontFor(weight: 400 | 500 | 600 | 700 | 800): FontName {
       return Font.extrabold;
   }
 }
+
+/**
+ * LE PIED D'ÉCRAN — un seul gabarit pour la ligne qui offre la SORTIE.
+ *
+ * Trois écrans portent la même ligne tout en bas : « Pas encore de compte ? »
+ * sur la connexion, « Déjà un compte ? » sur l'inscription, « Plus tard » sur
+ * la bienvenue. Les trois font le même travail — offrir une porte à qui n'est
+ * pas au bon endroit — et les trois s'écrivaient différemment : 15 px en
+ * `medium` d'un côté, 15 px en `bold` de l'autre, 13 px en `regular` sur le
+ * troisième. Trois tailles et trois graisses pour UN rôle, c'est la même
+ * phrase prononcée sur trois tons.
+ *
+ * Le gabarit ne porte que ce qui doit être commun : la taille, l'interligne et
+ * la famille. L'ENCRE reste à l'écran, parce qu'elle dit l'intention — les
+ * deux premiers mènent à l'écran jumeau et prennent la mangue, le troisième
+ * DÉCLINE la proposition et garde l'encre grise.
+ *
+ * 13 px est la taille de la mention légale (D91 7A) : le bas d'écran recule
+ * d'un bloc. L'interligne suit la police et non le nombre (D95) — 18 px pour
+ * 13, sans quoi Plus Jakarta se fait roger ses jambages.
+ */
+export const FooterLine = {
+  fontSize: 13,
+  lineHeight: 18,
+  fontFamily: Font.regular,
+} as const;

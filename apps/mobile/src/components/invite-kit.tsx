@@ -40,7 +40,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import YambaSymbol from '@/components/yamba-symbol';
 import { Spacing } from '@/constants/theme';
 import { Brand } from '@/constants/theme';
-import { Font } from '@/constants/typography';
+import { FooterLine, Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -271,9 +271,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: Spacing.one,
   },
+  // « Plus tard » est un pied d'écran comme les deux autres (revue du 10/11)
+  // — même gabarit, et l'encre GRISE posée par l'appelant : les deux autres
+  // mènent à l'écran jumeau (connexion ↔ inscription), celui-ci DÉCLINE la
+  // proposition. Même gabarit, autre intention.
   tertiaryLabel: {
-    fontSize: 15,
-    fontFamily: Font.semibold,
+    ...FooterLine,
   },
   pressed: {
     opacity: 0.75,
