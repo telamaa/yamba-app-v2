@@ -7553,3 +7553,207 @@ ligne de réassurance sous le bouton. L'utilisateur l'a fait supprimer. Les docu
 amendement daté**, qui dit ce qui la remplace. Un document qui se corrige en ajoutant reste
 lisible dans son ordre chronologique ; un document qui se corrige en effaçant perd la trace de ce
 qu'on a cru.
+
+---
+
+## Chapitre 232 — Supprimer plutôt qu'aligner, la variable de module comme coffre, et le test qu'on ne contourne pas
+
+*D92, 10/11/2026 — `feat/finitions-verification`.*
+
+### 1. La question qui change la réponse : « à qui montre-t-on cette donnée ? »
+
+Le lot est parti d'une question simple posée en cours de revue : *« est-ce une bonne pratique
+d'afficher l'e-mail masqué `c************`, ou doit-on le supprimer ? »*
+
+La tentation est de répondre par l'autorité — « Apple, Stripe et Wise le font ». C'est vrai, et
+c'est hors sujet, parce que **le motif n'est pas « masquer un e-mail », il est « masquer un
+e-mail que le spectateur n'a peut-être pas le droit de connaître »**.
+
+La bonne méthode, et elle est générale : **ne jamais évaluer un motif d'interface sans son
+contexte d'usage**. Deux contextes, deux réponses opposées :
+
+| Contexte | D'où vient l'adresse | Le spectateur est-il le titulaire ? | Masquer ? |
+|---|---|---|---|
+| Récupération de compte | du dossier serveur | on ne sait pas | **oui** |
+| Vérification d'inscription | de ce que l'utilisateur vient de taper | forcément | **non** |
+
+Et c'est en code qu'on tranche, pas en opinion : *l'adresse vient-elle du serveur ou de l'état
+du parcours ?* Le `grep` a donné la réponse — **cinq appels, cinq adresses tapées**.
+
+### 2. Deux implémentations divergentes : le signal, pas le problème
+
+```ts
+// apps/user-ui/src/lib/auth/email-mask.ts
+const middleStars = "*".repeat(Math.min(localPart.length - 2, 9));   // plafonné
+
+// apps/mobile/src/components/auth/auth-theme.ts
+`${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}`  // PAS plafonné
+```
+
+Le réflexe de développeur est d'aligner : extraire, partager, écrire une fiche. Le réflexe
+**utile** est de se demander pourquoi la divergence a pu vivre des mois sans gêner personne.
+
+Réponse : parce que la fonction ne servait à rien. Une divergence silencieuse et durable est
+**un test de nécessité** qui a déjà tourné, et qui a répondu non.
+
+> **La leçon :** quand deux copies d'une même règle s'écartent longtemps sans conséquence,
+> commencez par demander si la règle doit exister. Aligner, c'est figer une erreur en deux
+> exemplaires.
+
+Au passage, la version mobile était la *moins* discrète des deux : `'*'.repeat(local.length - 2)`
+publie la **longueur exacte** de la partie locale. Un masque qui fuit ce qu'il prétend cacher.
+
+### 3. Où ranger un secret vivant quelques secondes : la variable de module
+
+Le site devait enchaîner la connexion après la vérification — donc garder le mot de passe le
+temps d'une navigation. Quatre rangements possibles, un seul acceptable :
+
+| Rangement | Survit au rechargement | Lisible par un autre script | Verdict |
+|---|---|---|---|
+| `localStorage` | oui, et au-delà de l'onglet | oui | non |
+| `sessionStorage` | oui | oui | non |
+| URL (`?pwd=`) | dans l'historique, les journaux, le `Referer` | oui | non |
+| **Variable de module** | **non** | **non** | **oui** |
+
+```ts
+// apps/user-ui/src/lib/auth/register-flow-state.ts
+let pending: PendingPassword | null = null;
+```
+
+Ce qui rend la chose possible est une propriété de l'App Router qu'il faut connaître :
+`router.push("/register/verify")` est une navigation **client**. Le bundle n'est pas rechargé,
+le module n'est pas réévalué, la variable traverse. Un `window.location.href = …` l'aurait
+perdue — et c'est **exactement** ce qui se produit à un rechargement manuel.
+
+Ce n'est pas un défaut : c'est la contrepartie, et elle était déjà payée. Le repli existait
+(connexion préremplie, bandeau « compte activé »). **Un chemin dégradé qui existe déjà rend un
+choix de conception gratuit** — encore faut-il le remarquer avant de concevoir.
+
+Et la forme de l'interface compte autant que le rangement :
+
+```ts
+export function readPendingPassword(email: string): string | null  // répond, n'écrit pas
+export function clearPendingPassword(): void                        // écrit, ne répond pas
+```
+
+C'est la règle **CQS** que le dépôt a payée en D88 (une lecture qui normalisait en répondant
+provoquait *« Cannot update a component while rendering a different component »*). Un
+`takePendingPassword()` qui lirait **et** effacerait serait appelable depuis un rendu sans que
+rien ne le signale.
+
+### 4. Mesurer un contraste plutôt que le ressentir
+
+« Les cases ne se voient pas » est une impression. Voici comment on en fait un fait.
+
+La luminance relative d'une couleur sRGB (WCAG) :
+
+```
+L = 0,2126·R + 0,7152·G + 0,0722·B      (R,G,B linéarisés)
+contraste = (L_clair + 0,05) / (L_sombre + 0,05)
+```
+
+Pour `slate-800` (#1E293B) sur `slate-950` (#020617) :
+
+```
+L(#1E293B) ≈ 0,0219     L(#020617) ≈ 0,0046
+contraste  = (0,0219 + 0,05) / (0,0046 + 0,05) = 0,0719 / 0,0546 ≈ 1,32:1
+```
+
+**SC 1.4.11 (Non-text Contrast) exige 3:1** pour la limite visuelle d'un contrôle de saisie.
+On est à un facteur 2,3 en dessous — et le fond de la case était `slate-950`, c'est-à-dire
+**exactement la couleur de la page**. Six rectangles invisibles sur fond invisible.
+
+Même calcul pour le compteur de renvoi, `slate-600` (#475569) sur `slate-950` : **2,60:1** pour
+4,5:1 exigés (SC 1.4.3). L'élément qui dit quand on pourra agir était le moins lisible.
+
+> **À retenir :** un désaccord de design se tranche en chiffres quand une norme existe. « Je
+> trouve ça trop sombre » se discute ; « 1,32:1 au lieu de 3:1 » ne se discute pas.
+
+### 5. La fiche qui attrape son auteur — deuxième fois, et la doctrine tient
+
+Trois fiches sont parties rouges. Motif : mes propres commentaires **citaient** les chaînes que
+je venais de retirer, pour expliquer pourquoi elles l'avaient été.
+
+```ts
+expect(lire(FORMULAIRE_WEB)).not.toContain('emerald');
+// ... et dans le fichier visé :
+//   « la case remplie prend le TEAL de la charte : son `emerald-500` y
+//     faisait entrer un troisième vert. »
+```
+
+Premier réflexe : apprendre l'exception à la fiche — un filtre qui retire les commentaires avant
+de balayer. C'est séduisant : le test mesurerait alors le *code*, donc plus précisément.
+
+C'est faux, et le dépôt l'avait déjà écrit un lot plus tôt (D91, commit `4d3b6854`) :
+
+> *« quand un balayage grossier dit non, c'est au code de s'adapter, jamais au test d'apprendre
+> une exception. »*
+
+Deux raisons de s'y tenir :
+
+1. **le filtre est une passoire** — un commentaire en fin de ligne, une chaîne de gabarit, un
+   `//` dans une URL, et la règle fuit sans bruit ;
+2. **une chaîne citée est une chaîne présente.** Le jour où quelqu'un copie le commentaire dans
+   du JSX, rien ne l'arrête.
+
+Les trois commentaires ont été reformulés (« le vert qu'elle portait avant », « un badge de
+sécurité auto-décerné », « un stockage du navigateur »). Le filtre a été retiré.
+
+> **La leçon de méthode :** une règle d'équipe écrite dans un message de commit vaut une règle
+> écrite dans un fichier. Avant de contourner un test, cherchez si quelqu'un a déjà payé la
+> question — et acceptez sa réponse même quand la vôtre vous paraît plus fine.
+
+### 6. Tester le front qui n'a pas de harnais
+
+`apps/user-ui` n'a **aucun lanceur de tests** dans les dix-neuf contrôles. Les règles de D92
+portent pourtant sur l'**accord** entre les deux fronts : les tester d'un seul côté ne prouve
+rien.
+
+La solution, ouverte par D91 et reprise ici : **le harnais du mobile lit le site comme du
+texte**.
+
+```ts
+const WEB = resolve(MOBILE, '../user-ui');
+const FORMULAIRE_WEB = join(WEB, 'src/components/auth/forms/RegisterVerifyForm.tsx');
+expect(lire(FORMULAIRE_WEB)).toContain('useTranslations("auth.otp")');
+```
+
+C'est inhabituel, et c'est assumé : c'est le seul endroit du dépôt où un test peut voir les deux
+applications à la fois. Le garde-fou indispensable vient en premier :
+
+```ts
+it('le formulaire web est bien au chemin que ces fiches lisent', () => {
+  expect(existsSync(FORMULAIRE_WEB)).toBe(true);
+});
+```
+
+Sans lui, **un simple déplacement de fichier rendrait toutes les fiches suivantes vertes pour la
+pire des raisons : elles ne liraient plus rien.** C'est le piège classique du test qui lit des
+fichiers — il faut toujours vérifier qu'on lit *quelque chose*.
+
+Pour les deux règles pures recopiées entre fronts, on compare le **code lui-même**, normalisé :
+
+```ts
+const normaliser = (s: string): string =>
+  s.slice(s.indexOf('export const OTP_EXPIRY_SECONDS'))
+   .replace(/["']/g, '"')      // le web écrit ", le mobile écrit '
+   .replace(/\s+/g, ' ')
+   .trim();
+```
+
+La recopie entre fronts est **assumée** (ils ne partagent pas de paquet d'interface) ; c'est la
+**divergence** qui ne l'est pas. Toute la différence est là, et c'est la leçon des deux
+`maskEmail`.
+
+### 7. Pour aller plus loin
+
+- **WCAG 2.1 SC 1.4.11 (Non-text Contrast)** — la règle des 3:1 sur les limites de contrôles,
+  et pourquoi elle existe : https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+- **NCSC / NIST sur les mots de passe** — déjà cités en D91 pour le blocage du collage ; la même
+  littérature explique pourquoi un mot de passe ne doit jamais atterrir dans un stockage
+  persistant du navigateur.
+- **Command–Query Separation (Meyer)** — la règle qui rend `read…` / `clear…` non
+  interchangeables, et qui a coûté un défaut de rendu au dépôt en D88.
+- **`autocomplete="one-time-code"`** — le mécanisme par lequel iOS et Android proposent le code
+  reçu par SMS ; sur un code reçu par e-mail il ne fait rien, ce qui rend « Ouvrir ma boîte
+  mail » d'autant plus utile.

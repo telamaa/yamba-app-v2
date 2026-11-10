@@ -16187,3 +16187,211 @@ Ce qui rendait cette rangée désagréable n'était pas l'appariement, c'était 
 hiérarchie corrigée ci-dessus : quatre éléments gris de même poids côte à côte. La limite à
 connaître : si un troisième champ (civilité, second prénom) rejoint un jour cette ligne, elle
 devra se rompre.
+
+---
+
+# D92 — La vérification du code : une salle d'attente, pas un formulaire
+
+*Deuxième page de la passe de finitions « page par page », 10/11/2026, branche
+`feat/finitions-verification` (empilée sur `feat/finitions-inscription`, PR #404).*
+
+## ① Le constat, et pourquoi cet écran compte plus que sa taille
+
+`/register/verify` (site) et `(auth)/register-verify` (téléphone) sont **le seul écran du
+produit où l'utilisateur sort de l'application** : il va chercher un code dans sa boîte mail,
+et il doit vouloir revenir. C'est donc le point le plus fragile du tunnel d'inscription — et
+les deux versions le traitaient comme un formulaire de saisie.
+
+D91 avait aligné l'inscription. L'écran qui la suit immédiatement portait encore **sept écarts**,
+dont aucun ne casse quoi que ce soit — c'est précisément pour cela qu'ils avaient survécu.
+
+## ② Le masquage de l'adresse : supprimé, pas aligné
+
+Le motif « masquer partiellement une adresse » est juste (Apple, Stripe, Wise) dans **une**
+situation : une adresse venue du **dossier serveur**, montrée à quelqu'un dont on ignore s'il
+est le titulaire — défi de connexion, récupération de compte.
+
+Ici, l'inverse exact : l'adresse a été **tapée trente secondes plus tôt**, en clair, sur le même
+appareil, dans la même session. On n'atteint cet écran qu'en sortant du formulaire précédent.
+
+| | Ce que le masque protège | Ce que le masque coûte |
+|---|---|---|
+| Écran de défi (adresse du serveur) | le regard d'un tiers | rien |
+| **Cet écran (adresse tapée)** | **rien** | **la faute de frappe devient invisible** |
+
+`c*********a@g***.com` rend `gmial.com` et `gmail.com` **rigoureusement identiques** — sur un
+écran qui propose par ailleurs « Trompé d'adresse e-mail ? ». Le mode d'échec n°1 de cette
+étape, « je n'ai rien reçu », est précisément celui que la ligne masquée empêche de diagnostiquer.
+
+La mesure qui a clos le débat : les **cinq** appels du dépôt affichaient tous une adresse
+**tapée** — `RegisterVerifyForm`, `ResetVerifyForm`, `ResetPasswordForm`, et la vue mobile
+partagée par ses deux écrans. Aucun ne relevait du motif. Et les deux implémentations avaient
+divergé en silence :
+
+```ts
+// web : étoiles plafonnées à 9
+const middleStars = "*".repeat(Math.min(localPart.length - 2, 9));
+// mobile : AUCUN plafond — la longueur exacte de la partie locale est publiée
+`${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}`
+```
+
+Deux fonctions qui s'écartent pendant des mois sans que personne ne le voie ne portaient rien.
+**La correction n'est pas de les aligner, c'est de les supprimer** : `email-mask.ts` est
+effacé, `maskEmail` sort d'`auth-theme.ts`, et la ligne devient l'affordance qu'elle prétendait
+être — l'adresse en clair, « Modifier » à côté.
+
+## ③ Les divergences web ↔ mobile, closes
+
+| | Avant web | Avant mobile | Après (les deux) |
+|---|---|---|---|
+| Titre FR | « Plus qu'une étape ! » | « Vérification du code » | **« Plus qu'une étape ! »** |
+| Validation | clic obligatoire | 6ᵉ frappe | **6ᵉ frappe** (+ CTA qui nomme le manquement) |
+| Focus à l'arrivée | **aucun** | `autoFocus` | **dans la première case** |
+| Adresse | masquée (9 ★) | masquée (n ★) | **en clair + « Modifier »** |
+| Compteur | `09:41` | `9:29` | **`09:41`** des deux côtés |
+| Case remplie | `emerald-500` | mangue/teal | **teal de la charte** |
+| Textes | ~40 ternaires `fr ? … : …` | dictionnaire | **dictionnaire, même espace de noms** |
+
+## ④ Le titre devenait vrai en changeant la mécanique, pas les mots
+
+« Plus qu'une étape ! » était **faux sur le web** : le serveur n'ouvre pas de session à la
+vérification (il active le compte, c'est tout), et le site poussait vers `/login?verified=1`.
+Il restait donc deux étapes. Le mobile, lui, rejoue la connexion avec le mot de passe encore
+en mémoire du parcours (A208) : chez lui la promesse était vraie — **et c'est lui qui ne la
+faisait pas**.
+
+Le web enchaîne désormais la connexion. Le mot de passe vit dans une **variable de module**
+(`apps/user-ui/src/lib/auth/register-flow-state.ts`) :
+
+- `/register` → `/register/verify` est une navigation **client** (`router.push`) : le module
+  n'est pas rechargé, la valeur traverse ;
+- elle meurt avec l'onglet, n'est jamais sérialisée, jamais relisible par un autre script ;
+- **jamais** un stockage du navigateur : un mot de passe en clair qui survit à un rechargement
+  est un abaissement de sécurité que le confort d'un enchaînement ne justifie pas ;
+- contrepartie **assumée** : un rechargement de la page de vérification perd le mot de passe.
+  Le repli existait déjà — connexion préremplie, bandeau « compte activé ». C'est le repli du
+  mobile, à l'identique.
+
+CQS (règle du dépôt, D88) : `readPendingPassword` **répond** sans écrire, `clearPendingPassword`
+**écrit** sans répondre. Une lecture qui effacerait en répondant serait appelable depuis un
+rendu sans que rien ne le dise.
+
+## ⑤ Les deux échecs d'accessibilité, mesurés
+
+En thème sombre, les six cases de saisie du web :
+
+| Élément | Couleurs | Mesuré | Exigé | Verdict |
+|---|---|---|---|---|
+| Bordure de case vide | `slate-800` sur `slate-950` | **1,32:1** | 3:1 (SC 1.4.11) | échec ×2,3 |
+| « Renvoyer dans 00:41 » | `slate-600` sur `slate-950` | **2,60:1** | 4,5:1 (SC 1.4.3) | échec |
+
+La case était **de la couleur exacte de la page** (`dark:bg-slate-950` sur un fond `slate-950`),
+bordée d'un cran à peine au-dessus. Combiné à l'absence de focus (③), l'écran ne disait
+nulle part où taper. Fond remonté d'un cran, bordure `slate-600`, et la case remplie passe du
+`emerald-500` — un **troisième vert** dans une charte qui n'a que la mangue et le teal — au teal.
+
+**La règle qui en sort : une case dans laquelle on doit taper ne peut pas être de la couleur de
+la page.**
+
+## ⑥ Un seul compte à rebours, et l'aide à l'heure
+
+L'écran en tenait deux, au même format `mm:ss`, à deux cents pixels l'un de l'autre : `09:41`
+(validité, 10 min) et `00:41` (renvoi, 1 min). Il fallait un effort pour comprendre que ce
+n'étaient pas les mêmes secondes.
+
+- **La validité ne paraît qu'à sa dernière minute** — là où elle devient actionnable. Le code
+  savait déjà la peindre en ambre (`expiryWarning`) mais l'affichait dès 10:00. Une horloge qui
+  tourne sur une attente qu'on ne contrôle pas n'informe pas : elle installe l'anxiété.
+- **Le bloc de renvoi passe en trois temps.** « Pas reçu le code ? Vérifie tes spams **ou** »
+  suivi d'un lien grisé laissait un « ou » pendre dans le vide **pendant soixante secondes**.
+  Désormais : vingt secondes qui annoncent le délai normal, puis les spams **et** l'heure du
+  geste, puis le geste. « Vérifie tes spams » à T+0 s accusait l'utilisateur d'un problème qu'il
+  n'avait pas encore.
+
+Les deux règles sortent de l'écran dans `lib/otp-display.ts` (mobile) et
+`lib/auth/otp-display.ts` (web), **seuils en arguments par défaut**, donc vérifiables sans rendu.
+
+## ⑦ La colonne de gauche cesse de vendre
+
+Elle servait les trois garanties produit de D45 — « Des personnes identifiées », « Débité
+seulement si c'est accepté », « Garantie Yamba incluse » — **à quelqu'un qui a déjà signé**.
+C'est l'argumentaire d'acquisition servi après l'acquisition.
+
+`AuthHeroVisual` gagne une variante `waiting` qui répond à la seule question du moment — *et si
+le mail n'arrive pas ?* — en trois points (délai normal, indésirables, adresse modifiable) et
+porte le geste réel : **« Ouvrir ma boîte mail »**.
+
+Ce geste est une règle pure, `webmailUrl(email)`, **28 domaines** (Google, Microsoft, Yahoo,
+Apple, Proton, les quatre français du corridor diaspora, GMX/web.de/Zoho/AOL). Deux choix
+tenus par les fiches :
+
+1. **une adresse `https://`, pas un schéma d'application native.** `googlegmail://` doit être
+   déclaré (`LSApplicationQueriesSchemes`) avant d'être seulement testé et échoue en silence ;
+   `message://` n'ouvre que Mail d'Apple, inutile à qui lit son courrier dans Gmail. Une adresse
+   web s'ouvre partout, et les webmails redirigent eux-mêmes vers leur application ;
+2. **un domaine inconnu ne rend RIEN.** Deviner `https://webmail.<domaine>` enverrait vers une
+   page morte — on aurait fait sortir l'utilisateur du tunnel pour rien.
+
+Et la page **cesse de tirer son illustration au hasard** (`pickRandomHeroVisual` →
+`getHeroVisualById("illu-route")`, comme `/register` depuis D91) : deux chances sur trois que
+le décor change sous les pieds de l'utilisateur entre la saisie de son adresse et celle de son
+code, au moment précis du parcours où la continuité visuelle dit « tu es toujours dans le même
+geste ».
+
+## ⑧ Les textes du web entrent dans le dictionnaire
+
+`RegisterVerifyForm` portait **une quarantaine de `fr ? … : …`** dans un `buildCopy(lang)`.
+Au-delà de la règle non négociable du dépôt, c'était la **cause mécanique d'un angle mort** :
+le contrôle i18n de la CI ne lit que les dictionnaires. Pas une ligne de cet écran n'était
+regardée — exactement ce qui avait laissé coexister « Secure signup » et « Secure sign-up »
+(D91).
+
+Les textes passent sous `auth.otp` dans `messages/{fr,en}/auth.json`, **espace de noms calqué
+sur celui du mobile**, ce qui met les deux fronts sous le même contrôle. Restent en ternaires,
+**délibérément** : `otpCodeMessage` et les messages de règle de mot de passe, partagés avec
+trois autres formulaires — leur migration est le lot i18n nommé par D91. *On migre l'écran que
+l'on touche.*
+
+## ⑨ Les fiches — 63, dont 25 qui lisent les DEUX fronts
+
+| Fiche | Nombre | Ce qu'elle tient |
+|---|---|---|
+| `webmail.spec.ts` | 21 | les domaines connus, la casse, les espaces ; et les deux dérives : deviner, accepter ce qui n'est pas une adresse |
+| `otp-display.spec.ts` | 17 | les deux seuils, les trois temps, les six formats de compteur dont `581 → 09:41` |
+| `auth-verify-parite.spec.ts` | 25 | l'accord des deux fronts, point par point |
+
+La troisième reprend la méthode ouverte par D91 : **le harnais du mobile lit le site comme du
+texte**, parce que c'est le seul endroit du dépôt où un test peut voir les deux à la fois. Elle
+compare notamment les deux règles pures **caractère par caractère** (aux guillemets près) et les
+**28 domaines** des deux tables — la recopie entre fronts est assumée, c'est la **divergence**
+qui ne l'est pas.
+
+Mobile : **494 → 557** fiches, **28 → 31** suites.
+
+## ⑩ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **557 / 31 suites**, vert |
+| `nx typecheck @yamba-app/mobile` | vert (les deux programmes) |
+| `tsc --noEmit -p apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | vert, 30 espaces de noms, miroir parfait |
+| Rendu `/fr/register/verify` | 200, nouveau titre et colonne d'attente servis |
+
+## ⑪ Ce qui n'a PAS été fait, et pourquoi
+
+**La navigation haute du site reste complète sur l'écran de vérification.** « Partager un
+trajet » et surtout « Connexion » invitent à quitter un tunnel à mi-chemin — et « Connexion »
+propose un compte qui n'existe pas encore. C'est une décision de **gabarit** : le `Header` est
+monté sans condition par `app/[locale]/layout.tsx`, elle concerne les six pages d'auth, et la
+trancher ici créerait l'incohérence exacte que ce lot corrige — `/register` la garderait,
+`/register/verify` ne l'aurait plus. **Lot à part : D93 candidate, « un tunnel n'offre pas la
+sortie ».**
+
+**La revue d'écran des quatre autres pages d'auth** (connexion, mot de passe oublié,
+vérification de mot de passe, réinitialisation) n'a toujours pas eu lieu : D91 l'avait laissée
+ouverte, elle le reste. La règle 2A, elle, leur a été appliquée — c'est une règle, pas une
+retouche d'écran.
+
+**Le délai réel d'arrivée du mail n'a pas été mesuré en conditions réelles** (Resend). Si
+l'envoi prend dix secondes, aucun travail de texte ne sauvera cet écran.

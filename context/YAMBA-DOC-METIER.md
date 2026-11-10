@@ -8298,3 +8298,95 @@ page de connexion garde une adresse générique.
 | # | Situation | Attendu |
 |---|---|---|
 | 7 | Page d'inscription ouverte sur le plus petit iPhone visé | Tout est visible sans défiler, y compris les moyens de connexion et le lien vers la connexion |
+
+---
+
+# D92 — La vérification du code : ce qu'on montre à quelqu'un qui attend
+
+## Le besoin
+
+Entre « je remplis le formulaire » et « j'ai un compte », il y a un écran que personne ne
+regarde jamais longtemps en conception, et que tout le monde traverse : celui où l'on saisit le
+code à six chiffres reçu par e-mail.
+
+C'est pourtant **le seul écran du produit où l'utilisateur sort de Yamba**. Il quitte l'onglet
+ou l'application, va dans sa boîte mail, et doit vouloir revenir. Tout ce qui s'y passe mal se
+paie en inscriptions perdues — et personne ne vient s'en plaindre, puisque le compte n'existe
+pas encore.
+
+Les deux versions — le site et le téléphone — ne disaient pas la même chose, ne validaient pas
+de la même façon, et n'affichaient pas l'adresse de la même manière.
+
+## Les règles
+
+**RG-D92-1 — On masque l'adresse que l'utilisateur n'a pas tapée ; on affiche en clair celle
+qu'il vient de taper.** Masquer une adresse protège quand elle vient du dossier serveur et
+qu'on ignore si celui qui regarde l'écran en est le titulaire (récupération de compte, défi de
+connexion). Quand elle a été saisie trente secondes plus tôt sur le même appareil, le masque ne
+protège de rien — et il **empêche de voir la faute de frappe**, qui est la cause la plus
+fréquente du « je n'ai pas reçu le code ». `c*********a@g***.com` rend `gmial.com` et
+`gmail.com` identiques.
+
+**RG-D92-2 — Une étape de tunnel ne vend pas, elle rassure.** L'argumentaire produit s'adresse
+à quelqu'un qui hésite encore. Servi après la signature, il occupe la place de la seule
+information utile à ce moment-là : *et si le mail n'arrive pas ?*
+
+**RG-D92-3 — Une promesse de nombre d'étapes engage le produit.** « Plus qu'une étape ! » ne
+peut s'écrire que si c'est la dernière. Si le parcours en impose une de plus, c'est le parcours
+qui change, pas la phrase qui s'adoucit.
+
+**RG-D92-4 — Six cases remplies déclenchent la vérification.** Un code complet qui ne fait rien
+tant qu'on n'a pas cliqué est une impasse silencieuse. Le bouton reste — et quand on le presse
+sans avoir fini, il **nomme ce qui manque** plutôt que de rester grisé sans explication.
+
+**RG-D92-5 — Une case dans laquelle on doit taper ne peut pas être de la couleur de la page.**
+Formulée en mesure : la limite d'un contrôle de saisie tient 3:1 de contraste avec son fond
+(WCAG 2.1 SC 1.4.11), et le texte qui dit quand on pourra agir tient 4,5:1.
+
+**RG-D92-6 — Un seul compte à rebours à l'écran.** Celui qui dit quand on pourra AGIR. Celui
+qui dit combien de temps il reste ne paraît qu'à sa dernière minute, c'est-à-dire quand il
+devient actionnable. Une horloge qui tourne sur une attente qu'on ne contrôle pas n'informe
+pas : elle inquiète.
+
+**RG-D92-7 — L'aide arrive quand elle sert.** « Vérifie tes spams » affiché à la seconde zéro
+reproche à l'utilisateur un retard qui n'existe pas encore. Et une phrase ne se termine jamais
+sur un geste indisponible : pendant l'attente, elle se tient seule.
+
+**RG-D92-8 — Un geste proposé mène quelque part de vivant.** « Ouvrir ma boîte mail » n'apparaît
+que si l'on sait où elle est. Un domaine inconnu ne déclenche aucune proposition : faire sortir
+quelqu'un du tunnel vers une page morte est pire que de ne rien proposer.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'arrive sur l'écran | mon adresse est lisible **en entier**, « Modifier » à côté |
+| 2 | Je me suis trompé de domaine | je le vois, et je corrige sans recommencer en aveugle |
+| 3 | J'arrive sur l'écran | le curseur est déjà dans la première case |
+| 4 | Je colle mon code à six chiffres | la vérification part **sans que je clique** |
+| 5 | Je presse « Valider » avec trois chiffres | on me dit qu'il en manque, pas un bouton muet |
+| 6 | Mon compte vient d'être activé (site) | je suis **connecté**, pas renvoyé vers la connexion |
+| 7 | Je recharge la page puis je valide | je retombe sur la connexion préremplie, « compte activé » |
+| 8 | J'arrive sur l'écran | **un seul** compte à rebours est visible |
+| 9 | Il reste moins d'une minute au code | la validité apparaît, en ambre |
+| 10 | T+5 s | on m'annonce le délai normal, on ne m'envoie pas dans mes spams |
+| 11 | T+30 s | on me propose les spams **et** l'heure à laquelle je pourrai redemander |
+| 12 | T+60 s | « Renvoyer le code » est offert, et la phrase se referme dessus |
+| 13 | Mon adresse est `@gmail.com` | « Ouvrir ma boîte mail » m'y emmène |
+| 14 | Mon adresse est `@mon-entreprise.fr` | aucun bouton — pas de page morte |
+| 15 | Thème sombre | je vois les six cases sans les chercher |
+| 16 | Je passe du formulaire au code | le décor de gauche ne change pas |
+
+## Ce qui reste hors de ce lot
+
+**La navigation haute du site reste offerte pendant la vérification.** « Partager un trajet » et
+« Connexion » invitent à quitter un tunnel à mi-chemin, et « Connexion » propose un compte qui
+n'existe pas encore. Le bandeau est monté pour **toutes** les pages : le retirer ici seulement
+créerait l'incohérence que ce lot corrige. Décision séparée, **D93 candidate**.
+
+**Les quatre autres écrans d'authentification** gardent leur composition et leur discours —
+leur revue n'a pas eu lieu. Seule la règle RG-D92-1 leur a été appliquée, parce que c'est une
+règle et non une retouche d'écran.
+
+**Le délai réel d'arrivée du mail** n'a pas été mesuré en conditions réelles. Si l'envoi prend
+dix secondes, aucun travail de texte ne sauvera cet écran.
