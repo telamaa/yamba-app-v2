@@ -347,7 +347,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   ctaLabel: {
-    fontSize: 17,
+    // 15 et non 17 (revue du 10/11). Ce qui fait avancer ce bouton n'est pas
+    // la TAILLE de son texte : c'est l'aplat mangue, sa pleine largeur, ses
+    // 52 pt de haut et le fait d'être le SEUL élément en gras de l'écran
+    // (D91 5A). Le libellé n'a donc pas à crier par-dessus — et un bouton
+    // dont le texte dépasse ses voisins d'un tiers a l'air d'un bouton de
+    // système d'exploitation, pas d'un produit. La zone tactile ne change
+    // pas d'un pixel : elle tient à la hauteur du bouton, pas à son texte.
+    //
+    // Reste un cran AU-DESSUS du site (14 px) : même rôle, autre distance de
+    // lecture — un téléphone se lit à bout de bras (D91 5A).
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: Font.bold,
   },
   divider: {

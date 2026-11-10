@@ -16863,3 +16863,24 @@ porte l'identification de toute façon.**
 exceptions étant **nommées dans le fichier avec leur raison**. Elle a trouvé 13 fautifs de plus
 que la revue — sur des écrans que personne n'avait rouverts depuis la bascule. Mobile :
 **570 → 571** fiches.
+
+## ⑨ Amendement du 10/11/2026 — la taille des libellés de boutons
+
+« Baisse aussi la police des textes des boutons. »
+
+`ctaLabel` passe de **17 à 15 px**, et `identity-gate` de 16 à 15 : **les cinq boutons d'action
+du mobile disent maintenant la même taille.**
+
+Le raisonnement, parce qu'il vaut pour tout bouton principal : **ce qui fait avancer ce bouton
+n'est pas la taille de son texte.** C'est l'aplat mangue, sa pleine largeur, ses 52 pt de haut,
+et le fait d'être le **seul élément en gras de l'écran** (D91 5A). Le libellé n'a donc pas à
+crier par-dessus — et un bouton dont le texte dépasse ses voisins d'un tiers a l'air d'un bouton
+de système d'exploitation, pas d'un produit.
+
+Deux choses à ne pas craindre :
+
+- **la zone tactile ne bouge pas d'un pixel** — elle tient à la hauteur du bouton (52 pt), pas
+  à la taille de son texte ;
+- **le rapport au site est préservé** : 15 côté mobile, 14 côté web. Même rôle, autre distance
+  de lecture — un téléphone se lit à bout de bras (D91 5A, qui fixait déjà 15 contre 13 pour
+  les libellés de champs).

@@ -235,7 +235,9 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.mango,
   },
   ctaLabel: {
-    fontSize: 16,
+    // Aligné sur les quatre autres CTA du mobile (15) — un bouton d'action
+    // n'a pas de raison de changer de taille selon l'écran qui le porte.
+    fontSize: 15,
     fontFamily: Font.bold,
   },
   pressed: {
