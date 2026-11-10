@@ -50,6 +50,11 @@ export const LAYOUT_EJS = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- D94 3A ③ — sans ces deux lignes, Gmail et Apple Mail inversent D'AUTORITÉ
+     la carte blanche en sombre et laissent le bandeau teal intact : un email
+     à moitié retourné. On assume les couleurs du gabarit, dans les deux modes. -->
+<meta name="color-scheme" content="light" />
+<meta name="supported-color-schemes" content="light" />
 <title><%= subject %></title>
 </head>
 <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
@@ -60,7 +65,7 @@ export const LAYOUT_EJS = `<!DOCTYPE html>
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -4px rgba(0,0,0,0.06);">
         <tr>
           <td style="background:linear-gradient(135deg,#0F766E 0%,#14b8a6 100%);padding:28px 24px;text-align:center;">
-            <p style="margin:0 0 6px 0;color:#ccfbf1;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Yamba</p>
+            <img src="cid:<%= logoCid %>" width="38" height="40" alt="Yamba" style="display:block;margin:0 auto 12px auto;border:0;outline:none;text-decoration:none;height:40px;width:38px;" />
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;line-height:1.3;"><%= content.title %></h1>
           </td>
         </tr>
@@ -74,11 +79,19 @@ export const LAYOUT_EJS = `<!DOCTYPE html>
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 24px 0;">
               <tr>
                 <td align="center">
-                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8fafc;border:1px solid #99f6e4;border-radius:12px;">
                     <tr>
                       <td style="padding:20px 40px;text-align:center;">
                         <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;"><%= content.code.label %></p>
-                        <p style="margin:0;font-size:36px;font-weight:800;color:#0f172a;letter-spacing:8px;font-family:'Courier New',Courier,monospace;"><%= content.code.value %></p>
+                        <!-- D94 3A - letter-spacing ajoute l'espace APRES
+                             chaque caractere, y compris le DERNIER : le code
+                             etait pousse de 8 px vers la droite dans sa boite.
+                             Un text-indent de la meme valeur le recentre, et
+                             c'est le seul remede qui tienne aussi sous Outlook
+                             (une marge droite negative y est ignoree).
+                             PAS D'ACCENT GRAVE ICI : ce HTML vit dans un
+                             gabarit de chaine TS, un seul le terminerait. -->
+                        <p style="margin:0;font-size:36px;font-weight:800;color:#0f172a;letter-spacing:8px;text-indent:8px;font-family:'Courier New',Courier,monospace;"><%= content.code.value %></p>
                       </td>
                     </tr>
                   </table>
