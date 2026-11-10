@@ -152,6 +152,39 @@ describe('④ aucun interligne ne rogne la police', () => {
   });
 });
 
+describe('⑤ rien ne se monte avant que les polices soient prêtes', () => {
+  /**
+   * Le défaut que cette fiche empêche est le plus coûteux du lot, et le plus
+   * difficile à relier à sa cause : les écrans se montaient SOUS le splash,
+   * mesuraient leurs textes avec la police encore système — plus étroite —
+   * puis se redessinaient en Plus Jakarta. React Native ne re-mesure pas un
+   * texte dont seule la police a changé : la boîte gardait la largeur de
+   * l'ancienne, et le dernier glyphe sortait du cadre.
+   *
+   * « Password » rendait « Passworc ». Seules les chaînes dont l'écart
+   * franchissait un pixel étaient touchées, ce qui donnait au défaut une
+   * allure capricieuse et masquait sa cause.
+   *
+   * Un écran qui ne se monte pas ne mesure rien : c'est la seule garantie
+   * solide. Retenir l'AFFICHAGE du splash n'en est pas une.
+   */
+  it('la racine retourne tôt tant que les polices ne sont pas chargées', () => {
+    const racine = readFileSync(join(SRC, 'app/_layout.tsx'), 'utf8');
+    expect(racine).toContain('if (!fontsReady) return');
+  });
+
+  it('la sortie précoce arrive AVANT l’arbre de navigation', () => {
+    // Si elle passait après le `<Stack>`, elle ne protégerait plus rien.
+    const racine = readFileSync(join(SRC, 'app/_layout.tsx'), 'utf8');
+    expect(racine.indexOf('if (!fontsReady) return')).toBeLessThan(racine.indexOf('<Stack '));
+  });
+
+  it('les polices sont bien celles que la racine charge', () => {
+    const racine = readFileSync(join(SRC, 'app/_layout.tsx'), 'utf8');
+    expect(racine).toContain('useFonts(FONT_ASSETS)');
+  });
+});
+
 describe('le site et le téléphone composent dans la MÊME police', () => {
   it('le nom de la famille du web se retrouve côté mobile', () => {
     const web = readFileSync(resolve(SRC, '../../user-ui/src/app/layout.tsx'), 'utf8');

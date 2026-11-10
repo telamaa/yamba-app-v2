@@ -49,7 +49,7 @@ function StripeRedirectRelay() {
 // et pas encore passé → l'écran de bienvenue ; connecté ou déjà passé → les
 // onglets. La redirection part sous le splash encore opaque : l'écran
 // d'arrivée est déjà en place quand le fondu le révèle.
-function LaunchGate({ fontsReady }: { fontsReady: boolean }) {
+function LaunchGate() {
   const { status } = useSession();
   const decided = useRef(false);
   const shownAt = useRef(Date.now());
@@ -57,12 +57,10 @@ function LaunchGate({ fontsReady }: { fontsReady: boolean }) {
   const [splashGone, setSplashGone] = useState(false);
 
   useEffect(() => {
-    // D95 — le splash attend AUSSI les polices. Sans cela, le premier rendu
-    // part en police système puis BASCULE quand les fichiers arrivent : un
-    // saut de typographie à l'ouverture, sur le seul écran qu'on ne peut pas
-    // fermer. Le splash natif couvrait déjà l'amorçage de la session ; il
-    // couvre maintenant les deux attentes, qui se recouvrent.
-    if (status === 'loading' || !fontsReady || decided.current) return;
+    // Les polices sont forcément prêtes ici : `RootLayout` ne monte pas cet
+    // arbre avant (voir son amendement du 10/11). Ce garde-fou ne porte donc
+    // que sur l'amorçage de la SESSION.
+    if (status === 'loading' || decided.current) return;
     decided.current = true;
     if (status === 'anonymous' && !isWelcomeDismissed()) {
       router.replace('/welcome');
@@ -76,13 +74,13 @@ function LaunchGate({ fontsReady }: { fontsReady: boolean }) {
       }).start(() => setSplashGone(true));
     }, remaining);
     return () => clearTimeout(timer);
-  }, [status, fontsReady, opacity]);
+  }, [status, opacity]);
 
   if (splashGone) return null;
   return (
     <Animated.View
       style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, opacity, zIndex: 10 }}
-      pointerEvents={status === 'loading' || !fontsReady ? 'auto' : 'none'}>
+      pointerEvents={status === 'loading' ? 'auto' : 'none'}>
       <AppSplash />
     </Animated.View>
   );
@@ -92,15 +90,32 @@ function LaunchGate({ fontsReady }: { fontsReady: boolean }) {
 // (idiomatique iOS ; sur Android, une feuille pleine page). La session vit au
 // niveau racine : les onglets, la porte d'identité et les badges la partagent.
 export default function RootLayout() {
-  // D95 — les cinq graisses de Plus Jakarta Sans. `useFonts` rend `false`
-  // tant qu'elles ne sont pas prêtes ; le splash tient l'écran pendant ce
-  // temps (voir `LaunchGate`). Une famille absente ne JETTE pas : React
-  // Native retombe en silence sur la police système, d'où la fiche qui
-  // confronte les noms aux fichiers.
+  // D95 — les cinq graisses de Plus Jakarta Sans. Une famille absente ne
+  // JETTE pas : React Native retombe en silence sur la police système, d'où
+  // la fiche qui confronte les noms aux fichiers.
   const [fontsReady] = useFonts(FONT_ASSETS);
   const colorScheme = useColorScheme();
   const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, primary: Brand.mango } };
+
+  // RIEN ne se monte avant les polices — et c'est un AMENDEMENT du 10/11,
+  // payé en recette sur les deux simulateurs (« textes toujours tronqués :
+  // name, account… »).
+  //
+  // La première version ne retenait que l'AFFICHAGE du splash. Les écrans se
+  // montaient donc dessous, MESURAIENT leurs textes avec la police encore
+  // système — SF Pro, plus étroite — puis se redessinaient en Plus Jakarta
+  // quand les fichiers arrivaient. React Native ne re-mesure pas un texte
+  // dont seule la police a changé : la boîte gardait la largeur de l'ANCIENNE
+  // et le dernier glyphe sortait du cadre. « Password » rendait « Passworc »,
+  // « Create an account » rendait « Create an accour ». Seules les chaînes
+  // dont l'écart franchissait un pixel étaient touchées, ce qui donnait au
+  // défaut une allure capricieuse — et masquait sa cause.
+  //
+  // Un écran qui ne se monte pas ne mesure rien. C'est la seule garantie
+  // solide : tout le reste revient à espérer que la mesure arrive après le
+  // chargement.
+  if (!fontsReady) return <AppSplash />;
 
   return (
     <AppIntlProvider>
@@ -136,7 +151,7 @@ export default function RootLayout() {
             <Stack.Screen name="profile" />
           </Stack>
           {/* Après la pile : le splash peint PAR-DESSUS pendant l'amorçage. */}
-          <LaunchGate fontsReady={fontsReady} />
+          <LaunchGate />
           {/* Ne peint rien : il écoute les retours de redirection bancaire (D82 7A). */}
           <StripeRedirectRelay />
         </ThemeProvider>

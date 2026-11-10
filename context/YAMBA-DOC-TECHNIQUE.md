@@ -16884,3 +16884,63 @@ Deux choses à ne pas craindre :
 - **le rapport au site est préservé** : 15 côté mobile, 14 côté web. Même rôle, autre distance
   de lecture — un téléphone se lit à bout de bras (D91 5A, qui fixait déjà 15 contre 13 pour
   les libellés de champs).
+
+## ⑩ Amendement du 10/11/2026 — « textes toujours tronqués » : la vraie cause
+
+Après l'élargissement des interlignes, la recette sur les **deux** simulateurs montrait encore
+des textes coupés — mais **horizontalement**, et sur un seul caractère :
+
+| Rendu | Attendu |
+|---|---|
+| `Passworc` | Password |
+| `Create an accour` | Create an account |
+| `Browse trips without an accoui` | Browse trips without an account |
+| `Emai` | Email |
+| `Yambȧ` | Yamba |
+
+Un glyphe **à moitié dessiné** n'est ni une césure ni une ellipse : c'est une **boîte plus
+étroite que son contenu**. Et la cause était dans D95 lui-même.
+
+### Ce que la première version gardait
+
+`LaunchGate` retenait l'**affichage** du splash tant que les polices n'étaient pas prêtes. Mais
+l'arbre de navigation, lui, **se montait dessous**. Les écrans mesuraient donc leurs textes avec
+la police encore **système** — SF Pro, plus étroite — puis se redessinaient en Plus Jakarta
+quand les fichiers arrivaient.
+
+**React Native ne re-mesure pas un texte dont seule la police a changé.** La boîte gardait la
+largeur de l'ancienne, le dernier glyphe sortait du cadre, et le parent le rognait.
+
+Seules les chaînes dont l'écart de largeur **franchissait un pixel** étaient touchées — ce qui
+donnait au défaut une allure capricieuse (« Last name » passait, « First name » non) et
+masquait sa cause.
+
+```tsx
+// AVANT — on retenait le splash, pas le montage
+const [fontsReady] = useFonts(FONT_ASSETS);
+return (<Providers><Stack …/><LaunchGate fontsReady={fontsReady} /></Providers>);
+
+// APRÈS — rien ne se monte, donc rien ne mesure
+if (!fontsReady) return <AppSplash />;
+return (<Providers><Stack …/><LaunchGate /></Providers>);
+```
+
+> **La règle, et elle dépasse les polices : un écran qui ne se monte pas ne mesure rien.** Tout
+> le reste — retenir un affichage, poser une opacité, masquer avec un calque — revient à
+> *espérer* que la mesure arrive après le chargement. Quand une ressource change une MESURE,
+> on bloque le montage, pas la peinture.
+
+### Vérifié sur les deux plateformes
+
+Le lot n'a aucune branche par système. Les deux bundles ont été demandés à Metro et obtenus :
+
+```
+ios      200 en 12,2 s
+android  200 en 10,3 s
+```
+
+### Les fiches
+
+`typography.spec.ts` ⑤ tient trois choses : la sortie précoce existe, elle arrive **avant** le
+`<Stack>` (après, elle ne protégerait plus rien), et elle porte bien sur `FONT_ASSETS`. Mobile :
+**571 → 574** fiches.
