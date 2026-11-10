@@ -2400,6 +2400,32 @@ PR + docs cumulatifs.
   mesures et corriges, un seul compte a rebours, la colonne de gauche qui
   cesse de vendre + « Ouvrir ma boite mail », et les ~40 ternaires de l'ecran
   passes au dictionnaire. Mobile 494 -> 557 fiches.
+- Lots TRANSVERSES de la meme branche (ils ne portent pas sur UNE page, mais sur
+  ce que toutes les pages partagent) :
+  - D94 — le symbole de la marque entre dans les emails, en piece jointe inline,
+    et aux DEUX couleurs. Notification 122 -> 136 fiches.
+  - D95 — le telephone compose dans la police de la marque (Plus Jakarta Sans,
+    67 `fontWeight` de 23 fichiers devenus cinq familles nommees), le splash
+    attend les polices, le bouton qui travaille garde sa taille et son mot.
+    Trois amendements du 10/11 : interlignes, taille des libelles de boutons, et
+    « rien ne se monte avant les polices » (un ecran qui ne se monte pas ne
+    mesure rien).
+  - D95 6A (11/11) — le PIED D'ECRAN devient un gabarit nomme (`FooterLine`) :
+    cinq declarations pour un seul role (« Pas encore de compte ? », « Deja un
+    compte ? », « Plus tard », et les deux pieds du site). Le jeton porte la
+    taille, l'interligne et la police ; l'ENCRE reste a l'ecran, parce qu'elle
+    dit l'intention (mangue = la porte jumelle, gris = on decline).
+    Mobile 574 -> 598 fiches (33 suites).
+
+ETAT DE LA BRANCHE `feat/finitions-verification` au 11/11 : 33 commits, poussee,
+AUCUNE PR ouverte a ce jour, empilee sur #404 (D91). Mesures du 11/11 : mobile
+598 (33 suites), notification 136 (12 suites), `nx typecheck @yamba-app/mobile`
+vert sur ses DEUX programmes, `tsc --noEmit -p apps/user-ui` vert, controle i18n
+vert, aucun fichier d'env suivi. Les deux bundles Metro obtenus (ios 200 en
+48,7 s, android 200 en 47,0 s, 551 `__workletHash`) — avec `NODE_PATH=./node_modules`,
+sans quoi `expo start` meurt sur `Cannot find module 'expo-router/_ctx-shared'`
+(expo-router est NICHE sous apps/mobile, et c'est ce que font les scripts du
+package.json du mobile : ne pas lancer `npx expo start` nu).
 
 RESTE dans cette passe :
 - les QUATRE autres ecrans d'auth (connexion, mot de passe oublie, verification
