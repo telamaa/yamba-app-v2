@@ -139,13 +139,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: 800,
+    // D91 5A, appliquée ici par la revue du 10/11 : le titre RECULE à 600.
+    // À 800 il ne laissait rien derrière lui — quand tout crie, rien ne porte.
+    // Le seul 700 de l'écran est le bouton, et c'est ce qui le fait avancer.
+    fontWeight: 600,
     marginBottom: Spacing.two,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: 500,
+    // 15 px (revue du 10/11) : le sous-titre ACCOMPAGNE le titre, il ne le
+    // double pas. À 16 il faisait un second titre juste sous le premier.
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: 400,
   },
   content: {
     marginTop: Spacing.four,

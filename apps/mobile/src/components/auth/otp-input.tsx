@@ -92,7 +92,9 @@ const styles = StyleSheet.create({
   },
   digit: {
     fontSize: 24,
-    fontWeight: 700,
+    // 600 : les chiffres restent nets sans devenir le centre de gravité de
+    // l'écran. Ce qui les désigne est la case et le focus, pas la graisse.
+    fontWeight: 600,
   },
   hidden: {
     position: 'absolute',

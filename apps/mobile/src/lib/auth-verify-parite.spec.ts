@@ -243,6 +243,57 @@ describe('⑥ le badge de sécurité ne revient pas sur l’inscription (D92 1A)
   });
 });
 
+describe('⑥ bis — un seul élément en 700 : le bouton (D91 5A)', () => {
+  /**
+   * Revue du 10/11 : « affiner la police des textes, pas assez fin, trop de
+   * gras ». D91 avait tranché la règle pour l'inscription — titre 600,
+   * libellés 500, corps 400, UN SEUL 700 — et l'écran de vérification ne
+   * l'avait jamais reçue, exactement comme le badge de sécurité.
+   *
+   * Quand tout crie, rien ne porte : c'est la graisse du bouton qui le fait
+   * avancer, et elle ne vaut que si elle est seule.
+   */
+  const GLYPHES = ['failureGlyph', 'checkboxMark'];
+
+  it('la trousse du mobile n’a qu’un seul TEXTE en 700 ou plus', () => {
+    const source = lire(join(MOBILE, 'src/components/auth/auth-kit.tsx'));
+    // Chaque style est lu SÉPARÉMENT : une expression régulière qui part d'un
+    // nom de style et cherche la graisse plus loin traverse les blocs voisins
+    // et accuse les innocents (mesuré : 3 fautifs annoncés pour 1 réel).
+    const lourds = [...source.matchAll(/\n {2}(\w+): \{([\s\S]*?)\n {2}\},/g)]
+      .filter((m) => /fontWeight: (?:7|8)00/.test(m[2]))
+      .map((m) => m[1])
+      // Un glyphe dessiné (une croix, une coche) n'est pas un niveau de
+      // lecture : sa graisse est un trait de dessin.
+      .filter((nom) => !GLYPHES.includes(nom));
+    expect(lourds).toEqual(['ctaLabel']);
+  });
+
+  it('le titre d’écran du mobile a reculé à 600', () => {
+    const source = lire(join(MOBILE, 'src/components/auth/auth-screen.tsx'));
+    expect(/title: \{[\s\S]*?fontWeight: 600/.test(source)).toBe(true);
+  });
+
+  it('la vue OTP du mobile ne porte plus aucun 700', () => {
+    expect(lire(VUE_MOBILE)).not.toContain('fontWeight: 700');
+  });
+
+  it('le formulaire web n’a plus de 800, et son seul gras est le bouton', () => {
+    const source = lire(FORMULAIRE_WEB);
+    expect(source).not.toContain('font-extrabold');
+    const gras = [...source.matchAll(/className="([^"]*font-bold[^"]*)"/g)].map((m) => m[1]);
+    expect(gras).toHaveLength(1);
+    expect(gras[0]).toContain('bg-[#FF9900]');
+  });
+
+  it('les deux fronts traitent « saisis ton code » comme un LIBELLÉ', () => {
+    expect(lire(FORMULAIRE_WEB)).toContain('text-[13px] font-medium text-slate-500');
+    // Côté mobile le libellé vaut 15 px : même rôle, autre distance de
+    // lecture (D91 5A). Ce qui s'aligne est la GRAISSE, pas la taille.
+    expect(/enterCode: \{[\s\S]*?fontWeight: 500/.test(lire(VUE_MOBILE))).toBe(true);
+  });
+});
+
 describe('⑦ les textes du web sont enfin dans le dictionnaire (D92 7A)', () => {
   /**
    * Cause MÉCANIQUE de l'angle mort : le contrôle i18n de la CI ne lit que

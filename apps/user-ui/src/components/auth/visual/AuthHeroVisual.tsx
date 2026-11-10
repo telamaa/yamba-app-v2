@@ -130,7 +130,7 @@ export default function AuthHeroVisual({ visual, variant = "promises", action }:
               <p.icon size={15} strokeWidth={2.2} aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold leading-tight text-slate-900 dark:text-white">{p.title}</p>
+              <p className="text-[13px] font-medium leading-tight text-slate-900 dark:text-white">{p.title}</p>
               <p className="mt-0.5 text-[12px] leading-snug text-slate-500 dark:text-slate-400">{p.text}</p>
             </div>
           </li>

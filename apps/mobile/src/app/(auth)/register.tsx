@@ -278,13 +278,18 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingTop: Spacing.two,
   },
+  // « Déjà un compte ? » est une SORTIE, pas une proposition : qui a déjà un
+  // compte la cherche et la trouve, les autres n'ont pas à la lire. 13 px,
+  // comme la mention légale — le bas d'écran recule d'un bloc (revue du 10/11).
   footerText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 400,
   },
   footerLink: {
-    fontSize: 15,
-    fontWeight: 500,
+    fontSize: 13,
+    // 400 : la MANGUE suffit à désigner le lien. Lui ajouter de la graisse,
+    // c'est le signaler deux fois — et un bas d'écran n'a pas à se signaler.
+    fontWeight: 400,
     color: AuthBrand.mango,
   },
 });

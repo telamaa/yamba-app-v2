@@ -347,6 +347,15 @@ export function AuthError({ message }: { message: string }) {
   return <Text style={styles.error}>{message}</Text>;
 }
 
+/**
+ * Les graisses de cette trousse suivent D91 5A (revue du 10/11, page 2) :
+ * titre 600, libellés 500, corps 400 — et UN SEUL élément en 700, le bouton.
+ * `ctaLabel` est donc le seul TEXTE en 700, et doit le rester : c'est ce qui
+ * le fait avancer pendant que le reste tient sa place. Restent lourds
+ * `failureGlyph` et `checkboxMark` — ce ne sont pas des textes mais des
+ * GLYPHES dessinés (une croix de 36 px, une coche de case), dont la graisse
+ * est un trait de dessin et non un niveau de lecture.
+ */
 const styles = StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
@@ -404,8 +413,12 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   dividerLabel: {
-    fontSize: 12,
-    fontWeight: 700,
+    // « OU CONTINUER AVEC » n'est pas une information : c'est une CHARNIÈRE
+    // entre deux façons de s'inscrire. Il doit se lire une fois et disparaître
+    // — 11 px, gris, et 400 : l'interlettrage et les deux filets font seuls le
+    // travail de séparation, la graisse n'y ajoutait qu'un bruit.
+    fontSize: 11,
+    fontWeight: 400,
     letterSpacing: 1.5,
   },
   methodButton: {
@@ -423,7 +436,7 @@ const styles = StyleSheet.create({
   },
   methodLabel: {
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 500,
   },
   failure: {
     flex: 1,
@@ -449,7 +462,7 @@ const styles = StyleSheet.create({
   failureTitle: {
     fontSize: 26,
     lineHeight: 32,
-    fontWeight: 800,
+    fontWeight: 600,
     textAlign: 'center',
   },
   failureBody: {
@@ -480,8 +493,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   checkboxLabel: {
-    fontSize: 15,
-    lineHeight: 21,
+    // 13 px (revue du 10/11) : la mention légale est la plus longue ligne de
+    // l'écran et la moins décisive. À 15 px elle pesait autant que les champs
+    // qu'il faut remplir ; à 13 elle reste parfaitement lisible et rend sa
+    // place à ce qui demande un geste. Les deux liens gardent leur encre.
+    fontSize: 13,
+    lineHeight: 19,
     // 400 et non 500 (revue du 10/11) : un libellé de case à cocher est du
     // texte courant, pas un titre. Il est long, il se lit, il ne s'annonce pas.
     fontWeight: 400,
@@ -492,7 +509,7 @@ const styles = StyleSheet.create({
   },
   tealLink: {
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: 500,
   },
   underline: {
     textDecorationLine: 'underline',

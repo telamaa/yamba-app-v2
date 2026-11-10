@@ -565,7 +565,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
         href={mailbox}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
       >
         <Mail size={16} aria-hidden />
         {t("openMailbox")}
@@ -598,7 +598,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
       {/* RIGHT — formulaire */}
       <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
         <div className="w-full max-w-[400px]">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
             {t("title")}
           </h1>
           <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">{t("sentTo")}</p>
@@ -616,7 +616,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
                 type="button"
                 onClick={handleStartOver}
                 disabled={cancelMutation.isPending}
-                className="flex-shrink-0 text-xs font-semibold text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 hover:decoration-[#0D9488] disabled:opacity-50 dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]"
+                className="flex-shrink-0 text-xs font-medium text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 hover:decoration-[#0D9488] disabled:opacity-50 dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]"
               >
                 {cancelMutation.isPending ? "…" : t("changeEmail")}
               </button>
@@ -632,7 +632,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
               <AlertTriangle size={12} />
               <span>{t("lockedRetryIn")}</span>
-              <span className="font-mono font-bold">{lockedDuration()}</span>
+              <span className="font-mono font-semibold">{lockedDuration()}</span>
             </div>
           ) : (
             showValidity(expiryTimer) && (
@@ -651,7 +651,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
                 ) : (
                   <>
                     <span>{t("validFor")}</span>
-                    <span className="font-mono font-bold">{formatMMSS(expiryTimer)}</span>
+                    <span className="font-mono font-semibold">{formatMMSS(expiryTimer)}</span>
                   </>
                 )}
               </div>
@@ -661,7 +661,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
           {/* OTP form */}
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
             <div>
-              <label className="block text-center text-xs font-semibold text-slate-700 dark:text-slate-200 mb-3">
+              <label className="block text-center text-[13px] font-medium text-slate-500 dark:text-slate-400 mb-3">
                 {t("enterCode")}
               </label>
 
@@ -736,7 +736,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
                       className="mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400"
                     />
                     <div className="text-xs">
-                      <p className="font-bold text-red-800 dark:text-red-300">{t("locked")}</p>
+                      <p className="font-semibold text-red-800 dark:text-red-300">{t("locked")}</p>
                       <p className="mt-1 text-red-700 dark:text-red-400">{t("lockedTip")}</p>
                     </div>
                   </div>
@@ -789,7 +789,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
                   type="button"
                   onClick={resendOtp}
                   disabled={resendOtpMutation.isPending}
-                  className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[#0D9488] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#2DD4BF] dark:hover:bg-slate-900/40"
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-[#0D9488] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#2DD4BF] dark:hover:bg-slate-900/40"
                 >
                   {resendOtpMutation.isPending ? (
                     <Loader2 size={11} className="animate-spin" />
@@ -804,7 +804,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {t("notReceivedWaiting")}
                 </p>
-                <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                   {t("resendIn", { time: formatMMSS(resendTimer) })}
                 </p>
               </>

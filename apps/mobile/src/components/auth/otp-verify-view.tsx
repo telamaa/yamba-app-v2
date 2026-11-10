@@ -230,7 +230,7 @@ export function OtpVerifyView({
         </View>
       )}
 
-      <Text style={[styles.enterCode, { color: palette.title }]}>{t('otp.enterCode')}</Text>
+      <Text style={[styles.enterCode, { color: palette.muted }]}>{t('otp.enterCode')}</Text>
 
       <OtpInput value={otp} onChangeAction={setOtp} disabled={pending || locked} />
 
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   emailAddress: {
     flexShrink: 1,
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 500,
   },
   validityChip: {
     flexDirection: 'row',
@@ -310,14 +310,19 @@ const styles = StyleSheet.create({
   },
   validityLabel: {
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   validityTime: {
-    fontWeight: 700,
+    // 600 et non 700 : le compte à rebours doit se REPÉRER dans sa phrase,
+    // pas peser autant que le bouton.
+    fontWeight: 600,
   },
   enterCode: {
-    fontSize: 16,
-    fontWeight: 700,
+    // « Saisis ton code » est un LIBELLÉ de champ, pas un titre : 15 px / 500
+    // en gris moyen, comme tous les libellés du mobile (D91 5A — 15 et non 13
+    // comme le web : même rôle, autre distance de lecture).
+    fontSize: 15,
+    fontWeight: 500,
     textAlign: 'center',
     marginTop: Spacing.two,
   },
@@ -339,6 +344,6 @@ const styles = StyleSheet.create({
   },
   resendWait: {
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: 500,
   },
 });

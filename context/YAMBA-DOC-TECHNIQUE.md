@@ -16634,3 +16634,64 @@ tranche sans discuter :
 grep -c 'background-color:#FF9900' apps/auth-service/dist/main.js   # 2 → le bundle est à jour
 grep -c 'linear-gradient(135deg,#0F766E' apps/auth-service/dist/main.js   # 0 → l'ancien est parti
 ```
+
+## ⑭ Amendement du 10/11/2026 — la graisse : D91 5A arrive enfin page 2
+
+Retour de revue sur capture iPhone : **« affiner la police des textes, pas assez fin, trop de
+gras »**, puis, sur l'écran d'inscription : **« baisse la police de "I accept Yamba's TERMS…",
+de "Or continue with" et de "Already…" — je veux que mes textes soient fins, pro »**, et enfin
+**« baisse encore de gras sur ces textes ainsi que "Send or…" »**.
+
+D91 5A avait **déjà tranché la règle** : *titre 600, libellés 13 px / 500 en gris moyen, corps
+400, et **un seul élément en 700 : le bouton**.* Elle n'avait été appliquée qu'à l'écran
+d'inscription — la vérification ne l'avait jamais reçue, exactement comme le badge de sécurité
+(D92 1A). Le diagnostic de D91 vaut mot pour mot : **la page n'avait aucune graisse sous 600,
+donc rien ne reculait, donc tout criait.**
+
+### Mobile
+
+| Élément | Avant | Après |
+|---|---|---|
+| Titre d'écran (`AuthScreen.title`) | **800** | **600** |
+| Sous-titre (« Envoie ou transporte… ») | 16 px / 500 | **15 px / 400** |
+| Adresse e-mail | 600 | **500** |
+| « Code valable » | 500 | **400** |
+| Le temps du compteur | 700 | **600** |
+| « Saisis ton code » | 16 px / **700**, encre navy | **15 px / 500, gris moyen** |
+| Chiffres des six cases | 700 | **600** |
+| « Modifier », « Renvoyer » (`tealLink`) | 600 | **500** |
+| « Ouvrir ma boîte mail » (`methodLabel`) | 600 | **500** |
+| Mention légale (`checkboxLabel`) | 15 px | **13 px** |
+| « OU CONTINUER AVEC » (`dividerLabel`) | 12 px / 700 | **11 px / 400** |
+| « Déjà un compte ? » + son lien | 15 px / 400 + 500 | **13 px / 400 + 400** |
+| Bouton (`ctaLabel`) | 700 | **700 — inchangé, et seul** |
+
+### Web
+
+Le titre de la vérification était en `font-extrabold` (**800**) alors que celui de l'inscription
+était passé en `font-semibold` (600) avec D91 : les deux étapes du même geste n'avaient pas le
+même titre. Corrigé, avec le libellé du code (`text-xs font-semibold` → `text-[13px]
+font-medium text-slate-500`), les liens, les compteurs, et les titres de la colonne de gauche.
+
+### Les trois raisonnements, parce qu'ils se transposent
+
+1. **« Saisis ton code » est un LIBELLÉ, pas un titre.** Il annonce un champ. À 16 px / 700 il
+   disputait le haut de la page au vrai titre.
+2. **Un lien coloré n'a pas besoin d'être gras.** Le mango du lien de pied et le teal des liens
+   d'action les désignent déjà ; la graisse les signalait **une seconde fois**.
+3. **Une charnière se lit une fois et disparaît.** « OU CONTINUER AVEC » sépare deux façons de
+   s'inscrire : ce sont les deux filets et l'interlettrage qui font ce travail, pas la graisse.
+
+### Ce que la fiche tient
+
+`auth-verify-parite.spec.ts` compte désormais les graisses : **la trousse du mobile n'a qu'un
+seul TEXTE en 700 ou plus — `ctaLabel`** — et le formulaire web n'a plus aucun `font-extrabold`,
+son unique `font-bold` portant la classe `bg-[#FF9900]`. `failureGlyph` et `checkboxMark` sont
+exclus nommément : une croix de 36 px et une coche de case sont des **glyphes dessinés**, dont
+la graisse est un trait et non un niveau de lecture.
+
+**Défaut de la fiche, trouvé en l'écrivant :** la première version cherchait la graisse à partir
+d'un nom de style avec `[\s\S]*?`, ce qui **traverse les blocs voisins** — elle annonçait trois
+fautifs pour un seul réel. Elle découpe maintenant les styles d'abord, et teste chacun
+séparément. Une expression régulière non bornée sur un fichier structuré accuse toujours les
+innocents qui précèdent le coupable.

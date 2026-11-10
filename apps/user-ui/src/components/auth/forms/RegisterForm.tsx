@@ -513,7 +513,11 @@ export default function RegisterForm({ heroVisual }: Props) {
                   className="mt-1 h-4 w-4 flex-shrink-0 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
                   {...register("termsAccepted", { required: copy.requiredTerms })}
                 />
-                <span className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                {/* Revue du 10/11 — la mention légale RECULE : c'est la plus longue
+                    ligne de l'écran et la moins décisive. Elle garde sa taille (le
+                    web lit plus près que le téléphone) et prend l'encre des
+                    textes secondaires, au lieu de celle du corps. */}
+                <span className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                   {copy.cguTextStart}{" "}
                   <Link
                     href="/legal/terms"
@@ -576,7 +580,7 @@ export default function RegisterForm({ heroVisual }: Props) {
               fonctionne. */}
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="text-[10px] font-normal uppercase tracking-wider text-slate-400 dark:text-slate-500">
               {copy.orSocial}
             </span>
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -594,11 +598,11 @@ export default function RegisterForm({ heroVisual }: Props) {
             </button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-6 text-center text-[13px] text-slate-500 dark:text-slate-400">
             {copy.haveAccount}{" "}
             <Link
               href={loginHref}
-              className="font-medium text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+              className="text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.login}
             </Link>
