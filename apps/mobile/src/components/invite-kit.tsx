@@ -40,6 +40,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import YambaSymbol from '@/components/yamba-symbol';
 import { Spacing } from '@/constants/theme';
 import { Brand } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     fontSize: 24,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
     letterSpacing: -0.5,
   },
   // NI l'un NI l'autre ne portent la gouttière : la typographie n'est pas une
@@ -212,13 +213,13 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 34,
     lineHeight: 39,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
     letterSpacing: -0.8,
   },
   body: {
     fontSize: 16,
     lineHeight: 23,
-    fontWeight: 500,
+    fontFamily: Font.medium,
     marginTop: Spacing.three,
     /**
      * AUCUN plafond de mesure, et c'est un retrait (revue du 08/11, 23h12).
@@ -251,7 +252,7 @@ const styles = StyleSheet.create({
   },
   primaryLabel: {
     fontSize: 16,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   secondary: {
     borderRadius: 12,
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     fontSize: 16,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   tertiary: {
     minHeight: 44,
@@ -272,7 +273,7 @@ const styles = StyleSheet.create({
   },
   tertiaryLabel: {
     fontSize: 15,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   pressed: {
     opacity: 0.75,

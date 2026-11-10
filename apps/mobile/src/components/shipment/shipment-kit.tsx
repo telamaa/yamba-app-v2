@@ -23,6 +23,7 @@ import { useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 
 /* ── Chrome ──────────────────────────────────────────────────────────────── */
@@ -390,7 +391,7 @@ const styles = StyleSheet.create({
   overline: {
     fontSize: 10,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },

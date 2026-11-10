@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 type Props = {
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     fontSize: 13,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   dismiss: {
     paddingHorizontal: Spacing.two,
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
     // D91 5A, appliquée ici par la revue du 10/11 : le titre RECULE à 600.
     // À 800 il ne laissait rien derrière lui — quand tout crie, rien ne porte.
     // Le seul 700 de l'écran est le bouton, et c'est ce qui le fait avancer.
-    fontWeight: 600,
+    fontFamily: Font.semibold,
     marginBottom: Spacing.two,
   },
   subtitle: {
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
     // double pas. À 16 il faisait un second titre juste sous le premier.
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: 400,
+    fontFamily: Font.regular,
   },
   content: {
     marginTop: Spacing.four,

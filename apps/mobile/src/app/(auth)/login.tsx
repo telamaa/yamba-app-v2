@@ -30,6 +30,7 @@ import {
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import {
   consumeLoginPrefill,
   setLoginEmail,
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     fontSize: 14,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   logo: {
     width: 20,
@@ -183,11 +184,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   footerLink: {
     fontSize: 15,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     color: AuthBrand.mango,
   },
   backdrop: {
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
   },
   confirmEmail: {
     fontSize: 18,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textAlign: 'center',
   },
   confirmBody: {
@@ -217,6 +218,6 @@ const styles = StyleSheet.create({
   },
   confirmBackLabel: {
     fontSize: 15,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
 });

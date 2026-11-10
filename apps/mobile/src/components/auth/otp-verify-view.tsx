@@ -33,6 +33,7 @@ import { AuthCta, AuthError, MethodButton, TealLink } from '@/components/auth/au
 import { OtpInput, OTP_LENGTH } from '@/components/auth/otp-input';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { formatMMSS, useCountdown } from '@/hooks/use-countdown';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
   emailAddress: {
     flexShrink: 1,
     fontSize: 16,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   validityChip: {
     flexDirection: 'row',
@@ -310,19 +311,19 @@ const styles = StyleSheet.create({
   },
   validityLabel: {
     fontSize: 14,
-    fontWeight: 400,
+    fontFamily: Font.regular,
   },
   validityTime: {
     // 600 et non 700 : le compte à rebours doit se REPÉRER dans sa phrase,
     // pas peser autant que le bouton.
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   enterCode: {
     // « Saisis ton code » est un LIBELLÉ de champ, pas un titre : 15 px / 500
     // en gris moyen, comme tous les libellés du mobile (D91 5A — 15 et non 13
     // comme le web : même rôle, autre distance de lecture).
     fontSize: 15,
-    fontWeight: 500,
+    fontFamily: Font.medium,
     textAlign: 'center',
     marginTop: Spacing.two,
   },
@@ -344,6 +345,6 @@ const styles = StyleSheet.create({
   },
   resendWait: {
     fontSize: 15,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
 });

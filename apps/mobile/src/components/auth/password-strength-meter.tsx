@@ -13,6 +13,7 @@ import { useTranslations } from 'use-intl';
 
 import { useAuthPalette } from '@/components/auth/auth-theme';
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import {
   getPasswordChecks,
   getPasswordLevel,
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
   },
   levelLabel: {
     fontSize: 13,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   missing: {
     fontSize: 13,

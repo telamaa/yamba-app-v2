@@ -38,6 +38,7 @@ import { ReportSheet } from '@/components/report-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
@@ -1075,7 +1076,7 @@ const styles = StyleSheet.create({
   routeArrow: {
     color: Brand.mango,
     fontSize: 24,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1106,7 +1107,7 @@ const styles = StyleSheet.create({
   overline: {
     fontSize: 10,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },

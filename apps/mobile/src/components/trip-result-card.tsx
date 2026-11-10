@@ -34,6 +34,7 @@ import { useLocale, useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { addTripFavorite, removeTripFavorite } from '@/lib/api/favorite.api';
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
   route: {
     fontSize: 16,
     lineHeight: 21,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
     letterSpacing: -0.2,
   },
   flag: {
@@ -512,7 +513,7 @@ const styles = StyleSheet.create({
   plusOne: {
     fontSize: 10,
     lineHeight: 18,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   priceBlock: {
     alignItems: 'flex-end',
@@ -529,21 +530,21 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     lineHeight: 21,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   example: {
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   priceUnit: {
     fontSize: 11,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   remainingKg: {
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   footer: {
     flexDirection: 'row',
@@ -558,12 +559,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
     fontSize: 13,
     lineHeight: 17,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   travelerMeta: {
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   avatar: {
     width: 26,
@@ -577,7 +578,7 @@ const styles = StyleSheet.create({
   avatarInitials: {
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   superRing: {
     padding: 1.5,
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
   viewsText: {
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   pressed: {
     opacity: 0.7,

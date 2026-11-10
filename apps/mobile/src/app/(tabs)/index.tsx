@@ -46,6 +46,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { shouldRefetchForLocale } from '@/lib/locale-refetch';
@@ -856,7 +857,7 @@ const styles = StyleSheet.create({
   tabCount: {
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     fontVariant: ['tabular-nums'],
   },
   sweepTrack: {

@@ -33,6 +33,7 @@ import { AuthBrand, useAuthPalette } from '@/components/auth/auth-theme';
 import { PasswordInput } from '@/components/auth/password-input';
 import { PasswordStrengthMeter } from '@/components/auth/password-strength-meter';
 import { Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { register } from '@/lib/api/auth.api';
 import { ApiError } from '@/lib/api/client';
 import { setPendingRegistration } from '@/lib/auth-flow-state';
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
    * rien perdre de ce qui se clique.
    */
   termsDoc: {
-    fontWeight: 500,
+    fontFamily: Font.medium,
     textDecorationLine: 'underline',
   },
   footer: {
@@ -283,13 +284,13 @@ const styles = StyleSheet.create({
   // comme la mention légale — le bas d'écran recule d'un bloc (revue du 10/11).
   footerText: {
     fontSize: 13,
-    fontWeight: 400,
+    fontFamily: Font.regular,
   },
   footerLink: {
     fontSize: 13,
     // 400 : la MANGUE suffit à désigner le lien. Lui ajouter de la graisse,
     // c'est le signaler deux fois — et un bas d'écran n'a pas à se signaler.
-    fontWeight: 400,
+    fontFamily: Font.regular,
     color: AuthBrand.mango,
   },
 });

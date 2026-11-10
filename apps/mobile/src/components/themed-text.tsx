@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
@@ -37,27 +38,27 @@ const styles = StyleSheet.create({
   small: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   smallBold: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   default: {
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   title: {
     fontSize: 30,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
     lineHeight: 36,
   },
   subtitle: {
     fontSize: 20,
     lineHeight: 28,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   link: {
     lineHeight: 30,
@@ -68,6 +69,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   code: {
+    // Le SEUL `fontWeight` qui subsiste dans `src/`, et il est légitime : il
+    // porte sur la famille MONO, pas sur Plus Jakarta. Le gras de synthèse
+    // qu'on redoute ailleurs (D95) est justement ce qu'on cherche ici — la
+    // mono d'Android est trop maigre d'un cran.
     fontFamily: Fonts.mono,
     fontWeight: Platform.select({ android: 700 }) ?? 500,
     fontSize: 12,

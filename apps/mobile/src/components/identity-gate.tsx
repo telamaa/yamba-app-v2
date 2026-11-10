@@ -85,6 +85,7 @@ import { useTranslations } from 'use-intl';
 import { InviteBody, InviteGutter, useInviteColors } from '@/components/invite-kit';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useSession } from '@/lib/session-context';
 
 /**
@@ -235,7 +236,7 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     fontSize: 16,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   pressed: {
     opacity: 0.75,

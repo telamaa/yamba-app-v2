@@ -44,6 +44,7 @@ import { BookingStepFrame } from '@/components/booking/booking-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { countryFlag } from '@/lib/country-name';
 import { useTheme } from '@/hooks/use-theme';
 import { currentPricingParams, loadPricingParams } from '@/lib/api/pricing.api';
@@ -787,7 +788,7 @@ const styles = StyleSheet.create({
   },
   surcharge: {
     color: Brand.mango,
-    fontWeight: '700',
+    fontFamily: Font.bold,
   },
   // LA CARTE DU COLIS — un titre, puis des lignes pleine largeur séparées par
   // un filet. Pas de cadre dans un cadre : le blanc fait la structure.
@@ -851,7 +852,7 @@ const styles = StyleSheet.create({
   stepperInput: {
     minWidth: 52,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: Font.bold,
     textAlign: 'center',
     paddingVertical: 0,
   },
