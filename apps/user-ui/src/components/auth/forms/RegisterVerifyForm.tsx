@@ -573,7 +573,16 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
     );
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
+    <main className="mx-auto w-full max-w-7xl px-4">
+      {/* D92 — la largeur du contenu est celle de l'EN-TÊTE : `mx-auto
+          max-w-7xl px-4`, la même ligne que `Header.tsx:99`. La page partait
+          auparavant bord à bord, si bien que le logo et « Connexion » étaient
+          les deux seuls éléments à respecter une marge : rien en dessous ne
+          s'alignait sur eux, et la colonne de gauche touchait le bord de
+          l'écran sur un grand moniteur. Les coins et la bordure suivent, sans
+          quoi le panneau teal redevient un rectangle à arêtes vives posé au
+          milieu du vide. */}
+      <div className="overflow-hidden lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-104px)] lg:rounded-2xl lg:border lg:border-slate-200 lg:my-5 dark:lg:border-slate-800">
       {/* LEFT — la colonne répond à l'attente, elle ne vend plus (D92 1A) */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} variant="waiting" action={mailboxButton} />
@@ -795,6 +804,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             )}
           </div>
         </div>
+      </div>
       </div>
     </main>
   );
