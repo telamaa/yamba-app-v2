@@ -7929,3 +7929,148 @@ Deux conséquences que l'on n'anticipe pas toujours :
   d'inverser un email, et comment le leur interdire.
 - **Can I email** (caniemail.com) — l'équivalent de Can I Use pour les clients mail : à
   consulter avant d'écrire la moindre propriété CSS dans un email.
+
+---
+
+## Chapitre 234 — Le symptôme traité trois fois, la famille par graisse, et le bouton qui ne change ni de taille ni de mot
+
+*D95, 10/11/2026.*
+
+### 1. Quand une correction juste ne corrige rien
+
+« Trop de gras sur le mobile » a été corrigé trois fois. Chaque passe était défendable : le
+titre passait de 800 à 600, les libellés de 700 à 500, la charnière de 12/700 à 11/400. Chaque
+passe améliorait. **Aucune ne refermait l'écart.**
+
+La cause : le site compose en **Plus Jakarta Sans**, le téléphone composait avec la police
+**système**. À graisse numérique égale, SF Pro rend plus épais que Plus Jakarta — l'écran
+paraissait trop gras alors que ses nombres étaient *déjà* ceux du site.
+
+> **Le signal à reconnaître : une correction juste qui améliore sans résoudre, deux fois de
+> suite, désigne une cause d'un autre ordre.** On déplaçait une courbe le long d'une autre au
+> lieu de changer de courbe. La question posée était « quelle graisse ? » ; la réponse était
+> « quelle police ? ».
+
+Le moyen de la trouver n'était pas le raisonnement, c'était la **comparaison** : deux captures
+du même formulaire, côte à côte.
+
+### 2. Pourquoi une famille par graisse, et pourquoi il faut le vérifier
+
+Sur le web, une famille porte toutes ses graisses : `font-weight: 600` choisit la bonne coupe.
+**En React Native, non.** Chaque fichier est une famille :
+
+```ts
+fontFamily: 'PlusJakartaSans_600SemiBold'   // ✅ la bonne coupe
+fontWeight: 600                              // ❌ ne choisit rien, ou pire
+```
+
+`expo-font` sait faire la correspondance… **par son config plugin**, donc dans un build de
+développement. Sous Expo Go, non.
+
+Le piège est qu'une erreur ici **ne casse rien** :
+
+| Erreur | Ce qui se passe |
+|---|---|
+| Famille inconnue | React Native retombe sur la police **système**, sans erreur ni journal |
+| `fontWeight` à côté d'un `fontFamily` nommé | **gras de synthèse** sur Android : le système épaissit un dessin déjà épais |
+
+Les deux sont invisibles en développement sur iOS. D'où la règle de méthode :
+
+> **Lisez la documentation de la version exacte avant d'écrire la première ligne, quand une
+> erreur possible ne produit aucun message.** Un bug qui lève une exception se trouve tout
+> seul ; un bug qui dégrade en silence ne se trouve jamais.
+
+### 3. Nommer des rôles, pas des nombres
+
+```ts
+export const Font = {
+  regular:   'PlusJakartaSans_400Regular',   // corps
+  medium:    'PlusJakartaSans_500Medium',    // libellés, liens
+  semibold:  'PlusJakartaSans_600SemiBold',  // titres
+  bold:      'PlusJakartaSans_700Bold',      // LE bouton
+  extrabold: 'PlusJakartaSans_800ExtraBold', // glyphes dessinés
+} as const;
+```
+
+Le gain n'était pas demandé et compte autant que la police : une revue de design peut désormais
+dire « c'est un libellé, pas un titre » au lieu de « mets 500 ». Et une **fiche peut compter les
+niveaux**, ce qu'un nombre ne permettait pas sans ambiguïté — 700 sur une croix de fermeture
+n'est pas le même objet que 700 sur un bouton.
+
+### 4. Trois pièges d'outillage, et ce qu'ils enseignent
+
+**① Le baril d'un paquet n'est pas un détail d'import.**
+
+```ts
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans';          // ❌
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold'; // ✅
+```
+
+Le baril réexporte **quatorze** graisses, leurs italiques et son propre `useFonts` — il
+embarquerait tout pour cinq fichiers utiles. Et il tire `expo-font` par une chaîne d'ESM que
+jest ne traverse pas : **une fiche qui ne peut pas importer la règle ne la vérifie pas.**
+
+**② Un module « pur » qui importe un binaire ne l'est plus pour le harnais.**
+
+```js
+moduleNameMapper: { '\\.(ttf|otf|woff2?|png|jpe?g|gif|webp)$': '<rootDir>/src/test-support/asset-stub.ts' }
+```
+
+Le bouchon rend ce que Metro rendrait : un identifiant. Les fiches vérifient que chaque niveau
+**pointe** un actif, sans rien savoir de son contenu — ce qui est exactement la frontière du
+harnais.
+
+**③ `transformIgnorePatterns` se nomme, il ne se ratisse pas.**
+
+```js
+transformIgnorePatterns: ['node_modules/(?!@expo-google-fonts/)']
+```
+
+Exempter un paquet nommément documente *pourquoi* l'exception existe. Un motif large
+(`node_modules/(?!.*expo.*)`) marche aussi, et personne ne saura plus lequel des trente paquets
+en avait besoin.
+
+### 5. Le bouton qui travaille : ce qu'il ne doit pas faire
+
+```tsx
+{pending && <Loader2 className="absolute inset-0 m-auto animate-spin" aria-hidden />}
+<span className={pending ? "opacity-0" : undefined}>{label}</span>
+```
+
+**Le libellé ne disparaît pas, il s'efface.** `opacity: 0` le laisse occuper sa place : la
+largeur du bouton est figée par son propre texte. `display: none` ou un ternaire qui le retire
+ferait sauter la largeur au moment précis où l'on vient de cliquer dessus.
+
+Trois choses qu'on évite ainsi, et la troisième est la moins évidente :
+
+1. le **saut de largeur** ;
+2. le **changement de libellé** (« Création… ») — un mot de plus à lire pour n'apprendre que ce
+   que le disque dit déjà. Les clés correspondantes sont **supprimées**, pas gardées ;
+3. le bouton qui **se vide puis se remplit** — deux animations là où une seule suffit.
+
+Et une règle qui ne se voit pas : **au succès, on ne réactive pas le bouton.** Le disque tourne
+jusqu'à la navigation. Le rendre cliquable une fraction de seconde avant que l'écran change,
+c'est offrir un second envoi à qui clique vite.
+
+### 6. Quand une fiche rouge est une bonne nouvelle
+
+Trois fiches écrites une heure plus tôt — « la trousse n'a qu'un seul texte en 700 » — sont
+passées au rouge à la bascule. Elles cherchaient `fontWeight: 700`, qui n'existait plus.
+
+C'est **exactement** ce qu'on leur demande. Elles tenaient une **règle** (un seul élément
+avance), pas une **orthographe** (`fontWeight: 700`). Traduites en `Font.bold`, elles tiennent
+la même chose — et elles ont prouvé au passage qu'elles regardaient vraiment quelque chose.
+
+> **Le corollaire :** une fiche qui reste verte pendant une refonte de ce qu'elle surveille ne
+> surveillait rien.
+
+### 7. Pour aller plus loin
+
+- **La documentation `expo-font` du SDK exact** — la différence entre le config plugin et le
+  runtime n'est écrite nulle part ailleurs.
+- **`@expo-google-fonts`** — la convention des sous-chemins, et pourquoi le baril existe quand
+  même (le prototypage).
+- **WAI-ARIA `aria-busy`** — ce qu'un lecteur d'écran annonce pendant qu'un bouton travaille,
+  et pourquoi cela ne remplace pas un indicateur visible.
+- **Gras de synthèse (*faux bold*)** — comment les systèmes fabriquent une graisse absente en
+  épaississant les contours, et pourquoi le résultat ne ressemble à aucune coupe réelle.

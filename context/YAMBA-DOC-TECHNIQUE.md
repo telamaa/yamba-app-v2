@@ -16695,3 +16695,132 @@ d'un nom de style avec `[\s\S]*?`, ce qui **traverse les blocs voisins** — ell
 fautifs pour un seul réel. Elle découpe maintenant les styles d'abord, et teste chacun
 séparément. Une expression régulière non bornée sur un fichier structuré accuse toujours les
 innocents qui précèdent le coupable.
+
+---
+
+# D95 — La police de la marque sur le téléphone, et le chargement des boutons
+
+*10/11/2026, `feat/finitions-verification`. Décision tranchée par l'utilisateur sur question
+explicite, après trois passes d'allègement qui ne refermaient pas l'écart.*
+
+## ① Le symptôme traité trois fois
+
+« Trop de gras sur le mobile » a été corrigé **trois fois de suite**, chaque fois justement :
+
+| Passe | Ce qui a été fait | Résultat |
+|---|---|---|
+| 1 | D91 5A appliquée page 2 : titre 800 → 600, libellés 700 → 500 | mieux, toujours plus lourd que le web |
+| 2 | mention légale 15 → 13 px, charnière 12/700 → 11/400, pied 15 → 13 px | mieux, toujours plus lourd |
+| 3 | charnière 500 → 400, lien de pied 500 → 400, sous-titre 16 → 15 px | mieux, **toujours plus lourd** |
+
+La cause n'était pas dans les nombres : **le site compose en Plus Jakarta Sans
+(`layout.tsx:2`, `global.css:130`), le téléphone composait avec la police SYSTÈME** — SF Pro sur
+iOS, Roboto sur Android.
+
+**À graisse numérique égale, SF Pro rend plus épais que Plus Jakarta.** L'écran du mobile
+paraissait trop gras alors que ses nombres étaient **déjà ceux du site**. On déplaçait une
+courbe le long d'une autre au lieu de changer de courbe : toute compensation était condamnée
+d'avance, et chaque écran futur aurait repayé la question.
+
+> **La leçon de méthode : un symptôme traité trois fois ne devient une cause qu'au moment où
+> l'on arrête de le traiter.** La question posée était « quelle graisse ? » ; la réponse était
+> « quelle police ? ».
+
+## ② Une famille par graisse — imposé par la documentation, pas choisi
+
+`expo-font` sait regrouper plusieurs fichiers sous **une** famille avec des descripteurs de
+graisse… par son **config plugin** uniquement, donc dans un build de développement. Ce chantier
+tourne sous **Expo Go** (D82 3A). Au runtime, chaque graisse est une famille à part entière.
+
+**Vérifié dans la documentation du SDK 57 avant d'écrire une ligne**, et c'est ce qui a sauvé le
+lot : supposer l'inverse aurait laissé des `fontWeight` à côté des familles nommées — donc un
+**gras de synthèse sur Android**, où le système épaissit un dessin déjà épais. Invisible en
+développement sur iOS, laid sur le téléphone de quelqu'un.
+
+```ts
+export const Font = {
+  regular:   'PlusJakartaSans_400Regular',   // corps
+  medium:    'PlusJakartaSans_500Medium',    // libellés, liens, mentions
+  semibold:  'PlusJakartaSans_600SemiBold',  // titres, valeurs à repérer
+  bold:      'PlusJakartaSans_700Bold',      // LE bouton (D91 5A)
+  extrabold: 'PlusJakartaSans_800ExtraBold', // glyphes dessinés seulement
+} as const;
+```
+
+**67 `fontWeight` dans 23 fichiers** deviennent des `fontFamily`. Le seul qui subsiste porte sur
+la famille **mono** — là, le gras de synthèse est précisément ce qu'on cherche : la mono
+d'Android est trop maigre d'un cran.
+
+Les cinq niveaux nomment des **rôles**, pas des nombres. `Font.medium` se lit ; `fontFor(500)`
+se déchiffre, et n'existe que pour les rares graisses calculées.
+
+## ③ Trois pièges rencontrés, dans l'ordre
+
+| Piège | Symptôme | Correction |
+|---|---|---|
+| Le **baril** du paquet | jest : `Unexpected token 'export'` — il tire `useFonts` et tout `expo-font` | import par **sous-chemin** (`…/600SemiBold`), qui évite aussi d'embarquer les 14 graisses |
+| `require('.ttf')` sous **Node** | le harnais ne sait pas lire un binaire | un **bouchon d'actif** qui rend ce que Metro rendrait |
+| **ESM** dans `node_modules` | jest n'y transforme rien par défaut | `transformIgnorePatterns` **nommant le seul paquet concerné** |
+
+Le harnais reste `testEnvironment: node` et ne rend **aucun** composant : la frontière d'A223 ne
+bouge pas.
+
+## ④ Le splash attend les polices
+
+`useFonts` rend `false` pendant le chargement. Sans attente, le premier rendu part en police
+système puis **bascule** à l'arrivée des fichiers — un saut de typographie à l'ouverture, sur le
+seul écran qu'on ne peut pas fermer. Le splash de D90 couvrait déjà l'amorçage de la session ;
+les deux attentes **se recouvrent**, donc l'ouverture ne s'allonge pas.
+
+## ⑤ Le chargement des boutons
+
+Trois options ont été présentées (disque en place / filet de progression / bouton qui se réduit
+en disque) ; le choix a été laissé au jugement. **Retenu : le libellé s'efface.**
+
+```tsx
+{pending && <Loader2 className="absolute inset-0 m-auto animate-spin" aria-hidden />}
+<span className={pending ? "opacity-0" : undefined}>{label}</span>
+```
+
+Rendu à l'opacité 0, le libellé **occupe toujours sa place** : la largeur du bouton ne bouge pas
+d'un pixel. Trois défauts évités, tous visibles à l'œil nu :
+
+1. **le saut de largeur** quand « Créer mon compte » devient « Création… » ;
+2. **le changement de libellé** — un mot de plus à lire pour n'apprendre que ce que le disque
+   dit déjà. Les clés `ctaLoading` et `otp.verifying` sont donc **supprimées**, pas conservées
+   « au cas où » ;
+3. **le bouton qui se vide puis se remplit** — deux animations là où une seule suffit.
+
+Au succès **on navigue** : le disque ne s'arrête jamais, il part avec l'écran. C'est voulu — un
+bouton qui redevient cliquable une fraction de seconde avant la navigation invite au double
+envoi. Le bouton porte `aria-busy` côté web ; côté mobile, `LoadingDots` (57 lignes) n'a plus
+d'appelant et **sort**.
+
+## ⑥ Ce que les fiches tiennent
+
+Le danger de ce lot n'est pas qu'il casse : **c'est qu'il se défasse en silence.** React Native
+ne se plaint jamais d'une famille inconnue — il retombe sur la police système, sans erreur, sans
+journal. Un écran écrit demain avec `fontWeight: 600` sera simplement composé dans une autre
+police que ses voisins.
+
+| Fiche | Ce qu'elle empêche |
+|---|---|
+| ① plus aucun `fontWeight` dans `src/` | le gras de synthèse d'Android |
+| ② aucun nom de famille écrit à la main | une chaîne recopiée qui se démode seule |
+| ③ `Font` ≡ clés de `FONT_ASSETS` | **le cas sournois** : un niveau déclaré mais jamais chargé compose en police système, les quatre autres étant justes |
+| ④ le nom de la famille du web se retrouve côté mobile | la divergence qui a motivé tout le lot |
+
+Mobile : **562 → 570** fiches, **31 → 32** suites. Les trois fiches de graisse de D91 5A ont été
+vues **rouges** à la bascule — et c'est ce qu'on leur demande : elles tenaient une **règle**, pas
+une orthographe. Traduites (`Font.bold` au lieu de `fontWeight: 700`), elles tiennent la même
+chose.
+
+## ⑦ Reste ouvert
+
+- **Android n'a pas été ouvert.** La bascule n'a été vue que sur le simulateur iOS — or c'est
+  précisément sur Android que le gras de synthèse se serait vu. D73 publie Android d'abord :
+  cette vérification est due.
+- **Les italiques ne sont pas chargées.** Aucun écran n'en utilise ; un `fontStyle: 'italic'`
+  posé sur une famille non italique donnerait un faux italique penché.
+- **La dépendance est entrée par une PR de fonctionnalité**, ce que le dépôt réserve d'ordinaire
+  aux PR `chore/deps`. Arbitrage assumé : la dépendance **est** le lot.

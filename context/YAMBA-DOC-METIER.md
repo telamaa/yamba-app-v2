@@ -8480,3 +8480,61 @@ trait en plus ne sépare rien qui ne le soit déjà.
 | # | Situation | Attendu |
 |---|---|---|
 | 17 | J'ouvre l'inscription sur un grand écran | le contenu s'aligne sur le logo et sur « Connexion », **sans cadre autour** |
+
+---
+
+# D95 — Une seule écriture pour un seul produit
+
+## Le besoin
+
+Un Expéditeur qui s'inscrit sur le site puis ouvre l'application doit reconnaître **le même
+produit**. Les couleurs étaient les mêmes, les mots étaient les mêmes depuis D91 et D92 — mais
+pas l'écriture. Le site compose dans la police de la marque ; le téléphone composait dans celle
+du système, c'est-à-dire dans celle de tout le monde.
+
+Personne ne sait nommer ce qui cloche quand une écriture change. On dit « ça fait moins fini »,
+ou, comme ici trois fois de suite : **« c'est trop gras »**.
+
+## Les règles
+
+**RG-D95-1 — Les deux applications écrivent dans la même police.** Elle fait partie de la
+marque, au même titre que la mangue et le teal. Une application qui emprunte l'écriture du
+système ressemble au système, pas à Yamba.
+
+**RG-D95-2 — Une graisse porte un rôle, pas un nombre.** Corps, libellé, titre, bouton. On
+choisit « libellé » et la valeur suit ; on ne choisit pas « 500 » en espérant que ce soit un
+libellé.
+
+**RG-D95-3 — L'écriture est prête avant le premier mot affiché.** Sinon l'application s'ouvre
+dans une police et bascule dans une autre sous les yeux de la personne — sur le seul écran
+qu'elle ne peut pas fermer.
+
+**RG-D95-4 — Un bouton qui travaille ne change ni de taille ni de mot.** Il montre qu'il
+travaille, c'est tout. Changer le libellé donne un mot de plus à lire qui n'apprend rien ;
+changer la largeur fait sauter la page au moment où l'on vient de cliquer.
+
+**RG-D95-5 — Un bouton qui a réussi ne redevient pas cliquable.** Entre la réussite et l'écran
+suivant, il reste occupé. Le rendre disponible une fraction de seconde, c'est inviter au second
+envoi.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je passe du site à l'application | **la même écriture**, à la même épaisseur |
+| 2 | J'ouvre l'application | aucun changement de police après l'affichage |
+| 3 | Je compare un titre web et son jumeau mobile | même poids visuel, pas seulement même nombre |
+| 4 | Je valide un formulaire | le bouton garde **exactement** sa taille et son mot |
+| 5 | Je valide un formulaire | il montre qu'il travaille, et ne se laisse plus cliquer |
+| 6 | La validation réussit | il reste occupé jusqu'à l'écran suivant |
+| 7 | La validation échoue | il redevient disponible, et l'erreur est lisible |
+
+## Ce qui reste hors de ce lot
+
+**L'application n'a pas été ouverte sur Android** depuis la bascule — or c'est le système où un
+mauvais câblage de police se serait vu le plus nettement. Yamba publie Android d'abord : cette
+vérification est due.
+
+**Les italiques n'ont pas été embarquées.** Aucun écran n'en utilise aujourd'hui ; le jour où
+l'un en demandera, il faudra les charger plutôt que de laisser le système en fabriquer une en
+penchant les lettres.
