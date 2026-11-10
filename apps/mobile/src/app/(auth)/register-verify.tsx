@@ -8,6 +8,10 @@
  * échec du chaînage retombe sur la connexion préremplie « compte activé ».
  * Étape morte côté serveur (pending 30 min / jeton 15 min expirés) : un
  * état dédié propose de recommencer — jamais un code d'erreur brut.
+ *
+ * D92 1A — l'écran ne porte plus de badge « Vérification sécurisée » : un
+ * signal de confiance nomme un tiers ou un fait vérifiable, sinon il ne dit
+ * rien (règle 1A de D91, que cet écran-ci n'avait pas encore reçue).
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -46,7 +50,7 @@ export default function RegisterVerifyScreen() {
   // l'écran le dit et propose de reprendre.
   if (pendingRegistration === null || expired) {
     return (
-      <AuthScreen badge={t('otp.badge')} title="">
+      <AuthScreen title="">
         <AuthFailureView
           title={t('failure.title')}
           body={expired ? t('otp.registrationExpired') : t('otp.flowLost')}
@@ -94,7 +98,7 @@ export default function RegisterVerifyScreen() {
   };
 
   return (
-    <AuthScreen badge={t('otp.badge')} title={t('otp.title')} subtitle={t('otp.sentTo')}>
+    <AuthScreen title={t('otp.title')} subtitle={t('otp.sentTo')}>
       <OtpVerifyView
         email={pendingRegistration.email}
         onVerifyAction={onVerify}
@@ -104,8 +108,7 @@ export default function RegisterVerifyScreen() {
           setExpired(true);
           return true;
         }}
-        restartQuestion={t('otp.wrongEmail')}
-        restartLabel={t('otp.restart')}
+        restartLabel={t('otp.changeEmail')}
         onRestartAction={onRestart}
       />
     </AuthScreen>

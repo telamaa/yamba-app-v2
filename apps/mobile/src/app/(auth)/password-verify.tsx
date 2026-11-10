@@ -47,8 +47,7 @@ export default function PasswordVerifyScreen() {
         email={pendingReset.email}
         onVerifyAction={onVerify}
         onResendAction={() => resendPasswordOtp(pendingReset.email)}
-        restartQuestion={t('otp.wrongEmail')}
-        restartLabel={t('otp.restart')}
+        restartLabel={t('otp.changeEmail')}
         onRestartAction={() => {
           setPendingReset(null);
           router.back();

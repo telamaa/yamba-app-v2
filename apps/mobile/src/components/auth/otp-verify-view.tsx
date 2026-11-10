@@ -1,40 +1,50 @@
 /**
- * otp-verify-view.tsx — l'étape « saisis ton code » partagée (A208, refonte
- * sur captures).
+ * otp-verify-view.tsx — l'étape « saisis ton code » partagée (A208, refondue
+ * par D92).
  * =========================================================================
- * La composition de l'écran « Vérification du code » du site : l'adresse
- * MASQUÉE dans une carte (police mono), la puce « Code valable mm:ss »,
- * les six cases, l'astuce collage, le CTA « Valider mon code », puis le
- * bloc renvoi (« Pas reçu le code ? Vérifie tes spams ou… ») et le lien
- * « Recommencer ». La mécanique est inchangée : TROIS compteurs
- * (expiration 10 min = TTL serveur, renvoi 60 s purement client —
- * anti-énumération —, verrou serveur `details.lockUntilSeconds`),
- * vérification d'office à la sixième frappe, refus par `details.code`
- * (RG-MOB-1), codes fatals remontés à l'écran appelant.
+ * L'écran est une SALLE D'ATTENTE, pas un formulaire : c'est le seul du
+ * produit où l'utilisateur sort de l'application pour aller chercher un code
+ * dans sa boîte mail, et doit vouloir revenir. Sa composition suit de là.
+ *
+ *   • L'adresse est EN CLAIR, avec « Modifier » à côté (D92 2A). On masque
+ *     une adresse que l'utilisateur n'a pas tapée — défi de connexion,
+ *     récupération de compte, où celui qui regarde l'écran n'est peut-être
+ *     pas le titulaire. Ici elle a été saisie trente secondes plus tôt sur
+ *     le même appareil : le masque ne protège de rien et DÉTRUIT la seule
+ *     fonction utile de la ligne, attraper la faute de frappe —
+ *     `c*********a@g***.com` rend `gmial.com` et `gmail.com` identiques.
+ *   • UN SEUL compte à rebours est visible à la fois (D92 6A, règles pures
+ *     dans `lib/otp-display.ts`), et l'aide arrive quand elle sert.
+ *   • « Ouvrir ma boîte mail » quand le domaine est connu (`lib/webmail.ts`).
+ *
+ * La mécanique est inchangée : TROIS compteurs (expiration 10 min = TTL
+ * serveur, renvoi 60 s purement client — anti-énumération —, verrou serveur
+ * `details.lockUntilSeconds`), vérification d'office à la sixième frappe,
+ * refus par `details.code` (RG-MOB-1), codes fatals remontés à l'écran
+ * appelant.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
-import { AuthCta, AuthError, TealLink } from '@/components/auth/auth-kit';
+import { AuthCta, AuthError, MethodButton, TealLink } from '@/components/auth/auth-kit';
 import { OtpInput, OTP_LENGTH } from '@/components/auth/otp-input';
-import {
-  AuthRadius,
-  maskEmail,
-  useAuthPalette,
-} from '@/components/auth/auth-theme';
+import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { Spacing } from '@/constants/theme';
 import { formatMMSS, useCountdown } from '@/hooks/use-countdown';
 import { ApiError } from '@/lib/api/client';
-
-/** Les TTL du serveur (otp-policy.ts) — affichés, jamais décidés ici. */
-const OTP_EXPIRY_SECONDS = 600;
-const RESEND_COOLDOWN_SECONDS = 60;
+import {
+  OTP_EXPIRY_SECONDS,
+  RESEND_COOLDOWN_SECONDS,
+  resendPhase,
+  showValidity,
+} from '@/lib/otp-display';
+import { webmailUrl } from '@/lib/webmail';
 
 type Props = {
-  /** L'adresse du parcours — affichée MASQUÉE, comme sur le site. */
+  /** L'adresse du parcours — affichée EN CLAIR (D92 2A). */
   email: string;
   onVerifyAction: (otp: string) => Promise<void>;
   /** Renvoie un code ; l'appelant fait son appel API et jette en cas d'échec. */
@@ -42,8 +52,11 @@ type Props = {
   /** Un `details.code` que l'appelant prend en charge (étape expirée…) :
    *  retourner true court-circuite l'affichage générique. */
   onFatalCodeAction?: (code: string) => boolean;
-  /** « Trompé d'adresse e-mail ? » / « Recommencer » du bas d'écran. */
-  restartQuestion: string;
+  /**
+   * Le geste « Modifier », rendu À CÔTÉ de l'adresse et non en pied d'écran
+   * (D92 2A) : la ligne qui porte l'adresse est la seule qui ait à répondre
+   * de sa justesse.
+   */
   restartLabel: string;
   onRestartAction: () => void;
 };
@@ -53,7 +66,6 @@ export function OtpVerifyView({
   onVerifyAction,
   onResendAction,
   onFatalCodeAction,
-  restartQuestion,
   restartLabel,
   onRestartAction,
 }: Props) {
@@ -164,29 +176,59 @@ export function OtpVerifyView({
 
   const canResend = resendWait <= 0 && !locked && !pending;
   const mono = Platform.select({ ios: 'ui-monospace', default: 'monospace' });
+  const mailbox = webmailUrl(email);
+  // Trois états, jamais deux à la fois (D92 6A) : le verrou et l'envoi en
+  // cours comptent comme « pas encore », sans quoi le lien s'offrirait au
+  // moment précis où il refuserait de servir.
+  const phase = canResend ? 'ready' : resendPhase(resendWait);
 
   return (
     <View style={styles.container}>
+      {/* L'adresse EN CLAIR, et le geste qui répond d'elle (D92 2A).
+          `ellipsizeMode="middle"` : si la ligne doit céder, elle cède au
+          MILIEU — le début et le domaine sont justement ce que l'on relit
+          pour attraper la faute de frappe. */}
       <View
         style={[styles.emailCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        <Text style={[styles.emailMasked, { color: palette.title, fontFamily: mono }]}>
-          {maskEmail(email)}
+        <Text
+          style={[styles.emailAddress, { color: palette.title, fontFamily: mono }]}
+          numberOfLines={1}
+          ellipsizeMode="middle">
+          {email}
         </Text>
+        <TealLink label={restartLabel} onPressAction={onRestartAction} />
       </View>
 
-      <View style={[styles.validityChip, { borderColor: palette.border }]}>
-        <Ionicons name="time-outline" size={14} color={palette.muted} />
-        <Text style={[styles.validityLabel, { color: palette.text }]}>
-          {expired ? (
-            t('otp.expired')
-          ) : (
-            <>
-              {t('otp.validFor')}{' '}
-              <Text style={[styles.validityTime, { fontFamily: mono }]}>{formatMMSS(expiry)}</Text>
-            </>
-          )}
-        </Text>
-      </View>
+      {mailbox !== null && (
+        <MethodButton
+          icon={<Ionicons name="mail-outline" size={18} color={palette.title} />}
+          label={t('otp.openMailbox')}
+          onPressAction={() => {
+            // Meilleur effort : un navigateur absent ne doit pas faire
+            // tomber l'écran qui porte le code.
+            void Linking.openURL(mailbox).catch(() => undefined);
+          }}
+        />
+      )}
+
+      {/* La validité ne se montre qu'à sa dernière minute (D92 6A). */}
+      {showValidity(expiry) && (
+        <View style={[styles.validityChip, { borderColor: palette.border }]}>
+          <Ionicons name="time-outline" size={14} color={palette.muted} />
+          <Text style={[styles.validityLabel, { color: palette.text }]}>
+            {expired ? (
+              t('otp.expired')
+            ) : (
+              <>
+                {t('otp.validFor')}{' '}
+                <Text style={[styles.validityTime, { fontFamily: mono }]}>
+                  {formatMMSS(expiry)}
+                </Text>
+              </>
+            )}
+          </Text>
+        </View>
+      )}
 
       <Text style={[styles.enterCode, { color: palette.title }]}>{t('otp.enterCode')}</Text>
 
@@ -206,22 +248,32 @@ export function OtpVerifyView({
 
       <View style={[styles.footerDivider, { backgroundColor: palette.border }]} />
 
+      {/* Le bloc de renvoi, en trois temps (D92 6A) — jamais une phrase
+          ouverte sur un non-geste. */}
       <View style={styles.resendBlock}>
-        <Text style={[styles.resendQuestion, { color: palette.text }]}>
-          {t('otp.notReceived')}
-        </Text>
-        {canResend ? (
-          <TealLink label={t('otp.resend')} onPressAction={resend} center />
-        ) : (
-          <Text style={[styles.resendWait, { color: palette.muted }]}>
-            {t('otp.resendIn', { time: formatMMSS(resendWait) })}
+        {phase === 'ready' ? (
+          <>
+            <Text style={[styles.resendQuestion, { color: palette.text }]}>
+              {t('otp.notReceived')}
+            </Text>
+            <TealLink label={t('otp.resend')} onPressAction={resend} center />
+          </>
+        ) : phase === 'early' ? (
+          <Text style={[styles.resendQuestion, { color: palette.muted }]}>
+            {t('otp.hintEarly')}
           </Text>
+        ) : (
+          <>
+            <Text style={[styles.resendQuestion, { color: palette.text }]}>
+              {t('otp.notReceivedWaiting')}
+            </Text>
+            {resendWait > 0 && (
+              <Text style={[styles.resendWait, { color: palette.muted }]}>
+                {t('otp.resendIn', { time: formatMMSS(resendWait) })}
+              </Text>
+            )}
+          </>
         )}
-      </View>
-
-      <View style={styles.restartRow}>
-        <Text style={[styles.resendQuestion, { color: palette.text }]}>{restartQuestion}</Text>
-        <TealLink label={restartLabel} onPressAction={onRestartAction} />
       </View>
     </View>
   );
@@ -232,12 +284,17 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   emailCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
     borderWidth: 1,
     borderRadius: AuthRadius,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
-  emailMasked: {
+  emailAddress: {
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: 600,
   },
@@ -283,12 +340,5 @@ const styles = StyleSheet.create({
   resendWait: {
     fontSize: 15,
     fontWeight: 600,
-  },
-  restartRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: Spacing.one,
-    flexWrap: 'wrap',
   },
 });
