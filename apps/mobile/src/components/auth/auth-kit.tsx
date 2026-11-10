@@ -39,11 +39,23 @@ import {
 
 /* ── Label de champ ──────────────────────────────────────────────────────── */
 
+/**
+ * Le libellé d'un champ GUIDE, il n'annonce pas (alignement du 10/11 sur le
+ * formulaire web). Il était en 700, à l'encre du titre : sur un écran qui en
+ * aligne quatre, la page n'avait plus de niveau de lecture — tout pesait le
+ * même poids que le titre, donc rien ne reculait.
+ *
+ * `muted` n'est pas un à-peu-près : #64748B / #94A3B8 sont exactement les
+ * `slate-500` / `slate-400` que le web vient d'adopter pour les siens. Mesuré :
+ * 4,55:1 sur le fond clair, 7,34:1 sur le sombre — l'un et l'autre au-dessus
+ * du seuil AA de 4,5:1, le clair de peu. C'est le plancher à surveiller si le
+ * fond de la page s'éclaircit un jour.
+ */
 export function FieldLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   const palette = useAuthPalette();
   return (
     <View style={styles.labelRow}>
-      <Text style={[styles.label, { color: palette.title }]}>{children}</Text>
+      <Text style={[styles.label, { color: palette.muted }]}>{children}</Text>
       {right}
     </View>
   );
@@ -330,8 +342,11 @@ const styles = StyleSheet.create({
     marginBottom: -Spacing.one,
   },
   label: {
+    // 15 et non 13 comme le web : même rôle, autre distance de lecture — un
+    // libellé de formulaire sur un téléphone se lit à bout de bras. Ce qui
+    // s'aligne est la GRAISSE et l'encre, c'est-à-dire ce qui fait reculer.
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 500,
   },
   input: {
     height: AuthFieldHeight,

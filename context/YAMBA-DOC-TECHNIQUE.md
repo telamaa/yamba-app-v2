@@ -16116,3 +16116,30 @@ ceux du web sont passés à 13 px / 500 en gris moyen. C'est un écart créé pa
 corrigé ici parce que `FieldLabel` est partagé par les **cinq autres écrans d'auth**, dont la
 revue n'a pas eu lieu — le corriger à l'aveugle referait l'erreur que D91 reproche au formulaire
 web : décider pour des écrans qu'on n'a pas regardés.
+
+### Suite — les libellés de champs du mobile rejoignent ceux du web
+
+La divergence signalée au paragraphe précédent est **corrigée** le 10/11, sur décision de
+l'utilisateur : `FieldLabel` (`auth-kit.tsx`) passe de **700 à l'encre du titre** à **500 en
+`muted`**.
+
+`muted` n'est pas un à-peu-près : `#64748B` / `#94A3B8` sont exactement les `slate-500` /
+`slate-400` que le web venait d'adopter. Ce qui s'aligne est **la graisse et l'encre** — ce qui
+fait reculer un libellé — et non la taille : le mobile garde 15 pt là où le web est à 13 px,
+parce qu'un formulaire se lit à bout de bras sur un téléphone.
+
+Contrastes **mesurés**, pas supposés :
+
+| | Ratio | Seuil AA (4,5:1) |
+|---|---|---|
+| `#64748B` sur `#F8FAFC` (clair) | **4,55:1** | passe, de peu |
+| `#94A3B8` sur `#0B1120` (sombre) | **7,34:1** | passe |
+
+Le clair est à 0,05 du plancher : c'est noté dans le code, parce que c'est la valeur à
+re-vérifier si le fond de la page s'éclaircit un jour.
+
+**Ce changement touche les cinq autres écrans d'auth** (connexion, connexion par mot de passe,
+les deux vérifications par code, mot de passe oublié) — c'est le prix d'un composant partagé, et
+il est assumé puisque la demande était l'alignement. La connexion par mot de passe a été ouverte
+sur simulateur iOS pour le vérifier : rien n'est cassé, et une observation en sort pour sa propre
+revue — « Oublié ? » est désormais **plus gras que le libellé qu'il accompagne**.
