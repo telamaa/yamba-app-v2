@@ -59,7 +59,11 @@ function FacebookIcon() {
 function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
-    title: fr ? "Crée ton compte Yamba" : "Create your Yamba account",
+    // « Yamba » sort du titre (revue du 10/11) : 25 caractères passaient sur
+    // DEUX lignes sur un iPhone, soit ~45 pt pris à un écran qui doit tenir
+    // sur un écran. La marque est déjà partout autour — l'en-tête du site,
+    // l'application elle-même sur mobile.
+    title: fr ? "Crée ton compte" : "Create your account",
     subtitle: fr
       ? "Envoie ou transporte des colis, en toute simplicité."
       : "Send or transport parcels, simply.",

@@ -16076,3 +16076,17 @@ pas appliqué — c'est une décision de contenu.
 | `nx test @yamba-app/mobile` | **494**, 28 suites |
 | `nx typecheck @yamba-app/mobile` + `tsc --project apps/user-ui` | vert |
 | `node scripts/check-i18n-messages.mjs` | miroir parfait |
+
+### Suite de l'amendement — le titre passe sur une ligne
+
+Proposé au paragraphe précédent, **appliqué** le 10/11 sur décision de l'utilisateur :
+« Crée ton compte Yamba » → **« Crée ton compte »**, « Create your Yamba account » →
+**« Create your account »**.
+
+« Yamba » sort du titre parce que la marque est **déjà partout autour** : l'en-tête du site sur
+le web, l'application elle-même sur mobile. Elle coûtait 25 caractères, donc deux lignes sur un
+iPhone, donc ~45 pt à un écran qui doit tenir sur un écran.
+
+Mesuré sur iPhone 15 Pro : titre sur **une** ligne, et ~130 pt de marge sous « Déjà membre ? ».
+C'est cette marge qui rend l'écran sûr sur un iPhone SE, et non plus seulement « juste bon » sur
+un grand modèle.
