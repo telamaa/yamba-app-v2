@@ -575,7 +575,7 @@ export default function RegisterForm({ heroVisual }: Props) {
             {copy.haveAccount}{" "}
             <Link
               href={loginHref}
-              className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+              className="font-medium text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.login}
             </Link>

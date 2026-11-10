@@ -257,8 +257,18 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.three,
   },
+  /**
+   * Les textes de BAS NIVEAU — les conditions, le renvoi vers la connexion —
+   * s'allègent (revue du 10/11). Ils accompagnent, ils ne hèlent pas : un
+   * paragraphe de conditions en demi-gras pèse autant que le libellé d'un
+   * champ, et l'œil n'a plus de raison de descendre vers le bouton.
+   *
+   * Ce qui porte l'affordance des liens n'est PAS la graisse : c'est le
+   * soulignement ici, et la mangue sur le renvoi. On peut donc alléger sans
+   * rien perdre de ce qui se clique.
+   */
   termsDoc: {
-    fontWeight: 600,
+    fontWeight: 500,
     textDecorationLine: 'underline',
   },
   footer: {
@@ -270,11 +280,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   footerLink: {
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 500,
     color: AuthBrand.mango,
   },
 });

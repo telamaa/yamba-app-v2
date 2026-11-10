@@ -454,7 +454,9 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 15,
     lineHeight: 21,
-    fontWeight: 500,
+    // 400 et non 500 (revue du 10/11) : un libellé de case à cocher est du
+    // texte courant, pas un titre. Il est long, il se lit, il ne s'annonce pas.
+    fontWeight: 400,
   },
   checkboxHelper: {
     fontSize: 13,

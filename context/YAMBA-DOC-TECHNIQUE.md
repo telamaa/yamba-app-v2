@@ -16090,3 +16090,29 @@ iPhone, donc ~45 pt à un écran qui doit tenir sur un écran.
 Mesuré sur iPhone 15 Pro : titre sur **une** ligne, et ~130 pt de marge sous « Déjà membre ? ».
 C'est cette marge qui rend l'écran sûr sur un iPhone SE, et non plus seulement « juste bon » sur
 un grand modèle.
+
+### Suite — les textes de bas niveau s'allègent
+
+Revue du 10/11 : « les textes de bas niveau comme "Already a member", "I accept…" doivent être
+plus fins, pas de gras ».
+
+| Texte | Avant | Après |
+|---|---|---|
+| Mobile — libellé de la case à cocher | 500 | **400** |
+| Mobile — liens CGU (`termsDoc`) | 600 + souligné | **500** + souligné |
+| Mobile — « Déjà membre ? » | 500 | **400** |
+| Mobile — « Connecte-toi » | **700** | **500**, mangue conservée |
+| Web — « Connecte-toi » | `font-bold` | `font-medium` |
+
+Le raisonnement est le même que pour les libellés de champs du web : **ce qui porte l'affordance
+d'un lien n'est pas sa graisse**, c'est son soulignement (CGU) ou sa couleur de marque (le
+renvoi). On allège donc sans rien perdre de ce qui se clique — et un paragraphe de conditions
+cesse de peser autant que le libellé d'un champ.
+
+### Divergence restante, NON corrigée
+
+Les **libellés de champs** du mobile (`FieldLabel`, `auth-kit.tsx:332`) sont en **700**, là où
+ceux du web sont passés à 13 px / 500 en gris moyen. C'est un écart créé par ce lot. Il n'est pas
+corrigé ici parce que `FieldLabel` est partagé par les **cinq autres écrans d'auth**, dont la
+revue n'a pas eu lieu — le corriger à l'aveugle referait l'erreur que D91 reproche au formulaire
+web : décider pour des écrans qu'on n'a pas regardés.
