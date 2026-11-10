@@ -16574,3 +16574,63 @@ disparaître avec elle.
 « largeur », pas « cadre ». Déduire le second de la première, même avec un raisonnement
 défendable, c'est décider à la place de celui qui regarde l'écran. D91 avait déjà retiré une
 ligne de réassurance ajoutée de la même façon — *« la page ne doit RIEN ajouter »*.
+
+## ⑫ Amendement du 10/11/2026 — aux couleurs de Yamba, c'est-à-dire aux DEUX
+
+Retour de revue, après le premier envoi réel : **« tu n'as pas mis le mail aux couleurs
+Yamba ».**
+
+Le constat est juste et il était sous les yeux : le bandeau était un aplat **teal** portant un
+symbole **blanc**. L'email entier ne montrait donc **qu'une couleur sur les deux — et pas la
+principale.** La mangue n'apparaissait nulle part, parce qu'elle était réservée au CTA
+(charte §3.4 : mango = avancer) et que l'email d'activation n'en a pas.
+
+C'est un défaut de raisonnement et pas de goût : une règle qui dit *« mango = CTA »* devient,
+dans un email sans CTA, *« pas de mango du tout »*. La règle décrivait un **rôle**, pas une
+**présence**.
+
+| | Avant | Après |
+|---|---|---|
+| Tête de carte | dégradé teal `#0F766E → #14b8a6` | **filet mangue 5 px** + fond blanc |
+| Symbole | blanc monochrome, 38×40 | **couleurs réelles** (Y mangue, colis teal), 46×46 |
+| Titre | blanc sur teal | **navy `#0f172a`** sur blanc |
+| Libellé du code | gris `#64748b` | **teal `#0F766E`** |
+| Cadre du code | gris-bleu | **teal clair `#f0fdfa` / `#5eead4`** |
+
+**Le principe : un email doit ressembler au site d'où il vient.** L'en-tête du site est blanc,
+avec un logo mangue — l'email dit maintenant la même chose. Et le symbole peut enfin être
+lui-même : un Y mangue portant un colis teal, ce qu'un aplat vert lui interdisait.
+
+Nouvel actif versionné : `apps/user-ui/public/brand/yamba-email-logo-color.png` (256×256, fond
+blanc, 6,2 Ko → 8 488 caractères base64). Le blanc monochrome
+(`yamba-email-logo.png`) **reste** dans le dépôt : il redeviendra le bon le jour où un email
+portera un bandeau sombre.
+
+Le fond du PNG est **blanc et non transparent** : l'alpha est rendu de façon inégale par
+Outlook, et le bandeau est blanc de toute façon.
+
+## ⑬ Le piège payé deux fois : `nx serve` ne surveille pas `packages/`
+
+Après la première série de modifications, l'email reçu était **identique**. Mesuré :
+
+```
+auth-service démarré   : 20:18:02
+layout.ts modifié      : 20:38:06     ← vingt minutes PLUS TARD
+recompilations depuis  : aucune
+```
+
+`nx serve` surveille les fichiers du **projet**, pas ceux de `packages/libs/*` qu'il consomme
+par alias webpack. Le service a donc continué à servir l'ancien bundle.
+
+Ce qui a rendu le défaut invisible : l'aperçu envoyé pour validation **ne passait pas par
+auth-service** — il rendait le gabarit directement par `tsx`. Les deux chemins divergeaient, et
+le bon montrait le bon résultat pendant que le service envoyait l'ancien.
+
+**La règle, à ranger à côté de « `nx serve` ne lit le `.env` qu'au démarrage » :** toucher à
+`packages/libs/*` oblige à **relancer chaque service qui la consomme**. Et la vérification qui
+tranche sans discuter :
+
+```sh
+grep -c 'background-color:#FF9900' apps/auth-service/dist/main.js   # 2 → le bundle est à jour
+grep -c 'linear-gradient(135deg,#0F766E' apps/auth-service/dist/main.js   # 0 → l'ancien est parti
+```

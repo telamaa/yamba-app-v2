@@ -63,14 +63,23 @@ export const LAYOUT_EJS = `<!DOCTYPE html>
   <tr>
     <td align="center" style="padding:32px 16px;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -4px rgba(0,0,0,0.06);">
+        <!-- D94, revue du 10/11 : AUX COULEURS DE YAMBA, c'est-a-dire aux
+             DEUX. Le bandeau etait un aplat teal portant un symbole blanc :
+             l'email entier ne montrait qu'une couleur sur les deux, et pas la
+             principale. Il prend la palette du SITE — en-tete blanc, symbole
+             mangue, filet mangue en tete de carte, teal pour ce qui engage.
+             Un email doit ressembler au site d'ou il vient. -->
         <tr>
-          <td style="background:linear-gradient(135deg,#0F766E 0%,#14b8a6 100%);padding:28px 24px;text-align:center;">
-            <img src="cid:<%= logoCid %>" width="38" height="40" alt="Yamba" style="display:block;margin:0 auto 12px auto;border:0;outline:none;text-decoration:none;height:40px;width:38px;" />
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;line-height:1.3;"><%= content.title %></h1>
+          <td style="height:5px;line-height:5px;font-size:0;background-color:#FF9900;">&nbsp;</td>
+        </tr>
+        <tr>
+          <td style="background-color:#ffffff;padding:30px 24px 22px 24px;text-align:center;">
+            <img src="cid:<%= logoCid %>" width="46" height="46" alt="Yamba" style="display:block;margin:0 auto 14px auto;border:0;outline:none;text-decoration:none;height:46px;width:46px;" />
+            <h1 style="margin:0;color:#0f172a;font-size:22px;font-weight:800;letter-spacing:-0.5px;line-height:1.3;"><%= content.title %></h1>
           </td>
         </tr>
         <tr>
-          <td style="padding:32px 24px 8px 24px;">
+          <td style="padding:8px 24px 8px 24px;">
             <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;"><%= content.greeting %></p>
 <% content.paragraphs.forEach(function (p) { %>
             <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;"><%= p %></p>
@@ -79,10 +88,10 @@ export const LAYOUT_EJS = `<!DOCTYPE html>
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 24px 0;">
               <tr>
                 <td align="center">
-                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8fafc;border:1px solid #99f6e4;border-radius:12px;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color:#f0fdfa;border:1px solid #5eead4;border-radius:12px;">
                     <tr>
                       <td style="padding:20px 40px;text-align:center;">
-                        <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:2px;font-weight:700;"><%= content.code.label %></p>
+                        <p style="margin:0 0 6px 0;font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:2px;font-weight:700;"><%= content.code.label %></p>
                         <!-- D94 3A - letter-spacing ajoute l'espace APRES
                              chaque caractere, y compris le DERNIER : le code
                              etait pousse de 8 px vers la droite dans sa boite.
