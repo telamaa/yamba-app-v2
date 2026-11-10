@@ -152,7 +152,7 @@ export default function RegisterScreen() {
       <FieldLabel>{t('login.emailLabel')}</FieldLabel>
       <AuthTextField
         ref={emailRef}
-        placeholder={t('login.emailPlaceholder')}
+        placeholder={t('register.emailPlaceholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -194,27 +194,38 @@ export default function RegisterScreen() {
 
       <AuthCta label={t('register.submit')} onPressAction={onSubmit} pending={pending} />
 
-      {/* La seule réassurance de l'écran, et elle est VÉRIFIABLE (D91). Elle
-          répond à l'inquiétude réelle du moment — « est-ce que je m'engage ? »
-          — là où elle se pose, sous le bouton, et non en haut de page. */}
-      <Text style={[styles.reassurance, { color: palette.muted }]}>
-        {t('register.reassurance')}
-      </Text>
-
       <AuthDivider label={t('common.orContinueWith')} />
-      {/* Boutons LIBELLÉS et non pastilles rondes (D91) : une pastille ne dit
-          ni le verbe, ni ce qui va se passer. Les deux fournisseurs sont
-          offerts sur les DEUX fronts — inertes tant que les flux natifs
-          n'existent pas (arbitrage du 09/11 : on les garde à l'écran, le
-          paramétrage vient après). L'ordre suit celui du site. */}
-      <MethodButton
-        icon={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} />}
-        label={t('social.google')}
-      />
-      <MethodButton
-        icon={<Image source={require('@/assets/images/facebook-f.svg')} style={styles.logo} />}
-        label={t('social.facebook')}
-      />
+      {/*
+        Les deux fournisseurs CÔTE À CÔTE, et non empilés (revue du 10/11).
+        Empilés, ils ajoutaient 60 pt et l'écran cessait de tenir sur un
+        iPhone : le second bouton et le lien « Déjà membre ? » passaient sous
+        la ligne de flottaison. Un écran d'inscription qui demande de faire
+        défiler pour voir ses propres options perd des inscriptions.
+
+        Ils restent des BOUTONS, pas des pastilles rondes (D91) : le nom du
+        fournisseur est écrit. Le verbe, lui, passe dans le libellé
+        ACCESSIBLE — « Continuer avec Google » reste ce que lisent VoiceOver
+        et TalkBack, et le séparateur juste au-dessus le dit à l'œil.
+
+        Divergence ASSUMÉE avec le site, qui les garde empilés : sa colonne a
+        la place, et le bouton officiel de Google veut sa largeur.
+      */}
+      <View style={styles.socialRow}>
+        <View style={styles.socialCol}>
+          <MethodButton
+            icon={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} />}
+            label={t('social.googleShort')}
+            accessibilityLabel={t('social.google')}
+          />
+        </View>
+        <View style={styles.socialCol}>
+          <MethodButton
+            icon={<Image source={require('@/assets/images/facebook-f.svg')} style={styles.logo} />}
+            label={t('social.facebookShort')}
+            accessibilityLabel={t('social.facebook')}
+          />
+        </View>
+      </View>
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('register.hasAccount')}</Text>
@@ -227,14 +238,16 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  reassurance: {
-    marginTop: Spacing.two,
-    fontSize: 13,
-    textAlign: 'center',
-  },
   logo: {
     width: 20,
     height: 20,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  socialCol: {
+    flex: 1,
   },
   nameRow: {
     flexDirection: 'row',

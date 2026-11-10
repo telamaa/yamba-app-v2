@@ -62,20 +62,22 @@ describe('① la mention de sécurité ne revient pas (D91)', () => {
   });
 });
 
-describe('② la réassurance dit la MÊME chose sur les deux fronts', () => {
-  it('elle existe dans les quatre dictionnaires', () => {
+describe('② aucune ligne de réassurance ajoutée ne revient (revue du 10/11)', () => {
+  /**
+   * Première intention : remplacer le badge de sécurité par une promesse
+   * VÉRIFIABLE sous le bouton — « Gratuit, sans engagement. ». Retirée à la
+   * revue d'écran du 10/11 : sur un iPhone, l'écran ne tenait plus sur une
+   * page, et une ligne que personne n'a demandée est la première à payer.
+   *
+   * Ce que la fiche tient n'est donc PAS « le texte est le bon » mais
+   * « on n'en rajoute pas » : la page dit ce qu'elle fait, le reste est du
+   * bruit que la hauteur d'écran facture.
+   */
+  it('la clé n’existe dans aucun des quatre dictionnaires', () => {
     for (const front of [MOBILE, WEB]) {
       for (const locale of ['fr', 'en']) {
-        expect(typeof registre(front, locale).reassurance).toBe('string');
+        expect(registre(front, locale)).not.toHaveProperty('reassurance');
       }
-    }
-  });
-
-  it('et elle est identique, langue par langue', () => {
-    // Le défaut d'avant, à l'envers : deux écrans qui promettent la même
-    // chose doivent la promettre avec les mêmes mots.
-    for (const locale of ['fr', 'en']) {
-      expect(registre(MOBILE, locale).reassurance).toBe(registre(WEB, locale).reassurance);
     }
   });
 });
@@ -106,16 +108,30 @@ describe('④ les deux fronts offrent les MÊMES fournisseurs sociaux', () => {
     expect(source).toContain('copy.facebook');
   });
 
-  it('le téléphone propose les deux, avec les mêmes libellés de dictionnaire', () => {
+  it('le téléphone propose les deux, par le dictionnaire', () => {
     const ecran = readFileSync(join(MOBILE, 'src/app/(auth)/register.tsx'), 'utf8');
-    expect(ecran).toContain("t('social.google')");
-    expect(ecran).toContain("t('social.facebook')");
+    expect(ecran).toContain("t('social.googleShort')");
+    expect(ecran).toContain("t('social.facebookShort')");
     for (const locale of ['fr', 'en']) {
       const social = (dictionnaire(MOBILE, locale) as unknown as {
         social: Record<string, string>;
       }).social;
-      expect(typeof social.google).toBe('string');
-      expect(typeof social.facebook).toBe('string');
+      for (const cle of ['google', 'facebook', 'googleShort', 'facebookShort']) {
+        expect(typeof social[cle]).toBe('string');
+      }
     }
+  });
+
+  it('le libellé COURT ne vole pas le verbe au lecteur d’écran', () => {
+    /**
+     * La rangée à deux colonnes n'a plus la place d'écrire « Continuer avec
+     * Google ». Le nom seul suffit à l'œil — le séparateur juste au-dessus
+     * porte le verbe — mais un lecteur d'écran, lui, annonce le bouton HORS
+     * de son contexte : sans `accessibilityLabel`, il dirait « Google,
+     * bouton », ce qui ne dit pas ce qui va se passer.
+     */
+    const ecran = readFileSync(join(MOBILE, 'src/app/(auth)/register.tsx'), 'utf8');
+    expect(ecran).toContain("accessibilityLabel={t('social.google')}");
+    expect(ecran).toContain("accessibilityLabel={t('social.facebook')}");
   });
 });

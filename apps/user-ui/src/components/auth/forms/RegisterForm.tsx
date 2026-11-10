@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
-import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -67,11 +66,13 @@ function buildCopy(lang: string) {
     facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
     orSocial: fr ? "ou continue avec" : "or continue with",
     firstName: fr ? "Prénom" : "First name",
-    firstNamePh: fr ? "Aminata" : "Aminata",
+    firstNamePh: "Marie",
     lastName: fr ? "Nom" : "Last name",
-    lastNamePh: fr ? "Diallo" : "Diallo",
+    lastNamePh: "Love",
     email: fr ? "E-mail" : "Email",
-    emailPh: fr ? "prenom@email.com" : "you@email.com",
+    // L'adresse PROLONGE les deux prénoms au-dessus d'elle : un exemple qui
+    // se lit comme un tout vaut mieux que trois exemples sans rapport.
+    emailPh: "marielove@email.com",
     password: fr ? "Mot de passe" : "Password",
     cta: fr ? "Créer mon compte" : "Create my account",
     ctaLoading: fr ? "Création…" : "Creating…",
@@ -121,11 +122,6 @@ function buildCopy(lang: string) {
 export default function RegisterForm({ heroVisual }: Props) {
   const router = useRouter();
   const { lang } = useUiPreferences();
-  /** La seule chaîne NEUVE de cette passe passe par le dictionnaire et non par
-   *  `buildCopy` : ce fichier porte encore 60 ternaires `fr ? … : …` — une
-   *  dette connue, invisible au contrôle i18n de la CI, et traitée à part. On
-   *  n'en ajoute pas une de plus. */
-  const tAuth = useTranslations("auth");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
@@ -542,13 +538,6 @@ export default function RegisterForm({ heroVisual }: Props) {
                 copy.cta
               )}
             </button>
-
-            {/* La seule réassurance de l'écran, et elle est vérifiable (D91) :
-                elle répond à « est-ce que je m'engage ? », là où la question se
-                pose — sous le bouton, et non en haut de page. */}
-            <p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
-              {tAuth("register.reassurance")}
-            </p>
           </form>
 
           {/* D91 — le social passe APRÈS le formulaire, comme sur le mobile.

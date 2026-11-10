@@ -5,11 +5,14 @@
  * au-dessus du champ (avec action à droite optionnelle — « Oublié ? »),
  * champ bordé arrondi 12 (la ref passe en PROP — React 19 — pour le
  * chaînage clavier `returnKeyType="next"`), CTA mangue à texte sombre,
- * séparateur, rangée sociale en LOGOS SEULS sous le CTA (itération UX du
- * 28/09 : le mobile a moins de place que le web — les boutons pleine
- * largeur du site deviennent deux pastilles ; inertes tant que les flux
- * n'existent pas, dessinées fonctionnelles), case à cocher carrée avec
- * aide, lien teal souligné. Palette : `auth-theme.ts`.
+ * séparateur, boutons de méthode (« Continuer avec … »), case à cocher
+ * carrée avec aide, lien teal souligné. Palette : `auth-theme.ts`.
+ *
+ * D91 — la rangée sociale en LOGOS SEULS a été retirée : une pastille ronde
+ * ne dit ni le verbe ni ce qui va se passer. Les fournisseurs passent par
+ * `MethodButton`, qui porte leur nom ; quand la place manque (rangée à deux
+ * colonnes de l'inscription), le libellé visible se raccourcit et le verbe
+ * reste dans `accessibilityLabel`.
  */
 import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 import {
@@ -181,16 +184,24 @@ export function MethodButton({
   icon,
   label,
   onPressAction,
+  accessibilityLabel,
 }: {
   icon: ReactNode;
   label: string;
   onPressAction?: () => void;
+  /**
+   * Ce que LIT un lecteur d'écran, quand le libellé visible a dû être
+   * raccourci (rangée à deux colonnes). Sans lui, VoiceOver annonce
+   * « Google », qui ne dit pas ce que fait le bouton.
+   */
+  accessibilityLabel?: string;
 }) {
   const palette = useAuthPalette();
   return (
     <Pressable
       onPress={onPressAction}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.methodButton,
         { backgroundColor: palette.card, borderColor: palette.border },
