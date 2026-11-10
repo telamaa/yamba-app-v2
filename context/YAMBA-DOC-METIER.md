@@ -8466,3 +8466,17 @@ désalignement se voyait.
 
 Appliqué aux **deux** pages — l'inscription et sa vérification sont deux étapes du même geste,
 et n'en aligner qu'une recréerait la rupture visuelle que D92 venait de supprimer.
+
+### Amendement du 10/11/2026 — RG-D92-10
+
+**RG-D92-10 — Une page du site n'a pas de cadre.** Ce qui est encadré se lit comme un objet
+posé sur la page : une carte, une fenêtre, quelque chose qu'on peut fermer. L'inscription n'est
+pas cela — elle **est** la page. Le contenu s'aligne sur l'en-tête, et s'arrête là : pas de
+bordure, pas de coins arrondis, pas de marge qui le détache du reste.
+
+La séparation entre les deux moitiés est déjà portée par le dégradé de la colonne de gauche. Un
+trait en plus ne sépare rien qui ne le soit déjà.
+
+| # | Situation | Attendu |
+|---|---|---|
+| 17 | J'ouvre l'inscription sur un grand écran | le contenu s'aligne sur le logo et sur « Connexion », **sans cadre autour** |

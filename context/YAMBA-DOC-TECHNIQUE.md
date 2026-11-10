@@ -16541,3 +16541,36 @@ Les deux touchent la **copie des quinze emails dans les deux langues** : lot à 
 **Les gabarits EJS par fichier de trip-service** (`sendTemplatedEmail`, voie héritée) ne
 reçoivent **pas** le symbole — ils ne passent pas par la mise en page partagée. Leur migration
 vers `sendTransactionalEmail` est un lot à part.
+
+## ⑪ Amendement du 10/11/2026 — aucun cadre : le contenu s'incruste
+
+La passe précédente (⑧) avait ajouté, **de son propre chef**, des coins arrondis, une bordure
+et une marge verticale au conteneur, au motif qu'un panneau coloré ne touchant plus le bord de
+l'écran « redevient un rectangle à arêtes vives posé dans le vide ».
+
+**Retour de revue, immédiat et net : « tout doit s'incruster dans la page sans bordure ».**
+
+L'argument de la passe précédente était un argument de *carte*, appliqué à une *page*. Un cadre
+fait de l'inscription un **objet posé sur le site** — une fenêtre, une boîte de dialogue — là
+où elle est une **page du site**. Et le dégradé de la colonne de gauche sépare déjà les deux
+moitiés : un trait en plus ne sépare rien qui ne le soit déjà, il ajoute seulement une
+frontière à lire.
+
+| | Passe ⑧ | Amendement |
+|---|---|---|
+| Largeur | `mx-auto max-w-7xl px-4` | **inchangée** — c'était la demande |
+| Coins | `lg:rounded-2xl` | **retirés** |
+| Bordure | `lg:border lg:border-slate-200` | **retirée** |
+| Marge verticale | `lg:my-5` | **retirée** |
+| Hauteur minimale | `-104px` | **`-64px`** (plus de marge à compenser) |
+| `overflow-hidden` | présent | **retiré** |
+
+`overflow-hidden` part **avec** les coins : il n'était là que pour les rogner, et le dépôt a
+déjà payé une fois le fait qu'il met en péril tout `position: sticky` (pitfall connu :
+`overflow-x: clip`, jamais `hidden`). Une propriété ajoutée pour servir une autre doit
+disparaître avec elle.
+
+**La leçon de méthode, et c'est la deuxième fois dans ce chantier :** la demande disait
+« largeur », pas « cadre ». Déduire le second de la première, même avec un raisonnement
+défendable, c'est décider à la place de celui qui regarde l'écran. D91 avait déjà retiré une
+ligne de réassurance ajoutée de la même façon — *« la page ne doit RIEN ajouter »*.

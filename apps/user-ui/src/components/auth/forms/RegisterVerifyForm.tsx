@@ -579,10 +579,17 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
           auparavant bord à bord, si bien que le logo et « Connexion » étaient
           les deux seuls éléments à respecter une marge : rien en dessous ne
           s'alignait sur eux, et la colonne de gauche touchait le bord de
-          l'écran sur un grand moniteur. Les coins et la bordure suivent, sans
-          quoi le panneau teal redevient un rectangle à arêtes vives posé au
-          milieu du vide. */}
-      <div className="overflow-hidden lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-104px)] lg:rounded-2xl lg:border lg:border-slate-200 lg:my-5 dark:lg:border-slate-800">
+          l'écran sur un grand moniteur.
+
+          AUCUNE BORDURE, AUCUN COIN ARRONDI, AUCUNE MARGE VERTICALE (revue du
+          10/11) : le contenu s'INCRUSTE dans la page. Un cadre ferait de
+          l'inscription un objet POSÉ sur le site — une carte, une fenêtre —
+          là où elle en est une page. Le dégradé de la colonne de gauche
+          suffit à séparer les deux moitiés ; un trait en plus ne sépare rien
+          qui ne le soit déjà, il ajoute seulement une frontière à lire.
+          `overflow-hidden` est parti avec les coins : il n'était là que pour
+          les rogner, et il met en péril tout `position: sticky` à venir. */}
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — la colonne répond à l'attente, elle ne vend plus (D92 1A) */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} variant="waiting" action={mailboxButton} />
