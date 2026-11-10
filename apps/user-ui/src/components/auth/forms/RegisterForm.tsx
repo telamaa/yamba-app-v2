@@ -80,7 +80,6 @@ function buildCopy(lang: string) {
     emailPh: "marielove@email.com",
     password: fr ? "Mot de passe" : "Password",
     cta: fr ? "Créer mon compte" : "Create my account",
-    ctaLoading: fr ? "Création…" : "Creating…",
     haveAccount: fr ? "Déjà membre ?" : "Already a member?",
     login: fr ? "Connecte-toi" : "Sign in",
     showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
@@ -558,16 +557,27 @@ export default function RegisterForm({ heroVisual }: Props) {
             <button
               type="submit"
               disabled={registerMutation.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
+              aria-busy={registerMutation.isPending}
+              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {registerMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {copy.ctaLoading}
-                </>
-              ) : (
-                copy.cta
+              {/* D95 — le libellé s'EFFACE, il ne disparaît pas : rendu à
+                  l'opacité 0 il garde sa place, donc la largeur du bouton ne
+                  bouge pas d'un pixel, et le disque se superpose au centre.
+                  Pas de changement de libellé non plus (« Création… » est un
+                  mot de plus à lire pour n'apprendre que ce que le disque dit
+                  déjà). Au succès on NAVIGUE : le disque ne s'arrête jamais —
+                  un bouton qui redevient cliquable une fraction de seconde
+                  avant la navigation invite au double envoi. */}
+              {registerMutation.isPending && (
+                <Loader2
+                  size={18}
+                  aria-hidden
+                  className="absolute inset-0 m-auto animate-spin"
+                />
               )}
+              <span className={registerMutation.isPending ? "opacity-0" : undefined}>
+                {copy.cta}
+              </span>
             </button>
           </form>
 

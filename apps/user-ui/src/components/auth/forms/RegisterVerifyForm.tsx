@@ -765,16 +765,27 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             <button
               type="submit"
               disabled={verifyOtpMutation.isPending || expired || isLocked}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
+              aria-busy={verifyOtpMutation.isPending}
+              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {verifyOtpMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {t("verifying")}
-                </>
-              ) : (
-                t("verify")
+              {/* D95 — le libellé s'EFFACE, il ne disparaît pas : rendu à
+                  l'opacité 0 il garde sa place, donc la largeur du bouton ne
+                  bouge pas d'un pixel, et le disque se superpose au centre.
+                  Pas de changement de libellé non plus (« Création… » est un
+                  mot de plus à lire pour n'apprendre que ce que le disque dit
+                  déjà). Au succès on NAVIGUE : le disque ne s'arrête jamais —
+                  un bouton qui redevient cliquable une fraction de seconde
+                  avant la navigation invite au double envoi. */}
+              {verifyOtpMutation.isPending && (
+                <Loader2
+                  size={18}
+                  aria-hidden
+                  className="absolute inset-0 m-auto animate-spin"
+                />
               )}
+              <span className={verifyOtpMutation.isPending ? "opacity-0" : undefined}>
+                {t("verify")}
+              </span>
             </button>
           </form>
 
