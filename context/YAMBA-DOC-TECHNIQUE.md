@@ -16395,3 +16395,149 @@ retouche d'écran.
 
 **Le délai réel d'arrivée du mail n'a pas été mesuré en conditions réelles** (Resend). Si
 l'envoi prend dix secondes, aucun travail de texte ne sauvera cet écran.
+
+---
+
+# D94 — Le symbole dans les emails, et la largeur des pages d'auth
+
+*Revue de l'email d'activation, 10/11/2026 — premier email VU dans une vraie boîte Gmail,
+après la bascule SMTP du même soir.*
+
+## ① Ce que la revue a trouvé
+
+L'email fonctionnait. Ce qu'il montrait :
+
+| # | Constat | Gravité |
+|---|---|---|
+| 1 | **Aucun logo** — le mot « YAMBA » en capitales espacées | demandé par l'utilisateur |
+| 2 | Le code à six chiffres **décentré** dans sa boîte | visible, cause invisible |
+| 3 | La boîte du code **en tirets** — le motif du coupon à découper | discours |
+| 4 | **Aucun schéma de couleurs déclaré** | casse en mode sombre |
+| 5 | Le nom « Yamba » écrit **trois fois** à l'écran | redondance |
+| 6 | **Aucun bouton**, alors que `EmailContent.cta` existe | hors lot, nommé |
+| 7 | L'encadré ambre mélange expiration **et** avertissement de sécurité | hors lot, nommé |
+
+## ② Le refus de D85, relu et levé
+
+D85 avait **refusé** ce lot, et c'est ce qui l'a rendu faisable en une passe. Elle avait écrit
+le coût (« étendre `OutgoingEmail`, l'interface `EmailProvider` et **les trois** fournisseurs »),
+le risque (« l'affichage *inline* dépend du support de `content_id` côté Resend ; mal câblé,
+l'image part en **pièce jointe attachée** au lieu de s'afficher — pire que pas d'image ») et la
+portée (« si le symbole entre dans les emails, il entre par la **mise en page partagée**, pour
+les quinze d'un coup »). Elle avait même versionné `yamba-email-logo.png` en notant : *« il est
+prêt le jour où ce lot se fera »*.
+
+**Le risque a été levé par mesure, pas par confiance.** L'API REST de Resend accepte les images
+inline, et le champ s'appelle **`content_id`** — son SDK JavaScript expose `contentId` et le
+convertit avant l'appel, or ce dépôt poste le JSON brut par `fetch` (zéro dépendance, D35 2A).
+Une erreur de casse à cet endroit ne casse rien : elle transforme le logo en trombone.
+
+## ③ Pourquoi la pièce jointe inline, et pas une adresse
+
+| Option | Ce qui cloche |
+|---|---|
+| `<img src="https://le-site/logo.png">` | ne s'affiche **que si** le client accepte de charger les images distantes ; et en recette locale le mandataire d'images de Gmail **ne peut pas atteindre** `http://192.168.x.x:3000` — le logo serait cassé sur le poste même où on le vérifie |
+| `<img src="data:image/png;base64,…">` | Gmail **supprime** les `data:` URI des emails |
+| Fichier lu sur le disque | `layout.ts` est une **chaîne TS** et non un fichier EJS, précisément pour être indépendant du `cwd` (D44 ④) ; et le bundle webpack ne copie que `src/assets` |
+| **`cid:` + pièce inline** | **retenu** — s'affiche toujours, ne dépend d'aucun hébergeur, marche avec Mailpit comme avec Gmail |
+
+Le PNG vit donc en base64 dans `packages/libs/email/src/logo.ts` : 4,1 Ko bruts → 5 652
+caractères, payés une fois par email.
+
+## ④ Le transport, pas le contenu
+
+C'est la ligne de partage qui tient tout le reste :
+
+- **`EmailContent`** dit ce que l'email **raconte** → inchangé, les quinze emails n'ont pas
+  bougé d'une ligne ;
+- **`OutgoingEmail`** dit ce qu'on **envoie** → gagne `inlineImages: InlineImage[]` ;
+- **le gabarit** ne connaît qu'un `cid` ;
+- **chaque fournisseur** traduit dans sa langue :
+
+| Fournisseur | Forme attendue |
+|---|---|
+| SMTP (Nodemailer) | `{ cid, content: Buffer, contentType, contentDisposition: "inline" }` |
+| Resend (HTTP) | `{ content: base64, filename, content_type, content_id }` |
+| Fake | conservé en mémoire, pour que les fiches comptent |
+
+`contentDisposition: "inline"` n'est pas décoratif : sans lui, Nodemailer joint l'image en
+pièce **attachée**. Elle s'affiche quand même par son `cid`, mais le client mail montre **en
+plus** un trombone — le défaut exact que D85 redoutait.
+
+## ⑤ Le code décentré : la cause
+
+Le bloc de code paraissait poussé vers la droite, et rien dans le CSS ne le disait.
+
+```css
+letter-spacing: 8px;   /* ajoute 8 px APRÈS chaque caractère… */
+```
+
+…**y compris après le dernier**. Un code de six chiffres porte donc 8 px d'espace à sa droite
+que rien ne compense : dans une boîte centrée, il est décalé de 8 px.
+
+```css
+letter-spacing: 8px; text-indent: 8px;   /* le remède */
+```
+
+`text-indent` décale la première ligne de la même valeur. C'est le seul remède qui tienne
+**aussi sous Outlook**, où une marge droite négative est ignorée. La fiche tient la **règle**
+(les deux valeurs sont égales), pas le nombre.
+
+## ⑥ Le mode sombre
+
+Le document ne déclarait **aucun** schéma de couleurs. Gmail et Apple Mail inversent alors
+d'autorité la carte blanche en sombre — en laissant le bandeau teal intact. Un email à moitié
+retourné. `color-scheme` et `supported-color-schemes` l'annoncent désormais, et les couleurs du
+gabarit sont assumées dans les deux modes.
+
+## ⑦ Le piège payé en chemin
+
+Le commentaire HTML expliquant le `text-indent` citait les propriétés CSS entre **accents
+graves**. `LAYOUT_EJS` est un **gabarit de chaîne TypeScript** : le premier accent grave a
+terminé la chaîne, et `tsc` a sorti quatre erreurs de syntaxe à des lignes qui n'avaient rien à
+se reprocher. Les commentaires de ce fichier n'en portent plus, et le fichier le dit en toutes
+lettres.
+
+## ⑧ La largeur des pages d'auth (D92, retour de revue)
+
+Les deux pages d'inscription posaient leur `lg:grid` directement sur le `<main>`, donc **bord à
+bord**. Conséquence : le logo et « Connexion » étaient les deux **seuls** éléments de la page à
+respecter une marge — rien en dessous ne s'alignait sur eux, et sur un grand moniteur la
+colonne de gauche touchait le bord de l'écran.
+
+Elles prennent désormais la ligne exacte de l'en-tête : **`mx-auto max-w-7xl px-4`**, celle de
+`Header.tsx:99`. Les coins arrondis et la bordure suivent — sans quoi le panneau teal redevient
+un rectangle à arêtes vives posé au milieu du vide — et la hauteur minimale passe de `-64px` à
+`-104px` pour la marge verticale.
+
+**Les DEUX pages, pas seulement celle en revue.** L'inscription et sa vérification sont deux
+étapes du même geste : n'en contraindre qu'une recréerait à l'identique le saut visuel que D92
+venait de supprimer en fixant l'illustration de la colonne de gauche.
+
+## ⑨ Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test notification-service` | **136 / 12 suites** (122 → 136, **+14**) |
+| `nx test auth-service` | 407, inchangé |
+| `nx test trip-service` | 409, inchangé |
+| `nx run-many --target=typecheck --all` | **10 projets**, vert |
+| `bash scripts/smoke-services.sh` | **les six bundles démarrent** — obligatoire, une lib partagée par quatre services a changé |
+| Envoi réel via Gmail | reçu, logo affiché |
+
+## ⑩ Ce qui reste nommé et non fait
+
+**L'email d'activation n'offre aucun bouton**, alors que `EmailContent.cta` existe et que la
+page de vérification sait déjà lire `?token=&email=` — le commentaire de `RegisterVerifyForm`
+dit en toutes lettres « utile pour les liens magiques email envoyés par le backend ». Un lien
+magique supprimerait la recopie à six chiffres pour qui lit son courrier sur le même appareil.
+
+**L'encadré ambre mélange deux messages** : « ce code expire dans 10 minutes » (neutre,
+informatif) et « si vous n'êtes pas à l'origine de cette demande, ignorez cet email »
+(conditionnel, sécurité). Le premier n'a rien d'une alerte, et l'ambre le rend inquiétant.
+
+Les deux touchent la **copie des quinze emails dans les deux langues** : lot à part.
+
+**Les gabarits EJS par fichier de trip-service** (`sendTemplatedEmail`, voie héritée) ne
+reçoivent **pas** le symbole — ils ne passent pas par la mise en page partagée. Leur migration
+vers `sendTransactionalEmail` est un lot à part.

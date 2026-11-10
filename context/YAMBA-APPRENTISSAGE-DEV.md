@@ -7757,3 +7757,175 @@ La recopie entre fronts est **assumée** (ils ne partagent pas de paquet d'inter
 - **`autocomplete="one-time-code"`** — le mécanisme par lequel iOS et Android proposent le code
   reçu par SMS ; sur un code reçu par e-mail il ne fait rien, ce qui rend « Ouvrir ma boîte
   mail » d'autant plus utile.
+
+---
+
+## Chapitre 233 — L'image qui voyage avec le message, le refus qui devient un cahier des charges, et l'accent grave qui ferme une chaîne
+
+*D94, 10/11/2026.*
+
+### 1. Un refus bien écrit vaut un cahier des charges
+
+D85 avait refusé de mettre le logo dans les emails. Pas « plus tard », pas « à voir » : elle
+avait écrit **le coût, le risque et la portée**, et versionné le fichier PNG en notant *« il est
+prêt le jour où ce lot se fera »*.
+
+Quand le lot est arrivé, il restait une seule chose à faire avant de coder : **mesurer le point
+signalé comme incertain**. Dix minutes de lecture de documentation, et le lot pouvait commencer.
+
+> **À retenir :** quand vous refusez une demande, écrivez ce qui la rendrait acceptable. Un
+> « non » nu se repaie à chaque fois qu'on y revient ; un « non, parce que A, B et C » est un
+> plan de travail que quelqu'un exécutera un jour — peut-être vous.
+
+Et la vérification a payé tout de suite : l'API REST de Resend attend **`content_id`**, alors
+que son SDK JavaScript expose `contentId`. Ce dépôt poste le JSON brut par `fetch`, donc c'est
+la forme *snake* qu'il lui faut. Une erreur de casse à cet endroit **ne casse rien** — Resend
+ignore la clé inconnue et joint l'image en pièce attachée. L'email part, arrive, et le
+destinataire voit un trombone.
+
+### 2. Les trois façons de mettre une image dans un email, et pourquoi deux échouent
+
+| Technique | Ce qui se passe réellement |
+|---|---|
+| `<img src="https://…">` | le client doit **accepter** de charger l'image. Gmail la fait passer par son mandataire — qui **ne peut pas atteindre** `http://192.168.x.x:3000` : votre logo est cassé sur le poste même où vous le testez |
+| `<img src="data:image/png;base64,…">` | Gmail **supprime** les `data:` URI des emails. L'image disparaît sans message d'erreur |
+| `<img src="cid:mon-logo">` + pièce jointe inline | l'image **voyage avec le message**. Elle s'affiche hors ligne, sans autorisation, chez tous les clients |
+
+La troisième est la seule qui marche partout, et c'est la plus ancienne : elle date de MIME
+(RFC 2392). Le `cid` est un identifiant arbitraire que vous choisissez ; il relie le `src` du
+HTML à l'en-tête `Content-ID` de la partie MIME.
+
+```ts
+// Nodemailer
+attachments: [{ filename, content: Buffer, cid: "yamba-symbol", contentDisposition: "inline" }]
+// Resend (API REST)
+attachments: [{ content: base64, filename, content_type, content_id: "yamba-symbol" }]
+```
+
+**`contentDisposition: "inline"` n'est pas décoratif.** Sans lui, Nodemailer marque la partie
+comme `attachment` : l'image s'affiche quand même par son `cid`, mais le client ajoute un
+trombone à côté du message. Deux lignes de différence, deux rendus très différents.
+
+### 3. Où ranger l'octet : la dépendance au répertoire courant
+
+Le gabarit de Yamba est une **chaîne TypeScript**, pas un fichier `.ejs` lu sur le disque. La
+raison est écrite dans son en-tête : il doit fonctionner quel que soit le `cwd` du processus
+(`nx serve` depuis la racine, `node dist/main.js` depuis `apps/<service>`, jest depuis ailleurs
+encore).
+
+Lire l'image sur le disque aurait **réintroduit exactement la dépendance que ce choix avait
+supprimée** — et le bundle webpack ne copie que `src/assets`, donc le fichier aurait manqué en
+production. L'image est donc encodée en base64 dans un module TypeScript.
+
+```ts
+export const LOGO_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUg…";
+```
+
+> **Le principe général :** quand un module a été écrit pour ne dépendre de rien d'extérieur, la
+> première ressource qu'on y ajoute doit respecter la même règle. Sinon on paie deux fois : la
+> contrainte d'origine **et** la nouvelle exception.
+
+### 4. Séparer ce que l'objet DIT de ce qu'on en FAIT
+
+Le réflexe aurait été d'ajouter l'image à `EmailContent` — le type qui décrit le contenu d'un
+email. C'eût été une erreur de couche : **aucun des quinze emails n'a quoi que ce soit à dire
+sur son logo.**
+
+```
+EmailContent   → ce que l'email RACONTE   (titre, paragraphes, code, encadré)
+OutgoingEmail  → ce qu'on ENVOIE          (destinataire, HTML, pièces inline)
+EmailProvider  → COMMENT on l'envoie      (SMTP, Resend, Faux)
+```
+
+L'image est entrée dans la couche du milieu. Résultat : les quinze emails n'ont pas bougé d'une
+ligne, et chaque fournisseur traduit la même notion dans sa langue.
+
+> **Le test qui révèle la bonne couche :** si j'ajoute un seizième email, devra-t-il parler de
+> cette chose ? Non → elle n'appartient pas au contenu.
+
+### 5. `letter-spacing` ajoute l'espace après le DERNIER caractère
+
+Un défaut visible depuis des mois, dont personne ne voyait la cause : le code à six chiffres
+paraissait poussé vers la droite dans son cadre.
+
+```css
+letter-spacing: 8px;
+```
+
+La propriété ajoute l'espace **après chaque caractère**, dernier compris. `167139` porte donc
+8 px d'espace à sa droite que rien ne compense : centré, il est décalé de 8 px.
+
+```css
+letter-spacing: 8px; text-indent: 8px;   /* la première ligne recule d'autant */
+```
+
+Pourquoi `text-indent` et pas `margin-right: -8px` : **Outlook ignore les marges négatives.**
+Dans un email, le choix d'une technique CSS se fait par ce que les clients savent rendre, pas
+par élégance.
+
+Et la fiche tient la **règle**, pas le nombre :
+
+```ts
+const ligne = /letter-spacing:(\d+)px;text-indent:(\d+)px;/.exec(rendu());
+expect(ligne?.[1]).toBe(ligne?.[2]);
+```
+
+Si quelqu'un passe l'espacement à 10 px demain, le test réclame 10 px d'indentation — il ne se
+contente pas d'avoir mémorisé « 8 ».
+
+### 6. L'accent grave qui ferme une chaîne
+
+En documentant le point précédent, j'ai écrit ce commentaire **dans** le gabarit :
+
+```ts
+export const LAYOUT_EJS = `<!DOCTYPE html>
+…
+  <!-- `letter-spacing` ajoute l'espace APRÈS chaque caractère -->
+```
+
+`tsc` a sorti quatre erreurs de syntaxe à des lignes qui n'avaient rien à se reprocher. La
+cause : **le premier accent grave termine le gabarit de chaîne.** Tout ce qui suit est relu
+comme du TypeScript.
+
+Ce n'est pas une faute de frappe, c'est une habitude : on cite le code entre accents graves
+depuis des années dans les commentaires. Elle devient un piège dès qu'on écrit *à l'intérieur*
+d'un gabarit de chaîne.
+
+**Le remède tenu :** les commentaires de ce fichier n'en portent plus, et le fichier le dit en
+toutes lettres à l'endroit du piège — pas dans un en-tête que personne ne relit.
+
+### 7. Aligner le contenu sur l'en-tête
+
+La correction demandée en fin de revue — *« le contenu doit rester en largeur entre le logo et
+Connexion »* — vaut comme principe de mise en page.
+
+L'en-tête du site borne son contenu : `mx-auto max-w-7xl px-4`. Les pages d'auth posaient leur
+grille directement sur le `<main>`, donc d'un bord à l'autre de l'écran. Le logo et le lien de
+connexion devenaient les **seuls** éléments à respecter une marge, et plus l'écran était large,
+plus le désalignement sautait aux yeux.
+
+```tsx
+<main className="mx-auto w-full max-w-7xl px-4">   {/* la MÊME ligne que Header.tsx:99 */}
+  <div className="overflow-hidden lg:grid lg:grid-cols-2 lg:rounded-2xl lg:border …">
+```
+
+Deux conséquences que l'on n'anticipe pas toujours :
+
+1. **un panneau coloré qui ne touche plus le bord doit être arrondi**, sinon c'est un rectangle
+   à arêtes vives posé dans le vide ;
+2. **la hauteur minimale doit retirer la marge verticale** (`-64px` → `-104px`), sinon la page
+   gagne une barre de défilement d'une poignée de pixels.
+
+> **La règle :** un conteneur partagé se déclare une fois et se cite, il ne se recopie pas. Ici
+> la citation est un commentaire qui nomme le fichier et la ligne — le minimum tant que la
+> valeur n'est pas extraite dans une constante.
+
+### 8. Pour aller plus loin
+
+- **RFC 2392** — `cid:` URL scheme : le mécanisme exact derrière les images inline.
+- **La documentation de Resend sur les pièces jointes** — et surtout l'écart entre le SDK et
+  l'API REST, qui est le genre de détail qu'aucun type TypeScript ne rattrape.
+- **`color-scheme` / `supported-color-schemes`** — comment Gmail et Apple Mail décident
+  d'inverser un email, et comment le leur interdire.
+- **Can I email** (caniemail.com) — l'équivalent de Can I Use pour les clients mail : à
+  consulter avant d'écrire la moindre propriété CSS dans un email.

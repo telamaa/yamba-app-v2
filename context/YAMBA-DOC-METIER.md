@@ -8390,3 +8390,79 @@ règle et non une retouche d'écran.
 
 **Le délai réel d'arrivée du mail** n'a pas été mesuré en conditions réelles. Si l'envoi prend
 dix secondes, aucun travail de texte ne sauvera cet écran.
+
+---
+
+# D94 — L'email d'activation : ce qu'il montre de Yamba
+
+## Le besoin
+
+L'email d'activation est, pour beaucoup, **la première chose signée Yamba qui entre chez eux**.
+Il arrive dans une boîte où il côtoie des marques installées, et il n'a que quelques secondes
+pour ne pas ressembler à un message automatique de plus.
+
+Jusqu'ici il n'en portait pas le logo : seulement le mot « YAMBA » en capitales espacées, au
+même endroit — c'est-à-dire la troisième fois que le nom apparaissait à l'écran, après
+l'expéditeur affiché par le client mail et la mention de pied de page.
+
+## Les règles
+
+**RG-D94-1 — Un email porte la marque par un dessin, pas par la répétition de son nom.** Le
+nom est déjà dit par l'expéditeur et par le pied de page. Une troisième mention ne renforce
+rien : elle occupe la place.
+
+**RG-D94-2 — Une image dans un email s'affiche toujours, ou n'y est pas.** Une image chargée
+depuis un serveur distant ne paraît que si le client du destinataire accepte de la charger. Un
+logo visible une fois sur deux est pire qu'un email sans logo : il fait douter du reste.
+
+**RG-D94-3 — Un code de sécurité n'a pas l'air d'un coupon.** La bordure en tirets est le motif
+du ticket à découper. Un code d'activation est le contraire : une donnée à recopier vite, à ne
+transmettre à personne.
+
+**RG-D94-4 — Un email déclare ses couleurs.** Sans déclaration, les clients en mode sombre
+inversent ce qu'ils veulent — ici la carte blanche, pas le bandeau coloré : le message arrive à
+moitié retourné.
+
+**RG-D94-5 — Ce que l'email DIT et ce qu'on ENVOIE sont deux choses.** Le texte d'un email ne
+connaît ni pièce jointe ni fournisseur. Changer de fournisseur ne doit jamais obliger à
+réécrire une phrase.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je reçois l'email dans Gmail | le symbole Yamba s'affiche **sans que j'aie à autoriser les images** |
+| 2 | Je reçois l'email hors ligne, ou images bloquées | le symbole s'affiche quand même (il voyage AVEC le message) |
+| 3 | Je regarde la liste des pièces jointes | **aucun trombone** : l'image est dans le corps, pas à côté |
+| 4 | Je lis l'email en mode sombre | la carte et le bandeau sont cohérents, pas l'un inversé et l'autre non |
+| 5 | Je regarde le bloc du code | les six chiffres sont **centrés** dans leur cadre |
+| 6 | Je compte les mentions « Yamba » dans le corps | une de moins qu'avant — le dessin a remplacé le mot |
+| 7 | L'envoi passe par Resend | même rendu que par SMTP : une seule mise en page pour tous |
+
+## Ce qui reste hors de ce lot
+
+**L'email ne propose aucun bouton.** Le code doit être recopié à la main, même quand on lit son
+courrier sur l'appareil où l'on s'inscrit. Un lien d'activation direct existe déjà côté site :
+le brancher supprimerait cette recopie.
+
+**L'encadré d'expiration mélange deux messages** — « ce code expire dans 10 minutes », qui est
+une information neutre, et « si vous n'êtes pas à l'origine de cette demande, ignorez cet
+email », qui est un avertissement. Les présenter ensemble, en ambre, rend inquiétant ce qui ne
+l'est pas.
+
+Les deux touchent la **rédaction des quinze emails dans les deux langues** : lot à part.
+
+---
+
+## Amendement D92 — la largeur des pages d'inscription
+
+Retour de revue du 10/11 : *« le contenu doit rester en largeur entre le logo Yamba et
+Connexion ».*
+
+**RG-D92-9 — Le contenu d'une page s'aligne sur son en-tête.** Les deux pages d'inscription
+s'étendaient d'un bord à l'autre de l'écran, si bien que le logo et le lien de connexion
+étaient les deux seuls éléments à respecter une marge : plus l'écran était large, plus le
+désalignement se voyait.
+
+Appliqué aux **deux** pages — l'inscription et sa vérification sont deux étapes du même geste,
+et n'en aligner qu'une recréerait la rupture visuelle que D92 venait de supprimer.
