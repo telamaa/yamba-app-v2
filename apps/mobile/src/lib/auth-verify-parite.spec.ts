@@ -255,13 +255,20 @@ describe('⑥ bis — un seul élément en 700 : le bouton (D91 5A)', () => {
    */
   const GLYPHES = ['failureGlyph', 'checkboxMark'];
 
-  it('la trousse du mobile n’a qu’un seul TEXTE en 700 ou plus', () => {
+  /**
+   * Depuis D95 la graisse ne s'écrit plus `fontWeight: 700` mais
+   * `fontFamily: Font.bold` — une famille par graisse, le mobile ayant pris
+   * la police du site. Ces fiches ont été vues ROUGES au moment de la bascule,
+   * et c'est ce qu'on leur demande : elles tenaient une règle, pas une
+   * orthographe. Elles la tiennent maintenant dans le nouveau vocabulaire.
+   */
+  it('la trousse du mobile n’a qu’un seul TEXTE en gras', () => {
     const source = lire(join(MOBILE, 'src/components/auth/auth-kit.tsx'));
     // Chaque style est lu SÉPARÉMENT : une expression régulière qui part d'un
     // nom de style et cherche la graisse plus loin traverse les blocs voisins
     // et accuse les innocents (mesuré : 3 fautifs annoncés pour 1 réel).
     const lourds = [...source.matchAll(/\n {2}(\w+): \{([\s\S]*?)\n {2}\},/g)]
-      .filter((m) => /fontWeight: (?:7|8)00/.test(m[2]))
+      .filter((m) => /Font\.(bold|extrabold)/.test(m[2]))
       .map((m) => m[1])
       // Un glyphe dessiné (une croix, une coche) n'est pas un niveau de
       // lecture : sa graisse est un trait de dessin.
@@ -269,13 +276,14 @@ describe('⑥ bis — un seul élément en 700 : le bouton (D91 5A)', () => {
     expect(lourds).toEqual(['ctaLabel']);
   });
 
-  it('le titre d’écran du mobile a reculé à 600', () => {
+  it('le titre d’écran du mobile a reculé d’un niveau', () => {
     const source = lire(join(MOBILE, 'src/components/auth/auth-screen.tsx'));
-    expect(/title: \{[\s\S]*?fontWeight: 600/.test(source)).toBe(true);
+    expect(/title: \{[\s\S]*?fontFamily: Font\.semibold/.test(source)).toBe(true);
   });
 
-  it('la vue OTP du mobile ne porte plus aucun 700', () => {
-    expect(lire(VUE_MOBILE)).not.toContain('fontWeight: 700');
+  it('la vue OTP du mobile ne porte plus aucun gras', () => {
+    expect(lire(VUE_MOBILE)).not.toContain('Font.bold');
+    expect(lire(VUE_MOBILE)).not.toContain('Font.extrabold');
   });
 
   it('le formulaire web n’a plus de 800, et son seul gras est le bouton', () => {
@@ -290,7 +298,7 @@ describe('⑥ bis — un seul élément en 700 : le bouton (D91 5A)', () => {
     expect(lire(FORMULAIRE_WEB)).toContain('text-[13px] font-medium text-slate-500');
     // Côté mobile le libellé vaut 15 px : même rôle, autre distance de
     // lecture (D91 5A). Ce qui s'aligne est la GRAISSE, pas la taille.
-    expect(/enterCode: \{[\s\S]*?fontWeight: 500/.test(lire(VUE_MOBILE))).toBe(true);
+    expect(/enterCode: \{[\s\S]*?fontFamily: Font\.medium/.test(lire(VUE_MOBILE))).toBe(true);
   });
 });
 
