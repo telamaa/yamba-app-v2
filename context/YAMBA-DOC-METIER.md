@@ -8538,3 +8538,29 @@ vérification est due.
 **Les italiques n'ont pas été embarquées.** Aucun écran n'en utilise aujourd'hui ; le jour où
 l'un en demandera, il faudra les charger plutôt que de laisser le système en fabriquer une en
 penchant les lettres.
+
+## Amendement du 11/11/2026 — le pied d'écran est un rôle, pas cinq décisions
+
+Trois écrans de l'application, et deux pages du site, portent la même ligne tout en bas :
+« Pas encore de compte ? », « Déjà un compte ? », « Plus tard ». Elle fait partout le même
+travail — **offrir une porte à qui n'est pas au bon endroit** — et s'écrivait partout
+différemment. Personne ne s'en plaint jamais nommément : on dit que l'application « n'a pas
+l'air finie ».
+
+**RG-D95-6 — Une ligne de sortie se compose de la même façon partout, dans les deux
+applications.** Même taille, même épaisseur : celle de la mention légale. Un bas d'écran
+n'a pas à se signaler — il doit se trouver quand on le cherche, et se taire sinon.
+
+**RG-D95-7 — L'encre, elle, dit l'intention.** Une sortie qui mène à l'écran jumeau
+(connexion ↔ inscription) prend la couleur de la marque ; une sortie qui **décline** une
+proposition (« Plus tard ») reste grise. Même gabarit, deux intentions — les confondre
+reviendrait à proposer et à refuser sur le même ton.
+
+### Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 8 | Je passe de la connexion à l'inscription, sur l'un ou l'autre support | la ligne du bas est **identique** des deux côtés |
+| 9 | Je compare les trois bas d'écran de l'application | une seule taille, une seule épaisseur |
+| 10 | Je regarde « Plus tard » sur l'écran de bienvenue | même gabarit que les deux autres, mais **gris** : il décline |
+| 11 | Un écran nouveau ajoute une ligne de sortie | il réemploie le gabarit ; recopier les valeurs est refusé par les fiches |

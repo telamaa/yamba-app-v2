@@ -8074,3 +8074,66 @@ la même chose — et elles ont prouvé au passage qu'elles regardaient vraiment
   et pourquoi cela ne remplace pas un indicateur visible.
 - **Gras de synthèse (*faux bold*)** — comment les systèmes fabriquent une graisse absente en
   épaississant les contours, et pourquoi le résultat ne ressemble à aucune coupe réelle.
+
+### Addendum du 11/11 — un rôle, un gabarit : le jeton qui ferme un écart invisible
+
+Dernier écart de la recette du 10/11 : la ligne de sortie en bas d'écran s'écrivait de cinq
+façons pour un seul rôle (15 `medium`, 15 `bold`, 15 `semibold`, 13 `regular` côté natif ;
+`text-sm` gras et `text-[13px]` maigre côté site).
+
+**Le réflexe à ne pas suivre : aligner les cinq valeurs.** Cela referme l'écart *aujourd'hui*,
+et le quatrième écran le rouvre — parce que rien, dans le dépôt, ne dit qu'un pied d'écran a un
+gabarit. Les cinq déclarations étaient le symptôme ; l'absence de **nom** était la cause. C'est
+la même leçon que D95 lui-même, un cran plus bas : *un symptôme traité devient une cause le jour
+où l'on arrête de le traiter*.
+
+```ts
+export const FooterLine = { fontSize: 13, lineHeight: 18, fontFamily: Font.regular } as const;
+```
+
+Trois choses que ce jeton enseigne, et qui dépassent la typographie :
+
+1. **Un jeton de style porte ce qui doit être commun, jamais ce qui doit varier.** La couleur
+   reste à l'écran : mangue pour les deux portes qui mènent à l'écran jumeau, gris pour celle
+   qui décline. Un jeton trop gourmand uniformise une **intention**, et c'est bien plus coûteux
+   qu'une taille qui diverge. La fiche le tient en comparant la **liste exacte des clés** —
+   `['fontFamily', 'fontSize', 'lineHeight']` — et non en vérifiant trois valeurs : ajouter une
+   couleur casse le test, ce qu'un contrôle valeur par valeur n'aurait pas vu.
+
+2. **`{ ...FooterLine }` dans un `StyleSheet.create` n'est pas un détail d'écriture.** Une
+   valeur posée *après* l'épandage l'emporte, silencieusement et légitimement du point de vue du
+   langage. La fiche refuse donc `fontSize:` / `lineHeight:` / `fontFamily:` **dans le bloc de
+   style**, pas seulement l'absence du spread : c'est la seule formulation qui empêche la
+   régression la plus probable — celle qui ressemble à une correction locale.
+
+3. **Un test qui lit un nombre dans la règle ne peut pas diverger d'elle.** Le contrôle du site
+   attend `` `text-[${FooterLine.fontSize}px]` `` — pas `text-[13px]`. Changer le gabarit à 12 px
+   déplace les deux fronts ou fait rougir la fiche ; il n'existe pas de troisième issue où les
+   deux applications s'écartent en silence. (Et `text-[13px]` plutôt que `text-sm` parce que 13
+   n'est **pas** dans l'échelle de Tailwind : l'écriture arbitraire est ici le seul moyen
+   d'inscrire *le* nombre de la règle.)
+
+**Le piège TypeScript, pour la deuxième fois sur cette branche.** La liste des chemins lus était
+écrite ainsi :
+
+```ts
+it.each([
+  ['le formulaire du site', FORM_WEB],
+  ...PIEDS_MOBILE.map(([quoi, chemin]) => [`natif : ${quoi}`, chemin] as const),
+])('%s', (_quoi, chemin) => { … });
+```
+
+Jest passe au vert. `tsc -p tsconfig.spec.json` refuse : l'union d'un `string[]` et d'un tuple
+`readonly [string, string]` s'élargit en `string[]`, et `ExtractEachCallbackArgs` ne peut plus
+garantir deux arguments (**TS2345 : *Target requires 2 element(s) but source may have fewer***).
+La correction est une annotation, pas un `as any` :
+
+```ts
+const A_LIRE: ReadonlyArray<[string, string]> = [ … ];
+```
+
+> **Ce que cela rappelle :** les huit contrôles de typage de la CI lisent les
+> `tsconfig.app.json`, qui **excluent** les `*.spec.ts`. Seul le neuvième job, *TypeScript
+> (fiches de test)*, voit ce fichier — et il n'est **pas** dans la liste des contrôles requis.
+> Un défaut de typage vivant dans une fiche se fait donc voir, mais ne bloque pas un merge : la
+> seule parade est de lancer `nx typecheck` localement, à chaque fiche écrite.

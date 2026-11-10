@@ -16944,3 +16944,72 @@ android  200 en 10,3 s
 `typography.spec.ts` ⑤ tient trois choses : la sortie précoce existe, elle arrive **avant** le
 `<Stack>` (après, elle ne protégerait plus rien), et elle porte bien sur `FONT_ASSETS`. Mobile :
 **571 → 574** fiches.
+
+## ⑪ Amendement du 11/11/2026 — les trois pieds d'écran, et le gabarit qui les tient
+
+La recette du 10/11 au soir, captures côte à côte, montre un dernier écart : **la ligne de
+sortie en bas d'écran ne s'écrit pas deux fois pareil**. Cinq déclarations pour un seul rôle.
+
+| Écran | Avant | Après |
+|---|---|---|
+| Connexion (mobile) — « Pas encore de compte ? » | 15 px `medium` + lien 15 px `bold` | 13 px `regular` |
+| Inscription (mobile) — « Déjà un compte ? » | 13 px `regular` | *inchangé* |
+| Bienvenue (mobile) — « Plus tard » | 15 px `semibold` | 13 px `regular` |
+| Connexion (site) — « Pas encore de compte ? » | `text-sm` + lien `font-bold` | `text-[13px]`, lien sans graisse |
+| Inscription (site) — « Déjà un compte ? » | `text-[13px]` | *inchangé* |
+
+Les trois lignes du natif font **le même travail** : offrir une porte à qui n'est pas au bon
+endroit. Trois tailles et trois graisses pour un rôle, c'est la même phrase prononcée sur trois
+tons — et l'écart ne casse rien, ce qui est exactement pourquoi il avait tenu.
+
+### Le geste : un jeton, pas trois nombres recopiés
+
+Aligner les trois valeurs à la main aurait refermé l'écart **aujourd'hui**. Le quatrième écran
+l'aurait rouvert. Le gabarit sort donc des écrans et devient un jeton nommé, à côté des cinq
+graisses de D95 :
+
+```ts
+// apps/mobile/src/constants/typography.ts
+export const FooterLine = {
+  fontSize: 13,
+  lineHeight: 18,
+  fontFamily: Font.regular,
+} as const;
+```
+
+```tsx
+// apps/mobile/src/app/(auth)/login.tsx — les écrans ne connaissent plus de nombre
+footerText: { ...FooterLine },
+footerLink: { ...FooterLine, color: AuthBrand.mango },
+```
+
+**Ce que le jeton ne porte pas : l'encre.** Les deux premiers mènent à l'écran jumeau
+(connexion ↔ inscription) et prennent la mangue ; le troisième **décline** la proposition et
+garde l'encre grise, posée par l'appelant (`invite-kit`). Même gabarit, autre intention — un
+jeton qui aurait emporté la couleur aurait effacé la nuance au premier réemploi.
+
+13 px est la taille de la mention légale (D91 7A) : le bas d'écran recule d'un bloc. 18 px
+d'interligne parce que l'interligne suit la **police** et non le nombre (⑧ ci-dessus).
+
+### Les fiches — `apps/mobile/src/lib/pied-ecran.spec.ts`, 24 fiches
+
+Trois groupes, et le deuxième est celui qui a de la valeur dans six mois :
+
+1. **le gabarit** — 13 px, `Font.regular`, interligne ≥ 1,3 × la taille, et **aucune couleur**
+   (la liste des clés est comparée exactement) ;
+2. **les trois écrans épandent `FooterLine`** et ne redéclarent **ni** `fontSize`, **ni**
+   `lineHeight`, **ni** `fontFamily`. Une valeur posée *après* l'épandage l'emporterait sans
+   bruit : c'est la façon la plus discrète de rouvrir l'écart qu'on vient de fermer ;
+3. **le site compose comme le téléphone** — les deux pieds portent `text-[13px]` (le nombre
+   est lu depuis `FooterLine.fontSize`, les deux fronts ne peuvent donc pas diverger d'un
+   chiffre), aucun `font-bold`/`font-semibold`, et la mangue reste.
+
+Mobile : **574 → 598** fiches (33 suites). `tsc -p tsconfig.json && -p tsconfig.spec.json` vert,
+`tsc --noEmit -p apps/user-ui` vert, contrôle i18n vert.
+
+> **Le piège repayé une fois de plus, et pour deux lignes :** la première version du fichier
+> construisait sa liste de chemins avec un `it.each([…, ...map(… as const)])`. Les tests
+> passaient ; `tsc -p tsconfig.spec.json` refusait (TS2345 — `string[]` n'est pas un tuple de
+> deux). C'est **exactement** le travail du contrôle « TypeScript (fiches de test) », et c'est
+> le rappel que les huit autres jobs de typage **excluent** les `*.spec.ts`. Corrigé en
+> annotant la liste `ReadonlyArray<[string, string]>`.
