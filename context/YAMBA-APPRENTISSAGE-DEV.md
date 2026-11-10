@@ -7518,3 +7518,38 @@ découvrir que la règle qu'on testait n'était pas la bonne.**
   et qui a servi d'argument décisif.
 - Chapitres 229 et 230 — la même famille : des défauts qui ne cassent rien, donc qu'aucun
   contrôle ne regarde.
+
+### Addendum au chapitre 231 — la hauteur d'écran est une contrainte, pas une préférence
+
+La revue suivante est arrivée avec une capture d'**iPhone** : le second bouton social passait
+sous la ligne de flottaison. Trois enseignements, tous reproductibles ailleurs.
+
+**① Un changement de disposition a un budget.** Descendre le bloc social sous le formulaire était
+juste ; le servir en **deux boutons pleine largeur empilés** coûtait 60 pt que l'écran n'avait
+pas. La bonne question n'est pas « est-ce mieux placé ? » mais « combien ça coûte en hauteur, et
+sur quel appareil ».
+
+**② Raccourcir un libellé visible n'autorise pas à le raccourcir pour tout le monde.** Deux
+colonnes imposent « Google » au lieu de « Continuer avec Google ». À l'œil, le séparateur juste
+au-dessus porte le verbe — mais **un lecteur d'écran annonce un bouton hors de son contexte**. La
+solution tient en une prop :
+
+```tsx
+label={t('social.googleShort')}            // ce que l'œil lit, dans son contexte
+accessibilityLabel={t('social.google')}    // ce que VoiceOver annonce, sans contexte
+```
+
+C'est une règle générale : **dès qu'un libellé dépend de ce qui l'entoure, l'étiquette accessible
+doit redevenir autonome.**
+
+**③ Un seul appareil ne montre pas une contrainte de hauteur.** Le Pixel 6 (914 dp) tenait ;
+l'iPhone 15 Pro (852 pt) non. Vérifier sur les deux simulateurs a pris quatre minutes — c'est
+exactement le coût qu'avait déjà payé le chapitre 229 pour la parité Android. Les deux fois, la
+leçon est la même, et elle est bête : **ouvrez l'application sur l'appareil dont vous parlez.**
+
+**④ Une règle qu'on vient d'écrire peut devenir fausse le lendemain.** `RG-D91-2` justifiait une
+ligne de réassurance sous le bouton. L'utilisateur l'a fait supprimer. Les documents cumulatifs
+étant en **ajout seul**, la règle n'est pas réécrite : elle est **explicitement supprimée par un
+amendement daté**, qui dit ce qui la remplace. Un document qui se corrige en ajoutant reste
+lisible dans son ordre chronologique ; un document qui se corrige en effaçant perd la trace de ce
+qu'on a cru.

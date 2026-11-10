@@ -8276,3 +8276,25 @@ site, il s'annonce « bientôt disponible » tant que la clé n'est pas renseign
 Les six formulaires d'authentification du site portent leurs textes dans le code, en dur, langue
 par langue. C'est pour cela que deux orthographes anglaises du même badge ont pu coexister sans
 que rien ne le signale. Lot séparé.
+
+## Amendement du 10/11/2026
+
+**RG-D91-2 est SUPPRIMÉE** (« la réassurance répond à l'inquiétude réelle du moment »). La ligne
+« Gratuit, sans engagement. » a été retirée des deux écrans : la page d'inscription n'ajoute
+rien, elle demande ce qu'il lui faut et s'arrête là. Ce qui reste de l'esprit de la règle est
+dans RG-D91-1 : on ne met pas de texte de réconfort, ni abstrait ni concret.
+
+**RG-D91-9 — Un écran d'inscription tient sur un écran.** Si l'on doit faire défiler pour
+découvrir qu'il existe d'autres moyens de s'inscrire, ces moyens n'existent pas. La contrainte se
+vérifie sur le plus petit appareil visé, pas sur le plus grand.
+
+**RG-D91-10 — Les exemples d'un formulaire forment un seul personnage.** « Marie », « Love »,
+`marielove@email.com` : un exemple qui se lit d'un bloc aide, trois exemples sans rapport
+distraient. L'adresse d'exemple complète n'apparaît que là où les champs de nom existent — la
+page de connexion garde une adresse générique.
+
+### Test d'acceptation ajouté
+
+| # | Situation | Attendu |
+|---|---|---|
+| 7 | Page d'inscription ouverte sur le plus petit iPhone visé | Tout est visible sans défiler, y compris les moyens de connexion et le lien vers la connexion |

@@ -16014,3 +16014,65 @@ contre « Send or carry parcels, with ease ».
 La seule chaîne **neuve** de ce lot (`register.reassurance`) passe par le dictionnaire, et le
 composant gagne un `useTranslations("auth")` qui marque le point d'entrée de la migration. Le
 reste est un lot à part.
+
+## ⑧ Amendement du 10/11/2026 — l'écran doit tenir sur un écran
+
+Revue d'écran de l'utilisateur, capture d'**iPhone** à l'appui : le second bouton social et le
+lien « Déjà membre ? » passaient sous la ligne de flottaison. Cause directe de ⑤ : le social
+descendu sous le formulaire, en **deux boutons pleine largeur empilés**.
+
+Un écran d'inscription qui demande de faire défiler pour voir ses propres options perd des
+inscriptions. Trois corrections :
+
+**Les fournisseurs passent côte à côte — sur mobile seulement.**
+
+```tsx
+<View style={styles.socialRow}>
+  <View style={styles.socialCol}>
+    <MethodButton … label={t('social.googleShort')} accessibilityLabel={t('social.google')} />
+  </View>
+  <View style={styles.socialCol}>
+    <MethodButton … label={t('social.facebookShort')} accessibilityLabel={t('social.facebook')} />
+  </View>
+</View>
+```
+
+Ils restent des **boutons nommés**, pas des pastilles rondes — la règle de D91 ne bouge pas. Le
+libellé visible se raccourcit au nom du fournisseur, et **le verbe part dans
+`accessibilityLabel`** : le séparateur « Ou continue avec » le porte pour l'œil, mais un lecteur
+d'écran annonce un bouton **hors de son contexte** — « Google, bouton » ne dit pas ce qui va se
+passer. `MethodButton` gagne donc une prop optionnelle.
+
+Le **site garde l'empilement** : sa colonne a la place, et le bouton officiel de Google veut sa
+largeur. La parité testée porte sur les **fournisseurs offerts**, pas sur leur disposition.
+
+**La ligne « Gratuit, sans engagement. » est supprimée** des deux fronts, à la demande. Elle
+avait remplacé le badge ; la page n'ajoute désormais plus rien. Sur un écran qui ne tenait déjà
+pas, une ligne que personne n'a demandée est la première à payer. Le `useTranslations` du
+formulaire web disparaît avec elle — le point d'entrée de la migration i18n reste donc à ouvrir.
+
+**Les exemples de champs deviennent un seul personnage cohérent** : « Marie », « Love »,
+`marielove@email.com`. Trois exemples sans rapport se lisent comme trois formulaires ; un seul se
+lit comme un exemple. L'inscription gagne sa **propre** clé d'adresse (`register.emailPlaceholder`)
+au lieu d'emprunter celle de la connexion, qui reste générique — l'adresse complète n'a de sens
+que là où les champs de nom existent.
+
+### Vérifié sur les DEUX simulateurs
+
+Première fois dans ce chantier, et c'est exactement le genre de contrainte qu'un seul appareil ne
+montre pas :
+
+| Appareil | Avant | Après |
+|---|---|---|
+| Pixel 6 (Android, 914 dp) | tenait déjà | tient, avec marge |
+| iPhone 15 Pro (iOS, 852 pt) | **coupé au second bouton** | tient, « Déjà membre ? » visible |
+
+Le titre reste sur **deux lignes** sur iPhone (« Create your Yamba account », 25 caractères) :
+~45 pt dépensés. C'est la marge qui manquerait sur un iPhone SE. Raccourcir le titre est proposé,
+pas appliqué — c'est une décision de contenu.
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **494**, 28 suites |
+| `nx typecheck @yamba-app/mobile` + `tsc --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait |
