@@ -45,17 +45,30 @@ import {
  * aligne quatre, la page n'avait plus de niveau de lecture — tout pesait le
  * même poids que le titre, donc rien ne reculait.
  *
- * `muted` n'est pas un à-peu-près : #64748B / #94A3B8 sont exactement les
- * `slate-500` / `slate-400` que le web vient d'adopter pour les siens. Mesuré :
- * 4,55:1 sur le fond clair, 7,34:1 sur le sombre — l'un et l'autre au-dessus
- * du seuil AA de 4,5:1, le clair de peu. C'est le plancher à surveiller si le
- * fond de la page s'éclaircit un jour.
+ * CORRIGÉ le 10/11 — il était passé à `muted`, qui est AUSSI la couleur de
+ * l'exemple dans le champ (`placeholderTextColor`) : « First name » et
+ * « Marie » se retrouvaient à la même encre, à la même graisse, à quatre
+ * points de taille près. Le libellé se lisait comme une deuxième valeur.
+ *
+ * Il prend donc `text`, l'encre INTERMÉDIAIRE : plus clair que le titre, plus
+ * franc que l'exemple. Trois niveaux au lieu de deux.
+ *
+ * On n'a PAS copié le web ici, et c'est délibéré. Le web sépare les deux en
+ * ÉCLAIRCISSANT son exemple (slate-400 sur blanc), ce qui le fait tomber à
+ * 2,56:1 — sous le seuil AA. Un exemple de format se lit, surtout dehors sur
+ * un téléphone. On sépare donc par le HAUT. Mesuré :
+ *
+ *     libellé   9,90:1 (clair)   12,68:1 (sombre)
+ *     exemple   4,76:1 (clair)    6,96:1 (sombre)   ← au-dessus de 4,5:1
+ *
+ * Ce qui reste aligné avec le web est ce qui comptait : la GRAISSE (500, plus
+ * aucun gras) et la hiérarchie libellé > exemple.
  */
 export function FieldLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   const palette = useAuthPalette();
   return (
     <View style={styles.labelRow}>
-      <Text style={[styles.label, { color: palette.muted }]}>{children}</Text>
+      <Text style={[styles.label, { color: palette.text }]}>{children}</Text>
       {right}
     </View>
   );

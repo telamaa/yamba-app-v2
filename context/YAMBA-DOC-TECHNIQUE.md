@@ -16143,3 +16143,47 @@ les deux vérifications par code, mot de passe oublié) — c'est le prix d'un c
 il est assumé puisque la demande était l'alignement. La connexion par mot de passe a été ouverte
 sur simulateur iOS pour le vérifier : rien n'est cassé, et une observation en sort pour sa propre
 revue — « Oublié ? » est désormais **plus gras que le libellé qu'il accompagne**.
+
+### Correction — un libellé ne doit pas avoir l'encre de l'exemple
+
+Constat de l'utilisateur, capture à l'appui : *« sur le mobile, "First name" ne doit pas être du
+même niveau visuel que "Marie" »*. Il avait raison, et c'est mon propre changement qui l'avait
+créé.
+
+`AuthTextField` peint l'exemple avec `placeholderTextColor={palette.muted}`. En passant le
+libellé à `muted` lui aussi, les deux se sont retrouvés à **la même encre, à la même graisse**,
+à quatre points de taille près : la rangée « First name / Last name » se lisait comme quatre
+valeurs grises alignées, sans hiérarchie.
+
+Le libellé prend donc `text`, l'encre **intermédiaire** : plus clair que le titre, plus franc que
+l'exemple. Trois niveaux au lieu de deux.
+
+**On n'a pas copié le web ici, et c'est délibéré.** Le web sépare les deux par le BAS — il
+éclaircit son exemple à `slate-400` sur blanc, ce qui le met à **2,56:1**, sous le seuil AA. Un
+exemple de format se lit, surtout dehors, sur un téléphone. On sépare donc par le HAUT :
+
+| | Libellé | Exemple |
+|---|---|---|
+| Clair | `#334155` → **9,90:1** | `#64748B` → **4,76:1** |
+| Sombre | `#CBD5E1` → **12,68:1** | `#94A3B8` → **6,96:1** |
+
+Les deux restent au-dessus de 4,5:1 — ce que le web ne fait pas. Ce qui demeure aligné entre les
+deux fronts est ce qui comptait : **la graisse (500, plus aucun gras) et l'ordre libellé >
+exemple**.
+
+### Pourquoi « Prénom » et « Nom » restent sur une seule ligne
+
+Question posée à la même revue. Ils y restent, pour trois raisons :
+
+1. **Ils forment UNE information** — le nom d'une personne. La règle « un champ par ligne »
+   (Baymard : une colonne se remplit plus vite) admet explicitement l'exception des champs
+   courts et **logiquement appariés** : prénom/nom, ville/code postal, date/cryptogramme.
+2. **Ils sont courts.** Mesuré sur iPhone 15 Pro : ~160 pt par champ, de quoi afficher la grande
+   majorité des prénoms et noms sans défilement interne.
+3. **Les séparer coûterait ~75 pt** — exactement le budget que l'on vient de reconquérir pour
+   que l'écran tienne sans défiler.
+
+Ce qui rendait cette rangée désagréable n'était pas l'appariement, c'était l'absence de
+hiérarchie corrigée ci-dessus : quatre éléments gris de même poids côte à côte. La limite à
+connaître : si un troisième champ (civilité, second prénom) rejoint un jour cette ligne, elle
+devra se rompre.
