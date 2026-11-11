@@ -145,6 +145,40 @@ export function otpCodeMessage(
   }
 }
 
+/**
+ * Les refus de la CONNEXION (D96 4A). Miroir serveur :
+ * `apps/auth-service/src/controller/auth.controller.ts` — `loginUser` pose un
+ * `details.code` sur chacun de ses quatre refus, et le middleware d'erreur
+ * expose `details` dès que `code` est une chaîne (A146).
+ *
+ * Avant D96, le site comparait le MESSAGE anglais de l'API à dix-huit chaînes
+ * normalisées (« request failed with status code 401 »…) : il suffisait qu'un
+ * mot change côté serveur pour que l'Expéditeur reçoive « Connexion
+ * impossible pour le moment » au lieu de la vraie raison. Le mobile lisait
+ * déjà le code (RG-MOB-1) — une règle, deux implémentations, dont une fausse.
+ */
+export const LOGIN_ERROR_CODES = [
+  "INVALID_CREDENTIALS",
+  "TOO_MANY_ATTEMPTS",
+  "ACCOUNT_SUSPENDED",
+  "MISSING_FIELDS",
+] as const;
+
+export type LoginErrorCode = (typeof LOGIN_ERROR_CODES)[number];
+
+export function isLoginErrorCode(code: string): code is LoginErrorCode {
+  return (LOGIN_ERROR_CODES as readonly string[]).includes(code);
+}
+
+/** Le `details.code` d'une réponse d'erreur, ou null — on ne devine jamais. */
+export function readLoginErrorCode(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const details = (data as { details?: unknown }).details;
+  if (!details || typeof details !== "object") return null;
+  const code = (details as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
 export function readAuthErrorDetails(data: unknown): AuthErrorDetails | null {
   if (!data || typeof data !== "object") return null;
   const details = (data as { details?: unknown }).details;
