@@ -70,13 +70,33 @@ export default function AuthHeroVisual({ visual }: Props) {
     <div className="flex h-full min-h-[560px] w-full flex-col justify-between gap-4 bg-gradient-to-b from-[#FFF7E8] to-white p-6 lg:p-8 dark:from-[#1F1408] dark:to-slate-950">
       {/* Headline */}
       <div>
-        <h2 className="text-xl font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white lg:text-2xl">
+        <h2 className="text-xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-white lg:text-2xl">
           {headline}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
           {subline}
         </p>
       </div>
+
+      {/* Promesses produit (D45) — REMONTÉES sous l'accroche (D91).
+          Elles étaient ancrées en bas de colonne, sous ~400 px de vide : les
+          trois meilleurs arguments de la page arrivaient après l'illustration,
+          hors du premier regard. L'ordre de lecture suit maintenant l'ordre
+          d'importance ; l'illustration descend et redevient ce qu'elle est,
+          un décor. */}
+      <ul className="mt-6 space-y-2.5">
+        {promises.map((p) => (
+          <li key={p.title} className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-[#0F766E] shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-teal-300 dark:ring-slate-800">
+              <p.icon size={15} strokeWidth={2.2} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold leading-tight text-slate-900 dark:text-white">{p.title}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-slate-500 dark:text-slate-400">{p.text}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
 
       {/* Illustration */}
       <div className="flex flex-1 items-center justify-center py-2">
@@ -89,21 +109,6 @@ export default function AuthHeroVisual({ visual }: Props) {
           className="h-auto max-h-[180px] max-w-full"
         />
       </div>
-
-      {/* Promesses produit (D45) */}
-      <ul className="space-y-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
-        {promises.map((p) => (
-          <li key={p.title} className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-[#0F766E] shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-teal-300 dark:ring-slate-800">
-              <p.icon size={15} strokeWidth={2.2} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold leading-tight text-slate-900 dark:text-white">{p.title}</p>
-              <p className="mt-0.5 text-[12px] leading-snug text-slate-500 dark:text-slate-400">{p.text}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

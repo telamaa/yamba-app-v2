@@ -8203,3 +8203,98 @@ qu'aucun réglage de Yamba ne gouverne. L'écran de démarrage de Yamba n'appara
 application compilée. Il a donc été vérifié ici par son jumeau (celui qui prend le relais juste
 après, pixel pour pixel identique) et en aperçu ; sa version compilée attend le premier build de
 développement.
+
+---
+
+# D91 — L'inscription : ce qu'on promet, à qui, et dans quel ordre
+
+## Le besoin
+
+L'inscription est la première chose qu'un visiteur fait avec Yamba. Elle existait en deux
+versions — le site et le téléphone — qui ne disaient pas la même chose, ne demandaient pas la
+même chose, et ne les demandaient pas dans le même ordre.
+
+## Les règles
+
+**RG-D91-1 — Un signal de confiance nomme un tiers ou un fait vérifiable.** « Inscription
+sécurisée » n'est ni l'un ni l'autre : on se l'accorde à soi-même, et on installe ainsi une
+question que le visiteur ne se posait pas. La mention disparaît. « Paiement sécurisé par
+Stripe », qui nomme quelqu'un, reste.
+
+**RG-D91-2 — La réassurance répond à l'inquiétude réelle du moment, à l'endroit où elle se
+pose.** Au moment de créer un compte, la question est « est-ce que je m'engage ? ». La réponse —
+**« Gratuit, sans engagement. »** — est donc sous le bouton, et nulle part ailleurs.
+
+**RG-D91-3 — La page d'inscription s'adresse aux DEUX publics.** Yamba a des Expéditeurs et des
+Voyageurs ; les premiers sont les plus nombreux. Le titre d'une page d'inscription générique ne
+peut pas en désigner un seul : c'est « Crée ton compte Yamba ».
+
+**RG-D91-4 — On ne demande pas deux fois le mot de passe.** Le gestionnaire de mots de passe
+remplit les deux champs d'un coup : la confirmation ne confirme rien. L'œil qui révèle le mot de
+passe fait le travail.
+
+**RG-D91-5 — Le collage n'est jamais bloqué dans un champ de mot de passe.** Le bloquer casse
+les gestionnaires de mots de passe et pousse les gens vers des mots de passe qu'ils peuvent
+taper — donc plus faibles. C'est la recommandation explicite du NCSC et du NIST.
+
+**RG-D91-6 — Le site et l'application proposent les mêmes choses, dans le même ordre.** Mêmes
+champs, même enchaînement, mêmes moyens de connexion. Une différence entre les deux doit être
+justifiée par le support, jamais subie.
+
+**RG-D91-7 — Le meilleur argument se lit en premier.** Les garanties concrètes d'une page
+passent avant son décor.
+
+**RG-D91-8 — Une page a une identité stable.** Son illustration ne change pas d'un chargement à
+l'autre, et elle montre ce que le produit fait.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Page d'inscription, site ou application | Aucune mention de sécurité en tête ; « Gratuit, sans engagement. » sous le bouton |
+| 2 | Le visiteur lit le titre | Il ne se sent exclu ni comme Expéditeur ni comme Voyageur |
+| 3 | Le visiteur crée un compte | Un seul champ de mot de passe, et le collage y fonctionne |
+| 4 | On compare les deux écrans | Mêmes champs, même ordre, mêmes moyens de connexion |
+| 5 | On charge la page deux fois | La même illustration, qui montre un colis en voyage |
+| 6 | Quelqu'un retire un moyen de connexion d'un seul côté | Le contrôle automatique refuse |
+
+## Ce qui reste hors de ce lot
+
+### Les cinq autres écrans d'authentification portent encore la mention
+
+Connexion, connexion par mot de passe, les deux vérifications par code et « mot de passe
+oublié » affichent toujours leur badge de sécurité. La règle RG-D91-1 les condamne, mais leur
+revue n'a pas eu lieu : ils passeront un par un, comme celui-ci.
+
+### Le bouton Google est présent mais pas encore branché
+
+Il est affiché des deux côtés, à la demande expresse — le paramétrage viendra après. Sur le
+site, il s'annonce « bientôt disponible » tant que la clé n'est pas renseignée.
+
+### Les textes du site ne sont pas encore dans le système de traduction
+
+Les six formulaires d'authentification du site portent leurs textes dans le code, en dur, langue
+par langue. C'est pour cela que deux orthographes anglaises du même badge ont pu coexister sans
+que rien ne le signale. Lot séparé.
+
+## Amendement du 10/11/2026
+
+**RG-D91-2 est SUPPRIMÉE** (« la réassurance répond à l'inquiétude réelle du moment »). La ligne
+« Gratuit, sans engagement. » a été retirée des deux écrans : la page d'inscription n'ajoute
+rien, elle demande ce qu'il lui faut et s'arrête là. Ce qui reste de l'esprit de la règle est
+dans RG-D91-1 : on ne met pas de texte de réconfort, ni abstrait ni concret.
+
+**RG-D91-9 — Un écran d'inscription tient sur un écran.** Si l'on doit faire défiler pour
+découvrir qu'il existe d'autres moyens de s'inscrire, ces moyens n'existent pas. La contrainte se
+vérifie sur le plus petit appareil visé, pas sur le plus grand.
+
+**RG-D91-10 — Les exemples d'un formulaire forment un seul personnage.** « Marie », « Love »,
+`marielove@email.com` : un exemple qui se lit d'un bloc aide, trois exemples sans rapport
+distraient. L'adresse d'exemple complète n'apparaît que là où les champs de nom existent — la
+page de connexion garde une adresse générique.
+
+### Test d'acceptation ajouté
+
+| # | Situation | Attendu |
+|---|---|---|
+| 7 | Page d'inscription ouverte sur le plus petit iPhone visé | Tout est visible sans défiler, y compris les moyens de connexion et le lien vers la connexion |

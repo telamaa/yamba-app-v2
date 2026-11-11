@@ -5,11 +5,14 @@
  * au-dessus du champ (avec action à droite optionnelle — « Oublié ? »),
  * champ bordé arrondi 12 (la ref passe en PROP — React 19 — pour le
  * chaînage clavier `returnKeyType="next"`), CTA mangue à texte sombre,
- * séparateur, rangée sociale en LOGOS SEULS sous le CTA (itération UX du
- * 28/09 : le mobile a moins de place que le web — les boutons pleine
- * largeur du site deviennent deux pastilles ; inertes tant que les flux
- * n'existent pas, dessinées fonctionnelles), case à cocher carrée avec
- * aide, lien teal souligné. Palette : `auth-theme.ts`.
+ * séparateur, boutons de méthode (« Continuer avec … »), case à cocher
+ * carrée avec aide, lien teal souligné. Palette : `auth-theme.ts`.
+ *
+ * D91 — la rangée sociale en LOGOS SEULS a été retirée : une pastille ronde
+ * ne dit ni le verbe ni ce qui va se passer. Les fournisseurs passent par
+ * `MethodButton`, qui porte leur nom ; quand la place manque (rangée à deux
+ * colonnes de l'inscription), le libellé visible se raccourcit et le verbe
+ * reste dans `accessibilityLabel`.
  */
 import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 import {
@@ -36,11 +39,36 @@ import {
 
 /* ── Label de champ ──────────────────────────────────────────────────────── */
 
+/**
+ * Le libellé d'un champ GUIDE, il n'annonce pas (alignement du 10/11 sur le
+ * formulaire web). Il était en 700, à l'encre du titre : sur un écran qui en
+ * aligne quatre, la page n'avait plus de niveau de lecture — tout pesait le
+ * même poids que le titre, donc rien ne reculait.
+ *
+ * CORRIGÉ le 10/11 — il était passé à `muted`, qui est AUSSI la couleur de
+ * l'exemple dans le champ (`placeholderTextColor`) : « First name » et
+ * « Marie » se retrouvaient à la même encre, à la même graisse, à quatre
+ * points de taille près. Le libellé se lisait comme une deuxième valeur.
+ *
+ * Il prend donc `text`, l'encre INTERMÉDIAIRE : plus clair que le titre, plus
+ * franc que l'exemple. Trois niveaux au lieu de deux.
+ *
+ * On n'a PAS copié le web ici, et c'est délibéré. Le web sépare les deux en
+ * ÉCLAIRCISSANT son exemple (slate-400 sur blanc), ce qui le fait tomber à
+ * 2,56:1 — sous le seuil AA. Un exemple de format se lit, surtout dehors sur
+ * un téléphone. On sépare donc par le HAUT. Mesuré :
+ *
+ *     libellé   9,90:1 (clair)   12,68:1 (sombre)
+ *     exemple   4,76:1 (clair)    6,96:1 (sombre)   ← au-dessus de 4,5:1
+ *
+ * Ce qui reste aligné avec le web est ce qui comptait : la GRAISSE (500, plus
+ * aucun gras) et la hiérarchie libellé > exemple.
+ */
 export function FieldLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   const palette = useAuthPalette();
   return (
     <View style={styles.labelRow}>
-      <Text style={[styles.label, { color: palette.title }]}>{children}</Text>
+      <Text style={[styles.label, { color: palette.text }]}>{children}</Text>
       {right}
     </View>
   );
@@ -181,16 +209,24 @@ export function MethodButton({
   icon,
   label,
   onPressAction,
+  accessibilityLabel,
 }: {
   icon: ReactNode;
   label: string;
   onPressAction?: () => void;
+  /**
+   * Ce que LIT un lecteur d'écran, quand le libellé visible a dû être
+   * raccourci (rangée à deux colonnes). Sans lui, VoiceOver annonce
+   * « Google », qui ne dit pas ce que fait le bouton.
+   */
+  accessibilityLabel?: string;
 }) {
   const palette = useAuthPalette();
   return (
     <Pressable
       onPress={onPressAction}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.methodButton,
         { backgroundColor: palette.card, borderColor: palette.border },
@@ -243,40 +279,6 @@ export function AuthDivider({ label }: { label: string }) {
   );
 }
 
-/* ── Rangée sociale en logos seuls (sous le CTA — itération UX du 28/09) ── */
-
-export function SocialLogosRow() {
-  const t = useTranslations('auth');
-  const palette = useAuthPalette();
-  return (
-    <View style={styles.socialRow}>
-      {/* Les VRAIS logos (SVG officiels, rendus par expo-image — le canal de
-          l'illustration de bienvenue) : le G quadricolore est obligatoire
-          dans la charte Google. Inertes tant que les flux natifs n'existent
-          pas (Google : lot A201) — le câblage viendra sans changer l'écran. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('social.google')}
-        style={({ pressed }) => [
-          styles.socialDot,
-          { backgroundColor: palette.card, borderColor: palette.border },
-          pressed && styles.dimmed,
-        ]}>
-        <Image source={require('@/assets/images/google-g.svg')} style={styles.socialLogo} />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('social.facebook')}
-        style={({ pressed }) => [
-          styles.socialDot,
-          { backgroundColor: palette.card, borderColor: palette.border },
-          pressed && styles.dimmed,
-        ]}>
-        <Image source={require('@/assets/images/facebook-f.svg')} style={styles.socialLogo} />
-      </Pressable>
-    </View>
-  );
-}
 
 /* ── Case à cocher ───────────────────────────────────────────────────────── */
 
@@ -353,8 +355,11 @@ const styles = StyleSheet.create({
     marginBottom: -Spacing.one,
   },
   label: {
+    // 15 et non 13 comme le web : même rôle, autre distance de lecture — un
+    // libellé de formulaire sur un téléphone se lit à bout de bras. Ce qui
+    // s'aligne est la GRAISSE et l'encre, c'est-à-dire ce qui fait reculer.
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 500,
   },
   input: {
     height: AuthFieldHeight,
@@ -402,23 +407,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: 1.5,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.three,
-  },
-  socialDot: {
-    width: AuthFieldHeight,
-    height: AuthFieldHeight,
-    borderRadius: AuthFieldHeight / 2,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialLogo: {
-    width: 24,
-    height: 24,
   },
   methodButton: {
     flexDirection: 'row',
@@ -494,7 +482,9 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 15,
     lineHeight: 21,
-    fontWeight: 500,
+    // 400 et non 500 (revue du 10/11) : un libellé de case à cocher est du
+    // texte courant, pas un titre. Il est long, il se lit, il ne s'annonce pas.
+    fontWeight: 400,
   },
   checkboxHelper: {
     fontSize: 13,

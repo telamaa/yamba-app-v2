@@ -15876,3 +15876,314 @@ seule.
 - **`sharp` n'entre pas dans les dépendances.** Le générateur documente son installation à la
   demande ; il a été lancé avec `npm install --no-save sharp`, et `package.json` comme
   `package-lock.json` sont restés intacts (vérifié au `git status`).
+
+---
+
+# D91 — Finitions, page 1 : l'inscription, et les quatre écarts qu'elle portait
+
+> PR `feat/finitions-inscription`. Première page de la passe « page par page », instruite
+> capture en main sur les deux fronts. Quatre arbitrages tranchés **avant** le code.
+
+## ① Ce qui a été mesuré, pas ressenti
+
+La demande de départ tenait en une phrase : « la version web n'est pas épurée, la police des
+textes n'est pas fine, il manque quelque chose ». Voici ce que le code disait :
+
+| Élément | Avant |
+|---|---|
+| Titre | `font-extrabold` → **800** |
+| Les **8 libellés** | `text-xs font-semibold text-slate-100` → 12 px / **600**, quasi-blanc |
+| CTA | `font-bold` → **700** |
+| Liens CGU | `font-semibold` → **600** |
+
+**Aucune graisse sous 600**, et les libellés dans la même famille de couleur que le titre. Rien
+ne recule, donc tout crie : c'est cela que « pas épuré » désigne, et non un excès d'éléments.
+
+Après : titre **600**, libellés **13 px / 500** en `slate-500/400`, corps **400**, et **un seul
+élément en 700 — le bouton**.
+
+## ② La mention de sécurité, et la règle qui en sort
+
+« Inscription sécurisée » était une affirmation que Yamba se décernait à elle-même. Trois
+défauts :
+
+- elle **installe** la question que personne ne se posait ;
+- elle occupait le premier point de fixation, en repoussant le titre ;
+- sur le web, c'était la version abstraite d'un bloc **concret** déjà présent (les trois
+  garanties de la colonne de gauche).
+
+**La règle, valable pour tout le produit : un signal de confiance nomme un tiers ou un fait
+vérifiable, sinon il ne dit rien.** « Paiement sécurisé par Stripe » nomme quelqu'un ;
+« Inscription sécurisée » ne nomme personne.
+
+La preuve qu'elle n'était pas lue est dans les fichiers : `RegisterForm.tsx` écrivait
+**« Secure signup »**, `apps/mobile/messages/en/auth.json` **« Secure sign-up »**. Deux
+orthographes pour quatre mots, et aucun contrôle pour le dire.
+
+À sa place, une ligne **vérifiable**, posée là où le doute existe — sous le bouton :
+
+```tsx
+<p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+  {tAuth("register.reassurance")}        {/* « Gratuit, sans engagement. » */}
+</p>
+```
+
+`AuthScreen.badge` devient **optionnel** côté mobile (il était requis) : les cinq autres écrans
+d'auth le passent encore, et leur revue se fera écran par écran.
+
+## ③ Les divergences web ↔ mobile, closes
+
+| | Avant web | Avant mobile | Après (les deux) |
+|---|---|---|---|
+| Ordre | social → formulaire | formulaire → social | **formulaire → social** |
+| Social | boutons libellés | pastilles rondes | **boutons libellés** |
+| Confirmer le mot de passe | **oui** | non | **non** |
+| Titre | « Deviens Voyageur » | « Deviens Voyageur » | **« Crée ton compte Yamba »** |
+
+Le troisième cas est le plus net : **le mobile avait déjà tranché et écrit pourquoi**
+(`register.tsx:6-8`, A208) — *« le trousseau remplit les deux champs d'un coup, la confirmation
+ne confirme rien »*. Le web ne l'avait pas suivi, et y ajoutait un `onPaste` bloquant que le
+NCSC et le NIST déconseillent explicitement.
+
+Sur les fournisseurs sociaux, l'arbitrage a changé **en cours de lot** : Google avait d'abord
+été retiré tant qu'il n'est pas branché ; l'utilisateur a demandé le soir même de le garder à
+l'écran des deux côtés, le paramétrage viendra après. La règle tenue par les fiches n'est donc
+pas « branché ou caché » mais **la parité**.
+
+## ④ La colonne de gauche et l'illustration
+
+Les trois garanties étaient ancrées **en bas**, sous ~400 px de vide (`justify-between` + une
+illustration en `flex-1`) : le meilleur contenu de la page arrivait hors du premier regard.
+Elles passent **sous l'accroche** ; l'illustration descend et redevient un décor.
+
+Et le visuel **cesse d'être tiré au hasard** :
+
+```tsx
+const heroVisual = getHeroVisualById("illu-route");
+if (heroVisual === undefined) throw new Error("Visuel auth introuvable : illu-route");
+```
+
+Un visuel différent à chaque chargement prive la page d'identité et fait varier sa qualité
+selon le tirage. Le garde-fou qui lève est volontaire : sans lui, un identifiant faux
+afficherait une colonne vide, en silence. `export const dynamic = "force-dynamic"` disparaît au
+passage — il n'existait que pour le tirage aléatoire ; le build confirme que la page se rend
+désormais en statique.
+
+**`illu-map.svg` est redessiné.** Sa grille pleine page derrière des courbes en pointillés le
+faisait lire « graphique de tableau de bord » : la grille sort, un colis prend la route
+principale, les nœuds gardent le dessin des deux autres visuels.
+
+## ⑤ Les fiches — 9, qui lisent les DEUX fronts
+
+`auth-register-parite.spec.ts` est inhabituel : le harnais du **mobile** lit une page du
+**site**. C'est assumé, et c'est le seul endroit du dépôt où un test voit les deux à la fois —
+or la règle porte justement sur leur accord (`splash.spec.ts` lit déjà un script de la racine
+pour la même raison).
+
+| # | Ce qu'elle tient |
+|---|---|
+| 0 | le formulaire web est bien au chemin lu — sans quoi tout le reste passerait au vert en ne lisant rien |
+| ① | la mention de sécurité ne revient ni au dictionnaire mobile, ni dans le composant web |
+| ② | `register.reassurance` existe dans les **quatre** dictionnaires **et dit la même chose par langue** |
+| ③ | plus de `passwordConfirm`, plus d'`onPaste` côté web |
+| ④ | les deux fronts offrent les **mêmes** fournisseurs sociaux |
+
+La fiche ① a été vue **rouge** au premier essai — et pour une bonne raison : un commentaire que
+je venais d'écrire citait la chaîne interdite. Le balayage ne distingue pas un commentaire d'un
+rendu ; le commentaire a été reformulé.
+
+## ⑥ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **494** (+9), 28 suites (+1) |
+| `nx run-many --target=typecheck --all --skip-sync` | 10/10 vert |
+| `tsc --noEmit --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait |
+| `nx build @yamba-app/user-ui` | vert (`next-env.d.ts` réécrit puis **restauré**) |
+| Rendu | émulateur Android + Chrome 1440×900, thèmes clair **et** sombre |
+
+## ⑦ La dette nommée, non traitée
+
+Les six formulaires d'auth du web portent **140 `fr ? … : …`** dans leurs composants. C'est une
+violation frontale d'une règle non négociable du dépôt, et surtout **la cause mécanique** de
+l'angle mort : le contrôle i18n de la CI ne lit que les dictionnaires, donc ces pages lui sont
+invisibles — d'où « Secure signup » contre « Secure sign-up », et « Send or transport parcels »
+contre « Send or carry parcels, with ease ».
+
+La seule chaîne **neuve** de ce lot (`register.reassurance`) passe par le dictionnaire, et le
+composant gagne un `useTranslations("auth")` qui marque le point d'entrée de la migration. Le
+reste est un lot à part.
+
+## ⑧ Amendement du 10/11/2026 — l'écran doit tenir sur un écran
+
+Revue d'écran de l'utilisateur, capture d'**iPhone** à l'appui : le second bouton social et le
+lien « Déjà membre ? » passaient sous la ligne de flottaison. Cause directe de ⑤ : le social
+descendu sous le formulaire, en **deux boutons pleine largeur empilés**.
+
+Un écran d'inscription qui demande de faire défiler pour voir ses propres options perd des
+inscriptions. Trois corrections :
+
+**Les fournisseurs passent côte à côte — sur mobile seulement.**
+
+```tsx
+<View style={styles.socialRow}>
+  <View style={styles.socialCol}>
+    <MethodButton … label={t('social.googleShort')} accessibilityLabel={t('social.google')} />
+  </View>
+  <View style={styles.socialCol}>
+    <MethodButton … label={t('social.facebookShort')} accessibilityLabel={t('social.facebook')} />
+  </View>
+</View>
+```
+
+Ils restent des **boutons nommés**, pas des pastilles rondes — la règle de D91 ne bouge pas. Le
+libellé visible se raccourcit au nom du fournisseur, et **le verbe part dans
+`accessibilityLabel`** : le séparateur « Ou continue avec » le porte pour l'œil, mais un lecteur
+d'écran annonce un bouton **hors de son contexte** — « Google, bouton » ne dit pas ce qui va se
+passer. `MethodButton` gagne donc une prop optionnelle.
+
+Le **site garde l'empilement** : sa colonne a la place, et le bouton officiel de Google veut sa
+largeur. La parité testée porte sur les **fournisseurs offerts**, pas sur leur disposition.
+
+**La ligne « Gratuit, sans engagement. » est supprimée** des deux fronts, à la demande. Elle
+avait remplacé le badge ; la page n'ajoute désormais plus rien. Sur un écran qui ne tenait déjà
+pas, une ligne que personne n'a demandée est la première à payer. Le `useTranslations` du
+formulaire web disparaît avec elle — le point d'entrée de la migration i18n reste donc à ouvrir.
+
+**Les exemples de champs deviennent un seul personnage cohérent** : « Marie », « Love »,
+`marielove@email.com`. Trois exemples sans rapport se lisent comme trois formulaires ; un seul se
+lit comme un exemple. L'inscription gagne sa **propre** clé d'adresse (`register.emailPlaceholder`)
+au lieu d'emprunter celle de la connexion, qui reste générique — l'adresse complète n'a de sens
+que là où les champs de nom existent.
+
+### Vérifié sur les DEUX simulateurs
+
+Première fois dans ce chantier, et c'est exactement le genre de contrainte qu'un seul appareil ne
+montre pas :
+
+| Appareil | Avant | Après |
+|---|---|---|
+| Pixel 6 (Android, 914 dp) | tenait déjà | tient, avec marge |
+| iPhone 15 Pro (iOS, 852 pt) | **coupé au second bouton** | tient, « Déjà membre ? » visible |
+
+Le titre reste sur **deux lignes** sur iPhone (« Create your Yamba account », 25 caractères) :
+~45 pt dépensés. C'est la marge qui manquerait sur un iPhone SE. Raccourcir le titre est proposé,
+pas appliqué — c'est une décision de contenu.
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **494**, 28 suites |
+| `nx typecheck @yamba-app/mobile` + `tsc --project apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait |
+
+### Suite de l'amendement — le titre passe sur une ligne
+
+Proposé au paragraphe précédent, **appliqué** le 10/11 sur décision de l'utilisateur :
+« Crée ton compte Yamba » → **« Crée ton compte »**, « Create your Yamba account » →
+**« Create your account »**.
+
+« Yamba » sort du titre parce que la marque est **déjà partout autour** : l'en-tête du site sur
+le web, l'application elle-même sur mobile. Elle coûtait 25 caractères, donc deux lignes sur un
+iPhone, donc ~45 pt à un écran qui doit tenir sur un écran.
+
+Mesuré sur iPhone 15 Pro : titre sur **une** ligne, et ~130 pt de marge sous « Déjà membre ? ».
+C'est cette marge qui rend l'écran sûr sur un iPhone SE, et non plus seulement « juste bon » sur
+un grand modèle.
+
+### Suite — les textes de bas niveau s'allègent
+
+Revue du 10/11 : « les textes de bas niveau comme "Already a member", "I accept…" doivent être
+plus fins, pas de gras ».
+
+| Texte | Avant | Après |
+|---|---|---|
+| Mobile — libellé de la case à cocher | 500 | **400** |
+| Mobile — liens CGU (`termsDoc`) | 600 + souligné | **500** + souligné |
+| Mobile — « Déjà membre ? » | 500 | **400** |
+| Mobile — « Connecte-toi » | **700** | **500**, mangue conservée |
+| Web — « Connecte-toi » | `font-bold` | `font-medium` |
+
+Le raisonnement est le même que pour les libellés de champs du web : **ce qui porte l'affordance
+d'un lien n'est pas sa graisse**, c'est son soulignement (CGU) ou sa couleur de marque (le
+renvoi). On allège donc sans rien perdre de ce qui se clique — et un paragraphe de conditions
+cesse de peser autant que le libellé d'un champ.
+
+### Divergence restante, NON corrigée
+
+Les **libellés de champs** du mobile (`FieldLabel`, `auth-kit.tsx:332`) sont en **700**, là où
+ceux du web sont passés à 13 px / 500 en gris moyen. C'est un écart créé par ce lot. Il n'est pas
+corrigé ici parce que `FieldLabel` est partagé par les **cinq autres écrans d'auth**, dont la
+revue n'a pas eu lieu — le corriger à l'aveugle referait l'erreur que D91 reproche au formulaire
+web : décider pour des écrans qu'on n'a pas regardés.
+
+### Suite — les libellés de champs du mobile rejoignent ceux du web
+
+La divergence signalée au paragraphe précédent est **corrigée** le 10/11, sur décision de
+l'utilisateur : `FieldLabel` (`auth-kit.tsx`) passe de **700 à l'encre du titre** à **500 en
+`muted`**.
+
+`muted` n'est pas un à-peu-près : `#64748B` / `#94A3B8` sont exactement les `slate-500` /
+`slate-400` que le web venait d'adopter. Ce qui s'aligne est **la graisse et l'encre** — ce qui
+fait reculer un libellé — et non la taille : le mobile garde 15 pt là où le web est à 13 px,
+parce qu'un formulaire se lit à bout de bras sur un téléphone.
+
+Contrastes **mesurés**, pas supposés :
+
+| | Ratio | Seuil AA (4,5:1) |
+|---|---|---|
+| `#64748B` sur `#F8FAFC` (clair) | **4,55:1** | passe, de peu |
+| `#94A3B8` sur `#0B1120` (sombre) | **7,34:1** | passe |
+
+Le clair est à 0,05 du plancher : c'est noté dans le code, parce que c'est la valeur à
+re-vérifier si le fond de la page s'éclaircit un jour.
+
+**Ce changement touche les cinq autres écrans d'auth** (connexion, connexion par mot de passe,
+les deux vérifications par code, mot de passe oublié) — c'est le prix d'un composant partagé, et
+il est assumé puisque la demande était l'alignement. La connexion par mot de passe a été ouverte
+sur simulateur iOS pour le vérifier : rien n'est cassé, et une observation en sort pour sa propre
+revue — « Oublié ? » est désormais **plus gras que le libellé qu'il accompagne**.
+
+### Correction — un libellé ne doit pas avoir l'encre de l'exemple
+
+Constat de l'utilisateur, capture à l'appui : *« sur le mobile, "First name" ne doit pas être du
+même niveau visuel que "Marie" »*. Il avait raison, et c'est mon propre changement qui l'avait
+créé.
+
+`AuthTextField` peint l'exemple avec `placeholderTextColor={palette.muted}`. En passant le
+libellé à `muted` lui aussi, les deux se sont retrouvés à **la même encre, à la même graisse**,
+à quatre points de taille près : la rangée « First name / Last name » se lisait comme quatre
+valeurs grises alignées, sans hiérarchie.
+
+Le libellé prend donc `text`, l'encre **intermédiaire** : plus clair que le titre, plus franc que
+l'exemple. Trois niveaux au lieu de deux.
+
+**On n'a pas copié le web ici, et c'est délibéré.** Le web sépare les deux par le BAS — il
+éclaircit son exemple à `slate-400` sur blanc, ce qui le met à **2,56:1**, sous le seuil AA. Un
+exemple de format se lit, surtout dehors, sur un téléphone. On sépare donc par le HAUT :
+
+| | Libellé | Exemple |
+|---|---|---|
+| Clair | `#334155` → **9,90:1** | `#64748B` → **4,76:1** |
+| Sombre | `#CBD5E1` → **12,68:1** | `#94A3B8` → **6,96:1** |
+
+Les deux restent au-dessus de 4,5:1 — ce que le web ne fait pas. Ce qui demeure aligné entre les
+deux fronts est ce qui comptait : **la graisse (500, plus aucun gras) et l'ordre libellé >
+exemple**.
+
+### Pourquoi « Prénom » et « Nom » restent sur une seule ligne
+
+Question posée à la même revue. Ils y restent, pour trois raisons :
+
+1. **Ils forment UNE information** — le nom d'une personne. La règle « un champ par ligne »
+   (Baymard : une colonne se remplit plus vite) admet explicitement l'exception des champs
+   courts et **logiquement appariés** : prénom/nom, ville/code postal, date/cryptogramme.
+2. **Ils sont courts.** Mesuré sur iPhone 15 Pro : ~160 pt par champ, de quoi afficher la grande
+   majorité des prénoms et noms sans défilement interne.
+3. **Les séparer coûterait ~75 pt** — exactement le budget que l'on vient de reconquérir pour
+   que l'écran tienne sans défiler.
+
+Ce qui rendait cette rangée désagréable n'était pas l'appariement, c'était l'absence de
+hiérarchie corrigée ci-dessus : quatre éléments gris de même poids côte à côte. La limite à
+connaître : si un troisième champ (civilité, second prénom) rejoint un jour cette ligne, elle
+devra se rompre.

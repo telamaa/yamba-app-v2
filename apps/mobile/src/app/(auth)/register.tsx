@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 
+import { Image } from 'expo-image';
 import { useTranslations } from 'use-intl';
 
 import { LEGAL_VERSIONS } from '@packages/legal/versions';
@@ -25,7 +26,7 @@ import {
   AuthError,
   AuthTextField,
   FieldLabel,
-  SocialLogosRow,
+  MethodButton,
 } from '@/components/auth/auth-kit';
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, useAuthPalette } from '@/components/auth/auth-theme';
@@ -116,7 +117,6 @@ export default function RegisterScreen() {
 
   return (
     <AuthScreen
-      badge={t('register.badge')}
       title={t('register.title')}
       subtitle={t('register.subtitle')}>
       <View style={styles.nameRow}>
@@ -152,7 +152,7 @@ export default function RegisterScreen() {
       <FieldLabel>{t('login.emailLabel')}</FieldLabel>
       <AuthTextField
         ref={emailRef}
-        placeholder={t('login.emailPlaceholder')}
+        placeholder={t('register.emailPlaceholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -195,7 +195,37 @@ export default function RegisterScreen() {
       <AuthCta label={t('register.submit')} onPressAction={onSubmit} pending={pending} />
 
       <AuthDivider label={t('common.orContinueWith')} />
-      <SocialLogosRow />
+      {/*
+        Les deux fournisseurs CÔTE À CÔTE, et non empilés (revue du 10/11).
+        Empilés, ils ajoutaient 60 pt et l'écran cessait de tenir sur un
+        iPhone : le second bouton et le lien « Déjà membre ? » passaient sous
+        la ligne de flottaison. Un écran d'inscription qui demande de faire
+        défiler pour voir ses propres options perd des inscriptions.
+
+        Ils restent des BOUTONS, pas des pastilles rondes (D91) : le nom du
+        fournisseur est écrit. Le verbe, lui, passe dans le libellé
+        ACCESSIBLE — « Continuer avec Google » reste ce que lisent VoiceOver
+        et TalkBack, et le séparateur juste au-dessus le dit à l'œil.
+
+        Divergence ASSUMÉE avec le site, qui les garde empilés : sa colonne a
+        la place, et le bouton officiel de Google veut sa largeur.
+      */}
+      <View style={styles.socialRow}>
+        <View style={styles.socialCol}>
+          <MethodButton
+            icon={<Image source={require('@/assets/images/google-g.svg')} style={styles.logo} />}
+            label={t('social.googleShort')}
+            accessibilityLabel={t('social.google')}
+          />
+        </View>
+        <View style={styles.socialCol}>
+          <MethodButton
+            icon={<Image source={require('@/assets/images/facebook-f.svg')} style={styles.logo} />}
+            label={t('social.facebookShort')}
+            accessibilityLabel={t('social.facebook')}
+          />
+        </View>
+      </View>
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: palette.text }]}>{t('register.hasAccount')}</Text>
@@ -208,6 +238,17 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
+  logo: {
+    width: 20,
+    height: 20,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  socialCol: {
+    flex: 1,
+  },
   nameRow: {
     flexDirection: 'row',
     gap: Spacing.three,
@@ -216,8 +257,18 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.three,
   },
+  /**
+   * Les textes de BAS NIVEAU — les conditions, le renvoi vers la connexion —
+   * s'allègent (revue du 10/11). Ils accompagnent, ils ne hèlent pas : un
+   * paragraphe de conditions en demi-gras pèse autant que le libellé d'un
+   * champ, et l'œil n'a plus de raison de descendre vers le bouton.
+   *
+   * Ce qui porte l'affordance des liens n'est PAS la graisse : c'est le
+   * soulignement ici, et la mangue sur le renvoi. On peut donc alléger sans
+   * rien perdre de ce qui se clique.
+   */
   termsDoc: {
-    fontWeight: 600,
+    fontWeight: 500,
     textDecorationLine: 'underline',
   },
   footer: {
@@ -229,11 +280,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   footerLink: {
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 500,
     color: AuthBrand.mango,
   },
 });
