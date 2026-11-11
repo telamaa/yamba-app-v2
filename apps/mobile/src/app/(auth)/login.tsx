@@ -75,7 +75,6 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      badge={t('login.badge')}
       title={t('login.title')}
       subtitle={t('login.subtitle')}
       dismissGlyph="close">

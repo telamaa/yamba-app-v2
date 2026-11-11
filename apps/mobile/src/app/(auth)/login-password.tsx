@@ -90,7 +90,6 @@ export default function LoginPasswordScreen() {
 
   return (
     <AuthScreen
-      badge={t('login.badge')}
       title={t('login.passwordTitle')}
       subtitle={lockedEmail === null ? t('login.subtitle') : undefined}>
       {lockedEmail !== null ? (
@@ -166,12 +165,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: Font.semibold,
   },
+  // D91 5A / D95 : un lien secondaire se désigne par sa COULEUR (le teal),
+  // jamais par sa graisse. En gras, « Modifier » pesait plus lourd que
+  // l'adresse qu'il modifie, et « Oublié ? » que le libellé du champ.
   changeEmail: {
-    fontSize: 14,
-    fontFamily: Font.bold,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: Font.medium,
   },
   forgotLink: {
-    fontSize: 15,
-    fontFamily: Font.bold,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: Font.medium,
   },
 });
