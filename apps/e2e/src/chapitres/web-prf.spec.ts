@@ -18,7 +18,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { test, expect, connexion, type Navigateur } from "../fixtures/yamba";
+import { test, expect, connexion, remplirConnexion, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi } from "../fixtures/adresses";
 import { COMPTES, MOT_DE_PASSE_SEED } from "../fixtures/comptes";
 import { compteNeuf } from "../fixtures/compte-neuf";
@@ -161,8 +161,7 @@ test.describe("WEB-PRF — préférences, langue et relances (chapitre 5.26)", (
     const formulaire = page.locator("main form").first();
     await formulaire.locator("#firstName").fill(neuf.prenom);
     await formulaire.locator("#lastName").fill(neuf.nom);
-    await formulaire.locator("#email").fill(neuf.email);
-    await formulaire.locator("#password").fill(neuf.motDePasse);
+    await remplirConnexion(page, formulaire, neuf.email, neuf.motDePasse);
     await formulaire.locator("#passwordConfirm").fill(neuf.motDePasse);
     await formulaire.locator('input[type="checkbox"]').check();
     const reponse = page.waitForResponse((r) => r.url().includes("/auth/register") && r.request().method() === "POST", { timeout: 30_000 });

@@ -218,6 +218,16 @@ test.describe("WEB-A11Y — accessibilité clavier de base (chapitre 5.31)", () 
     /* On entre dans le formulaire par le clavier, puis on ne touche plus à rien d'autre. */
     await page.locator("#email").focus();
     await page.keyboard.type(COMPTES.aminata.email);
+    /* D96 — l'écran a DEUX marches : Entrée ouvre la confirmation d'adresse, dont le bouton
+       « Confirmer » reçoit le focus d'office ; une seconde Entrée mène au mot de passe. Tout se
+       fait donc au clavier, sans jamais toucher la souris — c'est précisément ce que la fiche
+       vérifie. */
+    await page.keyboard.press("Enter");
+    const confirmation = page.getByRole("dialog");
+    await expect(confirmation, "la confirmation d'adresse s'ouvre").toBeVisible();
+    await expect(confirmation.getByRole("button", { name: "Confirmer" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#password"), "l'étape mot de passe est montée").toBeVisible();
     /* Le lien « Oublié ? » est posé dans la ligne du libellé du mot de passe : il s'intercale entre
        les deux champs dans l'ordre de tabulation (motif courant, lisible). On tabule donc jusqu'au champ. */
     const avantMotDePasse: string[] = [];
@@ -356,7 +366,12 @@ test.describe("WEB-A11Y — accessibilité clavier de base (chapitre 5.31)", () 
     await verifier(visiteur.page, "la croix de la porte d'identité", '[aria-labelledby="auth-gate-title"] .relative > button:first-of-type', /^Fermer$/);
 
     await page.goto("/fr/login", { waitUntil: "domcontentloaded" });
-    await expect(page.locator("#password")).toBeVisible({ timeout: 90_000 });
+    /* D96 — le champ mot de passe est à la SECONDE marche : on y va par le raccourci
+       « Continuer avec e-mail et mot de passe », qui ne demande pas de confirmation. */
+    await expect(page.locator("#email")).toBeVisible({ timeout: 90_000 });
+    await page.locator("#email").fill(COMPTES.aminata.email);
+    await page.locator("main").getByRole("button", { name: "Continuer avec e-mail et mot de passe" }).click();
+    await expect(page.locator("#password")).toBeVisible({ timeout: 30_000 });
     await verifier(page, "l'affichage du mot de passe", 'main button[aria-label*="mot de passe" i]', /Afficher le mot de passe/i);
 
     await page.goto("/fr/dashboard/home", { waitUntil: "domcontentloaded" });

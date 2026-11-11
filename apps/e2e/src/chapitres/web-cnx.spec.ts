@@ -14,7 +14,7 @@
  * ouverte — le limiteur de la passerelle ignore les requêtes en échec, `skipFailedRequests`). Le
  * jour où le verrou existe, la fiche « passe » et Playwright le signale : retirer la marque.
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, remplirConnexion, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi, adresseDeLApiAdmin } from "../fixtures/adresses";
 import { COMPTES, MOT_DE_PASSE_SEED } from "../fixtures/comptes";
 
@@ -145,8 +145,7 @@ test.describe("WEB-CNX — connexion et session", () => {
 
     // Et le formulaire est bel et bien utilisable : c'est la vraie vérification.
     const f = page.locator("main form").first();
-    await f.locator("#email").fill(COMPTES.aminata.email);
-    await f.locator("#password").fill(MOT_DE_PASSE_SEED);
+    await remplirConnexion(page, f, COMPTES.aminata.email, MOT_DE_PASSE_SEED);
     await f.locator("button[type=submit]").click({ timeout: 10_000 });
     await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
   });

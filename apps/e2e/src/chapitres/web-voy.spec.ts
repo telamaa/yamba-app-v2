@@ -12,7 +12,7 @@
  * Partie Stripe (VOY-5, VOY-7) : cle `sk_test_`, Connect Express reel en mode test. Le flux heberge
  * de Stripe (`connect.stripe.com`) est pilote au mieux ; s'il change, ces fiches le signalent.
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, saisirLesCases, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi } from "../fixtures/adresses";
 import { compteNeuf, type CompteNeuf } from "../fixtures/compte-neuf";
 import type { Mailpit } from "../fixtures/mailpit";
@@ -50,7 +50,7 @@ async function creerCompteActive(page: Page, mailpit: Mailpit, compte: CompteNeu
   await expect(page).toHaveURL(/\/fr\/register\/verify/, { timeout: 60_000 });
   const email = await mailpit.attendreEmail({ pour: compte.email, sujet: SUJET_ACTIVATION });
   const code = codeDe(email.texte);
-  for (const [i, c] of code.split("").entries()) await page.getByLabel(`OTP digit ${i + 1}`).fill(c);
+  await saisirLesCases(page, code);
   const verif = page.waitForResponse((r) => r.url().includes("/auth/register/verify") && r.request().method() === "POST", { timeout: 30_000 });
   await page.getByRole("button", { name: "Valider mon code" }).click();
   expect((await verif).ok(), "POST /auth/register/verify").toBe(true);

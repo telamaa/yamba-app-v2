@@ -33,15 +33,17 @@ export class Inscription {
     const email = await mailpit.attendreEmail({ pour: compte.email, sujet: "Ton code d'activation Yamba" });
     const code = /\b(\d{6})\b/.exec(email.texte)?.[1];
     if (!code) throw new Error(`Inscription : aucun code à six chiffres dans l'email « ${email.sujet} »`);
+    // D97 — le nom accessible des cases est « Saisis ton code N/6 », et il
+    // est le même pour les deux parcours (écran partagé).
     for (const [i, chiffre] of code.split("").entries()) {
-      await this.page.getByLabel(`OTP digit ${i + 1}`).fill(chiffre);
+      await this.page.getByLabel(`Saisis ton code ${i + 1}/6`).fill(chiffre);
     }
     const verification = this.page.waitForResponse((r) => r.url().includes("/auth/register/verify") && r.request().method() === "POST", { timeout: 30_000 });
     await this.page.getByRole("button", { name: "Valider mon code" }).click();
     const v = await verification;
     if (!v.ok()) throw new Error(`Activation refusée : ${v.status()} ${await v.text()}`);
     await expect(this.page).toHaveURL(/\/fr\/login\?verified=1/, { timeout: 60_000 });
-    await expect(this.page.getByText("Compte activé")).toBeVisible({ timeout: 30_000 });
+    await expect(this.page.getByText("Ton compte est activé. Connecte-toi pour commencer.")).toBeVisible({ timeout: 30_000 });
     await mailpit.attendreEmail({ pour: compte.email, sujet: "Bienvenue sur Yamba" });
   }
 }
