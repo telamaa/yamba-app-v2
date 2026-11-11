@@ -65,6 +65,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
 import { submitDispute } from '@/lib/api/dispute.api';
@@ -665,7 +666,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six,
   },
   centeredText: { textAlign: 'center' },
-  ticket: { fontSize: 22, lineHeight: 30, fontWeight: 700, letterSpacing: 1 },
+  ticket: { fontSize: 22, lineHeight: 30, fontFamily: Font.bold, letterSpacing: 1 },
   intro: { paddingTop: Spacing.three },
 
   textArea: {

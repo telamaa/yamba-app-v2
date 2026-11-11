@@ -16187,3 +16187,829 @@ Ce qui rendait cette rangée désagréable n'était pas l'appariement, c'était 
 hiérarchie corrigée ci-dessus : quatre éléments gris de même poids côte à côte. La limite à
 connaître : si un troisième champ (civilité, second prénom) rejoint un jour cette ligne, elle
 devra se rompre.
+
+---
+
+# D92 — La vérification du code : une salle d'attente, pas un formulaire
+
+*Deuxième page de la passe de finitions « page par page », 10/11/2026, branche
+`feat/finitions-verification` (empilée sur `feat/finitions-inscription`, PR #404).*
+
+## ① Le constat, et pourquoi cet écran compte plus que sa taille
+
+`/register/verify` (site) et `(auth)/register-verify` (téléphone) sont **le seul écran du
+produit où l'utilisateur sort de l'application** : il va chercher un code dans sa boîte mail,
+et il doit vouloir revenir. C'est donc le point le plus fragile du tunnel d'inscription — et
+les deux versions le traitaient comme un formulaire de saisie.
+
+D91 avait aligné l'inscription. L'écran qui la suit immédiatement portait encore **sept écarts**,
+dont aucun ne casse quoi que ce soit — c'est précisément pour cela qu'ils avaient survécu.
+
+## ② Le masquage de l'adresse : supprimé, pas aligné
+
+Le motif « masquer partiellement une adresse » est juste (Apple, Stripe, Wise) dans **une**
+situation : une adresse venue du **dossier serveur**, montrée à quelqu'un dont on ignore s'il
+est le titulaire — défi de connexion, récupération de compte.
+
+Ici, l'inverse exact : l'adresse a été **tapée trente secondes plus tôt**, en clair, sur le même
+appareil, dans la même session. On n'atteint cet écran qu'en sortant du formulaire précédent.
+
+| | Ce que le masque protège | Ce que le masque coûte |
+|---|---|---|
+| Écran de défi (adresse du serveur) | le regard d'un tiers | rien |
+| **Cet écran (adresse tapée)** | **rien** | **la faute de frappe devient invisible** |
+
+`c*********a@g***.com` rend `gmial.com` et `gmail.com` **rigoureusement identiques** — sur un
+écran qui propose par ailleurs « Trompé d'adresse e-mail ? ». Le mode d'échec n°1 de cette
+étape, « je n'ai rien reçu », est précisément celui que la ligne masquée empêche de diagnostiquer.
+
+La mesure qui a clos le débat : les **cinq** appels du dépôt affichaient tous une adresse
+**tapée** — `RegisterVerifyForm`, `ResetVerifyForm`, `ResetPasswordForm`, et la vue mobile
+partagée par ses deux écrans. Aucun ne relevait du motif. Et les deux implémentations avaient
+divergé en silence :
+
+```ts
+// web : étoiles plafonnées à 9
+const middleStars = "*".repeat(Math.min(localPart.length - 2, 9));
+// mobile : AUCUN plafond — la longueur exacte de la partie locale est publiée
+`${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}`
+```
+
+Deux fonctions qui s'écartent pendant des mois sans que personne ne le voie ne portaient rien.
+**La correction n'est pas de les aligner, c'est de les supprimer** : `email-mask.ts` est
+effacé, `maskEmail` sort d'`auth-theme.ts`, et la ligne devient l'affordance qu'elle prétendait
+être — l'adresse en clair, « Modifier » à côté.
+
+## ③ Les divergences web ↔ mobile, closes
+
+| | Avant web | Avant mobile | Après (les deux) |
+|---|---|---|---|
+| Titre FR | « Plus qu'une étape ! » | « Vérification du code » | **« Plus qu'une étape ! »** |
+| Validation | clic obligatoire | 6ᵉ frappe | **6ᵉ frappe** (+ CTA qui nomme le manquement) |
+| Focus à l'arrivée | **aucun** | `autoFocus` | **dans la première case** |
+| Adresse | masquée (9 ★) | masquée (n ★) | **en clair + « Modifier »** |
+| Compteur | `09:41` | `9:29` | **`09:41`** des deux côtés |
+| Case remplie | `emerald-500` | mangue/teal | **teal de la charte** |
+| Textes | ~40 ternaires `fr ? … : …` | dictionnaire | **dictionnaire, même espace de noms** |
+
+## ④ Le titre devenait vrai en changeant la mécanique, pas les mots
+
+« Plus qu'une étape ! » était **faux sur le web** : le serveur n'ouvre pas de session à la
+vérification (il active le compte, c'est tout), et le site poussait vers `/login?verified=1`.
+Il restait donc deux étapes. Le mobile, lui, rejoue la connexion avec le mot de passe encore
+en mémoire du parcours (A208) : chez lui la promesse était vraie — **et c'est lui qui ne la
+faisait pas**.
+
+Le web enchaîne désormais la connexion. Le mot de passe vit dans une **variable de module**
+(`apps/user-ui/src/lib/auth/register-flow-state.ts`) :
+
+- `/register` → `/register/verify` est une navigation **client** (`router.push`) : le module
+  n'est pas rechargé, la valeur traverse ;
+- elle meurt avec l'onglet, n'est jamais sérialisée, jamais relisible par un autre script ;
+- **jamais** un stockage du navigateur : un mot de passe en clair qui survit à un rechargement
+  est un abaissement de sécurité que le confort d'un enchaînement ne justifie pas ;
+- contrepartie **assumée** : un rechargement de la page de vérification perd le mot de passe.
+  Le repli existait déjà — connexion préremplie, bandeau « compte activé ». C'est le repli du
+  mobile, à l'identique.
+
+CQS (règle du dépôt, D88) : `readPendingPassword` **répond** sans écrire, `clearPendingPassword`
+**écrit** sans répondre. Une lecture qui effacerait en répondant serait appelable depuis un
+rendu sans que rien ne le dise.
+
+## ⑤ Les deux échecs d'accessibilité, mesurés
+
+En thème sombre, les six cases de saisie du web :
+
+| Élément | Couleurs | Mesuré | Exigé | Verdict |
+|---|---|---|---|---|
+| Bordure de case vide | `slate-800` sur `slate-950` | **1,32:1** | 3:1 (SC 1.4.11) | échec ×2,3 |
+| « Renvoyer dans 00:41 » | `slate-600` sur `slate-950` | **2,60:1** | 4,5:1 (SC 1.4.3) | échec |
+
+La case était **de la couleur exacte de la page** (`dark:bg-slate-950` sur un fond `slate-950`),
+bordée d'un cran à peine au-dessus. Combiné à l'absence de focus (③), l'écran ne disait
+nulle part où taper. Fond remonté d'un cran, bordure `slate-600`, et la case remplie passe du
+`emerald-500` — un **troisième vert** dans une charte qui n'a que la mangue et le teal — au teal.
+
+**La règle qui en sort : une case dans laquelle on doit taper ne peut pas être de la couleur de
+la page.**
+
+## ⑥ Un seul compte à rebours, et l'aide à l'heure
+
+L'écran en tenait deux, au même format `mm:ss`, à deux cents pixels l'un de l'autre : `09:41`
+(validité, 10 min) et `00:41` (renvoi, 1 min). Il fallait un effort pour comprendre que ce
+n'étaient pas les mêmes secondes.
+
+- **La validité ne paraît qu'à sa dernière minute** — là où elle devient actionnable. Le code
+  savait déjà la peindre en ambre (`expiryWarning`) mais l'affichait dès 10:00. Une horloge qui
+  tourne sur une attente qu'on ne contrôle pas n'informe pas : elle installe l'anxiété.
+- **Le bloc de renvoi passe en trois temps.** « Pas reçu le code ? Vérifie tes spams **ou** »
+  suivi d'un lien grisé laissait un « ou » pendre dans le vide **pendant soixante secondes**.
+  Désormais : vingt secondes qui annoncent le délai normal, puis les spams **et** l'heure du
+  geste, puis le geste. « Vérifie tes spams » à T+0 s accusait l'utilisateur d'un problème qu'il
+  n'avait pas encore.
+
+Les deux règles sortent de l'écran dans `lib/otp-display.ts` (mobile) et
+`lib/auth/otp-display.ts` (web), **seuils en arguments par défaut**, donc vérifiables sans rendu.
+
+## ⑦ La colonne de gauche cesse de vendre
+
+Elle servait les trois garanties produit de D45 — « Des personnes identifiées », « Débité
+seulement si c'est accepté », « Garantie Yamba incluse » — **à quelqu'un qui a déjà signé**.
+C'est l'argumentaire d'acquisition servi après l'acquisition.
+
+`AuthHeroVisual` gagne une variante `waiting` qui répond à la seule question du moment — *et si
+le mail n'arrive pas ?* — en trois points (délai normal, indésirables, adresse modifiable) et
+porte le geste réel : **« Ouvrir ma boîte mail »**.
+
+Ce geste est une règle pure, `webmailUrl(email)`, **28 domaines** (Google, Microsoft, Yahoo,
+Apple, Proton, les quatre français du corridor diaspora, GMX/web.de/Zoho/AOL). Deux choix
+tenus par les fiches :
+
+1. **une adresse `https://`, pas un schéma d'application native.** `googlegmail://` doit être
+   déclaré (`LSApplicationQueriesSchemes`) avant d'être seulement testé et échoue en silence ;
+   `message://` n'ouvre que Mail d'Apple, inutile à qui lit son courrier dans Gmail. Une adresse
+   web s'ouvre partout, et les webmails redirigent eux-mêmes vers leur application ;
+2. **un domaine inconnu ne rend RIEN.** Deviner `https://webmail.<domaine>` enverrait vers une
+   page morte — on aurait fait sortir l'utilisateur du tunnel pour rien.
+
+Et la page **cesse de tirer son illustration au hasard** (`pickRandomHeroVisual` →
+`getHeroVisualById("illu-route")`, comme `/register` depuis D91) : deux chances sur trois que
+le décor change sous les pieds de l'utilisateur entre la saisie de son adresse et celle de son
+code, au moment précis du parcours où la continuité visuelle dit « tu es toujours dans le même
+geste ».
+
+## ⑧ Les textes du web entrent dans le dictionnaire
+
+`RegisterVerifyForm` portait **une quarantaine de `fr ? … : …`** dans un `buildCopy(lang)`.
+Au-delà de la règle non négociable du dépôt, c'était la **cause mécanique d'un angle mort** :
+le contrôle i18n de la CI ne lit que les dictionnaires. Pas une ligne de cet écran n'était
+regardée — exactement ce qui avait laissé coexister « Secure signup » et « Secure sign-up »
+(D91).
+
+Les textes passent sous `auth.otp` dans `messages/{fr,en}/auth.json`, **espace de noms calqué
+sur celui du mobile**, ce qui met les deux fronts sous le même contrôle. Restent en ternaires,
+**délibérément** : `otpCodeMessage` et les messages de règle de mot de passe, partagés avec
+trois autres formulaires — leur migration est le lot i18n nommé par D91. *On migre l'écran que
+l'on touche.*
+
+## ⑨ Les fiches — 63, dont 25 qui lisent les DEUX fronts
+
+| Fiche | Nombre | Ce qu'elle tient |
+|---|---|---|
+| `webmail.spec.ts` | 21 | les domaines connus, la casse, les espaces ; et les deux dérives : deviner, accepter ce qui n'est pas une adresse |
+| `otp-display.spec.ts` | 17 | les deux seuils, les trois temps, les six formats de compteur dont `581 → 09:41` |
+| `auth-verify-parite.spec.ts` | 25 | l'accord des deux fronts, point par point |
+
+La troisième reprend la méthode ouverte par D91 : **le harnais du mobile lit le site comme du
+texte**, parce que c'est le seul endroit du dépôt où un test peut voir les deux à la fois. Elle
+compare notamment les deux règles pures **caractère par caractère** (aux guillemets près) et les
+**28 domaines** des deux tables — la recopie entre fronts est assumée, c'est la **divergence**
+qui ne l'est pas.
+
+Mobile : **494 → 557** fiches, **28 → 31** suites.
+
+## ⑩ Les contrôles passés
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **557 / 31 suites**, vert |
+| `nx typecheck @yamba-app/mobile` | vert (les deux programmes) |
+| `tsc --noEmit -p apps/user-ui` | vert |
+| `node scripts/check-i18n-messages.mjs` | vert, 30 espaces de noms, miroir parfait |
+| Rendu `/fr/register/verify` | 200, nouveau titre et colonne d'attente servis |
+
+## ⑪ Ce qui n'a PAS été fait, et pourquoi
+
+**La navigation haute du site reste complète sur l'écran de vérification.** « Partager un
+trajet » et surtout « Connexion » invitent à quitter un tunnel à mi-chemin — et « Connexion »
+propose un compte qui n'existe pas encore. C'est une décision de **gabarit** : le `Header` est
+monté sans condition par `app/[locale]/layout.tsx`, elle concerne les six pages d'auth, et la
+trancher ici créerait l'incohérence exacte que ce lot corrige — `/register` la garderait,
+`/register/verify` ne l'aurait plus. **Lot à part : D93 candidate, « un tunnel n'offre pas la
+sortie ».**
+
+**La revue d'écran des quatre autres pages d'auth** (connexion, mot de passe oublié,
+vérification de mot de passe, réinitialisation) n'a toujours pas eu lieu : D91 l'avait laissée
+ouverte, elle le reste. La règle 2A, elle, leur a été appliquée — c'est une règle, pas une
+retouche d'écran.
+
+**Le délai réel d'arrivée du mail n'a pas été mesuré en conditions réelles** (Resend). Si
+l'envoi prend dix secondes, aucun travail de texte ne sauvera cet écran.
+
+---
+
+# D94 — Le symbole dans les emails, et la largeur des pages d'auth
+
+*Revue de l'email d'activation, 10/11/2026 — premier email VU dans une vraie boîte Gmail,
+après la bascule SMTP du même soir.*
+
+## ① Ce que la revue a trouvé
+
+L'email fonctionnait. Ce qu'il montrait :
+
+| # | Constat | Gravité |
+|---|---|---|
+| 1 | **Aucun logo** — le mot « YAMBA » en capitales espacées | demandé par l'utilisateur |
+| 2 | Le code à six chiffres **décentré** dans sa boîte | visible, cause invisible |
+| 3 | La boîte du code **en tirets** — le motif du coupon à découper | discours |
+| 4 | **Aucun schéma de couleurs déclaré** | casse en mode sombre |
+| 5 | Le nom « Yamba » écrit **trois fois** à l'écran | redondance |
+| 6 | **Aucun bouton**, alors que `EmailContent.cta` existe | hors lot, nommé |
+| 7 | L'encadré ambre mélange expiration **et** avertissement de sécurité | hors lot, nommé |
+
+## ② Le refus de D85, relu et levé
+
+D85 avait **refusé** ce lot, et c'est ce qui l'a rendu faisable en une passe. Elle avait écrit
+le coût (« étendre `OutgoingEmail`, l'interface `EmailProvider` et **les trois** fournisseurs »),
+le risque (« l'affichage *inline* dépend du support de `content_id` côté Resend ; mal câblé,
+l'image part en **pièce jointe attachée** au lieu de s'afficher — pire que pas d'image ») et la
+portée (« si le symbole entre dans les emails, il entre par la **mise en page partagée**, pour
+les quinze d'un coup »). Elle avait même versionné `yamba-email-logo.png` en notant : *« il est
+prêt le jour où ce lot se fera »*.
+
+**Le risque a été levé par mesure, pas par confiance.** L'API REST de Resend accepte les images
+inline, et le champ s'appelle **`content_id`** — son SDK JavaScript expose `contentId` et le
+convertit avant l'appel, or ce dépôt poste le JSON brut par `fetch` (zéro dépendance, D35 2A).
+Une erreur de casse à cet endroit ne casse rien : elle transforme le logo en trombone.
+
+## ③ Pourquoi la pièce jointe inline, et pas une adresse
+
+| Option | Ce qui cloche |
+|---|---|
+| `<img src="https://le-site/logo.png">` | ne s'affiche **que si** le client accepte de charger les images distantes ; et en recette locale le mandataire d'images de Gmail **ne peut pas atteindre** `http://192.168.x.x:3000` — le logo serait cassé sur le poste même où on le vérifie |
+| `<img src="data:image/png;base64,…">` | Gmail **supprime** les `data:` URI des emails |
+| Fichier lu sur le disque | `layout.ts` est une **chaîne TS** et non un fichier EJS, précisément pour être indépendant du `cwd` (D44 ④) ; et le bundle webpack ne copie que `src/assets` |
+| **`cid:` + pièce inline** | **retenu** — s'affiche toujours, ne dépend d'aucun hébergeur, marche avec Mailpit comme avec Gmail |
+
+Le PNG vit donc en base64 dans `packages/libs/email/src/logo.ts` : 4,1 Ko bruts → 5 652
+caractères, payés une fois par email.
+
+## ④ Le transport, pas le contenu
+
+C'est la ligne de partage qui tient tout le reste :
+
+- **`EmailContent`** dit ce que l'email **raconte** → inchangé, les quinze emails n'ont pas
+  bougé d'une ligne ;
+- **`OutgoingEmail`** dit ce qu'on **envoie** → gagne `inlineImages: InlineImage[]` ;
+- **le gabarit** ne connaît qu'un `cid` ;
+- **chaque fournisseur** traduit dans sa langue :
+
+| Fournisseur | Forme attendue |
+|---|---|
+| SMTP (Nodemailer) | `{ cid, content: Buffer, contentType, contentDisposition: "inline" }` |
+| Resend (HTTP) | `{ content: base64, filename, content_type, content_id }` |
+| Fake | conservé en mémoire, pour que les fiches comptent |
+
+`contentDisposition: "inline"` n'est pas décoratif : sans lui, Nodemailer joint l'image en
+pièce **attachée**. Elle s'affiche quand même par son `cid`, mais le client mail montre **en
+plus** un trombone — le défaut exact que D85 redoutait.
+
+## ⑤ Le code décentré : la cause
+
+Le bloc de code paraissait poussé vers la droite, et rien dans le CSS ne le disait.
+
+```css
+letter-spacing: 8px;   /* ajoute 8 px APRÈS chaque caractère… */
+```
+
+…**y compris après le dernier**. Un code de six chiffres porte donc 8 px d'espace à sa droite
+que rien ne compense : dans une boîte centrée, il est décalé de 8 px.
+
+```css
+letter-spacing: 8px; text-indent: 8px;   /* le remède */
+```
+
+`text-indent` décale la première ligne de la même valeur. C'est le seul remède qui tienne
+**aussi sous Outlook**, où une marge droite négative est ignorée. La fiche tient la **règle**
+(les deux valeurs sont égales), pas le nombre.
+
+## ⑥ Le mode sombre
+
+Le document ne déclarait **aucun** schéma de couleurs. Gmail et Apple Mail inversent alors
+d'autorité la carte blanche en sombre — en laissant le bandeau teal intact. Un email à moitié
+retourné. `color-scheme` et `supported-color-schemes` l'annoncent désormais, et les couleurs du
+gabarit sont assumées dans les deux modes.
+
+## ⑦ Le piège payé en chemin
+
+Le commentaire HTML expliquant le `text-indent` citait les propriétés CSS entre **accents
+graves**. `LAYOUT_EJS` est un **gabarit de chaîne TypeScript** : le premier accent grave a
+terminé la chaîne, et `tsc` a sorti quatre erreurs de syntaxe à des lignes qui n'avaient rien à
+se reprocher. Les commentaires de ce fichier n'en portent plus, et le fichier le dit en toutes
+lettres.
+
+## ⑧ La largeur des pages d'auth (D92, retour de revue)
+
+Les deux pages d'inscription posaient leur `lg:grid` directement sur le `<main>`, donc **bord à
+bord**. Conséquence : le logo et « Connexion » étaient les deux **seuls** éléments de la page à
+respecter une marge — rien en dessous ne s'alignait sur eux, et sur un grand moniteur la
+colonne de gauche touchait le bord de l'écran.
+
+Elles prennent désormais la ligne exacte de l'en-tête : **`mx-auto max-w-7xl px-4`**, celle de
+`Header.tsx:99`. Les coins arrondis et la bordure suivent — sans quoi le panneau teal redevient
+un rectangle à arêtes vives posé au milieu du vide — et la hauteur minimale passe de `-64px` à
+`-104px` pour la marge verticale.
+
+**Les DEUX pages, pas seulement celle en revue.** L'inscription et sa vérification sont deux
+étapes du même geste : n'en contraindre qu'une recréerait à l'identique le saut visuel que D92
+venait de supprimer en fixant l'illustration de la colonne de gauche.
+
+## ⑨ Les contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test notification-service` | **136 / 12 suites** (122 → 136, **+14**) |
+| `nx test auth-service` | 407, inchangé |
+| `nx test trip-service` | 409, inchangé |
+| `nx run-many --target=typecheck --all` | **10 projets**, vert |
+| `bash scripts/smoke-services.sh` | **les six bundles démarrent** — obligatoire, une lib partagée par quatre services a changé |
+| Envoi réel via Gmail | reçu, logo affiché |
+
+## ⑩ Ce qui reste nommé et non fait
+
+**L'email d'activation n'offre aucun bouton**, alors que `EmailContent.cta` existe et que la
+page de vérification sait déjà lire `?token=&email=` — le commentaire de `RegisterVerifyForm`
+dit en toutes lettres « utile pour les liens magiques email envoyés par le backend ». Un lien
+magique supprimerait la recopie à six chiffres pour qui lit son courrier sur le même appareil.
+
+**L'encadré ambre mélange deux messages** : « ce code expire dans 10 minutes » (neutre,
+informatif) et « si vous n'êtes pas à l'origine de cette demande, ignorez cet email »
+(conditionnel, sécurité). Le premier n'a rien d'une alerte, et l'ambre le rend inquiétant.
+
+Les deux touchent la **copie des quinze emails dans les deux langues** : lot à part.
+
+**Les gabarits EJS par fichier de trip-service** (`sendTemplatedEmail`, voie héritée) ne
+reçoivent **pas** le symbole — ils ne passent pas par la mise en page partagée. Leur migration
+vers `sendTransactionalEmail` est un lot à part.
+
+## ⑪ Amendement du 10/11/2026 — aucun cadre : le contenu s'incruste
+
+La passe précédente (⑧) avait ajouté, **de son propre chef**, des coins arrondis, une bordure
+et une marge verticale au conteneur, au motif qu'un panneau coloré ne touchant plus le bord de
+l'écran « redevient un rectangle à arêtes vives posé dans le vide ».
+
+**Retour de revue, immédiat et net : « tout doit s'incruster dans la page sans bordure ».**
+
+L'argument de la passe précédente était un argument de *carte*, appliqué à une *page*. Un cadre
+fait de l'inscription un **objet posé sur le site** — une fenêtre, une boîte de dialogue — là
+où elle est une **page du site**. Et le dégradé de la colonne de gauche sépare déjà les deux
+moitiés : un trait en plus ne sépare rien qui ne le soit déjà, il ajoute seulement une
+frontière à lire.
+
+| | Passe ⑧ | Amendement |
+|---|---|---|
+| Largeur | `mx-auto max-w-7xl px-4` | **inchangée** — c'était la demande |
+| Coins | `lg:rounded-2xl` | **retirés** |
+| Bordure | `lg:border lg:border-slate-200` | **retirée** |
+| Marge verticale | `lg:my-5` | **retirée** |
+| Hauteur minimale | `-104px` | **`-64px`** (plus de marge à compenser) |
+| `overflow-hidden` | présent | **retiré** |
+
+`overflow-hidden` part **avec** les coins : il n'était là que pour les rogner, et le dépôt a
+déjà payé une fois le fait qu'il met en péril tout `position: sticky` (pitfall connu :
+`overflow-x: clip`, jamais `hidden`). Une propriété ajoutée pour servir une autre doit
+disparaître avec elle.
+
+**La leçon de méthode, et c'est la deuxième fois dans ce chantier :** la demande disait
+« largeur », pas « cadre ». Déduire le second de la première, même avec un raisonnement
+défendable, c'est décider à la place de celui qui regarde l'écran. D91 avait déjà retiré une
+ligne de réassurance ajoutée de la même façon — *« la page ne doit RIEN ajouter »*.
+
+## ⑫ Amendement du 10/11/2026 — aux couleurs de Yamba, c'est-à-dire aux DEUX
+
+Retour de revue, après le premier envoi réel : **« tu n'as pas mis le mail aux couleurs
+Yamba ».**
+
+Le constat est juste et il était sous les yeux : le bandeau était un aplat **teal** portant un
+symbole **blanc**. L'email entier ne montrait donc **qu'une couleur sur les deux — et pas la
+principale.** La mangue n'apparaissait nulle part, parce qu'elle était réservée au CTA
+(charte §3.4 : mango = avancer) et que l'email d'activation n'en a pas.
+
+C'est un défaut de raisonnement et pas de goût : une règle qui dit *« mango = CTA »* devient,
+dans un email sans CTA, *« pas de mango du tout »*. La règle décrivait un **rôle**, pas une
+**présence**.
+
+| | Avant | Après |
+|---|---|---|
+| Tête de carte | dégradé teal `#0F766E → #14b8a6` | **filet mangue 5 px** + fond blanc |
+| Symbole | blanc monochrome, 38×40 | **couleurs réelles** (Y mangue, colis teal), 46×46 |
+| Titre | blanc sur teal | **navy `#0f172a`** sur blanc |
+| Libellé du code | gris `#64748b` | **teal `#0F766E`** |
+| Cadre du code | gris-bleu | **teal clair `#f0fdfa` / `#5eead4`** |
+
+**Le principe : un email doit ressembler au site d'où il vient.** L'en-tête du site est blanc,
+avec un logo mangue — l'email dit maintenant la même chose. Et le symbole peut enfin être
+lui-même : un Y mangue portant un colis teal, ce qu'un aplat vert lui interdisait.
+
+Nouvel actif versionné : `apps/user-ui/public/brand/yamba-email-logo-color.png` (256×256, fond
+blanc, 6,2 Ko → 8 488 caractères base64). Le blanc monochrome
+(`yamba-email-logo.png`) **reste** dans le dépôt : il redeviendra le bon le jour où un email
+portera un bandeau sombre.
+
+Le fond du PNG est **blanc et non transparent** : l'alpha est rendu de façon inégale par
+Outlook, et le bandeau est blanc de toute façon.
+
+## ⑬ Le piège payé deux fois : `nx serve` ne surveille pas `packages/`
+
+Après la première série de modifications, l'email reçu était **identique**. Mesuré :
+
+```
+auth-service démarré   : 20:18:02
+layout.ts modifié      : 20:38:06     ← vingt minutes PLUS TARD
+recompilations depuis  : aucune
+```
+
+`nx serve` surveille les fichiers du **projet**, pas ceux de `packages/libs/*` qu'il consomme
+par alias webpack. Le service a donc continué à servir l'ancien bundle.
+
+Ce qui a rendu le défaut invisible : l'aperçu envoyé pour validation **ne passait pas par
+auth-service** — il rendait le gabarit directement par `tsx`. Les deux chemins divergeaient, et
+le bon montrait le bon résultat pendant que le service envoyait l'ancien.
+
+**La règle, à ranger à côté de « `nx serve` ne lit le `.env` qu'au démarrage » :** toucher à
+`packages/libs/*` oblige à **relancer chaque service qui la consomme**. Et la vérification qui
+tranche sans discuter :
+
+```sh
+grep -c 'background-color:#FF9900' apps/auth-service/dist/main.js   # 2 → le bundle est à jour
+grep -c 'linear-gradient(135deg,#0F766E' apps/auth-service/dist/main.js   # 0 → l'ancien est parti
+```
+
+## ⑭ Amendement du 10/11/2026 — la graisse : D91 5A arrive enfin page 2
+
+Retour de revue sur capture iPhone : **« affiner la police des textes, pas assez fin, trop de
+gras »**, puis, sur l'écran d'inscription : **« baisse la police de "I accept Yamba's TERMS…",
+de "Or continue with" et de "Already…" — je veux que mes textes soient fins, pro »**, et enfin
+**« baisse encore de gras sur ces textes ainsi que "Send or…" »**.
+
+D91 5A avait **déjà tranché la règle** : *titre 600, libellés 13 px / 500 en gris moyen, corps
+400, et **un seul élément en 700 : le bouton**.* Elle n'avait été appliquée qu'à l'écran
+d'inscription — la vérification ne l'avait jamais reçue, exactement comme le badge de sécurité
+(D92 1A). Le diagnostic de D91 vaut mot pour mot : **la page n'avait aucune graisse sous 600,
+donc rien ne reculait, donc tout criait.**
+
+### Mobile
+
+| Élément | Avant | Après |
+|---|---|---|
+| Titre d'écran (`AuthScreen.title`) | **800** | **600** |
+| Sous-titre (« Envoie ou transporte… ») | 16 px / 500 | **15 px / 400** |
+| Adresse e-mail | 600 | **500** |
+| « Code valable » | 500 | **400** |
+| Le temps du compteur | 700 | **600** |
+| « Saisis ton code » | 16 px / **700**, encre navy | **15 px / 500, gris moyen** |
+| Chiffres des six cases | 700 | **600** |
+| « Modifier », « Renvoyer » (`tealLink`) | 600 | **500** |
+| « Ouvrir ma boîte mail » (`methodLabel`) | 600 | **500** |
+| Mention légale (`checkboxLabel`) | 15 px | **13 px** |
+| « OU CONTINUER AVEC » (`dividerLabel`) | 12 px / 700 | **11 px / 400** |
+| « Déjà un compte ? » + son lien | 15 px / 400 + 500 | **13 px / 400 + 400** |
+| Bouton (`ctaLabel`) | 700 | **700 — inchangé, et seul** |
+
+### Web
+
+Le titre de la vérification était en `font-extrabold` (**800**) alors que celui de l'inscription
+était passé en `font-semibold` (600) avec D91 : les deux étapes du même geste n'avaient pas le
+même titre. Corrigé, avec le libellé du code (`text-xs font-semibold` → `text-[13px]
+font-medium text-slate-500`), les liens, les compteurs, et les titres de la colonne de gauche.
+
+### Les trois raisonnements, parce qu'ils se transposent
+
+1. **« Saisis ton code » est un LIBELLÉ, pas un titre.** Il annonce un champ. À 16 px / 700 il
+   disputait le haut de la page au vrai titre.
+2. **Un lien coloré n'a pas besoin d'être gras.** Le mango du lien de pied et le teal des liens
+   d'action les désignent déjà ; la graisse les signalait **une seconde fois**.
+3. **Une charnière se lit une fois et disparaît.** « OU CONTINUER AVEC » sépare deux façons de
+   s'inscrire : ce sont les deux filets et l'interlettrage qui font ce travail, pas la graisse.
+
+### Ce que la fiche tient
+
+`auth-verify-parite.spec.ts` compte désormais les graisses : **la trousse du mobile n'a qu'un
+seul TEXTE en 700 ou plus — `ctaLabel`** — et le formulaire web n'a plus aucun `font-extrabold`,
+son unique `font-bold` portant la classe `bg-[#FF9900]`. `failureGlyph` et `checkboxMark` sont
+exclus nommément : une croix de 36 px et une coche de case sont des **glyphes dessinés**, dont
+la graisse est un trait et non un niveau de lecture.
+
+**Défaut de la fiche, trouvé en l'écrivant :** la première version cherchait la graisse à partir
+d'un nom de style avec `[\s\S]*?`, ce qui **traverse les blocs voisins** — elle annonçait trois
+fautifs pour un seul réel. Elle découpe maintenant les styles d'abord, et teste chacun
+séparément. Une expression régulière non bornée sur un fichier structuré accuse toujours les
+innocents qui précèdent le coupable.
+
+---
+
+# D95 — La police de la marque sur le téléphone, et le chargement des boutons
+
+*10/11/2026, `feat/finitions-verification`. Décision tranchée par l'utilisateur sur question
+explicite, après trois passes d'allègement qui ne refermaient pas l'écart.*
+
+## ① Le symptôme traité trois fois
+
+« Trop de gras sur le mobile » a été corrigé **trois fois de suite**, chaque fois justement :
+
+| Passe | Ce qui a été fait | Résultat |
+|---|---|---|
+| 1 | D91 5A appliquée page 2 : titre 800 → 600, libellés 700 → 500 | mieux, toujours plus lourd que le web |
+| 2 | mention légale 15 → 13 px, charnière 12/700 → 11/400, pied 15 → 13 px | mieux, toujours plus lourd |
+| 3 | charnière 500 → 400, lien de pied 500 → 400, sous-titre 16 → 15 px | mieux, **toujours plus lourd** |
+
+La cause n'était pas dans les nombres : **le site compose en Plus Jakarta Sans
+(`layout.tsx:2`, `global.css:130`), le téléphone composait avec la police SYSTÈME** — SF Pro sur
+iOS, Roboto sur Android.
+
+**À graisse numérique égale, SF Pro rend plus épais que Plus Jakarta.** L'écran du mobile
+paraissait trop gras alors que ses nombres étaient **déjà ceux du site**. On déplaçait une
+courbe le long d'une autre au lieu de changer de courbe : toute compensation était condamnée
+d'avance, et chaque écran futur aurait repayé la question.
+
+> **La leçon de méthode : un symptôme traité trois fois ne devient une cause qu'au moment où
+> l'on arrête de le traiter.** La question posée était « quelle graisse ? » ; la réponse était
+> « quelle police ? ».
+
+## ② Une famille par graisse — imposé par la documentation, pas choisi
+
+`expo-font` sait regrouper plusieurs fichiers sous **une** famille avec des descripteurs de
+graisse… par son **config plugin** uniquement, donc dans un build de développement. Ce chantier
+tourne sous **Expo Go** (D82 3A). Au runtime, chaque graisse est une famille à part entière.
+
+**Vérifié dans la documentation du SDK 57 avant d'écrire une ligne**, et c'est ce qui a sauvé le
+lot : supposer l'inverse aurait laissé des `fontWeight` à côté des familles nommées — donc un
+**gras de synthèse sur Android**, où le système épaissit un dessin déjà épais. Invisible en
+développement sur iOS, laid sur le téléphone de quelqu'un.
+
+```ts
+export const Font = {
+  regular:   'PlusJakartaSans_400Regular',   // corps
+  medium:    'PlusJakartaSans_500Medium',    // libellés, liens, mentions
+  semibold:  'PlusJakartaSans_600SemiBold',  // titres, valeurs à repérer
+  bold:      'PlusJakartaSans_700Bold',      // LE bouton (D91 5A)
+  extrabold: 'PlusJakartaSans_800ExtraBold', // glyphes dessinés seulement
+} as const;
+```
+
+**67 `fontWeight` dans 23 fichiers** deviennent des `fontFamily`. Le seul qui subsiste porte sur
+la famille **mono** — là, le gras de synthèse est précisément ce qu'on cherche : la mono
+d'Android est trop maigre d'un cran.
+
+Les cinq niveaux nomment des **rôles**, pas des nombres. `Font.medium` se lit ; `fontFor(500)`
+se déchiffre, et n'existe que pour les rares graisses calculées.
+
+## ③ Trois pièges rencontrés, dans l'ordre
+
+| Piège | Symptôme | Correction |
+|---|---|---|
+| Le **baril** du paquet | jest : `Unexpected token 'export'` — il tire `useFonts` et tout `expo-font` | import par **sous-chemin** (`…/600SemiBold`), qui évite aussi d'embarquer les 14 graisses |
+| `require('.ttf')` sous **Node** | le harnais ne sait pas lire un binaire | un **bouchon d'actif** qui rend ce que Metro rendrait |
+| **ESM** dans `node_modules` | jest n'y transforme rien par défaut | `transformIgnorePatterns` **nommant le seul paquet concerné** |
+
+Le harnais reste `testEnvironment: node` et ne rend **aucun** composant : la frontière d'A223 ne
+bouge pas.
+
+## ④ Le splash attend les polices
+
+`useFonts` rend `false` pendant le chargement. Sans attente, le premier rendu part en police
+système puis **bascule** à l'arrivée des fichiers — un saut de typographie à l'ouverture, sur le
+seul écran qu'on ne peut pas fermer. Le splash de D90 couvrait déjà l'amorçage de la session ;
+les deux attentes **se recouvrent**, donc l'ouverture ne s'allonge pas.
+
+## ⑤ Le chargement des boutons
+
+Trois options ont été présentées (disque en place / filet de progression / bouton qui se réduit
+en disque) ; le choix a été laissé au jugement. **Retenu : le libellé s'efface.**
+
+```tsx
+{pending && <Loader2 className="absolute inset-0 m-auto animate-spin" aria-hidden />}
+<span className={pending ? "opacity-0" : undefined}>{label}</span>
+```
+
+Rendu à l'opacité 0, le libellé **occupe toujours sa place** : la largeur du bouton ne bouge pas
+d'un pixel. Trois défauts évités, tous visibles à l'œil nu :
+
+1. **le saut de largeur** quand « Créer mon compte » devient « Création… » ;
+2. **le changement de libellé** — un mot de plus à lire pour n'apprendre que ce que le disque
+   dit déjà. Les clés `ctaLoading` et `otp.verifying` sont donc **supprimées**, pas conservées
+   « au cas où » ;
+3. **le bouton qui se vide puis se remplit** — deux animations là où une seule suffit.
+
+Au succès **on navigue** : le disque ne s'arrête jamais, il part avec l'écran. C'est voulu — un
+bouton qui redevient cliquable une fraction de seconde avant la navigation invite au double
+envoi. Le bouton porte `aria-busy` côté web ; côté mobile, `LoadingDots` (57 lignes) n'a plus
+d'appelant et **sort**.
+
+## ⑥ Ce que les fiches tiennent
+
+Le danger de ce lot n'est pas qu'il casse : **c'est qu'il se défasse en silence.** React Native
+ne se plaint jamais d'une famille inconnue — il retombe sur la police système, sans erreur, sans
+journal. Un écran écrit demain avec `fontWeight: 600` sera simplement composé dans une autre
+police que ses voisins.
+
+| Fiche | Ce qu'elle empêche |
+|---|---|
+| ① plus aucun `fontWeight` dans `src/` | le gras de synthèse d'Android |
+| ② aucun nom de famille écrit à la main | une chaîne recopiée qui se démode seule |
+| ③ `Font` ≡ clés de `FONT_ASSETS` | **le cas sournois** : un niveau déclaré mais jamais chargé compose en police système, les quatre autres étant justes |
+| ④ le nom de la famille du web se retrouve côté mobile | la divergence qui a motivé tout le lot |
+
+Mobile : **562 → 570** fiches, **31 → 32** suites. Les trois fiches de graisse de D91 5A ont été
+vues **rouges** à la bascule — et c'est ce qu'on leur demande : elles tenaient une **règle**, pas
+une orthographe. Traduites (`Font.bold` au lieu de `fontWeight: 700`), elles tiennent la même
+chose.
+
+## ⑦ Reste ouvert
+
+- **Android n'a pas été ouvert.** La bascule n'a été vue que sur le simulateur iOS — or c'est
+  précisément sur Android que le gras de synthèse se serait vu. D73 publie Android d'abord :
+  cette vérification est due.
+- **Les italiques ne sont pas chargées.** Aucun écran n'en utilise ; un `fontStyle: 'italic'`
+  posé sur une famille non italique donnerait un faux italique penché.
+- **La dépendance est entrée par une PR de fonctionnalité**, ce que le dépôt réserve d'ordinaire
+  aux PR `chore/deps`. Arbitrage assumé : la dépendance **est** le lot.
+
+## ⑧ Amendement du 10/11/2026 — « plusieurs textes sont hachés »
+
+Retour de recette immédiatement après la bascule de police : **des textes rognés**, et les
+libellés Google / Facebook à l'étroit.
+
+### La cause, et elle découle de D95
+
+Plus Jakarta Sans a des **ascendantes et des jambages plus généreux** que SF Pro. Une boîte de
+ligne réglée pour l'ancienne police rogne les accents (« É », « À ») et les descendantes
+(« g », « j », « ç »). Les `lineHeight` n'avaient pas bougé — **la police, si.**
+
+Mesure : **24 styles sous le ratio 1,35**, dont `34/39` (1,15), `11/13` (1,18) et `28/34`
+(1,21). Vingt-deux ont été dégagés ; le seuil retenu est **lineHeight ≥ 1,35 × fontSize**, en
+dessous duquel Android coupe.
+
+| Exception | Pourquoi elle est nommée |
+|---|---|
+| `tab-bar.tsx` | géométrie **mesurée** de D88 (barre 52, pilule 42, fente du libellé 11). Augmenter l'interligne sans toucher à la fente ne dégagerait rien, et toucher à la fente rouvre D88 |
+| `profile-avatar-button.tsx`, `avatarInitials`, `badgeLabel` | un **glyphe centré dans un disque** ne se lit pas en lignes : y augmenter l'interligne le décentrerait au lieu de le dégager |
+
+**Ce que cela enseigne :** changer de police n'est pas un changement de style, c'est un
+changement de **métriques**. Tout ce qui a été dimensionné à la main autour de l'ancienne
+police doit être re-mesuré — et la bonne unité de mesure est le **ratio**, pas le pixel.
+
+### Les libellés Google / Facebook
+
+`methodLabel` passe de **16 à 14 px**. Sur l'inscription ces boutons vont par **deux, côte à
+côte** (D91 7A) : chacun n'a que la moitié de la colonne, et « Facebook » y tenait de justesse —
+il suffisait d'une langue plus longue ou d'une taille de texte système augmentée pour que le
+mot se coupe. 14 rend la marge que la disposition à deux colonnes avait prise, et **le logo
+porte l'identification de toute façon.**
+
+### La fiche
+
+`typography.spec.ts` ④ balaie tous les styles de `src/` et refuse tout ratio sous 1,35, les
+exceptions étant **nommées dans le fichier avec leur raison**. Elle a trouvé 13 fautifs de plus
+que la revue — sur des écrans que personne n'avait rouverts depuis la bascule. Mobile :
+**570 → 571** fiches.
+
+## ⑨ Amendement du 10/11/2026 — la taille des libellés de boutons
+
+« Baisse aussi la police des textes des boutons. »
+
+`ctaLabel` passe de **17 à 15 px**, et `identity-gate` de 16 à 15 : **les cinq boutons d'action
+du mobile disent maintenant la même taille.**
+
+Le raisonnement, parce qu'il vaut pour tout bouton principal : **ce qui fait avancer ce bouton
+n'est pas la taille de son texte.** C'est l'aplat mangue, sa pleine largeur, ses 52 pt de haut,
+et le fait d'être le **seul élément en gras de l'écran** (D91 5A). Le libellé n'a donc pas à
+crier par-dessus — et un bouton dont le texte dépasse ses voisins d'un tiers a l'air d'un bouton
+de système d'exploitation, pas d'un produit.
+
+Deux choses à ne pas craindre :
+
+- **la zone tactile ne bouge pas d'un pixel** — elle tient à la hauteur du bouton (52 pt), pas
+  à la taille de son texte ;
+- **le rapport au site est préservé** : 15 côté mobile, 14 côté web. Même rôle, autre distance
+  de lecture — un téléphone se lit à bout de bras (D91 5A, qui fixait déjà 15 contre 13 pour
+  les libellés de champs).
+
+## ⑩ Amendement du 10/11/2026 — « textes toujours tronqués » : la vraie cause
+
+Après l'élargissement des interlignes, la recette sur les **deux** simulateurs montrait encore
+des textes coupés — mais **horizontalement**, et sur un seul caractère :
+
+| Rendu | Attendu |
+|---|---|
+| `Passworc` | Password |
+| `Create an accour` | Create an account |
+| `Browse trips without an accoui` | Browse trips without an account |
+| `Emai` | Email |
+| `Yambȧ` | Yamba |
+
+Un glyphe **à moitié dessiné** n'est ni une césure ni une ellipse : c'est une **boîte plus
+étroite que son contenu**. Et la cause était dans D95 lui-même.
+
+### Ce que la première version gardait
+
+`LaunchGate` retenait l'**affichage** du splash tant que les polices n'étaient pas prêtes. Mais
+l'arbre de navigation, lui, **se montait dessous**. Les écrans mesuraient donc leurs textes avec
+la police encore **système** — SF Pro, plus étroite — puis se redessinaient en Plus Jakarta
+quand les fichiers arrivaient.
+
+**React Native ne re-mesure pas un texte dont seule la police a changé.** La boîte gardait la
+largeur de l'ancienne, le dernier glyphe sortait du cadre, et le parent le rognait.
+
+Seules les chaînes dont l'écart de largeur **franchissait un pixel** étaient touchées — ce qui
+donnait au défaut une allure capricieuse (« Last name » passait, « First name » non) et
+masquait sa cause.
+
+```tsx
+// AVANT — on retenait le splash, pas le montage
+const [fontsReady] = useFonts(FONT_ASSETS);
+return (<Providers><Stack …/><LaunchGate fontsReady={fontsReady} /></Providers>);
+
+// APRÈS — rien ne se monte, donc rien ne mesure
+if (!fontsReady) return <AppSplash />;
+return (<Providers><Stack …/><LaunchGate /></Providers>);
+```
+
+> **La règle, et elle dépasse les polices : un écran qui ne se monte pas ne mesure rien.** Tout
+> le reste — retenir un affichage, poser une opacité, masquer avec un calque — revient à
+> *espérer* que la mesure arrive après le chargement. Quand une ressource change une MESURE,
+> on bloque le montage, pas la peinture.
+
+### Vérifié sur les deux plateformes
+
+Le lot n'a aucune branche par système. Les deux bundles ont été demandés à Metro et obtenus :
+
+```
+ios      200 en 12,2 s
+android  200 en 10,3 s
+```
+
+### Les fiches
+
+`typography.spec.ts` ⑤ tient trois choses : la sortie précoce existe, elle arrive **avant** le
+`<Stack>` (après, elle ne protégerait plus rien), et elle porte bien sur `FONT_ASSETS`. Mobile :
+**571 → 574** fiches.
+
+## ⑪ Amendement du 11/11/2026 — les trois pieds d'écran, et le gabarit qui les tient
+
+La recette du 10/11 au soir, captures côte à côte, montre un dernier écart : **la ligne de
+sortie en bas d'écran ne s'écrit pas deux fois pareil**. Cinq déclarations pour un seul rôle.
+
+| Écran | Avant | Après |
+|---|---|---|
+| Connexion (mobile) — « Pas encore de compte ? » | 15 px `medium` + lien 15 px `bold` | 13 px `regular` |
+| Inscription (mobile) — « Déjà un compte ? » | 13 px `regular` | *inchangé* |
+| Bienvenue (mobile) — « Plus tard » | 15 px `semibold` | 13 px `regular` |
+| Connexion (site) — « Pas encore de compte ? » | `text-sm` + lien `font-bold` | `text-[13px]`, lien sans graisse |
+| Inscription (site) — « Déjà un compte ? » | `text-[13px]` | *inchangé* |
+
+Les trois lignes du natif font **le même travail** : offrir une porte à qui n'est pas au bon
+endroit. Trois tailles et trois graisses pour un rôle, c'est la même phrase prononcée sur trois
+tons — et l'écart ne casse rien, ce qui est exactement pourquoi il avait tenu.
+
+### Le geste : un jeton, pas trois nombres recopiés
+
+Aligner les trois valeurs à la main aurait refermé l'écart **aujourd'hui**. Le quatrième écran
+l'aurait rouvert. Le gabarit sort donc des écrans et devient un jeton nommé, à côté des cinq
+graisses de D95 :
+
+```ts
+// apps/mobile/src/constants/typography.ts
+export const FooterLine = {
+  fontSize: 13,
+  lineHeight: 18,
+  fontFamily: Font.regular,
+} as const;
+```
+
+```tsx
+// apps/mobile/src/app/(auth)/login.tsx — les écrans ne connaissent plus de nombre
+footerText: { ...FooterLine },
+footerLink: { ...FooterLine, color: AuthBrand.mango },
+```
+
+**Ce que le jeton ne porte pas : l'encre.** Les deux premiers mènent à l'écran jumeau
+(connexion ↔ inscription) et prennent la mangue ; le troisième **décline** la proposition et
+garde l'encre grise, posée par l'appelant (`invite-kit`). Même gabarit, autre intention — un
+jeton qui aurait emporté la couleur aurait effacé la nuance au premier réemploi.
+
+13 px est la taille de la mention légale (D91 7A) : le bas d'écran recule d'un bloc. 18 px
+d'interligne parce que l'interligne suit la **police** et non le nombre (⑧ ci-dessus).
+
+### Les fiches — `apps/mobile/src/lib/pied-ecran.spec.ts`, 24 fiches
+
+Trois groupes, et le deuxième est celui qui a de la valeur dans six mois :
+
+1. **le gabarit** — 13 px, `Font.regular`, interligne ≥ 1,3 × la taille, et **aucune couleur**
+   (la liste des clés est comparée exactement) ;
+2. **les trois écrans épandent `FooterLine`** et ne redéclarent **ni** `fontSize`, **ni**
+   `lineHeight`, **ni** `fontFamily`. Une valeur posée *après* l'épandage l'emporterait sans
+   bruit : c'est la façon la plus discrète de rouvrir l'écart qu'on vient de fermer ;
+3. **le site compose comme le téléphone** — les deux pieds portent `text-[13px]` (le nombre
+   est lu depuis `FooterLine.fontSize`, les deux fronts ne peuvent donc pas diverger d'un
+   chiffre), aucun `font-bold`/`font-semibold`, et la mangue reste.
+
+Mobile : **574 → 598** fiches (33 suites). `tsc -p tsconfig.json && -p tsconfig.spec.json` vert,
+`tsc --noEmit -p apps/user-ui` vert, contrôle i18n vert.
+
+> **Le piège repayé une fois de plus, et pour deux lignes :** la première version du fichier
+> construisait sa liste de chemins avec un `it.each([…, ...map(… as const)])`. Les tests
+> passaient ; `tsc -p tsconfig.spec.json` refusait (TS2345 — `string[]` n'est pas un tuple de
+> deux). C'est **exactement** le travail du contrôle « TypeScript (fiches de test) », et c'est
+> le rappel que les huit autres jobs de typage **excluent** les `*.spec.ts`. Corrigé en
+> annotant la liste `ReadonlyArray<[string, string]>`.

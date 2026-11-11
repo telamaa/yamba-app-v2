@@ -85,6 +85,7 @@ import { useTranslations } from 'use-intl';
 import { InviteBody, InviteGutter, useInviteColors } from '@/components/invite-kit';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useSession } from '@/lib/session-context';
 
 /**
@@ -234,8 +235,10 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.mango,
   },
   ctaLabel: {
-    fontSize: 16,
-    fontWeight: 700,
+    // Aligné sur les quatre autres CTA du mobile (15) — un bouton d'action
+    // n'a pas de raison de changer de taille selon l'écran qui le porte.
+    fontSize: 15,
+    fontFamily: Font.bold,
   },
   pressed: {
     opacity: 0.75,

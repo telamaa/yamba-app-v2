@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslations } from 'use-intl';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 type Props = {
@@ -131,21 +132,31 @@ const styles = StyleSheet.create({
   },
   badgeLabel: {
     fontSize: 13,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   dismiss: {
     paddingHorizontal: Spacing.two,
   },
   title: {
+    // D95 — l'interligne suit la POLICE, pas l'inverse. Plus Jakarta Sans a
+    // des hauteurs d'ascendantes et de jambages plus généreuses que SF Pro :
+    // la boîte de ligne réglée pour l'ancienne police ROGNAIT les accents
+    // (« É », « À ») et les descendantes (« g », « j », « ç »). Ratio tenu :
+    // au moins 1,35 × la taille, seuil sous lequel Android coupe.
     fontSize: 28,
-    lineHeight: 34,
-    fontWeight: 800,
+    lineHeight: 38,
+    // D91 5A, appliquée ici par la revue du 10/11 : le titre RECULE à 600.
+    // À 800 il ne laissait rien derrière lui — quand tout crie, rien ne porte.
+    // Le seul 700 de l'écran est le bouton, et c'est ce qui le fait avancer.
+    fontFamily: Font.semibold,
     marginBottom: Spacing.two,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: 500,
+    // 15 px (revue du 10/11) : le sous-titre ACCOMPAGNE le titre, il ne le
+    // double pas. À 16 il faisait un second titre juste sous le premier.
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: Font.regular,
   },
   content: {
     marginTop: Spacing.four,

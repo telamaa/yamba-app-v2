@@ -7553,3 +7553,587 @@ ligne de réassurance sous le bouton. L'utilisateur l'a fait supprimer. Les docu
 amendement daté**, qui dit ce qui la remplace. Un document qui se corrige en ajoutant reste
 lisible dans son ordre chronologique ; un document qui se corrige en effaçant perd la trace de ce
 qu'on a cru.
+
+---
+
+## Chapitre 232 — Supprimer plutôt qu'aligner, la variable de module comme coffre, et le test qu'on ne contourne pas
+
+*D92, 10/11/2026 — `feat/finitions-verification`.*
+
+### 1. La question qui change la réponse : « à qui montre-t-on cette donnée ? »
+
+Le lot est parti d'une question simple posée en cours de revue : *« est-ce une bonne pratique
+d'afficher l'e-mail masqué `c************`, ou doit-on le supprimer ? »*
+
+La tentation est de répondre par l'autorité — « Apple, Stripe et Wise le font ». C'est vrai, et
+c'est hors sujet, parce que **le motif n'est pas « masquer un e-mail », il est « masquer un
+e-mail que le spectateur n'a peut-être pas le droit de connaître »**.
+
+La bonne méthode, et elle est générale : **ne jamais évaluer un motif d'interface sans son
+contexte d'usage**. Deux contextes, deux réponses opposées :
+
+| Contexte | D'où vient l'adresse | Le spectateur est-il le titulaire ? | Masquer ? |
+|---|---|---|---|
+| Récupération de compte | du dossier serveur | on ne sait pas | **oui** |
+| Vérification d'inscription | de ce que l'utilisateur vient de taper | forcément | **non** |
+
+Et c'est en code qu'on tranche, pas en opinion : *l'adresse vient-elle du serveur ou de l'état
+du parcours ?* Le `grep` a donné la réponse — **cinq appels, cinq adresses tapées**.
+
+### 2. Deux implémentations divergentes : le signal, pas le problème
+
+```ts
+// apps/user-ui/src/lib/auth/email-mask.ts
+const middleStars = "*".repeat(Math.min(localPart.length - 2, 9));   // plafonné
+
+// apps/mobile/src/components/auth/auth-theme.ts
+`${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}`  // PAS plafonné
+```
+
+Le réflexe de développeur est d'aligner : extraire, partager, écrire une fiche. Le réflexe
+**utile** est de se demander pourquoi la divergence a pu vivre des mois sans gêner personne.
+
+Réponse : parce que la fonction ne servait à rien. Une divergence silencieuse et durable est
+**un test de nécessité** qui a déjà tourné, et qui a répondu non.
+
+> **La leçon :** quand deux copies d'une même règle s'écartent longtemps sans conséquence,
+> commencez par demander si la règle doit exister. Aligner, c'est figer une erreur en deux
+> exemplaires.
+
+Au passage, la version mobile était la *moins* discrète des deux : `'*'.repeat(local.length - 2)`
+publie la **longueur exacte** de la partie locale. Un masque qui fuit ce qu'il prétend cacher.
+
+### 3. Où ranger un secret vivant quelques secondes : la variable de module
+
+Le site devait enchaîner la connexion après la vérification — donc garder le mot de passe le
+temps d'une navigation. Quatre rangements possibles, un seul acceptable :
+
+| Rangement | Survit au rechargement | Lisible par un autre script | Verdict |
+|---|---|---|---|
+| `localStorage` | oui, et au-delà de l'onglet | oui | non |
+| `sessionStorage` | oui | oui | non |
+| URL (`?pwd=`) | dans l'historique, les journaux, le `Referer` | oui | non |
+| **Variable de module** | **non** | **non** | **oui** |
+
+```ts
+// apps/user-ui/src/lib/auth/register-flow-state.ts
+let pending: PendingPassword | null = null;
+```
+
+Ce qui rend la chose possible est une propriété de l'App Router qu'il faut connaître :
+`router.push("/register/verify")` est une navigation **client**. Le bundle n'est pas rechargé,
+le module n'est pas réévalué, la variable traverse. Un `window.location.href = …` l'aurait
+perdue — et c'est **exactement** ce qui se produit à un rechargement manuel.
+
+Ce n'est pas un défaut : c'est la contrepartie, et elle était déjà payée. Le repli existait
+(connexion préremplie, bandeau « compte activé »). **Un chemin dégradé qui existe déjà rend un
+choix de conception gratuit** — encore faut-il le remarquer avant de concevoir.
+
+Et la forme de l'interface compte autant que le rangement :
+
+```ts
+export function readPendingPassword(email: string): string | null  // répond, n'écrit pas
+export function clearPendingPassword(): void                        // écrit, ne répond pas
+```
+
+C'est la règle **CQS** que le dépôt a payée en D88 (une lecture qui normalisait en répondant
+provoquait *« Cannot update a component while rendering a different component »*). Un
+`takePendingPassword()` qui lirait **et** effacerait serait appelable depuis un rendu sans que
+rien ne le signale.
+
+### 4. Mesurer un contraste plutôt que le ressentir
+
+« Les cases ne se voient pas » est une impression. Voici comment on en fait un fait.
+
+La luminance relative d'une couleur sRGB (WCAG) :
+
+```
+L = 0,2126·R + 0,7152·G + 0,0722·B      (R,G,B linéarisés)
+contraste = (L_clair + 0,05) / (L_sombre + 0,05)
+```
+
+Pour `slate-800` (#1E293B) sur `slate-950` (#020617) :
+
+```
+L(#1E293B) ≈ 0,0219     L(#020617) ≈ 0,0046
+contraste  = (0,0219 + 0,05) / (0,0046 + 0,05) = 0,0719 / 0,0546 ≈ 1,32:1
+```
+
+**SC 1.4.11 (Non-text Contrast) exige 3:1** pour la limite visuelle d'un contrôle de saisie.
+On est à un facteur 2,3 en dessous — et le fond de la case était `slate-950`, c'est-à-dire
+**exactement la couleur de la page**. Six rectangles invisibles sur fond invisible.
+
+Même calcul pour le compteur de renvoi, `slate-600` (#475569) sur `slate-950` : **2,60:1** pour
+4,5:1 exigés (SC 1.4.3). L'élément qui dit quand on pourra agir était le moins lisible.
+
+> **À retenir :** un désaccord de design se tranche en chiffres quand une norme existe. « Je
+> trouve ça trop sombre » se discute ; « 1,32:1 au lieu de 3:1 » ne se discute pas.
+
+### 5. La fiche qui attrape son auteur — deuxième fois, et la doctrine tient
+
+Trois fiches sont parties rouges. Motif : mes propres commentaires **citaient** les chaînes que
+je venais de retirer, pour expliquer pourquoi elles l'avaient été.
+
+```ts
+expect(lire(FORMULAIRE_WEB)).not.toContain('emerald');
+// ... et dans le fichier visé :
+//   « la case remplie prend le TEAL de la charte : son `emerald-500` y
+//     faisait entrer un troisième vert. »
+```
+
+Premier réflexe : apprendre l'exception à la fiche — un filtre qui retire les commentaires avant
+de balayer. C'est séduisant : le test mesurerait alors le *code*, donc plus précisément.
+
+C'est faux, et le dépôt l'avait déjà écrit un lot plus tôt (D91, commit `4d3b6854`) :
+
+> *« quand un balayage grossier dit non, c'est au code de s'adapter, jamais au test d'apprendre
+> une exception. »*
+
+Deux raisons de s'y tenir :
+
+1. **le filtre est une passoire** — un commentaire en fin de ligne, une chaîne de gabarit, un
+   `//` dans une URL, et la règle fuit sans bruit ;
+2. **une chaîne citée est une chaîne présente.** Le jour où quelqu'un copie le commentaire dans
+   du JSX, rien ne l'arrête.
+
+Les trois commentaires ont été reformulés (« le vert qu'elle portait avant », « un badge de
+sécurité auto-décerné », « un stockage du navigateur »). Le filtre a été retiré.
+
+> **La leçon de méthode :** une règle d'équipe écrite dans un message de commit vaut une règle
+> écrite dans un fichier. Avant de contourner un test, cherchez si quelqu'un a déjà payé la
+> question — et acceptez sa réponse même quand la vôtre vous paraît plus fine.
+
+### 6. Tester le front qui n'a pas de harnais
+
+`apps/user-ui` n'a **aucun lanceur de tests** dans les dix-neuf contrôles. Les règles de D92
+portent pourtant sur l'**accord** entre les deux fronts : les tester d'un seul côté ne prouve
+rien.
+
+La solution, ouverte par D91 et reprise ici : **le harnais du mobile lit le site comme du
+texte**.
+
+```ts
+const WEB = resolve(MOBILE, '../user-ui');
+const FORMULAIRE_WEB = join(WEB, 'src/components/auth/forms/RegisterVerifyForm.tsx');
+expect(lire(FORMULAIRE_WEB)).toContain('useTranslations("auth.otp")');
+```
+
+C'est inhabituel, et c'est assumé : c'est le seul endroit du dépôt où un test peut voir les deux
+applications à la fois. Le garde-fou indispensable vient en premier :
+
+```ts
+it('le formulaire web est bien au chemin que ces fiches lisent', () => {
+  expect(existsSync(FORMULAIRE_WEB)).toBe(true);
+});
+```
+
+Sans lui, **un simple déplacement de fichier rendrait toutes les fiches suivantes vertes pour la
+pire des raisons : elles ne liraient plus rien.** C'est le piège classique du test qui lit des
+fichiers — il faut toujours vérifier qu'on lit *quelque chose*.
+
+Pour les deux règles pures recopiées entre fronts, on compare le **code lui-même**, normalisé :
+
+```ts
+const normaliser = (s: string): string =>
+  s.slice(s.indexOf('export const OTP_EXPIRY_SECONDS'))
+   .replace(/["']/g, '"')      // le web écrit ", le mobile écrit '
+   .replace(/\s+/g, ' ')
+   .trim();
+```
+
+La recopie entre fronts est **assumée** (ils ne partagent pas de paquet d'interface) ; c'est la
+**divergence** qui ne l'est pas. Toute la différence est là, et c'est la leçon des deux
+`maskEmail`.
+
+### 7. Pour aller plus loin
+
+- **WCAG 2.1 SC 1.4.11 (Non-text Contrast)** — la règle des 3:1 sur les limites de contrôles,
+  et pourquoi elle existe : https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+- **NCSC / NIST sur les mots de passe** — déjà cités en D91 pour le blocage du collage ; la même
+  littérature explique pourquoi un mot de passe ne doit jamais atterrir dans un stockage
+  persistant du navigateur.
+- **Command–Query Separation (Meyer)** — la règle qui rend `read…` / `clear…` non
+  interchangeables, et qui a coûté un défaut de rendu au dépôt en D88.
+- **`autocomplete="one-time-code"`** — le mécanisme par lequel iOS et Android proposent le code
+  reçu par SMS ; sur un code reçu par e-mail il ne fait rien, ce qui rend « Ouvrir ma boîte
+  mail » d'autant plus utile.
+
+---
+
+## Chapitre 233 — L'image qui voyage avec le message, le refus qui devient un cahier des charges, et l'accent grave qui ferme une chaîne
+
+*D94, 10/11/2026.*
+
+### 1. Un refus bien écrit vaut un cahier des charges
+
+D85 avait refusé de mettre le logo dans les emails. Pas « plus tard », pas « à voir » : elle
+avait écrit **le coût, le risque et la portée**, et versionné le fichier PNG en notant *« il est
+prêt le jour où ce lot se fera »*.
+
+Quand le lot est arrivé, il restait une seule chose à faire avant de coder : **mesurer le point
+signalé comme incertain**. Dix minutes de lecture de documentation, et le lot pouvait commencer.
+
+> **À retenir :** quand vous refusez une demande, écrivez ce qui la rendrait acceptable. Un
+> « non » nu se repaie à chaque fois qu'on y revient ; un « non, parce que A, B et C » est un
+> plan de travail que quelqu'un exécutera un jour — peut-être vous.
+
+Et la vérification a payé tout de suite : l'API REST de Resend attend **`content_id`**, alors
+que son SDK JavaScript expose `contentId`. Ce dépôt poste le JSON brut par `fetch`, donc c'est
+la forme *snake* qu'il lui faut. Une erreur de casse à cet endroit **ne casse rien** — Resend
+ignore la clé inconnue et joint l'image en pièce attachée. L'email part, arrive, et le
+destinataire voit un trombone.
+
+### 2. Les trois façons de mettre une image dans un email, et pourquoi deux échouent
+
+| Technique | Ce qui se passe réellement |
+|---|---|
+| `<img src="https://…">` | le client doit **accepter** de charger l'image. Gmail la fait passer par son mandataire — qui **ne peut pas atteindre** `http://192.168.x.x:3000` : votre logo est cassé sur le poste même où vous le testez |
+| `<img src="data:image/png;base64,…">` | Gmail **supprime** les `data:` URI des emails. L'image disparaît sans message d'erreur |
+| `<img src="cid:mon-logo">` + pièce jointe inline | l'image **voyage avec le message**. Elle s'affiche hors ligne, sans autorisation, chez tous les clients |
+
+La troisième est la seule qui marche partout, et c'est la plus ancienne : elle date de MIME
+(RFC 2392). Le `cid` est un identifiant arbitraire que vous choisissez ; il relie le `src` du
+HTML à l'en-tête `Content-ID` de la partie MIME.
+
+```ts
+// Nodemailer
+attachments: [{ filename, content: Buffer, cid: "yamba-symbol", contentDisposition: "inline" }]
+// Resend (API REST)
+attachments: [{ content: base64, filename, content_type, content_id: "yamba-symbol" }]
+```
+
+**`contentDisposition: "inline"` n'est pas décoratif.** Sans lui, Nodemailer marque la partie
+comme `attachment` : l'image s'affiche quand même par son `cid`, mais le client ajoute un
+trombone à côté du message. Deux lignes de différence, deux rendus très différents.
+
+### 3. Où ranger l'octet : la dépendance au répertoire courant
+
+Le gabarit de Yamba est une **chaîne TypeScript**, pas un fichier `.ejs` lu sur le disque. La
+raison est écrite dans son en-tête : il doit fonctionner quel que soit le `cwd` du processus
+(`nx serve` depuis la racine, `node dist/main.js` depuis `apps/<service>`, jest depuis ailleurs
+encore).
+
+Lire l'image sur le disque aurait **réintroduit exactement la dépendance que ce choix avait
+supprimée** — et le bundle webpack ne copie que `src/assets`, donc le fichier aurait manqué en
+production. L'image est donc encodée en base64 dans un module TypeScript.
+
+```ts
+export const LOGO_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUg…";
+```
+
+> **Le principe général :** quand un module a été écrit pour ne dépendre de rien d'extérieur, la
+> première ressource qu'on y ajoute doit respecter la même règle. Sinon on paie deux fois : la
+> contrainte d'origine **et** la nouvelle exception.
+
+### 4. Séparer ce que l'objet DIT de ce qu'on en FAIT
+
+Le réflexe aurait été d'ajouter l'image à `EmailContent` — le type qui décrit le contenu d'un
+email. C'eût été une erreur de couche : **aucun des quinze emails n'a quoi que ce soit à dire
+sur son logo.**
+
+```
+EmailContent   → ce que l'email RACONTE   (titre, paragraphes, code, encadré)
+OutgoingEmail  → ce qu'on ENVOIE          (destinataire, HTML, pièces inline)
+EmailProvider  → COMMENT on l'envoie      (SMTP, Resend, Faux)
+```
+
+L'image est entrée dans la couche du milieu. Résultat : les quinze emails n'ont pas bougé d'une
+ligne, et chaque fournisseur traduit la même notion dans sa langue.
+
+> **Le test qui révèle la bonne couche :** si j'ajoute un seizième email, devra-t-il parler de
+> cette chose ? Non → elle n'appartient pas au contenu.
+
+### 5. `letter-spacing` ajoute l'espace après le DERNIER caractère
+
+Un défaut visible depuis des mois, dont personne ne voyait la cause : le code à six chiffres
+paraissait poussé vers la droite dans son cadre.
+
+```css
+letter-spacing: 8px;
+```
+
+La propriété ajoute l'espace **après chaque caractère**, dernier compris. `167139` porte donc
+8 px d'espace à sa droite que rien ne compense : centré, il est décalé de 8 px.
+
+```css
+letter-spacing: 8px; text-indent: 8px;   /* la première ligne recule d'autant */
+```
+
+Pourquoi `text-indent` et pas `margin-right: -8px` : **Outlook ignore les marges négatives.**
+Dans un email, le choix d'une technique CSS se fait par ce que les clients savent rendre, pas
+par élégance.
+
+Et la fiche tient la **règle**, pas le nombre :
+
+```ts
+const ligne = /letter-spacing:(\d+)px;text-indent:(\d+)px;/.exec(rendu());
+expect(ligne?.[1]).toBe(ligne?.[2]);
+```
+
+Si quelqu'un passe l'espacement à 10 px demain, le test réclame 10 px d'indentation — il ne se
+contente pas d'avoir mémorisé « 8 ».
+
+### 6. L'accent grave qui ferme une chaîne
+
+En documentant le point précédent, j'ai écrit ce commentaire **dans** le gabarit :
+
+```ts
+export const LAYOUT_EJS = `<!DOCTYPE html>
+…
+  <!-- `letter-spacing` ajoute l'espace APRÈS chaque caractère -->
+```
+
+`tsc` a sorti quatre erreurs de syntaxe à des lignes qui n'avaient rien à se reprocher. La
+cause : **le premier accent grave termine le gabarit de chaîne.** Tout ce qui suit est relu
+comme du TypeScript.
+
+Ce n'est pas une faute de frappe, c'est une habitude : on cite le code entre accents graves
+depuis des années dans les commentaires. Elle devient un piège dès qu'on écrit *à l'intérieur*
+d'un gabarit de chaîne.
+
+**Le remède tenu :** les commentaires de ce fichier n'en portent plus, et le fichier le dit en
+toutes lettres à l'endroit du piège — pas dans un en-tête que personne ne relit.
+
+### 7. Aligner le contenu sur l'en-tête
+
+La correction demandée en fin de revue — *« le contenu doit rester en largeur entre le logo et
+Connexion »* — vaut comme principe de mise en page.
+
+L'en-tête du site borne son contenu : `mx-auto max-w-7xl px-4`. Les pages d'auth posaient leur
+grille directement sur le `<main>`, donc d'un bord à l'autre de l'écran. Le logo et le lien de
+connexion devenaient les **seuls** éléments à respecter une marge, et plus l'écran était large,
+plus le désalignement sautait aux yeux.
+
+```tsx
+<main className="mx-auto w-full max-w-7xl px-4">   {/* la MÊME ligne que Header.tsx:99 */}
+  <div className="overflow-hidden lg:grid lg:grid-cols-2 lg:rounded-2xl lg:border …">
+```
+
+Deux conséquences que l'on n'anticipe pas toujours :
+
+1. **un panneau coloré qui ne touche plus le bord doit être arrondi**, sinon c'est un rectangle
+   à arêtes vives posé dans le vide ;
+2. **la hauteur minimale doit retirer la marge verticale** (`-64px` → `-104px`), sinon la page
+   gagne une barre de défilement d'une poignée de pixels.
+
+> **La règle :** un conteneur partagé se déclare une fois et se cite, il ne se recopie pas. Ici
+> la citation est un commentaire qui nomme le fichier et la ligne — le minimum tant que la
+> valeur n'est pas extraite dans une constante.
+
+### 8. Pour aller plus loin
+
+- **RFC 2392** — `cid:` URL scheme : le mécanisme exact derrière les images inline.
+- **La documentation de Resend sur les pièces jointes** — et surtout l'écart entre le SDK et
+  l'API REST, qui est le genre de détail qu'aucun type TypeScript ne rattrape.
+- **`color-scheme` / `supported-color-schemes`** — comment Gmail et Apple Mail décident
+  d'inverser un email, et comment le leur interdire.
+- **Can I email** (caniemail.com) — l'équivalent de Can I Use pour les clients mail : à
+  consulter avant d'écrire la moindre propriété CSS dans un email.
+
+---
+
+## Chapitre 234 — Le symptôme traité trois fois, la famille par graisse, et le bouton qui ne change ni de taille ni de mot
+
+*D95, 10/11/2026.*
+
+### 1. Quand une correction juste ne corrige rien
+
+« Trop de gras sur le mobile » a été corrigé trois fois. Chaque passe était défendable : le
+titre passait de 800 à 600, les libellés de 700 à 500, la charnière de 12/700 à 11/400. Chaque
+passe améliorait. **Aucune ne refermait l'écart.**
+
+La cause : le site compose en **Plus Jakarta Sans**, le téléphone composait avec la police
+**système**. À graisse numérique égale, SF Pro rend plus épais que Plus Jakarta — l'écran
+paraissait trop gras alors que ses nombres étaient *déjà* ceux du site.
+
+> **Le signal à reconnaître : une correction juste qui améliore sans résoudre, deux fois de
+> suite, désigne une cause d'un autre ordre.** On déplaçait une courbe le long d'une autre au
+> lieu de changer de courbe. La question posée était « quelle graisse ? » ; la réponse était
+> « quelle police ? ».
+
+Le moyen de la trouver n'était pas le raisonnement, c'était la **comparaison** : deux captures
+du même formulaire, côte à côte.
+
+### 2. Pourquoi une famille par graisse, et pourquoi il faut le vérifier
+
+Sur le web, une famille porte toutes ses graisses : `font-weight: 600` choisit la bonne coupe.
+**En React Native, non.** Chaque fichier est une famille :
+
+```ts
+fontFamily: 'PlusJakartaSans_600SemiBold'   // ✅ la bonne coupe
+fontWeight: 600                              // ❌ ne choisit rien, ou pire
+```
+
+`expo-font` sait faire la correspondance… **par son config plugin**, donc dans un build de
+développement. Sous Expo Go, non.
+
+Le piège est qu'une erreur ici **ne casse rien** :
+
+| Erreur | Ce qui se passe |
+|---|---|
+| Famille inconnue | React Native retombe sur la police **système**, sans erreur ni journal |
+| `fontWeight` à côté d'un `fontFamily` nommé | **gras de synthèse** sur Android : le système épaissit un dessin déjà épais |
+
+Les deux sont invisibles en développement sur iOS. D'où la règle de méthode :
+
+> **Lisez la documentation de la version exacte avant d'écrire la première ligne, quand une
+> erreur possible ne produit aucun message.** Un bug qui lève une exception se trouve tout
+> seul ; un bug qui dégrade en silence ne se trouve jamais.
+
+### 3. Nommer des rôles, pas des nombres
+
+```ts
+export const Font = {
+  regular:   'PlusJakartaSans_400Regular',   // corps
+  medium:    'PlusJakartaSans_500Medium',    // libellés, liens
+  semibold:  'PlusJakartaSans_600SemiBold',  // titres
+  bold:      'PlusJakartaSans_700Bold',      // LE bouton
+  extrabold: 'PlusJakartaSans_800ExtraBold', // glyphes dessinés
+} as const;
+```
+
+Le gain n'était pas demandé et compte autant que la police : une revue de design peut désormais
+dire « c'est un libellé, pas un titre » au lieu de « mets 500 ». Et une **fiche peut compter les
+niveaux**, ce qu'un nombre ne permettait pas sans ambiguïté — 700 sur une croix de fermeture
+n'est pas le même objet que 700 sur un bouton.
+
+### 4. Trois pièges d'outillage, et ce qu'ils enseignent
+
+**① Le baril d'un paquet n'est pas un détail d'import.**
+
+```ts
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans';          // ❌
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold'; // ✅
+```
+
+Le baril réexporte **quatorze** graisses, leurs italiques et son propre `useFonts` — il
+embarquerait tout pour cinq fichiers utiles. Et il tire `expo-font` par une chaîne d'ESM que
+jest ne traverse pas : **une fiche qui ne peut pas importer la règle ne la vérifie pas.**
+
+**② Un module « pur » qui importe un binaire ne l'est plus pour le harnais.**
+
+```js
+moduleNameMapper: { '\\.(ttf|otf|woff2?|png|jpe?g|gif|webp)$': '<rootDir>/src/test-support/asset-stub.ts' }
+```
+
+Le bouchon rend ce que Metro rendrait : un identifiant. Les fiches vérifient que chaque niveau
+**pointe** un actif, sans rien savoir de son contenu — ce qui est exactement la frontière du
+harnais.
+
+**③ `transformIgnorePatterns` se nomme, il ne se ratisse pas.**
+
+```js
+transformIgnorePatterns: ['node_modules/(?!@expo-google-fonts/)']
+```
+
+Exempter un paquet nommément documente *pourquoi* l'exception existe. Un motif large
+(`node_modules/(?!.*expo.*)`) marche aussi, et personne ne saura plus lequel des trente paquets
+en avait besoin.
+
+### 5. Le bouton qui travaille : ce qu'il ne doit pas faire
+
+```tsx
+{pending && <Loader2 className="absolute inset-0 m-auto animate-spin" aria-hidden />}
+<span className={pending ? "opacity-0" : undefined}>{label}</span>
+```
+
+**Le libellé ne disparaît pas, il s'efface.** `opacity: 0` le laisse occuper sa place : la
+largeur du bouton est figée par son propre texte. `display: none` ou un ternaire qui le retire
+ferait sauter la largeur au moment précis où l'on vient de cliquer dessus.
+
+Trois choses qu'on évite ainsi, et la troisième est la moins évidente :
+
+1. le **saut de largeur** ;
+2. le **changement de libellé** (« Création… ») — un mot de plus à lire pour n'apprendre que ce
+   que le disque dit déjà. Les clés correspondantes sont **supprimées**, pas gardées ;
+3. le bouton qui **se vide puis se remplit** — deux animations là où une seule suffit.
+
+Et une règle qui ne se voit pas : **au succès, on ne réactive pas le bouton.** Le disque tourne
+jusqu'à la navigation. Le rendre cliquable une fraction de seconde avant que l'écran change,
+c'est offrir un second envoi à qui clique vite.
+
+### 6. Quand une fiche rouge est une bonne nouvelle
+
+Trois fiches écrites une heure plus tôt — « la trousse n'a qu'un seul texte en 700 » — sont
+passées au rouge à la bascule. Elles cherchaient `fontWeight: 700`, qui n'existait plus.
+
+C'est **exactement** ce qu'on leur demande. Elles tenaient une **règle** (un seul élément
+avance), pas une **orthographe** (`fontWeight: 700`). Traduites en `Font.bold`, elles tiennent
+la même chose — et elles ont prouvé au passage qu'elles regardaient vraiment quelque chose.
+
+> **Le corollaire :** une fiche qui reste verte pendant une refonte de ce qu'elle surveille ne
+> surveillait rien.
+
+### 7. Pour aller plus loin
+
+- **La documentation `expo-font` du SDK exact** — la différence entre le config plugin et le
+  runtime n'est écrite nulle part ailleurs.
+- **`@expo-google-fonts`** — la convention des sous-chemins, et pourquoi le baril existe quand
+  même (le prototypage).
+- **WAI-ARIA `aria-busy`** — ce qu'un lecteur d'écran annonce pendant qu'un bouton travaille,
+  et pourquoi cela ne remplace pas un indicateur visible.
+- **Gras de synthèse (*faux bold*)** — comment les systèmes fabriquent une graisse absente en
+  épaississant les contours, et pourquoi le résultat ne ressemble à aucune coupe réelle.
+
+### Addendum du 11/11 — un rôle, un gabarit : le jeton qui ferme un écart invisible
+
+Dernier écart de la recette du 10/11 : la ligne de sortie en bas d'écran s'écrivait de cinq
+façons pour un seul rôle (15 `medium`, 15 `bold`, 15 `semibold`, 13 `regular` côté natif ;
+`text-sm` gras et `text-[13px]` maigre côté site).
+
+**Le réflexe à ne pas suivre : aligner les cinq valeurs.** Cela referme l'écart *aujourd'hui*,
+et le quatrième écran le rouvre — parce que rien, dans le dépôt, ne dit qu'un pied d'écran a un
+gabarit. Les cinq déclarations étaient le symptôme ; l'absence de **nom** était la cause. C'est
+la même leçon que D95 lui-même, un cran plus bas : *un symptôme traité devient une cause le jour
+où l'on arrête de le traiter*.
+
+```ts
+export const FooterLine = { fontSize: 13, lineHeight: 18, fontFamily: Font.regular } as const;
+```
+
+Trois choses que ce jeton enseigne, et qui dépassent la typographie :
+
+1. **Un jeton de style porte ce qui doit être commun, jamais ce qui doit varier.** La couleur
+   reste à l'écran : mangue pour les deux portes qui mènent à l'écran jumeau, gris pour celle
+   qui décline. Un jeton trop gourmand uniformise une **intention**, et c'est bien plus coûteux
+   qu'une taille qui diverge. La fiche le tient en comparant la **liste exacte des clés** —
+   `['fontFamily', 'fontSize', 'lineHeight']` — et non en vérifiant trois valeurs : ajouter une
+   couleur casse le test, ce qu'un contrôle valeur par valeur n'aurait pas vu.
+
+2. **`{ ...FooterLine }` dans un `StyleSheet.create` n'est pas un détail d'écriture.** Une
+   valeur posée *après* l'épandage l'emporte, silencieusement et légitimement du point de vue du
+   langage. La fiche refuse donc `fontSize:` / `lineHeight:` / `fontFamily:` **dans le bloc de
+   style**, pas seulement l'absence du spread : c'est la seule formulation qui empêche la
+   régression la plus probable — celle qui ressemble à une correction locale.
+
+3. **Un test qui lit un nombre dans la règle ne peut pas diverger d'elle.** Le contrôle du site
+   attend `` `text-[${FooterLine.fontSize}px]` `` — pas `text-[13px]`. Changer le gabarit à 12 px
+   déplace les deux fronts ou fait rougir la fiche ; il n'existe pas de troisième issue où les
+   deux applications s'écartent en silence. (Et `text-[13px]` plutôt que `text-sm` parce que 13
+   n'est **pas** dans l'échelle de Tailwind : l'écriture arbitraire est ici le seul moyen
+   d'inscrire *le* nombre de la règle.)
+
+**Le piège TypeScript, pour la deuxième fois sur cette branche.** La liste des chemins lus était
+écrite ainsi :
+
+```ts
+it.each([
+  ['le formulaire du site', FORM_WEB],
+  ...PIEDS_MOBILE.map(([quoi, chemin]) => [`natif : ${quoi}`, chemin] as const),
+])('%s', (_quoi, chemin) => { … });
+```
+
+Jest passe au vert. `tsc -p tsconfig.spec.json` refuse : l'union d'un `string[]` et d'un tuple
+`readonly [string, string]` s'élargit en `string[]`, et `ExtractEachCallbackArgs` ne peut plus
+garantir deux arguments (**TS2345 : *Target requires 2 element(s) but source may have fewer***).
+La correction est une annotation, pas un `as any` :
+
+```ts
+const A_LIRE: ReadonlyArray<[string, string]> = [ … ];
+```
+
+> **Ce que cela rappelle :** les huit contrôles de typage de la CI lisent les
+> `tsconfig.app.json`, qui **excluent** les `*.spec.ts`. Seul le neuvième job, *TypeScript
+> (fiches de test)*, voit ce fichier — et il n'est **pas** dans la liste des contrôles requis.
+> Un défaut de typage vivant dans une fiche se fait donc voir, mais ne bloque pas un merge : la
+> seule parade est de lancer `nx typecheck` localement, à chaque fiche écrite.

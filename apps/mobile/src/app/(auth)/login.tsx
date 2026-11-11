@@ -30,6 +30,7 @@ import {
 import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthBrand, AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { Spacing } from '@/constants/theme';
+import { FooterLine, Font } from '@/constants/typography';
 import {
   consumeLoginPrefill,
   setLoginEmail,
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     fontSize: 14,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   logo: {
     width: 20,
@@ -181,13 +182,16 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingTop: Spacing.two,
   },
+  // Le gabarit du pied d'écran, partagé avec l'inscription et la bienvenue
+  // (revue du 10/11) : les trois lignes offrent la même sortie, elles se
+  // composent donc de la même façon. Le pourquoi est dans `FooterLine`.
   footerText: {
-    fontSize: 15,
-    fontWeight: 500,
+    ...FooterLine,
   },
   footerLink: {
-    fontSize: 15,
-    fontWeight: 700,
+    ...FooterLine,
+    // La MANGUE suffit à désigner le lien ; la graisse le signalerait une
+    // seconde fois.
     color: AuthBrand.mango,
   },
   backdrop: {
@@ -203,7 +207,7 @@ const styles = StyleSheet.create({
   },
   confirmEmail: {
     fontSize: 18,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textAlign: 'center',
   },
   confirmBody: {
@@ -217,6 +221,6 @@ const styles = StyleSheet.create({
   },
   confirmBackLabel: {
     fontSize: 15,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
 });

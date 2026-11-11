@@ -9,6 +9,23 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 export type EmailProviderName = "RESEND" | "SMTP" | "FAKE";
+
+/**
+ * Une image affichée DANS le corps du message (D94 2A).
+ *
+ * C'est une notion du TRANSPORT, pas du contenu : `EmailContent` dit ce que
+ * l'email raconte, `OutgoingEmail` dit ce qu'on envoie. Le gabarit ne connaît
+ * qu'un `cid` ; chaque fournisseur le traduit dans sa langue.
+ */
+export type InlineImage = {
+  /** Référencé par `<img src="cid:…">`. Moins de 128 caractères (Resend). */
+  cid: string;
+  filename: string;
+  contentType: string;
+  /** Le fichier, en base64 — jamais un chemin : voir `logo.ts`. */
+  base64: string;
+};
+
 export type OutgoingEmail = {
   to: string;
   from: string;
@@ -18,6 +35,8 @@ export type OutgoingEmail = {
   tags?: Record<string, string>;
   /** Clé d'idempotence : un même envoi rejoué ne part pas deux fois (Resend). */
   idempotencyKey?: string;
+  /** Images affichées dans le corps (D94). Absentes = aucune pièce jointe. */
+  inlineImages?: InlineImage[];
 };
 export type SendResult = { provider: EmailProviderName; providerMessageId: string | null };
 
@@ -48,6 +67,21 @@ export class ResendEmailProvider implements EmailProvider {
       subject: e.subject,
       html: e.html,
       ...(e.tags ? { tags: Object.entries(e.tags).map(([name, value]) => ({ name, value: String(value).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 256) })) } : {}),
+      // D94 : `content_id` en SNAKE. Le SDK JavaScript de Resend expose
+      // `contentId` et le convertit avant l'appel ; ici on poste le JSON brut
+      // (zéro dépendance, D35 2A), donc c'est la forme de l'API qu'il faut.
+      // Une erreur de casse ne casse RIEN : elle transforme le logo en pièce
+      // jointe que le destinataire voit comme un trombone.
+      ...(e.inlineImages?.length
+        ? {
+            attachments: e.inlineImages.map((i) => ({
+              content: i.base64,
+              filename: i.filename,
+              content_type: i.contentType,
+              content_id: i.cid,
+            })),
+          }
+        : {}),
     };
   }
   async send(e: OutgoingEmail): Promise<SendResult> {
@@ -78,7 +112,23 @@ export class SmtpEmailProvider implements EmailProvider {
   }
   async send(e: OutgoingEmail): Promise<SendResult> {
     try {
-      const info = (await this.transport().sendMail({ from: e.from, to: e.to, subject: e.subject, html: e.html })) as { messageId?: string };
+      const attachments = (e.inlineImages ?? []).map((i) => ({
+        filename: i.filename,
+        content: Buffer.from(i.base64, "base64"),
+        contentType: i.contentType,
+        cid: i.cid,
+        // Sans `inline`, Nodemailer joint l'image EN PIÈCE ATTACHÉE : elle
+        // s'affiche quand même par son `cid`, mais le client mail montre en
+        // plus un trombone. C'est le défaut que D85 redoutait.
+        contentDisposition: "inline" as const,
+      }));
+      const info = (await this.transport().sendMail({
+        from: e.from,
+        to: e.to,
+        subject: e.subject,
+        html: e.html,
+        ...(attachments.length ? { attachments } : {}),
+      })) as { messageId?: string };
       return { provider: "SMTP", providerMessageId: info?.messageId ?? null };
     } catch (err) {
       throw new EmailSendError(err instanceof Error ? err.message : String(err), null, true);

@@ -81,6 +81,7 @@ import { useTranslations } from 'use-intl';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 
 import { Brand, Colors, MaxContentWidth, Spacing, TabBar } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBadges } from '@/hooks/use-tab-badges';
 import { useTabBarVisibility } from '@/lib/tab-bar-visibility';
@@ -490,7 +491,7 @@ const styles = StyleSheet.create({
     // gratuitement.
     fontSize: 9,
     lineHeight: 11,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     letterSpacing: -0.1,
   },
   badge: {
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
   badgeLabel: {
     color: '#0B1120',
     fontSize: 10,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
     lineHeight: 12,
   },
   pressed: {

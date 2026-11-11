@@ -36,6 +36,7 @@ import { useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 10,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     paddingBottom: Spacing.two,
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
   reasonLabel: {
     flex: 1,
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   details: {
     minHeight: 96,

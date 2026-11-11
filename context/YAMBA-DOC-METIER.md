@@ -8298,3 +8298,269 @@ page de connexion garde une adresse générique.
 | # | Situation | Attendu |
 |---|---|---|
 | 7 | Page d'inscription ouverte sur le plus petit iPhone visé | Tout est visible sans défiler, y compris les moyens de connexion et le lien vers la connexion |
+
+---
+
+# D92 — La vérification du code : ce qu'on montre à quelqu'un qui attend
+
+## Le besoin
+
+Entre « je remplis le formulaire » et « j'ai un compte », il y a un écran que personne ne
+regarde jamais longtemps en conception, et que tout le monde traverse : celui où l'on saisit le
+code à six chiffres reçu par e-mail.
+
+C'est pourtant **le seul écran du produit où l'utilisateur sort de Yamba**. Il quitte l'onglet
+ou l'application, va dans sa boîte mail, et doit vouloir revenir. Tout ce qui s'y passe mal se
+paie en inscriptions perdues — et personne ne vient s'en plaindre, puisque le compte n'existe
+pas encore.
+
+Les deux versions — le site et le téléphone — ne disaient pas la même chose, ne validaient pas
+de la même façon, et n'affichaient pas l'adresse de la même manière.
+
+## Les règles
+
+**RG-D92-1 — On masque l'adresse que l'utilisateur n'a pas tapée ; on affiche en clair celle
+qu'il vient de taper.** Masquer une adresse protège quand elle vient du dossier serveur et
+qu'on ignore si celui qui regarde l'écran en est le titulaire (récupération de compte, défi de
+connexion). Quand elle a été saisie trente secondes plus tôt sur le même appareil, le masque ne
+protège de rien — et il **empêche de voir la faute de frappe**, qui est la cause la plus
+fréquente du « je n'ai pas reçu le code ». `c*********a@g***.com` rend `gmial.com` et
+`gmail.com` identiques.
+
+**RG-D92-2 — Une étape de tunnel ne vend pas, elle rassure.** L'argumentaire produit s'adresse
+à quelqu'un qui hésite encore. Servi après la signature, il occupe la place de la seule
+information utile à ce moment-là : *et si le mail n'arrive pas ?*
+
+**RG-D92-3 — Une promesse de nombre d'étapes engage le produit.** « Plus qu'une étape ! » ne
+peut s'écrire que si c'est la dernière. Si le parcours en impose une de plus, c'est le parcours
+qui change, pas la phrase qui s'adoucit.
+
+**RG-D92-4 — Six cases remplies déclenchent la vérification.** Un code complet qui ne fait rien
+tant qu'on n'a pas cliqué est une impasse silencieuse. Le bouton reste — et quand on le presse
+sans avoir fini, il **nomme ce qui manque** plutôt que de rester grisé sans explication.
+
+**RG-D92-5 — Une case dans laquelle on doit taper ne peut pas être de la couleur de la page.**
+Formulée en mesure : la limite d'un contrôle de saisie tient 3:1 de contraste avec son fond
+(WCAG 2.1 SC 1.4.11), et le texte qui dit quand on pourra agir tient 4,5:1.
+
+**RG-D92-6 — Un seul compte à rebours à l'écran.** Celui qui dit quand on pourra AGIR. Celui
+qui dit combien de temps il reste ne paraît qu'à sa dernière minute, c'est-à-dire quand il
+devient actionnable. Une horloge qui tourne sur une attente qu'on ne contrôle pas n'informe
+pas : elle inquiète.
+
+**RG-D92-7 — L'aide arrive quand elle sert.** « Vérifie tes spams » affiché à la seconde zéro
+reproche à l'utilisateur un retard qui n'existe pas encore. Et une phrase ne se termine jamais
+sur un geste indisponible : pendant l'attente, elle se tient seule.
+
+**RG-D92-8 — Un geste proposé mène quelque part de vivant.** « Ouvrir ma boîte mail » n'apparaît
+que si l'on sait où elle est. Un domaine inconnu ne déclenche aucune proposition : faire sortir
+quelqu'un du tunnel vers une page morte est pire que de ne rien proposer.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'arrive sur l'écran | mon adresse est lisible **en entier**, « Modifier » à côté |
+| 2 | Je me suis trompé de domaine | je le vois, et je corrige sans recommencer en aveugle |
+| 3 | J'arrive sur l'écran | le curseur est déjà dans la première case |
+| 4 | Je colle mon code à six chiffres | la vérification part **sans que je clique** |
+| 5 | Je presse « Valider » avec trois chiffres | on me dit qu'il en manque, pas un bouton muet |
+| 6 | Mon compte vient d'être activé (site) | je suis **connecté**, pas renvoyé vers la connexion |
+| 7 | Je recharge la page puis je valide | je retombe sur la connexion préremplie, « compte activé » |
+| 8 | J'arrive sur l'écran | **un seul** compte à rebours est visible |
+| 9 | Il reste moins d'une minute au code | la validité apparaît, en ambre |
+| 10 | T+5 s | on m'annonce le délai normal, on ne m'envoie pas dans mes spams |
+| 11 | T+30 s | on me propose les spams **et** l'heure à laquelle je pourrai redemander |
+| 12 | T+60 s | « Renvoyer le code » est offert, et la phrase se referme dessus |
+| 13 | Mon adresse est `@gmail.com` | « Ouvrir ma boîte mail » m'y emmène |
+| 14 | Mon adresse est `@mon-entreprise.fr` | aucun bouton — pas de page morte |
+| 15 | Thème sombre | je vois les six cases sans les chercher |
+| 16 | Je passe du formulaire au code | le décor de gauche ne change pas |
+
+## Ce qui reste hors de ce lot
+
+**La navigation haute du site reste offerte pendant la vérification.** « Partager un trajet » et
+« Connexion » invitent à quitter un tunnel à mi-chemin, et « Connexion » propose un compte qui
+n'existe pas encore. Le bandeau est monté pour **toutes** les pages : le retirer ici seulement
+créerait l'incohérence que ce lot corrige. Décision séparée, **D93 candidate**.
+
+**Les quatre autres écrans d'authentification** gardent leur composition et leur discours —
+leur revue n'a pas eu lieu. Seule la règle RG-D92-1 leur a été appliquée, parce que c'est une
+règle et non une retouche d'écran.
+
+**Le délai réel d'arrivée du mail** n'a pas été mesuré en conditions réelles. Si l'envoi prend
+dix secondes, aucun travail de texte ne sauvera cet écran.
+
+---
+
+# D94 — L'email d'activation : ce qu'il montre de Yamba
+
+## Le besoin
+
+L'email d'activation est, pour beaucoup, **la première chose signée Yamba qui entre chez eux**.
+Il arrive dans une boîte où il côtoie des marques installées, et il n'a que quelques secondes
+pour ne pas ressembler à un message automatique de plus.
+
+Jusqu'ici il n'en portait pas le logo : seulement le mot « YAMBA » en capitales espacées, au
+même endroit — c'est-à-dire la troisième fois que le nom apparaissait à l'écran, après
+l'expéditeur affiché par le client mail et la mention de pied de page.
+
+## Les règles
+
+**RG-D94-1 — Un email porte la marque par un dessin, pas par la répétition de son nom.** Le
+nom est déjà dit par l'expéditeur et par le pied de page. Une troisième mention ne renforce
+rien : elle occupe la place.
+
+**RG-D94-2 — Une image dans un email s'affiche toujours, ou n'y est pas.** Une image chargée
+depuis un serveur distant ne paraît que si le client du destinataire accepte de la charger. Un
+logo visible une fois sur deux est pire qu'un email sans logo : il fait douter du reste.
+
+**RG-D94-3 — Un code de sécurité n'a pas l'air d'un coupon.** La bordure en tirets est le motif
+du ticket à découper. Un code d'activation est le contraire : une donnée à recopier vite, à ne
+transmettre à personne.
+
+**RG-D94-4 — Un email déclare ses couleurs.** Sans déclaration, les clients en mode sombre
+inversent ce qu'ils veulent — ici la carte blanche, pas le bandeau coloré : le message arrive à
+moitié retourné.
+
+**RG-D94-5 — Ce que l'email DIT et ce qu'on ENVOIE sont deux choses.** Le texte d'un email ne
+connaît ni pièce jointe ni fournisseur. Changer de fournisseur ne doit jamais obliger à
+réécrire une phrase.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je reçois l'email dans Gmail | le symbole Yamba s'affiche **sans que j'aie à autoriser les images** |
+| 2 | Je reçois l'email hors ligne, ou images bloquées | le symbole s'affiche quand même (il voyage AVEC le message) |
+| 3 | Je regarde la liste des pièces jointes | **aucun trombone** : l'image est dans le corps, pas à côté |
+| 4 | Je lis l'email en mode sombre | la carte et le bandeau sont cohérents, pas l'un inversé et l'autre non |
+| 5 | Je regarde le bloc du code | les six chiffres sont **centrés** dans leur cadre |
+| 6 | Je compte les mentions « Yamba » dans le corps | une de moins qu'avant — le dessin a remplacé le mot |
+| 7 | L'envoi passe par Resend | même rendu que par SMTP : une seule mise en page pour tous |
+
+## Ce qui reste hors de ce lot
+
+**L'email ne propose aucun bouton.** Le code doit être recopié à la main, même quand on lit son
+courrier sur l'appareil où l'on s'inscrit. Un lien d'activation direct existe déjà côté site :
+le brancher supprimerait cette recopie.
+
+**L'encadré d'expiration mélange deux messages** — « ce code expire dans 10 minutes », qui est
+une information neutre, et « si vous n'êtes pas à l'origine de cette demande, ignorez cet
+email », qui est un avertissement. Les présenter ensemble, en ambre, rend inquiétant ce qui ne
+l'est pas.
+
+Les deux touchent la **rédaction des quinze emails dans les deux langues** : lot à part.
+
+---
+
+## Amendement D92 — la largeur des pages d'inscription
+
+Retour de revue du 10/11 : *« le contenu doit rester en largeur entre le logo Yamba et
+Connexion ».*
+
+**RG-D92-9 — Le contenu d'une page s'aligne sur son en-tête.** Les deux pages d'inscription
+s'étendaient d'un bord à l'autre de l'écran, si bien que le logo et le lien de connexion
+étaient les deux seuls éléments à respecter une marge : plus l'écran était large, plus le
+désalignement se voyait.
+
+Appliqué aux **deux** pages — l'inscription et sa vérification sont deux étapes du même geste,
+et n'en aligner qu'une recréerait la rupture visuelle que D92 venait de supprimer.
+
+### Amendement du 10/11/2026 — RG-D92-10
+
+**RG-D92-10 — Une page du site n'a pas de cadre.** Ce qui est encadré se lit comme un objet
+posé sur la page : une carte, une fenêtre, quelque chose qu'on peut fermer. L'inscription n'est
+pas cela — elle **est** la page. Le contenu s'aligne sur l'en-tête, et s'arrête là : pas de
+bordure, pas de coins arrondis, pas de marge qui le détache du reste.
+
+La séparation entre les deux moitiés est déjà portée par le dégradé de la colonne de gauche. Un
+trait en plus ne sépare rien qui ne le soit déjà.
+
+| # | Situation | Attendu |
+|---|---|---|
+| 17 | J'ouvre l'inscription sur un grand écran | le contenu s'aligne sur le logo et sur « Connexion », **sans cadre autour** |
+
+---
+
+# D95 — Une seule écriture pour un seul produit
+
+## Le besoin
+
+Un Expéditeur qui s'inscrit sur le site puis ouvre l'application doit reconnaître **le même
+produit**. Les couleurs étaient les mêmes, les mots étaient les mêmes depuis D91 et D92 — mais
+pas l'écriture. Le site compose dans la police de la marque ; le téléphone composait dans celle
+du système, c'est-à-dire dans celle de tout le monde.
+
+Personne ne sait nommer ce qui cloche quand une écriture change. On dit « ça fait moins fini »,
+ou, comme ici trois fois de suite : **« c'est trop gras »**.
+
+## Les règles
+
+**RG-D95-1 — Les deux applications écrivent dans la même police.** Elle fait partie de la
+marque, au même titre que la mangue et le teal. Une application qui emprunte l'écriture du
+système ressemble au système, pas à Yamba.
+
+**RG-D95-2 — Une graisse porte un rôle, pas un nombre.** Corps, libellé, titre, bouton. On
+choisit « libellé » et la valeur suit ; on ne choisit pas « 500 » en espérant que ce soit un
+libellé.
+
+**RG-D95-3 — L'écriture est prête avant le premier mot affiché.** Sinon l'application s'ouvre
+dans une police et bascule dans une autre sous les yeux de la personne — sur le seul écran
+qu'elle ne peut pas fermer.
+
+**RG-D95-4 — Un bouton qui travaille ne change ni de taille ni de mot.** Il montre qu'il
+travaille, c'est tout. Changer le libellé donne un mot de plus à lire qui n'apprend rien ;
+changer la largeur fait sauter la page au moment où l'on vient de cliquer.
+
+**RG-D95-5 — Un bouton qui a réussi ne redevient pas cliquable.** Entre la réussite et l'écran
+suivant, il reste occupé. Le rendre disponible une fraction de seconde, c'est inviter au second
+envoi.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je passe du site à l'application | **la même écriture**, à la même épaisseur |
+| 2 | J'ouvre l'application | aucun changement de police après l'affichage |
+| 3 | Je compare un titre web et son jumeau mobile | même poids visuel, pas seulement même nombre |
+| 4 | Je valide un formulaire | le bouton garde **exactement** sa taille et son mot |
+| 5 | Je valide un formulaire | il montre qu'il travaille, et ne se laisse plus cliquer |
+| 6 | La validation réussit | il reste occupé jusqu'à l'écran suivant |
+| 7 | La validation échoue | il redevient disponible, et l'erreur est lisible |
+
+## Ce qui reste hors de ce lot
+
+**L'application n'a pas été ouverte sur Android** depuis la bascule — or c'est le système où un
+mauvais câblage de police se serait vu le plus nettement. Yamba publie Android d'abord : cette
+vérification est due.
+
+**Les italiques n'ont pas été embarquées.** Aucun écran n'en utilise aujourd'hui ; le jour où
+l'un en demandera, il faudra les charger plutôt que de laisser le système en fabriquer une en
+penchant les lettres.
+
+## Amendement du 11/11/2026 — le pied d'écran est un rôle, pas cinq décisions
+
+Trois écrans de l'application, et deux pages du site, portent la même ligne tout en bas :
+« Pas encore de compte ? », « Déjà un compte ? », « Plus tard ». Elle fait partout le même
+travail — **offrir une porte à qui n'est pas au bon endroit** — et s'écrivait partout
+différemment. Personne ne s'en plaint jamais nommément : on dit que l'application « n'a pas
+l'air finie ».
+
+**RG-D95-6 — Une ligne de sortie se compose de la même façon partout, dans les deux
+applications.** Même taille, même épaisseur : celle de la mention légale. Un bas d'écran
+n'a pas à se signaler — il doit se trouver quand on le cherche, et se taire sinon.
+
+**RG-D95-7 — L'encre, elle, dit l'intention.** Une sortie qui mène à l'écran jumeau
+(connexion ↔ inscription) prend la couleur de la marque ; une sortie qui **décline** une
+proposition (« Plus tard ») reste grise. Même gabarit, deux intentions — les confondre
+reviendrait à proposer et à refuser sur le même ton.
+
+### Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 8 | Je passe de la connexion à l'inscription, sur l'un ou l'autre support | la ligne du bas est **identique** des deux côtés |
+| 9 | Je compare les trois bas d'écran de l'application | une seule taille, une seule épaisseur |
+| 10 | Je regarde « Plus tard » sur l'écran de bienvenue | même gabarit que les deux autres, mais **gris** : il décline |
+| 11 | Un écran nouveau ajoute une ligne de sortie | il réemploie le gabarit ; recopier les valeurs est refusé par les fiches |

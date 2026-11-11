@@ -14,6 +14,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { useTranslations } from 'use-intl';
 
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 
 export const OTP_LENGTH = 6;
@@ -92,7 +93,9 @@ const styles = StyleSheet.create({
   },
   digit: {
     fontSize: 24,
-    fontWeight: 700,
+    // 600 : les chiffres restent nets sans devenir le centre de gravité de
+    // l'écran. Ce qui les désigne est la case et le focus, pas la graisse.
+    fontFamily: Font.semibold,
   },
   hidden: {
     position: 'absolute',

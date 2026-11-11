@@ -38,6 +38,7 @@ import { ReportSheet } from '@/components/report-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
@@ -1070,12 +1071,12 @@ const styles = StyleSheet.create({
   },
   route: {
     fontSize: 26,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   routeArrow: {
     color: Brand.mango,
     fontSize: 24,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1106,7 +1107,7 @@ const styles = StyleSheet.create({
   overline: {
     fontSize: 10,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
@@ -1170,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   dotHollow: {
     width: 12,
@@ -1189,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   placeCity: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   /* Voyageur */
   tripperRow: {
@@ -1239,7 +1240,7 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontSize: 26,
-    lineHeight: 32,
+    lineHeight: 36,
   },
   familyWrap: {
     flexDirection: 'row',
@@ -1337,7 +1338,7 @@ const styles = StyleSheet.create({
   },
   bottomPriceValue: {
     fontSize: 22,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   bottomCta: {
     backgroundColor: Brand.mango,

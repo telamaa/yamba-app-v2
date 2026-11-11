@@ -40,6 +40,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import YambaSymbol from '@/components/yamba-symbol';
 import { Spacing } from '@/constants/theme';
 import { Brand } from '@/constants/theme';
+import { FooterLine, Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     fontSize: 24,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
     letterSpacing: -0.5,
   },
   // NI l'un NI l'autre ne portent la gouttière : la typographie n'est pas une
@@ -211,14 +212,14 @@ const styles = StyleSheet.create({
   // bienvenue, bloc de contenu pour la porte d'identité.
   headline: {
     fontSize: 34,
-    lineHeight: 39,
-    fontWeight: 800,
+    lineHeight: 46,
+    fontFamily: Font.extrabold,
     letterSpacing: -0.8,
   },
   body: {
     fontSize: 16,
     lineHeight: 23,
-    fontWeight: 500,
+    fontFamily: Font.medium,
     marginTop: Spacing.three,
     /**
      * AUCUN plafond de mesure, et c'est un retrait (revue du 08/11, 23h12).
@@ -251,7 +252,7 @@ const styles = StyleSheet.create({
   },
   primaryLabel: {
     fontSize: 16,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   secondary: {
     borderRadius: 12,
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     fontSize: 16,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   tertiary: {
     minHeight: 44,
@@ -270,9 +271,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: Spacing.one,
   },
+  // « Plus tard » est un pied d'écran comme les deux autres (revue du 10/11)
+  // — même gabarit, et l'encre GRISE posée par l'appelant : les deux autres
+  // mènent à l'écran jumeau (connexion ↔ inscription), celui-ci DÉCLINE la
+  // proposition. Même gabarit, autre intention.
   tertiaryLabel: {
-    fontSize: 15,
-    fontWeight: 600,
+    ...FooterLine,
   },
   pressed: {
     opacity: 0.75,

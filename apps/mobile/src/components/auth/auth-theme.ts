@@ -59,24 +59,3 @@ export const AuthBrand = {
 /** Rayons et hauteurs des captures : cartes et CTA arrondis 12, PAS en pilule. */
 export const AuthRadius = 12;
 export const AuthFieldHeight = 52;
-
-/**
- * `egoiomab@gmail.com` → `e******b@g***.com` — le masquage de l'écran de
- * vérification du site : premier et dernier caractère du local, première
- * lettre du domaine, le TLD en clair.
- */
-export function maskEmail(email: string): string {
-  const at = email.indexOf('@');
-  if (at <= 0) return email;
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  const dot = domain.lastIndexOf('.');
-  const domainName = dot > 0 ? domain.slice(0, dot) : domain;
-  const tld = dot > 0 ? domain.slice(dot) : '';
-  const maskedLocal =
-    local.length <= 2
-      ? `${local[0] ?? ''}*`
-      : `${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}`;
-  const maskedDomain = `${domainName[0] ?? ''}${'*'.repeat(Math.max(1, Math.min(3, domainName.length - 1)))}`;
-  return `${maskedLocal}@${maskedDomain}${tld}`;
-}

@@ -2382,6 +2382,65 @@ Ordre de demarrage : auth -> trip -> gateway.
   paiement (il faut un build de developpement, Expo Go n'a aucun module natif),
   le suivi d'envoi et la notation.
 
+## Passe de finitions « page par page » (ouverte le 09/11/2026)
+
+Une page a la fois, capture en main, sur les DEUX fronts : revue UX/UI + metier,
+decision gravee au registre AVANT le code, puis mobile natif, page web jumelle,
+PR + docs cumulatifs.
+
+- Page 1 — l'INSCRIPTION (D91, `feat/finitions-inscription`, PR #404 ouverte le
+  09/11, amendee le 10/11) : mention de securite retiree, titre qui n'exclut
+  plus la moitie du public, confirmation du mot de passe supprimee du web,
+  parite des fournisseurs sociaux, hierarchie typographique, et l'ecran qui
+  tient sur un ecran.
+- Page 2 — la VERIFICATION DU CODE (D92, `feat/finitions-verification`,
+  empilee sur la precedente) : l'adresse en clair (`maskEmail` SUPPRIMEE des
+  deux fronts, 5 appels), la connexion enchainee cote web (le titre devient
+  vrai), la 6e frappe qui valide + le focus a l'arrivee, deux echecs WCAG
+  mesures et corriges, un seul compte a rebours, la colonne de gauche qui
+  cesse de vendre + « Ouvrir ma boite mail », et les ~40 ternaires de l'ecran
+  passes au dictionnaire. Mobile 494 -> 557 fiches.
+- Lots TRANSVERSES de la meme branche (ils ne portent pas sur UNE page, mais sur
+  ce que toutes les pages partagent) :
+  - D94 — le symbole de la marque entre dans les emails, en piece jointe inline,
+    et aux DEUX couleurs. Notification 122 -> 136 fiches.
+  - D95 — le telephone compose dans la police de la marque (Plus Jakarta Sans,
+    67 `fontWeight` de 23 fichiers devenus cinq familles nommees), le splash
+    attend les polices, le bouton qui travaille garde sa taille et son mot.
+    Trois amendements du 10/11 : interlignes, taille des libelles de boutons, et
+    « rien ne se monte avant les polices » (un ecran qui ne se monte pas ne
+    mesure rien).
+  - D95 6A (11/11) — le PIED D'ECRAN devient un gabarit nomme (`FooterLine`) :
+    cinq declarations pour un seul role (« Pas encore de compte ? », « Deja un
+    compte ? », « Plus tard », et les deux pieds du site). Le jeton porte la
+    taille, l'interligne et la police ; l'ENCRE reste a l'ecran, parce qu'elle
+    dit l'intention (mangue = la porte jumelle, gris = on decline).
+    Mobile 574 -> 598 fiches (33 suites).
+
+ETAT DE LA BRANCHE `feat/finitions-verification` au 11/11 : 33 commits, poussee,
+AUCUNE PR ouverte a ce jour, empilee sur #404 (D91). Mesures du 11/11 : mobile
+598 (33 suites), notification 136 (12 suites), `nx typecheck @yamba-app/mobile`
+vert sur ses DEUX programmes, `tsc --noEmit -p apps/user-ui` vert, controle i18n
+vert, aucun fichier d'env suivi. Les deux bundles Metro obtenus (ios 200 en
+48,7 s, android 200 en 47,0 s, 551 `__workletHash`) — avec `NODE_PATH=./node_modules`,
+sans quoi `expo start` meurt sur `Cannot find module 'expo-router/_ctx-shared'`
+(expo-router est NICHE sous apps/mobile, et c'est ce que font les scripts du
+package.json du mobile : ne pas lancer `npx expo start` nu).
+
+RESTE dans cette passe :
+- les QUATRE autres ecrans d'auth (connexion, mot de passe oublie, verification
+  de mot de passe, reinitialisation) : leur composition et leur discours n'ont
+  pas ete revus ; `AuthScreen.badge` est optionnel exprES pour cela.
+- **D93 candidate — « un tunnel n'offre pas la sortie »** : le `Header` du site
+  est monte sans condition par `app/[locale]/layout.tsx` et propose « Partager
+  un trajet » / « Connexion » au milieu de l'inscription. Decision de GABARIT,
+  elle concerne les six pages d'auth.
+- Dette i18n nommee par D91 : ~140 ternaires `fr ? … : …` dans les formulaires
+  d'auth du web (D92 en a retire ~40 pour l'ecran qu'elle touchait). Ces pages
+  sont invisibles au controle i18n de la CI tant qu'ils y restent.
+- Le delai reel d'arrivee du mail de verification n'a jamais ete mesure en
+  conditions reelles (Resend).
+
 ## Ce qui RESTE — Jalon 5 (iOS)
 
 - Meme base ; Sign in with Apple (obligatoire si login social), Apple Pay

@@ -1,19 +1,43 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Image from "next/image";
-import { CreditCard, ShieldCheck, UserCheck, type LucideIcon } from "lucide-react";
+import {
+  AtSign,
+  CreditCard,
+  Inbox,
+  ShieldCheck,
+  Timer,
+  UserCheck,
+  type LucideIcon,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 
 type Props = {
   visual: HeroVisual;
+  /**
+   * D92 1A — ce que la colonne RACONTE.
+   *
+   * `promises` (défaut) : les trois garanties produit de D45, qui servent
+   * l'ACQUISITION — elles ont leur place devant quelqu'un qui hésite encore.
+   *
+   * `waiting` : l'étape de vérification. Servir l'argumentaire à quelqu'un
+   * qui vient de signer, c'est vendre après la vente ; la colonne répond
+   * alors à la seule question du moment — « et si le mail n'arrive pas ? ».
+   */
+  variant?: "promises" | "waiting";
+  /** Le geste de la variante `waiting` (« Ouvrir ma boîte mail »). */
+  action?: ReactNode;
 };
 
 /** D45 — trois promesses PRODUIT vraies (CNF-05, capture manuelle D11, GAR-02), jamais un chiffre inventé. */
 type Promise = { icon: LucideIcon; title: string; text: string };
 
-export default function AuthHeroVisual({ visual }: Props) {
+export default function AuthHeroVisual({ visual, variant = "promises", action }: Props) {
   const { lang } = useUiPreferences();
+  const help = useTranslations("auth.otp.help");
   const fr = lang === "fr";
   const alt = fr ? visual.altFr : visual.altEn;
 
@@ -34,11 +58,26 @@ export default function AuthHeroVisual({ visual }: Props) {
     );
   }
 
-  // Mode illustration : gradient + accroche + illustration + promesses produit
-  const headline = fr ? "Le transport, c'est toi." : "Shipping, by the people.";
-  const subline = fr
-    ? "Yamba connecte celles et ceux qui envoient un colis à celles et ceux qui voyagent."
-    : "Yamba connects people who send a parcel with people who travel.";
+  // Mode illustration : gradient + accroche + illustration + trois points
+  const waiting = variant === "waiting";
+  const headline = waiting
+    ? help("headline")
+    : fr
+      ? "Le transport, c'est toi."
+      : "Shipping, by the people.";
+  const subline = waiting
+    ? help("subline")
+    : fr
+      ? "Yamba connecte celles et ceux qui envoient un colis à celles et ceux qui voyagent."
+      : "Yamba connects people who send a parcel with people who travel.";
+
+  // D92 1A — les trois réponses à « et si le mail n'arrive pas ? ». Elles
+  // remplacent l'argumentaire SUR CETTE ÉTAPE seulement.
+  const waitingPoints: Promise[] = [
+    { icon: Timer, title: help("delayTitle"), text: help("delayText") },
+    { icon: Inbox, title: help("spamTitle"), text: help("spamText") },
+    { icon: AtSign, title: help("addressTitle"), text: help("addressText") },
+  ];
 
   // Recette 03/09 (D45) : les « 12k+ Yambers / 48h / 4.8 » et le témoignage
   // fictif sont remplacés par ce que le produit garantit VRAIMENT.
@@ -85,18 +124,20 @@ export default function AuthHeroVisual({ visual }: Props) {
           d'importance ; l'illustration descend et redevient ce qu'elle est,
           un décor. */}
       <ul className="mt-6 space-y-2.5">
-        {promises.map((p) => (
+        {(waiting ? waitingPoints : promises).map((p) => (
           <li key={p.title} className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-[#0F766E] shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-teal-300 dark:ring-slate-800">
               <p.icon size={15} strokeWidth={2.2} aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold leading-tight text-slate-900 dark:text-white">{p.title}</p>
+              <p className="text-[13px] font-medium leading-tight text-slate-900 dark:text-white">{p.title}</p>
               <p className="mt-0.5 text-[12px] leading-snug text-slate-500 dark:text-slate-400">{p.text}</p>
             </div>
           </li>
         ))}
       </ul>
+
+      {action !== undefined && action !== null && <div className="mt-5">{action}</div>}
 
       {/* Illustration */}
       <div className="flex flex-1 items-center justify-center py-2">

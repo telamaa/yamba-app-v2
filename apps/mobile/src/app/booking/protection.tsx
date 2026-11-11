@@ -28,6 +28,7 @@ import { BookingStepFrame } from '@/components/booking/booking-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 import { currentPricingParams, loadPricingParams } from '@/lib/api/pricing.api';
 import { getPublicTrip, type PublicTrip } from '@/lib/api/trip.api';
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   rowTexts: { flex: 1, minWidth: 0, gap: 2 },
   hairline: { height: StyleSheet.hairlineWidth },
   amount: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
-  amountInput: { minWidth: 56, fontSize: 17, fontWeight: '700', textAlign: 'right', paddingVertical: 0 },
+  amountInput: { minWidth: 56, fontSize: 17, fontFamily: Font.bold, textAlign: 'right', paddingVertical: 0 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },

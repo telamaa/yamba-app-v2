@@ -45,6 +45,7 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { summaryLabel } from '@/lib/search-date';
@@ -429,13 +430,13 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 10,
     lineHeight: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   fieldValue: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

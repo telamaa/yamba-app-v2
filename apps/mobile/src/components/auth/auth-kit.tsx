@@ -16,8 +16,7 @@
  */
 import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 import {
-  Animated,
-  Easing,
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -30,6 +29,7 @@ import { Image } from 'expo-image';
 import { useTranslations } from 'use-intl';
 
 import { Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import {
   AuthBrand,
   AuthFieldHeight,
@@ -98,67 +98,7 @@ export function AuthTextField(props: TextInputProps & { ref?: Ref<TextInput> }) 
 
 /* ── CTA mangue ──────────────────────────────────────────────────────────── */
 
-const DOT_COUNT = 3;
-const DOT_CYCLE_MS = 900;
-const DOT_STAGGER_MS = 150;
 
-/**
- * L'attente des CTA : trois points qui respirent en VAGUE (le motif du
- * « typing indicator ») à la place du spinner système — `Animated` natif
- * (`useNativeDriver`), zéro dépendance. Chaque point monte, gonfle et
- * s'éclaire avec un décalage d'un tiers de cycle.
- */
-function LoadingDots({ color }: { color: string }) {
-  const values = useRef(
-    Array.from({ length: DOT_COUNT }, () => new Animated.Value(0))
-  ).current;
-
-  useEffect(() => {
-    const loops = values.map((value, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * DOT_STAGGER_MS),
-          Animated.timing(value, {
-            toValue: 1,
-            duration: DOT_CYCLE_MS / 3,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(value, {
-            toValue: 0,
-            duration: DOT_CYCLE_MS / 3,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.delay((DOT_COUNT - 1 - i) * DOT_STAGGER_MS),
-        ])
-      )
-    );
-    loops.forEach((loop) => loop.start());
-    return () => loops.forEach((loop) => loop.stop());
-  }, [values]);
-
-  return (
-    <View style={styles.dotsRow} accessibilityRole="progressbar">
-      {values.map((value, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.dot,
-            {
-              backgroundColor: color,
-              opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
-              transform: [
-                { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) },
-                { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) },
-              ],
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
 
 /**
  * Doctrine du désactivé (passes UX des 28/09) : `disabled` n'est permis que
@@ -188,17 +128,34 @@ export function AuthCta({
         disabled && !pending && { backgroundColor: palette.border },
         pressed && styles.dimmed,
       ]}>
-      {pending ? (
-        <LoadingDots color={palette.ctaLabel} />
-      ) : (
-        <Text
-          style={[
-            styles.ctaLabel,
-            { color: disabled ? palette.muted : palette.ctaLabel },
-          ]}>
-          {label}
-        </Text>
+      {/* D95 — le chargement moderne : le libellé ne DISPARAÎT pas, il
+          s'efface. Rendu à l'opacité 0, il continue d'occuper sa place, donc
+          la largeur du bouton ne bouge pas d'un pixel ; le disque se
+          superpose, centré. Trois choses qu'on évite ainsi, et qui se voient
+          toutes à l'œil nu :
+            • le SAUT de largeur quand « Créer mon compte » devient « … » ;
+            • le changement de LIBELLÉ (« Création… »), un mot de plus à lire
+              pour n'apprendre que ce que le disque dit déjà ;
+            • le bouton qui se vide, puis se remplit — deux animations là où
+              une seule suffit.
+          Au succès on NAVIGUE : le disque ne s'arrête jamais, il part avec
+          l'écran. C'est voulu — un bouton qui redevient cliquable une
+          fraction de seconde avant la navigation invite au double envoi. */}
+      {pending && (
+        <ActivityIndicator
+          size="small"
+          color={palette.ctaLabel}
+          style={StyleSheet.absoluteFill}
+        />
       )}
+      <Text
+        style={[
+          styles.ctaLabel,
+          { color: disabled ? palette.muted : palette.ctaLabel },
+          pending && styles.labelFaded,
+        ]}>
+          {label}
+      </Text>
     </Pressable>
   );
 }
@@ -347,6 +304,15 @@ export function AuthError({ message }: { message: string }) {
   return <Text style={styles.error}>{message}</Text>;
 }
 
+/**
+ * Les graisses de cette trousse suivent D91 5A (revue du 10/11, page 2) :
+ * titre 600, libellés 500, corps 400 — et UN SEUL élément en 700, le bouton.
+ * `ctaLabel` est donc le seul TEXTE en 700, et doit le rester : c'est ce qui
+ * le fait avancer pendant que le reste tient sa place. Restent lourds
+ * `failureGlyph` et `checkboxMark` — ce ne sont pas des textes mais des
+ * GLYPHES dessinés (une croix de 36 px, une coche de case), dont la graisse
+ * est un trait de dessin et non un niveau de lecture.
+ */
 const styles = StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
@@ -359,7 +325,7 @@ const styles = StyleSheet.create({
     // libellé de formulaire sur un téléphone se lit à bout de bras. Ce qui
     // s'aligne est la GRAISSE et l'encre, c'est-à-dire ce qui fait reculer.
     fontSize: 15,
-    fontWeight: 500,
+    fontFamily: Font.medium,
   },
   input: {
     height: AuthFieldHeight,
@@ -367,6 +333,10 @@ const styles = StyleSheet.create({
     borderRadius: AuthRadius,
     paddingHorizontal: Spacing.three,
     fontSize: 16,
+  },
+  /** Le libellé effacé GARDE sa place : c'est ce qui fige la largeur. */
+  labelFaded: {
+    opacity: 0,
   },
   cta: {
     backgroundColor: AuthBrand.mango,
@@ -377,21 +347,19 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   ctaLabel: {
-    fontSize: 17,
-    fontWeight: 700,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    // La hauteur de la ligne du libellé : le bouton ne bouge pas d'un pixel
-    // quand le texte cède la place aux points.
-    height: 24,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    // 15 et non 17 (revue du 10/11). Ce qui fait avancer ce bouton n'est pas
+    // la TAILLE de son texte : c'est l'aplat mangue, sa pleine largeur, ses
+    // 52 pt de haut et le fait d'être le SEUL élément en gras de l'écran
+    // (D91 5A). Le libellé n'a donc pas à crier par-dessus — et un bouton
+    // dont le texte dépasse ses voisins d'un tiers a l'air d'un bouton de
+    // système d'exploitation, pas d'un produit. La zone tactile ne change
+    // pas d'un pixel : elle tient à la hauteur du bouton, pas à son texte.
+    //
+    // Reste un cran AU-DESSUS du site (14 px) : même rôle, autre distance de
+    // lecture — un téléphone se lit à bout de bras (D91 5A).
+    fontSize: 15,
+    lineHeight: 21,
+    fontFamily: Font.bold,
   },
   divider: {
     flexDirection: 'row',
@@ -404,8 +372,12 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   dividerLabel: {
-    fontSize: 12,
-    fontWeight: 700,
+    // « OU CONTINUER AVEC » n'est pas une information : c'est une CHARNIÈRE
+    // entre deux façons de s'inscrire. Il doit se lire une fois et disparaître
+    // — 11 px, gris, et 400 : l'interlettrage et les deux filets font seuls le
+    // travail de séparation, la graisse n'y ajoutait qu'un bruit.
+    fontSize: 11,
+    fontFamily: Font.regular,
     letterSpacing: 1.5,
   },
   methodButton: {
@@ -422,8 +394,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   methodLabel: {
-    fontSize: 16,
-    fontWeight: 600,
+    // 14 et non 16 (revue du 10/11) : sur l'inscription ces boutons vont par
+    // DEUX, côte à côte (D91 7A), et chacun n'a donc que la moitié de la
+    // colonne. « Facebook » y tenait de justesse — il suffisait d'une langue
+    // plus longue, ou d'une taille de texte système augmentée, pour que le
+    // mot se coupe. 14 rend la marge que la disposition à deux colonnes avait
+    // prise, et le logo porte l'identification de toute façon.
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: Font.medium,
   },
   failure: {
     flex: 1,
@@ -441,15 +420,15 @@ const styles = StyleSheet.create({
   },
   failureGlyph: {
     fontSize: 36,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   failureTexts: {
     gap: Spacing.two,
   },
   failureTitle: {
     fontSize: 26,
-    lineHeight: 32,
-    fontWeight: 800,
+    lineHeight: 36,
+    fontFamily: Font.semibold,
     textAlign: 'center',
   },
   failureBody: {
@@ -473,18 +452,22 @@ const styles = StyleSheet.create({
   checkboxMark: {
     color: '#0F172A',
     fontSize: 13,
-    fontWeight: 800,
+    fontFamily: Font.extrabold,
   },
   checkboxTexts: {
     flex: 1,
     gap: 2,
   },
   checkboxLabel: {
-    fontSize: 15,
-    lineHeight: 21,
+    // 13 px (revue du 10/11) : la mention légale est la plus longue ligne de
+    // l'écran et la moins décisive. À 15 px elle pesait autant que les champs
+    // qu'il faut remplir ; à 13 elle reste parfaitement lisible et rend sa
+    // place à ce qui demande un geste. Les deux liens gardent leur encre.
+    fontSize: 13,
+    lineHeight: 19,
     // 400 et non 500 (revue du 10/11) : un libellé de case à cocher est du
     // texte courant, pas un titre. Il est long, il se lit, il ne s'annonce pas.
-    fontWeight: 400,
+    fontFamily: Font.regular,
   },
   checkboxHelper: {
     fontSize: 13,
@@ -492,7 +475,7 @@ const styles = StyleSheet.create({
   },
   tealLink: {
     fontSize: 15,
-    fontWeight: 600,
+    fontFamily: Font.medium,
   },
   underline: {
     textDecorationLine: 'underline',

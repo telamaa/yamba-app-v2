@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
+import { setPendingPassword } from "@/lib/auth/register-flow-state";
 import GoogleSignInButton from "@/components/auth/shared/GoogleSignInButton";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -79,7 +80,6 @@ function buildCopy(lang: string) {
     emailPh: "marielove@email.com",
     password: fr ? "Mot de passe" : "Password",
     cta: fr ? "Créer mon compte" : "Create my account",
-    ctaLoading: fr ? "Création…" : "Creating…",
     haveAccount: fr ? "Déjà membre ?" : "Already a member?",
     login: fr ? "Connecte-toi" : "Sign in",
     showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
@@ -180,6 +180,12 @@ export default function RegisterForm({ heroVisual }: Props) {
       // 🔒 SÉCURITÉ : token + email écrits en sessionStorage AVANT la redirection
       sessionStorage.setItem("register_verification_token", String(data.verificationToken));
       sessionStorage.setItem("register_verification_email", normalizedEmail);
+
+      // D92 3A — le mot de passe reste en MÉMOIRE DE MODULE (jamais en
+      // stockage, jamais dans l'URL) pour que l'écran de vérification puisse
+      // enchaîner la connexion, comme le fait le téléphone. Un rechargement
+      // le perd : le repli est la connexion préremplie.
+      setPendingPassword(normalizedEmail, variables.password);
       if (redirectTo) sessionStorage.setItem(REGISTER_REDIRECT_KEY, redirectTo);
       else sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
 
@@ -294,7 +300,23 @@ export default function RegisterForm({ heroVisual }: Props) {
     "dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]";
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
+    <main className="mx-auto w-full max-w-7xl px-4">
+      {/* D92 — la largeur du contenu est celle de l'EN-TÊTE : `mx-auto
+          max-w-7xl px-4`, la même ligne que `Header.tsx:99`. La page partait
+          auparavant bord à bord, si bien que le logo et « Connexion » étaient
+          les deux seuls éléments à respecter une marge : rien en dessous ne
+          s'alignait sur eux, et la colonne de gauche touchait le bord de
+          l'écran sur un grand moniteur.
+
+          AUCUNE BORDURE, AUCUN COIN ARRONDI, AUCUNE MARGE VERTICALE (revue du
+          10/11) : le contenu s'INCRUSTE dans la page. Un cadre ferait de
+          l'inscription un objet POSÉ sur le site — une carte, une fenêtre —
+          là où elle en est une page. Le dégradé de la colonne de gauche
+          suffit à séparer les deux moitiés ; un trait en plus ne sépare rien
+          qui ne le soit déjà, il ajoute seulement une frontière à lire.
+          `overflow-hidden` est parti avec les coins : il n'était là que pour
+          les rogner, et il met en péril tout `position: sticky` à venir. */}
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — visuel desktop */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} />
@@ -490,7 +512,11 @@ export default function RegisterForm({ heroVisual }: Props) {
                   className="mt-1 h-4 w-4 flex-shrink-0 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
                   {...register("termsAccepted", { required: copy.requiredTerms })}
                 />
-                <span className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                {/* Revue du 10/11 — la mention légale RECULE : c'est la plus longue
+                    ligne de l'écran et la moins décisive. Elle garde sa taille (le
+                    web lit plus près que le téléphone) et prend l'encre des
+                    textes secondaires, au lieu de celle du corps. */}
+                <span className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                   {copy.cguTextStart}{" "}
                   <Link
                     href="/legal/terms"
@@ -531,16 +557,27 @@ export default function RegisterForm({ heroVisual }: Props) {
             <button
               type="submit"
               disabled={registerMutation.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
+              aria-busy={registerMutation.isPending}
+              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {registerMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {copy.ctaLoading}
-                </>
-              ) : (
-                copy.cta
+              {/* D95 — le libellé s'EFFACE, il ne disparaît pas : rendu à
+                  l'opacité 0 il garde sa place, donc la largeur du bouton ne
+                  bouge pas d'un pixel, et le disque se superpose au centre.
+                  Pas de changement de libellé non plus (« Création… » est un
+                  mot de plus à lire pour n'apprendre que ce que le disque dit
+                  déjà). Au succès on NAVIGUE : le disque ne s'arrête jamais —
+                  un bouton qui redevient cliquable une fraction de seconde
+                  avant la navigation invite au double envoi. */}
+              {registerMutation.isPending && (
+                <Loader2
+                  size={18}
+                  aria-hidden
+                  className="absolute inset-0 m-auto animate-spin"
+                />
               )}
+              <span className={registerMutation.isPending ? "opacity-0" : undefined}>
+                {copy.cta}
+              </span>
             </button>
           </form>
 
@@ -553,7 +590,7 @@ export default function RegisterForm({ heroVisual }: Props) {
               fonctionne. */}
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="text-[10px] font-normal uppercase tracking-wider text-slate-400 dark:text-slate-500">
               {copy.orSocial}
             </span>
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -571,16 +608,17 @@ export default function RegisterForm({ heroVisual }: Props) {
             </button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-6 text-center text-[13px] text-slate-500 dark:text-slate-400">
             {copy.haveAccount}{" "}
             <Link
               href={loginHref}
-              className="font-medium text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+              className="text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.login}
             </Link>
           </p>
         </div>
+      </div>
       </div>
     </main>
   );

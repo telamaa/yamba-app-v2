@@ -25,6 +25,7 @@ import { AuthScreen } from '@/components/auth/auth-screen';
 import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
 import { PasswordInput } from '@/components/auth/password-input';
 import { Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { ApiError } from '@/lib/api/client';
 import { getLoginEmail, setLoginEmail } from '@/lib/auth-flow-state';
 import { isValidEmail } from '@/lib/email';
@@ -163,14 +164,14 @@ const styles = StyleSheet.create({
   emailChipText: {
     flex: 1,
     fontSize: 16,
-    fontWeight: 600,
+    fontFamily: Font.semibold,
   },
   changeEmail: {
     fontSize: 14,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   forgotLink: {
     fontSize: 15,
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
 });

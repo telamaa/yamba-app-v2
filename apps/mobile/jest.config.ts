@@ -39,12 +39,22 @@ export default {
   // Metro, et c'est justement pour cela que ses modules RECOPIENT les
   // constantes du contrat — ce que les fiches peuvent enfin comparer.
   moduleNameMapper: {
+    // D95 — la police de la marque est EMBARQUÉE : `constants/typography.ts`
+    // importe cinq `.ttf`. Metro les transforme en identifiants ; Node jette.
+    // Le bouchon rend ce que Metro rendrait, et les fiches peuvent vérifier
+    // que chaque niveau pointe un actif sans rien savoir de son contenu.
+    '\\.(ttf|otf|woff2?|png|jpe?g|gif|webp)$': '<rootDir>/src/test-support/asset-stub.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@packages/api-contracts$': '<rootDir>/../../packages/libs/api-contracts/src/index.ts',
     '^@packages/api-contracts/locale$': '<rootDir>/../../packages/libs/api-contracts/src/locale.ts',
     '^@packages/pricing$': '<rootDir>/../../packages/libs/pricing/src/index.ts',
     '^@packages/legal/versions$': '<rootDir>/../../packages/libs/legal/versions.ts',
   },
+  // D95 — `@expo-google-fonts/*` est publié en ESM (un `export const` par
+  // fichier de police, généré). jest ignore `node_modules` par défaut : sans
+  // cette exception, il bute sur le premier `export`. C'est le SEUL paquet
+  // exempté, et volontairement nommé plutôt que couvert par un motif large.
+  transformIgnorePatterns: ['node_modules/(?!@expo-google-fonts/)'],
   setupFiles: ['<rootDir>/jest.setup.ts'],
   coverageDirectory: '../../coverage/apps/mobile',
 };

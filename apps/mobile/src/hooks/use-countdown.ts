@@ -30,9 +30,18 @@ export function useCountdown(initialSeconds = 0): [number, (seconds: number) => 
   return [seconds, restart];
 }
 
-/** `754` → `12:34` — l'affichage des trois compteurs OTP. */
+/**
+ * `754` → `12:34`, `29` → `00:29` — l'affichage des compteurs OTP.
+ *
+ * Les minutes sont COMPLÉTÉES (D92) : le site écrivait `09:41` et le
+ * téléphone `9:29` pour la même mécanique, parce que ce `padStart` manquait
+ * ici. Un compteur qui change de largeur en passant sous la minute fait
+ * sautiller la ligne qui le porte — et personne ne lit « 9:29 » et « 09:41 »
+ * comme le même objet.
+ */
 export function formatMMSS(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
+  const safe = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }

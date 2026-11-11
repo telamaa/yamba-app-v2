@@ -6,9 +6,11 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-rout
 import { Animated, useColorScheme } from 'react-native';
 
 import { useLinkingURL } from 'expo-linking';
+import { useFonts } from 'expo-font';
 
 import { AppSplash } from '@/components/app-splash';
 import { Brand } from '@/constants/theme';
+import { FONT_ASSETS } from '@/constants/typography';
 import { AppIntlProvider } from '@/i18n/provider';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { handleStripeRedirect } from '@/lib/stripe-sheet';
@@ -55,6 +57,9 @@ function LaunchGate() {
   const [splashGone, setSplashGone] = useState(false);
 
   useEffect(() => {
+    // Les polices sont forcément prêtes ici : `RootLayout` ne monte pas cet
+    // arbre avant (voir son amendement du 10/11). Ce garde-fou ne porte donc
+    // que sur l'amorçage de la SESSION.
     if (status === 'loading' || decided.current) return;
     decided.current = true;
     if (status === 'anonymous' && !isWelcomeDismissed()) {
@@ -85,9 +90,32 @@ function LaunchGate() {
 // (idiomatique iOS ; sur Android, une feuille pleine page). La session vit au
 // niveau racine : les onglets, la porte d'identité et les badges la partagent.
 export default function RootLayout() {
+  // D95 — les cinq graisses de Plus Jakarta Sans. Une famille absente ne
+  // JETTE pas : React Native retombe en silence sur la police système, d'où
+  // la fiche qui confronte les noms aux fichiers.
+  const [fontsReady] = useFonts(FONT_ASSETS);
   const colorScheme = useColorScheme();
   const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, primary: Brand.mango } };
+
+  // RIEN ne se monte avant les polices — et c'est un AMENDEMENT du 10/11,
+  // payé en recette sur les deux simulateurs (« textes toujours tronqués :
+  // name, account… »).
+  //
+  // La première version ne retenait que l'AFFICHAGE du splash. Les écrans se
+  // montaient donc dessous, MESURAIENT leurs textes avec la police encore
+  // système — SF Pro, plus étroite — puis se redessinaient en Plus Jakarta
+  // quand les fichiers arrivaient. React Native ne re-mesure pas un texte
+  // dont seule la police a changé : la boîte gardait la largeur de l'ANCIENNE
+  // et le dernier glyphe sortait du cadre. « Password » rendait « Passworc »,
+  // « Create an account » rendait « Create an accour ». Seules les chaînes
+  // dont l'écart franchissait un pixel étaient touchées, ce qui donnait au
+  // défaut une allure capricieuse — et masquait sa cause.
+  //
+  // Un écran qui ne se monte pas ne mesure rien. C'est la seule garantie
+  // solide : tout le reste revient à espérer que la mesure arrive après le
+  // chargement.
+  if (!fontsReady) return <AppSplash />;
 
   return (
     <AppIntlProvider>

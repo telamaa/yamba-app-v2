@@ -20,6 +20,8 @@ export * from "./recipient"; // D35 4A — ANO-ADM-10 / 11 : une seule règle de
 import ejs from "ejs";
 import path from "path";
 import { LAYOUT_EJS, NOTICE_STYLES, type EmailContent } from "./layout";
+import { LOGO_CID, LOGO_PNG_BASE64 } from "./logo";
+import type { InlineImage } from "./provider";
 
 export type { EmailContent, EmailNoticeTone } from "./layout";
 
@@ -94,11 +96,23 @@ export function renderTransactionalEmail(email: Pick<TransactionalEmail, "locale
     content: email.content,
     noticeStyle,
     year: new Date().getFullYear(),
+    logoCid: LOGO_CID,
   });
+}
+
+/**
+ * La pièce jointe que le `cid` du gabarit référence (D94).
+ *
+ * Exportée : les fiches la comparent au `src` rendu, et c'est le seul lien
+ * entre les deux — un `cid` renommé d'un côté et pas de l'autre donnerait un
+ * email avec une image cassée ET une pièce jointe en trombone.
+ */
+export function layoutInlineImages(): InlineImage[] {
+  return [{ cid: LOGO_CID, filename: "yamba.png", contentType: "image/png", base64: LOGO_PNG_BASE64 }];
 }
 
 /** Envoie un email rendu par le gabarit partagé. */
 export async function sendTransactionalEmail(email: TransactionalEmail): Promise<SendResult> {
   const html = renderTransactionalEmail(email);
-  return getEmailProvider().send({ from: getFromAddress(), to: email.to, subject: email.subject, html, tags: email.tags, idempotencyKey: email.idempotencyKey });
+  return getEmailProvider().send({ from: getFromAddress(), to: email.to, subject: email.subject, html, tags: email.tags, idempotencyKey: email.idempotencyKey, inlineImages: layoutInlineImages() });
 }

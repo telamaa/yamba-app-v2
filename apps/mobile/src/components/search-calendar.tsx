@@ -26,6 +26,7 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -256,11 +257,11 @@ const styles = StyleSheet.create({
   },
   dayLabel: {
     fontSize: 15,
-    lineHeight: 20,
-    fontWeight: 500,
+    lineHeight: 21,
+    fontFamily: Font.medium,
   },
   dayStrong: {
-    fontWeight: 700,
+    fontFamily: Font.bold,
   },
   past: {
     opacity: 0.35,
