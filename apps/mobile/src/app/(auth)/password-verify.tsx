@@ -24,7 +24,7 @@ export default function PasswordVerifyScreen() {
 
   if (pendingReset === null) {
     return (
-      <AuthScreen badge={t('otp.badge')} title="">
+      <AuthScreen title="">
         <AuthFailureView
           title={t('failure.title')}
           body={t('otp.flowLost')}
@@ -42,7 +42,7 @@ export default function PasswordVerifyScreen() {
   };
 
   return (
-    <AuthScreen badge={t('otp.badge')} title={t('otp.title')} subtitle={t('otp.sentToIfExists')}>
+    <AuthScreen title={t('otp.title')} subtitle={t('otp.sentToIfExists')}>
       <OtpVerifyView
         email={pendingReset.email}
         onVerifyAction={onVerify}

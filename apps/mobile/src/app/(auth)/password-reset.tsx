@@ -2,10 +2,11 @@
  * (auth)/password-reset.tsx — le nouveau mot de passe (A208, refonte sur
  * captures).
  * ======================================================================
- * La dernière étape du parcours oublié, dans la composition du site :
- * badge « Récupération sécurisée », UN champ avec œil et jauge des 8
- * critères (pas de confirmation — même divergence mobile assumée que
- * l'inscription : l'œil + l'autofill la rendent inutile), CTA mangue.
+ * La dernière étape du parcours oublié, dans la composition du site : UN
+ * champ avec œil et jauge des 8 critères (pas de confirmation — l'œil et le
+ * remplissage automatique la rendent inutile, et D97 l'a retirée du site à
+ * son tour), CTA mangue. La pastille de sécurité auto-décernée qu'il portait
+ * est partie avec D97 (règle D91 1A).
  * Jeton absent ou expiré
  * (`RESET_SESSION_EXPIRED`, 15 min, consommé au premier essai transformé) :
  * un état dédié propose de recommencer. Succès → la connexion, préremplie,
@@ -35,7 +36,7 @@ export default function PasswordResetScreen() {
 
   if (pendingReset === null || pendingReset.passwordResetToken === null || sessionExpired) {
     return (
-      <AuthScreen badge={t('forgot.badge')} title="">
+      <AuthScreen title="">
         <AuthFailureView
           title={t('failure.title')}
           body={t('reset.sessionExpired')}
@@ -59,7 +60,9 @@ export default function PasswordResetScreen() {
       case 'PASSWORD_STATE_CHANGED':
         return t('reset.errors.PASSWORD_STATE_CHANGED');
       default:
-        return err.message;
+        // Jamais le message brut de l'API : il est en anglais, et il peut
+        // être reformulé côté serveur sans que rien ne le dise (D96 4A).
+        return t('reset.errors.generic');
     }
   };
 
@@ -94,7 +97,7 @@ export default function PasswordResetScreen() {
   };
 
   return (
-    <AuthScreen badge={t('forgot.badge')} title={t('reset.title')} subtitle={t('reset.subtitle')}>
+    <AuthScreen title={t('reset.title')} subtitle={t('reset.subtitle')}>
       <FieldLabel>{t('reset.passwordLabel')}</FieldLabel>
       <PasswordInput
         autoComplete="new-password"
