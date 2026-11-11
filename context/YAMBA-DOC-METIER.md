@@ -8612,3 +8612,48 @@ n'avait pas été appliqué à la connexion).
 | 6 | Mon compte est suspendu | on me le dit, au lieu d'un message générique |
 | 7 | Mon mot de passe fait 6 caractères (compte ancien) | l'écran l'envoie : c'est le serveur qui répond |
 | 8 | Ma session expire au milieu d'une action | la fenêtre propose **le même** parcours en deux temps, et la page ne bouge pas |
+
+# D97 — Retrouver son mot de passe, sans que l'écran en dise trop
+
+## Le besoin
+
+Trois écrans que personne ne regarde quand tout va bien, et que tout le monde regarde le jour
+où il est bloqué dehors. Ils doivent être **exactement aussi soignés** que l'inscription — or
+l'écran du code y était resté dans sa version d'avant la refonte, parce qu'il en existait une
+seconde copie que rien ne signalait.
+
+## Les règles
+
+**RG-D97-1 — L'écran de saisie du code est le même pour tous les parcours.** Inscription ou mot
+de passe oublié : mêmes cases, même aide, même compte à rebours. Une amélioration profite aux
+deux, un défaut se corrige une fois.
+
+**RG-D97-2 — Le parcours « mot de passe oublié » ne révèle jamais qu'un compte existe.** La
+phrase est conditionnelle (« si un compte existe, un code a été envoyé à… ») et le message est
+identique que l'adresse soit connue ou non.
+
+**RG-D97-3 — Un seul champ de mot de passe, et le collage est autorisé.** La confirmation
+double le risque de faute sur un champ qu'on ne relit pas ; interdire le collage écarte les
+mots de passe générés par un gestionnaire, c'est-à-dire les meilleurs.
+
+**RG-D97-4 — Une étape expirée propose de recommencer, elle n'affiche pas une erreur.** Et elle
+le sait parce que le serveur le dit, pas parce qu'un mot anglais apparaît dans une phrase.
+
+**RG-D97-5 — L'adresse reste visible d'un bout à l'autre du parcours** — jusqu'à l'écran du
+nouveau mot de passe, qui dit pour quel compte on le change.
+
+**RG-D97-6 — Les exigences du mot de passe sont les mêmes à l'inscription et à la
+réinitialisation.** Une seule définition : si elle change, elle change partout.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je demande un code avec une adresse inconnue | le même écran et le même message qu'avec une adresse connue |
+| 2 | Je saisis le 6ᵉ chiffre | la vérification part d'office, sans cliquer |
+| 3 | Je colle le code reçu | les six cases se remplissent |
+| 4 | Je ne reçois rien | sous 20 s l'écran annonce le délai normal ; ensuite seulement il parle des spams ; le renvoi apparaît quand il devient possible |
+| 5 | J'arrive à l'écran du nouveau mot de passe | mon adresse y est écrite, et il n'y a qu'un seul champ |
+| 6 | Je colle un mot de passe généré | il est accepté |
+| 7 | Mon étape a expiré | un écran dédié propose de redemander un code |
+| 8 | Je choisis un mot de passe trop faible | l'écran nomme le critère manquant — le même qu'à l'inscription |

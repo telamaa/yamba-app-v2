@@ -8247,3 +8247,113 @@ changement de **structure**, si.
   un lecteur d'écran, et pour un test.
 - **Codes d'erreur contractuels** — RFC 7807 (*problem+json*) et ce qu'elle formalise de ce que
   fait ici `details.code`.
+
+## Chapitre 236 — Le jumeau qu'on n'a pas cherché, le test qui réclame au lieu de se taire, et le harnais hors CI
+
+Page 4 de la passe. Le lot tient en une phrase : **D92 avait corrigé un écran, pas une
+classe d'écrans.** Cinq techniques en sortent.
+
+### 1. Après chaque refonte, chercher les jumeaux — avant de la déclarer finie
+
+D92 a refondu l'écran de saisie du code avec soin : adresse en clair, 6ᵉ frappe qui valide,
+cases visibles au sens WCAG, un seul compte à rebours, aide différée. Tout cela est vrai, et
+tout cela n'a profité qu'à **la moitié** des utilisateurs : le même écran existait à six cents
+lignes de là, pour le parcours « mot de passe oublié ».
+
+Comment le voir ? Trois signaux, tous disponibles le jour de D92 :
+
+```sh
+# ① deux fichiers qui parlent le même vocabulaire
+grep -rl "OTP_LENGTH\|RESEND_COOLDOWN" apps/user-ui/src
+# ② l'autre front, qui a peut-être déjà tranché
+ls apps/mobile/src/components/auth/           # otp-verify-view.tsx, partagé depuis A208
+# ③ la taille : deux fichiers de 700-800 lignes dans le même dossier se ressemblent souvent
+wc -l apps/user-ui/src/components/auth/forms/*.tsx | sort -n
+```
+
+> **La question à poser après une refonte n'est pas « est-ce bien fait ? » mais « combien
+> d'autres endroits font la même chose ? »** — et l'autre plateforme est souvent la réponse :
+> si elle n'a qu'un écran là où vous en avez deux, c'est elle qui a raison.
+
+### 2. Extraire sans tout casser : ce qui reste à l'appelant
+
+La règle d'extraction tient en une question posée à chaque morceau : **est-ce le PARCOURS, ou
+est-ce l'ÉCRAN ?**
+
+| Reste à l'appelant | Part dans la vue |
+|---|---|
+| d'où vient l'adresse (jeton, session) | les six cases, le clavier, le collage |
+| ce que « vérifier » appelle, et la suite | les deux minuteries, le verrou, les essais restants |
+| ce que « Modifier » détruit (confirmation ou non) | le bloc de renvoi en trois temps, la boîte mail |
+| la phrase qui révèle — ou non — qu'un compte existe | les contrastes, les états, le bouton |
+
+C'est ce qui évite le piège inverse : un composant « configurable » à vingt props qui finit par
+contenir les deux parcours sous forme de `if`.
+
+### 3. Un test qui change d'adresse ne devient pas faux — il devient rouge
+
+Sept fiches de D92 sont passées au rouge à l'extraction : elles cherchaient `showValidity(`
+dans `RegisterVerifyForm.tsx`, qui ne l'appelle plus.
+
+```ts
+const FORMULAIRE_WEB = join(WEB, 'src/components/auth/shared/OtpVerifyView.tsx'); // ← l'adresse
+const APPELANT_WEB  = join(WEB, 'src/components/auth/forms/RegisterVerifyForm.tsx');
+```
+
+Une fiche qui tient une règle **par son lieu** est un contrat avec l'arborescence : elle
+réclame dès qu'on déplace. C'est inconfortable et c'est le but — l'alternative (chercher
+« quelque part dans `src/` ») laisse une règle disparaître sans bruit.
+
+Et l'assertion qui mérite d'être recopiée partout :
+
+```ts
+expect(paragraphe).not.toBe('');   // l'extraction a trouvé quelque chose
+expect(paragraphe).toContain(…);   // et ce quelque chose est correct
+```
+
+### 4. Le client qui réinvente ce que le serveur dit déjà
+
+Quatre occurrences dans trois écrans, toutes du même geste :
+
+```ts
+if (data?.message?.toLowerCase().includes("expired")) setSessionExpired(true);   // ❌ la prose
+if (details?.code === "RESET_SESSION_EXPIRED") setSessionExpired(true);          // ✅ le contrat
+```
+
+```ts
+const baseChecksOk = password.length >= 8 && /[a-z]/.test(password) && …;        // ❌ la copie
+const manquant = firstFailingCheck(getPasswordChecks(password, contexte));        // ✅ la source
+```
+
+Le second cas est le plus sournois : la jauge affichée **sous le champ** utilisait déjà la
+source commune. L'écran pouvait donc afficher huit critères verts et refuser quand même, le
+jour où les deux définitions auraient divergé d'un caractère spécial.
+
+### 5. Un harnais hors CI vieillit sans prévenir
+
+```sh
+git log -S "OTP digit" -- apps/user-ui     # → D92, la veille : le nom a disparu
+git log -S "OTP digit" -- apps/e2e         # → il y a deux mois : les fiches le demandent encore
+```
+
+Trois chapitres cherchaient un élément qui n'existait plus depuis vingt-quatre heures. Aucun
+contrôle ne l'a dit, parce que le harnais navigateur **n'est pas une vérification de CI** : il
+se joue à la main, pendant une campagne de recette.
+
+Deux parades, toutes deux appliquées ici :
+
+1. **un helper par geste** (`saisirLesCases`, `remplirConnexion`) : le jour où l'écran change,
+   il y a UN endroit à corriger, pas huit — et l'oubli devient improbable ;
+2. **mettre à jour le harnais dans le MÊME lot** que le changement d'écran, en premier et non
+   en dernier. Une fiche de recette périmée ne coûte rien le jour où on l'écrit, et coûte une
+   demi-journée de doute le jour où on la rejoue.
+
+### 6. Pour aller plus loin
+
+- **Component extraction** — la différence entre *lifting state up* et *lifting rendering up*,
+  et pourquoi la seconde demande de nommer les parcours.
+- **`aria-label` comme contrat de test** — ce que l'on gagne à viser le nom accessible plutôt
+  qu'un `data-testid` : le test échoue quand l'écran devient inutilisable au lecteur d'écran.
+- **Anti-énumération** (OWASP WSTG-IDNT-04) — pourquoi « si un compte existe » n'est pas une
+  tournure de politesse mais une exigence, et ce que le serveur fait pour la tenir (temps de
+  réponse constant, message unique).
