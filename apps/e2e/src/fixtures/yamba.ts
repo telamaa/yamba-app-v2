@@ -104,8 +104,13 @@ export async function connexion(page: Page, compte: Compte, motDePasse = MOT_DE_
   const tenter = async (): Promise<boolean> => {
     await page.goto("/fr/login", { waitUntil: "domcontentloaded" });
     await page.waitForResponse((r) => r.url().includes("/api/"), { timeout: 30_000 }).catch(() => undefined);
+    // D96 — la connexion du site a DEUX marches, comme celle du téléphone : l'adresse, sa
+    // confirmation, puis le mot de passe. Le harnais les monte explicitement : un `#password`
+    // introuvable ne veut plus dire « page non hydratée » mais « on est resté à l'étape 1 ».
     const formulaire = page.locator("main form").first();
     await formulaire.locator("#email").fill(compte.email);
+    await formulaire.locator("button[type=submit]").click();
+    await page.getByRole("dialog").getByRole("button", { name: "Confirmer" }).click();
     await formulaire.locator("#password").fill(motDePasse);
     if (options.memoriser) await formulaire.locator('input[type="checkbox"]').check();
     const reponse = page
