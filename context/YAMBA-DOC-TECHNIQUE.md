@@ -17013,3 +17013,106 @@ Mobile : **574 → 598** fiches (33 suites). `tsc -p tsconfig.json && -p tsconfi
 > deux). C'est **exactement** le travail du contrôle « TypeScript (fiches de test) », et c'est
 > le rappel que les huit autres jobs de typage **excluent** les `*.spec.ts`. Corrigé en
 > annotant la liste `ReadonlyArray<[string, string]>`.
+
+# D96 — La connexion du site adopte le parcours du téléphone
+
+*Page 3 de la passe de finitions « page par page ». Premier lot où le **mobile est la
+référence** : l'arbitrage du 11/11 dit « adapter le site au workflow mobile », à l'inverse de
+ce qui était recommandé.*
+
+## ① Ce qui n'allait pas, et que personne n'avait signalé
+
+Deux écrans jumeaux, deux produits différents :
+
+| | Mobile | Site (avant) |
+|---|---|---|
+| Parcours | adresse → confirmation → mot de passe | un seul formulaire |
+| Ordre | social **sous** le formulaire | social **au-dessus** — alors que l'inscription du même site les met dessous |
+| Titre | « Heureux de te revoir » | « Connecte-toi » |
+| Refus | `details.code` (RG-MOB-1) | **18 chaînes anglaises normalisées** |
+| Textes | dictionnaire | ~45 ternaires `fr ? … : …` |
+
+Quatre défauts de fond s'y cachaient. Aucun ne cassait rien — c'est ce qui les a gardés en vie.
+
+## ② Le refus qui ment dès qu'une phrase change (4A)
+
+```ts
+// AVANT — on comparait le MESSAGE de l'API, en anglais, normalisé
+if (normalized === "request failed with status code 401") return copy.invalidCredentials;
+if (normalized.includes("too many attempts")) return copy.rateLimitError;
+```
+
+Le serveur, lui, pose un **code** sur chacun de ses quatre refus
+(`apps/auth-service/src/controller/auth.controller.ts`, `loginUser`) et le middleware d'erreur
+expose `details` dès que `code` est une chaîne (A146). Le mobile le lisait déjà.
+
+> **Une règle, deux implémentations, dont une fausse.** Il suffisait qu'un mot change côté
+> serveur — ce qu'aucune fiche du dépôt n'interdit, puisque ce sont des *messages* — pour que
+> l'Expéditeur reçoive « Connexion impossible pour le moment » à la place de la vraie raison.
+> C'est le motif exact que D92 avait trouvé sur `maskEmail`.
+
+Le nouveau chemin : `readLoginErrorCode(getApiErrorData(err))` → `t(\`errors.${code}\`)`.
+
+**La clé est CALCULÉE**, donc invisible à `tsc` (un gabarit se type toujours) et au contrôle
+i18n de la CI (il compare FR et EN entre **eux**, jamais aux clés que le code demande). Une
+fiche confronte donc `LOGIN_ERROR_CODES` aux deux dictionnaires — l'angle mort trouvé sur le
+paiement (`payment-i18n`), qui fait lire le **chemin de la clé** à l'utilisateur.
+
+## ③ La politique de mot de passe sur la connexion (5A)
+
+```tsx
+{...register("password", { minLength: { value: 8, message: copy.minPassword } })}  // RETIRÉ
+```
+
+Une politique de mot de passe se vérifie à la **création**. Sur la connexion, elle :
+1. refuse d'**essayer** un mot de passe plus ancien que la politique ;
+2. renseigne un attaquant sur la politique ;
+3. pour un gain nul — le serveur est seul juge.
+
+## ④ Deux marches, mais pas deux URL (1A)
+
+Le mobile a deux routes (`/login`, `/login-password`) parce qu'une pile native donne le retour
+gratuitement. Le site garde **une** URL et un état interne :
+
+```tsx
+type Step = "identifier" | "password";
+```
+
+Deux raisons, et la seconde est la plus coûteuse à découvrir tard : une seconde URL perdrait
+l'adresse au rechargement (le mobile la garde en mémoire de module), et elle **casserait la
+variante modale** — la fenêtre « ta session a expiré », c'est-à-dire l'endroit où la connexion
+compte le plus, puisqu'on est au milieu d'une action.
+
+Détail payé au passage : cette fenêtre est à `z-[210]`. La confirmation d'adresse rendue à
+`z-[60]` serait passée **dessous**, et le parcours aurait été bloqué sans message. Elle est à
+`z-[220]`.
+
+## ⑤ Le harnais navigateur apprend les deux marches
+
+**Trois fichiers**, et le harnais n'est **pas** dans la CI : rien ne l'aurait dit.
+
+- `apps/e2e/src/fixtures/yamba.ts` — la connexion que **tous** les parcours membres utilisent ;
+- `apps/e2e/src/chapitres/web-cnx.spec.ts` — WEB-CNX-1 réécrit en trois temps (adresse,
+  confirmation, mot de passe) + **WEB-CNX-1 bis** : « Continuer avec e-mail et mot de passe »
+  saute la confirmation (on n'a pas demandé à l'adresse d'être le chemin) ;
+- `apps/e2e/src/chapitres/web-voy.spec.ts` — son propre raccourci de connexion.
+
+La fenêtre de confirmation est nommée **par l'adresse** (`aria-labelledby`) : c'est ce qui la
+distingue de la fenêtre « ta session a expiré » quand les deux sont à l'écran.
+
+## ⑥ Les fiches — `apps/mobile/src/lib/auth-login-parite.spec.ts`, 23 fiches
+
+Huit groupes : le parcours adopté, les sociaux sous le formulaire, le code de refus (et sa clé
+calculée dans les deux dictionnaires), la longueur minimale partie des deux côtés, la pastille
+qui ne revient pas, le discours identique **mot pour mot** sur les 19 textes partagés, le bouton
+qui garde son mot, et la **même regex d'adresse** des deux côtés.
+
+Mobile : **598 → 621** fiches (34 suites).
+
+> **Une fiche de la veille est passée au rouge, et c'était la bonne nouvelle.**
+> `pied-ecran.spec.ts` ancrait le pied du site sur `{copy.notMemberYet}` ; la migration au
+> dictionnaire a fait de cette ancre `{t("noAccount")}`. Le garde-fou « le paragraphe n'est pas
+> vide » l'a dit **immédiatement**, au lieu de laisser la fiche devenir verte en ne lisant plus
+> rien. L'ancre est désormais passée en toutes lettres par l'appelant : les deux formulaires ne
+> lisent pas leurs textes de la même façon, et une ancre devinée se tait le jour d'une
+> migration.
