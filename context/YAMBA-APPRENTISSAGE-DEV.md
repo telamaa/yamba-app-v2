@@ -8137,3 +8137,113 @@ const A_LIRE: ReadonlyArray<[string, string]> = [ … ];
 > (fiches de test)*, voit ce fichier — et il n'est **pas** dans la liste des contrôles requis.
 > Un défaut de typage vivant dans une fiche se fait donc voir, mais ne bloque pas un merge : la
 > seule parade est de lancer `nx typecheck` localement, à chaque fiche écrite.
+
+## Chapitre 235 — Traduire un message au lieu de lire un code, la clé calculée, et le test qui refuse de ne plus rien lire
+
+Page 3 de la passe de finitions. Le lot est une **transposition** : le site reçoit le parcours
+du téléphone. Cinq techniques en sortent, et aucune ne parle de connexion.
+
+### 1. Comparer des messages, c'est se lier à la prose de quelqu'un d'autre
+
+Le site traduisait ses refus ainsi :
+
+```ts
+const normalized = String(message ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+if (normalized === "request failed with status code 401") return copy.invalidCredentials;
+if (normalized.includes("too many attempts")) return copy.rateLimitError;
+```
+
+Dix-huit comparaisons, écrites avec soin — et fausses par construction. Un `message` d'API est
+de la **prose** : il est fait pour être lu par un humain, il peut être reformulé sans préavis,
+et aucun test du dépôt ne l'en empêche. Un **code** est un contrat : il est stable par
+définition, et c'est pour cela qu'il existe.
+
+> **La règle, et elle dépasse les API :** quand on se surprend à normaliser une chaîne pour la
+> comparer, on est en train d'inventer un protocole à partir d'un affichage. Soit le protocole
+> existe déjà et on ne l'a pas cherché, soit il faut le créer — jamais le deviner.
+
+Ici il existait : le contrôleur pose `{ code: "INVALID_CREDENTIALS" }`, et le middleware
+d'erreur l'expose au client dès que `code` est une chaîne. Le téléphone le lisait déjà. **Deux
+implémentations d'une même règle, dont une fausse** : c'est exactement le motif que D92 avait
+trouvé sur `maskEmail` — et la leçon s'étend, *quand deux copies d'une règle s'écartent pendant
+des mois sans gêner personne, la question n'est pas comment les aligner mais pourquoi elles
+sont deux*.
+
+### 2. La clé calculée : ce que trois contrôles ne voient pas
+
+```tsx
+return t(`errors.${code}`);
+```
+
+Cette ligne passe `tsc` (un gabarit se type toujours), passe le contrôle i18n de la CI (il
+compare FR et EN **entre eux**, pas aux clés que le code demande), et passe le harnais (qui ne
+rend rien). Si la clé manque, l'utilisateur lit **le chemin de la clé**.
+
+La parade n'est pas de renoncer aux clés calculées — c'est d'épingler l'ensemble des valeurs
+possibles :
+
+```ts
+const codes = [...lire(CODES_WEB).matchAll(/"([A-Z_]{4,})",/g)].map((m) => m[1]);
+for (const locale of ["fr", "en"]) for (const code of codes) {
+  expect(erreurs(WEB, locale)).toHaveProperty(code);
+}
+```
+
+La fiche lit la LISTE dans le code source, pas une copie : ajouter un code sans sa phrase fait
+rougir la fiche le jour même. (Trouvé en l'écrivant : `MISSING_FIELDS` était dans la liste et
+dans aucun dictionnaire.)
+
+### 3. Un état d'étape plutôt qu'une URL : quand la contrainte vient d'ailleurs
+
+Le téléphone a deux écrans, donc deux routes. Le réflexe serait de faire pareil sur le site
+(`/login`, `/login/password`). Deux choses l'interdisent, et la seconde ne se voit pas en
+regardant la page :
+
+1. une seconde URL **perd l'adresse au rechargement** (le mobile la garde en mémoire de
+   module, ce qu'une URL partagée ou rechargée n'a pas) ;
+2. le même composant sert la fenêtre **« ta session a expiré »** — une modale n'a pas d'URL.
+
+> **Avant de transposer une structure, chercher ce qui la rend possible dans l'original.** Ici
+> c'est la pile de navigation native, qui donne le retour gratuitement. Ce qui n'existe pas en
+> face doit être remplacé, pas recopié.
+
+Corollaire mesuré : la fenêtre de session est à `z-[210]`. Une confirmation posée à `z-[60]`
+aurait été **sous** elle — invisible, et le parcours bloqué sans message d'erreur. Un `z-index`
+local est toujours une affirmation sur un empilement global.
+
+### 4. Le test qui refuse de ne plus rien lire
+
+Une fiche écrite la veille est passée au rouge :
+
+```ts
+const paragraphe = paragrapheWeb(lire(chemin), cle);
+expect(paragraphe).not.toBe('');     // ← c'est CETTE ligne qui a parlé
+```
+
+Elle cherchait le pied de page par `{copy.notMemberYet}` ; la migration au dictionnaire en a
+fait `{t("noAccount")}`. **Sans ce garde-fou, la fiche serait devenue verte en ne lisant plus
+rien** — le pire état possible pour un test, parce qu'il continue de rassurer.
+
+Toute fiche qui EXTRAIT avant d'affirmer doit donc affirmer **deux fois** : que l'extraction a
+trouvé quelque chose, puis que ce quelque chose est correct. Et l'ancre d'extraction se passe
+en toutes lettres plutôt que de se construire à partir d'une clé : une ancre devinée se tait
+le jour d'une migration.
+
+### 5. Le harnais que la CI ne protège pas
+
+Changer le parcours de connexion du site touche **tout** le harnais navigateur : le *fixture*
+de connexion sert à 543 scénarios. Comme il n'est pas dans la CI, aucune machine ne l'aurait
+dit — c'est donc la **première** chose à mettre à jour, pas la dernière.
+
+Ce qui l'a sauvé ici : ce *fixture* vise des sélecteurs **structurels** (`#email`, `#password`,
+`button[type=submit]`), jamais des libellés. Un changement de mots ne l'aurait pas touché ; un
+changement de **structure**, si.
+
+### 6. Pour aller plus loin
+
+- **Identifier-first** (Revolut, Google) — pourquoi demander l'adresse d'abord permet de
+  router vers la bonne méthode, et ce que cela coûte quand une seule méthode existe.
+- **`aria-labelledby` sur une fenêtre** — comment deux dialogues simultanés se distinguent pour
+  un lecteur d'écran, et pour un test.
+- **Codes d'erreur contractuels** — RFC 7807 (*problem+json*) et ce qu'elle formalise de ce que
+  fait ici `details.code`.

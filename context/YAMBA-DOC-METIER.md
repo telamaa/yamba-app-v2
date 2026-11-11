@@ -8564,3 +8564,51 @@ reviendrait à proposer et à refuser sur le même ton.
 | 9 | Je compare les trois bas d'écran de l'application | une seule taille, une seule épaisseur |
 | 10 | Je regarde « Plus tard » sur l'écran de bienvenue | même gabarit que les deux autres, mais **gris** : il décline |
 | 11 | Un écran nouveau ajoute une ligne de sortie | il réemploie le gabarit ; recopier les valeurs est refusé par les fiches |
+
+# D96 — Se connecter, c'est le même geste sur les deux écrans
+
+## Le besoin
+
+Quelqu'un qui s'est inscrit sur le téléphone et qui revient par le site doit retrouver **le
+même geste**. Jusqu'ici il en trouvait un autre : le site demandait tout en une fois, proposait
+d'abord Google et Facebook, et ne disait pas la même phrase.
+
+L'arbitrage du 11/11 : **c'est le site qui s'aligne**, parce que c'est le parcours du téléphone
+qui porte l'intention — on demande d'abord **qui tu es**, et seulement ensuite comment tu le
+prouves.
+
+## Les règles
+
+**RG-D96-1 — La connexion se fait en deux temps : l'adresse, puis la preuve.** Les autres
+façons d'entrer (mot de passe, Google, Facebook) sont proposées à la **première** étape, sous
+la question, jamais au-dessus d'elle.
+
+**RG-D96-2 — L'adresse se confirme avant de continuer.** Elle reste affichée ensuite, en clair,
+avec « Modifier » à côté : on ne demande jamais un mot de passe sans montrer pour quel compte.
+
+**RG-D96-3 — Qui entre par « e-mail et mot de passe » ne confirme rien.** On n'a pas demandé à
+l'adresse d'être le chemin : la confirmation ne sert qu'à celui qui l'a choisie.
+
+**RG-D96-4 — Un refus dit sa vraie raison.** Mot de passe faux, trop de tentatives, compte
+suspendu : trois situations, trois phrases, les mêmes des deux côtés. Jamais « connexion
+impossible pour le moment » quand le produit sait pourquoi.
+
+**RG-D96-5 — La connexion ne juge pas le mot de passe, elle le vérifie.** Aucune règle de
+longueur ni de composition n'est appliquée ici : un mot de passe plus ancien que la politique
+actuelle doit pouvoir être essayé, et c'est le serveur qui tranche.
+
+**RG-D96-6 — Aucun écran ne s'auto-décerne un label de sécurité** (rappel de RG-D91-1, qui
+n'avait pas été appliqué à la connexion).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'arrive sur la connexion du site | un seul champ : l'adresse ; « Continuer » éteint tant qu'elle n'est pas valide |
+| 2 | Je saisis mon adresse et je continue | elle m'est montrée en toutes lettres, et je peux revenir |
+| 3 | Je confirme | le mot de passe, avec mon adresse affichée et modifiable |
+| 4 | Je choisis « Continuer avec e-mail et mot de passe » | j'arrive directement au mot de passe, sans confirmation |
+| 5 | Je me trompe de mot de passe | « E-mail ou mot de passe incorrect. » — le même texte que sur le téléphone |
+| 6 | Mon compte est suspendu | on me le dit, au lieu d'un message générique |
+| 7 | Mon mot de passe fait 6 caractères (compte ancien) | l'écran l'envoie : c'est le serveur qui répond |
+| 8 | Ma session expire au milieu d'une action | la fenêtre propose **le même** parcours en deux temps, et la page ne bouge pas |

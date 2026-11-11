@@ -59,10 +59,13 @@ async function creerCompteActive(page: Page, mailpit: Mailpit, compte: CompteNeu
 
 async function connecter(page: Page, email: string, motDePasse: string): Promise<void> {
   await page.goto("/fr/login", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Connecte-toi" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Heureux de te revoir" })).toBeVisible({ timeout: 60_000 });
   await attendreHydratation(page);
   const f = formulaire(page);
+  // D96 — deux marches : l'adresse, sa confirmation, puis le mot de passe.
   await f.locator("#email").fill(email);
+  await f.locator("button[type=submit]").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirmer" }).click();
   await f.locator("#password").fill(motDePasse);
   const rep = page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
   await f.locator("button[type=submit]").click();

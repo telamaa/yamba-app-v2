@@ -34,7 +34,7 @@ const enTete = (page: Page) => page.getByRole("banner");
 
 async function ouvrirLaConnexion(page: Page): Promise<void> {
   await page.goto("/fr/login", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Connecte-toi" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Heureux de te revoir" })).toBeVisible({ timeout: 60_000 });
   // Hydraté quand le client a fait son premier appel d'API (sonde de session).
   await page.waitForResponse((r) => r.url().includes("/api/"), { timeout: 30_000 }).catch(() => undefined);
 }
@@ -42,7 +42,14 @@ async function ouvrirLaConnexion(page: Page): Promise<void> {
 /** Envoie le formulaire de connexion de la page et rend la réponse de `POST /auth/login`. */
 async function seConnecter(page: Page, email: string, motDePasse: string, memoriser = false) {
   const f = formulaire(page);
+  // D96 — l'adresse, sa confirmation, puis le mot de passe : le parcours du téléphone,
+  // désormais celui du site. Si l'on arrive ici depuis une tentative précédente, l'écran est
+  // resté à l'étape mot de passe — on y revient par « Modifier ».
+  const modifier = f.getByRole("button", { name: "Modifier" });
+  if (await modifier.isVisible().catch(() => false)) await modifier.click();
   await f.locator("#email").fill(email);
+  await f.locator("button[type=submit]").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirmer" }).click();
   await f.locator("#password").fill(motDePasse);
   if (memoriser) await f.locator('input[type="checkbox"]').check();
   const reponse = page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
@@ -170,17 +177,46 @@ test.describe("WEB-CNX — connexion et session", () => {
 /* ══ Les fiches du chapitre 5.3 ══════════════════════════════════════════════════════════════ */
 
 test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils (chapitre 5.3)", () => {
-  test("WEB-CNX-1 · l'écran de connexion", async ({ navigateurVisiteur }) => {
+  test("WEB-CNX-1 · l'écran de connexion, en deux marches (D96)", async ({ navigateurVisiteur }) => {
     const { page } = await navigateurVisiteur();
     await ouvrirLaConnexion(page);
-
-    await expect(page.getByText("Connexion sécurisée")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Connecte-toi" })).toBeVisible();
-    await expect(page.getByText("Reprends là où tu t'es arrêté·e.")).toBeVisible();
-
     const f = formulaire(page);
+
+    // ① L'ADRESSE. Le site pose la même question que le téléphone, dans les mêmes mots.
+    await expect(page.getByRole("heading", { name: "Heureux de te revoir" })).toBeVisible();
+    await expect(page.getByText("Saisis l'adresse e-mail associée à ton compte Yamba.")).toBeVisible();
+    // D91 1A : plus de pastille de sécurité auto-décernée, ici non plus.
+    await expect(page.getByText("Connexion sécurisée")).toHaveCount(0);
     await expect(f.getByText("E-mail", { exact: true })).toBeVisible();
     await expect(f.locator("#email")).toHaveAttribute("placeholder", "prenom@email.com");
+    // Le désactivé n'est permis que quand UN SEUL champ visible l'explique.
+    const continuer = f.getByRole("button", { name: "Continuer", exact: true });
+    await expect(continuer).toBeDisabled();
+    await expect(f.locator("#password")).toHaveCount(0);
+
+    const principal = page.locator("main");
+    await expect(principal.getByText("ou", { exact: true })).toBeVisible();
+    await expect(principal.getByRole("button", { name: "Continuer avec e-mail et mot de passe" })).toBeVisible();
+    await expect(principal.getByRole("button", { name: /Google/ })).toBeVisible();
+    await expect(principal.getByRole("button", { name: "Continuer avec Facebook" })).toBeVisible();
+    await expect(principal.getByText("Pas encore membre ?")).toBeVisible();
+    await expect(principal.getByRole("link", { name: "Inscris-toi" })).toHaveAttribute("href", /\/register/);
+
+    // ② LA CONFIRMATION. L'adresse en clair, et une sortie.
+    await f.locator("#email").fill(COMPTES.aminata.email);
+    await expect(continuer).toBeEnabled();
+    await continuer.click();
+    const fenetre = page.getByRole("dialog");
+    await expect(fenetre).toBeVisible();
+    await expect(fenetre.getByText(COMPTES.aminata.email)).toBeVisible();
+    await expect(fenetre.getByText("C'est bien l'adresse associée à ton compte ?")).toBeVisible();
+    await expect(fenetre.getByRole("button", { name: "Retour" })).toBeVisible();
+    await fenetre.getByRole("button", { name: "Confirmer" }).click();
+
+    // ③ LE MOT DE PASSE. L'adresse reste lisible, et modifiable.
+    await expect(page.getByRole("heading", { name: "Entre ton mot de passe" })).toBeVisible();
+    await expect(f.getByText(COMPTES.aminata.email)).toBeVisible();
+    await expect(f.getByRole("button", { name: "Modifier" })).toBeVisible();
     await expect(f.getByText("Mot de passe", { exact: true })).toBeVisible();
     await expect(f.locator("#password")).toHaveAttribute("type", "password");
     await expect(f.getByRole("button", { name: "Afficher le mot de passe" })).toBeVisible();
@@ -191,14 +227,8 @@ test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils
     await expect(memoriser).toHaveCount(1);
     await expect(memoriser).not.toBeChecked();
     await expect(f.getByText("Rester connecté sur cet appareil")).toBeVisible();
-    await expect(f.getByText("Coché : 7 jours sans activité. Sinon : déconnexion après 60 minutes sans activité.")).toBeVisible();
-
+    await expect(f.getByText("7 jours d'inactivité au lieu de 60 minutes.")).toBeVisible();
     await expect(f.getByRole("button", { name: "Se connecter" })).toBeVisible();
-    await expect(page.locator("main").getByText("ou par e-mail")).toBeVisible();
-    await expect(page.locator("main").getByRole("button", { name: /Google/ })).toBeVisible();
-    await expect(page.locator("main").getByRole("button", { name: "Continuer avec Facebook" })).toBeVisible();
-    await expect(page.locator("main").getByText("Pas encore membre ?")).toBeVisible();
-    await expect(page.locator("main").getByRole("link", { name: "Inscris-toi" })).toHaveAttribute("href", /\/register/);
 
     // Le bouton d'affichage montre le mot de passe, puis le masque.
     await f.locator("#password").fill("secret");
@@ -206,6 +236,23 @@ test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils
     await expect(f.locator("#password")).toHaveAttribute("type", "text");
     await f.getByRole("button", { name: "Masquer le mot de passe" }).click();
     await expect(f.locator("#password")).toHaveAttribute("type", "password");
+
+    // « Modifier » ramène à l'étape 1, et le mot de passe repart à vide.
+    await f.getByRole("button", { name: "Modifier" }).click();
+    await expect(f.locator("#password")).toHaveCount(0);
+    await expect(f.locator("#email")).toHaveValue(COMPTES.aminata.email);
+  });
+
+  test("WEB-CNX-1 bis · « Continuer avec e-mail et mot de passe » saute la confirmation (D96)", async ({ navigateurVisiteur }) => {
+    // On n'a pas demandé à l'adresse d'être le chemin : on ne la fait donc pas confirmer.
+    const { page } = await navigateurVisiteur();
+    await ouvrirLaConnexion(page);
+    const f = formulaire(page);
+    await f.locator("#email").fill(COMPTES.aminata.email);
+    await page.locator("main").getByRole("button", { name: "Continuer avec e-mail et mot de passe" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(f.locator("#password")).toBeVisible();
+    await expect(f.getByText(COMPTES.aminata.email)).toBeVisible();
   });
 
   test("WEB-CNX-2 · identifiants incorrects : le même message, que le compte existe ou non", async ({ navigateurVisiteur }) => {
@@ -274,7 +321,7 @@ test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils
 
     await ouvrirLaConnexion(page);
     await seConnecter(page, COMPTES.aminata.email, MOT_DE_PASSE_FAUX);
-    await expect(erreurDeConnexion(page)).toHaveText("Trop de tentatives. Réessaie dans quelques instants.");
+    await expect(erreurDeConnexion(page)).toHaveText("Trop de tentatives. Réessaie dans quelques minutes.");
   });
 
   test("WEB-CNX-5 · session expirée : la fenêtre s'ouvre sur place", async ({ navigateurConnecte }) => {
@@ -298,12 +345,15 @@ test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils
     await expect(page).toHaveURL(/\/fr\/dashboard\//);
     await expect(page).not.toHaveURL(/\/login/);
     await expect(page.getByText(/Erreur, réessaye|Une erreur est survenue/)).toHaveCount(0);
-    // Le formulaire est DANS la fenêtre.
+    // Le formulaire est DANS la fenêtre, et il porte le MÊME parcours en deux marches (D96).
     await expect(fenetre.locator("form #email")).toBeVisible();
-    await expect(fenetre.locator("form #password")).toBeVisible();
+    await expect(fenetre.locator("form #password")).toHaveCount(0);
 
     // Reconnexion depuis la fenêtre : elle se ferme, la page reprend.
     await fenetre.locator("form #email").fill(COMPTES.aminata.email);
+    await fenetre.locator("form button[type=submit]").click();
+    // La confirmation est nommée par l'ADRESSE : c'est ce qui la distingue de la fenêtre de session.
+    await page.getByRole("dialog", { name: COMPTES.aminata.email }).getByRole("button", { name: "Confirmer" }).click();
     await fenetre.locator("form #password").fill(MOT_DE_PASSE_SEED);
     const reponse = page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
     await fenetre.locator("form button[type=submit]").click();

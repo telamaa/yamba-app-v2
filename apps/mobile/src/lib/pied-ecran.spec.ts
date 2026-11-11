@@ -73,11 +73,18 @@ function blocDeStyle(source: string, cle: string): string {
 }
 
 /**
- * La ligne qui porte `{copy.<cle>}` et le paragraphe qui l'entoure, côté web.
+ * Le paragraphe du pied, côté web, trouvé par l'EXPRESSION qu'il affiche.
  * On remonte au `<p` qui l'ouvre : c'est lui qui porte les classes.
+ *
+ * L'ancre est donnée en toutes lettres par l'appelant, et non construite ici
+ * à partir d'une clé : les deux formulaires ne lisent pas leurs textes de la
+ * même façon (la connexion est passée au dictionnaire en D96, l'inscription
+ * porte encore ses ternaires). Une ancre devinée se serait tue le jour de la
+ * migration — c'est d'ailleurs ce qui est arrivé, et le garde-fou
+ * « le paragraphe n'est pas vide » l'a dit tout de suite.
  */
-function paragrapheWeb(source: string, cle: string): string {
-  const ancre = source.indexOf(`{copy.${cle}}`);
+function paragrapheWeb(source: string, expression: string): string {
+  const ancre = source.indexOf(expression);
   if (ancre === -1) return '';
   const ouverture = source.lastIndexOf('<p ', ancre);
   const fermeture = source.indexOf('</p>', ancre);
@@ -143,10 +150,10 @@ describe('② aucun écran ne recopie les nombres — les trois épandent le gab
 
 describe('③ le site compose ses deux pieds comme le téléphone', () => {
   it.each([
-    ['la connexion', FORM_CONNEXION_WEB, 'notMemberYet'],
-    ['l’inscription', FORM_INSCRIPTION_WEB, 'haveAccount'],
-  ])('%s porte la taille du gabarit, en clair dans la classe', (_quoi, chemin, cle) => {
-    const paragraphe = paragrapheWeb(lire(chemin), cle);
+    ['la connexion', FORM_CONNEXION_WEB, '{t("noAccount")}'],
+    ['l’inscription', FORM_INSCRIPTION_WEB, '{copy.haveAccount}'],
+  ])('%s porte la taille du gabarit, en clair dans la classe', (_quoi, chemin, ancre) => {
+    const paragraphe = paragrapheWeb(lire(chemin), ancre);
     expect(paragraphe).not.toBe('');
     // `text-[13px]` plutôt que `text-sm` : 13 n'existe pas dans l'échelle de
     // Tailwind, et c'est le seul moyen d'écrire LE nombre du gabarit.
@@ -155,10 +162,10 @@ describe('③ le site compose ses deux pieds comme le téléphone', () => {
   });
 
   it.each([
-    ['la connexion', FORM_CONNEXION_WEB, 'notMemberYet'],
-    ['l’inscription', FORM_INSCRIPTION_WEB, 'haveAccount'],
-  ])('%s ne met aucune graisse sur le lien', (_quoi, chemin, cle) => {
-    const paragraphe = paragrapheWeb(lire(chemin), cle);
+    ['la connexion', FORM_CONNEXION_WEB, '{t("noAccount")}'],
+    ['l’inscription', FORM_INSCRIPTION_WEB, '{copy.haveAccount}'],
+  ])('%s ne met aucune graisse sur le lien', (_quoi, chemin, ancre) => {
+    const paragraphe = paragrapheWeb(lire(chemin), ancre);
     expect(paragraphe).not.toContain('font-bold');
     expect(paragraphe).not.toContain('font-semibold');
     // La mangue, elle, reste : c'est elle qui désigne le lien.

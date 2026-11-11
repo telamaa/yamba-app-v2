@@ -2388,8 +2388,8 @@ Une page a la fois, capture en main, sur les DEUX fronts : revue UX/UI + metier,
 decision gravee au registre AVANT le code, puis mobile natif, page web jumelle,
 PR + docs cumulatifs.
 
-- Page 1 — l'INSCRIPTION (D91, `feat/finitions-inscription`, PR #404 ouverte le
-  09/11, amendee le 10/11) : mention de securite retiree, titre qui n'exclut
+- Page 1 — l'INSCRIPTION (D91, `feat/finitions-inscription`, **PR #404 MERGEE le
+  11/11**, 19 controles comptes) : mention de securite retiree, titre qui n'exclut
   plus la moitie du public, confirmation du mot de passe supprimee du web,
   parite des fournisseurs sociaux, hierarchie typographique, et l'ecran qui
   tient sur un ecran.
@@ -2417,8 +2417,8 @@ PR + docs cumulatifs.
     dit l'intention (mangue = la porte jumelle, gris = on decline).
     Mobile 574 -> 598 fiches (33 suites).
 
-ETAT DE LA BRANCHE `feat/finitions-verification` au 11/11 : 33 commits, poussee,
-AUCUNE PR ouverte a ce jour, empilee sur #404 (D91). Mesures du 11/11 : mobile
+ETAT DE LA BRANCHE `feat/finitions-verification` au 11/11 : **PR #405 MERGEE**
+(19 controles comptes au vert avant le merge), apres #404. Mesures du 11/11 : mobile
 598 (33 suites), notification 136 (12 suites), `nx typecheck @yamba-app/mobile`
 vert sur ses DEUX programmes, `tsc --noEmit -p apps/user-ui` vert, controle i18n
 vert, aucun fichier d'env suivi. Les deux bundles Metro obtenus (ios 200 en
@@ -2426,6 +2426,21 @@ vert, aucun fichier d'env suivi. Les deux bundles Metro obtenus (ios 200 en
 sans quoi `expo start` meurt sur `Cannot find module 'expo-router/_ctx-shared'`
 (expo-router est NICHE sous apps/mobile, et c'est ce que font les scripts du
 package.json du mobile : ne pas lancer `npx expo start` nu).
+
+- Page 3 — la CONNEXION (D96, `feat/finitions-connexion`) : **le SITE s'aligne sur
+  le TELEPHONE** (arbitrage du 11/11, a l'inverse de ce qui etait recommande).
+  Deux marches (adresse -> confirmation -> mot de passe) en etat INTERNE et non
+  en seconde URL (la variante modale « ta session a expiree » n'a pas d'URL) ;
+  les sociaux passent sous le formulaire ; les refus parlent par `details.code`
+  des deux cotes (18 comparaisons de messages anglais SUPPRIMEES) ; la longueur
+  minimale sort du champ mot de passe de la connexion ; ~45 ternaires passes au
+  dictionnaire ; plus de pastille de securite (D91 1A) ; le bouton garde son mot
+  (D95 4A). Mobile 598 -> 621 fiches. **Le harnais navigateur apprend les deux
+  marches dans TROIS fichiers** (`fixtures/yamba.ts`, `web-cnx.spec.ts`,
+  `web-voy.spec.ts`) — il n'est pas dans la CI, rien ne l'aurait dit.
+  Arbitrage LAISSE OUVERT : la confirmation d'adresse protege le parcours « code
+  par e-mail », qui n'existe pas encore cote serveur — portee telle quelle, a
+  trancher sur chiffres, sur les DEUX fronts.
 
 RESTE dans cette passe :
 - les QUATRE autres ecrans d'auth (connexion, mot de passe oublie, verification
