@@ -16,7 +16,8 @@
  */
 import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -96,6 +97,80 @@ export function AuthTextField(props: TextInputProps & { ref?: Ref<TextInput> }) 
   );
 }
 
+const DOT_COUNT = 3;
+const DOT_CYCLE_MS = 900;
+const DOT_STAGGER_MS = 150;
+
+/**
+ * L'attente des CTA : trois points qui respirent en VAGUE (le motif du
+ * « typing indicator »), `Animated` natif avec `useNativeDriver`, zéro
+ * dépendance. Chaque point monte, gonfle et s'éclaire avec un décalage d'un
+ * tiers de cycle.
+ *
+ * Arbitré à l'écran le 13/11/2026, après avoir vu CINQ dispositions dans le
+ * simulateur en une journée : libellé d'attente, points à droite, points à
+ * gauche avec le libellé gardé, spinner centré, et enfin celle-ci — la vague
+ * PREND la place du libellé. Ce que la journée a appris, et qui vaut plus que
+ * le réglage : sur un effet d'interface, on ne tranche pas sur un
+ * raisonnement, on tranche en regardant.
+ *
+ * `dotsRow` porte la hauteur exacte de la ligne du libellé : le bouton ne se
+ * tasse pas quand le texte cède la place. Et comme le texte s'en va, le NOM
+ * du bouton est porté par `accessibilityLabel` sur la Pressable — sans quoi
+ * un lecteur d'écran n'annonce plus que « bouton » pendant toute l'attente.
+ */
+function LoadingDots({ color }: { color: string }) {
+  const values = useRef(
+    Array.from({ length: DOT_COUNT }, () => new Animated.Value(0))
+  ).current;
+
+  useEffect(() => {
+    const loops = values.map((value, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * DOT_STAGGER_MS),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: DOT_CYCLE_MS / 3,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(value, {
+            toValue: 0,
+            duration: DOT_CYCLE_MS / 3,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.delay((DOT_COUNT - 1 - i) * DOT_STAGGER_MS),
+        ])
+      )
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [values]);
+
+  return (
+    <View style={styles.dotsRow} accessibilityRole="progressbar">
+      {values.map((value, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.dot,
+            {
+              backgroundColor: color,
+              opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+              transform: [
+                { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) },
+                { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 /* ── CTA mangue ──────────────────────────────────────────────────────────── */
 
 
@@ -123,39 +198,34 @@ export function AuthCta({
     <Pressable
       onPress={onPressAction}
       disabled={disabled || pending}
+      accessibilityLabel={label}
+      accessibilityState={{ busy: pending, disabled: disabled || pending }}
       style={({ pressed }) => [
         styles.cta,
         disabled && !pending && { backgroundColor: palette.border },
         pressed && styles.dimmed,
       ]}>
-      {/* D95 — le chargement moderne : le libellé ne DISPARAÎT pas, il
-          s'efface. Rendu à l'opacité 0, il continue d'occuper sa place, donc
-          la largeur du bouton ne bouge pas d'un pixel ; le disque se
-          superpose, centré. Trois choses qu'on évite ainsi, et qui se voient
-          toutes à l'œil nu :
-            • le SAUT de largeur quand « Créer mon compte » devient « … » ;
-            • le changement de LIBELLÉ (« Création… »), un mot de plus à lire
-              pour n'apprendre que ce que le disque dit déjà ;
-            • le bouton qui se vide, puis se remplit — deux animations là où
-              une seule suffit.
-          Au succès on NAVIGUE : le disque ne s'arrête jamais, il part avec
-          l'écran. C'est voulu — un bouton qui redevient cliquable une
-          fraction de seconde avant la navigation invite au double envoi. */}
-      {pending && (
-        <ActivityIndicator
-          size="small"
-          color={palette.ctaLabel}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-      <Text
-        style={[
-          styles.ctaLabel,
-          { color: disabled ? palette.muted : palette.ctaLabel },
-          pending && styles.labelFaded,
-        ]}>
+      {/* La vague de trois points PREND la place du libellé (arbitrage à
+          l'écran du 13/11/2026, après cinq dispositions essayées). Le bouton
+          ne se tasse pas pour autant : sa hauteur est fixée (`AuthFieldHeight`),
+          et sa largeur ne dépend pas de son contenu.
+          `accessibilityLabel` sur la Pressable : quand le texte disparaît, le
+          bouton perdrait son NOM pour un lecteur d'écran — c'est le seul coût
+          réel de cette disposition, et il se paie en une ligne.
+          Au succès on NAVIGUE — le spinner ne s'arrête jamais, il part avec
+          l'écran, et un bouton qui redevient cliquable une fraction de seconde
+          avant la navigation invite au double envoi. */}
+      {pending ? (
+        <LoadingDots color={palette.ctaLabel} />
+      ) : (
+        <Text
+          style={[
+            styles.ctaLabel,
+            { color: disabled ? palette.muted : palette.ctaLabel },
+          ]}>
           {label}
-      </Text>
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -334,10 +404,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     fontSize: 16,
   },
-  /** Le libellé effacé GARDE sa place : c'est ce qui fige la largeur. */
-  labelFaded: {
-    opacity: 0,
-  },
   cta: {
     backgroundColor: AuthBrand.mango,
     borderRadius: AuthRadius,
@@ -360,6 +426,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontFamily: Font.bold,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    // La hauteur de la ligne du libellé : le bouton ne bouge pas d'un pixel
+    // quand le texte cède la place aux points.
+    height: 24,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   divider: {
     flexDirection: 'row',

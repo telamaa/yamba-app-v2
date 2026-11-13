@@ -44,6 +44,45 @@ body::-webkit-scrollbar {
   }
 }
 
+/* ── La vague d'attente des boutons d'action (13/11/2026) ───────────────────
+   Le jumeau CSS de la vague native du téléphone (`Animated` dans
+   `apps/mobile/src/components/auth/auth-kit.tsx`) : mêmes mesures — cycle de
+   900 ms, montée de 4 px, grossissement 0,85 → 1,15, opacité 0,35 → 1. Le
+   décalage de chaque point est posé en style inline par
+   `components/ui/LoadingDots.tsx`, comme `Skeleton` le fait pour
+   `yambaShimmer`.
+   `currentColor` : les points prennent la couleur du texte du bouton, donc
+   ils marchent sur l'aplat mangue comme sur un bouton clair. */
+.yamba-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: yambaDot 900ms ease-in-out infinite;
+}
+
+@keyframes yambaDot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0) scale(0.85);
+  }
+  33% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.15);
+  }
+}
+
+/* Mouvement réduit : les points CESSENT de bouger mais restent visibles —
+   trois points à la place d'un libellé disent déjà « en cours », et le bouton
+   porte de toute façon `aria-busy`. On retire le mouvement, pas le signal. */
+@media (prefers-reduced-motion: reduce) {
+  .yamba-dot {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────── */
 /* HOME PAGE — Animations & utilities                          */
 /* ─────────────────────────────────────────────────────────── */

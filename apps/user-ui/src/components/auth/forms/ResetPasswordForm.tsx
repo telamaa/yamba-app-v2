@@ -36,7 +36,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import LoadingDots from "@/components/ui/LoadingDots";
 import {
   firstFailingCheck,
   passwordCheckMessage,
@@ -308,13 +309,20 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
               aria-busy={resetPasswordMutation.isPending}
               className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {/* D95 4A — le libellé s'efface, il ne change pas. */}
-              {resetPasswordMutation.isPending && (
-                <Loader2 size={16} aria-hidden className="absolute inset-0 m-auto animate-spin" />
+              {/* La vague de trois points PREND la place du libellé (arbitrage à l'écran du
+                  13/11/2026). Le bouton ne change pas de taille pour autant : il est en
+                  pleine largeur et sa hauteur vient de son padding.
+                  Le `sr-only` garde le NOM du bouton pour un lecteur d'écran — sans lui, le
+                  bouton devient anonyme pendant toute l'attente, et c'est le seul coût réel
+                  de cette disposition. */}
+              {resetPasswordMutation.isPending ? (
+                <>
+                  <LoadingDots />
+                  <span className="sr-only">{t("submit")}</span>
+                </>
+              ) : (
+                t("submit")
               )}
-              <span className={resetPasswordMutation.isPending ? "opacity-0" : undefined}>
-                {t("submit")}
-              </span>
             </button>
 
             <div className="pt-2 text-center">{retourConnexion}</div>
