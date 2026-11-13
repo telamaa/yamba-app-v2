@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { loginHrefFor } from "@/lib/auth/login-redirect";
+import { tunnelModeFor } from "@/lib/layout/tunnel";
 import CommandPalette, { type CommandAction } from "./CommandPalette";
 import HeaderLogo from "./header/HeaderLogo";
 import HeaderLocaleSwitcher from "./header/HeaderLocaleSwitcher";
@@ -32,12 +33,23 @@ export default function Header() {
   const loginHref = loginHrefFor(pathname);
   const [isCompact, setIsCompact] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-  // ── Tunnel de réservation : un en-tête qui ne propose PAS de sortir ──────────
-  // Pendant un paiement, la cloche, la messagerie, le menu du compte et surtout
-  // le CTA mangue « Partager un trajet » sont autant de portes de sortie — un CTA
-  // concurrent À L'INTÉRIEUR d'un entonnoir (revue UX 17/10). Il ne reste que le
-  // logo et la mention de sécurité.
-  const isCheckoutTunnel = /^\/trips\/[^/]+\/book\/?$/.test(pathname);
+  // ── Un tunnel n'offre pas la sortie (D93) ───────────────────────────────────
+  // La cloche, la messagerie, le menu du compte, la palette Cmd+K et surtout le
+  // CTA mangue « Partager un trajet » sont autant de portes de sortie — un appel
+  // à l'action concurrent À L'INTÉRIEUR d'un entonnoir (revue UX 17/10, étendue
+  // aux six pages d'auth le 13/11). Le régime vient de la ROUTE, pas d'ici :
+  // `lib/layout/tunnel.ts` est pur et testé, et c'est la seule liste des pages
+  // d'auth du dépôt. Ce qu'il RESTE diffère par tunnel :
+  //   • paiement : le logo et la mention qui nomme Stripe ;
+  //   • auth     : le logo, la langue et le thème — un sélecteur de langue ne
+  //                quitte pas l'entonnoir, il le rend lisible, et qui atterrit
+  //                sur /register depuis un lien d'e-mail n'a aucun autre moyen
+  //                de changer de langue (le téléphone, lui, suit l'OS).
+  // Le logo reste cliquable dans les deux : UNE sortie, neutre, toujours.
+  const tunnel = tunnelModeFor(pathname);
+  const isCheckoutTunnel = tunnel === "checkout";
+  const isAuthTunnel = tunnel === "auth";
+  const isTunnel = tunnel !== "none";
 
   useEffect(() => {
     const onScroll = () =>
@@ -85,11 +97,11 @@ export default function Header() {
   return (
     <>
       <div style={{ display: userState.isLoading ? "block" : "none" }}>
-        <HeaderSkeleton isCompact={isCompact} />
+        <HeaderSkeleton isCompact={isCompact} tunnel={tunnel} />
       </div>
 
       <div style={{ display: userState.isLoading ? "none" : "block" }}>
-        {!isCheckoutTunnel && <CommandPalette actions={commandActions} />}
+        {!isTunnel && <CommandPalette actions={commandActions} />}
 
         <header
           className="fixed inset-x-0 top-0 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85"
@@ -111,6 +123,13 @@ export default function Header() {
               <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 dark:text-slate-400">
                 <Lock size={13} strokeWidth={2} />
                 <span>{t("checkoutSecure")}</span>
+              </div>
+            ) : isAuthTunnel ? (
+              /* Les deux réglages, à toutes les largeurs : ni l'un ni l'autre
+                 ne fait sortir de l'entonnoir. */
+              <div className="flex items-center gap-2 md:gap-3">
+                <HeaderLocaleSwitcher variant="header" />
+                <HeaderThemeToggle variant="icon" />
               </div>
             ) : (
             <>
@@ -176,7 +195,7 @@ export default function Header() {
           </div>
         </header>
 
-        {!isCheckoutTunnel && (
+        {!isTunnel && (
         <HeaderMobileBottomSheet
           open={bottomSheetOpen}
           onCloseAction={() => setBottomSheetOpen(false)}

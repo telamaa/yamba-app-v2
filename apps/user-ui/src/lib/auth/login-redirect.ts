@@ -7,14 +7,20 @@
  * l'accueil (retour par défaut de LoginForm).
  *
  * `pathname` est SANS préfixe de locale (usePathname de @/i18n/navigation).
+ *
+ * D93 — la liste des pages d'auth N'EST PLUS ICI. Ce fichier en tenait sa
+ * propre copie (`NO_REDIRECT_PREFIXES`), et les deux avaient divergé :
+ * `/refresh` appartient au groupe de routes `(auth)` depuis le 28/08 et
+ * manquait à celle-ci, donc le header proposait d'y revenir après connexion —
+ * un `?redirect=/refresh` qui ne ramène sur aucune page utile. La liste vit
+ * désormais dans `lib/layout/tunnel.ts`, une fois.
  */
+import { isAuthTunnel } from "@/lib/layout/tunnel";
 import { withRedirect } from "./safe-redirect";
-
-const NO_REDIRECT_PREFIXES = ["/login", "/register", "/password"];
 
 export function shouldCarryRedirect(pathname: string | null | undefined): boolean {
   if (!pathname || pathname === "/") return false;
-  return !NO_REDIRECT_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  return !isAuthTunnel(pathname);
 }
 
 export function loginHrefFor(pathname: string | null | undefined): string {
