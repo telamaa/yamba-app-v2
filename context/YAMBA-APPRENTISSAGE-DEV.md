@@ -8357,3 +8357,162 @@ Deux parades, toutes deux appliquées ici :
 - **Anti-énumération** (OWASP WSTG-IDNT-04) — pourquoi « si un compte existe » n'est pas une
   tournure de politesse mais une exigence, et ce que le serveur fait pour la tenir (temps de
   réponse constant, message unique).
+
+## Chapitre 237 — Une règle juste écrite au mauvais endroit, l'arbre React qui décide à votre place, et le coût caché d'un `import`
+
+Page 5 de la passe. Le lot tient en une phrase : **la règle existait déjà, bien écrite, et elle
+n'a protégé qu'une page pendant vingt-sept jours.** Cinq techniques en sortent.
+
+### 1. Une constante dans un composant n'est ni lisible, ni testable, ni réutilisable
+
+Le `Header` portait ceci depuis le 17/10 :
+
+```tsx
+const isCheckoutTunnel = /^\/trips\/[^/]+\/book\/?$/.test(pathname);
+```
+
+Rien à reprocher au code. Tout à reprocher à son **adresse** : une règle de produit vivait dans
+un `.tsx` client, donc (a) personne ne la trouve en cherchant « quelles pages sont des
+entonnoirs ? », (b) aucune fiche ne peut l'exécuter sans monter React, (c) le cinquième
+entonnoir du produit ne peut pas la réutiliser — il la réécrira, ou l'ignorera. C'est la
+troisième fois dans cette passe que le dépôt paie une règle dupliquée (`maskEmail` en D92, la
+lecture des refus en D96, la liste des pages d'auth ici).
+
+> **Le test de l'adresse** : si la règle était fausse, où iriez-vous la corriger ? Si la réponse
+> est « dans le composant qui l'affiche », elle est au mauvais endroit.
+
+Sorti dans un module pur, c'est gratuit :
+
+```ts
+export type TunnelMode = "none" | "auth" | "checkout";
+export function tunnelModeFor(pathname: string | null | undefined): TunnelMode { … }
+```
+
+Noter le **type union** plutôt que deux booléens : `isAuthTunnel && isCheckoutTunnel` ne peut
+pas exister, et TypeScript le sait. Deux booléens autorisent quatre états dont deux absurdes.
+
+### 2. L'arbre React décide où une règle peut vivre — pas votre sens de l'élégance
+
+Le réflexe, en App Router, est de poser le chrome d'un groupe de routes dans son `layout.tsx` :
+c'est ce que fait déjà `(marketing)/layout.tsx` pour le `Footer`. Ici c'est **impossible**, et
+pour une raison structurelle qu'il faut savoir reconnaître :
+
+```
+app/[locale]/layout.tsx        ← monte <Header /> ET réserve sa hauteur (pt-[78px])
+└── (auth)/layout.tsx          ← serait ICI : sous le Header, donc sans prise sur lui
+    └── login/page.tsx
+```
+
+Un layout enfant ne peut pas démonter un composant monté par son parent, et un contexte
+**descend** — il ne remonte pas. Les trois issues, avec leur coût :
+
+| Issue | Coût |
+|---|---|
+| Déplacer `<Header />` dans chaque layout de groupe | il faut le remonter dans tous les segments **non groupés** (dashboard, search, trips…) : beaucoup de code pour un drapeau |
+| Un provider au-dessus du `Header`, alimenté par la route | il faudrait quand même lire `pathname` quelque part — c'est la même règle, avec un provider en plus |
+| **Lire la route là où le `Header` est monté** | une fonction pure, zéro structure nouvelle |
+
+Et une contrainte visuelle tranche le reste : la hauteur de l'en-tête est réservée **en dur** par
+le parent (`pt-[78px]`). Un en-tête retiré laisserait un trou de 78 px. Donc il ne disparaît
+pas : il **se réduit**. Beaucoup de décisions d'architecture se prennent ainsi — non pas par
+goût, mais parce qu'une seule option survit aux contraintes déjà payées.
+
+### 3. Le composant monté en permanence que personne ne regarde
+
+`Header` rend **deux** arbres, en permanence :
+
+```tsx
+<div style={{ display: userState.isLoading ? "block" : "none" }}><HeaderSkeleton … /></div>
+<div style={{ display: userState.isLoading ? "none" : "block" }}>{/* le vrai */}</div>
+```
+
+C'est un bon motif (zéro saut de mise en page), et c'est un **angle mort** : toute règle posée
+dans la seconde branche doit l'être dans la première. Le tunnel de paiement affichait donc son
+CTA mangue pendant toute la résolution de `useUser`, depuis un mois, sans que rien ne le dise.
+
+La leçon est générale : **chaque fois qu'un écran a un état d'attente, demandez-vous si la règle
+que vous venez d'écrire s'y applique aussi.** Et testez-le en deux temps — c'est ce que fait la
+fiche de recette :
+
+```ts
+await page.goto(route, { waitUntil: "domcontentloaded" });     // 1er temps : le squelette
+expect(await compterLesPortesDeSortie(page)).toBe(0);
+await page.waitForLoadState("networkidle");                     // 2e temps : l'en-tête réel
+expect(await compterLesPortesDeSortie(page)).toBe(0);
+```
+
+### 4. Un `import` a un coût que `tsc` ne montre pas : il crée une arête dans le graphe
+
+Pour exécuter la règle du site depuis le harnais du téléphone, un import relatif suffit — et il
+passe au vert du premier coup. Mesure prise **avant** de garder la solution :
+
+```sh
+npx nx graph --file=/tmp/g.json   # @yamba-app/mobile : [] → ["@yamba-app/user-ui"]
+```
+
+```json
+// nx.json
+"targetDefaults": { "test": { "dependsOn": ["^build"] } }
+```
+
+Conséquence : `nx test @yamba-app/mobile` construit désormais **user-ui d'abord** (53,6 s
+mesurées), et le contrôle de CI « Tests unitaires (mobile) » devient rouge quand le **build du
+site** casse. Deux contrôles couplés pour une fiche : on jette.
+
+> **Dans un monorepo, un `import` n'est pas qu'une ligne : c'est une dépendance de build.**
+> Avant d'importer à travers une frontière de projet, regardez `dependsOn` — et comparez au coût
+> de lire le fichier comme du texte (`readFileSync`), qui ne crée aucune arête.
+
+C'est précisément pour cela que les quatre fiches de parité du dépôt lisent le web comme du
+texte. En relisant leur en-tête on croit à de la prudence ; c'était une mesure.
+
+### 5. Une fiche texte peut quand même être impossible à contourner — si elle lit le disque
+
+Une fiche qui compare des chaînes se périme. Une fiche qui lit l'**arborescence réelle** ne se
+périme pas :
+
+```ts
+/** Tout dossier de app/[locale]/(auth)/ qui porte un page.tsx. */
+function routesDuGroupeWeb(racine = GROUPE_WEB, prefixe = ''): string[] {
+  const trouvees: string[] = [];
+  for (const entree of readdirSync(racine, { withFileTypes: true })) {
+    if (!entree.isDirectory()) continue;
+    const chemin = `${prefixe}/${entree.name}`;
+    if (existsSync(join(racine, entree.name, 'page.tsx'))) trouvees.push(chemin);
+    trouvees.push(...routesDuGroupeWeb(join(racine, entree.name), chemin));
+  }
+  return trouvees.sort();
+}
+
+it.each(routesDuGroupeWeb())('%s est couverte par la liste', (route) => {
+  expect(prefixesDeclares().some((p) => couvertPar(route, p))).toBe(true);
+});
+```
+
+Deux propriétés qui valent le détour : `it.each` **génère** une fiche par route trouvée (le
+rapport nomme la route fautive, pas « une route »), et la liste attendue est lue dans la source
+de la règle, pas recopiée. Ajouter une septième page d'auth sans l'inscrire dans la règle fait
+échouer la CI.
+
+Et dites dans l'en-tête de la fiche ce qu'elle ne couvre **pas** — ici : elle n'exécute pas la
+fonction, donc un changement d'**algorithme** d'appariement lui échapperait. Une fiche qui
+annonce sa limite est une fiche qu'on ne croira pas plus forte qu'elle n'est.
+
+### 6. Le piège du préfixe nu
+
+`pathname.startsWith("/login")` est vrai pour `/loginate`. D'où la frontière explicite, et les
+sept fiches qui l'épinglent (`/loginate`, `/registered`, `/passwords`, `/refreshed`, …) :
+
+```ts
+const sousPrefixe = (pathname: string, prefixe: string): boolean =>
+  pathname === prefixe || pathname.startsWith(prefixe + "/");
+```
+
+### Pour aller plus loin
+
+- **CQS** (chapitre 213) : `tunnelModeFor` répond sans rien écrire — aucun état, aucun effet.
+- **Le jumeau** (chapitre 236) : la réponse était écrite dans `apps/mobile/src/app/(auth)/_layout.tsx`
+  (`headerShown: false`) depuis le lot auth. Chercher le jumeau a remplacé la moitié de la
+  réflexion, deux lots de suite.
+- **Ce qui reste à faire** : `apps/user-ui` n'a **aucune** cible de test. Une règle pure sans
+  harnais pour l'exécuter est une promesse à moitié tenue — c'est le lot « l'A223 du site ».

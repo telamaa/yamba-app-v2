@@ -2459,6 +2459,30 @@ package.json du mobile : ne pas lancer `npx expo start` nu).
   NON REJOUE : le harnais demande les six services, Mailpit et les deux fronts ;
   ses mises a jour sont verifiees au TYPAGE, pas a l'execution.
 
+- Page 5 — le GABARIT des six pages d'auth (D93, `feat/finitions-tunnel`) : l'en-tete
+  du site proposait « Partager un trajet » (aplat MANGUE, un appel a l'action
+  concurrent dans un entonnoir) et « Connexion » (un compte qui n'existe pas
+  encore) au milieu d'une inscription, plus la cloche, la messagerie, le menu du
+  compte, la palette Cmd+K et la feuille du bas. La regle existait DEJA, ecrite
+  une fois en dur pour le seul tunnel de paiement (`Header.tsx:40`, 17/10) :
+  juste, et confinee. Elle devient une donnee de la ROUTE
+  (`lib/layout/tunnel.ts`, pur, zero import, trois regimes). Il reste le logo
+  (SEULE sortie, cliquable), la langue et le theme — un selecteur de langue ne
+  quitte pas l'entonnoir, il le rend lisible. PAS un `(auth)/layout.tsx` : le
+  `Header` est monte par le layout PARENT, un layout de groupe est SOUS lui dans
+  l'arbre et le wrapper reserve sa hauteur en dur (`pt-[78px]`).
+  Trois defauts corriges au passage : `/refresh` manquait a la copie de la liste
+  tenue par `login-redirect.ts` ; `HeaderSkeleton` faisait clignoter le CTA mangue
+  DANS le tunnel de paiement depuis le 17/10 (il est monte en permanence) ; et la
+  mention « Reservation securisee » ne nommait personne — elle devient « Paiement
+  securise par Stripe » (D91 1A). Mobile 665 -> 705 fiches, et SIX fiches de
+  recette NEUVES (WEB-ACC-13) JOUEES dans un vrai Chrome, vertes en 36,7 s (une
+  fiche de chrome n'a besoin que du front, pas des six services).
+  DETTE NOMMEE, la vraie decouverte du lot : `apps/user-ui` n'a AUCUNE cible de
+  test, aucun `jest.config`, zero fiche — la plus grosse app du depot, invisible
+  aux dix-neuf controles. C'est mot pour mot le constat d'A223. Lot a part :
+  « l'A223 du site ».
+
 RESTE dans cette passe :
 - ~~les QUATRE autres ecrans d'auth~~ : FAITS (D96 pour la connexion, D97 pour
   les trois ecrans du mot de passe oublie). `AuthScreen.badge` n'a plus AUCUN
@@ -2466,13 +2490,15 @@ RESTE dans cette passe :
   Reste la variante MODALE de la connexion (« ta session a expire »,
   « connecte-toi pour reserver ») : elle monte le meme composant, donc le meme
   parcours en deux marches, mais elle n'a jamais ete revue POUR ELLE-MEME.
-- **D93 candidate — « un tunnel n'offre pas la sortie »** : le `Header` du site
-  est monte sans condition par `app/[locale]/layout.tsx` et propose « Partager
-  un trajet » / « Connexion » au milieu de l'inscription. Decision de GABARIT,
-  elle concerne les six pages d'auth.
+- ~~**D93 candidate — « un tunnel n'offre pas la sortie »**~~ : FAITE (page 5,
+  13/11). Reste a trancher ailleurs : les AUTRES entonnoirs du produit
+  (publication d'un trajet, demande de dossier Voyageur) n'ont pas ete passes au
+  crible — la regle les attend, `tunnelModeFor` n'a qu'a apprendre leur chemin.
 - Dette i18n nommee par D91 : ~140 ternaires `fr ? … : …` dans les formulaires
-  d'auth du web (D92 en a retire ~40 pour l'ecran qu'elle touchait). Ces pages
-  sont invisibles au controle i18n de la CI tant qu'ils y restent.
+  d'auth du web (D92 en a retire ~40 pour l'ecran qu'elle touchait, D97 ceux des
+  trois ecrans du mot de passe). Ces pages sont invisibles au controle i18n de la
+  CI tant qu'ils y restent. D93 n'y touche pas : elle ne modifie aucun
+  formulaire, seulement le gabarit qui les entoure.
 - Le delai reel d'arrivee du mail de verification n'a jamais ete mesure en
   conditions reelles (Resend).
 

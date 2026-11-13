@@ -8657,3 +8657,64 @@ réinitialisation.** Une seule définition : si elle change, elle change partout
 | 6 | Je colle un mot de passe généré | il est accepté |
 | 7 | Mon étape a expiré | un écran dédié propose de redemander un code |
 | 8 | Je choisis un mot de passe trop faible | l'écran nomme le critère manquant — le même qu'à l'inscription |
+
+# D93 — Dans un tunnel, on ne propose pas la sortie
+
+## Le besoin
+
+Une personne qui crée un compte, se connecte ou récupère son mot de passe est **en train de
+faire une seule chose**. Pendant ces six écrans, l'en-tête du site lui proposait un bouton
+mangue « Partager un trajet », un lien « Connexion » (vers un compte qui n'existe pas encore),
+sa messagerie, ses notifications et son menu de compte. Chacun de ces éléments est une raison
+de ne pas finir.
+
+Le produit avait déjà tranché cette question **une fois**, pour l'étape de paiement d'une
+réservation, le 17 octobre. La décision n'avait jamais été étendue, parce qu'elle avait été
+écrite à l'intérieur du composant qui s'en servait plutôt que posée comme une règle.
+
+## Les règles
+
+**RG-D93-1 — Un écran d'entonnoir ne propose aucune action concurrente.** Sur les six pages
+d'authentification et sur l'étape de paiement, l'en-tête ne porte ni appel à l'action, ni
+raccourci de navigation, ni geste de session (notifications, messages, menu du compte,
+recherche par raccourci clavier).
+
+**RG-D93-2 — Il reste toujours exactement une sortie, et elle est neutre.** Le logo demeure un
+lien vers l'accueil. Un entonnoir sans issue est hostile, et le navigateur garde de toute façon
+son bouton Retour : prétendre la porte fermée serait mentir.
+
+**RG-D93-3 — Changer de langue ou de thème n'est pas sortir.** Ces deux réglages restent
+disponibles sur les écrans d'authentification : ils ne quittent pas la page, ils la rendent
+lisible. Quelqu'un qui arrive sur l'inscription depuis un e-mail en anglais n'a aucun autre
+moyen de revenir au français.
+
+**RG-D93-4 — La liste des écrans d'authentification n'existe qu'une fois.** Toute page du
+groupe `(auth)` en fait partie, y compris les pages techniques. Une nouvelle page
+d'authentification entre dans la règle le jour où elle est créée, sans quoi un test échoue.
+
+**RG-D93-5 — Ce qui est vrai pendant le chargement est vrai après.** Les portes de sortie ne
+doivent pas apparaître « le temps que la page se charge » : l'état d'attente montre le même
+en-tête que l'état final.
+
+**RG-D93-6 — Un signal de confiance nomme un tiers ou un fait vérifiable** (reprise de
+RG-D91-1, appliquée au tunnel de paiement). « Réservation sécurisée » n'engage personne ;
+« Paiement sécurisé par Stripe » nomme qui garantit quoi.
+
+**RG-D93-7 — Les deux applications ferment le même tunnel.** Sur le téléphone, le groupe
+d'écrans d'authentification ne monte ni barre de navigation ni barre d'onglets : l'authenti-
+fication est une parenthèse au-dessus de l'application, jamais une destination. Le site dit
+désormais la même chose. Seuls les deux réglages diffèrent, parce que le téléphone suit la
+langue et le thème du système.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'inscription | aucun bouton « Partager un trajet », aucun lien « Connexion » dans l'en-tête |
+| 2 | J'ouvre n'importe laquelle des six pages d'authentification | le logo, le choix de la langue et le thème — rien d'autre |
+| 3 | Je clique le logo depuis l'inscription | je reviens à l'accueil (la sortie existe, une fois) |
+| 4 | Je regarde l'en-tête **pendant** que la page charge | il montre déjà l'en-tête réduit, sans clignotement du bouton mangue |
+| 5 | Je change la langue depuis l'écran du code | la page reste la même, dans l'autre langue |
+| 6 | J'ouvre l'étape de paiement d'une réservation | la mention lue est « Paiement sécurisé par Stripe » |
+| 7 | Je suis connecté et j'ouvre une page d'authentification | ni cloche, ni messagerie, ni menu de compte |
+| 8 | Une septième page d'authentification est ajoutée au code sans entrer dans la règle | un test échoue avant la fusion |
