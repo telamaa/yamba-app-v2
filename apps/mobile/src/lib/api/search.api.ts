@@ -11,6 +11,8 @@
  * La route est en authentification OPTIONNELLE : connecté, le Bearer part et
  * personnalise la réponse (favoris, langue du compte) ; visiteur, rien.
  */
+import { PRICING_EXAMPLE_PARAMS } from '@/lib/pricing-example';
+
 import { apiFetch } from './client';
 
 /** Catégories de colis (mêmes clés que le web, `search-results.types.ts`). */
@@ -57,6 +59,13 @@ export type TripSearchResult = {
   pricePerKg?: number | null;
   /** Kilos encore disponibles (CAP-02). */
   remainingKg?: number | null;
+  /** D99 3C — poids qui a servi aux deux champs ci-dessous : celui choisi par
+   *  l'Expéditeur, ou celui supposé (`estimateKg`). */
+  weightKg?: number;
+  /** D99 3A — total Expéditeur pour ce poids, en euros. Calculé par le SERVEUR,
+   *  le seul à connaître les paramètres de plateforme : la projection locale
+   *  (`pricing-example`) n'est qu'un repli. */
+  totalForWeight?: number | null;
   currency?: string;
   /** Catégories acceptées par le Voyageur (aperçu en pied de carte). */
   allowedCategories?: SearchParcelCategory[];
@@ -110,6 +119,10 @@ function baseQuery(params: SearchParams): URLSearchParams {
 
 export async function searchTrips(params: SearchParams): Promise<SearchPage> {
   const query = baseQuery(params);
+  // D99 3C — le colis de RÉFÉRENCE, pour que chaque carte annonce un total et
+  // non un prix au kilo. `estimateKg` enrichit sans filtrer : il ne retire
+  // aucun trajet de la liste, contrairement à `weightKg`.
+  query.set('estimateKg', String(PRICING_EXAMPLE_PARAMS.exampleWeightKg));
   if (params.mode && params.mode !== 'all') query.set('mode', params.mode);
   if (params.sort && params.sort !== 'earliest') query.set('sort', params.sort);
   if (params.cursor) query.set('cursor', params.cursor);

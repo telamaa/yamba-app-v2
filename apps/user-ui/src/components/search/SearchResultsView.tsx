@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { usePersistedFormState } from "@/hooks/usePersistedFormState";
+import { PRICING_EXAMPLE_PARAMS } from "@/lib/pricing-example";
 import TripSearchBar, { initialSearchDraft, SEARCH_VERSION, TRIP_SEARCH_STORAGE_KEY, type TripSearchValue } from "./TripSearchBar";
 import TripResultCard from "./TripResultCard";
 import TripResultCardMobile from "./TripResultCardMobile";
@@ -30,6 +31,20 @@ const HEADER_HEIGHT = 78;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
 const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
 const WEIGHT_STORAGE_KEY = "yamba.search.weightKg";
+
+/**
+ * D99 3B/3C — le colis SUPPOSÉ tant que l'Expéditeur n'a rien choisi.
+ *
+ * C'est le colis de RÉFÉRENCE de la recherche (2 kg), celui-là même que la
+ * projection de prix utilise pour son exemple : une seule valeur pour les
+ * deux, sinon la carte et son aperçu parleraient de deux colis différents.
+ *
+ * Il part au serveur en `estimateKg`, qui enrichit SANS filtrer — un poids
+ * supposé n'a pas à retirer des trajets d'une page qui annonce les montrer
+ * tous. Dès que l'Expéditeur touche le curseur, `weightKg` prend le relais et
+ * retrouve ses deux pouvoirs : filtrer sur la capacité, et trier.
+ */
+const DEFAULT_ESTIMATE_KG = PRICING_EXAMPLE_PARAMS.exampleWeightKg;
 
 
 const PAGE_SIZE = 10;
@@ -339,6 +354,8 @@ export default function SearchResultsView() {
       verifiedTicket: verifiedTicketOnly,
       families: selectedFamilies,
       weightKg: weightKg ?? undefined,
+      // Le poids CHOISI l'emporte ; sinon on fait estimer le colis de référence.
+      estimateKg: weightKg === null ? DEFAULT_ESTIMATE_KG : undefined,
       departureBuckets: selectedDepartureBuckets,
       limit: PAGE_SIZE,
       locale,

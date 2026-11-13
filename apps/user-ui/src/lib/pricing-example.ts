@@ -45,3 +45,30 @@ export function estimateShipperTotalCents(
 
 /** D81 — le plancher, en kilos : la seule formulation vraie sur tous les corridors. */
 export const BILLING_FLOOR_KG = PRICING_EXAMPLE_PARAMS.billingFloorKg;
+
+/**
+ * D99 1A — LA MISE EN FORME D'UN PRIX EST UNE RÈGLE, PAS UN DÉTAIL D'ÉCRAN.
+ *
+ * Les deux applications affichaient le même total de deux façons : le site
+ * arrondissait à l'euro (`maximumFractionDigits: 0` → « ≈ 25 € »), le
+ * téléphone donnait deux décimales (« ≈ 24,85 € »). Même trajet, même colis,
+ * deux prix. Le CALCUL était pourtant le même — c'est la mise en forme qui
+ * avait divergé, et c'est l'endroit où une divergence coûte le plus cher.
+ *
+ * La règle, tranchée le 13/11/2026 : **toujours deux décimales**. Le « ≈ »
+ * dit déjà que c'est une estimation ; arrondir ajoute une seconde
+ * approximation par-dessus, et ce chiffre sera comparé au prix DÉFINITIF à la
+ * réservation — un total qui change entre la liste et le paiement coûte plus
+ * cher en confiance que deux décimales en lisibilité.
+ *
+ * Le séparateur décimal suit la langue (`toLocaleString`), pas le pays du
+ * prix : « 24,85 » en français, « 24.85 » en anglais.
+ */
+export const PRICE_FRACTION_DIGITS = 2;
+
+export function formatAmountFromCents(cents: number, localeTag: string): string {
+  return (cents / 100).toLocaleString(localeTag, {
+    minimumFractionDigits: PRICE_FRACTION_DIGITS,
+    maximumFractionDigits: PRICE_FRACTION_DIGITS,
+  });
+}

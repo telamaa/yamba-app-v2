@@ -26,6 +26,14 @@ export type SearchTripsParams = {
   families?: SearchFamily[];
   /** D33 V2 — poids du colis (kg) : prix par carte, tri pour ce poids, capacité */
   weightKg?: number;
+  /**
+   * D99 3C — le colis SUPPOSÉ, tant que l'Expéditeur n'a rien choisi : il sert
+   * à calculer le prix affiché sur chaque carte, et RIEN d'autre. Il ne filtre
+   * pas sur la capacité et ne change pas le tri — sans quoi une page qui
+   * annonce « tous les trajets disponibles » en retirerait en silence.
+   * Ignoré par le serveur dès que `weightKg` est présent.
+   */
+  estimateKg?: number;
   departureBuckets?: DepartureTimeBucket[];
   cursor?: string | null;
   limit?: number;
@@ -86,6 +94,7 @@ function buildQueryString(params: SearchTripsParams): string {
   if (params.categories?.length) qs.set("categories", params.categories.join(","));
   if (params.families?.length) qs.set("families", params.families.join(","));
   if (params.weightKg) qs.set("weightKg", String(params.weightKg));
+  if (params.estimateKg) qs.set("estimateKg", String(params.estimateKg));
   if (params.departureBuckets?.length)
     qs.set("departureBuckets", params.departureBuckets.join(","));
 

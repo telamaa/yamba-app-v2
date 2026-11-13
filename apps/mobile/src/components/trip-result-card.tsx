@@ -43,10 +43,17 @@ import type { TripSearchResult } from '@/lib/api/search.api';
 import { countryFlag, countryName } from '@/lib/country-name';
 import {
   estimateShipperTotalCents,
+  formatAmountFromCents,
   PRICING_EXAMPLE_PARAMS,
 } from '@/lib/pricing-example';
 import { useSession } from '@/lib/session-context';
 import { getInitials, isPopular, showsViews } from '@/lib/trip-format';
+
+/**
+ * D99 3A — en dessous de ce seuil, la place restante CONTRAINT et mérite d'être
+ * dite ; au-dessus, c'est du décor. Même valeur que sur le site.
+ */
+const LOW_CAPACITY_KG = 5;
 
 export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   const t = useTranslations('search');
@@ -123,10 +130,21 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
   // réserver. MÊME miroir que la fiche, projection INDICATIVE : le prix réel
   // reste calculé et figé par le serveur (snapshot D17).
   const exampleKg = PRICING_EXAMPLE_PARAMS.exampleWeightKg;
-  const exampleCents =
-    perKgPrice !== null
-      ? estimateShipperTotalCents(Math.round(perKgPrice * 100), exampleKg).totalCents
-      : null;
+  /**
+   * D99 3A/3C — ce que l'envoi COÛTE, et pour quel colis.
+   *
+   * Le serveur l'envoie désormais (`totalForWeight`, calculé pour `estimateKg`
+   * ou pour le poids choisi) : c'est LUI qui fait foi, parce qu'il est le seul
+   * à connaître les paramètres de plateforme. La projection locale reste un
+   * repli — serveur plus ancien, ou trajet sans moteur au kilo.
+   */
+  const poidsAffiche = typeof trip.weightKg === 'number' ? trip.weightKg : exampleKg;
+  const totalCents =
+    typeof trip.totalForWeight === 'number'
+      ? Math.round(trip.totalForWeight * 100)
+      : perKgPrice !== null
+        ? estimateShipperTotalCents(Math.round(perKgPrice * 100), exampleKg).totalCents
+        : null;
   const showRemainingAlert = typeof trip.remainingSlots === 'number' && trip.remainingSlots <= 3;
 
   return (
@@ -134,8 +152,12 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
       onPress={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
       style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
       <ThemedView type="backgroundElement" style={styles.card}>
-        {/* ── En-tête : transport + date + alerte + cœur ── */}
-        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
+        {/* ── En-tête : transport + date + alerte + cœur ──
+            D99 4A — plus de bandeau ni de trait : la carte est UN objet, et les
+            groupes se lisent par la proximité. Même geste que sur le site, le
+            même jour : laisser le natif en trois bandes aurait recréé la dérive
+            que ce dépôt paie à répétition. */}
+        <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={[styles.modeChip, { backgroundColor: theme.backgroundSelected }]}>
               <Ionicons name={transportIcon(trip.transportMode)} size={12} color={theme.text} />
@@ -219,21 +241,25 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
           <View style={styles.priceBlock}>
             {perKgPrice !== null ? (
               <>
+                {/* D99 3A — DEUX lignes : ce que ça coûte, et pour quoi. Le
+                    prix au kilo quitte la carte — il ne servait qu'à comparer,
+                    or toutes les cartes affichent le total pour le MÊME colis,
+                    donc les totaux se comparent directement ; il reste sur la
+                    fiche du trajet. La place restante ne se dit que lorsqu'elle
+                    CONTRAINT : un signal de rareté toujours présent n'en est
+                    pas un, et « kg » voulait dire trois choses dans la même
+                    colonne (le colis, un prix unitaire, la place du trajet). */}
                 <ThemedText style={styles.price}>
-                  {formatTwoDecimals(perKgPrice, locale)} {currency}
-                  <ThemedText style={[styles.priceUnit, { color: theme.textSecondary }]}>
-                    /kg
-                  </ThemedText>
+                  {totalCents !== null
+                    ? `${formatAmountFromCents(totalCents, locale === 'fr' ? 'fr-FR' : 'en-US')} ${currency}`
+                    : `${formatTwoDecimals(perKgPrice, locale)} ${currency}`}
                 </ThemedText>
-                {exampleCents !== null && (
+                {totalCents !== null && (
                   <ThemedText style={[styles.example, { color: theme.textSecondary }]}>
-                    {t('card.exampleParcel', {
-                      price: `${formatCents(exampleCents, locale)} ${currency}`,
-                      kg: exampleKg,
-                    })}
+                    {t('card.totalForWeight', { kg: poidsAffiche })}
                   </ThemedText>
                 )}
-                {trip.remainingKg != null && (
+                {trip.remainingKg != null && trip.remainingKg <= LOW_CAPACITY_KG && (
                   <ThemedText style={[styles.remainingKg, { color: theme.tint }]}>
                     {t('card.remainingKg', { kg: trip.remainingKg })}
                   </ThemedText>
@@ -253,11 +279,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
         </View>
 
         {/* ── Pied : Voyageur + vues + chevron ── */}
-        <View
-          style={[
-            styles.footer,
-            { borderTopColor: theme.backgroundSelected, backgroundColor: accents.footerBg },
-          ]}>
+        <View style={styles.footer}>
           <TravelerAvatar trip={trip} dark={dark} />
           <ThemedText style={styles.travelerName} numberOfLines={1}>
             {trip.travelerFirstName}
@@ -272,11 +294,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                   {typeof trip.reviewCount === 'number' ? ` (${trip.reviewCount})` : ''}
                 </ThemedText>
               </>
-            ) : (
-              <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}>
-                {t('card.newTripper')}
-              </ThemedText>
-            )}
+            ) : null}
           </ThemedText>
 
           <View style={styles.footerRight}>
@@ -359,18 +377,6 @@ function formatTwoDecimals(value: number, locale: string): string {
 
 /** Cents → « 11 » / « 20,50 » : les centimes ne s'écrivent que s'il y en a
  *  (« 11,00 € » sous un prix au kilo fait du bruit pour rien). */
-function formatCents(cents: number, locale: string): string {
-  const value = cents / 100;
-  try {
-    return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    const fixed = cents % 100 === 0 ? String(value) : value.toFixed(2);
-    return locale === 'fr' ? fixed.replace('.', ',') : fixed;
-  }
-}
 
 /** « 4,8 » en français, "4.8" ailleurs. */
 function formatRating(rating: number, locale: string): string {
@@ -428,9 +434,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
-    paddingVertical: Spacing.two,
+    paddingTop: Spacing.two,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -550,9 +555,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
-    paddingVertical: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
   },
   travelerName: {
     flex: 1,

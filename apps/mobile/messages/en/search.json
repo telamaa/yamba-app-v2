@@ -50,11 +50,10 @@
   "card": {
     "fromPrice": "from",
     "remainingKg": "{kg} kg left",
-    "exampleParcel": "≈ {price} for {kg} kg",
+    "totalForWeight": "for {kg} kg, all in",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
     "remainingSlots": "{count, plural, one {# slot} other {# slots}}",
-    "newTripper": "New Traveler",
     "popular": "Popular",
     "favoriteAdd": "Add to favorites",
     "favoriteRemove": "Remove from favorites",
