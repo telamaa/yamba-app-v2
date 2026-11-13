@@ -26,7 +26,7 @@
     "welcomeTitle": "Bienvenue sur Yamba",
     "welcomeSubtitle": "Envoie tes colis légers autrement.",
     "createAccount": "Créer un compte",
-    "checkoutSecure": "Réservation sécurisée"
+    "checkoutSecure": "Paiement sécurisé par Stripe"
   },
   "userMenu": {
     "myAccount": "Mon compte",

@@ -26,7 +26,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import LoadingDots from "@/components/ui/LoadingDots";
 import { hasApiBaseUrl, requestPasswordResetOtp } from "@/services/auth.api";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
@@ -131,13 +132,20 @@ export default function ForgotPasswordForm({ heroVisual }: Props) {
               aria-busy={requestOtpMutation.isPending}
               className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {/* D95 4A — le libellé s'efface, il ne change pas. */}
-              {requestOtpMutation.isPending && (
-                <Loader2 size={16} aria-hidden className="absolute inset-0 m-auto animate-spin" />
+              {/* La vague de trois points PREND la place du libellé (arbitrage à l'écran du
+                  13/11/2026). Le bouton ne change pas de taille pour autant : il est en
+                  pleine largeur et sa hauteur vient de son padding.
+                  Le `sr-only` garde le NOM du bouton pour un lecteur d'écran — sans lui, le
+                  bouton devient anonyme pendant toute l'attente, et c'est le seul coût réel
+                  de cette disposition. */}
+              {requestOtpMutation.isPending ? (
+                <>
+                  <LoadingDots />
+                  <span className="sr-only">{t("submit")}</span>
+                </>
+              ) : (
+                t("submit")
               )}
-              <span className={requestOtpMutation.isPending ? "opacity-0" : undefined}>
-                {t("submit")}
-              </span>
             </button>
           </form>
 

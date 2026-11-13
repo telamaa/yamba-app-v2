@@ -26,7 +26,7 @@
     "welcomeTitle": "Welcome to Yamba",
     "welcomeSubtitle": "Send your light parcels differently.",
     "createAccount": "Create an account",
-    "checkoutSecure": "Secure booking"
+    "checkoutSecure": "Payment secured by Stripe"
   },
   "userMenu": {
     "myAccount": "My account",

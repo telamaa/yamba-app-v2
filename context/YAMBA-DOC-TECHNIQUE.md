@@ -17204,3 +17204,305 @@ elles sont passées aux deux marches dans le même lot.
 Mobile : **622 → 665** fiches (35 suites). `tsc` vert sur le mobile (deux programmes), sur
 `apps/user-ui` et sur `apps/e2e` ; contrôle i18n vert. Les trois écrans ont été **ouverts dans
 un navigateur**, FR et EN, aucun chemin de clé à l'écran.
+
+# D93 — Un tunnel n'offre pas la sortie
+
+*Page 5 de la passe de finitions, et la première qui ne touche aucun formulaire : elle tranche
+le gabarit des six pages d'auth. Nommée « D93 candidate » par D92 trois jours plus tôt.*
+
+## ① Ce que montraient les six pages d'auth
+
+L'en-tête du site est monté **sans condition** par `app/[locale]/layout.tsx`. Sur
+`/register`, `/register/verify`, `/login`, `/password/forgot`, `/password/verify` et
+`/password/reset`, il proposait donc :
+
+| Élément | Pourquoi c'est une porte de sortie |
+|---|---|
+| « Partager un trajet » (aplat mangue) | un appel à l'action **concurrent** à l'intérieur d'un entonnoir |
+| « Connexion » | propose un compte qui n'existe pas encore, en plein milieu d'une inscription |
+| cloche, bulle de messagerie, menu du compte | gestes d'une session… sur l'écran où on essaie d'en ouvrir une |
+| palette `Cmd+K`, feuille du bas (mobile) | deux navigations complètes de plus |
+
+La règle existait déjà — **une fois, en dur, pour un seul parcours** :
+
+```tsx
+// Header.tsx:40, posée le 17/10 pour le tunnel de paiement
+const isCheckoutTunnel = /^\/trips\/[^/]+\/book\/?$/.test(pathname);
+```
+
+Elle était juste, commentée, motivée. Et confinée : aucune fiche ne la lisait, et rien ne
+disait aux cinq autres entonnoirs du produit qu'elle existait.
+
+## ② La règle devient une donnée de la route
+
+`apps/user-ui/src/lib/layout/tunnel.ts` — **pur, zéro import**, donc lisible et testable :
+
+```ts
+export type TunnelMode = "none" | "auth" | "checkout";
+
+export const AUTH_TUNNEL_PREFIXES = ["/login", "/register", "/password", "/refresh"] as const;
+const CHECKOUT_TUNNEL_PATH = /^\/trips\/[^/]+\/book\/?$/;
+
+export function tunnelModeFor(pathname: string | null | undefined): TunnelMode {
+  if (isCheckoutTunnel(pathname)) return "checkout";
+  if (isAuthTunnel(pathname)) return "auth";
+  return "none";
+}
+```
+
+Et le `Header` ne décide plus, il lit :
+
+```tsx
+const tunnel = tunnelModeFor(pathname);
+const isCheckoutTunnel = tunnel === "checkout";
+const isAuthTunnel = tunnel === "auth";
+const isTunnel = tunnel !== "none";
+```
+
+### Pourquoi pas un `(auth)/layout.tsx`, qui serait l'endroit idiomatique de Next ?
+
+C'est la question à se poser, et la réponse est une contrainte d'**arbre**, pas de goût :
+
+| Fait | Conséquence |
+|---|---|
+| `(auth)/` existe comme groupe de routes mais n'a aucun `layout.tsx` (`(marketing)/` en a un, qui ajoute le `Footer`) | le groupe serait l'endroit naturel… |
+| `<Header />` est monté par le layout **parent** (`[locale]/layout.tsx:66`) | …mais un `(auth)/layout.tsx` est **sous** lui dans l'arbre React : il ne peut ni le démonter ni l'informer (le contexte descend, il ne remonte pas) |
+| `pt-[78px]` est en dur sur le wrapper parent (`:69`) | l'en-tête ne peut pas **disparaître** : il laisserait un trou de 78 px. Il reste monté et se **réduit** |
+
+Déplacer le `Header` dans chaque layout de groupe aurait obligé à le remonter dans tous les
+segments non groupés (dashboard, search, trips, …) : disproportionné pour le gain.
+
+## ③ Ce qu'il reste dans l'entonnoir
+
+```tsx
+{isCheckoutTunnel ? (
+  <div …><Lock size={13} /><span>{t("checkoutSecure")}</span></div>
+) : isAuthTunnel ? (
+  /* Les deux réglages, à toutes les largeurs : ni l'un ni l'autre ne fait sortir. */
+  <div className="flex items-center gap-2 md:gap-3">
+    <HeaderLocaleSwitcher variant="header" />
+    <HeaderThemeToggle variant="icon" />
+  </div>
+) : ( /* la navigation complète */ )}
+```
+
+Le **logo reste un lien vers l'accueil** dans les trois régimes (`HeaderLogo` est monté avant
+la ternaire). Un entonnoir dont on ne peut pas sortir est un motif hostile, et le navigateur
+garde son bouton Retour de toute façon : la ligne tracée n'est pas « aucune sortie » mais
+**une** sortie, neutre.
+
+## ④ Deux listes disaient la même chose — et avaient déjà divergé
+
+`lib/auth/login-redirect.ts` tenait sa propre copie des préfixes d'auth :
+
+```ts
+const NO_REDIRECT_PREFIXES = ["/login", "/register", "/password"];   // ← avant
+```
+
+`/refresh` y **manquait**, alors qu'il appartient au groupe `(auth)` depuis le 28/08 : le
+header proposait donc d'y revenir après connexion, un `?redirect=/refresh` qui ne ramène sur
+aucune page utile. Le fichier lit désormais la liste unique :
+
+```ts
+import { isAuthTunnel } from "@/lib/layout/tunnel";
+
+export function shouldCarryRedirect(pathname: string | null | undefined): boolean {
+  if (!pathname || pathname === "/") return false;
+  return !isAuthTunnel(pathname);
+}
+```
+
+Même motif que `maskEmail` (D92) et que la lecture des refus (D96), une troisième fois : deux
+listes qui disent la même chose finissent toujours par ne plus la dire.
+
+## ⑤ Le défaut non demandé : le squelette ne suivait pas la règle
+
+`HeaderSkeleton` est monté **en permanence** — le `Header` le cache en `display: none` — et
+rendait `HeaderShareTripCTA` plus trois pastilles **y compris dans le tunnel de paiement**,
+depuis le 17/10. Les portes de sortie clignotaient donc pendant toute la résolution de
+`useUser`. La règle avait été posée dans le `Header`, pas ici.
+
+En tunnel il n'y a **rien à attendre** (aucune grappe d'authentification ne s'y affiche) : le
+squelette y rend l'en-tête définitif — zéro pastille, zéro saut à la résolution.
+
+```tsx
+<HeaderSkeleton isCompact={isCompact} tunnel={tunnel} />
+```
+
+## ⑥ La mention du tunnel de paiement nomme enfin un tiers
+
+D91 1A : « un signal de confiance nomme un tiers ou un fait vérifiable, sinon il ne dit rien »,
+et donne pour contre-exemple « Inscription sécurisée ». La mention servie par le tunnel était
+« **Réservation sécurisée** » / « Secure booking » — elle ne nomme personne, et tombait donc
+sous sa propre règle.
+
+| | avant | après |
+|---|---|---|
+| `fr` | Réservation sécurisée | **Paiement sécurisé par Stripe** |
+| `en` | Secure booking | **Payment secured by Stripe** |
+
+## ⑦ Les fiches
+
+| Où | Quoi | Combien |
+|---|---|---|
+| `apps/mobile/src/lib/auth-tunnel-parite.spec.ts` | la couverture du groupe de routes, l'unicité de la liste, ce qui reste dans l'entonnoir, le squelette, la parité avec `headerShown: false`, la mention qui nomme Stripe | **40** |
+| `apps/e2e/src/chapitres/web-acc.spec.ts` | WEB-ACC-13, les six routes dans un vrai Chrome | **6** |
+
+Mobile **665 → 705** (36 suites). La fiche la plus utile lit le **système de fichiers** :
+
+```ts
+// tout dossier de app/[locale]/(auth)/ qui porte un page.tsx doit être couvert par la liste
+it.each(routesDuGroupeWeb())('%s est couverte par la liste', (route) => {
+  expect(prefixes.some((p) => couvertPar(route, p))).toBe(true);
+});
+```
+
+Une septième page d'auth ajoutée sans la liste passe au rouge — c'est la seule chose qui
+empêche ce lot de vieillir comme le harnais a vieilli entre D92 et D97.
+
+Les six fiches de recette comptent les portes de sortie **deux fois**, avant et après la
+résolution de `useUser` : c'est la seule façon de voir le défaut ⑤. Elles ont été **jouées**
+(6/6, 36,7 s) et, fait utile à noter, elles n'ont eu besoin **que du front** — une fiche de
+chrome ne demande pas les six services.
+
+### Ce que les fiches ne font pas, et pourquoi
+
+Elles n'**exécutent** pas `tunnelModeFor` : elles lisent la liste réelle dans la source et
+rejouent l'appariement. Un `import` du code du site depuis le harnais mobile créerait une arête
+dans le graphe Nx, et `targetDefaults.test.dependsOn = ["^build"]` ferait **construire user-ui**
+avant chaque lancement des tests du téléphone — 53,6 s mesurées, et un job « Tests unitaires
+(mobile) » qui tomberait quand le build du site casse. C'est aussi pourquoi les quatre fiches
+de parité existantes lisent le web comme du texte : ce n'était pas de la timidité.
+
+La vraie réponse est ailleurs : **`apps/user-ui` n'a aucune cible de test, aucun `jest.config`,
+zéro fiche** — la plus grosse application du dépôt, et aucun des dix-neuf contrôles n'en lit une
+ligne de logique. C'est mot pour mot le constat qui a justifié A223 pour le mobile. Lot à part,
+nommé : **« l'A223 du site »**.
+
+# D98 — L'attente d'un bouton d'action : la vague de trois points
+
+*Retour de recette de l'utilisateur sur le simulateur — « je n'aime pas le chargement actuel de
+mes boutons ». Cinq dispositions posées et jugées à l'écran dans la même journée.*
+
+## ① Les cinq dispositions, et pourquoi la cinquième
+
+| # | Disposition | Verdict |
+|---|---|---|
+| ① | Libellé remplacé par un libellé d'attente (« Connexion… ») + disque à gauche | refusée — la largeur du bouton saute entre « Se connecter » et « Connexion… » |
+| ② | Points animés à DROITE, libellé conservé | vue, pas retenue |
+| ③ | Points animés à GAUCHE, plus petits, libellé conservé | vue, pas retenue |
+| ④ | Spinner centré à la place du libellé | vue, pas retenue |
+| ⑤ | **Vague de trois points à la place du libellé** | **retenue** |
+
+L'état de départ était D95 4A : le libellé rendu à l'opacité 0 — il garde sa place, donc la
+largeur est figée — et un disque superposé au centre. **D95 avait raison sur le fond** (le
+bouton ne doit pas changer de taille ; un libellé d'attente n'apprend rien que l'indicateur ne
+dise déjà) **et tort sur la forme** : un mot invisible qui occupe sa place est illisible ET
+présent. À l'écran, cela se lit comme une **pulsation** du bouton — c'est le mot qu'a employé
+l'utilisateur, trois fois, avant qu'on ne comprenne de quel écran il parlait.
+
+## ② Ce qui est retenu, au chiffre près
+
+```ts
+const DOT_COUNT = 3;
+const DOT_CYCLE_MS = 900;
+const DOT_STAGGER_MS = 150;
+// montée 4 px · grossissement 0,85 → 1,15 · opacité 0,35 → 1
+```
+
+**Téléphone** — `Animated` natif, `useNativeDriver: true` (l'animation tourne hors du fil JS,
+donc elle ne saccade pas pendant un rendu) :
+
+```tsx
+{pending ? (
+  <LoadingDots color={palette.ctaLabel} />
+) : (
+  <Text style={[styles.ctaLabel, …]}>{label}</Text>
+)}
+```
+
+**Site** — le jumeau CSS, dans `app/global.css`, selon le motif maison (`yambaShimmer` pour
+`Skeleton`) : ce dépôt ne déclare **aucun** keyframe dans Tailwind.
+
+```css
+.yamba-dot { animation: yambaDot 900ms ease-in-out infinite; }
+@keyframes yambaDot {
+  0%, 100% { opacity: 0.35; transform: translateY(0) scale(0.85); }
+  33%      { opacity: 1;    transform: translateY(-4px) scale(1.15); }
+}
+```
+
+Le décalage de chaque point est posé en style inline (`animationDelay`), comme `Skeleton` le
+fait pour son shimmer.
+
+## ③ Le coût de cette disposition, et comment il est payé
+
+Quand le texte visible disparaît, **le bouton perd son nom** pour un lecteur d'écran : il
+n'annonce plus que « bouton » pendant toute l'attente. C'est le seul inconvénient réel du choix
+⑤, et il se paie en une ligne de chaque côté.
+
+```tsx
+// téléphone — sur la Pressable
+accessibilityLabel={label}
+accessibilityState={{ busy: pending, disabled: disabled || pending }}
+
+// site — à côté des points
+<span className="sr-only">{t("submit")}</span>
+```
+
+## ④ Un composant, pas cinq copies
+
+L'ancien motif vivait **recopié dans les cinq formulaires d'auth** du site, et il avait déjà
+dérivé : disque de 16 px dans `LoginForm`, `ForgotPasswordForm`, `ResetPasswordForm`, 18 px
+dans `RegisterForm` et `OtpVerifyView`. Il vit maintenant dans
+`apps/user-ui/src/components/ui/LoadingDots.tsx`. Le jour où la forme changera encore — et elle
+a changé cinq fois en un jour — elle changera à un endroit.
+
+Au passage, et selon la règle posée par D95 elle-même (« une animation maison qu'on garde au cas
+où est du code mort qui se maintient ») : `ActivityIndicator` et le style `labelFaded` sortent
+du téléphone ; côté site, le composant de points et son keyframe ont été supprimés puis
+recréés selon la disposition en cours, jamais laissés en double.
+
+## ⑤ Ce qui n'est pas touché
+
+`OtpVerifyView` porte un **second** indicateur : un disque de 11 px sur le lien « Renvoyer le
+code » (`:588`). Ce n'est pas un appel à l'action — un lien de texte n'accueille pas une vague
+de points de 8 px — il garde donc sa forme. La fiche vise le bouton qui porte `aria-busy`, pas
+le fichier.
+
+## ⑥ Les fiches, et ce qu'elles gardent
+
+**Onze fiches** (`auth-login-parite.spec.ts` ⑥, `auth-password-parite.spec.ts` ⑧), mobile
+**705 → 711**. Elles ne gardent pas l'effet — il a changé cinq fois en un jour — mais ce qui
+doit rester vrai quel qu'il soit :
+
+| # | Ce qui est gardé |
+|---|---|
+| ① | le bouton ne change pas de taille pendant l'attente (hauteur fixée côté mobile, pleine largeur côté web, rangée de points à la hauteur de la ligne de texte) |
+| ② | le bouton garde son **nom** quand son texte s'en va |
+| ③ | les deux fronts attendent de la même façon — et les fiches comparent les **chiffres**, pas l'intention |
+
+```ts
+// ③ — les mesures sont recopiées d'un front à l'autre, donc on les confronte
+expect(lire(KIT)).toMatch(/outputRange: \[0, -4\]/);
+expect(css).toMatch(/translateY\(-4px\) scale\(1\.15\)/);
+```
+
+### Trois fiches parties au rouge, et ce qu'elles ont attrapé
+
+1. **Un mot interdit que le commentaire d'à côté citait** — `not.toContain('ActivityIndicator')`
+   échouait sur la phrase qui explique sa disparition. Deuxième fois dans la journée (le matin,
+   `NO_REDIRECT_PREFIXES` sur D93). On vise l'**usage**, jamais le mot :
+   `not.toMatch(/<ActivityIndicator/)`.
+2. **Une tranche de fichier qui cherchait sa fin avant son début** —
+   `source.indexOf('</button>')` sans repartir de l'index du bouton : tranche vide, fiche verte
+   pour de mauvaises raisons sur un fichier, rouge sur l'autre.
+3. **`LoginForm` a DEUX boutons d'envoi depuis D96** — « Continuer » (étape 1, aucune attente :
+   le passage à l'étape du mot de passe est local) et « Se connecter » (étape 2). L'aide prenait
+   le premier. Elle vise maintenant celui qui porte `aria-busy`, c'est-à-dire celui qui travaille.
+
+### La dette que ce lot referme
+
+Avant ce jour, **aucune fiche n'épinglait l'indicateur d'attente**, sur aucun des deux fronts.
+C'est pour cela que D95 avait pu supprimer la vague native du téléphone — posée un mois plus tôt
+— sans que rien ne le signale, et le retour en arrière serait passé tout aussi inaperçu.

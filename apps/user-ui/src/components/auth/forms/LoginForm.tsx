@@ -54,7 +54,8 @@ import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, KeyRound } from "lucide-react";
+import LoadingDots from "@/components/ui/LoadingDots";
 import { useFlashToast } from "@/hooks/useFlashToast";
 import { sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import GoogleSignInButton from "@/components/auth/shared/GoogleSignInButton";
@@ -377,12 +378,20 @@ export default function LoginForm({ heroVisual, variant = "page", redirectOverri
       {errorBlock}
 
       <button type="submit" disabled={loginMutation.isPending} aria-busy={loginMutation.isPending} className={ctaBtn}>
-        {/* D95 4A — le libellé s'EFFACE, il ne change pas : il garde sa place,
-            donc le bouton garde sa largeur, et le disque se superpose. */}
-        {loginMutation.isPending && (
-          <Loader2 size={16} className="absolute inset-0 m-auto animate-spin" aria-hidden="true" />
+        {/* La vague de trois points PREND la place du libellé (arbitrage à l'écran du
+            13/11/2026). Le bouton ne change pas de taille pour autant : il est en
+            pleine largeur et sa hauteur vient de son padding.
+            Le `sr-only` garde le NOM du bouton pour un lecteur d'écran — sans lui, le
+            bouton devient anonyme pendant toute l'attente, et c'est le seul coût réel
+            de cette disposition. */}
+        {loginMutation.isPending ? (
+          <>
+            <LoadingDots />
+            <span className="sr-only">{t("submit")}</span>
+          </>
+        ) : (
+          t("submit")
         )}
-        <span className={loginMutation.isPending ? "opacity-0" : undefined}>{t("submit")}</span>
       </button>
     </form>
   );

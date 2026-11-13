@@ -8357,3 +8357,291 @@ Deux parades, toutes deux appliquées ici :
 - **Anti-énumération** (OWASP WSTG-IDNT-04) — pourquoi « si un compte existe » n'est pas une
   tournure de politesse mais une exigence, et ce que le serveur fait pour la tenir (temps de
   réponse constant, message unique).
+
+## Chapitre 237 — Une règle juste écrite au mauvais endroit, l'arbre React qui décide à votre place, et le coût caché d'un `import`
+
+Page 5 de la passe. Le lot tient en une phrase : **la règle existait déjà, bien écrite, et elle
+n'a protégé qu'une page pendant vingt-sept jours.** Cinq techniques en sortent.
+
+### 1. Une constante dans un composant n'est ni lisible, ni testable, ni réutilisable
+
+Le `Header` portait ceci depuis le 17/10 :
+
+```tsx
+const isCheckoutTunnel = /^\/trips\/[^/]+\/book\/?$/.test(pathname);
+```
+
+Rien à reprocher au code. Tout à reprocher à son **adresse** : une règle de produit vivait dans
+un `.tsx` client, donc (a) personne ne la trouve en cherchant « quelles pages sont des
+entonnoirs ? », (b) aucune fiche ne peut l'exécuter sans monter React, (c) le cinquième
+entonnoir du produit ne peut pas la réutiliser — il la réécrira, ou l'ignorera. C'est la
+troisième fois dans cette passe que le dépôt paie une règle dupliquée (`maskEmail` en D92, la
+lecture des refus en D96, la liste des pages d'auth ici).
+
+> **Le test de l'adresse** : si la règle était fausse, où iriez-vous la corriger ? Si la réponse
+> est « dans le composant qui l'affiche », elle est au mauvais endroit.
+
+Sorti dans un module pur, c'est gratuit :
+
+```ts
+export type TunnelMode = "none" | "auth" | "checkout";
+export function tunnelModeFor(pathname: string | null | undefined): TunnelMode { … }
+```
+
+Noter le **type union** plutôt que deux booléens : `isAuthTunnel && isCheckoutTunnel` ne peut
+pas exister, et TypeScript le sait. Deux booléens autorisent quatre états dont deux absurdes.
+
+### 2. L'arbre React décide où une règle peut vivre — pas votre sens de l'élégance
+
+Le réflexe, en App Router, est de poser le chrome d'un groupe de routes dans son `layout.tsx` :
+c'est ce que fait déjà `(marketing)/layout.tsx` pour le `Footer`. Ici c'est **impossible**, et
+pour une raison structurelle qu'il faut savoir reconnaître :
+
+```
+app/[locale]/layout.tsx        ← monte <Header /> ET réserve sa hauteur (pt-[78px])
+└── (auth)/layout.tsx          ← serait ICI : sous le Header, donc sans prise sur lui
+    └── login/page.tsx
+```
+
+Un layout enfant ne peut pas démonter un composant monté par son parent, et un contexte
+**descend** — il ne remonte pas. Les trois issues, avec leur coût :
+
+| Issue | Coût |
+|---|---|
+| Déplacer `<Header />` dans chaque layout de groupe | il faut le remonter dans tous les segments **non groupés** (dashboard, search, trips…) : beaucoup de code pour un drapeau |
+| Un provider au-dessus du `Header`, alimenté par la route | il faudrait quand même lire `pathname` quelque part — c'est la même règle, avec un provider en plus |
+| **Lire la route là où le `Header` est monté** | une fonction pure, zéro structure nouvelle |
+
+Et une contrainte visuelle tranche le reste : la hauteur de l'en-tête est réservée **en dur** par
+le parent (`pt-[78px]`). Un en-tête retiré laisserait un trou de 78 px. Donc il ne disparaît
+pas : il **se réduit**. Beaucoup de décisions d'architecture se prennent ainsi — non pas par
+goût, mais parce qu'une seule option survit aux contraintes déjà payées.
+
+### 3. Le composant monté en permanence que personne ne regarde
+
+`Header` rend **deux** arbres, en permanence :
+
+```tsx
+<div style={{ display: userState.isLoading ? "block" : "none" }}><HeaderSkeleton … /></div>
+<div style={{ display: userState.isLoading ? "none" : "block" }}>{/* le vrai */}</div>
+```
+
+C'est un bon motif (zéro saut de mise en page), et c'est un **angle mort** : toute règle posée
+dans la seconde branche doit l'être dans la première. Le tunnel de paiement affichait donc son
+CTA mangue pendant toute la résolution de `useUser`, depuis un mois, sans que rien ne le dise.
+
+La leçon est générale : **chaque fois qu'un écran a un état d'attente, demandez-vous si la règle
+que vous venez d'écrire s'y applique aussi.** Et testez-le en deux temps — c'est ce que fait la
+fiche de recette :
+
+```ts
+await page.goto(route, { waitUntil: "domcontentloaded" });     // 1er temps : le squelette
+expect(await compterLesPortesDeSortie(page)).toBe(0);
+await page.waitForLoadState("networkidle");                     // 2e temps : l'en-tête réel
+expect(await compterLesPortesDeSortie(page)).toBe(0);
+```
+
+### 4. Un `import` a un coût que `tsc` ne montre pas : il crée une arête dans le graphe
+
+Pour exécuter la règle du site depuis le harnais du téléphone, un import relatif suffit — et il
+passe au vert du premier coup. Mesure prise **avant** de garder la solution :
+
+```sh
+npx nx graph --file=/tmp/g.json   # @yamba-app/mobile : [] → ["@yamba-app/user-ui"]
+```
+
+```json
+// nx.json
+"targetDefaults": { "test": { "dependsOn": ["^build"] } }
+```
+
+Conséquence : `nx test @yamba-app/mobile` construit désormais **user-ui d'abord** (53,6 s
+mesurées), et le contrôle de CI « Tests unitaires (mobile) » devient rouge quand le **build du
+site** casse. Deux contrôles couplés pour une fiche : on jette.
+
+> **Dans un monorepo, un `import` n'est pas qu'une ligne : c'est une dépendance de build.**
+> Avant d'importer à travers une frontière de projet, regardez `dependsOn` — et comparez au coût
+> de lire le fichier comme du texte (`readFileSync`), qui ne crée aucune arête.
+
+C'est précisément pour cela que les quatre fiches de parité du dépôt lisent le web comme du
+texte. En relisant leur en-tête on croit à de la prudence ; c'était une mesure.
+
+### 5. Une fiche texte peut quand même être impossible à contourner — si elle lit le disque
+
+Une fiche qui compare des chaînes se périme. Une fiche qui lit l'**arborescence réelle** ne se
+périme pas :
+
+```ts
+/** Tout dossier de app/[locale]/(auth)/ qui porte un page.tsx. */
+function routesDuGroupeWeb(racine = GROUPE_WEB, prefixe = ''): string[] {
+  const trouvees: string[] = [];
+  for (const entree of readdirSync(racine, { withFileTypes: true })) {
+    if (!entree.isDirectory()) continue;
+    const chemin = `${prefixe}/${entree.name}`;
+    if (existsSync(join(racine, entree.name, 'page.tsx'))) trouvees.push(chemin);
+    trouvees.push(...routesDuGroupeWeb(join(racine, entree.name), chemin));
+  }
+  return trouvees.sort();
+}
+
+it.each(routesDuGroupeWeb())('%s est couverte par la liste', (route) => {
+  expect(prefixesDeclares().some((p) => couvertPar(route, p))).toBe(true);
+});
+```
+
+Deux propriétés qui valent le détour : `it.each` **génère** une fiche par route trouvée (le
+rapport nomme la route fautive, pas « une route »), et la liste attendue est lue dans la source
+de la règle, pas recopiée. Ajouter une septième page d'auth sans l'inscrire dans la règle fait
+échouer la CI.
+
+Et dites dans l'en-tête de la fiche ce qu'elle ne couvre **pas** — ici : elle n'exécute pas la
+fonction, donc un changement d'**algorithme** d'appariement lui échapperait. Une fiche qui
+annonce sa limite est une fiche qu'on ne croira pas plus forte qu'elle n'est.
+
+### 6. Le piège du préfixe nu
+
+`pathname.startsWith("/login")` est vrai pour `/loginate`. D'où la frontière explicite, et les
+sept fiches qui l'épinglent (`/loginate`, `/registered`, `/passwords`, `/refreshed`, …) :
+
+```ts
+const sousPrefixe = (pathname: string, prefixe: string): boolean =>
+  pathname === prefixe || pathname.startsWith(prefixe + "/");
+```
+
+### Pour aller plus loin
+
+- **CQS** (chapitre 213) : `tunnelModeFor` répond sans rien écrire — aucun état, aucun effet.
+- **Le jumeau** (chapitre 236) : la réponse était écrite dans `apps/mobile/src/app/(auth)/_layout.tsx`
+  (`headerShown: false`) depuis le lot auth. Chercher le jumeau a remplacé la moitié de la
+  réflexion, deux lots de suite.
+- **Ce qui reste à faire** : `apps/user-ui` n'a **aucune** cible de test. Une règle pure sans
+  harnais pour l'exécuter est une promesse à moitié tenue — c'est le lot « l'A223 du site ».
+
+## Chapitre 238 — L'effet d'interface ne se raisonne pas, il se regarde
+
+Cinq dispositions du même bouton dans la même journée, et la cinquième retenue. Le lot n'a rien
+appris sur React ni sur `Animated` ; il a appris une **méthode**, et trois pièges de fiches.
+
+### 1. Il existe une classe de décisions que le registre ne peut pas préempter
+
+La règle du dépôt est claire : une décision d'architecture s'écrit au registre **avant** le
+code. Elle marche parce que ces décisions se **démontrent** — une liste en double finit par
+diverger, un 404 ne doit pas révéler une ressource, un instantané de prix ne se recalcule pas.
+On peut en convaincre quelqu'un sur le papier.
+
+Un effet d'interface, non. D95 était argumentée, mesurée, et portait trois défauts nommés à son
+actif :
+
+> le SAUT de largeur ; le changement de LIBELLÉ, un mot de plus à lire pour n'apprendre que ce
+> que le disque dit déjà ; le bouton qui se vide puis se remplit — deux animations là où une
+> suffit.
+
+Tout cela est vrai. Et l'effet produit a été rejeté par son commanditaire **à la seconde où il
+l'a vu**, un mois plus tard. Le raisonnement était juste et la conclusion mauvaise, parce que
+le raisonnement ne contenait pas la seule chose qui comptait : ce que ça fait, à l'œil, sur un
+écran de téléphone.
+
+> **La méthode pour cette classe de sujets : poser, montrer, jeter, recommencer — et ne graver
+> qu'à la fin.** D98 est donc écrite APRÈS le code, par exception assumée, et l'entrée le dit.
+
+Corollaire de coût : il faut rendre le cycle **court**. C'est ce qui justifie, ici, un composant
+partagé plutôt que cinq copies — ce n'est pas de l'hygiène, c'est ce qui fait passer un essai
+de cinq minutes à trente secondes.
+
+### 2. Le vocabulaire de l'utilisateur est une donnée, pas une approximation
+
+« C'est un effet Pulse » — répété trois fois. Techniquement faux : il n'y avait aucun
+`animate-pulse` sur ce bouton, mais un disque qui tourne. **Et pourtant le mot était juste** :
+un libellé rendu à l'opacité 0 qui garde sa place produit exactement la sensation d'un bloc qui
+respire. Pendant deux allers-retours j'ai corrigé le vocabulaire au lieu d'écouter ce qu'il
+décrivait, et j'ai modifié le mauvais écran — puis le mauvais front.
+
+Ce qui a débloqué la situation n'est pas une question de plus, c'est une recherche dans
+l'**historique** :
+
+```sh
+git log --oneline -S "LoadingDots" -- apps/mobile
+# f88e5914  auth — attente des CTA en points pulsés (vague animée native)…
+# 92912eca  le telephone compose dans la police de la marque (D95)
+```
+
+« Points **pulsés** » : le mot de l'utilisateur était dans le message de commit qui les avait
+posés. Il décrivait quelque chose qui avait existé, et qu'on lui avait retiré.
+
+> **Quand un retour de recette ne colle pas au code sous vos yeux, cherchez ce qui a été
+> SUPPRIMÉ.** `git log -S` sur le nom du composant répond en une seconde.
+
+### 3. Trois pièges de fiches, tous payés le même jour
+
+**① Interdire un mot qu'un commentaire cite.**
+
+```ts
+expect(kit).not.toContain('ActivityIndicator');   // ✗ rouge sur le commentaire
+expect(kit).not.toMatch(/<ActivityIndicator/);    // ✓ l'usage
+expect(kit).not.toMatch(/^\s*ActivityIndicator,$/m); // ✓ l'import
+```
+
+Un fichier bien écrit **explique** ce qu'il a cessé de faire. Une fiche qui interdit le mot
+interdit la mémoire. Payé deux fois dans la journée (le matin sur `NO_REDIRECT_PREFIXES`).
+
+**② Une tranche dont la fin précède le début.**
+
+```ts
+source.slice(source.indexOf('type="submit"'), source.indexOf('</button>'))   // ✗
+source.slice(debut, source.indexOf('</button>', debut))                      // ✓
+```
+
+`slice` ne proteste pas : il rend une chaîne vide. Et une chaîne vide passe toutes les
+assertions `not.toContain` — **la fiche devient verte pour la pire des raisons.** C'est le
+défaut le plus dangereux des trois, parce qu'il ne se manifeste que sur les fichiers où il ne
+nuit pas.
+
+**③ « Le bouton » n'existe pas.**
+
+```ts
+// LoginForm en a DEUX depuis D96 : « Continuer » (étape 1) et « Se connecter » (étape 2)
+function blocDuBouton(source: string): string {
+  let i = source.indexOf('type="submit"');
+  while (i >= 0) {
+    const bloc = source.slice(i, source.indexOf('</button>', i));
+    if (bloc.includes('aria-busy')) return bloc;   // celui qui TRAVAILLE
+    i = source.indexOf('type="submit"', i + 1);
+  }
+  throw new Error('aucun bouton d’envoi avec aria-busy dans ce fichier');
+}
+```
+
+On vise par une **propriété** (« celui qui porte `aria-busy` »), pas par un rang (« le
+premier »). Un rang se périme au prochain lot ; une propriété décrit l'intention.
+
+### 4. Tester ce qui survit aux changements d'avis
+
+L'effet a changé cinq fois en un jour. Une fiche qui épingle l'effet se réécrit cinq fois —
+c'est ce qui s'est passé, et c'est du temps perdu. Les fiches finales gardent trois propriétés
+qui, elles, n'ont pas bougé d'une disposition à l'autre :
+
+1. le bouton ne change pas de taille pendant l'attente ;
+2. il garde son **nom** pour un lecteur d'écran quand son texte s'en va ;
+3. les deux fronts attendent de la même façon — et on compare les **chiffres**, pas l'intention.
+
+> **Avant d'écrire une fiche sur un choix visuel, demandez-vous : qu'est-ce qui resterait vrai
+> si le commanditaire changeait d'avis demain ?** C'est cela qu'il faut garder. Le reste est de
+> la documentation, et sa place est dans le commentaire du composant.
+
+### 5. L'accessibilité comme solde d'un choix visuel
+
+Masquer le libellé est un choix légitime. Il a un prix exact : le bouton perd son **nom
+accessible** et n'est plus annoncé que « bouton ». Le prix se paie en une ligne
+(`accessibilityLabel` / `sr-only`), et le fait de le nommer dans le commentaire — « c'est le
+seul coût réel de cette disposition » — vaut mieux que de le découvrir à l'audit.
+
+### Pour aller plus loin
+
+- **`useNativeDriver: true`** : l'animation est transmise une fois au thread d'UI natif et
+  tourne sans repasser par JavaScript. Sans lui, chaque image dépend du fil JS — et un rendu
+  React pendant l'attente fait saccader les points. Il n'accepte que les propriétés non
+  liées à la mise en page (`opacity`, `transform`), ce qui explique qu'on anime `scale` et
+  `translateY` plutôt qu'une hauteur.
+- **Le keyframe vit dans `global.css`, pas dans Tailwind** (chapitre 237 §5 pour la fiche qui
+  garde les deux ensemble) : un composant dont l'animation est déclarée ailleurs se casse en
+  silence — rien ne plante, les points cessent simplement de bouger.
