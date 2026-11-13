@@ -203,13 +203,131 @@ describe('⑤ un seul discours, mot pour mot (D96 6A)', () => {
   });
 });
 
-describe('⑥ le bouton qui travaille garde sa taille et son mot (D95 4A)', () => {
-  it('aucun libellé de chargement, et le disque se superpose', () => {
+/**
+ * Le chargement des boutons a changé de forme le 13/11/2026, sur arbitrage à
+ * l'écran : les trois points animés remplacent le libellé effacé + disque
+ * centré de D95 4A. Ce qui est CONSERVÉ de D95, et qui compte plus que
+ * l'effet lui-même : le libellé ne change pas, la largeur du bouton ne bouge
+ * pas, et `aria-busy` reste le seul canal pour les lecteurs d'écran.
+ *
+ * Ce qui est GAGNÉ : le motif ne vit plus recopié dans les cinq formulaires
+ * (il avait déjà dérivé — disque 16 px dans trois fichiers, 18 px dans deux
+ * autres) mais dans UN composant, `components/ui/LoadingDots.tsx`.
+ */
+/**
+ * Le bloc du bouton QUI TRAVAILLE : celui dont le `type="submit"` porte un
+ * `aria-busy`. On ne prend pas « le premier bouton du fichier » : depuis D96,
+ * `LoginForm` en a DEUX — « Continuer » (étape 1, aucune attente, puisque le
+ * passage à l'étape du mot de passe est local) et « Se connecter » (étape 2).
+ * La première écriture de cette aide visait le premier : elle est partie au
+ * rouge sur l'étape 1, le 13/11.
+ */
+function blocDuBouton(source: string): string {
+  let i = source.indexOf('type="submit"');
+  while (i >= 0) {
+    const bloc = source.slice(i, source.indexOf('</button>', i));
+    if (bloc.includes('aria-busy')) return bloc;
+    i = source.indexOf('type="submit"', i + 1);
+  }
+  throw new Error('aucun bouton d’envoi avec aria-busy dans ce fichier');
+}
+
+/**
+ * Le chargement des boutons a été arbitré À L'ÉCRAN le 13/11/2026, après avoir
+ * vu quatre dispositions dans le simulateur et dans le navigateur : libellé
+ * remplacé par un libellé d'attente, points animés à droite, points animés à
+ * gauche avec le libellé conservé, et enfin celle-ci — **le spinner PREND la
+ * place du libellé, centré**. C'est la seule qui a été retenue après l'avoir
+ * vue, et c'est la leçon du lot : sur un effet d'interface, une capture vaut
+ * trois raisonnements.
+ *
+ * Ce que ces fiches gardent n'est donc PAS l'effet (il a changé quatre fois en
+ * un jour) mais ce qui doit rester vrai quel qu'il soit :
+ *   ① le bouton ne change pas de taille pendant l'attente ;
+ *   ② il garde son NOM pour un lecteur d'écran, alors que son texte visible
+ *     disparaît — `accessibilityLabel` sur le téléphone, `sr-only` sur le
+ *     site. C'est le seul coût réel de cette disposition, et il est payé ;
+ *   ③ les deux fronts attendent de la même façon.
+ *
+ * Et une dette refermée au passage : avant ce jour, AUCUNE fiche n'épinglait
+ * l'indicateur d'attente. D95 avait pu remplacer les points du téléphone par
+ * un spinner système sans que rien ne le signale.
+ */
+describe('⑥ le bouton qui travaille : la vague prend la place du mot (13/11)', () => {
+  const KIT = join(MOBILE, 'src/components/auth/auth-kit.tsx');
+  const COMPOSANT_WEB = join(WEB, 'src/components/ui/LoadingDots.tsx');
+
+  it('le téléphone : la vague native, et le libellé cède la place', () => {
+    const kit = lire(KIT);
+    expect(kit).toContain('function LoadingDots');
+    expect(kit).toContain('<LoadingDots color={palette.ctaLabel} />');
+    // `Animated` natif : la condition pour que l'animation tourne hors du fil JS.
+    expect(kit).toContain('useNativeDriver: true');
+    expect(kit).not.toMatch(/<ActivityIndicator/);
+    expect(kit).not.toMatch(/^\s*ActivityIndicator,$/m);
+  });
+
+  it('le site : la vague aussi, et plus aucun disque sur le CTA', () => {
     const s = lire(FORM_WEB);
-    expect(s).not.toContain('ctaLoading');
-    expect(s).toContain('aria-busy');
-    expect(s).toContain('absolute inset-0 m-auto animate-spin');
-    expect(s).toContain('opacity-0');
+    const bouton = blocDuBouton(s);
+    expect(bouton).toContain('<LoadingDots />');
+    expect(bouton).toContain('aria-busy');
+    expect(bouton).not.toContain('animate-spin');
+    expect(bouton).not.toContain('ctaLoading');
+    expect(bouton).not.toContain('opacity-0');
+  });
+
+  it('② le bouton garde son NOM quand son texte s’en va', () => {
+    // Le seul coût réel de cette disposition, et il est payé des deux côtés :
+    // sans ça, un lecteur d'écran n'annonce plus que « bouton » pendant
+    // toute l'attente.
+    const kit = lire(KIT);
+    expect(kit).toContain('accessibilityLabel={label}');
+    expect(kit).toContain('accessibilityState={{ busy: pending');
+    expect(lire(FORM_WEB)).toContain('className="sr-only"');
+  });
+
+  it('① le bouton ne change pas de taille pendant l’attente', () => {
+    const kit = lire(KIT);
+    // Téléphone : hauteur du CTA fixée, et la rangée de points porte la
+    // hauteur exacte de la ligne du libellé.
+    expect(kit.slice(kit.indexOf('  cta: {'), kit.indexOf('  dimmed'))).toMatch(/height: AuthFieldHeight/);
+    expect(kit.slice(kit.indexOf('dotsRow: {'), kit.indexOf('dot: {'))).toMatch(/height: 24/);
+    // Site : bouton en pleine largeur, insensible à son contenu.
+    expect(lire(FORM_WEB)).toMatch(/w-full/);
+  });
+
+  /**
+   * ③ Les DEUX fronts attendent de la même façon — et ici ce n'est pas une
+   * formule : les mesures de la vague sont RECOPIÉES d'un front à l'autre
+   * (trois points, cycle 900 ms, décalage 150 ms, montée 4 px, grossissement
+   * 0,85 → 1,15, opacité 0,35 → 1). Deux implémentations d'une même règle
+   * divergent toujours : c'est `maskEmail` (D92), la lecture des refus (D96)
+   * et la liste des pages d'auth (D93). Ces fiches comparent les chiffres.
+   */
+  it.each([
+    ['trois points', /DOT_COUNT = 3/, /length: DOT_COUNT = 3|DOT_COUNT = 3/],
+    ['décalage de 150 ms', /DOT_STAGGER_MS = 150/, /DOT_STAGGER_MS = 150/],
+  ])('③ %s, des deux côtés', (_quoi, motifMobile, motifWeb) => {
+    expect(lire(KIT)).toMatch(motifMobile);
+    expect(lire(COMPOSANT_WEB)).toMatch(motifWeb);
+  });
+
+  it('③ la course de la vague est la même des deux côtés', () => {
+    const kit = lire(KIT);
+    expect(kit).toMatch(/outputRange: \[0, -4\]/);
+    expect(kit).toMatch(/outputRange: \[0\.85, 1\.15\]/);
+    expect(kit).toMatch(/outputRange: \[0\.35, 1\]/);
+    expect(kit).toMatch(/DOT_CYCLE_MS = 900/);
+
+    const css = lire(join(WEB, 'src/app/global.css'));
+    expect(css).toContain('@keyframes yambaDot');
+    expect(css).toMatch(/translateY\(-4px\) scale\(1\.15\)/);
+    expect(css).toMatch(/translateY\(0\) scale\(0\.85\)/);
+    expect(css).toMatch(/opacity: 0\.35/);
+    expect(css).toMatch(/animation: yambaDot 900ms/);
+    // Mouvement réduit : on retire le mouvement, pas le signal.
+    expect(css).toContain('prefers-reduced-motion');
   });
 });
 

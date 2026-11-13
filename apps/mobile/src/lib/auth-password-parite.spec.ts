@@ -212,16 +212,63 @@ describe('⑦ aucun message brut de l’API sous les yeux de l’Expéditeur', (
   });
 });
 
-describe('⑧ les boutons gardent leur taille et leur mot (D95 4A)', () => {
+/**
+ * Même changement de forme que pour la connexion (13/11/2026) : trois points
+ * animés au lieu du libellé effacé. Voir l'en-tête du bloc ⑥ de
+ * `auth-login-parite.spec.ts`.
+ *
+ * La fiche sur le keyframe n'est pas du zèle : `LoadingDots` ne porte AUCUNE
+ * animation — elle vit dans `app/global.css` (`.yamba-dot` +
+ * `@keyframes yambaDot`), comme `yambaShimmer` pour `Skeleton`. Un composant
+ * dont l'animation est déclarée dans un autre fichier se casse en silence le
+ * jour où quelqu'un range le CSS : rien ne plante, les points cessent
+ * simplement de bouger.
+ */
+/**
+ * Le bloc du bouton QUI TRAVAILLE : celui dont le `type="submit"` porte un
+ * `aria-busy`. On ne prend pas « le premier bouton du fichier » : depuis D96,
+ * `LoginForm` en a DEUX — « Continuer » (étape 1, aucune attente, puisque le
+ * passage à l'étape du mot de passe est local) et « Se connecter » (étape 2).
+ * La première écriture de cette aide visait le premier : elle est partie au
+ * rouge sur l'étape 1, le 13/11.
+ */
+function blocDuBouton(source: string): string {
+  let i = source.indexOf('type="submit"');
+  while (i >= 0) {
+    const bloc = source.slice(i, source.indexOf('</button>', i));
+    if (bloc.includes('aria-busy')) return bloc;
+    i = source.indexOf('type="submit"', i + 1);
+  }
+  throw new Error('aucun bouton d’envoi avec aria-busy dans ce fichier');
+}
+
+/**
+ * Même arbitrage que pour la connexion (13/11/2026, à l'écran) : le spinner
+ * prend la place du libellé, centré. Voir l'en-tête du bloc ⑥ de
+ * `auth-login-parite.spec.ts` pour ce qui est gardé quel que soit l'effet.
+ */
+describe('⑧ les trois écrans du mot de passe : la vague prend la place du mot (13/11)', () => {
   it.each([
     ['« oublié »', OUBLI_WEB],
     ['le nouveau mot de passe', NOUVEAU_WEB],
     ['la vue de code partagée', VUE_OTP_WEB],
-  ])('%s : pas de libellé de chargement, et le disque se superpose', (_quoi, chemin) => {
+  ])('%s : la vague, et le bouton garde son nom', (_quoi, chemin) => {
     const source = lire(chemin);
-    expect(source).not.toContain('ctaLoading');
-    expect(source).toContain('aria-busy');
-    expect(source).toContain('absolute inset-0 m-auto animate-spin');
+    // On vise le BOUTON D'ENVOI, pas le fichier : `OtpVerifyView` porte un
+    // second indicateur — un disque de 11 px sur le lien « Renvoyer le code »,
+    // qui n'est pas un CTA et garde délibérément sa forme (un lien de texte
+    // n'accueille pas une vague de points de 8 px). La première écriture de
+    // cette fiche interdisait `animate-spin` dans tout le fichier : elle est
+    // partie au rouge sur ce lien, le 13/11.
+    const bouton = blocDuBouton(source);
+    expect(bouton).toContain('<LoadingDots />');
+    expect(bouton).toContain('aria-busy');
+    // Le texte visible s'en va : `sr-only` garde le NOM du bouton.
+    expect(bouton).toContain('className="sr-only"');
+    // Aucune des quatre autres dispositions essayées ce jour-là ne survit.
+    expect(bouton).not.toContain('ctaLoading');
+    expect(bouton).not.toContain('opacity-0');
+    expect(bouton).not.toContain('animate-spin');
   });
 });
 
