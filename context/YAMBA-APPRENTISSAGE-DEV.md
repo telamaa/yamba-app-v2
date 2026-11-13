@@ -8645,3 +8645,113 @@ seul coût réel de cette disposition » — vaut mieux que de le découvrir à 
 - **Le keyframe vit dans `global.css`, pas dans Tailwind** (chapitre 237 §5 pour la fiche qui
   garde les deux ensemble) : un composant dont l'animation est déclarée ailleurs se casse en
   silence — rien ne plante, les points cessent simplement de bouger.
+
+## Chapitre 239 — Un contrôle qui affiche une valeur qu'il n'applique pas, et trois façons de formater un prix
+
+Une revue d'écran, trois défauts, et aucun n'était visible depuis le code seul. Quatre
+techniques en sortent.
+
+### 1. `valeur ?? défaut` à l'AFFICHAGE est un mensonge d'interface
+
+```tsx
+// SearchFiltersSidebar.tsx — le curseur
+{(weightKg ?? 2).toLocaleString("fr-FR")} kg      // il AFFICHE 2
+<input value={weightKg ?? 2} … />                  // il se POSITIONNE sur 2
+// …alors que l'état réel est `null`, donc rien n'est envoyé au serveur.
+```
+
+Le motif est courant et paraît inoffensif : on donne une valeur de repli pour que le composant
+ait quelque chose à montrer. Mais un contrôle **décrit l'état du système**. S'il montre 2 kg, il
+affirme que les résultats valent pour 2 kg — et ici, ils n'en savaient rien.
+
+Ce qui rendait le défaut invisible : le repli d'affichage (`?? 2`) et le poids codé en dur dans
+la carte (`kg: 2`) étaient **le même nombre**. L'écran était cohérent par coïncidence. Il
+suffisait de pousser le curseur pour que tout se décale — ce que seule une main sur l'écran
+pouvait révéler.
+
+> **Règle : si un contrôle affiche une valeur, cette valeur doit être appliquée.** Sinon le
+> repli ne va pas à l'affichage, il va à l'état — et c'est l'état qui part au serveur.
+
+### 2. Un calcul partagé ne suffit pas : la MISE EN FORME est une règle aussi
+
+Les deux fronts appelaient la même fonction de calcul, et affichaient deux prix différents :
+
+```ts
+// site                                    → « 25 »
+price.toLocaleString(tag, { maximumFractionDigits: 0 })
+// téléphone, fonction locale              → « 25 » si rond, « 24,85 » sinon
+new Intl.NumberFormat(tag, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+```
+
+On protège volontiers la formule et on laisse l'affichage à chaque écran, parce qu'il « dépend
+du contexte ». Pour un **prix**, l'affichage *est* la promesse : c'est le nombre que la personne
+lit, retient et compare au montant qu'on lui demandera à la fin.
+
+La correction tient en deux gestes : poser la règle (`PRICE_FRACTION_DIGITS = 2` + une fonction)
+et **supprimer** l'autre implémentation plutôt que l'aligner — une fonction alignée aujourd'hui
+diverge demain.
+
+### 3. Quand une duplication est voulue, rendez-la vérifiable
+
+`pricing-example.ts` existe en double, et c'est justifié : le mobile ne doit pas tirer le moteur
+de tarification dans un écran d'atterrissage. La bonne réponse n'est donc pas de fusionner, mais
+de **tenir la promesse par une fiche** :
+
+```ts
+it('octet pour octet', () => {
+  expect(readFileSync(webFile, 'utf8')).toBe(readFileSync(mobileFile, 'utf8'));
+});
+```
+
+Trois lignes, et une propriété en cadeau : une autre fiche confronte déjà la copie du mobile au
+moteur partagé, donc la copie du **site** est validée par transitivité — alors que `user-ui`
+n'a aucun harnais de tests. Quand deux fichiers doivent rester identiques, comparez-les
+entièrement : c'est plus simple *et* plus fort que de comparer les constantes une à une.
+
+### 4. Séparer deux pouvoirs qu'un seul paramètre portait
+
+`weightKg` faisait deux choses à la fois : enrichir les cartes et **filtrer** les trajets trop
+petits. Juste pour un poids choisi ; faux pour un poids supposé.
+
+```ts
+const enrichKg = params.weightKg ?? params.estimateKg;   // les CHIFFRES
+// …mais le filtre de capacité et le tri ne reçoivent que params.weightKg
+```
+
+La question à se poser avant d'ajouter une valeur par défaut à un paramètre existant : **ce
+paramètre fait-il UNE chose, ou plusieurs ?** S'il en fait plusieurs, le défaut n'hérite pas
+forcément de toutes. Ici, un défaut hérité du filtrage aurait retiré des trajets d'une page
+intitulée « Tous les trajets disponibles » — sans erreur, sans log, sans qu'on puisse le voir.
+
+### 5. Un empilement de micro-lignes n'est pas de l'information
+
+Première version de la colonne de prix, après avoir promu le total :
+
+```
+pour 2 kg, tout compris
+24,85 €
+9,50 €/kg
+23 kg dispo
+```
+
+Quatre lignes, et le mot « **kg** » qui désigne trois notions différentes : le poids du colis
+(une hypothèse), un prix unitaire, la capacité du trajet. Deux questions ont suffi à en retirer
+deux :
+
+- **Le prix au kilo sert-il encore ?** Il servait à comparer — mais si toutes les cartes
+  affichent le total pour le *même* colis, les totaux se comparent directement.
+- **« 23 kg dispo » informe-t-il ?** Pour un colis de 2 kg, non. Un signal de rareté toujours
+  présent n'est pas un signal : il ne reste que sous un seuil.
+
+> **Quand une zone devient illisible, ne cherchez pas à mieux la hiérarchiser : cherchez ce
+> qu'on peut en retirer.** La hiérarchie typographique répare un déséquilibre ; elle ne répare
+> pas un excédent.
+
+### Pour aller plus loin
+
+- **Les bandeaux d'une carte** : avant de peindre un fond pour séparer deux zones, vérifiez si
+  elles sont des cibles distinctes. Ici la carte entière était un seul `<Link>` : les trois
+  bandes ne portaient aucune affordance, et faisaient franchir une bordure entre le trajet et
+  son prix. Les retirer n'a rien coûté — sauf à devoir rendre le `focus-visible` explicite, que
+  les bandes masquaient (chapitre 237 §3 : chaque fois qu'on retire un décor, demandez-vous ce
+  qu'il faisait sans le dire).
