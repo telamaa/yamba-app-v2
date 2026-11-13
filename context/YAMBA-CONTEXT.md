@@ -2483,6 +2483,24 @@ package.json du mobile : ne pas lancer `npx expo start` nu).
   aux dix-neuf controles. C'est mot pour mot le constat d'A223. Lot a part :
   « l'A223 du site ».
 
+- Lot d'attente des boutons (D98, meme branche) : retour de recette sur le
+  SIMULATEUR — « je n'aime pas le chargement actuel de mes boutons ». CINQ
+  dispositions posees et jugees a l'ecran dans la journee ; retenue : la VAGUE
+  de trois points PREND la place du libelle (900 ms, decalage 150 ms, montee
+  4 px, 0,85->1,15, opacite 0,35->1), `Animated` natif cote telephone et jumeau
+  CSS cote site, MEMES CHIFFRES des deux cotes et les fiches les comparent.
+  Defait D95 4A (libelle a l'opacite 0 + disque superpose) sur les deux fronts,
+  et `92912eca` qui avait supprime la vague native du telephone posee un mois
+  plus tot. Cout assume et paye : le bouton perd son NOM quand son texte part
+  (`accessibilityLabel` / `sr-only`). Un composant partage au lieu de CINQ
+  copies qui avaient deja derive (disque 16 px dans trois fichiers, 18 px dans
+  deux autres). Mobile 705 -> 711.
+  LECON, et elle vaut au-dela du bouton : un effet d'interface ne se raisonne
+  pas, il se REGARDE — D95 etait argumentee, mesuree, et son effet a ete rejete
+  a la seconde ou il a ete vu. D98 est donc gravee APRES le code, par exception
+  assumee. Corollaire : AUCUNE fiche n'epinglait l'indicateur d'attente avant
+  ce jour, ce qui avait rendu la suppression de D95 invisible.
+
 RESTE dans cette passe :
 - ~~les QUATRE autres ecrans d'auth~~ : FAITS (D96 pour la connexion, D97 pour
   les trois ecrans du mot de passe oublie). `AuthScreen.badge` n'a plus AUCUN

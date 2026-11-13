@@ -17378,3 +17378,131 @@ La vraie réponse est ailleurs : **`apps/user-ui` n'a aucune cible de test, aucu
 zéro fiche** — la plus grosse application du dépôt, et aucun des dix-neuf contrôles n'en lit une
 ligne de logique. C'est mot pour mot le constat qui a justifié A223 pour le mobile. Lot à part,
 nommé : **« l'A223 du site »**.
+
+# D98 — L'attente d'un bouton d'action : la vague de trois points
+
+*Retour de recette de l'utilisateur sur le simulateur — « je n'aime pas le chargement actuel de
+mes boutons ». Cinq dispositions posées et jugées à l'écran dans la même journée.*
+
+## ① Les cinq dispositions, et pourquoi la cinquième
+
+| # | Disposition | Verdict |
+|---|---|---|
+| ① | Libellé remplacé par un libellé d'attente (« Connexion… ») + disque à gauche | refusée — la largeur du bouton saute entre « Se connecter » et « Connexion… » |
+| ② | Points animés à DROITE, libellé conservé | vue, pas retenue |
+| ③ | Points animés à GAUCHE, plus petits, libellé conservé | vue, pas retenue |
+| ④ | Spinner centré à la place du libellé | vue, pas retenue |
+| ⑤ | **Vague de trois points à la place du libellé** | **retenue** |
+
+L'état de départ était D95 4A : le libellé rendu à l'opacité 0 — il garde sa place, donc la
+largeur est figée — et un disque superposé au centre. **D95 avait raison sur le fond** (le
+bouton ne doit pas changer de taille ; un libellé d'attente n'apprend rien que l'indicateur ne
+dise déjà) **et tort sur la forme** : un mot invisible qui occupe sa place est illisible ET
+présent. À l'écran, cela se lit comme une **pulsation** du bouton — c'est le mot qu'a employé
+l'utilisateur, trois fois, avant qu'on ne comprenne de quel écran il parlait.
+
+## ② Ce qui est retenu, au chiffre près
+
+```ts
+const DOT_COUNT = 3;
+const DOT_CYCLE_MS = 900;
+const DOT_STAGGER_MS = 150;
+// montée 4 px · grossissement 0,85 → 1,15 · opacité 0,35 → 1
+```
+
+**Téléphone** — `Animated` natif, `useNativeDriver: true` (l'animation tourne hors du fil JS,
+donc elle ne saccade pas pendant un rendu) :
+
+```tsx
+{pending ? (
+  <LoadingDots color={palette.ctaLabel} />
+) : (
+  <Text style={[styles.ctaLabel, …]}>{label}</Text>
+)}
+```
+
+**Site** — le jumeau CSS, dans `app/global.css`, selon le motif maison (`yambaShimmer` pour
+`Skeleton`) : ce dépôt ne déclare **aucun** keyframe dans Tailwind.
+
+```css
+.yamba-dot { animation: yambaDot 900ms ease-in-out infinite; }
+@keyframes yambaDot {
+  0%, 100% { opacity: 0.35; transform: translateY(0) scale(0.85); }
+  33%      { opacity: 1;    transform: translateY(-4px) scale(1.15); }
+}
+```
+
+Le décalage de chaque point est posé en style inline (`animationDelay`), comme `Skeleton` le
+fait pour son shimmer.
+
+## ③ Le coût de cette disposition, et comment il est payé
+
+Quand le texte visible disparaît, **le bouton perd son nom** pour un lecteur d'écran : il
+n'annonce plus que « bouton » pendant toute l'attente. C'est le seul inconvénient réel du choix
+⑤, et il se paie en une ligne de chaque côté.
+
+```tsx
+// téléphone — sur la Pressable
+accessibilityLabel={label}
+accessibilityState={{ busy: pending, disabled: disabled || pending }}
+
+// site — à côté des points
+<span className="sr-only">{t("submit")}</span>
+```
+
+## ④ Un composant, pas cinq copies
+
+L'ancien motif vivait **recopié dans les cinq formulaires d'auth** du site, et il avait déjà
+dérivé : disque de 16 px dans `LoginForm`, `ForgotPasswordForm`, `ResetPasswordForm`, 18 px
+dans `RegisterForm` et `OtpVerifyView`. Il vit maintenant dans
+`apps/user-ui/src/components/ui/LoadingDots.tsx`. Le jour où la forme changera encore — et elle
+a changé cinq fois en un jour — elle changera à un endroit.
+
+Au passage, et selon la règle posée par D95 elle-même (« une animation maison qu'on garde au cas
+où est du code mort qui se maintient ») : `ActivityIndicator` et le style `labelFaded` sortent
+du téléphone ; côté site, le composant de points et son keyframe ont été supprimés puis
+recréés selon la disposition en cours, jamais laissés en double.
+
+## ⑤ Ce qui n'est pas touché
+
+`OtpVerifyView` porte un **second** indicateur : un disque de 11 px sur le lien « Renvoyer le
+code » (`:588`). Ce n'est pas un appel à l'action — un lien de texte n'accueille pas une vague
+de points de 8 px — il garde donc sa forme. La fiche vise le bouton qui porte `aria-busy`, pas
+le fichier.
+
+## ⑥ Les fiches, et ce qu'elles gardent
+
+**Onze fiches** (`auth-login-parite.spec.ts` ⑥, `auth-password-parite.spec.ts` ⑧), mobile
+**705 → 711**. Elles ne gardent pas l'effet — il a changé cinq fois en un jour — mais ce qui
+doit rester vrai quel qu'il soit :
+
+| # | Ce qui est gardé |
+|---|---|
+| ① | le bouton ne change pas de taille pendant l'attente (hauteur fixée côté mobile, pleine largeur côté web, rangée de points à la hauteur de la ligne de texte) |
+| ② | le bouton garde son **nom** quand son texte s'en va |
+| ③ | les deux fronts attendent de la même façon — et les fiches comparent les **chiffres**, pas l'intention |
+
+```ts
+// ③ — les mesures sont recopiées d'un front à l'autre, donc on les confronte
+expect(lire(KIT)).toMatch(/outputRange: \[0, -4\]/);
+expect(css).toMatch(/translateY\(-4px\) scale\(1\.15\)/);
+```
+
+### Trois fiches parties au rouge, et ce qu'elles ont attrapé
+
+1. **Un mot interdit que le commentaire d'à côté citait** — `not.toContain('ActivityIndicator')`
+   échouait sur la phrase qui explique sa disparition. Deuxième fois dans la journée (le matin,
+   `NO_REDIRECT_PREFIXES` sur D93). On vise l'**usage**, jamais le mot :
+   `not.toMatch(/<ActivityIndicator/)`.
+2. **Une tranche de fichier qui cherchait sa fin avant son début** —
+   `source.indexOf('</button>')` sans repartir de l'index du bouton : tranche vide, fiche verte
+   pour de mauvaises raisons sur un fichier, rouge sur l'autre.
+3. **`LoginForm` a DEUX boutons d'envoi depuis D96** — « Continuer » (étape 1, aucune attente :
+   le passage à l'étape du mot de passe est local) et « Se connecter » (étape 2). L'aide prenait
+   le premier. Elle vise maintenant celui qui porte `aria-busy`, c'est-à-dire celui qui travaille.
+
+### La dette que ce lot referme
+
+Avant ce jour, **aucune fiche n'épinglait l'indicateur d'attente**, sur aucun des deux fronts.
+C'est pour cela que D95 avait pu supprimer la vague native du téléphone — posée un mois plus tôt
+— sans que rien ne le signale, et le retour en arrière serait passé tout aussi inaperçu.

@@ -8718,3 +8718,54 @@ langue et le thème du système.
 | 6 | J'ouvre l'étape de paiement d'une réservation | la mention lue est « Paiement sécurisé par Stripe » |
 | 7 | Je suis connecté et j'ouvre une page d'authentification | ni cloche, ni messagerie, ni menu de compte |
 | 8 | Une septième page d'authentification est ajoutée au code sans entrer dans la règle | un test échoue avant la fusion |
+
+# D98 — Savoir que ça travaille, sans perdre le bouton
+
+## Le besoin
+
+Entre le clic sur « Se connecter » et la réponse du serveur, il s'écoule un temps que personne
+ne contrôle. Pendant ce temps, l'écran doit dire **trois choses** : que le geste a été pris en
+compte, que quelque chose est en cours, et qu'il ne sert à rien de cliquer une seconde fois.
+
+L'état précédent disait les trois — mais en rendant le libellé du bouton invisible tout en lui
+gardant sa place. Vu sur un téléphone, cela ne se lit pas comme une attente : cela se lit comme
+un bouton qui **pulse**, c'est-à-dire comme un défaut d'affichage.
+
+## Les règles
+
+**RG-D98-1 — Un bouton qui travaille le montre par une animation, jamais par un changement de
+mot.** « Connexion… » n'apprend rien de plus que l'indicateur, et oblige le bouton à changer de
+largeur sous le doigt.
+
+**RG-D98-2 — Un bouton ne change jamais de taille pendant l'attente.** Ni en largeur, ni en
+hauteur : la place de l'indicateur est réservée par la mise en page, pas par le contenu.
+
+**RG-D98-3 — Un bouton garde son nom quand son texte disparaît.** Ce qui est caché à l'œil
+reste annoncé à l'oreille : une personne qui navigue au lecteur d'écran doit continuer
+d'entendre « Se connecter », pas « bouton ».
+
+**RG-D98-4 — L'attente ne s'arrête pas avant que l'écran ne change.** En cas de succès on
+navigue : l'indicateur part avec l'écran. Un bouton qui redevient cliquable une fraction de
+seconde avant la navigation invite au double envoi.
+
+**RG-D98-5 — Les deux applications attendent de la même façon.** Mêmes points, même rythme,
+même amplitude sur le téléphone et sur le site. Une différence d'attente entre les deux n'est
+pas une adaptation à la plateforme, c'est une dérive.
+
+**RG-D98-6 — Mouvement réduit : on retire le mouvement, pas le signal.** Quand le système
+demande moins d'animation, les points cessent de bouger et restent affichés.
+
+**RG-D98-7 — Un indicateur n'est pas un CTA.** Un lien de texte (« Renvoyer le code ») garde un
+indicateur discret à sa mesure ; la règle ci-dessus porte sur les boutons d'action.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | Je clique « Se connecter » | le libellé cède la place à trois points animés, le bouton ne bouge pas d'un pixel |
+| 2 | Je regarde le même écran sur le téléphone et sur le site | même attente, même rythme |
+| 3 | Je navigue au lecteur d'écran et je lance la connexion | le bouton reste annoncé par son nom, et il est annoncé occupé |
+| 4 | La connexion réussit | l'attente ne s'interrompt pas avant le changement d'écran |
+| 5 | Je clique une seconde fois pendant l'attente | rien ne part (le bouton est inactif) |
+| 6 | J'ai demandé « réduire les animations » dans mon système | les points sont là, immobiles |
+| 7 | Je demande un nouveau code depuis l'écran de saisie | le lien « Renvoyer le code » garde son indicateur discret |
