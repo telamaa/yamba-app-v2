@@ -7,7 +7,7 @@
  * d'abonnés, bascule de notification), l'email d'abonné à la publication (et son silence quand la
  * notification est coupée), le désabonnement, l'état vide de « Voyageurs suivis ».
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, remplirConnexion, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi, adresseDeLApiAdmin } from "../fixtures/adresses";
 import { COMPTES, MOT_DE_PASSE_SEED } from "../fixtures/comptes";
 import { carteDuTrajet, ouvrirLaRecherche } from "../pages/recherche";
@@ -94,8 +94,7 @@ test.describe("WEB-FAV — favoris et Voyageurs suivis (chapitre 5.11)", () => {
 
     // Connexion DANS la fenêtre : on reste sur la recherche et le favori est enregistré.
     const formulaire = page.locator("form").filter({ has: page.locator("#email") }).filter({ visible: true }).last();
-    await formulaire.locator("#email").fill(COMPTES.aminata.email);
-    await formulaire.locator("#password").fill(MOT_DE_PASSE_SEED);
+    await remplirConnexion(page, formulaire, COMPTES.aminata.email, MOT_DE_PASSE_SEED);
     const favori = page.waitForResponse((r) => /\/trips\/[^/]+\/favorite$/.test(r.url()) && r.request().method() === "POST", { timeout: 30_000 });
     await formulaire.locator("button[type=submit]").click();
     expect((await favori).status(), "POST /trips/:id/favorite après connexion").toBe(200);

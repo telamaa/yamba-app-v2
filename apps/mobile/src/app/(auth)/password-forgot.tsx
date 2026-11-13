@@ -50,7 +50,10 @@ export default function PasswordForgotScreen() {
       setPendingReset({ email: normalized, passwordResetToken: null });
       router.push('/password-verify');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('common.errors.network'));
+      // Cette route répond TOUJOURS 200 (anti-énumération) : ce qui tombe
+      // ici n'est pas métier, et le message anglais de l'API n'a rien à
+      // faire sous les yeux de l'Expéditeur (D96 4A).
+      setError(err instanceof ApiError ? t('forgot.errors.generic') : t('common.errors.network'));
     } finally {
       setPending(false);
     }
@@ -58,7 +61,6 @@ export default function PasswordForgotScreen() {
 
   return (
     <AuthScreen
-      badge={t('forgot.badge')}
       title={t('forgot.title')}
       subtitle={t('forgot.subtitle')}>
       <FieldLabel>{t('forgot.emailLabel')}</FieldLabel>

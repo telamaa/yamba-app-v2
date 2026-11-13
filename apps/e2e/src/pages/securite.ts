@@ -12,6 +12,7 @@
 import { expect, type Page } from "@playwright/test";
 import type { Mailpit } from "../fixtures/mailpit";
 import { normaliserEspaces } from "./reservation";
+import { remplirConnexion } from "../fixtures/yamba";
 
 export class Securite {
   constructor(private readonly page: Page) {}
@@ -69,8 +70,7 @@ export class Securite {
     const fenetre = this.page.getByRole("dialog");
     await expect(fenetre.getByText("Ta session a expiré")).toBeVisible({ timeout: 30_000 });
     await expect(fenetre.getByText(/une session se ferme après une heure sans activité/)).toBeVisible();
-    await fenetre.locator("#email").fill(email);
-    await fenetre.locator("#password").fill(motDePasse);
+    await remplirConnexion(this.page, fenetre, email, motDePasse);
     const reponse = this.page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
     await fenetre.getByRole("button", { name: "Se connecter" }).click();
     const r = await reponse;

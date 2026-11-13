@@ -17116,3 +17116,91 @@ Mobile : **598 → 621** fiches (34 suites).
 > rien. L'ancre est désormais passée en toutes lettres par l'appelant : les deux formulaires ne
 > lisent pas leurs textes de la même façon, et une ancre devinée se tait le jour d'une
 > migration.
+
+# D97 — Le parcours « mot de passe oublié », et l'écran de code qui existait en double
+
+*Page 4 de la passe de finitions. Trois écrans (demander un code, le saisir, choisir le nouveau
+mot de passe) et un constat qui résume le lot.*
+
+## ① L'écran que D92 a refondu existait en deux exemplaires
+
+| | Lignes avant | Lignes après |
+|---|---|---|
+| `RegisterVerifyForm.tsx` (inscription) | 829 | **170** |
+| `ResetVerifyForm.tsx` (mot de passe oublié) | 689 | **89** |
+| `shared/OtpVerifyView.tsx` (neuf) | — | **598** |
+| **Total** | **1 518** | **857** |
+
+D92 avait refondu le premier : l'adresse en clair, la 6ᵉ frappe qui valide, le focus à
+l'arrivée, les cases visibles au sens WCAG 2.1 SC 1.4.11, un seul compte à rebours, l'aide qui
+arrive quand elle sert. Le second — **mêmes six cases, même collage, mêmes deux minuteries,
+même verrou** — n'a rien reçu. Rien ne l'a signalé : le parcours ne s'ouvre que si l'on a
+oublié son mot de passe, ce qu'aucune recette ne fait par hasard.
+
+Le téléphone, lui, partage `otp-verify-view.tsx` entre ses deux parcours **depuis A208**.
+
+### Ce qui reste à chaque appelant
+
+```tsx
+// RegisterVerifyForm — l'enchaînement de la connexion (D92 3A) et l'annulation CONFIRMÉE
+<OtpVerifyView subtitle={t("sentTo")} onVerifyAction={…} onChangeEmailAction={…} />
+
+// ResetVerifyForm — la phrase CONDITIONNELLE : le serveur répond toujours 200 (ANO-API-08),
+// l'écran ne doit pas trahir l'existence du compte
+<OtpVerifyView subtitle={t("sentToIfExists")} … />
+```
+
+## ② Quatre fois le même défaut : le client réinvente ce que le serveur dit
+
+| Où | Ce qu'il faisait | Ce qu'il fait |
+|---|---|---|
+| Expiration du jeton | cherchait le mot anglais « expired » dans le message | lit `RESET_SESSION_EXPIRED` |
+| Politique de mot de passe | **réécrivait** les 8 règles dans l'écran (~60 lignes) | `getPasswordChecks` + `firstFailingCheck`, la source de l'inscription et de la jauge |
+| Échecs réseau / serveur | affichait le `message` anglais de l'API | sa propre phrase, par domaine |
+| Textes | ~45 ternaires `fr ? … : …` | `auth.forgot`, `auth.reset`, `auth.otp` |
+
+C'est la suite directe de D96 4A : **un client qui lit la prose du serveur au lieu de ses codes
+ment dès que le serveur se reformule.**
+
+## ③ Un seul champ, et le collage autorisé
+
+La confirmation du mot de passe part (D91 l'avait retirée de l'inscription, elle avait survécu
+ici), et avec elle le **collage interdit** sur ce champ :
+
+> Empêcher le collage condamne précisément les mots de passe qu'on souhaite — ceux qu'un
+> gestionnaire génère et que personne ne retape. Le geste « protège » contre une faute de
+> frappe dans un champ qui n'existe plus.
+
+## ④ Le harnais réclamait un élément absent depuis la veille
+
+`git log -S "OTP digit"` : le nom accessible des six cases a disparu du site avec **D92
+(`676c2a19`)**. Trois chapitres et une page-objet du harnais le cherchaient encore
+(`getByLabel("OTP digit 1")`). Le harnais **n'étant pas un contrôle de CI, personne ne l'a su.**
+
+Deux helpers centralisent désormais ce que six fiches recopiaient :
+
+- `saisirLesCases(page, code)` — le nom accessible réel, en un seul endroit ;
+- `remplirConnexion(page, portée, email, motDePasse)` — les **deux marches** de D96, pour la
+  page comme pour les fenêtres (« ta session a expiré », « connecte-toi pour réserver »…).
+
+Six fiches de plus attendaient encore l'ancien formulaire de connexion en une seule page
+(`web-mdp`, `web-err`, `web-a11y` ×2, `web-fav`, `web-sig`, `web-prf`, `pages/securite.ts`) :
+elles sont passées aux deux marches dans le même lot.
+
+## ⑤ Les fiches
+
+- `auth-password-parite.spec.ts` (neuve) — **43 fiches**, onze groupes : l'écran de code unique
+  et ce que les appelants n'ont PLUS le droit de recoder (`OTP_LENGTH`, `handlePaste`,
+  `startResendTimer`, `lockTimer`, `inputsRef`), la phrase conditionnelle, les pastilles, le
+  champ unique, la politique écrite une fois, l'expiration lue sur son code, aucun message brut
+  d'API, les boutons qui gardent leur mot, les textes identiques mot pour mot, **toute clé
+  demandée par un écran présente dans les DEUX dictionnaires**, et l'adresse qui ne voyage pas
+  en URL et survit à l'étape suivante.
+- `auth-verify-parite.spec.ts` (D92) — **sept fiches sont passées au rouge** en cherchant
+  `showValidity(` dans un fichier qui ne l'appelle plus. Les règles n'ont pas bougé : elles ont
+  changé d'adresse, et les fiches suivent (elles pointent la vue partagée, et l'enchaînement de
+  connexion est vérifié chez l'appelant — le parcours « oublié » n'ouvre, lui, aucune session).
+
+Mobile : **622 → 665** fiches (35 suites). `tsc` vert sur le mobile (deux programmes), sur
+`apps/user-ui` et sur `apps/e2e` ; contrôle i18n vert. Les trois écrans ont été **ouverts dans
+un navigateur**, FR et EN, aucun chemin de clé à l'écran.

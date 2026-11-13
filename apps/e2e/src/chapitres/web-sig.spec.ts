@@ -12,7 +12,7 @@
  * (SIG-4, 5, 8), le trajet `fih` de Joséphine masqué par le back-office et le profil `seed-josephine` rendu privé
  * par manœuvre (SIG-6) — les deux remis en l'état dans un `finally`.
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, remplirConnexion, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi, adresseDeLApiAdmin } from "../fixtures/adresses";
 import { COMPTES, MOT_DE_PASSE_SEED } from "../fixtures/comptes";
 import { JeuEssai } from "../fixtures/jeu-essai";
@@ -87,8 +87,7 @@ test.describe("WEB-SIG — signaler un trajet, un profil, un message (chapitre 5
     await expect(page.getByText("Un signalement est toujours signé : cela protège tout le monde des abus.")).toBeVisible();
     /* Connexion DANS la fenêtre : retour sur l'annonce. */
     const formulaire = page.locator("form").filter({ has: page.locator("#email") }).filter({ visible: true }).last();
-    await formulaire.locator("#email").fill(COMPTES.aminata.email);
-    await formulaire.locator("#password").fill(MOT_DE_PASSE_SEED);
+    await remplirConnexion(page, formulaire, COMPTES.aminata.email, MOT_DE_PASSE_SEED);
     const connexion = page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
     await formulaire.locator("button[type=submit]").click();
     expect((await connexion).status()).toBe(200);

@@ -18,7 +18,7 @@
  * (429) — mesuré le 09/09/2026. `{ parEcran: true }` force la connexion par l'écran : c'est ce
  * que fait `harnais.spec.ts`, pour ne pas perdre la vérification de la porte d'entrée.
  */
-import { test as base, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { test as base, expect, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { totpCode, TOTP_STEP_SECONDS } from "../../../../packages/libs/totp/src";
 import { adresseDeLApi, adresseDeLApiAdmin, adresseDuBackOffice } from "./adresses";
 import { COMPTES, COMPTES_ADMIN, MOT_DE_PASSE_SEED, type Compte, type CompteAdmin } from "./comptes";
@@ -83,6 +83,47 @@ function optionsContexte(mobile?: OptionsConnexion["mobile"]): Record<string, un
   // `isMobile` et `hasTouch` changent ce que le produit rend (`useIsMobile`, feuilles du bas) :
   // un simple `viewport` étroit ne suffit pas à jouer le cahier mobile.
   return { ...OPTIONS_CONTEXTE, viewport: { width, height }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: UA_TELEPHONE };
+}
+
+/* ══ Les deux marches de la connexion (D96) ══════════════════════════════════════════════════ */
+
+/**
+ * Remplit l'adresse, confirme, puis remplit le mot de passe — SANS envoyer : l'appelant clique
+ * lui-même sur « Se connecter », parce que c'est lui qui sait quelle réponse attendre.
+ *
+ * `portee` est le formulaire visé : la PAGE de connexion, ou celui d'une fenêtre (« ta session a
+ * expiré », « connecte-toi pour réserver »…). Les deux montent le même composant, donc le même
+ * parcours en deux marches.
+ */
+export async function remplirConnexion(
+  page: Page,
+  portee: Locator,
+  email: string,
+  motDePasse: string
+): Promise<void> {
+  await portee.locator("#email").fill(email);
+  await portee.locator("button[type=submit]").click();
+  // La fenêtre de confirmation est nommée PAR L'ADRESSE : c'est ce qui la distingue de la
+  // fenêtre de connexion qui l'entoure parfois.
+  await page.getByRole("dialog", { name: email }).getByRole("button", { name: "Confirmer" }).click();
+  await portee.locator("#password").fill(motDePasse);
+}
+
+/* ══ Le code à six chiffres ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Remplit les six cases du code, des DEUX parcours (inscription, mot de passe oublié) — depuis
+ * D97 c'est le même écran, `OtpVerifyView`.
+ *
+ * Le nom accessible d'une case est « <libellé> N/6 » : il se LIT, parce qu'un lecteur d'écran
+ * l'annonce. Le harnais demandait « OTP digit N » jusqu'ici — un nom qui n'existe plus depuis
+ * **D92** (`676c2a19`), c'est-à-dire que ces fiches réclamaient un élément absent sans que rien
+ * ne le dise : le harnais n'est pas un contrôle de CI. D'où ce passage par UN seul endroit.
+ */
+export async function saisirLesCases(page: Page, code: string): Promise<void> {
+  for (const [i, chiffre] of code.split("").entries()) {
+    await page.getByLabel(`Saisis ton code ${i + 1}/6`).fill(chiffre);
+  }
 }
 
 /* ══ La connexion d'un membre, par l'écran ═══════════════════════════════════════════════════ */

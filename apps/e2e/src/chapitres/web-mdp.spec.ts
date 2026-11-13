@@ -13,7 +13,7 @@
  * anti-spam (six par heure, un par minute). Sur une adresse neuve les compteurs sont vierges ;
  * la seule attente est le cooldown d'une minute quand deux codes du MÊME scope se suivent.
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, saisirLesCases, type Navigateur } from "../fixtures/yamba";
 import { adresseDeLApi } from "../fixtures/adresses";
 import { compteNeuf, type CompteNeuf } from "../fixtures/compte-neuf";
 import { COMPTES } from "../fixtures/comptes";
@@ -63,7 +63,7 @@ async function creerCompteActive(page: Page, mailpit: Mailpit, compte: CompteNeu
 
   const email = await mailpit.attendreEmail({ pour: compte.email, sujet: SUJET_ACTIVATION });
   const code = codeDe(email.texte);
-  for (const [i, c] of code.split("").entries()) await page.getByLabel(`OTP digit ${i + 1}`).fill(c);
+  await saisirLesCases(page, code);
   const verif = page.waitForResponse((r) => r.url().includes("/auth/register/verify") && r.request().method() === "POST", { timeout: 30_000 });
   await page.getByRole("button", { name: "Valider mon code" }).click();
   expect((await verif).ok(), "POST /auth/register/verify").toBe(true);
@@ -73,10 +73,13 @@ async function creerCompteActive(page: Page, mailpit: Mailpit, compte: CompteNeu
 /** Connexion par l'écran, dans un contexte donné (compte hors `COMPTES`). */
 async function connecter(page: Page, email: string, motDePasse: string): Promise<void> {
   await page.goto("/fr/login", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Connecte-toi" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Heureux de te revoir" })).toBeVisible({ timeout: 60_000 });
   await attendreHydratation(page);
   const f = formulaire(page);
+  // D96 — l'adresse, sa confirmation, puis le mot de passe.
   await f.locator("#email").fill(email);
+  await f.locator("button[type=submit]").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirmer" }).click();
   await f.locator("#password").fill(motDePasse);
   const rep = page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 });
   await f.locator("button[type=submit]").click();
@@ -127,7 +130,7 @@ test.describe("WEB-MDP — mot de passe et adresse email (chapitre 5.4)", () => 
     // WEB-MDP-3 d'abord : « Retour à la connexion » ramène sans rien perdre.
     await page.getByRole("link", { name: "Retour à la connexion" }).click();
     await expect(page).toHaveURL(/\/fr\/login/);
-    await expect(page.getByRole("heading", { name: "Connecte-toi" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Heureux de te revoir" })).toBeVisible();
 
     // WEB-MDP-1 : une adresse inexistante — l'écran avance, aucun email n'est envoyé.
     await page.locator("main").getByRole("link", { name: "Oublié ?" }).first().click();
@@ -159,24 +162,24 @@ test.describe("WEB-MDP — mot de passe et adresse email (chapitre 5.4)", () => 
     const email = await mailpit.attendreEmail({ pour: compte.email, sujet: SUJET_RESET });
     expect(email.texte, "l'email annonce 10 minutes").toMatch(/10 minutes/);
     const code = codeDe(email.texte);
-    for (const [i, c] of code.split("").entries()) await page.getByLabel(`OTP digit ${i + 1}`).fill(c);
+    await saisirLesCases(page, code);
     const verif = page.waitForResponse((r) => r.url().includes("/auth/password/verify") && r.request().method() === "POST", { timeout: 30_000 });
     await page.getByRole("button", { name: "Valider mon code" }).click();
     expect((await verif).ok(), "POST /auth/password/verify").toBe(true);
     await expect(page).toHaveURL(/\/fr\/password\/reset/, { timeout: 30_000 });
 
     // Les règles de force s'appliquent ici aussi : « abc » nomme la règle.
+    // D97 — UN seul champ : la confirmation a disparu (l'œil et le
+    // gestionnaire de mots de passe la rendent inutile, D91).
     await page.locator("#new-password").fill("abc");
-    await page.locator("#confirm-password").fill("abc");
-    await page.getByRole("button", { name: "Réinitialiser le mot de passe" }).click();
+    await page.getByRole("button", { name: "Changer le mot de passe" }).click();
     await expect(page.locator("main").getByText(/au moins 8 caractères/)).toBeVisible();
     await expect(page).toHaveURL(/\/fr\/password\/reset/);
 
     // Le vrai nouveau mot de passe.
     await page.locator("#new-password").fill(NOUVEAU_MOT_DE_PASSE);
-    await page.locator("#confirm-password").fill(NOUVEAU_MOT_DE_PASSE);
     const reset = page.waitForResponse((r) => r.url().includes("/auth/password/reset") && r.request().method() === "POST", { timeout: 30_000 });
-    await page.getByRole("button", { name: "Réinitialiser le mot de passe" }).click();
+    await page.getByRole("button", { name: "Changer le mot de passe" }).click();
     expect((await reset).ok(), "POST /auth/password/reset").toBe(true);
     await expect(page).toHaveURL(/\/fr\/login/, { timeout: 30_000 });
 

@@ -24,7 +24,20 @@ import { join, resolve } from 'node:path';
 const MOBILE = resolve(__dirname, '../..');
 const WEB = resolve(MOBILE, '../user-ui');
 
-const FORMULAIRE_WEB = join(WEB, 'src/components/auth/forms/RegisterVerifyForm.tsx');
+/**
+ * D97 — l'écran de vérification du site N'EST PLUS un formulaire mais une VUE
+ * PARTAGÉE : l'inscription et le mot de passe oublié en étaient deux copies,
+ * dont une seule avait reçu D92. Les règles de D92 n'ont pas bougé d'un mot —
+ * elles ont changé d'ADRESSE, et ces fiches suivent.
+ *
+ * Elles l'ont dit elles-mêmes le jour de l'extraction : sept d'entre elles
+ * sont passées au rouge en cherchant `showValidity(` dans un fichier qui ne
+ * l'appelait plus. C'est le comportement attendu d'une fiche qui tient une
+ * règle PAR SON LIEU : elle ne se tait pas, elle réclame.
+ */
+const FORMULAIRE_WEB = join(WEB, 'src/components/auth/shared/OtpVerifyView.tsx');
+/** L'appelant du parcours d'inscription — il ne porte plus que SON parcours. */
+const APPELANT_WEB = join(WEB, 'src/components/auth/forms/RegisterVerifyForm.tsx');
 const VUE_MOBILE = join(MOBILE, 'src/components/auth/otp-verify-view.tsx');
 const ECRAN_MOBILE = join(MOBILE, 'src/app/(auth)/register-verify.tsx');
 
@@ -49,7 +62,8 @@ const LOCALES = ['fr', 'en'];
 
 describe('les deux écrans existent là où ces fiches les cherchent', () => {
   it.each([
-    ['le formulaire web', FORMULAIRE_WEB],
+    ['la vue de vérification partagée du site', FORMULAIRE_WEB],
+    ['l’appelant du parcours d’inscription', APPELANT_WEB],
     ['la vue partagée du mobile', VUE_MOBILE],
     ['l’écran mobile', ECRAN_MOBILE],
   ])('%s', (_quoi, chemin) => {
@@ -115,7 +129,10 @@ describe('② un seul titre pour une seule étape (D92 3A)', () => {
   });
 
   it('le web enchaîne bien la connexion, sinon le titre redevient un mensonge', () => {
-    const source = lire(FORMULAIRE_WEB);
+    // Depuis D97 cela vit chez l'APPELANT : l'enchaînement appartient au
+    // parcours d'inscription, pas à l'écran de saisie du code — le parcours
+    // « mot de passe oublié » n'ouvre justement AUCUNE session.
+    const source = lire(APPELANT_WEB);
     expect(source).toContain('loginUser(');
     expect(source).toContain('readPendingPassword');
   });

@@ -2442,10 +2442,30 @@ package.json du mobile : ne pas lancer `npx expo start` nu).
   par e-mail », qui n'existe pas encore cote serveur — portee telle quelle, a
   trancher sur chiffres, sur les DEUX fronts.
 
+- Page 4 — le MOT DE PASSE OUBLIE (D97, `feat/finitions-mot-de-passe`) : le site
+  avait DEUX ecrans de saisie du code — D92 en avait refondu un seul, et rien ne
+  disait qu'il en existait un second (689 lignes, parcours « oublie »). Une vue
+  partagee (`OtpVerifyView`, le jumeau de `otp-verify-view.tsx` du mobile) :
+  1 518 lignes -> 857. Quatre fois le meme defaut corrige (le client reinvente ce
+  que le serveur dit : expiration lue sur un mot anglais, regles de mot de passe
+  REECRITES dans l'ecran, message brut de l'API, textes en ternaires), la
+  confirmation du mot de passe et le COLLAGE INTERDIT retires, les pastilles de
+  securite parties des deux fronts. Mobile 622 -> 665 fiches.
+  **Le harnais reclamait un element absent depuis D92** (`getByLabel("OTP digit
+  N")`, supprime par `676c2a19` la veille) : trois chapitres + une page-objet.
+  Deux helpers centralisent desormais les gestes (`saisirLesCases`,
+  `remplirConnexion`), et SIX fiches attendaient encore le formulaire de
+  connexion en une seule page (D96) — elles sont passees aux deux marches.
+  NON REJOUE : le harnais demande les six services, Mailpit et les deux fronts ;
+  ses mises a jour sont verifiees au TYPAGE, pas a l'execution.
+
 RESTE dans cette passe :
-- les QUATRE autres ecrans d'auth (connexion, mot de passe oublie, verification
-  de mot de passe, reinitialisation) : leur composition et leur discours n'ont
-  pas ete revus ; `AuthScreen.badge` est optionnel exprES pour cela.
+- ~~les QUATRE autres ecrans d'auth~~ : FAITS (D96 pour la connexion, D97 pour
+  les trois ecrans du mot de passe oublie). `AuthScreen.badge` n'a plus AUCUN
+  appelant — la pastille de securite a disparu de tous les ecrans d'auth.
+  Reste la variante MODALE de la connexion (« ta session a expire »,
+  « connecte-toi pour reserver ») : elle monte le meme composant, donc le meme
+  parcours en deux marches, mais elle n'a jamais ete revue POUR ELLE-MEME.
 - **D93 candidate — « un tunnel n'offre pas la sortie »** : le `Header` du site
   est monte sans condition par `app/[locale]/layout.tsx` et propose « Partager
   un trajet » / « Connexion » au milieu de l'inscription. Decision de GABARIT,

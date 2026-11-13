@@ -196,7 +196,10 @@ test.describe("WEB-ERR — pages d'erreur et page introuvable (chapitre 5.29)", 
     /* 4. Un formulaire refusé : mot de passe faux à la connexion. */
     const refuse = await navigateurVisiteur();
     await refuse.page.goto("/fr/login", { waitUntil: "domcontentloaded" });
+    // D96 — deux marches : l'adresse, sa confirmation, puis le mot de passe.
     await refuse.page.locator("#email").fill("aminata.shipper@seed.yamba.dev");
+    await refuse.page.locator("main form button[type=submit]").click();
+    await refuse.page.getByRole("dialog").getByRole("button", { name: "Confirmer" }).click();
     await refuse.page.locator("#password").fill("mauvais-mot-de-passe-2026");
     const reponse = refuse.page.waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 30_000 }).catch(() => null);
     await refuse.page.getByRole("button", { name: "Se connecter" }).click();

@@ -13,7 +13,7 @@
  * Adresses : une par exécution (`compteNeuf()`), jamais `recette+neuf@…` en dur — un compte créé
  * hier bloquerait la fiche 6 d'aujourd'hui sur « adresse déjà utilisée ».
  */
-import { test, expect, type Navigateur } from "../fixtures/yamba";
+import { test, expect, saisirLesCases, type Navigateur } from "../fixtures/yamba";
 import { compteNeuf, type CompteNeuf } from "../fixtures/compte-neuf";
 import { COMPTES } from "../fixtures/comptes";
 
@@ -70,9 +70,7 @@ async function jusquAuCode(page: Navigateur["page"], compte: CompteNeuf): Promis
 
 /** Saisit six chiffres case par case et clique « Valider mon code » ; rend la réponse du serveur. */
 async function saisirLeCode(page: Navigateur["page"], code: string) {
-  for (const [i, chiffre] of code.split("").entries()) {
-    await page.getByLabel(`OTP digit ${i + 1}`).fill(chiffre);
-  }
+  await saisirLesCases(page, code);
   const reponse = page.waitForResponse((r) => r.url().includes("/auth/register/verify") && r.request().method() === "POST", { timeout: 30_000 });
   await page.getByRole("button", { name: "Valider mon code" }).click();
   return reponse;
@@ -80,7 +78,7 @@ async function saisirLeCode(page: Navigateur["page"], code: string) {
 
 /** Colle un texte dans le champ à six cases — un vrai événement `paste`, pas six saisies. */
 async function collerLeCode(page: Navigateur["page"], code: string): Promise<void> {
-  await page.getByLabel("OTP digit 1").evaluate((input, texte) => {
+  await page.getByLabel("Saisis ton code 1/6").evaluate((input, texte) => {
     const dt = new DataTransfer();
     dt.setData("text", texte);
     input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
@@ -257,7 +255,7 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
       const t2 = await compteARebours.innerText();
       expect(t1 <= "10:00" && t2 < t1, `le compte à rebours décroît (${t1} → ${t2})`).toBe(true);
       await expect(page.getByText("Saisis ton code")).toBeVisible();
-      await expect(page.getByLabel("OTP digit 6")).toBeVisible();
+      await expect(page.getByLabel("Saisis ton code 6/6")).toBeVisible();
       await expect(page.getByText("Astuce : tu peux coller le code directement.")).toBeVisible();
       await expect(page.getByRole("button", { name: "Valider mon code" })).toBeVisible();
 
@@ -284,7 +282,7 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
       await expect(page.getByText("Saisie bloquée temporairement.")).toBeVisible();
       await expect(page.getByText(/Réessaie dans/)).toBeVisible();
       await expect(page.getByText("Pour ta sécurité, la saisie est bloquée après plusieurs tentatives incorrectes.")).toBeVisible();
-      await expect(page.getByLabel("OTP digit 1")).toBeDisabled();
+      await expect(page.getByLabel("Saisis ton code 1/6")).toBeDisabled();
       await expect(page.getByRole("button", { name: "Valider mon code" })).toBeDisabled();
 
       // Le blocage survit à un rechargement : le compteur vit sur le serveur.
@@ -302,7 +300,7 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
 
     await test.step("WEB-INS-8 · « Renvoyer le code » et son délai", async () => {
       // La fin du blocage : une vraie minute.
-      await expect(page.getByLabel("OTP digit 1")).toBeEnabled({ timeout: 75_000 });
+      await expect(page.getByLabel("Saisis ton code 1/6")).toBeEnabled({ timeout: 75_000 });
       const emailsAvant = await mailpit.compter({ pour: compte.email, sujet: "Ton code d'activation Yamba" });
 
       const renvoi = page.waitForResponse((r) => r.url().includes("/auth/register/resend") && r.request().method() === "POST", { timeout: 30_000 });
@@ -336,7 +334,7 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
       // Le collage remplit les six cases d'un coup.
       await collerLeCode(page, code);
       for (const [i, chiffre] of code.split("").entries()) {
-        await expect(page.getByLabel(`OTP digit ${i + 1}`)).toHaveValue(chiffre);
+        await expect(page.getByLabel(`Saisis ton code ${i + 1}/6`)).toHaveValue(chiffre);
       }
       const verification = page.waitForResponse((r) => r.url().includes("/auth/register/verify") && r.request().method() === "POST", { timeout: 30_000 });
       await page.getByRole("button", { name: "Valider mon code" }).click();
@@ -344,7 +342,8 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
 
       await expect(page).toHaveURL(/\/fr\/login\?verified=1/, { timeout: 60_000 });
       await expect(page.getByText("Compte activé")).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByText("Ton adresse est vérifiée. Connecte-toi avec ton mot de passe pour commencer.")).toBeVisible();
+      // D96 — un seul bandeau, celui du téléphone : « Ton compte est activé… »
+      await expect(page.getByText("Ton compte est activé. Connecte-toi pour commencer.")).toBeVisible();
       await mailpit.attendreEmail({ pour: compte.email, sujet: "Bienvenue" });
 
       // En base : le journal des consentements et la langue de l'écran.
