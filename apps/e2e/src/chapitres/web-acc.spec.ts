@@ -3,7 +3,8 @@
  * ==================================================================================
  * Ce qu'un visiteur voit AVANT d'avoir un compte : la page d'accueil, l'en-tête, le pied de page,
  * la bascule de langue, le thème, les portes d'entrée du produit — puis l'accueil connecté et la
- * déconnexion. Douze fiches (WEB-ACC-1 à WEB-ACC-12), jouées dans l'ordre du cahier.
+ * déconnexion, et le GABARIT du tunnel d'auth (D93). Treize fiches (WEB-ACC-1 à WEB-ACC-13),
+ * jouées dans l'ordre du cahier.
  *
  * Le chapitre est joué en **desktop** (`Desktop Chrome`, 1280 px) : l'en-tête et le pied de page
  * ont chacun DEUX arbres dans le DOM (un `md:hidden`, un `hidden md:block`), et seul celui de la
@@ -459,4 +460,76 @@ test.describe("WEB-ACC — découverte, accueil et navigation (chapitre 5.1)", (
     await expect(lienVisible(enTete(page), "Connexion")).toBeVisible({ timeout: 30_000 });
     await expect(enTete(page).getByRole("button", { name: "Menu utilisateur" }).filter({ visible: true })).toHaveCount(0);
   });
+
+  /**
+   * WEB-ACC-13 — « un tunnel n'offre pas la sortie » (D93).
+   *
+   * Les six pages d'auth gardaient la navigation haute complète : « Partager un trajet » en
+   * mangue et « Connexion » (un compte qui n'existe pas encore) au milieu d'une inscription.
+   * Il ne reste que le logo, la langue et le thème — un sélecteur de langue ne fait pas sortir
+   * de l'entonnoir, il le rend lisible.
+   *
+   * Deux temps de mesure, et c'est tout l'intérêt de la fiche : on compte les portes de sortie
+   * AVANT que `useUser` se résolve (le squelette est monté en permanence, caché en
+   * `display: none`) puis APRÈS. Le tunnel de paiement portait ce défaut depuis le 17/10 — la
+   * règle était dans le `Header`, pas dans `HeaderSkeleton`, donc le CTA mangue clignotait.
+   *
+   * Les trois dernières routes demandent normalement un état (un code envoyé, un jeton) : sans
+   * lui elles renvoient vers une AUTRE page d'auth, et c'est très bien — la fiche vérifie
+   * qu'on ne quitte jamais le groupe, donc que le gabarit tient quelle que soit la redirection.
+   */
+  const PAGES_DU_TUNNEL = [
+    "/fr/login",
+    "/fr/register",
+    "/fr/password/forgot",
+    "/fr/register/verify",
+    "/fr/password/verify",
+    "/fr/password/reset",
+  ];
+
+  /** Ce qui emmène AILLEURS que dans l'entonnoir, et ne doit donc exister sur aucune des six. */
+  async function compterLesPortesDeSortie(page: Navigateur["page"]): Promise<number> {
+    const entete = enTete(page);
+    const liens = ["Connexion", "Créer un compte", "Messages", "Notifications"];
+    const boutons = ["Partager un trajet", "Menu utilisateur", "Notifications", "Messages"];
+    let total = 0;
+    for (const nom of liens) {
+      total += await entete.getByRole("link", { name: nom }).filter({ visible: true }).count();
+    }
+    for (const nom of boutons) {
+      total += await entete.getByRole("button", { name: nom }).filter({ visible: true }).count();
+    }
+    return total;
+  }
+
+  for (const route of PAGES_DU_TUNNEL) {
+    test(`WEB-ACC-13 · ${route} n'offre aucune porte de sortie`, async ({ navigateurVisiteur }) => {
+      const { page } = await navigateurVisiteur();
+
+      // 1er temps : le squelette. On n'attend PAS le réseau exprès.
+      await page.goto(route, { waitUntil: "domcontentloaded" });
+      await expect(enTete(page)).toBeVisible({ timeout: 60_000 });
+      expect(await compterLesPortesDeSortie(page), "portes de sortie pendant le squelette").toBe(0);
+
+      // 2e temps : l'en-tête réel, une fois la sonde de session retombée.
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      expect(await compterLesPortesDeSortie(page), "portes de sortie après résolution").toBe(0);
+
+      // Ce qui RESTE : le logo (la seule sortie, neutre), la langue et le thème.
+      await expect(lienVisible(enTete(page), "Yamba")).toBeVisible();
+      await expect(
+        enTete(page).getByRole("button", { name: "English" }).filter({ visible: true }).first()
+      ).toBeVisible();
+      await expect(
+        enTete(page).getByRole("button", { name: "Changer de thème" }).filter({ visible: true }).first()
+      ).toBeVisible();
+
+      // On n'a pas quitté le groupe (auth), quelle que soit la redirection.
+      await expect(page).toHaveURL(/\/fr\/(login|register|password|refresh)/);
+
+      // Et aucune mention de sécurité auto-décernée (D91 1A) sur un écran d'auth.
+      await expect(page.getByText("Connexion sécurisée")).toHaveCount(0);
+      await expect(page.getByText("Paiement sécurisé par Stripe")).toHaveCount(0);
+    });
+  }
 });
