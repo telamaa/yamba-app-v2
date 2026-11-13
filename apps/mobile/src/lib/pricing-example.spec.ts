@@ -12,10 +12,14 @@
  */
 import { PRICING_PARAMS, quoteShipperPrice } from '@packages/pricing';
 
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
 import {
   BILLING_FLOOR_KG,
   PRICING_EXAMPLE_PARAMS,
   estimateShipperTotalCents,
+  formatAmountFromCents,
 } from '@/lib/pricing-example';
 
 describe('les trois paramètres RECOPIÉS sont ceux du moteur', () => {
@@ -103,5 +107,56 @@ describe('l’ancre ne promet JAMAIS moins cher que le devis du tunnel', () => {
         real.totalShipperCents
       );
     }
+  });
+});
+
+/**
+ * D99 1A — LA COPIE EST UNE COPIE, ET LA FICHE L'EXIGE.
+ *
+ * `pricing-example.ts` existe en DEUX exemplaires — un par front — et c'est
+ * volontaire : le mobile ne doit pas tirer `@packages/pricing` dans un écran
+ * d'atterrissage (voir l'en-tête de ce fichier). Mais deux fichiers qu'on
+ * promet identiques et que personne ne compare finissent par ne plus l'être :
+ * c'est le motif de `maskEmail` (D92), de la lecture des refus (D96) et de la
+ * liste des pages d'auth (D93).
+ *
+ * Cette fiche-ci rend la promesse vérifiable, à l'octet près. Elle a une
+ * conséquence utile : comme les fiches ci-dessus confrontent déjà la copie du
+ * MOBILE au moteur partagé, la copie du SITE se trouve couverte par
+ * transitivité — alors que `apps/user-ui` n'a toujours aucun harnais de
+ * tests. Une fiche, deux fronts.
+ */
+describe('les deux copies de la projection sont la MÊME (D99 1A)', () => {
+  const MOBILE = resolve(__dirname, '../..');
+  const WEB = resolve(MOBILE, '../user-ui');
+
+  it('octet pour octet', () => {
+    const ici = readFileSync(join(MOBILE, 'src/lib/pricing-example.ts'), 'utf8');
+    const la = readFileSync(join(WEB, 'src/lib/pricing-example.ts'), 'utf8');
+    expect(la).toBe(ici);
+  });
+});
+
+describe('formatAmountFromCents — deux décimales, toujours (D99 1A)', () => {
+  it('ne laisse jamais tomber les centimes', () => {
+    // Le défaut corrigé : le site affichait « 25 » là où le téléphone
+    // affichait « 24,85 » pour le même trajet et le même colis.
+    expect(formatAmountFromCents(2485, 'fr-FR')).toBe('24,85');
+    expect(formatAmountFromCents(2485, 'en-GB')).toBe('24.85');
+  });
+
+  it('complète un montant rond, plutôt que de le raccourcir', () => {
+    expect(formatAmountFromCents(2500, 'fr-FR')).toBe('25,00');
+    expect(formatAmountFromCents(900, 'en-GB')).toBe('9.00');
+  });
+
+  it('le séparateur suit la LANGUE, pas le pays du prix', () => {
+    expect(formatAmountFromCents(123456, 'fr-FR')).toContain(',');
+    expect(formatAmountFromCents(123456, 'en-GB')).toContain('.');
+  });
+
+  it('deux montants proches ne se confondent plus', () => {
+    // L'arrondi à l'euro affichait « 25 € » pour les deux.
+    expect(formatAmountFromCents(2485, 'fr-FR')).not.toBe(formatAmountFromCents(2540, 'fr-FR'));
   });
 });
