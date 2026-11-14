@@ -113,6 +113,18 @@ export type SearchParams = {
   dateTo?: string;
   mode?: SearchTransportFilter;
   sort?: SearchSort;
+  /**
+   * D101 1A/3A — le poids CHOISI par l'Expéditeur. Ce champ n'existait pas :
+   * le client mobile ne pouvait émettre aucun poids, et posait `estimateKg`
+   * en dur à 2 kg — une hypothèse que la carte affirmait sans que rien dans
+   * l'application ne permette de la voir ni de la changer.
+   *
+   * Il ne se cumule JAMAIS avec `estimateKg` (D99 3C) : `weightKg` filtre ET
+   * enrichit (un trajet sans la capacité sort des résultats), `estimateKg`
+   * enrichit sans filtrer. Tant que rien n'est choisi, « Tous les trajets
+   * disponibles » ne doit retirer aucun trajet.
+   */
+  weightKg?: number | null;
   cursor?: string | null;
   limit?: number;
 };
@@ -128,10 +140,14 @@ function baseQuery(params: SearchParams): URLSearchParams {
 
 export async function searchTrips(params: SearchParams): Promise<SearchPage> {
   const query = baseQuery(params);
-  // D99 3C — le colis de RÉFÉRENCE, pour que chaque carte annonce un total et
-  // non un prix au kilo. `estimateKg` enrichit sans filtrer : il ne retire
-  // aucun trajet de la liste, contrairement à `weightKg`.
-  query.set('estimateKg', String(PRICING_EXAMPLE_PARAMS.exampleWeightKg));
+  // D99 3C / D101 3A — L'UN ou L'AUTRE, jamais les deux. Le poids choisi
+  // filtre et enrichit ; à défaut, le colis de RÉFÉRENCE enrichit seulement,
+  // pour que chaque carte annonce un total et non un prix au kilo.
+  if (typeof params.weightKg === 'number') {
+    query.set('weightKg', String(params.weightKg));
+  } else {
+    query.set('estimateKg', String(PRICING_EXAMPLE_PARAMS.exampleWeightKg));
+  }
   if (params.mode && params.mode !== 'all') query.set('mode', params.mode);
   // D100 1A — le tri part TOUJOURS : un défaut écrit des deux côtés dérive.
   if (params.sort) query.set('sort', params.sort);

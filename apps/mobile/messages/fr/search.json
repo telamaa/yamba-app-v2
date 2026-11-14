@@ -31,7 +31,14 @@
     "relevance": "Les plus pertinents",
     "earliest": "Départ le plus tôt",
     "lowestPrice": "Prix le plus bas",
-    "bestRated": "Mieux notés"
+    "bestRated": "Mieux notés",
+    "yourParcel": "Ton colis",
+    "clearWeight": "Tous les poids",
+    "weightAssumed": "estimation — choisis ton poids",
+    "weightChosen": "prix et places pour ce poids",
+    "lighter": "Colis plus léger",
+    "heavier": "Colis plus lourd",
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum."
   },
   "corridors": {
     "label": "En ce moment",

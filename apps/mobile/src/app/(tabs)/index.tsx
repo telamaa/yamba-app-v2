@@ -51,6 +51,16 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { shouldRefetchForLocale } from '@/lib/locale-refetch';
 import { EMPTY_FACET_OPACITY, isEmptyFacet } from '@/lib/search-facets';
+import {
+  BILLING_FLOOR_KG,
+  PRICING_EXAMPLE_PARAMS as PARAMS_EXEMPLE,
+} from '@/lib/pricing-example';
+import {
+  PARCEL_PRESETS_KG,
+  canStepParcelKg,
+  formatParcelKg,
+  stepParcelKg,
+} from '@/lib/parcel-weight';
 import { dateBounds, summaryLabel, type SearchDate } from '@/lib/search-date';
 import { cityLabel } from '@/lib/trip-format';
 import { getSearchDraft, setSearchDraft, subscribeSearchDraft } from '@/lib/search-draft';
@@ -120,6 +130,12 @@ export default function SearchScreen() {
   const theme = useTheme();
   const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
+  // D101 5A — la mise en forme d'un nombre suit la LANGUE, jamais un pays
+  // écrit en dur (le site affichait « 1,5 kg » jusque dans son interface
+  // anglaise). Même règle que le prix depuis D99 1A.
+  const localeTag = locale === 'fr' ? 'fr-FR' : 'en-US';
+  /** Le colis SUPPOSÉ, tant que l'Expéditeur n'a rien choisi. */
+  const exempleKg = PARAMS_EXEMPLE.exampleWeightKg;
   // Départ, destination et date se choisissent dans des PAGES poussées
   // (`/search/city`, `/search/date`) : une page ne retourne pas de valeur,
   // elle écrit dans le brouillon partagé et cet écran s'y abonne.
@@ -129,6 +145,13 @@ export default function SearchScreen() {
   // Pastille transport active + tri (serveur) — persistent d'une recherche à l'autre.
   const [mode, setMode] = useState<SearchTransportFilter>('all');
   const [sort, setSort] = useState<SearchSort>('relevance');
+  /**
+   * D101 1A — le colis de l'Expéditeur. `null` = « rien de choisi » : la
+   * recherche n'envoie alors que `estimateKg`, qui enrichit sans FILTRER, et
+   * « Tous les trajets disponibles » ne retire aucun trajet. Dès qu'un poids
+   * est posé, il filtre sur la capacité — et la carte cesse de supposer.
+   */
+  const [weightKg, setWeightKg] = useState<number | null>(null);
   // Comptes par transport (facettes serveur) : rafraîchis sur les recherches
   // STRUCTURANTES (villes/date), jamais au toucher d'une pastille.
   const [facets, setFacets] = useState<SearchFacets | null>(null);
@@ -159,19 +182,36 @@ export default function SearchScreen() {
     };
   }, []);
 
+  /**
+   * D101 — la signature passe en ARGUMENT NOMMÉ. Elle prenait cinq positions
+   * et le poids en aurait fait une sixième : deux `string` puis trois valeurs
+   * dont deux unions de chaînes, appelées depuis six endroits — une inversion
+   * y serait passée sans bruit, ce qui est exactement le défaut que D100
+   * vient de corriger ailleurs. Un champ absent de l'objet garde son défaut,
+   * là où une position oubliée décalait tout le reste.
+   */
   const paramsFor = useCallback(
-    (
-      nextFrom: string,
-      nextTo: string,
-      nextDate: SearchDate | null,
-      nextMode: SearchTransportFilter,
-      nextSort: SearchSort
-    ): SearchParams => ({
+    ({
+      from: nextFrom = '',
+      to: nextTo = '',
+      date: nextDate = null,
+      mode: nextMode,
+      sort: nextSort,
+      weightKg: nextWeightKg = null,
+    }: {
+      from?: string;
+      to?: string;
+      date?: SearchDate | null;
+      mode: SearchTransportFilter;
+      sort: SearchSort;
+      weightKg?: number | null;
+    }): SearchParams => ({
       from: nextFrom.trim() || undefined,
       to: nextTo.trim() || undefined,
       ...(nextDate !== null ? dateBounds(nextDate) : {}),
       mode: nextMode,
       sort: nextSort,
+      weightKg: nextWeightKg,
       limit: PAGE_SIZE,
     }),
     []
@@ -269,7 +309,7 @@ export default function SearchScreen() {
   );
 
   const runSearch = useCallback(
-    () => runSearchWith(paramsFor(from, to, date, mode, sort), true),
+    () => runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg }), true),
     [runSearchWith, paramsFor, from, to, date, mode, sort]
   );
 
@@ -309,9 +349,9 @@ export default function SearchScreen() {
     (next: SearchTransportFilter) => {
       if (next === mode) return;
       setMode(next);
-      void runSearchWith(paramsFor(from, to, date, next, sort), false, true);
+      void runSearchWith(paramsFor({ from, to, date, mode: next, sort, weightKg }), false, true);
     },
-    [mode, runSearchWith, paramsFor, from, to, date, sort]
+    [mode, runSearchWith, paramsFor, from, to, date, sort, weightKg]
   );
 
   const pickSort = useCallback(
@@ -319,9 +359,23 @@ export default function SearchScreen() {
       setFiltersOpen(false);
       if (next === sort) return;
       setSort(next);
-      void runSearchWith(paramsFor(from, to, date, mode, next), false, true);
+      void runSearchWith(paramsFor({ from, to, date, mode, sort: next, weightKg }), false, true);
     },
-    [sort, runSearchWith, paramsFor, from, to, date, mode]
+    [sort, runSearchWith, paramsFor, from, to, date, mode, weightKg]
+  );
+
+  /**
+   * D101 — poser un poids RELANCE la recherche : il filtre sur la capacité et
+   * change tous les totaux affichés. La feuille reste ouverte, contrairement
+   * au tri : on règle un colis par petits pas, et chaque pas doit se voir.
+   */
+  const pickWeight = useCallback(
+    (next: number | null) => {
+      if (next === weightKg) return;
+      setWeightKg(next);
+      void runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg: next }), false, true);
+    },
+    [weightKg, runSearchWith, paramsFor, from, to, date, mode, sort]
   );
 
   // Le X de l'atterrissage → résultats DIRECTS (motif Airbnb, cf.
@@ -329,7 +383,7 @@ export default function SearchScreen() {
   // « Partout · Toutes les dates ». Une seule fois, à l'arrivée.
   useEffect(() => {
     if (consumeBrowseOnLanding()) {
-      void runSearchWith(paramsFor('', '', null, 'all', 'relevance'), true);
+      void runSearchWith(paramsFor({ mode: 'all', sort: 'relevance' }), true);
     }
     // Au montage uniquement : le drapeau est un geste d'atterrissage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -338,9 +392,9 @@ export default function SearchScreen() {
   const openCorridor = useCallback(
     (corridor: Corridor) => {
       setSearchDraft({ from: corridor.fromCity, to: corridor.toCity, date: null });
-      void runSearchWith(paramsFor(corridor.fromCity, corridor.toCity, null, mode, sort), true);
+      void runSearchWith(paramsFor({ from: corridor.fromCity, to: corridor.toCity, mode, sort, weightKg }), true);
     },
-    [runSearchWith, paramsFor, mode, sort]
+    [runSearchWith, paramsFor, mode, sort, weightKg]
   );
 
   const loadMore = useCallback(async () => {
@@ -348,7 +402,7 @@ export default function SearchScreen() {
     setState({ ...state, loadingMore: true });
     try {
       const next = await searchTrips({
-        ...paramsFor(from, to, date, mode, sort),
+        ...paramsFor({ from, to, date, mode, sort, weightKg }),
         cursor: state.page.nextCursor,
       });
       setState({
@@ -408,7 +462,14 @@ export default function SearchScreen() {
   const modeCounts = facets?.modeCount ?? { all: 0, plane: 0, train: 0, car: 0 };
   // Le bouton « Filtres » n'a plus de mot pour s'expliquer : il doit donc
   // DIRE quand un filtre est posé — sinon un tri actif devient invisible.
-  const filtersActive = sort !== 'earliest';
+  /**
+   * D101 — le point mangue de la pastille. Il lisait `sort !== 'earliest'`,
+   * vrai EN PERMANENCE depuis que D100 a fait de `relevance` le défaut : il
+   * annonçait un filtre posé sur un écran vierge. Un indicateur toujours
+   * allumé n'est pas un indicateur — même règle que la capacité restante
+   * (D99 3A) et que le compteur de vues (D100 4A).
+   */
+  const filtersActive = sort !== 'relevance' || weightKg !== null;
 
   // La barre du haut : la pilule récap (elle OUVRE l'éditeur) et la pastille
   // de profil — partagée entre le flux normal et l'en-tête collant du mode
@@ -724,6 +785,110 @@ export default function SearchScreen() {
                 {sort === option && <Ionicons name="checkmark" size={18} color={Brand.mango} />}
               </Pressable>
             ))}
+
+            {/* ── Ton colis (D101) ──
+                Le site fait glisser un curseur : geste de souris, précis au
+                pixel. Ici on avance PAS À PAS et on propose des valeurs
+                d'usage — viser un cran parmi 59 sur une piste large d'un
+                écran, c'est ~8 px par cran, et l'Expéditeur VISE un poids
+                qu'il connaît plutôt qu'il n'explore un continuum. Mêmes
+                nombres que le site (`parcel-weight.ts`), geste natif :
+                exactement la doctrine A207 du calendrier. */}
+            <View style={styles.sheetWeight}>
+              <View style={styles.sheetWeightHead}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.sheetSection}>
+                  {t('filters.yourParcel')}
+                </ThemedText>
+                {weightKg !== null && (
+                  <Pressable
+                    onPress={() => pickWeight(null)}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={({ pressed }) => pressed && styles.pressed}>
+                    <ThemedText type="smallBold" style={{ color: Brand.mango }}>
+                      {t('filters.clearWeight')}
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={styles.stepperRow}>
+                <Pressable
+                  onPress={() => pickWeight(stepParcelKg(weightKg ?? exempleKg, -1))}
+                  disabled={weightKg !== null && !canStepParcelKg(weightKg, -1)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('filters.lighter')}
+                  style={({ pressed }) => [
+                    styles.stepperButton,
+                    { backgroundColor: theme.backgroundElement },
+                    weightKg !== null && !canStepParcelKg(weightKg, -1) && styles.stepperOff,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Ionicons name="remove" size={20} color={theme.text} />
+                </Pressable>
+
+                <View style={styles.stepperValue}>
+                  <ThemedText type="title" style={styles.stepperNumber}>
+                    {formatParcelKg(weightKg ?? exempleKg, localeTag)} kg
+                  </ThemedText>
+                  {/* La carte dit « estimation » tant que rien n'est choisi :
+                      la feuille doit dire la MÊME chose, au même moment. */}
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {weightKg === null ? t('filters.weightAssumed') : t('filters.weightChosen')}
+                  </ThemedText>
+                </View>
+
+                <Pressable
+                  onPress={() => pickWeight(stepParcelKg(weightKg ?? exempleKg, 1))}
+                  disabled={weightKg !== null && !canStepParcelKg(weightKg, 1)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('filters.heavier')}
+                  style={({ pressed }) => [
+                    styles.stepperButton,
+                    { backgroundColor: theme.backgroundElement },
+                    weightKg !== null && !canStepParcelKg(weightKg, 1) && styles.stepperOff,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Ionicons name="add" size={20} color={theme.text} />
+                </Pressable>
+              </View>
+
+              <View style={styles.presetsRow}>
+                {PARCEL_PRESETS_KG.map((preset) => {
+                  const choisi = weightKg === preset;
+                  return (
+                    <Pressable
+                      key={preset}
+                      onPress={() => pickWeight(preset)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: choisi }}
+                      style={({ pressed }) => [
+                        styles.preset,
+                        {
+                          backgroundColor: choisi
+                            ? dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8'
+                            : theme.backgroundElement,
+                          borderColor: choisi ? 'rgba(255,153,0,0.5)' : 'transparent',
+                        },
+                        pressed && styles.pressed,
+                      ]}>
+                      <ThemedText
+                        type="smallBold"
+                        style={{ color: choisi ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary }}>
+                        {formatParcelKg(preset, localeTag)} kg
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Le plancher de facturation (D81) s'explique LÀ OÙ l'on règle
+                  son colis — la carte, elle, ne doit ni le répéter ni le
+                  contredire (D99 bis, D100 2A). */}
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sheetHint}>
+                {t('filters.lightParcel', { kg: formatParcelKg(BILLING_FLOOR_KG, localeTag) })}
+              </ThemedText>
+            </View>
           </ThemedView>
         </Modal>
       </SafeAreaView>
@@ -909,6 +1074,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
+  },
+  // ── Ton colis (D101) ──
+  sheetWeight: {
+    marginTop: Spacing.three,
+    paddingTop: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(148,163,184,0.3)',
+    gap: Spacing.two,
+  },
+  sheetWeightHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  // 44 pt : la cible tactile du système. Un pas-à-pas se touche vite et
+  // plusieurs fois de suite — c'est son seul avantage sur une piste.
+  stepperButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperOff: {
+    opacity: EMPTY_FACET_OPACITY,
+  },
+  stepperValue: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  stepperNumber: {
+    fontSize: 22,
+    // 1,36 — le plancher d'interligne du dépôt est 1,35, et une fiche le
+    // garde (`typography.spec.ts`). Elle a attrapé ce style au premier essai.
+    lineHeight: 30,
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+    justifyContent: 'center',
+  },
+  preset: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sheetHint: {
+    textAlign: 'center',
   },
   idle: {
     gap: Spacing.four,

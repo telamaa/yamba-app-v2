@@ -8922,3 +8922,126 @@ qui décrit un comportement qu'il n'a pas**.
 - Le squelette de la page (§6 du document technique) est le troisième cas de la série
   `HeaderSkeleton` : **après avoir modifié une mise en page, ouvrez son écran de chargement.**
   Ils vivent dans le même fichier et personne ne les regarde jamais ensemble.
+
+---
+
+# Chapitre 241 — La parité ne se mesure pas aux écrans, elle se mesure au contrat (D101)
+
+## 1. Le piège : cinq fiches vertes et un front infirme
+
+Ce dépôt a cinq fiches de parité. Elles comparent des règles, des clés de traduction, des seuils,
+un ordre d'affichage. Toutes étaient **vertes**.
+
+Pendant ce temps, le client mobile était **incapable d'envoyer un paramètre** que le site envoyait
+depuis des semaines :
+
+```ts
+// apps/mobile/src/lib/api/search.api.ts — avant
+export type SearchParams = {
+  from?; to?; dateFrom?; dateTo?; mode?; sort?; cursor?; limit?;
+  // ← pas de weightKg. Nulle part.
+};
+```
+
+Aucune fiche ne pouvait le dire, parce qu'aucune ne posait **la bonne question**. Elles
+demandaient « les deux fronts calculent-ils pareil ? ». Il fallait demander :
+
+> **Pour chaque paramètre du contrat : quels clients savent l'écrire ?**
+
+C'est ce que fait désormais le dernier bloc de `parcel-weight.spec.ts` :
+
+```ts
+it('les deux clients savent envoyer `weightKg`', () => {
+  expect(apiMobile).toContain("query.set('weightKg'");
+  expect(apiWeb).toMatch(/qs\.set\("weightKg"/);
+});
+```
+
+> **À emporter** : une suite de parité qui ne compare que des *valeurs* laisse passer les
+> *capacités absentes*. Un front qui ne sait rien émettre est parfaitement cohérent avec lui-même.
+
+## 2. Le concept : la parité porte sur les nombres, pas sur le geste
+
+Le réflexe, pour « mettre le mobile au niveau », serait de porter le curseur du site. **C'est le
+mauvais réflexe**, et ce dépôt l'a déjà tranché une fois : `search-calendar.tsx` a abandonné le
+`DatePicker` de `@expo/ui` (doctrine A207) pour construire sa grille, parce que le composant de
+l'OS ne savait pas peindre « Je suis flexible », ne se teintait pas en mangue, et divergeait entre
+iOS et Android.
+
+Appliquez le même raisonnement à un curseur de poids :
+
+| | Site | Téléphone |
+|---|---|---|
+| Geste | glisser (souris, précis au pixel) | toucher (pouce, ~10 mm) |
+| Domaine | 59 crans | 59 crans |
+| Largeur utile | panneau de 300 px | écran de 390 px |
+| **Précision** | 1 cran ≈ 5 px, viser est facile | 1 cran ≈ 8 px, **viser est pénible** |
+
+Et surtout : **quelle question l'utilisateur répond-il ?** Il ne parcourt pas un continuum, il
+vise une valeur qu'il connaît déjà (« mon ordinateur, c'est 2 kg »). Un pas-à-pas plus des valeurs
+d'usage répond à cette question ; un curseur répond à une autre.
+
+> **Principe** : ce qui doit être identique entre deux fronts, ce sont les **nombres** et les
+> **règles**. Le geste appartient au support. Copier le widget de l'autre, c'est confondre la
+> parité avec l'uniformité.
+
+## 3. La technique : un flottant qui sort d'un pas
+
+Le pas vaut 0,5. L'alignement naïf est :
+
+```ts
+Math.round(kg / 0.5) * 0.5
+```
+
+Pour `kg = 2.4`, cela rend **2.4000000000000004** — qui s'afficherait tel quel dans la feuille.
+D'où la fermeture à la précision du pas :
+
+```ts
+const crans = Math.round(borne / PARCEL_STEP_KG) * PARCEL_STEP_KG;
+return Math.round(crans * 10) / 10;   // le pas n'a qu'une décimale
+```
+
+La fiche ne teste pas un cas : elle balaie **tout le domaine** et exige que chaque valeur
+multipliée par 10 soit entière. Une fiche qui n'essaie qu'une valeur ne trouve jamais ce bug.
+
+## 4. Cinq arguments positionnels, c'est déjà un de trop
+
+```ts
+paramsFor(from, to, date, mode, sort)   // deux string, puis deux unions de string
+```
+
+Le poids en aurait fait un sixième, depuis six appels. Une inversion `from`/`to` ou `mode`/`sort`
+aurait compilé sans un mot — et serait exactement le genre de défaut que D100 venait de corriger
+ailleurs. La signature passe en objet :
+
+```ts
+paramsFor({ from, to, date, mode, sort, weightKg })
+```
+
+> **Règle simple** : au-delà de **trois** arguments, ou dès que **deux arguments voisins ont le
+> même type**, passez à un objet nommé. Un champ oublié garde son défaut ; une position oubliée
+> décale tout le reste.
+
+## 5. L'indicateur qui s'allume toujours
+
+Trouvé en écrivant ce lot, et c'était **une régression du lot précédent** :
+
+```ts
+const filtersActive = sort !== 'earliest';   // D100 a fait de `relevance` le défaut…
+```
+
+Le point mangue annonçait donc « des filtres sont posés » sur un écran vierge. C'est la troisième
+fois que ce dépôt rencontre la même famille de défaut (la capacité restante toujours affichée en
+D99, le compteur de vues à 1 en D100) :
+
+> **Un signal toujours présent n'est pas un signal.** Quand vous changez une valeur par défaut,
+> cherchez qui la **comparait**.
+
+## 6. Pour aller plus loin
+
+- Comptez, dans votre propre code, les constantes qui vivent dans des **attributs de balise**
+  (`min`, `max`, `step`, `maxLength`). Chacune est un nombre que personne ne nomme, donc que
+  personne ne peut comparer.
+- La fiche de typographie du dépôt (`typography.spec.ts`) a attrapé un style écrit dans ce lot :
+  `22/26 = 1,18` contre un plancher de 1,35. Les fiches qui gardent une **propriété transversale**
+  (interligne, contraste, cible tactile) rapportent longtemps après avoir été écrites.

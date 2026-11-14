@@ -8912,3 +8912,55 @@ l'obtenir. C'est assumé — ce n'était pas ce que la page faisait, et le prét
 | 7 | Aucune option de confiance n'a de résultat | le titre « Confiance et sécurité » disparaît avec sa section |
 | 8 | Un Voyageur n'a pas encore de note | son nom n'est suivi d'aucun séparateur |
 | 9 | La page charge | le squelette a la forme de la carte qui arrive |
+
+---
+
+# D101 — L'Expéditeur règle son colis sur le téléphone (14/11/2026)
+
+## Le besoin
+
+Depuis D99, la carte de résultat annonce ce que l'envoi **coûte**, et la mention dit pour quel
+colis. Sur le téléphone, cette mention disait « estimation pour 2 kg » — et **aucun écran de
+l'application ne permettait de voir d'où venait ce 2, ni de le changer**. L'Expéditeur qui envoie
+5 kg lisait donc un prix qui n'était pas le sien, sans moyen d'y remédier.
+
+Ce n'était pas un filtre oublié : le client mobile n'avait **aucun champ** pour transmettre un
+poids au serveur.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D101-1** | L'Expéditeur peut régler le poids de son colis **sur les deux fronts**, dans le même domaine : de **0,5 kg à 30 kg**, par pas de **0,5 kg**. | Une capacité offerte d'un côté et pas de l'autre n'est pas un retard : c'est un produit différent. |
+| **RG-D101-2** | Tant qu'aucun poids n'est choisi, la recherche **n'écarte aucun trajet** : le poids supposé sert à calculer un prix, pas à filtrer. | « Tous les trajets disponibles » doit tenir son titre (RG-D99 3C). |
+| **RG-D101-3** | Dès qu'un poids est choisi, il **filtre** sur la capacité et recalcule tous les totaux. | C'est ce que l'Expéditeur demande en le posant, et la feuille le dit. |
+| **RG-D101-4** | Le poids choisi et le poids supposé ne sont **jamais** envoyés ensemble. | L'un filtre, l'autre pas : les cumuler retirerait des trajets sans que personne l'ait demandé. |
+| **RG-D101-5** | Le plancher de facturation (2,3 kg, RG-D81) est expliqué **là où l'on règle son colis**, jamais sur la carte. | La carte nomme le poids facturé (RG-D100-4) ; l'explication appartient au réglage. |
+| **RG-D101-6** | L'indicateur « des filtres sont posés » ne s'allume que si un filtre **l'est réellement**. | Il s'allumait en permanence : un indicateur toujours allumé n'informe de rien. |
+| **RG-D101-7** | Un poids s'écrit selon la **langue** de l'interface : « 1,5 kg » en français, « 1.5 kg » en anglais. | Même règle que le prix depuis RG-D99. |
+
+## Ce que l'Expéditeur gagne
+
+Le prix qu'il lit devient **le sien**. Sur le téléphone, il peut enfin dire ce qu'il envoie — et
+la liste cesse de lui proposer des trajets qui n'ont pas la place.
+
+## Divergence assumée entre les deux fronts
+
+Le site fait **glisser un curseur**, le téléphone avance **pas à pas** avec des poids d'usage. Ce
+n'est pas un oubli : viser une valeur parmi 59 au pouce est imprécis, et l'Expéditeur vise un
+poids qu'il connaît plutôt qu'il n'explore une plage. **Mêmes nombres, geste du support** —
+précédent du calendrier (A207).
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre « Filtres » sur le téléphone | une section « Ton colis » affiche 2 kg et dit que c'est une estimation |
+| 2 | Je touche « + » | le poids passe à 2,5 kg, la liste et les prix se recalculent |
+| 3 | Je touche « 5 kg » | le poids passe à 5 kg et la mention dit qu'il est choisi |
+| 4 | Je touche « − » à 0,5 kg | rien ne bouge, le bouton est éteint |
+| 5 | Je pose un poids | la pastille de filtres porte son point mangue |
+| 6 | Je n'ai rien posé | la pastille **ne** porte **pas** de point |
+| 7 | Je touche « Tous les poids » | le poids est oublié, et aucun trajet n'est plus écarté |
+| 8 | Un trajet n'a pas la place pour mon colis | il sort de la liste |
+| 9 | Je bascule l'application en anglais | le poids s'écrit « 1.5 kg » |
