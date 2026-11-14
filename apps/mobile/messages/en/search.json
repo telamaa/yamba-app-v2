@@ -28,6 +28,7 @@
     "title": "Filters",
     "active": "Filters (active)",
     "sortBy": "Sort by",
+    "relevance": "Most relevant",
     "earliest": "Earliest departure",
     "lowestPrice": "Lowest price",
     "bestRated": "Best rated"

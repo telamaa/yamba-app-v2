@@ -50,6 +50,7 @@ import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { shouldRefetchForLocale } from '@/lib/locale-refetch';
+import { EMPTY_FACET_OPACITY, isEmptyFacet } from '@/lib/search-facets';
 import { dateBounds, summaryLabel, type SearchDate } from '@/lib/search-date';
 import { cityLabel } from '@/lib/trip-format';
 import { getSearchDraft, setSearchDraft, subscribeSearchDraft } from '@/lib/search-draft';
@@ -111,7 +112,8 @@ type SearchState =
 // carte de résultat et la fiche, où elles ne sont pas redondantes.
 const TRANSPORT_TABS: SearchTransportFilter[] = ['all', 'plane', 'train', 'car'];
 
-const SORT_OPTIONS: SearchSort[] = ['earliest', 'lowestPrice', 'bestRated'];
+// D100 1B — le défaut du serveur en tête, enfin nommé.
+const SORT_OPTIONS: SearchSort[] = ['relevance', 'earliest', 'lowestPrice', 'bestRated'];
 
 export default function SearchScreen() {
   const t = useTranslations('search');
@@ -126,7 +128,7 @@ export default function SearchScreen() {
   const [state, setState] = useState<SearchState>({ kind: 'idle' });
   // Pastille transport active + tri (serveur) — persistent d'une recherche à l'autre.
   const [mode, setMode] = useState<SearchTransportFilter>('all');
-  const [sort, setSort] = useState<SearchSort>('earliest');
+  const [sort, setSort] = useState<SearchSort>('relevance');
   // Comptes par transport (facettes serveur) : rafraîchis sur les recherches
   // STRUCTURANTES (villes/date), jamais au toucher d'une pastille.
   const [facets, setFacets] = useState<SearchFacets | null>(null);
@@ -327,7 +329,7 @@ export default function SearchScreen() {
   // « Partout · Toutes les dates ». Une seule fois, à l'arrivée.
   useEffect(() => {
     if (consumeBrowseOnLanding()) {
-      void runSearchWith(paramsFor('', '', null, 'all', 'earliest'), true);
+      void runSearchWith(paramsFor('', '', null, 'all', 'relevance'), true);
     }
     // Au montage uniquement : le drapeau est un geste d'atterrissage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -463,10 +465,13 @@ export default function SearchScreen() {
             style={({ pressed }) => [
               styles.tab,
               pressed && styles.pressed,
-              // Un mode SANS trajet reste tapable (c'est le chemin de sortie
-              // d'un filtre à zéro) mais s'efface : il ne doit pas avoir le
-              // même poids qu'un mode qui a de l'offre.
-              count === 0 && !active && styles.tabEmpty,
+              // D100 5A — la règle (« un mode SANS trajet reste tapable, c'est
+              // le chemin de sortie d'un filtre à zéro, mais il s'efface »)
+              // vivait ici, dans ce seul composant : le site ne l'a donc jamais
+              // eue, et ses onglets invitaient à un geste sans issue. Elle est
+              // sortie dans `lib/search-facets.ts`, que les deux fronts
+              // recopient et qu'une fiche compare à l'octet près.
+              isEmptyFacet(count, active) && styles.tabEmpty,
               active
                 ? {
                     backgroundColor: dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8',
@@ -852,7 +857,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tabEmpty: {
-    opacity: 0.5,
+    opacity: EMPTY_FACET_OPACITY,
   },
   tabCount: {
     fontSize: 11,

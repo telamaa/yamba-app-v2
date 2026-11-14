@@ -84,7 +84,15 @@ function buildQueryString(params: SearchTripsParams): string {
   if (params.to) qs.set("to", params.to);
   if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
   if (params.dateTo) qs.set("dateTo", params.dateTo);
-  if (params.sort && params.sort !== "earliest") qs.set("sort", params.sort);
+  // D100 1A — le tri part TOUJOURS. Cette ligne omettait le paramètre quand il
+  // valait `earliest`, au motif que c'était « le défaut » : c'était vrai avant
+  // D80, qui a fait de `relevance` le défaut du SERVEUR
+  // (`trip-search.dto.ts`, `.default("relevance")`). Depuis, le site cochait
+  // « Départ le plus tôt » et recevait la pertinence — mesuré le 14/11 :
+  // `sort=earliest` rend 15 → 18 → 23 novembre, aucun tri rend 18 → 15 → 23,
+  // et c'est 18 → 15 → 23 qui s'affichait sous un bouton promettant l'inverse.
+  // Un défaut écrit des DEUX côtés d'un contrat finit toujours par diverger.
+  if (params.sort) qs.set("sort", params.sort);
 
   if (params.superTripper) qs.set("superTripper", "true");
   if (params.profileVerified) qs.set("profileVerified", "true");

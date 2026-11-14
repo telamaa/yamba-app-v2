@@ -93,8 +93,17 @@ export type SearchPage = {
 /** Filtre transport des pastilles (« Tout » = pas de paramètre serveur). */
 export type SearchTransportFilter = 'all' | 'plane' | 'train' | 'car';
 
-/** Tris serveur (mêmes clés que le web ; « earliest » = défaut, omis). */
-export type SearchSort = 'earliest' | 'lowestPrice' | 'bestRated';
+/**
+ * Tris serveur (mêmes clés que le web).
+ *
+ * D100 1A/1B — `relevance` est le défaut du CONTRAT depuis D80 (flux
+ * d'atterrissage localisé), et il manquait ici comme sur le site : les deux
+ * fronts n'exposaient que trois tris sur quatre, et tous deux OMETTAIENT le
+ * paramètre quand il valait `earliest` « parce que c'est le défaut ». Il ne
+ * l'était plus côté serveur. Résultat : « Départ le plus tôt » coché, et la
+ * pertinence appliquée.
+ */
+export type SearchSort = 'relevance' | 'earliest' | 'lowestPrice' | 'bestRated';
 
 export type SearchParams = {
   from?: string;
@@ -124,7 +133,8 @@ export async function searchTrips(params: SearchParams): Promise<SearchPage> {
   // aucun trajet de la liste, contrairement à `weightKg`.
   query.set('estimateKg', String(PRICING_EXAMPLE_PARAMS.exampleWeightKg));
   if (params.mode && params.mode !== 'all') query.set('mode', params.mode);
-  if (params.sort && params.sort !== 'earliest') query.set('sort', params.sort);
+  // D100 1A — le tri part TOUJOURS : un défaut écrit des deux côtés dérive.
+  if (params.sort) query.set('sort', params.sort);
   if (params.cursor) query.set('cursor', params.cursor);
   if (params.limit) query.set('limit', String(params.limit));
   const qs = query.toString();
