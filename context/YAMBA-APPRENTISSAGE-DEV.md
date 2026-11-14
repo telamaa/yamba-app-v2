@@ -8755,3 +8755,170 @@ deux :
   son prix. Les retirer n'a rien coûté — sauf à devoir rendre le `focus-visible` explicite, que
   les bandes masquaient (chapitre 237 §3 : chaque fois qu'on retire un décor, demandez-vous ce
   qu'il faisait sans le dire).
+
+---
+
+# Chapitre 240 — Quand l'écran et le serveur ne racontent pas la même histoire (D100)
+
+## 1. La technique du lot : mesurer avant de juger une capture
+
+Une capture d'écran montre un **symptôme**. Elle ne dit jamais où est la cause. Le réflexe à
+prendre, quand un écran paraît faux, est de demander au serveur ce qu'il répond — et de le
+demander **en faisant varier une seule chose**.
+
+```sh
+for q in "" "sort=earliest" "sort=cheapest"; do
+  curl -s "localhost:8080/api/trips/search?limit=5&$q" | …
+done
+```
+
+Trois requêtes, trois minutes, et le diagnostic bascule : le serveur triait juste, l'écran
+affichait l'ordre **sans tri**. Sans cette mesure, on aurait cherché le défaut dans le
+comparateur de dates, dans le cache de TanStack Query, dans la pagination — partout sauf dans la
+ligne qui décidait de **ne pas envoyer le paramètre**.
+
+> **À retenir** : face à un écran suspect, la première commande n'est pas `grep`, c'est `curl`.
+> Isolez d'abord le côté fautif, cherchez la cause ensuite.
+
+## 2. Le concept : un défaut dupliqué est un bug en sommeil
+
+Voici la ligne qui a causé le défaut, et elle est *raisonnable* :
+
+```ts
+// Ne pas encombrer l'URL avec le paramètre par défaut.
+if (params.sort && params.sort !== "earliest") qs.set("sort", params.sort);
+```
+
+Le raisonnement : « `earliest` est le défaut, le serveur le remettra ». C'était **vrai le jour où
+elle a été écrite**. Puis D80 a changé le défaut du serveur pour `relevance`. Le serveur n'a rien
+cassé : il a fait exactement ce que son contrat annonçait. Le client non plus : il a fait ce que
+*son* contrat annonçait. Le bug vit **entre les deux**, et aucun compilateur ne le voit.
+
+C'est un motif général :
+
+> **Une valeur par défaut écrite des deux côtés d'une frontière finit par diverger.**
+> Le côté qui l'applique peut changer sans prévenir le côté qui la suppose.
+
+La parade n'est pas « mieux documenter » : c'est **supprimer l'hypothèse**. Le client envoie
+désormais toujours le paramètre. Il ne suppose plus rien.
+
+```ts
+// Un défaut écrit des deux côtés d'un contrat dérive.
+if (params.sort) qs.set("sort", params.sort);
+```
+
+Vous connaissez déjà ce motif dans ce dépôt : `maskEmail` (D92), la lecture des refus (D96), la
+liste des pages d'auth (D93), la mise en forme d'un prix (D99). C'est la cinquième fois. La
+différence ici : **la valeur dupliquée n'était pas du code, c'était une convention**.
+
+## 3. Le corollaire : un comportement appliqué doit être nommable
+
+Le serveur offrait quatre tris. Les deux fronts en montraient trois. Le quatrième — celui qui
+était **réellement appliqué par défaut** — n'existait nulle part dans l'interface.
+
+Conséquence concrète : un Expéditeur qui choisissait « Prix le plus bas » ne pouvait **plus
+jamais revenir** au classement par lequel il était arrivé. Il n'avait pas de nom, donc pas de
+bouton.
+
+> **Règle à emporter** : tout état que votre système peut prendre doit être atteignable depuis
+> l'interface. Un défaut implicite est un état sans porte de retour.
+
+Et la fiche qui garde ça est la plus utile du lot, parce qu'elle compare l'interface au
+**contrat**, pas à elle-même :
+
+```ts
+const duContrat = litLesValeurs(contrat, 'export const SORT_OPTIONS');
+expect(litLesValeurs(apiMobile, 'export type SearchSort')).toEqual(duContrat);
+expect(litLesValeurs(typesWeb,  'export type SortOption')).toEqual(duContrat);
+```
+
+Le contrat est lu avec `readFileSync`, **jamais importé** : un `import` par-dessus la frontière
+d'un projet Nx est une dépendance de *build* (`targetDefaults.test.dependsOn = ["^build"]`), et
+`nx test @yamba-app/mobile` se mettrait à construire trip-service avant de jouer les fiches —
+53,6 s mesurées pour user-ui au chapitre 237.
+
+## 4. Le piège de la tranche, revu — et comment s'en prémunir
+
+Vous avez lu au chapitre 238 que `slice(indexOf(x), indexOf(y))` sans garde rend une chaîne
+**vide**, qui passe toutes les assertions `not.toContain`. La fonction de lecture de ce lot porte
+donc sa garde, et c'est une habitude à prendre :
+
+```ts
+function litLesValeurs(source: string, ancre: string): string[] {
+  const debut = source.indexOf(ancre);
+  expect(debut).toBeGreaterThanOrEqual(0);   // ← sans cette ligne, la tranche serait VIDE
+  const fin = source.indexOf(';', debut);
+  expect(fin).toBeGreaterThan(debut);
+  …
+}
+```
+
+> **Principe** : une fiche qui lit un fichier doit d'abord prouver qu'elle a **trouvé** ce qu'elle
+> lit. Sinon elle est verte pour la pire des raisons.
+
+## 5. Une règle vit dans un module, jamais dans le composant qui l'utilise
+
+Trois traitements d'un même compteur à zéro coexistaient. Le meilleur des trois était sur le
+téléphone, **commenté, raisonné, juste** — et écrit *dans* le composant :
+
+```tsx
+// Un mode SANS trajet reste tapable (c'est le chemin de sortie d'un filtre
+// à zéro) mais s'efface.
+count === 0 && !active && styles.tabEmpty,
+```
+
+Une bonne règle enfermée dans un composant ne protège qu'un écran. C'est exactement le défaut du
+chapitre 237 (la regex du tunnel dans `Header.tsx`, qui a laissé six pages sans protection
+pendant 27 jours). Elle sort donc :
+
+```ts
+export const EMPTY_FACET_OPACITY = 0.5;
+export function isEmptyFacet(count: number | null | undefined, active: boolean): boolean {
+  return !active && typeof count === 'number' && count === 0;
+}
+```
+
+Deux détails valent l'attention :
+
+1. **Une facette ACTIVE échappe à la règle même à zéro.** C'est celle qu'on vient de choisir :
+   l'effacer au moment précis où l'écran change rendrait l'état illisible.
+2. **Un compteur absent n'est pas un compteur à zéro.** `null` / `undefined` signifient « je ne
+   sais pas » (chargement, contrat plus ancien). Ne rien savoir n'est pas savoir qu'il n'y a
+   rien — confondre les deux efface des filtres parfaitement valides pendant le chargement.
+
+Le fichier est **dupliqué à l'octet près** entre les deux fronts, avec une fiche qui les compare.
+Ce n'est pas un pis-aller : le téléphone ne doit pas tirer de code du site, et le site n'a pas de
+harnais de tests — la comparaison est donc ce qui le couvre.
+
+## 6. La leçon que les fiches ont donnée d'elles-mêmes
+
+La toute première exécution de `search-facets.spec.ts` est partie au rouge sur une assertion
+écrite « par principe » :
+
+```ts
+expect(source).not.toContain('cursor-not-allowed');
+```
+
+Elle a trouvé ceci, dans le panneau de filtres :
+
+```tsx
+const disabled = false;   // puis QUATRE branches de style derrière
+```
+
+Une constante toujours fausse, et tout un état visuel qui ne pouvait jamais arriver — jusque dans
+`CustomCheckbox`. C'est la même maladie que le reste du lot, en version silencieuse : **du code
+qui décrit un comportement qu'il n'a pas**.
+
+> **À emporter** : écrivez les assertions « de principe ». Celles qui interdisent un motif que
+> vous croyez déjà absent sont celles qui trouvent le code mort.
+
+## 7. Pour aller plus loin
+
+- Relisez D80 (`trip-search.dto.ts`) : le commentaire du contrat disait déjà « le front ne décide
+  pas ». La doctrine était écrite ; c'est son application côté client qui manquait. Une doctrine
+  qu'aucun test ne garde n'est qu'un commentaire.
+- Cherchez dans votre propre code les `if (x !== LA_VALEUR_PAR_DÉFAUT)`. Chacun est un pari sur ce
+  que fait l'autre côté.
+- Le squelette de la page (§6 du document technique) est le troisième cas de la série
+  `HeaderSkeleton` : **après avoir modifié une mise en page, ouvrez son écran de chargement.**
+  Ils vivent dans le même fichier et personne ne les regarde jamais ensemble.
