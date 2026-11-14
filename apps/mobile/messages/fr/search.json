@@ -38,7 +38,9 @@
     "weightChosen": "prix et places pour ce poids",
     "lighter": "Colis plus léger",
     "heavier": "Colis plus lourd",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum."
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum.",
+    "trustSafety": "Confiance et sécurité",
+    "families": "Que veux-tu envoyer ?"
   },
   "corridors": {
     "label": "En ce moment",
@@ -94,5 +96,21 @@
     "clear": "Effacer la saisie",
     "noResult": "Aucune ville trouvée",
     "unavailable": "Suggestions indisponibles — tape la ville, la recherche fonctionne quand même"
+  },
+  "badges": {
+    "superTripper": "Super Voyageur",
+    "profileVerified": "Profil vérifié",
+    "instantBooking": "Réservation instantanée",
+    "verifiedTicket": "Billet vérifié"
+  },
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papiers",
+    "CLOTHES_TEXTILE": "Vêtements & textile",
+    "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+    "ELECTRONICS_DEVICES": "Électronique & appareils",
+    "COSMETICS_CARE": "Cosmétiques & soins",
+    "PARTS_TOOLS": "Pièces & outillage",
+    "TOYS_CHILDCARE": "Jouets & puériculture",
+    "MISC_ACCESSORIES": "Accessoires & divers"
   }
 }
