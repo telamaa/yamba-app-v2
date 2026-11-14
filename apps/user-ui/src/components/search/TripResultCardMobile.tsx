@@ -42,6 +42,8 @@ export default function YambaTripResultCardMobile({
    * partout — deux décimales, toujours.
    */
   const poidsAffiche = typeof item.weightKg === "number" ? item.weightKg : null;
+  /** L'Expéditeur a-t-il CHOISI ce poids, ou le lui suppose-t-on ? */
+  const poidsChoisi = typeof weightKg === "number";
   const totalPourLePoids =
     poidsAffiche !== null && typeof item.totalForWeight === "number"
       ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
@@ -163,19 +165,30 @@ export default function YambaTripResultCardMobile({
                   {/* D99 3A — le gros chiffre est ce que l'envoi COÛTE ; le prix
                       au kilo descend en qualificatif. Mêmes règles que la carte
                       large, mot pour mot. */}
-                  <div className="text-[9px] leading-none text-slate-400 dark:text-slate-500">
-                    {totalPourLePoids !== null
-                      ? t("card.totalForWeight", { kg: poidsAffiche as number })
-                      : t("card.perKg")}
-                  </div>
+                  {/* D99 bis — le libellé passe SOUS le prix (ordre du
+                      téléphone) : on lit le chiffre, puis pour quoi. */}
+                  {totalPourLePoids === null && (
+                    <div className="text-[9px] leading-none text-slate-400 dark:text-slate-500">
+                      {t("card.perKg")}
+                    </div>
+                  )}
                   {/* D99 3A — deux lignes : le total, et pour quoi. Le prix au
                       kilo quitte la carte (voir la carte large), et la place
                       restante ne se dit que lorsqu'elle contraint. */}
                   {totalPourLePoids !== null ? (
-                    <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                      {totalPourLePoids}
-                      {item.currency ?? "€"}
-                    </div>
+                    <>
+                      <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
+                        {totalPourLePoids}
+                        {item.currency ?? "€"}
+                      </div>
+                      {/* La mention dit une HYPOTHÈSE, jamais un seuil : « pour
+                          2 kg » se lisait comme un minimum d'achat. */}
+                      <div className="text-[9px] leading-none text-slate-400 dark:text-slate-500">
+                        {poidsChoisi
+                          ? t("card.totalForMyWeight", { kg: poidsAffiche as number })
+                          : t("card.totalForWeight", { kg: poidsAffiche as number })}
+                      </div>
+                    </>
                   ) : (
                     <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
                       {item.pricePerKg.toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

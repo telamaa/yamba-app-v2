@@ -63,7 +63,8 @@
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
     "perKg": "price per kg",
-    "totalForWeight": "for {kg} kg, all in",
+    "totalForWeight": "estimate for {kg} kg",
+    "totalForMyWeight": "for your {kg} kg parcel",
     "remainingKg": "{kg} kg left",
     "surcharge": "{family}: +{pct}%",
     "notEnoughKg": "Not enough room"
