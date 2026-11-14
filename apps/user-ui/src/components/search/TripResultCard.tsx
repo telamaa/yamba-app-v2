@@ -201,6 +201,8 @@ export default function TripResultCard({
    * donnait les centimes, pour le même trajet et le même colis.
    */
   const poidsAffiche = typeof item.weightKg === "number" ? item.weightKg : null;
+  /** L'Expéditeur a-t-il CHOISI ce poids, ou le lui suppose-t-on ? */
+  const poidsChoisi = typeof weightKg === "number";
   const totalPourLePoids =
     poidsAffiche !== null && typeof item.totalForWeight === "number"
       ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
@@ -260,7 +262,7 @@ export default function TripResultCard({
           <div className="truncate text-[15px] font-semibold leading-tight text-slate-950 dark:text-white">
             {item.fromCity}
             {fromCountry && (
-              <span className="font-normal text-slate-400 dark:text-slate-500">, {fromCountry}</span>
+              <span className="text-[12px] font-normal text-slate-400 dark:text-slate-500">, {fromCountry}</span>
             )}
           </div>
           {times.departure && (
@@ -298,7 +300,7 @@ export default function TripResultCard({
           <div className="truncate text-[15px] font-semibold leading-tight text-slate-950 dark:text-white">
             {item.toCity}
             {toCountry && (
-              <span className="font-normal text-slate-400 dark:text-slate-500">, {toCountry}</span>
+              <span className="text-[12px] font-normal text-slate-400 dark:text-slate-500">, {toCountry}</span>
             )}
           </div>
           {times.arrival && (
@@ -343,11 +345,10 @@ export default function TripResultCard({
             </button>
           ) : (
             <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {totalPourLePoids !== null
-                ? t("card.totalForWeight", { kg: poidsAffiche as number })
-                : isPerKg
-                  ? t("card.perKg")
-                  : t("startingFrom")}
+              {/* D99 bis — quand la carte annonce un TOTAL, le libellé passe
+                  SOUS le prix (ordre du téléphone) : on lit le chiffre, puis
+                  pour quoi. Au-dessus, il ne reste que les cas legacy. */}
+              {totalPourLePoids !== null ? null : isPerKg ? t("card.perKg") : t("startingFrom")}
             </div>
           )}
 
@@ -371,6 +372,23 @@ export default function TripResultCard({
               </>
             )}
           </div>
+          {/* D99 bis — la mention dit une HYPOTHÈSE, jamais un seuil.
+              « pour 2 kg, tout compris » se lisait comme une contrainte (« il
+              faut 2 kg », « on ne peut pas envoyer moins ») alors que c'est le
+              colis par défaut, que le curseur modifie. Le mot « estimation »
+              le dit ; « ton colis » le dit quand l'Expéditeur a choisi. Le
+              plancher de facturation (2,3 kg, D81) est expliqué dans le
+              panneau de gauche — la carte n'a pas à le répéter, mais elle ne
+              doit pas laisser croire à un minimum d'achat.
+              « tout compris » sort d'ici : il est réaffirmé au tunnel et sur
+              la page du trajet, et la ligne doit répondre à UNE question. */}
+          {totalPourLePoids !== null && (
+            <div className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+              {poidsChoisi
+                ? t("card.totalForMyWeight", { kg: poidsAffiche as number })
+                : t("card.totalForWeight", { kg: poidsAffiche as number })}
+            </div>
+          )}
           {/* D99 3A (revu le 13/11 après revue d'écran) — DEUX lignes, pas quatre.
               Le prix au KILO quitte la carte : il servait à comparer les offres,
               mais toutes les cartes affichent désormais le total POUR LE MÊME

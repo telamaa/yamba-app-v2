@@ -50,7 +50,7 @@
   "card": {
     "fromPrice": "dès",
     "remainingKg": "{kg} kg dispo",
-    "totalForWeight": "pour {kg} kg, tout compris",
+    "totalForWeight": "estimation pour {kg} kg",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
     "remainingSlots": "{count, plural, one {# place} other {# places}}",

@@ -8822,3 +8822,43 @@ se lisent par l'espace. Et l'état survolé ou sélectionné au clavier doit res
 | 6 | Un trajet n'a presque plus de place | la capacité restante s'affiche ; sinon elle reste masquée |
 | 7 | Un Voyageur n'a pas encore de note | rien n'est écrit à la place de son étoile |
 | 8 | Je parcours la page au clavier | la carte sélectionnée est visible sans ambiguïté |
+
+# D99 bis — Dire une hypothèse sans la faire passer pour une règle
+
+## Le besoin
+
+Sous le prix de chaque carte, une ligne précise pour quel colis ce prix a été calculé. Écrite
+« pour 2 kg, tout compris », elle se lisait comme une **condition d'achat** : faut-il 2 kg ?
+peut-on envoyer moins ? Ces questions sont celles de l'utilisateur, posées en regardant l'écran.
+
+C'est un cas d'école : l'information était exacte, et le message faux.
+
+## Les règles
+
+**RG-D99-8 — Une valeur supposée se présente comme une estimation.** Tant que l'Expéditeur n'a
+pas indiqué son colis, la carte annonce « estimation pour 2 kg » — jamais une formule qui
+pourrait se lire comme un seuil.
+
+**RG-D99-9 — Dès que l'Expéditeur a choisi, l'écran le lui rend.** La mention devient « pour ton
+colis de 5 kg » : ce n'est plus une hypothèse, c'est sa demande.
+
+**RG-D99-10 — Le minimum de facturation s'explique là où l'on règle son colis**, pas sur chaque
+carte. Il existe (2,3 kg), il est dit une fois, au bon endroit — et aucune carte ne le
+contredit ni ne le réinvente.
+
+**RG-D99-11 — On lit le prix, puis pour quoi.** Le montant vient en premier sur les deux
+applications.
+
+**RG-D99-12 — Une hiérarchie ne se joue pas sur la seule couleur.** Un pays écrit à la taille
+d'une ville pèse autant qu'elle, même en plus pâle.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'arrive sur la page sans rien régler | sous chaque prix : « estimation pour 2 kg » |
+| 2 | Je règle mon colis à 5 kg | la mention devient « pour ton colis de 5 kg » |
+| 3 | Je veux envoyer une enveloppe de 200 g | rien sur la carte ne me dit que c'est impossible |
+| 4 | Je cherche le minimum de facturation | il est écrit dans le panneau où je règle mon colis |
+| 5 | Je compare le site et le téléphone | même ordre : le prix, puis la mention |
+| 6 | Je lis une carte | la ville ressort du pays sans effort |
