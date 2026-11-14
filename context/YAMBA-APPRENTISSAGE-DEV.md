@@ -9045,3 +9045,131 @@ D99, le compteur de vues à 1 en D100) :
 - La fiche de typographie du dépôt (`typography.spec.ts`) a attrapé un style écrit dans ce lot :
   `22/26 = 1,18` contre un plancher de 1,35. Les fiches qui gardent une **propriété transversale**
   (interligne, contraste, cible tactile) rapportent longtemps après avoir été écrites.
+
+---
+
+# Chapitre 242 — Un contrat se vérifie dans les deux sens (D102)
+
+## 1. La suite de trois, et ce qu'elle révèle
+
+Trois lots en deux jours, trois défauts de parité, **et le serveur était juste les trois fois** :
+
+| Lot | Ce qui manquait au client |
+|---|---|
+| D100 | un paramètre qu'il **n'envoyait pas** (`sort`) |
+| D101 | un paramètre qu'il **ne pouvait pas construire** (`weightKg`) |
+| D102 | une réponse qu'il **ne lisait pas** (cinq compteurs sur sept) |
+
+Aucune modification de trip-service. Aucun contrat régénéré. Aucune migration.
+
+> **Avant d'estimer un chantier de parité, lisez la réponse du serveur.** Elle contient souvent
+> déjà ce que vous vous apprêtiez à construire.
+
+Et la fiche de D101 ne posait que la moitié de la question. La forme complète :
+
+```ts
+// ce que chaque client sait ÉMETTRE…
+expect(apiMobile).toContain("query.set('families'");
+expect(apiWeb).toContain('qs.set("families"');
+
+// …et ce que chaque client sait LIRE
+for (const champ of ['superTripperCount', 'familyCounts', /* … */]) {
+  expect(controleur).toContain(champ);   // le serveur l'écrit
+  expect(api).toContain(champ);          // le client le déclare
+}
+```
+
+## 2. Quand une fiche refuse de se charger, écoutez-la
+
+La première version du fichier de fiches importait les listes depuis `lib/api/search.api.ts` :
+
+```
+Jest encountered an unexpected token
+```
+
+La chaîne : `search.api.ts` → `client.ts` → `base-url.ts` → **`expo-constants`**. Le harnais est
+`testEnvironment: node`, sans transformation Expo (A223, chapitre 215).
+
+Le réflexe tentant serait d'ajouter un `transformIgnorePatterns` ou un *mock*. **C'est le mauvais
+réflexe** : l'erreur dit quelque chose de vrai sur l'architecture. Une **liste de constantes** n'a
+rien à faire dans un module qui parle HTTP. Elle part dans un fichier sans aucun import, que le
+module HTTP ré-exporte :
+
+```ts
+export { SEARCH_FAMILIES, TRUST_FILTERS, type SearchFamily } from '@/lib/search-filters';
+```
+
+> **Principe** : quand un test ne peut pas charger votre code, il vous apprend où passe la
+> frontière. Déplacez le code ; ne déplacez pas la frontière.
+
+## 3. Le piège de la séance : le cache de Metro
+
+Symptôme : **écran blanc**, et dans Metro :
+
+```
+ERROR [ReferenceError: Property 'TRUST_FILTERS' doesn't exist]
+```
+
+Le code était juste. `nx typecheck` vert. `nx test` vert — 810 fiches.
+
+La cause tient à l'ordre de deux passes :
+
+1. une passe ajoute `TRUST_FILTERS` **à l'usage** (`filtersActive`, un `useMemo`) ;
+2. une passe suivante ajoute l'**import**.
+
+Entre les deux, Metro a transformé `index.tsx` et **mis le résultat en cache**. Il a ensuite servi
+cette version intermédiaire, où l'identifiant est utilisé sans être importé.
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo start --go --clear
+```
+
+Deux enseignements, et le second est le plus utile :
+
+- **un fichier nouvellement créé + un import ajouté dans une passe ultérieure = `--clear`** ;
+- **le contrôle qui tranche n'est pas le typecheck, c'est le bundle réellement servi.** On y
+  cherche `_monModule.MON_EXPORT` : si l'identifiant y est **nu**, l'import n'a pas été lié.
+
+```sh
+curl -s -o /tmp/b.js "http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true"
+grep -o "_libSearchFilters.TRUST_FILTERS" /tmp/b.js | head -1   # lié ✅
+```
+
+*Au passage, une leçon de méthode* : la première lecture de ce bundle a conclu à tort à une
+référence nue, parce que le motif cherché (`TRUST_FILTERS.map(`) **est un sous-ensemble** de la
+forme liée (`_libSearchFilters.TRUST_FILTERS.map(`). Un `grep` qui cherche la fin d'une expression
+trouve aussi les versions préfixées. **Cherchez le préfixe, pas le suffixe.**
+
+## 4. La fiche qui corrige l'auteur
+
+Une fiche exigeait que les libellés soient **mot pour mot** ceux du site :
+
+```ts
+expect(duTel.families[famille]).toBe(duSite.families[famille]);
+```
+
+Elle est partie au rouge sur deux entrées anglaises :
+
+| Écrit de mémoire | Ce que le site dit |
+|---|---|
+| « Dry & sealed food » | « Dry sealed food » |
+| « Accessories & misc » | « Accessories & misc. » |
+
+Des détails ? Oui. Et c'est exactement ainsi que `maskEmail` (D92) et la mise en forme d'un prix
+(D99 1A) ont divergé : personne ne recopie *mal* une règle, on la **réécrit de mémoire**.
+
+> **À emporter** : quand une valeur doit être identique ailleurs, ne la retapez pas — faites la
+> comparer par une fiche, et laissez-la vous corriger.
+
+## 5. Ce que rapporte une règle sortie au bon endroit
+
+D100 5A avait extrait la règle du compteur à zéro dans `search-facets.ts`, **pour que le prochain
+écran n'ait pas à la redécouvrir**. Deux lots plus tard, les deux nouvelles sections s'en servent
+sans qu'une ligne de règle ait été réécrite :
+
+```tsx
+isEmptyFacet(compte, choisi) && styles.chipEmpty,
+```
+
+C'est le rendement d'une extraction : il ne se mesure pas le jour où on la fait, mais le jour où
+quelqu'un d'autre n'a rien à décider.
