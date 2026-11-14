@@ -1,8 +1,14 @@
 "use client";
 
 import { Baby, Banknote, Check, Clock3, FileText, Medal, Package, ShieldCheck, Shirt, ShoppingBag, Smartphone, Sparkles, Star, Ticket, Wrench } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { BILLING_FLOOR_KG } from "@/lib/pricing-example";
+import { useLocale, useTranslations } from "next-intl";
+import { BILLING_FLOOR_KG, PRICING_EXAMPLE_PARAMS } from "@/lib/pricing-example";
+import {
+  MAX_PARCEL_KG,
+  MIN_PARCEL_KG,
+  PARCEL_STEP_KG,
+  formatParcelKg,
+} from "@/lib/parcel-weight";
 import { EMPTY_FACET_OPACITY, isEmptyFacet } from "@/lib/search-facets";
 import {
   SEARCH_FAMILIES,
@@ -156,6 +162,10 @@ export default function SearchFiltersSidebar({
                                                className = "",
                                              }: Props) {
   const t = useTranslations("search");
+  const locale = useLocale();
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
+  /** Le colis SUPPOSÉ, tant que l'Expéditeur n'a rien choisi (D99 3C). */
+  const exempleKg = PRICING_EXAMPLE_PARAMS.exampleWeightKg;
 
 
   // ── Sort options ──
@@ -441,16 +451,24 @@ export default function SearchFiltersSidebar({
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               {t("filters.yourParcel")}
             </h3>
+            {/* D101 5A — la mise en forme suit la LANGUE, et non un pays écrit
+                en dur : « 1,5 kg » s'affichait jusque dans l'interface
+                anglaise. Troisième occurrence du motif de D99 1A, sur un
+                autre nombre que le prix. */}
             <span className="text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">
-              {(weightKg ?? 2).toLocaleString("fr-FR")} kg
+              {formatParcelKg(weightKg ?? exempleKg, localeTag)} kg
             </span>
           </div>
+          {/* D101 2B — les bornes vivaient ici, en attributs de balise : deux
+              fronts ne peuvent pas s'accorder sur des nombres qu'aucun des
+              deux ne nomme. Le geste, lui, reste celui du support — curseur
+              à la souris ici, pas-à-pas sur le téléphone (A207). */}
           <input
             type="range"
-            min={0.5}
-            max={30}
-            step={0.5}
-            value={weightKg ?? 2}
+            min={MIN_PARCEL_KG}
+            max={MAX_PARCEL_KG}
+            step={PARCEL_STEP_KG}
+            value={weightKg ?? exempleKg}
             aria-label={t("filters.weight")}
             onChange={(e) => onWeightChange(Number(e.target.value))}
             className="h-11 w-full cursor-pointer touch-pan-x"

@@ -31,7 +31,14 @@
     "relevance": "Most relevant",
     "earliest": "Earliest departure",
     "lowestPrice": "Lowest price",
-    "bestRated": "Best rated"
+    "bestRated": "Best rated",
+    "yourParcel": "Your parcel",
+    "clearWeight": "Any weight",
+    "weightAssumed": "estimate — pick your weight",
+    "weightChosen": "price and space for this weight",
+    "lighter": "Lighter parcel",
+    "heavier": "Heavier parcel",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum."
   },
   "corridors": {
     "label": "Right now",
