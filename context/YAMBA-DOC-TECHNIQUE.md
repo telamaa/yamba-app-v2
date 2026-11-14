@@ -17984,3 +17984,117 @@ une position oubliée décale tout le reste.
 
 **Non vérifié** : la feuille de filtres elle-même n'a pas été ouverte — `simctl` ne sait pas
 toucher l'écran. La vérification visuelle du contrôle reste à faire à la main.
+
+---
+
+# D102 — Les familles et la confiance dans la feuille native (`feat/familles-et-confiance-natives`, 14/11/2026)
+
+## Le constat : rien à construire côté serveur
+
+`GET /trips/search/facets` renvoie **sept** champs :
+
+```ts
+{ totalCount, modeCount, superTripperCount, profileVerifiedCount,
+  instantBookingCount, verifiedTicketCount, familyCounts }
+```
+
+Le type `SearchFacets` du client mobile en déclarait **deux**. À chaque recherche, cinq compteurs
+traversaient le réseau et étaient abandonnés au `JSON.parse`.
+
+**Aucune ligne n'a été ajoutée à trip-service pour ce lot.** Le contrat était déjà tenu d'un seul
+côté — comme pour D100 (un tri qu'on n'envoyait pas) et D101 (un poids qu'on ne pouvait pas
+construire).
+
+| Lot | Ce qui manquait | Côté serveur |
+|---|---|---|
+| D100 | un paramètre qu'on **n'envoyait pas** | déjà juste |
+| D101 | un paramètre qu'on **ne pouvait pas construire** | déjà juste |
+| D102 | une réponse qu'on **ne lisait pas** | déjà juste |
+
+> **La leçon couvre les trois : un contrat se vérifie dans les DEUX sens** — ce que chaque client
+> sait **émettre**, et ce que chaque client sait **lire**. La fiche de D101 ne posait que la
+> première moitié de la question.
+
+## Les filtres partent aussi avec les facettes
+
+Les cinq paramètres sont écrits dans `baseQuery`, pas dans `searchTrips` :
+
+```ts
+if (params.superTripper) query.set('superTripper', 'true');
+…
+if (params.families?.length) query.set('families', params.families.join(','));
+```
+
+« Combien de trajets en train » n'a de sens que **parmi les filtres déjà posés** : les deux
+requêtes doivent voir le même périmètre, sinon les compteurs mentent.
+
+## La liste des familles, troisième copie — mais gardée
+
+`PARCEL_FAMILIES` (contrat) et `SEARCH_FAMILIES` (site) étaient identiques **par chance** : rien
+ne les comparait. Une famille ajoutée au serveur et oubliée sur un front disparaîtrait de ses
+filtres, sans erreur et sans log. Une fiche confronte désormais les **trois**, le contrat lu au
+`readFileSync` et jamais importé (D93).
+
+## Pourquoi un module `search-filters.ts` séparé
+
+Les listes vivaient d'abord dans `lib/api/search.api.ts`. La fiche a refusé de se charger :
+
+```
+Jest encountered an unexpected token
+```
+
+`search.api.ts` → `client.ts` → `base-url.ts` → **`expo-constants`**. Le harnais est
+`testEnvironment: node`, sans transformation Expo. C'est la frontière assumée d'A223 : **une règle
+qu'on veut tester SORT de l'écran**. Les listes passent donc dans un module **sans aucun import**,
+que `search.api.ts` ré-exporte pour ses consommateurs.
+
+## Ce que le natif fait autrement
+
+Le site empile quatre cases à cocher pleine largeur. Ici, quatre **pastilles à bascule**, comme
+les familles et les modes : une feuille basse se parcourt au pouce, et quatre lignes de 44 pt
+pousseraient « Ton colis » hors de l'écran. Mêmes compteurs, même règle du zéro, geste du support
+(A207, D101 2A).
+
+La feuille portant désormais **quatre sections**, elle défile et se plafonne à 85 % de la hauteur.
+
+## La règle du zéro, réutilisée sans être réécrite
+
+Les deux nouvelles sections consomment `isEmptyFacet` / `EMPTY_FACET_OPACITY` (D100 5A). La règle
+avait été sortie dans un module partagé précisément pour que le prochain écran n'ait pas à la
+redécouvrir : **c'est le premier à en profiter sans l'avoir écrite.**
+
+## Le piège qui a coûté vingt minutes — le cache de Metro
+
+Après les modifications, l'application affichait un **écran blanc** et Metro répétait :
+
+```
+ERROR [ReferenceError: Property 'TRUST_FILTERS' doesn't exist]
+```
+
+Le code était pourtant juste, et le typecheck vert. La cause : le fichier `search-filters.ts`
+avait été **créé** dans une passe, et l'`import` qui l'utilise ajouté dans une **seconde**. Metro
+avait mis en cache la transformation de `index.tsx` dans l'état intermédiaire — où l'identifiant
+était utilisé sans être importé.
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo start --go --clear
+```
+
+Reconstruction complète de 54 s, et l'erreur disparaît.
+
+> **À retenir** : un fichier NOUVELLEMENT créé plus un import ajouté dans une passe ultérieure =
+> `--clear`. Et le contrôle qui tranche n'est pas le typecheck mais **le bundle réellement servi** :
+> y chercher `_monModule.MON_EXPORT` plutôt que l'identifiant nu.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **810 / 41 suites** (798 + 12) |
+| `nx typecheck @yamba-app/mobile` | propre (les deux programmes) |
+| i18n FR/EN | miroir parfait |
+| Bundle iOS | HTTP 200, 4,9 s, **zéro erreur** |
+| Application sur simulateur | démarre et rend l'écran d'accueil |
+
+**Non vérifié, comme pour D101** : la feuille n'a pas été *ouverte* — `simctl` ne sait pas toucher
+l'écran.

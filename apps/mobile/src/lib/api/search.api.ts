@@ -12,6 +12,7 @@
  * personnalise la réponse (favoris, langue du compte) ; visiteur, rien.
  */
 import { PRICING_EXAMPLE_PARAMS } from '@/lib/pricing-example';
+import type { SearchFamily } from '@/lib/search-filters';
 
 import { apiFetch } from './client';
 
@@ -105,6 +106,17 @@ export type SearchTransportFilter = 'all' | 'plane' | 'train' | 'car';
  */
 export type SearchSort = 'relevance' | 'earliest' | 'lowestPrice' | 'bestRated';
 
+// D102 2A — les listes vivent dans un module PUR (`@/lib/search-filters`) :
+// ce fichier-ci tire le client HTTP, donc `expo-constants`, et aucune fiche ne
+// peut le charger. Ré-exportées pour que les consommateurs n'aient qu'un seul
+// endroit où regarder.
+export {
+  SEARCH_FAMILIES,
+  TRUST_FILTERS,
+  type SearchFamily,
+  type TrustFilter,
+} from '@/lib/search-filters';
+
 export type SearchParams = {
   from?: string;
   to?: string;
@@ -125,6 +137,17 @@ export type SearchParams = {
    * disponibles » ne doit retirer aucun trajet.
    */
   weightKg?: number | null;
+  /**
+   * D102 1B — les quatre signaux de confiance et les familles de colis. Tous
+   * existaient au contrat et étaient déjà exercés par le site ; le client
+   * mobile ne savait simplement pas les écrire. L'encodage des familles est
+   * celui du site : une liste séparée par des virgules.
+   */
+  superTripper?: boolean;
+  profileVerified?: boolean;
+  instantBooking?: boolean;
+  verifiedTicket?: boolean;
+  families?: readonly SearchFamily[];
   cursor?: string | null;
   limit?: number;
 };
@@ -135,6 +158,14 @@ function baseQuery(params: SearchParams): URLSearchParams {
   if (params.to) query.set('to', params.to);
   if (params.dateFrom) query.set('dateFrom', params.dateFrom);
   if (params.dateTo) query.set('dateTo', params.dateTo);
+  // D102 1B — ils vivent dans `baseQuery` et non dans `searchTrips` parce que
+  // les FACETTES doivent compter dans le même périmètre : « combien de
+  // trajets en train » n'a de sens que parmi les filtres déjà posés.
+  if (params.superTripper) query.set('superTripper', 'true');
+  if (params.profileVerified) query.set('profileVerified', 'true');
+  if (params.instantBooking) query.set('instantBooking', 'true');
+  if (params.verifiedTicket) query.set('verifiedTicket', 'true');
+  if (params.families?.length) query.set('families', params.families.join(','));
   return query;
 }
 
@@ -158,12 +189,34 @@ export async function searchTrips(params: SearchParams): Promise<SearchPage> {
 }
 
 /** Comptes des pastilles transport — sous-ensemble utile du DTO web. */
+/**
+ * D102 1A — le serveur renvoie SEPT champs ; ce type n'en déclarait que deux.
+ * Cinq compteurs voyageaient à chaque recherche et étaient abandonnés au
+ * `JSON.parse`. Rien n'a été ajouté au serveur pour ce lot : le contrat était
+ * déjà tenu d'un seul côté.
+ */
 export type SearchFacets = {
   totalCount: number;
   modeCount: { all: number; plane: number; train: number; car: number };
+  superTripperCount: number;
+  profileVerifiedCount: number;
+  instantBookingCount: number;
+  verifiedTicketCount: number;
+  familyCounts: Record<SearchFamily, number>;
 };
 
-export type SearchFacetsParams = Pick<SearchParams, 'from' | 'to' | 'dateFrom' | 'dateTo'>;
+export type SearchFacetsParams = Pick<
+  SearchParams,
+  | 'from'
+  | 'to'
+  | 'dateFrom'
+  | 'dateTo'
+  | 'superTripper'
+  | 'profileVerified'
+  | 'instantBooking'
+  | 'verifiedTicket'
+  | 'families'
+>;
 
 /**
  * GET /trips/search/facets — mêmes paramètres STRUCTURANTS que la recherche,

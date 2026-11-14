@@ -8964,3 +8964,48 @@ précédent du calendrier (A207).
 | 7 | Je touche « Tous les poids » | le poids est oublié, et aucun trajet n'est plus écarté |
 | 8 | Un trajet n'a pas la place pour mon colis | il sort de la liste |
 | 9 | Je bascule l'application en anglais | le poids s'écrit « 1.5 kg » |
+
+---
+
+# D102 — Les familles et la confiance sur le téléphone (14/11/2026)
+
+## Le besoin
+
+Un Expéditeur qui cherche sur le téléphone ne pouvait ni restreindre aux Voyageurs vérifiés, ni
+dire ce qu'il veut envoyer. Le site le permettait depuis le début ; le serveur comptait déjà les
+résultats de chacun de ces filtres **à chaque recherche**, et le téléphone jetait ces compteurs.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D102-1** | Les **quatre signaux de confiance** (Super Voyageur, Profil vérifié, Réservation instantanée, Billet vérifié) sont filtrables **sur les deux fronts**. | C'est l'écran où quelqu'un décide de confier un colis à un inconnu. |
+| **RG-D102-2** | Les **huit familles de colis** sont filtrables sur les deux fronts. | Un Voyageur peut refuser ou surtaxer une famille : la question se pose avant de choisir. |
+| **RG-D102-3** | Un même filtre porte **le même nom** sur les deux fronts, dans les deux langues. | Un filtre qui change de nom d'un support à l'autre n'est plus le même filtre aux yeux du membre. |
+| **RG-D102-4** | Les compteurs affichés sont ceux du **serveur**, comptés **parmi les filtres déjà posés**. | « 3 trajets en train » n'a de sens que dans le périmètre courant. |
+| **RG-D102-5** | Un filtre sans résultat **s'efface** mais reste activable (RG-D100-6), ici aussi. | À zéro, le filtre est le chemin de sortie de la recherche qui ne rend rien. |
+| **RG-D102-6** | La section « Confiance et sécurité » disparaît **entièrement** si aucune de ses options n'a de résultat (RG-D100-7). | Un titre n'annonce pas un contenu absent. |
+| **RG-D102-7** | L'indicateur « des filtres sont posés » compte aussi la confiance et les familles. | Sinon il sous-déclare l'état de l'écran. |
+
+## Ce que l'Expéditeur gagne
+
+Les mêmes décisions qu'au bureau, dans sa poche : « je ne veux que des Voyageurs vérifiés » et
+« j'envoie des documents » deviennent des gestes d'un pouce.
+
+## Divergence assumée
+
+Le site empile quatre cases à cocher pleine largeur ; le téléphone pose quatre **pastilles à
+bascule**. Même règle, mêmes compteurs, mêmes noms — geste du support.
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre « Filtres » | je vois Tri, Ton colis, Confiance et sécurité, Que veux-tu envoyer ? |
+| 2 | La feuille dépasse l'écran | elle défile, la poignée et le titre restent visibles |
+| 3 | Je touche « Super Voyageur » | la liste se restreint, le compteur des autres filtres se recalcule |
+| 4 | Je touche « Documents & papiers » | idem, et la pastille se colore en mangue |
+| 5 | Une famille n'a aucun résultat | sa pastille s'efface mais reste tapable |
+| 6 | Aucun signal de confiance n'a de résultat | la section entière disparaît, titre compris |
+| 7 | Je pose un filtre quelconque | la pastille de filtres porte son point mangue |
+| 8 | Je compare un filtre au site | il porte exactement le même libellé |

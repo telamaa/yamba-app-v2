@@ -56,6 +56,12 @@ import {
   PRICING_EXAMPLE_PARAMS as PARAMS_EXEMPLE,
 } from '@/lib/pricing-example';
 import {
+  SEARCH_FAMILIES,
+  TRUST_FILTERS,
+  type SearchFamily,
+  type TrustFilter,
+} from '@/lib/search-filters';
+import {
   PARCEL_PRESETS_KG,
   canStepParcelKg,
   formatParcelKg,
@@ -124,6 +130,14 @@ const TRANSPORT_TABS: SearchTransportFilter[] = ['all', 'plane', 'train', 'car']
 
 // D100 1B — le défaut du serveur en tête, enfin nommé.
 const SORT_OPTIONS: SearchSort[] = ['relevance', 'earliest', 'lowestPrice', 'bestRated'];
+/** D102 — aucun signal de confiance exigé : l'état de départ, et le défaut de
+ *  `paramsFor`. Figé hors du composant pour ne pas se recréer à chaque rendu. */
+const TRUST_NONE: Record<TrustFilter, boolean> = {
+  superTripper: false,
+  profileVerified: false,
+  instantBooking: false,
+  verifiedTicket: false,
+};
 
 export default function SearchScreen() {
   const t = useTranslations('search');
@@ -152,6 +166,17 @@ export default function SearchScreen() {
    * est posé, il filtre sur la capacité — et la carte cesse de supposer.
    */
   const [weightKg, setWeightKg] = useState<number | null>(null);
+  /**
+   * D102 1B — les quatre signaux de confiance et les familles de colis. Le
+   * serveur servait déjà leurs compteurs (`/facets`) ; cet écran les jetait.
+   */
+  const [trust, setTrust] = useState<Record<TrustFilter, boolean>>({
+    superTripper: false,
+    profileVerified: false,
+    instantBooking: false,
+    verifiedTicket: false,
+  });
+  const [families, setFamilies] = useState<readonly SearchFamily[]>([]);
   // Comptes par transport (facettes serveur) : rafraîchis sur les recherches
   // STRUCTURANTES (villes/date), jamais au toucher d'une pastille.
   const [facets, setFacets] = useState<SearchFacets | null>(null);
@@ -198,6 +223,8 @@ export default function SearchScreen() {
       mode: nextMode,
       sort: nextSort,
       weightKg: nextWeightKg = null,
+      trust: nextTrust = TRUST_NONE,
+      families: nextFamilies = [],
     }: {
       from?: string;
       to?: string;
@@ -205,6 +232,8 @@ export default function SearchScreen() {
       mode: SearchTransportFilter;
       sort: SearchSort;
       weightKg?: number | null;
+      trust?: Record<TrustFilter, boolean>;
+      families?: readonly SearchFamily[];
     }): SearchParams => ({
       from: nextFrom.trim() || undefined,
       to: nextTo.trim() || undefined,
@@ -212,6 +241,8 @@ export default function SearchScreen() {
       mode: nextMode,
       sort: nextSort,
       weightKg: nextWeightKg,
+      ...nextTrust,
+      families: nextFamilies,
       limit: PAGE_SIZE,
     }),
     []
@@ -309,7 +340,7 @@ export default function SearchScreen() {
   );
 
   const runSearch = useCallback(
-    () => runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg }), true),
+    () => runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg, trust, families }), true),
     [runSearchWith, paramsFor, from, to, date, mode, sort]
   );
 
@@ -349,7 +380,7 @@ export default function SearchScreen() {
     (next: SearchTransportFilter) => {
       if (next === mode) return;
       setMode(next);
-      void runSearchWith(paramsFor({ from, to, date, mode: next, sort, weightKg }), false, true);
+      void runSearchWith(paramsFor({ from, to, date, mode: next, sort, weightKg, trust, families }), false, true);
     },
     [mode, runSearchWith, paramsFor, from, to, date, sort, weightKg]
   );
@@ -359,7 +390,7 @@ export default function SearchScreen() {
       setFiltersOpen(false);
       if (next === sort) return;
       setSort(next);
-      void runSearchWith(paramsFor({ from, to, date, mode, sort: next, weightKg }), false, true);
+      void runSearchWith(paramsFor({ from, to, date, mode, sort: next, weightKg, trust, families }), false, true);
     },
     [sort, runSearchWith, paramsFor, from, to, date, mode, weightKg]
   );
@@ -373,9 +404,43 @@ export default function SearchScreen() {
     (next: number | null) => {
       if (next === weightKg) return;
       setWeightKg(next);
-      void runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg: next }), false, true);
+      void runSearchWith(paramsFor({ from, to, date, mode, sort, weightKg: next, trust, families }), false, true);
     },
     [weightKg, runSearchWith, paramsFor, from, to, date, mode, sort]
+  );
+
+  /**
+   * D102 — basculer un signal de confiance ou une famille relance la
+   * recherche ET recompte les facettes : les deux FILTRENT, donc « combien de
+   * trajets en train » change avec eux. La feuille reste ouverte — on pose
+   * plusieurs filtres d'affilée, et chacun doit se voir.
+   */
+  const toggleTrust = useCallback(
+    (cle: TrustFilter) => {
+      const suivant = { ...trust, [cle]: !trust[cle] };
+      setTrust(suivant);
+      void runSearchWith(
+        paramsFor({ from, to, date, mode, sort, weightKg, trust: suivant, families }),
+        false,
+        true
+      );
+    },
+    [trust, runSearchWith, paramsFor, from, to, date, mode, sort, weightKg, families]
+  );
+
+  const toggleFamily = useCallback(
+    (famille: SearchFamily) => {
+      const suivant = families.includes(famille)
+        ? families.filter((f) => f !== famille)
+        : [...families, famille];
+      setFamilies(suivant);
+      void runSearchWith(
+        paramsFor({ from, to, date, mode, sort, weightKg, trust, families: suivant }),
+        false,
+        true
+      );
+    },
+    [families, runSearchWith, paramsFor, from, to, date, mode, sort, weightKg, trust]
   );
 
   // Le X de l'atterrissage → résultats DIRECTS (motif Airbnb, cf.
@@ -392,7 +457,7 @@ export default function SearchScreen() {
   const openCorridor = useCallback(
     (corridor: Corridor) => {
       setSearchDraft({ from: corridor.fromCity, to: corridor.toCity, date: null });
-      void runSearchWith(paramsFor({ from: corridor.fromCity, to: corridor.toCity, mode, sort, weightKg }), true);
+      void runSearchWith(paramsFor({ from: corridor.fromCity, to: corridor.toCity, mode, sort, weightKg, trust, families }), true);
     },
     [runSearchWith, paramsFor, mode, sort, weightKg]
   );
@@ -402,7 +467,7 @@ export default function SearchScreen() {
     setState({ ...state, loadingMore: true });
     try {
       const next = await searchTrips({
-        ...paramsFor({ from, to, date, mode, sort, weightKg }),
+        ...paramsFor({ from, to, date, mode, sort, weightKg, trust, families }),
         cursor: state.page.nextCursor,
       });
       setState({
@@ -469,7 +534,34 @@ export default function SearchScreen() {
    * allumé n'est pas un indicateur — même règle que la capacité restante
    * (D99 3A) et que le compteur de vues (D100 4A).
    */
-  const filtersActive = sort !== 'relevance' || weightKg !== null;
+  /**
+   * D100 6A / D102 4A — une seule source pour la section ET son titre. Les
+   * compteurs viennent du serveur (`/facets`) ; un signal jamais vu dans les
+   * résultats courants n'a pas à occuper une place dans la feuille.
+   */
+  const trustVisibles = useMemo(
+    () =>
+      TRUST_FILTERS.map((cle) => ({
+        cle,
+        compte:
+          facets === null
+            ? 0
+            : cle === 'superTripper'
+              ? facets.superTripperCount
+              : cle === 'profileVerified'
+                ? facets.profileVerifiedCount
+                : cle === 'instantBooking'
+                  ? facets.instantBookingCount
+                  : facets.verifiedTicketCount,
+      })).filter(({ cle, compte }) => compte > 0 || trust[cle]),
+    [facets, trust]
+  );
+
+  const filtersActive =
+    sort !== 'relevance' ||
+    weightKg !== null ||
+    families.length > 0 ||
+    TRUST_FILTERS.some((cle) => trust[cle]);
 
   // La barre du haut : la pilule récap (elle OUVRE l'éditeur) et la pastille
   // de profil — partagée entre le flux normal et l'en-tête collant du mode
@@ -768,6 +860,14 @@ export default function SearchScreen() {
             <ThemedText type="smallBold" style={styles.sheetTitle}>
               {t('filters.title')}
             </ThemedText>
+            {/* D102 — la feuille porte quatre sections depuis ce lot (tri,
+                colis, confiance, familles) : elle DOIT défiler, sinon les
+                dernières sortent de l'écran sur un petit téléphone. La poignée
+                et le titre restent fixes au-dessus. */}
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetScrollContent}
+              showsVerticalScrollIndicator={false}>
             <ThemedText
               type="small"
               themeColor="textSecondary"
@@ -889,6 +989,97 @@ export default function SearchScreen() {
                 {t('filters.lightParcel', { kg: formatParcelKg(BILLING_FLOOR_KG, localeTag) })}
               </ThemedText>
             </View>
+
+            {/* ── Confiance et sécurité (D102) ──
+                Le site empile quatre cases pleine largeur. Ici, quatre
+                pastilles à bascule : une feuille basse se parcourt au pouce,
+                et quatre lignes de 44 pt pousseraient « Ton colis » hors de
+                l'écran. Mêmes compteurs, même règle du zéro, geste du
+                support (A207, D101 2A).
+                D100 6A — la section ENTIÈRE suit son contenu : pas d'option
+                avec un résultat, pas de titre orphelin. */}
+            {trustVisibles.length > 0 && (
+              <View style={styles.sheetGroup}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.sheetSection}>
+                  {t('filters.trustSafety')}
+                </ThemedText>
+                <View style={styles.chipsRow}>
+                  {trustVisibles.map(({ cle, compte }) => {
+                    const choisi = trust[cle];
+                    return (
+                      <Pressable
+                        key={cle}
+                        onPress={() => toggleTrust(cle)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: choisi }}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          {
+                            backgroundColor: choisi
+                              ? dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8'
+                              : theme.backgroundElement,
+                            borderColor: choisi ? 'rgba(255,153,0,0.5)' : 'transparent',
+                          },
+                          isEmptyFacet(compte, choisi) && styles.chipEmpty,
+                          pressed && styles.pressed,
+                        ]}>
+                        <ThemedText
+                          type="smallBold"
+                          style={{ color: choisi ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary }}>
+                          {t(`badges.${cle}`)}
+                        </ThemedText>
+                        <ThemedText style={[styles.chipCount, { color: theme.textSecondary }]}>
+                          {compte}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* ── Que veux-tu envoyer ? (D102) ── */}
+            <View style={styles.sheetGroup}>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sheetSection}>
+                {t('filters.families')}
+              </ThemedText>
+              <View style={styles.chipsRow}>
+                {SEARCH_FAMILIES.map((famille) => {
+                  const choisi = families.includes(famille);
+                  const compte = facets?.familyCounts?.[famille];
+                  return (
+                    <Pressable
+                      key={famille}
+                      onPress={() => toggleFamily(famille)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: choisi }}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        {
+                          backgroundColor: choisi
+                            ? dark ? 'rgba(255,153,0,0.15)' : '#FFF6E8'
+                            : theme.backgroundElement,
+                          borderColor: choisi ? 'rgba(255,153,0,0.5)' : 'transparent',
+                        },
+                        isEmptyFacet(compte, choisi) && styles.chipEmpty,
+                        pressed && styles.pressed,
+                      ]}>
+                      <ThemedText
+                        type="smallBold"
+                        style={{ color: choisi ? (dark ? '#FFB84D' : '#B45309') : theme.textSecondary }}>
+                        {t(`families.${famille}`)}
+                      </ThemedText>
+                      {typeof compte === 'number' && (
+                        <ThemedText style={[styles.chipCount, { color: theme.textSecondary }]}>
+                          {compte}
+                        </ThemedText>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            </ScrollView>
           </ThemedView>
         </Modal>
       </SafeAreaView>
@@ -1050,6 +1241,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.five,
+    // D102 — quatre sections : la feuille se plafonne et défile, au lieu de
+    // pousser ses dernières lignes sous le bord de l'écran.
+    maxHeight: '85%',
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    paddingBottom: Spacing.two,
   },
   sheetHandle: {
     alignSelf: 'center',
@@ -1132,6 +1332,34 @@ const styles = StyleSheet.create({
   },
   sheetHint: {
     textAlign: 'center',
+  },
+  // ── Confiance et familles (D102) ──
+  sheetGroup: {
+    marginTop: Spacing.three,
+    paddingTop: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(148,163,184,0.3)',
+    gap: Spacing.two,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+  },
+  chip: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipEmpty: {
+    opacity: EMPTY_FACET_OPACITY,
+  },
+  chipCount: {
+    fontSize: 11,
   },
   idle: {
     gap: Spacing.four,
