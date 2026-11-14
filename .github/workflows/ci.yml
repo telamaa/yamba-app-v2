@@ -148,6 +148,18 @@ jobs:
           # celui d'un service.
           - project: mobile
             nx_project: "@yamba-app/mobile"
+          # A224 — le VINGTIEME controle, et le pendant exact d'A223 ci-dessus.
+          # `apps/user-ui` est la plus GROSSE application du depot et la seule
+          # qu'aucun des dix-neuf autres ne voyait executer une ligne : le job
+          # `TypeScript (user-ui)` ne verifie que des types, et son tsconfig
+          # EXCLUT `src/**/*.spec.ts`. Les 35 fichiers purs de `src/lib`
+          # (~2 900 lignes) portaient les corrections de D99 a D102 sans
+          # qu'aucune soit gardee autrement que par RICOCHET, depuis des fiches
+          # du harnais mobile qui comparent les copies a l'octet pres — ce qui
+          # garde l'EGALITE de deux fichiers, jamais le COMPORTEMENT d'une
+          # regle. Environnement `node`, aucun rendu de composant (A224 2A).
+          - project: user-ui
+            nx_project: "@yamba-app/user-ui"
     steps:
       - uses: actions/checkout@v4
 

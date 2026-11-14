@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/jest",
+    // A224 — `tsconfig.base.json` est écrit pour des projets COMPOSITES qui
+    // n'émettent que des déclarations ; ici le programme ne sert qu'à
+    // VÉRIFIER (ts-jest transpile fiche par fiche, sans jamais lire ces
+    // options). `noEmit` est incompatible avec `emitDeclarationOnly` : les
+    // trois se neutralisent. Même réglage que `apps/mobile` (A223).
+    "composite": false,
+    "emitDeclarationOnly": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["jest", "node"],
+    "baseUrl": ".",
+    "rootDir": "../../",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0",
+    "jsx": "react-jsx",
+    "lib": ["es2022", "dom"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"],
+      "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"],
+      "@packages/libs/maintenance": ["../../packages/libs/maintenance/index.ts"]
+    }
+  },
+  "include": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.spec.tsx"]
+}
