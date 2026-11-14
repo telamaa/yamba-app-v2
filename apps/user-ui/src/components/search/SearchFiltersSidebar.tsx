@@ -1,24 +1,9 @@
 "use client";
 
-import {
-  Baby,
-  Banknote,
-  Check,
-  Clock3,
-  FileText,
-  Medal,
-  Package,
-  ShieldCheck,
-  Shirt,
-  ShoppingBag,
-  Smartphone,
-  Sparkles,
-  Star,
-  Ticket,
-  Wrench,
-} from "lucide-react";
+import { Baby, Banknote, Check, Clock3, FileText, Medal, Package, ShieldCheck, Shirt, ShoppingBag, Smartphone, Sparkles, Star, Ticket, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { BILLING_FLOOR_KG } from "@/lib/pricing-example";
+import { EMPTY_FACET_OPACITY, isEmptyFacet } from "@/lib/search-facets";
 import {
   SEARCH_FAMILIES,
   type DepartureTimeBucket,
@@ -103,28 +88,22 @@ function CustomRadio({ checked }: { checked: boolean }) {
 // ── Custom checkbox ──
 // Remplace <input type="checkbox"> natif pour garantir visibilité en dark mode
 // et éviter les bugs d'association label-input.
-function CustomCheckbox({
-                          checked,
-                          disabled,
-                        }: {
-  checked: boolean;
-  disabled: boolean;
-}) {
+// D100 6A — la case n'a plus d'état « désactivée » : son unique appelant ne
+// désactive plus rien (une facette à zéro s'efface, elle ne s'éteint pas), et
+// le `disabled` qu'on lui passait valait `false` en dur. Une apparence qu'on
+// garde « au cas où » est du code mort qui se maintient — règle de D95/D98.
+function CustomCheckbox({ checked }: { checked: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={[
         "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
-        disabled
-          ? "border-slate-200 dark:border-slate-700"
-          : checked
-            ? "border-[#FF9900] bg-[#FF9900]"
-            : "border-slate-300 dark:border-slate-600",
+        checked
+          ? "border-[#FF9900] bg-[#FF9900]"
+          : "border-slate-300 dark:border-slate-600",
       ].join(" ")}
     >
-      {checked && !disabled && (
-        <Check size={11} strokeWidth={3.5} className="text-white" />
-      )}
+      {checked && <Check size={11} strokeWidth={3.5} className="text-white" />}
     </span>
   );
 }
@@ -136,17 +115,10 @@ function RightMeta({
   count?: number;
   icon: React.ReactNode;
 }) {
-  const disabled = typeof count === "number" && count === 0;
-
+  // D100 6A — son unique appelant (`visibleTrustOptions`) ne lui passe plus
+  // que des compteurs > 0 : la variante « éteinte » n'était plus atteignable.
   return (
-    <span
-      className={[
-        "flex items-center gap-2.5",
-        disabled
-          ? "text-slate-300 dark:text-slate-600"
-          : "text-slate-500 dark:text-slate-400",
-      ].join(" ")}
-    >
+    <span className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
       {typeof count === "number" && (
         <span className="min-w-[18px] text-right text-[12px] font-semibold tabular-nums">
           {count}
@@ -193,6 +165,14 @@ export default function SearchFiltersSidebar({
     hint?: string;
     icon: React.ReactNode;
   }> = [
+    // D100 1A/1B — le DÉFAUT du serveur depuis D80, enfin nommé. Il était
+    // appliqué sans être affiché : « Départ le plus tôt » portait son résultat.
+    {
+      value: "relevance",
+      label: t("filters.relevance"),
+      hint: t("filters.relevanceHint"),
+      icon: <Sparkles size={18} />,
+    },
     {
       value: "earliest",
       label: t("filters.earliest"),
@@ -238,6 +218,11 @@ export default function SearchFiltersSidebar({
     },
   ];
 
+  // D100 6A — une seule source pour la section ET son titre. Le filtre
+  // `count > 0` ne vivait qu'au point de rendu des options : le titre, lui,
+  // ne le voyait pas, et survivait donc à son propre contenu.
+  const visibleTrustOptions = trustOptions.filter((o) => o.count > 0);
+
   // ⚠️ DÉSACTIVÉ — Bloc "Horaires de départ" masqué pour le MVP.
   // ⚠️ La logique côté SearchResultsView est conservée pour réactivation rapide.
   // ⚠️ Pour réactiver:
@@ -279,8 +264,11 @@ export default function SearchFiltersSidebar({
       {/* min-h-[44px] : même hauteur que l'en-tête des cartes résultat → alignées */}
       {!hideHeader && (
         <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+          {/* D100 7A — le panneau contient le tri, la confiance, le poids et les
+              familles : il s'intitulait « Trier par », c'est-à-dire par une de
+              ses quatre parties. */}
           <h2 className="text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
-            {t("filters.sortBy")}
+            {t("filters.title")}
           </h2>
           {hasActiveFilters && (
             <button
@@ -298,7 +286,7 @@ export default function SearchFiltersSidebar({
         className="space-y-5 px-5 py-4"
         // ⚠️ role="group" pour accessibilité — annonce que tout ce bloc est un conteneur de filtres
         role="group"
-        aria-label={t("filters.sortBy")}
+        aria-label={t("filters.title")}
       >
         {/* ── Sort (custom radio buttons) ── */}
         <div
@@ -355,7 +343,12 @@ export default function SearchFiltersSidebar({
           })}
         </div>
 
-        {/* ── Trust & safety (custom checkboxes) ── */}
+        {/* ── Trust & safety (custom checkboxes) ──
+             D100 6A — la section ENTIÈRE est conditionnée au même filtre que son
+             contenu (`count > 0`). Le titre était rendu sans condition : orphelin
+             à l'œil dès qu'aucune option n'avait de résultat, et section vide
+             annoncée pour un lecteur d'écran. Un titre ne survit pas à sa section. */}
+        {visibleTrustOptions.length > 0 && (
         <div
           className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60"
           role="group"
@@ -366,39 +359,27 @@ export default function SearchFiltersSidebar({
           </h3>
 
           <div className="space-y-1">
-            {trustOptions.filter((o) => o.count > 0).map((option) => {
-              const disabled = false;
-
+            {visibleTrustOptions.map((option) => {
+              // D100 6A — `const disabled = false` vivait ici, suivi de QUATRE
+              // branches de style pour un état que rien ne pouvait atteindre.
+              // Du code qui décrit un comportement qu'il n'a pas : la maladie
+              // même de ce lot, en version silencieuse.
               return (
                 <button
                   key={option.label}
                   type="button"
                   role="checkbox"
                   aria-checked={option.checked}
-                  aria-disabled={disabled}
-                  disabled={disabled}
                   onClick={() => option.onChange(!option.checked)}
                   className={[
                     "flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors",
-                    disabled
-                      ? "cursor-not-allowed"
-                      : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/60",
+                    "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/60",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900]/40",
                   ].join(" ")}
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <CustomCheckbox
-                      checked={option.checked}
-                      disabled={disabled}
-                    />
-                    <span
-                      className={[
-                        "truncate text-[13px] font-medium",
-                        disabled
-                          ? "text-slate-300 dark:text-slate-600"
-                          : "text-slate-700 dark:text-slate-300",
-                      ].join(" ")}
-                    >
+                    <CustomCheckbox checked={option.checked} />
+                    <span className="truncate text-[13px] font-medium text-slate-700 dark:text-slate-300">
                       {option.label}
                     </span>
                   </span>
@@ -408,6 +389,7 @@ export default function SearchFiltersSidebar({
             })}
           </div>
         </div>
+        )}
 
         {/* ⚠️ ──────────────────────────────────────────────────────── */}
         {/* ⚠️ DÉSACTIVÉ — Section "Horaires de départ" cachée pour MVP */}
@@ -500,21 +482,23 @@ export default function SearchFiltersSidebar({
             {SEARCH_FAMILIES.map((family) => {
               const active = selectedFamilies.includes(family);
               const count = familyCounts[family];
-              const disabled = count === 0 && !active;
+              // D100 5A — une famille sans résultat s'EFFACE au lieu d'être
+              // désactivée : à zéro, la facette reste le chemin de sortie du
+              // filtre qu'on vient de poser. Trois traitements d'un même zéro
+              // coexistaient dans le produit ; il n'en reste qu'un.
+              const isEmpty = isEmptyFacet(count, active);
               return (
                 <button
                   key={family}
                   type="button"
-                  disabled={disabled}
                   aria-pressed={active}
                   onClick={() => onToggleFamily(family)}
+                  style={isEmpty ? { opacity: EMPTY_FACET_OPACITY } : undefined}
                   className={[
                     "inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                     active
                       ? "border-[#FF9900]/40 bg-[#FFF6E8] text-[#B45309] dark:border-[#FF9900]/30 dark:bg-[#FF9900]/10 dark:text-[#FFB84D]"
-                      : disabled
-                        ? "cursor-not-allowed border-slate-100 text-slate-300 dark:border-slate-800 dark:text-slate-600"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:bg-slate-800",
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:bg-slate-800",
                   ].join(" ")}
                 >
                   {FAMILY_ICONS[family]}

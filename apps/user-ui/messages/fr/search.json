@@ -43,7 +43,9 @@
     "weightHint": "Prix affichés pour un colis de {kg} kg. Indique le tien : les prix suivent, et les trajets sans assez de place sortent de la liste.",
     "weightHintActive": "Prix et tri calculés pour {kg} kg · trajets sans assez de place exclus",
     "lowestPriceHintWeight": "pour ton colis de {kg} kg",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum."
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum.",
+    "relevance": "Les plus pertinents",
+    "relevanceHint": "Près de toi, et les mieux notés"
   },
   "departureTimes": {
     "morning": "Matin",

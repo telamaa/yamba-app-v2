@@ -72,3 +72,22 @@ export function formatAmountFromCents(cents: number, localeTag: string): string 
     maximumFractionDigits: PRICE_FRACTION_DIGITS,
   });
 }
+
+/**
+ * Le poids que le prix FACTURE, à partir du poids du colis (D100 2A).
+ * ===================================================================
+ * Sous le plancher de facturation (D81), le montant ne bouge plus : une
+ * enveloppe de 200 g, un colis de 1,5 kg et un colis de 2,3 kg coûtent le même
+ * prix. La carte de résultat nommait pourtant le poids CHOISI à côté de ce
+ * montant — « pour ton colis de 1,5 kg » sous un prix qui est celui de 2,3 kg.
+ * Mesuré le 14/11/2026 sur les deux fronts : le site à 1,5 kg et le téléphone
+ * à 2 kg affichaient le même 24,85 €, et le curseur semblait donc inerte.
+ *
+ * D99 bis avait tranché que la carte ne doit NI répéter NI contredire le
+ * plancher : elle le contredisait. La mention nomme désormais le poids
+ * facturé ; l'explication du plancher, elle, reste dans le panneau où l'on
+ * règle son colis — c'est là qu'elle répond à une question.
+ */
+export function billedKg(kg: number): number {
+  return Math.max(kg, BILLING_FLOOR_KG);
+}

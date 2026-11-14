@@ -43,7 +43,9 @@
     "weightHint": "Prices shown for a {kg} kg parcel. Set yours: prices follow, and trips without enough room leave the list.",
     "weightHintActive": "Prices and sorting for {kg} kg · trips without enough room excluded",
     "lowestPriceHintWeight": "for your {kg} kg parcel",
-    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum."
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum.",
+    "relevance": "Most relevant",
+    "relevanceHint": "Near you, and the best rated"
   },
   "departureTimes": {
     "morning": "Morning",

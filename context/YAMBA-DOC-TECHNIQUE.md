@@ -17730,3 +17730,148 @@ Mobile **752 → 755**. Trois ajouts, tous nés de cette revue :
 | `le site distingue le colis SUPPOSÉ du colis CHOISI` | deux chaînes différentes, et les deux cartes du site les appellent |
 | `le téléphone ne porte pas la variante qu'il n'utilise pas` | aucune clé morte |
 | `le libellé se lit SOUS le prix, des deux côtés` | l'ordre, que la fiche de parité ne comparait pas |
+
+---
+
+# D100 — Un écran n'affirme rien qu'il n'applique (`feat/ecran-sans-mensonge`, 14/11/2026)
+
+## Le point de départ
+
+Revue d'écran de l'utilisateur, les deux fronts côte à côte, captures du 14/11. Quatre choses
+clochaient. Aucune ne se voyait en relisant un seul front : **trois ne se voient qu'en comparant
+l'écran à la réponse du serveur**, la quatrième qu'en comparant les deux fronts entre eux.
+
+## 1A/1B — Le tri affiché n'était pas le tri appliqué
+
+### Le symptôme
+
+Le bouton « Départ le plus tôt » était coché en mangue. L'ordre à l'écran était
+**18 nov → 15 nov → 23 nov**. Un trajet du 15 se cachait sous un trajet du 18.
+
+### La mesure, avant tout diagnostic
+
+Trois requêtes sur la pile locale, trois minutes :
+
+```sh
+curl "localhost:8080/api/trips/search?limit=5"                 # → 18 → 15 → 23
+curl "localhost:8080/api/trips/search?limit=5&sort=earliest"   # → 15 → 18 → 23
+curl "localhost:8080/api/trips/search?limit=5&sort=relevance"  # → 18 → 15 → 23
+```
+
+Le serveur triait correctement. L'écran affichait l'ordre **sans tri**.
+
+### La cause, une ligne
+
+`apps/user-ui/src/services/trip.api.ts` (et son jumeau `apps/mobile/src/lib/api/search.api.ts`) :
+
+```ts
+if (params.sort && params.sort !== "earliest") qs.set("sort", params.sort);
+```
+
+Le front omettait le paramètre quand il valait `earliest`, « parce que c'est le défaut ».
+C'était vrai — jusqu'à **D80**, qui a fait de `relevance` le défaut du serveur :
+
+```ts
+// apps/trip-service/src/dto/trip-search.dto.ts
+sort: z.enum(SORT_OPTIONS).optional().default("relevance").catch("relevance"),
+```
+
+Le commentaire de ce fichier dit même, mot pour mot : « le front ne décide pas : un client qui
+n'envoie rien reçoit la pertinence ». Les deux côtés avaient raison séparément. Ensemble, ils
+mentaient.
+
+### Le correctif, en deux temps
+
+| | Avant | Après |
+|---|---|---|
+| Envoi | omis quand `earliest` | **toujours envoyé** |
+| Tris exposés | 3 sur 4 | **les 4 du contrat** |
+| Défaut de l'écran | `earliest` | `relevance` |
+
+`relevance` cesse d'être anonyme : elle devient « Les plus pertinents », première de la liste et
+sélectionnée par défaut. Le classement de D80 est meilleur qu'un tri chronologique sur une page
+d'atterrissage — il devait simplement **dire son nom** au lieu d'emprunter celui d'un autre.
+
+**Vérification : nommer le défaut ne change rien à ce qu'on voit.** `sort=relevance` rend
+exactement l'ordre de l'ancien envoi (18 → 15 → 23). Zéro régression sur l'affichage ; la seule
+chose qui change est que le bouton coché est désormais le bon.
+
+## 2A — La mention nommait un poids que le prix ne facture pas
+
+Site à **1,5 kg** → 24,85 €. Téléphone à **2 kg** → **24,85 €**. Le même montant, parce que le
+plancher de facturation est à 2,3 kg (D81). Tout déplacement du curseur sous 2,3 kg changeait
+donc la phrase sans bouger le chiffre : le contrôle paraissait inerte.
+
+D99 bis avait tranché que la carte ne doit NI répéter NI contredire le plancher. Elle le
+contredisait. La règle entre dans `pricing-example.ts`, à côté du plancher qu'elle utilise :
+
+```ts
+export function billedKg(kg: number): number {
+  return Math.max(kg, BILLING_FLOOR_KG);
+}
+```
+
+Les **trois** cartes du produit en passent par là. Le fichier étant dupliqué à l'octet près entre
+les deux fronts, la fiche existante de comparaison garde l'ajout des deux côtés.
+
+## 3A — Un séparateur qui ponctuait le vide
+
+`apps/mobile/src/components/trip-result-card.tsx:287` rendait ` · ` **sans condition**, la note
+seulement si elle existait. Résultat sur les trois cartes de la capture : « Thomas N. **·** »
+suivi de rien. Le séparateur entre dans la branche qui porte la note.
+
+## 4A — « 1 vue » publiait l'impopularité d'une offre
+
+| Front | Seuil, avant |
+|---|---|
+| Téléphone | `MIN_SHOWN_VIEWS = 15` |
+| Site | `viewsCount > 0` |
+
+Le dépôt avait déjà écrit la règle pour la capacité restante (« un signal de rareté toujours
+présent n'est pas un signal ») sans l'appliquer ici. Le site adopte le seuil du téléphone ;
+`showsViews` rejoint `isPopular` dans `apps/user-ui/src/lib/trip-signals.ts`.
+
+## 5A — Trois traitements d'un même zéro
+
+| Où | Avant |
+|---|---|
+| Téléphone, onglets de mode | estompé à 50 %, **tapable** |
+| Site, familles | `disabled`, grisé, curseur barré |
+| Site, onglets de mode | **rien** |
+
+La règle du téléphone est retenue, et pour une raison précise : **une facette à zéro reste le
+chemin de sortie du filtre qu'on vient de poser**. La désactiver enferme. Elle sort dans
+`search-facets.ts`, dupliqué à l'octet près entre les deux fronts — la duplication est voulue
+(un `import` par-dessus la frontière d'un projet est une dépendance de build, D93).
+
+## 6A/7A/8A — Le panneau et le squelette
+
+- « Confiance et sécurité » était rendu sans condition alors que son contenu est filtré à
+  `count > 0` : titre orphelin à l'œil, section vide annoncée au lecteur d'écran. La section
+  entière passe sous la même condition, via une source unique (`visibleTrustOptions`).
+- Le panneau s'intitulait « Trier par » alors qu'il contient quatre groupes. Il prend
+  `filters.title`, qui existait déjà dans les deux langues.
+- **Les deux squelettes dessinaient encore la carte d'avant D99** : bandes peintes, bloc prix au
+  kilo, filet pointillé — le commentaire disait encore `Bloc prix PER_KG`. Chaque résultat
+  sautait de mise en page à l'arrivée des données. C'est `HeaderSkeleton` de D93, rejoué.
+
+## Ce que les fiches ont trouvé toutes seules
+
+La première exécution de `search-facets.spec.ts` est partie au **rouge** sur
+`expect(source).not.toContain('cursor-not-allowed')`. En cherchant pourquoi :
+
+```tsx
+const disabled = false;   // ← constante, avec QUATRE branches de style derrière
+```
+
+Un état inatteignable, porté par le code et par `CustomCheckbox`. Retiré.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `tsc --noEmit --project apps/user-ui` | propre (505 fichiers vus) |
+| `nx typecheck @yamba-app/mobile` | propre (les deux programmes) |
+| `nx test @yamba-app/mobile` | **780 / 39 suites** (755 + 25) |
+| `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 espaces de noms |
+| Serveur, trois ordres de tri | conformes au tableau ci-dessus |

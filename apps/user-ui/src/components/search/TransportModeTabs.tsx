@@ -2,6 +2,7 @@
 
 import { Car, Plane, Train } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { EMPTY_FACET_OPACITY, isEmptyFacet } from "@/lib/search-facets";
 import { TransportMode } from "./search-results.types";
 
 type FilterMode = "all" | TransportMode;
@@ -64,12 +65,18 @@ export default function TransportModeTabs({
       <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
         {tabs.map((tab) => {
           const isActive = active === tab.key;
+          // D100 5A — « Train 0 » et « Voiture 0 » avaient le POIDS PLEIN d'un
+          // mode qui a de l'offre : un geste sans issue, invitant à un clic qui
+          // ne mène qu'au vide. Le téléphone tenait déjà la règle ; elle vit
+          // désormais dans un module que les deux fronts recopient.
+          const isEmpty = isEmptyFacet(tab.count, isActive);
 
           return (
             <button
               key={tab.key}
               type="button"
               onClick={() => onChange(tab.key)}
+              style={isEmpty ? { opacity: EMPTY_FACET_OPACITY } : undefined}
               className={[
                 "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors",
                 // Actif = mango (charte) : lisible sur fond clair ET sombre

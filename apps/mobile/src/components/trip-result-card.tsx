@@ -42,6 +42,7 @@ import { ApiError } from '@/lib/api/client';
 import type { TripSearchResult } from '@/lib/api/search.api';
 import { countryFlag, countryName } from '@/lib/country-name';
 import {
+  billedKg,
   estimateShipperTotalCents,
   formatAmountFromCents,
   PRICING_EXAMPLE_PARAMS,
@@ -138,7 +139,13 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
    * à connaître les paramètres de plateforme. La projection locale reste un
    * repli — serveur plus ancien, ou trajet sans moteur au kilo.
    */
-  const poidsAffiche = typeof trip.weightKg === 'number' ? trip.weightKg : exampleKg;
+  /* D100 2A — la mention nomme le poids FACTURÉ. Sous le plancher (D81) le
+     montant ne bouge plus : annoncer « pour 2 kg » à côté du prix de 2,3 kg
+     décrivait faussement ce que l'Expéditeur paie, et sur ce front la carte
+     est la SEULE à parler du poids (la feuille de filtres n'en porte pas). */
+  const poidsAffiche = billedKg(
+    typeof trip.weightKg === 'number' ? trip.weightKg : exampleKg
+  );
   const totalCents =
     typeof trip.totalForWeight === 'number'
       ? Math.round(trip.totalForWeight * 100)
@@ -284,9 +291,13 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
           <ThemedText style={styles.travelerName} numberOfLines={1}>
             {trip.travelerFirstName}
             {trip.travelerLastName ? ` ${trip.travelerLastName.charAt(0)}.` : ''}
-            <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}> · </ThemedText>
+            {/* D100 3A — le séparateur ne s'affiche que s'il SÉPARE. Il était
+                rendu sans condition, la note seulement si elle existait : un
+                Voyageur sans note portait « Thomas N. · » suivi de rien (les
+                trois cartes de la capture du 14/11). */}
             {typeof trip.rating === 'number' ? (
               <>
+                <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}> · </ThemedText>
                 <ThemedText style={[styles.travelerMeta, { color: Brand.mango }]}>★</ThemedText>
                 <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}>
                   {' '}

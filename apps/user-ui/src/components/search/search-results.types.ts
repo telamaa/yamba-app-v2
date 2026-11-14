@@ -32,7 +32,11 @@ export type SearchFamilyCondition = {
   mode: "SURCHARGE" | "REFUSE";
   surchargePct?: number | null;
 };
-export type SortOption = "earliest" | "lowestPrice" | "bestRated";
+// D100 1B — `relevance` est le défaut du CONTRAT depuis D80 (flux d'atterrissage
+// localisé). Les deux fronts n'en exposaient que trois sur quatre : le défaut du
+// serveur était donc inatteignable depuis l'interface, et impossible à retrouver
+// une fois quitté. Il est premier parce qu'il est le défaut.
+export type SortOption = "relevance" | "earliest" | "lowestPrice" | "bestRated";
 
 export type DepartureTimeBucket =
   | "earlyMorning" // 04:00 - 09:00

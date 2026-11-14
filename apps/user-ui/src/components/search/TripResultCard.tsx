@@ -1,5 +1,5 @@
 "use client";
-import { formatAmountFromCents } from "@/lib/pricing-example";
+import { billedKg, formatAmountFromCents } from "@/lib/pricing-example";
 
 /**
  * D99 3A — en dessous de ce seuil, la place restante devient une CONTRAINTE et
@@ -37,7 +37,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import FavoriteButton from "@/components/favorites/FavoriteButton";
-import { isPopular } from "@/lib/trip-signals";
+import { isPopular, showsViews } from "@/lib/trip-signals";
 import {
   ParcelCategory,
   SearchFamily,
@@ -200,7 +200,12 @@ export default function TripResultCard({
    * C'est elle qui manquait — le site arrondissait à l'euro là où le téléphone
    * donnait les centimes, pour le même trajet et le même colis.
    */
-  const poidsAffiche = typeof item.weightKg === "number" ? item.weightKg : null;
+  /* D100 2A — la mention nomme le poids que le prix FACTURE, pas celui que
+     l'Expéditeur a posé sur le curseur. Sous le plancher (D81) les deux
+     diffèrent et le montant ne bouge pas : nommer 1,5 kg à côté d'un prix de
+     2,3 kg faisait passer un contrôle actif pour un contrôle inerte. */
+  const poidsAffiche =
+    typeof item.weightKg === "number" ? billedKg(item.weightKg) : null;
   /** L'Expéditeur a-t-il CHOISI ce poids, ou le lui suppose-t-on ? */
   const poidsChoisi = typeof weightKg === "number";
   const totalPourLePoids =
@@ -499,10 +504,11 @@ export default function TripResultCard({
               )}
             </div>
 
-            {(item.superTripper || item.verifiedTicket || (typeof item.viewsCount === "number" && item.viewsCount > 0)) && (
+            {(item.superTripper || item.verifiedTicket || showsViews(item.viewsCount)) && (
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {/* D5 / C-PR6 — signal de popularité : pastille lisible, badge « Populaire » à partir de 20 vues */}
-                {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+                {/* D100 4A — sous MIN_SHOWN_VIEWS, le compteur dessert le trajet. */}
+                {showsViews(item.viewsCount) && (
                   <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${isPopular(item.viewsCount) ? "bg-[#FFF6E8] text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`} title={t("views", { count: item.viewsCount })}>
                     <Eye size={10} strokeWidth={2.5} />
                     {isPopular(item.viewsCount) ? t("badges.popular") : t("views", { count: item.viewsCount })}

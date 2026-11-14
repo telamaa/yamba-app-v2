@@ -123,46 +123,71 @@ function SearchFiltersSidebarSkeleton() {
   );
 }
 
+/* D99 ter — un squelette est une PROMESSE : il dessine la carte qui va
+   arriver. Les deux ci-dessous dessinaient encore la carte d'AVANT D99 —
+   bandes peintes en en-tête et en pied, et un bloc prix « au kilo » avec son
+   libellé, sa capacité, son filet pointillé et sa ligne d'exemple. D99 a
+   aplati la carte (plus aucune bande : la carte entière est un seul lien) et
+   remplacé le prix au kilo par le TOTAL suivi d'une mention. Le squelette
+   annonçait donc une mise en page que le chargement démentait, et chaque
+   résultat « sautait » à l'arrivée des données.
+   C'est mot pour mot la leçon de D93 sur `HeaderSkeleton` : toute règle
+   écrite dans la vraie branche doit être écrite dans la branche de
+   chargement, sans quoi elle ne protège qu'un écran sur deux. */
 function TripResultCardSkeletonMobile() {
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-14 rounded-full" />
+      {/* En-tête : pastille transport + date, et le cœur à droite (h-9 = la
+          cible tactile de 44 px de la vraie carte). Aucune bordure, aucun
+          fond : la carte est plate. */}
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Skeleton className="h-[26px] w-14 rounded-full" />
           <Skeleton className="h-3 w-20 rounded-md" />
         </div>
+        <Skeleton className="h-9 w-9 rounded-full" />
       </div>
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-start gap-2 px-3.5 py-3">
-        <div className="space-y-1.5">
-          <Skeleton className="h-4 w-12 rounded-md" />
-          <Skeleton className="h-3 w-16 rounded-md" />
-        </div>
-        <div className="flex flex-col items-center gap-1.5 pt-1">
-          <Skeleton className="h-2 w-8 rounded-md" />
-          <Skeleton className="h-px w-full rounded-md" />
-          <Skeleton className="h-2 w-10 rounded-md" />
-        </div>
-        <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-4 w-12 rounded-md" />
-          <Skeleton className="h-3 w-16 rounded-md" />
-        </div>
-        <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2 w-10 rounded-md" />
-          <Skeleton className="h-4 w-16 rounded-md" />
-          <Skeleton className="h-2 w-12 rounded-md" />
+
+      <div className="px-3.5 py-3">
+        <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-start gap-2">
+          {/* Départ : ville (14 px), pays (10 px), heure (12 px) */}
+          <div className="space-y-1">
+            <Skeleton className="h-3.5 w-12 rounded-md" />
+            <Skeleton className="h-2.5 w-14 rounded-md" />
+            <Skeleton className="h-3 w-10 rounded-md" />
+          </div>
+          {/* Trajet : durée, ligne, escales */}
+          <div className="flex flex-col items-center gap-1 pt-1">
+            <Skeleton className="h-2.5 w-8 rounded-md" />
+            <Skeleton className="h-px w-full rounded-md" />
+            <Skeleton className="h-2 w-10 rounded-md" />
+          </div>
+          {/* Arrivée : même gabarit, aligné à droite */}
+          <div className="flex flex-col items-end space-y-1">
+            <Skeleton className="h-3.5 w-12 rounded-md" />
+            <Skeleton className="h-2.5 w-14 rounded-md" />
+            <Skeleton className="h-3 w-10 rounded-md" />
+          </div>
+          {/* Prix : le TOTAL (18 px) puis la mention. Deux lignes, pas quatre. */}
+          <div className="flex min-w-[50px] flex-col items-end space-y-1 pt-1">
+            <Skeleton className="h-[18px] w-14 rounded-md" />
+            <Skeleton className="h-2 w-12 rounded-md" />
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
-        <div className="flex items-center gap-2">
+
+      {/* Pied : avatar, nom, note — puis pastille et chevron. Plat lui aussi. */}
+      <div className="mt-1.5 flex items-center justify-between gap-2 px-3.5 pb-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-full" />
           <div className="space-y-1">
             <Skeleton className="h-3 w-16 rounded-md" />
-            <Skeleton className="h-3 w-20 rounded-md" />
+            <Skeleton className="h-2.5 w-20 rounded-md" />
           </div>
         </div>
-        <div className="flex gap-1">
-          <Skeleton className="h-5 w-5 rounded-full" />
-          <Skeleton className="h-5 w-5 rounded-full" />
+        <div className="flex shrink-0 items-center gap-1">
+          <Skeleton className="h-4 w-10 rounded-md" />
+          <Skeleton className="h-4 w-4 rounded-md" />
         </div>
       </div>
     </article>
@@ -171,16 +196,21 @@ function TripResultCardSkeletonMobile() {
 
 function TripResultCardSkeleton() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
-      <div className="flex min-h-[44px] items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] dark:border-slate-800/80 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">
+      {/* En-tête : pastille transport + date + cœur (h-8 sur grand écran) */}
+      <div className="flex min-h-[44px] items-center gap-3 px-4 pt-3">
         <Skeleton className="h-6 w-16 rounded-full" />
         <Skeleton className="h-3 w-20 rounded-md" />
+        <div className="flex-1" />
+        <Skeleton className="h-8 w-8 rounded-full" />
       </div>
-      <div className="grid items-center gap-4 px-4 py-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+
+      <div className="grid items-center gap-4 px-4 py-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:gap-5">
+        {/* Départ : le pays est INLINE avec la ville depuis D99 bis — une
+            ligne de ville, puis l'heure. Deux lignes, plus trois. */}
         <div className="space-y-1.5">
-          <Skeleton className="h-4 w-20 rounded-md" />
+          <Skeleton className="h-4 w-28 rounded-md" />
           <Skeleton className="h-3.5 w-12 rounded-md" />
-          <Skeleton className="h-2.5 w-16 rounded-md" />
         </div>
         <div className="flex flex-col items-center gap-1.5">
           <Skeleton className="h-2.5 w-10 rounded-md" />
@@ -188,29 +218,34 @@ function TripResultCardSkeleton() {
           <Skeleton className="h-2.5 w-12 rounded-md" />
         </div>
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-4 w-24 rounded-md" />
+          <Skeleton className="h-4 w-28 rounded-md" />
           <Skeleton className="h-3.5 w-12 rounded-md" />
-          <Skeleton className="h-2.5 w-16 rounded-md" />
         </div>
-        {/* Bloc prix PER_KG : libellé · €/kg · kg dispo · filet · exemple */}
+        {/* Prix : le gros chiffre (22 px) est le TOTAL, la mention dit pour
+            quel colis. Le libellé au-dessus, la capacité et la ligne
+            d'exemple ont quitté la carte — ils quittent donc le squelette. */}
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2.5 w-14 rounded-md" />
-          <Skeleton className="h-6 w-24 rounded-md" />
-          <Skeleton className="h-3 w-16 rounded-md" />
-          <div className="w-full border-t border-dashed border-slate-200 pt-1.5 dark:border-slate-700">
-            <Skeleton className="ml-auto h-2.5 w-28 rounded-md" />
-          </div>
+          <Skeleton className="h-[22px] w-24 rounded-md" />
+          <Skeleton className="h-2.5 w-24 rounded-md" />
         </div>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
-        <div className="flex items-center gap-2.5">
+
+      {/* Pied : avatar + nom + note à gauche, catégories et chevron à droite */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
+        <div className="flex min-w-0 items-center gap-2.5">
           <Skeleton className="h-8 w-8 rounded-full" />
           <div className="space-y-1">
             <Skeleton className="h-3 w-20 rounded-md" />
             <Skeleton className="h-3 w-32 rounded-md" />
           </div>
         </div>
-        <Skeleton className="h-4 w-4 rounded-md" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            <Skeleton className="h-6 w-6 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-4 rounded-md" />
+        </div>
       </div>
     </article>
   );
@@ -281,7 +316,11 @@ export default function SearchResultsView() {
   const locale = useLocale() as "fr" | "en";
 
   const [activeMode, setActiveMode] = useState<FilterMode>("all");
-  const [sort, setSort] = useState<SortOption>("earliest");
+  // D100 1A — le défaut de l'écran est celui du CONTRAT (`relevance`, D80), et
+  // il est désormais le même des deux côtés. Il valait `earliest` ici pendant
+  // que le serveur appliquait la pertinence : l'écran affirmait un ordre qu'il
+  // ne demandait pas.
+  const [sort, setSort] = useState<SortOption>("relevance");
 
   const [superTripperOnly, setSuperTripperOnly] = useState(false);
   const [profileVerifiedOnly, setProfileVerifiedOnly] = useState(false);

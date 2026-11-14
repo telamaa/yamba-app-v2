@@ -8862,3 +8862,53 @@ d'une ville pèse autant qu'elle, même en plus pâle.
 | 4 | Je cherche le minimum de facturation | il est écrit dans le panneau où je règle mon colis |
 | 5 | Je compare le site et le téléphone | même ordre : le prix, puis la mention |
 | 6 | Je lis une carte | la ville ressort du pays sans effort |
+
+---
+
+# D100 — Un écran n'affirme rien qu'il n'applique (14/11/2026)
+
+## Le besoin
+
+Un Expéditeur décide à partir de ce que l'écran lui dit. Quand l'écran dit une chose et que le
+produit en fait une autre, il ne s'agit pas d'un défaut d'esthétique : **il prend sa décision sur
+une information fausse**, sans aucun moyen de s'en apercevoir. Quatre affirmations de ce type
+vivaient sur la page de résultats.
+
+Le cas le plus coûteux : un trajet du 15 novembre affiché **sous** un trajet du 18, sur une page
+dont le tri coché promettait l'ordre chronologique. L'Expéditeur pressé lit les premières lignes.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D100-1** | Le tri **coché** est le tri **appliqué**. Le paramètre est toujours transmis au serveur, jamais omis au motif qu'il serait « le défaut ». | Un défaut écrit des deux côtés d'un contrat finit par diverger : ici le serveur avait changé le sien et aucun des deux clients ne l'avait suivi. |
+| **RG-D100-2** | Tout tri appliqué par le serveur est **nommé** dans l'interface, et sélectionnable. | Un classement appliqué sans être nommé est impossible à retrouver une fois quitté. |
+| **RG-D100-3** | Le tri par défaut d'une page d'atterrissage est **la pertinence** (proximité + qualité, D80), et elle s'affiche sous son nom : « Les plus pertinents ». | C'est le meilleur classement pour découvrir l'offre ; il n'avait pas à emprunter le nom d'un autre. |
+| **RG-D100-4** | La mention sous un prix nomme le poids que ce prix **facture**, jamais un poids qui ne changerait pas le montant. | Sous le plancher de 2,3 kg (RG-D81), 1,5 kg et 2 kg coûtent la même chose : nommer 1,5 kg faisait passer un contrôle actif pour un contrôle inerte. |
+| **RG-D100-5** | Un compteur de vues ne s'affiche qu'à partir de **15 vues**, sur les deux fronts. | En dessous, le compteur publie l'impopularité de l'offre au lieu de la servir. Même doctrine que RG-D99 pour « Nouveau Voyageur ». |
+| **RG-D100-6** | Un filtre **sans résultat** s'efface (opacité 0,5) mais **reste activable**, sur les deux fronts. | À zéro, le filtre est le chemin de **sortie** de la recherche qui ne rend rien : le désactiver enferme. |
+| **RG-D100-7** | Un titre de section n'est rendu que si sa section l'est. | Un titre orphelin annonce un contenu absent, à l'œil comme au lecteur d'écran. |
+| **RG-D100-8** | Un panneau porte le nom de ce qu'il contient, pas d'une de ses parties. | « Trier par » coiffait le tri, la confiance, le poids et les familles. |
+| **RG-D100-9** | Un écran de chargement dessine la mise en page qui va **réellement** arriver. | Un squelette est une promesse : s'il montre l'ancienne carte, chaque résultat saute à l'arrivée des données. |
+
+## Ce que l'Expéditeur gagne, et ce qu'il perd
+
+**Il gagne** un ordre de résultats conforme à ce qu'il a demandé, un prix dont la mention
+correspond au montant, et des filtres qui ne l'enferment plus quand ils ne rendent rien.
+
+**Il perd** « Départ le plus tôt » comme tri par défaut : il lui faut désormais un geste pour
+l'obtenir. C'est assumé — ce n'était pas ce que la page faisait, et le prétendre était le défaut.
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'arrive sur « Tous les trajets disponibles » | le tri affiché est « Les plus pertinents », et c'est bien lui qui est appliqué |
+| 2 | Je choisis « Départ le plus tôt » | les trajets se réordonnent par date de départ croissante |
+| 3 | Je règle mon colis à 1,5 kg | la mention sous le prix nomme 2,3 kg — le poids que je paie |
+| 4 | Je règle mon colis à 5 kg | la mention nomme 5 kg, et le prix suit |
+| 5 | Un trajet n'a qu'une seule vue | aucun compteur n'apparaît |
+| 6 | Aucun trajet en train | l'onglet « Train 0 » s'efface mais reste cliquable, et je peux en revenir |
+| 7 | Aucune option de confiance n'a de résultat | le titre « Confiance et sécurité » disparaît avec sa section |
+| 8 | Un Voyageur n'a pas encore de note | son nom n'est suivi d'aucun séparateur |
+| 9 | La page charge | le squelette a la forme de la carte qui arrive |
