@@ -17875,3 +17875,112 @@ Un état inatteignable, porté par le code et par `CustomCheckbox`. Retiré.
 | `nx test @yamba-app/mobile` | **780 / 39 suites** (755 + 25) |
 | `node scripts/check-i18n-messages.mjs` | miroir parfait, 30 espaces de noms |
 | Serveur, trois ordres de tri | conformes au tableau ci-dessus |
+
+---
+
+# D101 — L'Expéditeur règle son colis sur le téléphone (`feat/colis-sur-le-telephone`, 14/11/2026)
+
+## Le constat, plus lourd que « un filtre manque »
+
+Retour de recette : « sur mobile dans le filtre, je n'ai pas le filtre ton colis par kilo ».
+L'instruction a montré que le manque allait jusqu'au transport.
+
+| Ce qu'on croyait | Ce que le code disait |
+|---|---|
+| Un filtre oublié dans la feuille | `SearchParams` du client mobile **n'a pas de champ `weightKg`** |
+| | `searchTrips` pose `estimateKg` **en dur** à 2 kg |
+| | `query.set('weightKg'` : **zéro occurrence** dans tout le mobile |
+
+Le téléphone ne pouvait donc **pas** émettre un poids, nulle part. Conséquence directe : depuis
+D99, sa carte affirme « estimation pour 2 kg » — une hypothèse que **rien dans l'application ne
+permettait de voir ni de changer**. C'est la maladie de D100 d'un cran plus bas : non plus un
+contrôle qui ment, mais une affirmation **sans contrôle du tout**.
+
+## 2A — Le contrôle est construit, pas emprunté
+
+Le réflexe serait de porter le `<input type="range">` du site. C'est le mauvais réflexe, et le
+dépôt l'a déjà tranché une fois : `search-calendar.tsx` a **abandonné** le `DatePicker` de
+`@expo/ui` (doctrine A207) pour construire sa grille.
+
+Le raisonnement, appliqué au poids :
+
+- le curseur du site est un **geste de souris**, précis au pixel sur un panneau toujours visible ;
+- le domaine compte **59 crans** (0,5 → 30 kg par pas de 0,5) ; sur une piste large d'un écran de
+  téléphone, cela fait **~8 px par cran** ;
+- surtout, l'Expéditeur **ne parcourt pas** un continuum : il **vise** un poids qu'il connaît à
+  peu près (une paire de chaussures ≈ 1 kg, un ordinateur ≈ 2 kg).
+
+D'où un **pas-à-pas** (boutons de 44 pt, la cible tactile du système) accompagné de **valeurs
+d'usage** (1, 2, 5, 10, 20 kg). Mêmes nombres que le site, mode de parcours natif. **Zéro
+dépendance nouvelle** : le dépôt n'a pas de bibliothèque de curseur et n'en prend pas une pour ça.
+
+## 2B — Le domaine devient une donnée, pas un attribut de balise
+
+Les bornes vivaient en dur dans le JSX :
+
+```tsx
+<input type="range" min={0.5} max={30} step={0.5} … />
+```
+
+Deux fronts ne peuvent pas s'accorder sur des nombres qu'aucun des deux ne nomme. Elles passent
+dans `parcel-weight.ts`, **dupliqué à l'octet près** — troisième fichier de ce genre après
+`pricing-example.ts` (D99) et `search-facets.ts` (D100 5A), pour la même raison : un `import`
+par-dessus la frontière d'un projet Nx est une dépendance de **build** (D93).
+
+```ts
+export const MIN_PARCEL_KG = 0.5;
+export const MAX_PARCEL_KG = 30;
+export const PARCEL_STEP_KG = 0.5;
+export const PARCEL_PRESETS_KG = [1, 2, 5, 10, 20] as const;
+```
+
+`clampParcelKg` referme le flottant à la précision du pas : `Math.round(x / 0.5) * 0.5` rouvre
+des `2.4000000000000004`, qui s'afficheraient tels quels dans la feuille.
+
+## 3A — Le poids choisi et le poids supposé ne partent jamais ensemble
+
+D99 3C avait séparé les deux pouvoirs. Le client les respecte :
+
+```ts
+if (typeof params.weightKg === 'number') {
+  query.set('weightKg', String(params.weightKg));   // filtre ET enrichit
+} else {
+  query.set('estimateKg', String(PRICING_EXAMPLE_PARAMS.exampleWeightKg)); // enrichit seulement
+}
+```
+
+Les cumuler retirerait des trajets d'une page intitulée « Tous les trajets disponibles ».
+
+## Un argument positionnel de trop
+
+`paramsFor` prenait **cinq positions** (deux `string`, une date, deux unions de chaînes) et était
+appelé depuis six endroits. Le poids en aurait fait une sixième : une inversion y serait passée
+sans bruit. La signature devient **nommée**. Un champ absent de l'objet garde son défaut, là où
+une position oubliée décale tout le reste.
+
+## Deux défauts corrigés en chemin
+
+- **Régression de D100, trouvée ici** : `const filtersActive = sort !== 'earliest'` — vrai **en
+  permanence** depuis que `relevance` est le défaut. Le point mangue annonçait un filtre posé sur
+  un écran vierge. Un indicateur toujours allumé n'est pas un indicateur.
+- **5A, côté site** : le poids était rendu par `toLocaleString("fr-FR")` **en dur**, donc
+  « 1,5 kg » jusque dans l'interface anglaise. Troisième occurrence du motif de D99 1A.
+
+## Ce que les fiches ont trouvé
+
+`typography.spec.ts`, qui existait déjà, est partie au **rouge** : `stepperNumber` était à
+**22/26 = 1,18** contre un plancher maison de **1,35**. Corrigé à 30.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **798 / 40 suites** (780 + 18) |
+| `nx typecheck @yamba-app/mobile` | propre (les deux programmes) |
+| `tsc --noEmit --project apps/user-ui` | propre |
+| i18n FR/EN | miroir parfait |
+| Bundle iOS | HTTP 200, **5,6 s**, contrôle présent |
+| Application sur simulateur | démarre et rend l'écran d'accueil |
+
+**Non vérifié** : la feuille de filtres elle-même n'a pas été ouverte — `simctl` ne sait pas
+toucher l'écran. La vérification visuelle du contrôle reste à faire à la main.
