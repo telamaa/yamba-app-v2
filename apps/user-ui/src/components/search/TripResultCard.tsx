@@ -1,5 +1,12 @@
 "use client";
-import { estimateShipperTotalCents } from "@/lib/pricing-example";
+import { formatAmountFromCents } from "@/lib/pricing-example";
+
+/**
+ * D99 3A — en dessous de ce seuil, la place restante devient une CONTRAINTE et
+ * mérite d'être dite ; au-dessus, c'est du décor. Un signal de rareté toujours
+ * présent n'est pas un signal.
+ */
+const LOW_CAPACITY_KG = 5;
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
@@ -181,6 +188,24 @@ export default function TripResultCard({
         .replace(/\u00a0/g, "")
     : null;
 
+  /**
+   * D99 3A/1A — ce que l'envoi coûte, pour le poids qui a servi au calcul.
+   *
+   * Le poids vient du DTO (`item.weightKg`), pas de la prop : le serveur y
+   * renvoie celui qu'il a utilisé — le poids CHOISI par l'Expéditeur, ou le
+   * colis SUPPOSÉ (`estimateKg`) quand il n'a encore rien choisi. La carte
+   * n'a donc pas à savoir lequel des deux c'était.
+   *
+   * La mise en forme passe par la règle PARTAGÉE : deux décimales, toujours.
+   * C'est elle qui manquait — le site arrondissait à l'euro là où le téléphone
+   * donnait les centimes, pour le même trajet et le même colis.
+   */
+  const poidsAffiche = typeof item.weightKg === "number" ? item.weightKg : null;
+  const totalPourLePoids =
+    poidsAffiche !== null && typeof item.totalForWeight === "number"
+      ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
+      : null;
+
   const hasPricesByCategory =
     !isPerKg && !!item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
 
@@ -192,6 +217,8 @@ export default function TripResultCard({
         border border-slate-200 bg-white
         shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]
         transition-all duration-200
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900] focus-visible:ring-offset-2
+        dark:focus-visible:ring-offset-slate-950
         hover:border-[#FF9900]/40
         hover:shadow-[0_4px_24px_rgba(255,153,0,0.1),0_2px_8px_rgba(255,153,0,0.06)]
         dark:border-slate-800/80 dark:bg-slate-900
@@ -200,8 +227,11 @@ export default function TripResultCard({
         dark:hover:shadow-[0_4px_24px_rgba(255,153,0,0.15)]
       "
     >
-      {/* ── Header: transport + date + capacité ── */}
-      <div className="flex min-h-[44px] items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+      {/* ── En-tête : transport + date + capacité ──
+          D99 4A — plus de bandeau peint ni de trait : la carte est UN objet
+          (et un seul `<Link>`), les groupes se lisent par la proximité et la
+          graisse. Le survol et le focus portent seuls le signal « cliquable ». */}
+      <div className="flex min-h-[44px] items-center gap-3 px-4 pt-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
           <TransportIcon mode={item.transportMode} />
           {transportLabel}
@@ -313,12 +343,24 @@ export default function TripResultCard({
             </button>
           ) : (
             <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {isPerKg ? t("card.perKg") : t("startingFrom")}
+              {totalPourLePoids !== null
+                ? t("card.totalForWeight", { kg: poidsAffiche as number })
+                : isPerKg
+                  ? t("card.perKg")
+                  : t("startingFrom")}
             </div>
           )}
 
+          {/* D99 3A — le GROS chiffre est ce que l'envoi coûte, pas le prix au
+              kilo. Le prix au kilo compare des offres entre elles ; le total
+              décide. Il passe donc en qualificatif, sous le total, et la ligne
+              d'exemple disparaît — on remplace, on n'ajoute pas. */}
           <div className="text-[22px] font-black leading-none tracking-tight text-slate-950 dark:text-white">
-            {isPerKg ? (
+            {totalPourLePoids !== null ? (
+              <>
+                {totalPourLePoids} {item.currency ?? "€"}
+              </>
+            ) : isPerKg ? (
               <>
                 {formattedPerKg} {item.currency ?? "€"}
                 <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">/kg</span>
@@ -329,7 +371,18 @@ export default function TripResultCard({
               </>
             )}
           </div>
-          {isPerKg && typeof item.remainingKg === "number" && (
+          {/* D99 3A (revu le 13/11 après revue d'écran) — DEUX lignes, pas quatre.
+              Le prix au KILO quitte la carte : il servait à comparer les offres,
+              mais toutes les cartes affichent désormais le total POUR LE MÊME
+              COLIS — les totaux se comparent directement, et extrapoler vers un
+              autre poids est le travail du curseur. Il reste sur la page du
+              trajet, où l'on étudie une offre en détail.
+              La CAPACITÉ restante ne s'affiche plus que quand elle CONTRAINT :
+              « 23 kg dispo » sous un colis de 2 kg est du décor, et un signal de
+              rareté toujours présent n'est pas un signal. Le mot « kg » voulait
+              dire trois choses différentes dans la même colonne (le poids du
+              colis, un prix unitaire, la place restante). */}
+          {isPerKg && typeof item.remainingKg === "number" && item.remainingKg <= LOW_CAPACITY_KG && (
             <div className="mt-1.5 text-[11px] font-semibold text-[#0F766E] dark:text-teal-400">
               {t("card.remainingKg", { kg: item.remainingKg })}
             </div>
@@ -340,21 +393,7 @@ export default function TripResultCard({
               {t("card.notEnoughKg")}
             </div>
           )}
-          {weightKg && typeof item.totalForWeight === "number" ? (
-            <div className="mt-2 border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-600 dark:border-slate-800 dark:text-slate-300">
-              {t("card.exampleForWeight", {
-                kg: weightKg,
-                price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }),
-              })}
-            </div>
-          ) : isPerKg && (
-            <div className="mt-2 border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-800 dark:text-slate-500">
-              {t("card.example", {
-                kg: 2,
-                price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),
-              })}
-            </div>
-          )}
+
 
           {hasPricesByCategory && (
             <TripPricingPopover
@@ -370,7 +409,7 @@ export default function TripResultCard({
       </div>
 
       {/* ── Footer: tripper + catégories + chevron ── */}
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3 px-4 pb-3">
         {/* Tripper info */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative h-8 w-8 shrink-0">
@@ -416,7 +455,14 @@ export default function TripResultCard({
               <span className="font-semibold text-slate-900 dark:text-white">
                 {travelerDisplayName}
               </span>
-              {typeof item.rating === "number" ? (
+              {/* D99 2A — « Nouveau Voyageur » ne s'affiche plus ici. C'était la
+                  branche `else` de « a une note » : sur une place de marché
+                  jeune, c'était TOUTES les cartes, et la seule information
+                  sociale de l'écran disait « aucun historique ». Un signal de
+                  confiance absent est neutre ; un signal NÉGATIF affiché par
+                  défaut travaille contre le produit. Ceux qui ONT une note
+                  gardent leur étoile — la différence se voit d'elle-même. */}
+              {typeof item.rating === "number" && (
                 <span className="inline-flex items-center gap-0.5 text-[11px]">
                   <Star
                     size={11}
@@ -431,10 +477,6 @@ export default function TripResultCard({
                       ({item.reviewCount})
                     </span>
                   )}
-                </span>
-              ) : (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                  {t("newTripper")}
                 </span>
               )}
             </div>
@@ -455,7 +497,7 @@ export default function TripResultCard({
                   </span>
                 )}
                 {item.verifiedTicket && (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
+                  <span className="inline-flex items-center gap-0.5 rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#0F766E] dark:bg-teal-950/40 dark:text-teal-400">
                     <Ticket size={9} strokeWidth={2.5} />
                     {t("badges.verifiedTicket")}
                   </span>

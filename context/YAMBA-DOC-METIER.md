@@ -8769,3 +8769,56 @@ indicateur discret à sa mesure ; la règle ci-dessus porte sur les boutons d'ac
 | 5 | Je clique une seconde fois pendant l'attente | rien ne part (le bouton est inactif) |
 | 6 | J'ai demandé « réduire les animations » dans mon système | les points sont là, immobiles |
 | 7 | Je demande un nouveau code depuis l'écran de saisie | le lien « Renvoyer le code » garde son indicateur discret |
+
+# D99 — Savoir ce qu'on va payer, d'un coup d'œil
+
+## Le besoin
+
+La page de résultats est l'écran où un Expéditeur compare. Pour comparer, il lui faut **un seul
+chiffre par offre**, exprimé dans l'unité de sa décision : ce que *son* colis va lui coûter.
+
+Elle affichait l'inverse : un prix au kilo en gros — une unité que personne n'envoie — et le
+total en plus petit, en gris, sous une accumulation de mentions. Pire, les deux applications
+n'annonçaient pas le même montant pour le même trajet.
+
+## Les règles
+
+**RG-D99-1 — Le prix affiché est le même partout, au centime près.** Site et téléphone, à la
+virgule et à la décimale près. Deux décimales toujours, jamais d'arrondi à l'euro : ce montant
+sera comparé au prix définitif à la réservation.
+
+**RG-D99-2 — Le gros chiffre d'une carte est ce que l'envoi coûte, tout compris**, pour un
+colis donné. Le prix au kilo sert à comparer des offres entre elles ; il n'a pas sa place en
+tête de carte, et reste consultable sur la page du trajet.
+
+**RG-D99-3 — Tant que l'Expéditeur n'a rien choisi, les prix sont calculés pour un colis de
+référence de 2 kg, et l'écran le dit.** Un contrôle qui affiche une valeur doit l'appliquer.
+
+**RG-D99-4 — Supposer un poids ne retire jamais un trajet de la liste.** Un poids *choisi*
+filtre (les trajets sans assez de place sortent) et trie ; un poids *supposé* ne fait
+qu'estimer. Une page qui annonce montrer tous les trajets les montre tous.
+
+**RG-D99-5 — La place restante ne s'affiche que lorsqu'elle contraint.** « 23 kg disponibles »
+pour un colis de 2 kg n'informe de rien : un signal de rareté toujours présent n'est plus un
+signal.
+
+**RG-D99-6 — Aucun Voyageur n'est étiqueté par ce qu'il n'a pas.** La liste de résultats ne
+porte pas de mention « Nouveau Voyageur » : celui qui a une note montre son étoile, la
+différence se voit d'elle-même. L'information reste disponible là où la question se pose —
+page du trajet, réservation, fiche membre.
+
+**RG-D99-7 — Une carte est un seul objet.** Pas de bandeaux ni de traits internes : les groupes
+se lisent par l'espace. Et l'état survolé ou sélectionné au clavier doit rester visible.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre la page sur le site, puis la même sur le téléphone | le même trajet affiche le même prix, au centime près |
+| 2 | Je regarde une carte | le plus gros chiffre est ce que l'envoi me coûte, et la ligne dessous dit pour quel colis |
+| 3 | Je n'ai touché à rien | les prix sont ceux d'un colis de 2 kg, et le panneau de gauche l'annonce |
+| 4 | Je règle mon colis à 10 kg | les prix suivent, et les trajets sans assez de place quittent la liste |
+| 5 | Je compare le nombre de trajets avant et après avoir touché le curseur | avant, aucun trajet n'a été retiré |
+| 6 | Un trajet n'a presque plus de place | la capacité restante s'affiche ; sinon elle reste masquée |
+| 7 | Un Voyageur n'a pas encore de note | rien n'est écrit à la place de son étoile |
+| 8 | Je parcours la page au clavier | la carte sélectionnée est visible sans ambiguïté |

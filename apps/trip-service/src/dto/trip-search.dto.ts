@@ -128,6 +128,15 @@ export const searchTripsQuerySchema = z.object({
   // D33 V2 — poids du colis de l'Expéditeur (kg) : prix par carte, tri et
   // exclusion des trajets sans assez de capacité
   weightKg: z.coerce.number().min(0.5).max(30).optional(),
+  // D99 3C — ESTIMER N'EST PAS FILTRER. `weightKg` fait les deux : il enrichit
+  // les cartes (prix pour ce poids) ET il exclut les trajets dont la capacité
+  // déclarée ne suffit pas. C'est juste pour un poids CHOISI par l'Expéditeur ;
+  // ce ne l'est plus pour le poids par DÉFAUT du flux d'atterrissage, qui
+  // retirerait silencieusement des trajets d'une page intitulée « Tous les
+  // trajets disponibles ». `estimateKg` n'a donc que la moitié du pouvoir :
+  // il enrichit, il ne filtre pas, il ne trie pas. Ignoré si `weightKg` est
+  // présent — un poids choisi l'emporte toujours sur un poids supposé.
+  estimateKg: z.coerce.number().min(0.5).max(30).optional(),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
 
   // Pagination cursor-based — le curseur est l'id du dernier trip de la page.

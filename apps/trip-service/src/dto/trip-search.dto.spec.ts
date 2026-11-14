@@ -90,3 +90,60 @@ describe("searchTripsQuerySchema — tri par défaut et ancrage (D80)", () => {
     expect(parse({ nearCountry: "FR" }).nearCountry).toBe("FR");
   });
 });
+
+/**
+ * D99 3C — ESTIMER N'EST PAS FILTRER.
+ *
+ * `weightKg` fait DEUX choses : il enrichit les cartes (prix pour ce poids) et
+ * il exclut les trajets dont la capacité déclarée ne suffit pas
+ * (`trip-search.controller.ts`, `buildBaseWhere`). C'est juste pour un poids
+ * CHOISI par l'Expéditeur. Ce ne l'est plus pour le poids par DÉFAUT du flux
+ * d'atterrissage : il retirerait silencieusement des trajets d'une page
+ * intitulée « Tous les trajets disponibles ».
+ *
+ * `estimateKg` n'a donc que la moitié du pouvoir. Ces fiches gardent la
+ * frontière — c'est elle, et non le champ, qui est la décision.
+ */
+describe("searchTripsQuerySchema — estimateKg estime, il ne filtre pas (D99 3C)", () => {
+  const parse = (query: Record<string, unknown>) => {
+    const r = searchTripsQuerySchema.safeParse({ locale: "fr", ...query });
+    if (!r.success) throw new Error(r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    return r.data;
+  };
+  const errorsOn = (query: Record<string, unknown>) => {
+    const r = searchTripsQuerySchema.safeParse({ locale: "fr", ...query });
+    return r.success ? [] : r.error.issues.map((i) => i.path.join("."));
+  };
+
+  it("est lu depuis la requête, comme une chaîne d'URL", () => {
+    // `z.coerce` : tout arrive en chaîne dans une query string.
+    expect(parse({ estimateKg: "2" }).estimateKg).toBe(2);
+    expect(parse({ estimateKg: "2.5" }).estimateKg).toBe(2.5);
+  });
+
+  it("absent par défaut — aucune estimation n'est imposée au serveur", () => {
+    expect(parse({}).estimateKg).toBeUndefined();
+  });
+
+  it("porte les MÊMES bornes que le poids choisi", () => {
+    // Un poids supposé hors bornes serait un défaut du client, pas une
+    // tolérance à accorder : 0,5 kg mini, 30 kg maxi des deux côtés.
+    expect(errorsOn({ estimateKg: "0.4" })).toContain("estimateKg");
+    expect(errorsOn({ estimateKg: "31" })).toContain("estimateKg");
+    expect(parse({ estimateKg: "0.5" }).estimateKg).toBe(0.5);
+    expect(parse({ estimateKg: "30" }).estimateKg).toBe(30);
+  });
+
+  it("cohabite avec weightKg — les deux champs existent séparément", () => {
+    // Le contrôleur fait `weightKg ?? estimateKg` pour les CHIFFRES et ne
+    // passe que `weightKg` au filtre de capacité et au tri par prix : un poids
+    // choisi l'emporte toujours sur un poids supposé.
+    const p = parse({ weightKg: "5", estimateKg: "2" });
+    expect(p.weightKg).toBe(5);
+    expect(p.estimateKg).toBe(2);
+  });
+
+  it("une valeur illisible est un 400, pas un silence", () => {
+    expect(errorsOn({ estimateKg: "deux kilos" })).toContain("estimateKg");
+  });
+});

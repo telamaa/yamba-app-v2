@@ -475,7 +475,15 @@ export default function SearchFiltersSidebar({
             style={{ accentColor: "#FF9900" }}
           />
           <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-            {weightKg ? t("filters.weightHintActive", { kg: weightKg }) : t("filters.weightHint")}
+            {/* D99 3B — le curseur affichait 2 kg (`weightKg ?? 2`) alors que
+                son état réel était `null` : rien n'était envoyé au serveur, et
+                la carte retombait sur un exemple à 2 kg codé en dur. Les deux
+                coïncidaient par hasard. Le poids par défaut est désormais
+                VRAIMENT appliqué (`estimateKg`), et la phrase dit ce que
+                l'état fait : estimer seulement, ou estimer ET filtrer. */}
+            {weightKg
+              ? t("filters.weightHintActive", { kg: weightKg })
+              : t("filters.weightHint", { kg: weightKg ?? 2 })}
           </p>
           <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
             {t("filters.lightParcel", { kg: BILLING_FLOOR_KG })}

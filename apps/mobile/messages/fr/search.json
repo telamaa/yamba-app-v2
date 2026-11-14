@@ -50,11 +50,10 @@
   "card": {
     "fromPrice": "dès",
     "remainingKg": "{kg} kg dispo",
-    "exampleParcel": "≈ {price} pour {kg} kg",
+    "totalForWeight": "pour {kg} kg, tout compris",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
     "remainingSlots": "{count, plural, one {# place} other {# places}}",
-    "newTripper": "Nouveau Voyageur",
     "popular": "Populaire",
     "favoriteAdd": "Ajouter aux favoris",
     "favoriteRemove": "Retirer des favoris",

@@ -2501,6 +2501,30 @@ package.json du mobile : ne pas lancer `npx expo start` nu).
   assumee. Corollaire : AUCUNE fiche n'epinglait l'indicateur d'attente avant
   ce jour, ce qui avait rendu la suppression de D95 invisible.
 
+- Page de RESULTATS (D99, `feat/carte-resultat-prix`) : revue d'ecran sur les
+  DEUX fronts. (1A) les deux apps n'annoncaient PAS le meme prix — « 25 € » sur
+  le site, « 24,85 € » sur le telephone — alors que le CALCUL etait partage :
+  TROIS mises en forme existaient et la regle nulle part. Elle vit desormais
+  dans `pricing-example.ts` (deux decimales toujours), le `formatCents` local
+  du natif est SUPPRIME, et une fiche compare les deux copies du fichier A
+  L'OCTET PRES. (2A) « Nouveau Voyageur » quitte la carte : c'etait la branche
+  `else` de « a une note », donc TOUTES les cartes. (3A) le gros chiffre devient
+  ce que l'envoi COUTE ; le prix au kilo quitte la carte (il ne servait qu'a
+  comparer, or tous les totaux valent pour le MEME colis) et la place restante
+  ne se dit qu'en dessous de 5 kg — « kg » voulait dire trois choses dans la
+  meme colonne. (3B) le curseur MENTAIT (`weightKg ?? 2` a l'affichage, `null`
+  dans l'etat). (3C) decision d'API : `estimateKg` enrichit SANS filtrer, parce
+  que `weightKg` filtre la capacite et aurait retire des trajets d'une page
+  intitulee « Tous les trajets disponibles ». (4A) la carte redevient UN objet
+  sur les TROIS variantes (les bandeaux ne portaient aucune affordance : la
+  carte entiere est un seul `<Link>`) + `focus-visible` explicite. (4B) le bleu
+  hors charte passe au teal. Mobile 711 -> 752, trip-service 409 -> 414.
+  RESTE OUVERT sur cette page : l'ancrage de prix (aucun repere ne dit si
+  24,85 € est cher — le plus fort levier de conversion restant), les filtres de
+  mode a 0 resultat, le titre « Confiance et securite » rendu sans condition
+  alors que son contenu est filtre a `count > 0`, et le bouton flottant BLEU du
+  mobile.
+
 RESTE dans cette passe :
 - ~~les QUATRE autres ecrans d'auth~~ : FAITS (D96 pour la connexion, D97 pour
   les trois ecrans du mot de passe oublie). `AuthScreen.badge` n'a plus AUCUN

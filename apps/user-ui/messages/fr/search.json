@@ -8,7 +8,6 @@
   "oneStopIn": "1 escale · {city}",
   "stopsCount": "{count, plural, =1 {# escale} other {# escales}}",
   "remainingSlots": "{count, plural, =1 {# place restante} other {# places restantes}}",
-  "newTripper": "Nouveau Voyageur",
   "moreCategoriesTooltip": "{count, plural, =1 {# autre catégorie} other {# autres catégories}}",
   "transportTabs": {
     "all": "Tout",
@@ -41,7 +40,7 @@
     "lowestPriceHint": "pour un colis de 2 kg",
     "yourParcel": "Ton colis",
     "weight": "Poids du colis",
-    "weightHint": "Indique le poids : chaque trajet affichera son prix pour ton colis.",
+    "weightHint": "Prix affichés pour un colis de {kg} kg. Indique le tien : les prix suivent, et les trajets sans assez de place sortent de la liste.",
     "weightHintActive": "Prix et tri calculés pour {kg} kg · trajets sans assez de place exclus",
     "lowestPriceHintWeight": "pour ton colis de {kg} kg",
     "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum."
@@ -63,12 +62,10 @@
     "remainingSlots": "{count, plural, one {# place} other {# places}}",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
-    "newTripper": "Nouveau Voyageur",
     "perKg": "prix au kilo",
+    "totalForWeight": "pour {kg} kg, tout compris",
     "remainingKg": "{kg} kg dispo",
-    "example": "ex. {kg} kg ≈ {price} € tout compris",
     "surcharge": "{family} : +{pct} %",
-    "exampleForWeight": "≈ {price} € tout compris pour {kg} kg",
     "notEnoughKg": "Plus assez de place"
   },
   "pricingSheet": {

@@ -255,6 +255,12 @@ export const searchTrips = async (
       );
     }
     const params = parsed.data;
+    // D99 3C — le poids qui sert aux CHIFFRES : celui que l'Expéditeur a CHOISI,
+    // sinon celui que le front SUPPOSE (`estimateKg`, le colis par défaut du flux
+    // d'atterrissage). Le filtrage de capacité et le tri par prix, eux, ne
+    // connaissent que `weightKg` : estimer n'est pas filtrer, et un poids supposé
+    // n'a pas à retirer des trajets d'une page qui annonce les montrer tous.
+    const enrichKg = params.weightKg ?? params.estimateKg;
 
     // Base : hard filters + filtres structurants
     let where = buildBaseWhere({
@@ -333,7 +339,7 @@ export const searchTrips = async (
       for (const r of page) {
         try {
           const dto = mapTripToYambaResult(r.trip as any, params.locale);
-          const enriched = params.weightKg ? enrichForWeight(dto, r.trip, params.weightKg, pricing) : dto;
+          const enriched = enrichKg ? enrichForWeight(dto, r.trip, enrichKg, pricing) : dto;
           enriched.ring = r.ring; // null sans ancrage — le front ne rend alors aucune section
           mapped.push(enriched);
         } catch (err) {
@@ -403,7 +409,7 @@ export const searchTrips = async (
     for (const t of trips) {
       try {
         const dto = mapTripToYambaResult(t as any, params.locale);
-        mapped.push(params.weightKg ? enrichForWeight(dto, t, params.weightKg, pricing) : dto);
+        mapped.push(enrichKg ? enrichForWeight(dto, t, enrichKg, pricing) : dto);
       } catch (err) {
         console.warn(
           `[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`

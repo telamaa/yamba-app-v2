@@ -3,6 +3,10 @@
 import { useTranslations, useLocale } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle, Eye } from "lucide-react";
 import { isPopular } from "@/lib/trip-signals";
+import { formatAmountFromCents } from "@/lib/pricing-example";
+
+/** D99 3A — même seuil que la carte large : en dessous, la place CONTRAINT. */
+const LOW_CAPACITY_KG = 5;
 import { Link } from "@/i18n/navigation";
 import FavoriteButton from "@/components/favorites/FavoriteButton";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
@@ -30,6 +34,18 @@ export default function YambaTripResultCardMobile({
   const locale = useLocale();
   const localeTag = locale === "fr" ? "fr-FR" : "en-US";
   const { isOpen, open, close } = useBottomSheet();
+
+  /**
+   * D99 3A/1A — ce que l'envoi coûte, pour le poids qui a servi au calcul.
+   * Le poids vient du DTO : le serveur y renvoie celui qu'il a utilisé, choisi
+   * par l'Expéditeur ou supposé (`estimateKg`). Même règle de mise en forme que
+   * partout — deux décimales, toujours.
+   */
+  const poidsAffiche = typeof item.weightKg === "number" ? item.weightKg : null;
+  const totalPourLePoids =
+    poidsAffiche !== null && typeof item.totalForWeight === "number"
+      ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
+      : null;
 
   const transportLabel = t(`transportTabs.${item.transportMode}`);
   const TransportIcon = getTransportIcon(item.transportMode);
@@ -59,7 +75,7 @@ export default function YambaTripResultCardMobile({
         "
       >
         {/* ── Header : transport + date + alerte ── */}
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
+        <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[12px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
               <TransportIcon size={12} strokeWidth={2} />
@@ -144,25 +160,36 @@ export default function YambaTripResultCardMobile({
             <div className="min-w-[50px] text-right">
               {typeof item.pricePerKg === "number" && item.pricePerKg > 0 ? (
                 <>
+                  {/* D99 3A — le gros chiffre est ce que l'envoi COÛTE ; le prix
+                      au kilo descend en qualificatif. Mêmes règles que la carte
+                      large, mot pour mot. */}
                   <div className="text-[9px] leading-none text-slate-400 dark:text-slate-500">
-                    {t("card.perKg")}
+                    {totalPourLePoids !== null
+                      ? t("card.totalForWeight", { kg: poidsAffiche as number })
+                      : t("card.perKg")}
                   </div>
-                  <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                    {item.pricePerKg.toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    {item.currency ?? "€"}
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">/kg</span>
-                  </div>
-                  {typeof item.remainingKg === "number" && (
+                  {/* D99 3A — deux lignes : le total, et pour quoi. Le prix au
+                      kilo quitte la carte (voir la carte large), et la place
+                      restante ne se dit que lorsqu'elle contraint. */}
+                  {totalPourLePoids !== null ? (
+                    <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
+                      {totalPourLePoids}
+                      {item.currency ?? "€"}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
+                      {item.pricePerKg.toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {item.currency ?? "€"}
+                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">/kg</span>
+                    </div>
+                  )}
+                  {typeof item.remainingKg === "number" && item.remainingKg <= LOW_CAPACITY_KG && (
                     <div className="text-[9px] font-medium text-[#0F766E] dark:text-teal-400">
                       {t("card.remainingKg", { kg: item.remainingKg })}
                     </div>
                   )}
                   <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} size="[9px]" />
-                  {weightKg && typeof item.totalForWeight === "number" && (
-                    <div className="mt-0.5 text-[9px] text-slate-600 dark:text-slate-300">
-                      {t("card.exampleForWeight", { kg: weightKg, price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }) })}
-                    </div>
-                  )}
+
                 </>
               ) : (
                 <>
@@ -190,7 +217,7 @@ export default function YambaTripResultCardMobile({
         </div>
 
         {/* ── Footer : tripper + catégories ── */}
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
+        <div className="mt-1.5 flex items-center justify-between gap-2 px-3.5 pb-2.5">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Avatar item={item} />
             <div className="min-w-0 flex-1">
@@ -199,7 +226,9 @@ export default function YambaTripResultCardMobile({
                 {item.travelerLastName?.charAt(0)}.
               </div>
               <div className="truncate text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                {typeof item.rating === "number" ? (
+                {/* D99 2A — plus de « Nouveau Voyageur » : c'était la branche
+                    `else` de « a une note », donc toutes les cartes. */}
+                {typeof item.rating === "number" && (
                   <>
                     <span className="text-[#FF9900]">★</span>{" "}
                     {item.rating.toFixed(1).replace(".", ",")}{" "}
@@ -208,10 +237,7 @@ export default function YambaTripResultCardMobile({
                         ({item.reviewCount})
                       </span>
                     )}
-
                   </>
-                ) : (
-                  t("card.newTripper")
                 )}
               </div>
             </div>

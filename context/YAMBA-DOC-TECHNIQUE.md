@@ -17506,3 +17506,150 @@ expect(css).toMatch(/translateY\(-4px\) scale\(1\.15\)/);
 Avant ce jour, **aucune fiche n'épinglait l'indicateur d'attente**, sur aucun des deux fronts.
 C'est pour cela que D95 avait pu supprimer la vague native du téléphone — posée un mois plus tôt
 — sans que rien ne le signale, et le retour en arrière serait passé tout aussi inaperçu.
+
+# D99 — La carte de résultat dit ce que l'envoi coûte
+
+*Revue d'écran de l'utilisateur, captures des deux fronts en main. Trois arbitrages rendus avant
+la première ligne, sous une contrainte explicite : « la page ne doit pas être surchargée ».*
+
+## ① Les deux applications n'annonçaient pas le même prix
+
+Même trajet, même colis de 2 kg : **« ≈ 25 € » sur le site, « ≈ 24,85 € » sur le téléphone**.
+Le calcul était pourtant partagé (`estimateShipperTotalCents`). Ce qui divergeait, c'était la
+mise en forme — et il y en avait **trois** :
+
+| Où | Ce qu'il faisait | Ce que ça donne |
+|---|---|---|
+| `TripResultCard.tsx:347` | `maximumFractionDigits: 0` | `25` |
+| `trip-result-card.tsx` (`formatCents` local) | `minimumFractionDigits: 0` | `25` pour un montant rond, `24,85` sinon |
+| nulle part | la règle | — |
+
+La règle vit désormais dans `pricing-example.ts`, **des deux côtés** :
+
+```ts
+export const PRICE_FRACTION_DIGITS = 2;
+
+export function formatAmountFromCents(cents: number, localeTag: string): string {
+  return (cents / 100).toLocaleString(localeTag, {
+    minimumFractionDigits: PRICE_FRACTION_DIGITS,
+    maximumFractionDigits: PRICE_FRACTION_DIGITS,
+  });
+}
+```
+
+Le `formatCents` local du natif est **supprimé**, pas corrigé : une deuxième implémentation
+d'une règle finit toujours par diverger.
+
+### Pourquoi le fichier reste en double, et comment on le tient
+
+`pricing-example.ts` existe en deux exemplaires, et c'est **volontaire** : le mobile ne doit pas
+tirer `@packages/pricing` dans un écran d'atterrissage. Une fiche existait déjà pour confronter
+la copie du téléphone au moteur partagé ; on en ajoute une seconde, qui compare **les deux
+fichiers entiers, à l'octet près**. Conséquence utile : comme la première fiche valide la copie
+du mobile contre le moteur, la copie du **site** se trouve couverte par transitivité — alors que
+`apps/user-ui` n'a toujours aucun harnais de tests. Une fiche, deux fronts.
+
+## ② « Nouveau Voyageur » quitte la carte
+
+```tsx
+{typeof item.rating === "number" ? (<Étoile … />) : (<span>{t("newTripper")}</span>)}
+```
+
+C'était la **branche `else` de « a une note »** : sur une place de marché jeune, c'est *toutes*
+les cartes — trois sur trois dans la capture. La seule information sociale de l'écran où l'on
+décide de confier un colis à un inconnu disait « aucun historique », répété à chaque ligne.
+
+Un signal de confiance absent est neutre ; un signal **négatif** affiché par défaut travaille
+contre le produit. La ligne garde l'avatar, le prénom et le chevron. Le libellé reste dans les
+écrans où la question se pose (fiche membre, page du trajet, réservation) et **sort des
+dictionnaires de la recherche**, des deux côtés.
+
+## ③ Le gros chiffre devient ce que l'envoi coûte
+
+Le prix au kilo compare des offres entre elles ; le **total** décide. Les deux échangent donc
+leur taille. Mais la première version empilait quatre lignes dans la colonne de droite, et la
+revue d'écran a tranché une seconde fois :
+
+| Avant (4 lignes) | Après (2 lignes) |
+|---|---|
+| `pour 2 kg, tout compris` | **`24,85 €`** |
+| **`9,50 €/kg`** | `pour 2 kg, tout compris` |
+| `≈ 24,85 € pour 2 kg` | — |
+| `23 kg dispo` | — *(sauf si la place manque)* |
+
+Deux raisons, et aucune n'est esthétique :
+
+- **Le mot « kg » désignait trois notions dans la même colonne** : le poids du colis (une
+  hypothèse), un prix unitaire, la capacité restante du trajet.
+- **Le prix au kilo est devenu inutile ici** : toutes les cartes affichent le total pour le
+  *même* colis, donc les totaux se comparent directement. Extrapoler vers un autre poids est le
+  travail du curseur. Il reste sur la page du trajet.
+- **Un signal de rareté toujours présent n'est pas un signal** : « 23 kg dispo » sous un colis
+  de 2 kg est du décor. La ligne n'apparaît plus qu'en dessous de `LOW_CAPACITY_KG = 5`, même
+  valeur sur les trois cartes.
+
+### ③ bis — le curseur mentait
+
+`SearchFiltersSidebar.tsx:463` et `:471` affichaient et positionnaient le curseur sur
+`weightKg ?? 2` alors que l'état réel était `null`. Aucun poids n'était envoyé, `totalForWeight`
+n'arrivait jamais, et la carte retombait sur un exemple à 2 kg **codé en dur**. Les deux
+coïncidaient par hasard — on poussait le curseur, et l'écran ne suivait pas. Le code connaissait
+pourtant la différence : il portait déjà deux phrases, `weightHint` et `weightHintActive`.
+
+## ④ Estimer n'est pas filtrer — la décision d'API
+
+`weightKg` ne fait pas qu'enrichir : il **filtre** (`trip-search.controller.ts:152`, les trajets
+dont la capacité déclarée est inférieure au poids sortent des résultats). Appliquer un poids par
+défaut aurait donc retiré silencieusement des trajets d'une page intitulée « Tous les trajets
+disponibles ». Les deux intentions sont séparées :
+
+```ts
+// D99 3C — le poids qui sert aux CHIFFRES ; le filtre et le tri ne connaissent que weightKg
+const enrichKg = params.weightKg ?? params.estimateKg;
+```
+
+| Paramètre | Enrichit | Filtre la capacité | Trie |
+|---|---|---|---|
+| `weightKg` (choisi) | oui | **oui** | **oui** |
+| `estimateKg` (supposé) | oui | non | non |
+
+Le calcul reste celui du **serveur**, seul à connaître les paramètres de plateforme
+(`weightPricingFromSettings`) : une estimation calculée côté client diverge le jour où un
+réglage change, et personne ne le verrait. La projection locale devient un simple repli.
+
+## ⑤ La carte redevient un seul objet
+
+La carte du site était découpée en **quatre** : en-tête (`border-b` + `bg-slate-50/50`), corps,
+ligne d'exemple (son propre `border-t`), pied (`border-t` + `bg-slate-50/50`). Or la carte
+entière est **un seul `<Link>`** : le pied n'est pas une zone cliquable distincte, le chevron
+est décoratif. **Les bandeaux ne portaient donc aucune affordance** — ils faisaient franchir une
+bordure entre le trajet et son prix, soit entre les deux informations qu'on veut comparer.
+
+Une surface, une bordure, un rayon ; les groupes se lisent par **proximité**. Deux conséquences
+traitées dans le même geste, parce que les bandeaux faisaient ce travail sans le dire :
+
+- le **survol et le focus** portent seuls le signal « cliquable » (`focus-visible:ring-2`
+  ajouté : il manquait, et un focus clavier invisible est un défaut d'accessibilité) ;
+- la **profondeur en thème sombre** repose sur la palette documentée (canevas `slate-950`,
+  carte `slate-900`) — à vérifier à l'œil, pas au raisonnement (leçon de D98).
+
+Le natif est aplati **dans le même lot** : laisser le site plat et le téléphone en trois bandes
+aurait recréé la dérive que ce dépôt paie à répétition. Et une pastille `bg-blue-50 /
+text-blue-700` passe au **teal** — la charte n'a que la mangue et le teal.
+
+## ⑥ Les fiches
+
+| Où | Quoi | Combien |
+|---|---|---|
+| `apps/mobile/src/lib/search-card-parite.spec.ts` | la carte, des deux côtés : une seule mise en forme, le badge parti, le total en tête, le seuil de rareté commun, l'estimation qui ne filtre pas, les bandeaux absents, le bleu sorti | **36** |
+| `apps/mobile/src/lib/pricing-example.spec.ts` | les deux copies à l'octet près + la mise en forme | **+8** |
+| `apps/trip-service/src/dto/trip-search.dto.spec.ts` | `estimateKg` : bornes, cohabitation avec `weightKg`, refus 400 | **+5** |
+
+Mobile **711 → 752** (37 suites), trip-service **409 → 414** (30 suites).
+
+La fiche la plus utile est celle qui compare les **chiffres** d'un front à l'autre :
+
+```ts
+const seuils = TOUTES_LES_CARTES.map(([, chemin]) => /LOW_CAPACITY_KG = (\d+)/.exec(lire(chemin))?.[1]);
+expect(new Set(seuils).size).toBe(1);
+```
