@@ -9173,3 +9173,108 @@ isEmptyFacet(compte, choisi) && styles.chipEmpty,
 
 C'est le rendement d'une extraction : il ne se mesure pas le jour où on la fait, mais le jour où
 quelqu'un d'autre n'a rien à décider.
+
+---
+
+# Chapitre 243 — Une dette d'outillage ne se voit pas, elle se déduit (A224)
+
+## 1. Pourquoi celle-ci a mis cinq lots à être traitée
+
+Personne n'a jamais signalé que le site n'avait pas de tests. **Ce qui manque ne produit aucun
+symptôme.** Pas d'erreur, pas de log, pas de page blanche — juste une CI verte qui ne regarde
+nulle part.
+
+Elle est apparue le 13/11, en cherchant où épingler une correction (D93). Puis elle a été rappelée
+à l'ouverture de **quatre lots consécutifs** sans jamais être traitée, parce qu'il y avait
+toujours un défaut plus visible à corriger.
+
+> **Le signal utile n'était pas un bug.** C'était la phrase « cette correction, je ne sais pas où
+> la garder », répétée cinq fois. Quand vous l'entendez — ou que vous l'écrivez — notez-la : c'est
+> une dette d'outillage qui se présente sous un déguisement.
+
+## 2. Comparer n'est pas tester
+
+Pendant quatre lots, les règles du site ont été « gardées » par des fiches du harnais **mobile** :
+
+```ts
+it('octet pour octet', () => {
+  expect(readFileSync(copieWeb)).toBe(readFileSync(copieMobile));
+});
+```
+
+C'est utile, et c'est assumé — c'est ce qui empêche deux fronts de diverger. Mais :
+
+| Ce que ça garantit | Ce que ça ne garantit pas |
+|---|---|
+| les deux fichiers sont identiques | la règle est **juste** |
+| une correction a traversé | la correction **fonctionne** |
+
+**Une règle fausse des deux côtés reste verte.** Une fiche de comportement, elle, dit :
+
+```ts
+expect(billedKg(1.5)).toBe(BILLING_FLOOR_KG);
+```
+
+Les deux sont nécessaires, et elles ne répondent pas à la même question.
+
+## 3. Le coût réel d'un harnais : zéro dépendance
+
+Le réflexe serait d'installer `@testing-library/react` et `jsdom`. On y gagnerait des tests de
+composants ; on y perdrait des dépendances, du temps de CI, et surtout **la discipline qui fait
+que les règles sortent des écrans**.
+
+La configuration complète tient en un fichier, parce que `jest@30`, `ts-jest` et `@types/jest`
+étaient déjà à la racine et que `@nx/jest/plugin` était déjà déclaré :
+
+```
+cibles AVANT : build, dev, start, …
+cibles APRÈS : build, dev, start, …, test     ← poser jest.config.ts a suffi
+```
+
+> **Avant de déclarer un chantier d'outillage « lourd », vérifiez ce qui est déjà installé.** Ici
+> le coût réel était de deux fichiers de configuration.
+
+## 4. Le trou dans le trou : une fiche non typée
+
+Nouveau harnais, fiches vertes… et **aucune n'était typée**.
+
+- `TypeScript (user-ui)` lance `tsc -p apps/user-ui`, dont le tsconfig **exclut** `*.spec.ts` ;
+- `TypeScript (fiches de test)` lance `nx run-many --target=typecheck --all` — et user-ui
+  **n'avait pas de cible `typecheck`**.
+
+Deux contrôles qui se croyaient complémentaires, et un angle mort entre les deux. C'est exactement
+le motif du 18/09, quand `nx typecheck auth-service` était à 53 erreurs pendant que la CI était
+verte.
+
+> **Quand vous ajoutez une catégorie de fichiers à un projet, demandez-vous quel contrôle la
+> regarde.** La réponse est souvent « aucun », et elle n'est jamais affichée.
+
+## 5. La fiche qui vise le mot, quatrième occurrence
+
+```ts
+expect(config).not.toContain('jsdom');   // ← rouge au premier tir
+```
+
+Elle butait sur **le commentaire** qui explique pourquoi jsdom n'est pas là. Un fichier bien écrit
+explique ce qu'il a cessé de faire — c'est une qualité, et elle casse toute assertion qui vise une
+chaîne de caractères.
+
+La version qui tient regarde la **réalité** plutôt que le texte :
+
+```ts
+const installes = Object.keys({ ...racine.dependencies, ...racine.devDependencies });
+expect(installes.filter((p) => p.includes('jsdom'))).toEqual([]);
+```
+
+> **On vise l'usage, jamais le mot.** Quatre fois en un mois : D98 (`ActivityIndicator`), D100
+> (`cursor-not-allowed`, qui a trouvé du code mort), D102 (les libellés), et celle-ci.
+
+## 6. Pour aller plus loin
+
+- Comptez les projets de votre dépôt qui n'ont **aucune cible de test**. Puis comptez leurs
+  lignes. Le rapport des deux est votre dette.
+- Les fiches écrites ici gardent des règles vieilles de deux jours. Le prochain geste utile est
+  d'en écrire pour les 30 fichiers purs restants de `src/lib` — en commençant par ceux qui
+  décident d'un **prix** ou d'un **accès**.
+- Un contrôle ajouté à `ci.yml` n'est pas requis tant qu'il n'est pas coché dans
+  `branches/dev/protection`. Trois le sont encore, et aucun code ne le corrigera.

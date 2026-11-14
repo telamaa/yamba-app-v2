@@ -18098,3 +18098,115 @@ Reconstruction complète de 54 s, et l'erreur disparaît.
 
 **Non vérifié, comme pour D101** : la feuille n'a pas été *ouverte* — `simctl` ne sait pas toucher
 l'écran.
+
+---
+
+# A224 — Le site entre au harnais de tests (`chore/a224-harnais-du-site`, 15/11/2026)
+
+## Le constat, mesuré
+
+`apps/user-ui` est la **plus grosse application du dépôt**. Elle n'avait :
+
+- aucune cible `test` ;
+- aucun `jest.config` ;
+- **zéro fiche**.
+
+Alors que `src/lib/` compte **35 fichiers purs et ~2 900 lignes** — aucun import de `react`,
+`next`, `axios`, `posthog` ni `@tanstack`. Mot pour mot le constat d'A223 pour le mobile, qui en
+avait 2 109.
+
+## Ce que l'absence coûtait, et c'est mesurable
+
+Les quatre lots des 14 et 15/11 (D99 → D102) ont posé l'essentiel de leurs corrections **côté
+site**. Aucune n'y était gardée directement : elles ne tenaient que par **ricochet**, depuis cinq
+fiches du harnais mobile qui lisent les fichiers du site au `readFileSync` et les comparent à
+l'octet près.
+
+> Ce dispositif garde l'**égalité** de deux fichiers. Il ne garde pas le **comportement** d'une
+> règle. Une règle fausse des deux côtés restait verte.
+
+C'est exactement la différence que ce lot comble.
+
+## La frontière, et pourquoi elle ne bouge pas
+
+Le harnais exécute la logique pure de `src/lib/`. Il **n'exécute pas** les composants.
+
+Rendre du React demanderait `@testing-library/react` + `jsdom` — des dépendances de plus sur un
+poste déjà contraint (16 Go ; la séance du 14/11 a fait swaper la machine avec la pile complète).
+
+> Le jour où un composant portera une règle qu'on veut tester, c'est **la règle** qu'il faudra
+> sortir, pas le harnais qu'il faudra grossir.
+
+Ce n'est pas une promesse : c'est déjà arrivé **trois fois**, et chaque fois pour le mieux —
+`lib/layout/tunnel.ts` (D93), `lib/search-facets.ts` (D100 5A), `lib/parcel-weight.ts` (D101 2B).
+
+## Zéro dépendance nouvelle
+
+`jest@30`, `ts-jest` et `@types/jest` sont déjà à la racine ; `@nx/jest/plugin` est déjà déclaré
+dans `nx.json`. **Poser `jest.config.ts` a suffi** à faire apparaître la cible :
+
+```
+cibles AVANT : build, build-deps, dev, serve-static, start, watch-deps
+cibles APRÈS : build, build-deps, dev, serve-static, start, test, watch-deps
+```
+
+## Le trou que personne n'avait vu : les fiches n'étaient pas typées
+
+Le job `TypeScript (user-ui)` lance `tsc --noEmit --project apps/user-ui`, dont le tsconfig
+**exclut** `src/**/*.spec.ts`. Et le job `TypeScript (fiches de test)` lance
+`nx run-many --target=typecheck --all` — or user-ui **n'avait pas de cible `typecheck`**.
+
+Les nouvelles fiches auraient donc été exécutées sans jamais être typées. Le site gagne la même
+cible double que le mobile :
+
+```json
+"typecheck": { "command": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json" }
+```
+
+Le job « fiches de test » passe de **10 à 11 projets**.
+
+## Le vingtième contrôle — et le rappel qui va avec
+
+Le job `Tests unitaires (user-ui)` entre dans `ci.yml`. **Il ne devient pas requis pour autant.**
+
+| Contrôle | Dans `ci.yml` | Requis |
+|---|---|---|
+| `TypeScript (fiches de test)` (18/09) | ✅ | ❌ |
+| `Tests unitaires (mobile)` (A223) | ✅ | ❌ |
+| `Tests unitaires (user-ui)` (A224) | ✅ | ❌ |
+
+**Trois des vingt contrôles sont consultatifs** tant que personne ne les coche dans
+`branches/dev/protection`. C'est un réglage de dépôt, pas une tâche de code — et c'est la
+troisième fois que l'oubli est consigné.
+
+## Les 35 premières fiches
+
+| Fichier | Nb | Ce qu'il garde |
+|---|---|---|
+| `alias.spec.ts` | 5 | la table de résolution existe en **trois** copies (tsconfig app, tsconfig spec, jest) |
+| `regles-de-recherche.spec.ts` | 24 | D99 → D102, gardées par leur **comportement** pour la première fois |
+| `regles-de-navigation.spec.ts` | 11 | le régime de tunnel (D93) et le garde-fou anti « open redirect » |
+
+## La première fiche est partie au rouge — en visant le mot
+
+```ts
+expect(config).not.toContain('jsdom');   // ← rouge
+```
+
+Elle butait sur le **commentaire** de `jest.config.ts` qui explique pourquoi jsdom n'y est pas.
+Quatrième fois en novembre que ce piège se referme. La fiche regarde désormais ce qui est
+réellement **installé** :
+
+```ts
+const installes = Object.keys({ ...racine.dependencies, ...racine.devDependencies });
+expect(installes.filter((p) => p.includes('jsdom'))).toEqual([]);
+```
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **35 / 3 suites** (0 avant) |
+| `nx typecheck user-ui` | propre (les **deux** programmes) |
+| `nx run-many --target=typecheck --all` | **11 projets**, tous verts |
+| `nx test @yamba-app/mobile` | 810 / 41 — inchangé |

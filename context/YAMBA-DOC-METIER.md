@@ -9009,3 +9009,49 @@ bascule**. Même règle, mêmes compteurs, mêmes noms — geste du support.
 | 6 | Aucun signal de confiance n'a de résultat | la section entière disparaît, titre compris |
 | 7 | Je pose un filtre quelconque | la pastille de filtres porte son point mangue |
 | 8 | Je compare un filtre au site | il porte exactement le même libellé |
+
+---
+
+# A224 — Le site entre au harnais de tests (15/11/2026)
+
+## Le besoin
+
+Ce lot ne change rien à ce que voit un membre. Il change ce que le dépôt **sait garantir**.
+
+Les règles qui décident de ce qu'un Expéditeur lit — le prix qu'on lui annonce, le poids qu'on lui
+facture, l'ordre des trajets, le filtre qui l'enferme ou non, la page où il atterrit après s'être
+connecté — vivaient sur le site **sans qu'aucun contrôle ne les exécute**. Elles n'étaient gardées
+qu'en comparant deux copies de fichiers entre elles : un dispositif qui garantit que les deux
+fronts disent **la même chose**, jamais qu'ils disent **la bonne**.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-1** | Toute règle métier du site vit dans `src/lib/`, sans import de framework, et porte des fiches. | Une règle qu'on veut garantir sort de l'écran. |
+| **RG-A224-2** | Une règle gardée seulement par comparaison entre deux fronts n'est **pas** gardée. | La comparaison protège l'égalité, pas la justesse. |
+| **RG-A224-3** | Une fiche vise l'**usage**, jamais le mot : on ne teste pas l'absence d'une chaîne dans un fichier qui pourrait l'expliquer en commentaire. | Payé quatre fois en novembre. |
+| **RG-A224-4** | Un contrôle ajouté à la CI n'est **pas** requis tant qu'il n'est pas coché dans les réglages du dépôt. | Trois des vingt le sont encore. |
+
+## Ce que cela protège, concrètement
+
+| Si quelqu'un casse… | Avant | Maintenant |
+|---|---|---|
+| le prix affiché sur une carte | silencieux | rouge |
+| le poids facturé sous le plancher | silencieux | rouge |
+| le seuil d'affichage des vues | silencieux | rouge |
+| le filtre à zéro qui enferme l'Expéditeur | silencieux | rouge |
+| les pages où le tunnel masque les sorties | silencieux | rouge |
+| le garde-fou qui empêche une redirection vers un site tiers | silencieux | rouge |
+
+Cette dernière ligne mérite d'être lue deux fois : c'est un garde-fou de sécurité, le genre de code
+qui ne casse jamais en développement et se découvre en production.
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | `nx test user-ui` | la cible existe et joue les fiches |
+| 2 | Une règle de `src/lib` est modifiée à tort | la CI passe au rouge |
+| 3 | Un alias est ajouté d'un seul côté | la fiche des alias part au rouge |
+| 4 | Un composant React est ajouté à une fiche | il n'est pas rendu — la frontière est assumée |
