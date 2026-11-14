@@ -17653,3 +17653,80 @@ La fiche la plus utile est celle qui compare les **chiffres** d'un front à l'au
 const seuils = TOUTES_LES_CARTES.map(([, chemin]) => /LOW_CAPACITY_KG = (\d+)/.exec(lire(chemin))?.[1]);
 expect(new Set(seuils).size).toBe(1);
 ```
+
+# D99 bis — La mention sous le prix disait un seuil
+
+*Revue d'écran du 14/11, trois heures après la fusion du lot. Les questions de l'utilisateur,
+mot pour mot : « qu'est-ce que le client doit comprendre de cette mention ? c'est le prix pour
+2 kilos ? on ne peut pas acheter moins de 2 kilos ? ».*
+
+## ① Une hypothèse écrite comme une contrainte
+
+« **pour 2 kg, tout compris** » se lit comme un seuil. Or 2 kg est le colis *par défaut*, que le
+curseur modifie — rien n'empêche d'envoyer 200 g.
+
+| Situation | Avant | Après |
+|---|---|---|
+| Poids supposé | `pour 2 kg, tout compris` | **`estimation pour 2 kg`** |
+| Poids choisi | *(idem)* | **`pour ton colis de 5 kg`** |
+
+« Estimation » nomme l'hypothèse ; « ton colis » nomme l'appropriation. Aucune des deux ne
+suggère un minimum d'achat.
+
+```tsx
+const poidsChoisi = typeof weightKg === "number";   // la prop, pas le DTO
+…
+{poidsChoisi
+  ? t("card.totalForMyWeight", { kg: poidsAffiche })
+  : t("card.totalForWeight", { kg: poidsAffiche })}
+```
+
+Le téléphone n'a pas de curseur de poids : il n'affiche donc que la variante « estimation », et
+la clé `totalForMyWeight` **n'entre pas dans son dictionnaire** — une chaîne sans appelant est
+une clé morte, et une fiche le vérifie.
+
+### Ce que la carte ne doit NI répéter NI contredire
+
+Le plancher de facturation existe bel et bien : **2,3 kg** (D81). Une enveloppe de 200 g est
+facturée comme 2,3 kg. Mais il est déjà expliqué dans le panneau de gauche, à l'endroit où l'on
+règle son colis (« Colis léger (enveloppe, passeport, lunettes…) : facturé 2,3 kg minimum »).
+La carte n'a pas à le redire ; elle doit seulement ne pas laisser croire à un minimum d'achat,
+ce que l'ancienne formulation faisait.
+
+« tout compris » sort aussi de la carte : il est réaffirmé au tunnel et sur la page du trajet,
+et **une ligne qui en remplace quatre doit répondre à une seule question**.
+
+## ② Deux fronts corrigés dans la même passe avaient quand même divergé
+
+Le téléphone affichait le prix **puis** la mention ; le site affichait la mention **puis** le
+prix. L'écart vient d'un héritage : tant que le gros chiffre était le prix au kilo, il fallait
+l'annoncer avant de le lire (`prix au kilo` / `9,50 €/kg`). Une fois le **total** promu, l'ordre
+naturel s'inverse — on lit le chiffre, puis pour quoi.
+
+> **Leçon** : deux fronts corrigés dans le même lot divergent quand même, si l'un conserve une
+> structure que l'autre n'a jamais eue. La fiche de parité comparait les règles (quelle clé,
+> quel seuil, quelle mise en forme) — pas l'**ordre**. Elle le compare désormais.
+
+## ③ Le pays pesait autant que la ville
+
+```tsx
+// avant — 15 px pour les deux, seule la couleur changeait
+{item.toCity}<span className="font-normal text-slate-400">, {toCountry}</span>
+// après
+<span className="text-[12px] font-normal text-slate-400">, {toCountry}</span>
+```
+
+Une hiérarchie qui ne joue que sur la couleur n'en est pas une : à taille égale, l'œil pèse les
+deux informations pareil. C'est le même défaut que D91 5A avait mesuré sur l'inscription (« la
+page n'avait aucune graisse sous 600 — rien ne reculait, donc tout criait »).
+
+## ④ Les fiches
+
+Mobile **752 → 755**. Trois ajouts, tous nés de cette revue :
+
+| Fiche | Ce qu'elle garde |
+|---|---|
+| `la mention annonce une estimation, pas un minimum` | la clé contient « estimation » et plus « tout compris » |
+| `le site distingue le colis SUPPOSÉ du colis CHOISI` | deux chaînes différentes, et les deux cartes du site les appellent |
+| `le téléphone ne porte pas la variante qu'il n'utilise pas` | aucune clé morte |
+| `le libellé se lit SOUS le prix, des deux côtés` | l'ordre, que la fiche de parité ne comparait pas |
