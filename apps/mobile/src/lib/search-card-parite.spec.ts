@@ -136,15 +136,54 @@ describe('D99 3A — le gros chiffre est ce que l’envoi coûte', () => {
     expect(new Set(seuils).size).toBe(1);
   });
 
-  it('le libellé du total dit les deux choses qu’il doit dire', () => {
-    // Pour QUEL colis, et qu'il n'y a rien à ajouter ensuite. Le mot « kg » ne
-    // doit plus désigner trois notions différentes dans la même colonne.
+  /**
+   * La mention sous le prix dit une HYPOTHÈSE, jamais un seuil. Première
+   * écriture : « pour 2 kg, tout compris » — lue par l'utilisateur comme une
+   * contrainte (« il faut 2 kg ? on ne peut pas envoyer moins ? ») alors que
+   * c'est le colis par défaut, que le curseur modifie. Le plancher de
+   * FACTURATION existe bien (2,3 kg, D81) mais il est expliqué dans le panneau
+   * de gauche : la carte ne doit ni le répéter, ni laisser croire à un
+   * minimum d'achat.
+   */
+  it('la mention annonce une estimation, pas un minimum', () => {
     for (const front of [WEB, MOBILE]) {
       const fr = JSON.parse(readFileSync(join(front, 'messages/fr/search.json'), 'utf8')) as {
         card: Record<string, string>;
       };
       expect(fr.card.totalForWeight).toContain('{kg}');
-      expect(fr.card.totalForWeight).toContain('tout compris');
+      expect(fr.card.totalForWeight).toContain('estimation');
+      // « tout compris » est réaffirmé au tunnel et sur la page du trajet : la
+      // ligne de la carte répond à UNE question, pour quel colis.
+      expect(fr.card.totalForWeight).not.toContain('tout compris');
+    }
+  });
+
+  it('le site distingue le colis SUPPOSÉ du colis CHOISI', () => {
+    const fr = JSON.parse(readFileSync(join(WEB, 'messages/fr/search.json'), 'utf8')) as {
+      card: Record<string, string>;
+    };
+    expect(fr.card.totalForMyWeight).toContain('ton colis');
+    expect(fr.card.totalForWeight).not.toBe(fr.card.totalForMyWeight);
+    expect(lire(CARTE_WEB)).toContain('card.totalForMyWeight');
+    expect(lire(CARTE_WEB_MOBILE)).toContain('card.totalForMyWeight');
+  });
+
+  it('le téléphone ne porte pas la variante qu’il n’utilise pas', () => {
+    // Il n'a pas de curseur de poids : « pour ton colis » y serait une clé
+    // morte. On ne garde une chaîne que là où elle a un appelant.
+    const fr = JSON.parse(readFileSync(join(MOBILE, 'messages/fr/search.json'), 'utf8')) as {
+      card: Record<string, string>;
+    };
+    expect(fr.card.totalForMyWeight).toBeUndefined();
+  });
+
+  it('le libellé se lit SOUS le prix, des deux côtés', () => {
+    // Le téléphone l'a toujours fait ; le site mettait la mention au-dessus.
+    for (const chemin of [CARTE_WEB, CARTE_WEB_MOBILE, CARTE_NATIVE]) {
+      const source = lire(chemin);
+      const prix = source.indexOf('totalPourLePoids !== null ? (');
+      const mention = source.indexOf('card.totalFor', prix > 0 ? prix : 0);
+      expect(mention).toBeGreaterThan(0);
     }
   });
 });
