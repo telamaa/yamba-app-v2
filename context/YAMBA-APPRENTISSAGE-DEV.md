@@ -9752,3 +9752,109 @@ Et `jest.useFakeTimers().setSystemTime()` suffit — aucune dépendance, aucune 
   Demandez-vous ce qui y tombe quand l'entrée est `NaN`, `null`, `undefined` ou une chaîne vide.
 - `Number.isNaN(x)` et non `isNaN(x)` : le second convertit son argument, donc `isNaN("abc")` vaut
   `true` — ce qui est juste ici par accident, et faux dès qu'on lui passe autre chose qu'une date.
+
+---
+
+# Chapitre 249 — Que vaut la valeur VIDE de votre état ? (D106)
+
+## 1. Trois mécanismes justes qui produisent un défaut
+
+| | Mécanisme | Fautif isolément ? |
+|---|---|---|
+| ① | les résultats dans un `useState` local | non |
+| ② | la recherche d'atterrissage derrière un drapeau une-fois | non, et c'est documenté |
+| ③ | une recherche large ne pose ni ville ni date | non, c'est sa définition |
+
+Aucune revue de l'un des trois ne produit le diagnostic. C'est la **troisième fois en deux jours**
+que ce dépôt rencontre cette forme (D104 : le retour derrière la porte ; D105 : quatre flèches
+défendables isolément). Il y a une méthode à en tirer :
+
+> **Quand un défaut résiste à la relecture, cessez de lire les fichiers et décrivez le CHEMIN.**
+> « L'utilisateur a fait A, puis B, et obtient C » — puis demandez-vous, pour chaque étape, quel
+> état survit et lequel meurt.
+
+## 2. Le concept : la valeur vide dit deux choses
+
+Le brouillon de recherche est persistant, et il survit parfaitement. Mais il ne représente qu'une
+recherche **qualifiée** — une ville, une date.
+
+Une recherche large est l'**absence** de critères. Dans ce modèle, elle est donc indistinguable
+de « l'utilisateur n'a rien demandé ».
+
+```
+brouillon vide  ⟶  « rien ne s'est passé »        ← ce que le code comprenait
+brouillon vide  ⟶  « il a demandé TOUT voir »     ← ce que l'utilisateur avait fait
+```
+
+> **Quand vous persistez un état, demandez-vous ce que vaut sa valeur VIDE.** Si elle peut
+> signifier deux choses opposées, il vous manque un bit : une intention, un drapeau, un
+> horodatage.
+
+C'est le même piège que `null` contre « champ absent » que ce dépôt a payé six fois côté Prisma —
+transposé à l'état d'un écran.
+
+## 3. Mémoriser l'intention, jamais le résultat
+
+```ts
+export type LastSearchIntent = { from?, to?, dateFrom?, dateTo?, mode, sort, weightKg?, … };
+```
+
+Deux raisons, et la seconde est la plus forte :
+
+1. des résultats mémorisés seraient **périmés** — un trajet peut avoir été réservé entre-temps ;
+2. le serveur est le **seul** à connaître les paramètres de plateforme, les prix, les capacités.
+   C'est exactement la doctrine de D99 3C (« les totaux du serveur l'emportent sur la projection
+   du client »), appliquée à la restauration d'état.
+
+Rejouer coûte une requête ; restaurer coûte un mensonge.
+
+## 4. Les gardes valent la règle
+
+```ts
+return intent !== null && etat === 'idle';
+```
+
+Le `etat === 'idle'` n'est pas une précaution : sans lui, le rejeu repasserait par-dessus des
+résultats affichés et rouvrirait **le clignotement du 11/10** que `keepResults` avait corrigé. Une
+correction qui rouvre un ancien défaut n'est pas une correction.
+
+Et l'**ordre** compte autant : le rejeu vient après le drapeau d'atterrissage, qui a sa propre
+raison d'être. Une fiche vérifie cet ordre **dans le fichier** :
+
+```ts
+expect(ecran.indexOf('shouldReplayLastSearch(')).toBeGreaterThan(
+  ecran.indexOf('consumeBrowseOnLanding()')
+);
+```
+
+> Quand deux déclencheurs peuvent se marcher dessus, épinglez leur **ordre**, pas seulement leur
+> présence.
+
+## 5. Le piège du script qui mute en mémoire
+
+Hors sujet produit, mais payé dans ce lot : un script d'édition qui applique un remplacement **en
+mémoire**, puis lève sur une assertion **suivante**, et n'écrit jamais le fichier.
+
+```python
+s = s.replace(old, new)        # ✅ appliqué… en mémoire
+m = re.search(ancre, s)
+assert m, "ancre"              # ❌ lève ici
+f.write_text(s)                # ← jamais atteint
+```
+
+Le correctif de `signOut` a ainsi disparu silencieusement, et c'est **une fiche** qui l'a
+rattrapé — celle qui lit le corps de `signOut` au lieu de faire confiance au fait que l'édition a
+« marché ».
+
+> **Validez tout AVANT de muter, ou écrivez après chaque mutation.** Et quand une fiche vérifie
+> qu'un appel existe bien dans un autre module, elle ne fait pas que documenter : elle rattrape
+> les éditions perdues.
+
+## 6. Ce que ce lot ne résout pas, et le dire
+
+**Pourquoi l'écran se remonte-t-il ?** La cause n'est pas établie. Le correctif vaut quelle que
+soit la réponse, mais si le remontage arrive à chaque aller-retour, c'est une requête réseau de
+plus à chaque fois — un coût invisible en Wi-Fi, bien réel en 3G à Brazzaville.
+
+> Réparer une conséquence sans avoir trouvé la cause est parfois le bon choix ; le dire dans
+> l'entrée du registre est obligatoire.

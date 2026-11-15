@@ -9194,3 +9194,32 @@ Il peut dire non. Toucher « Profil » par curiosité cesse d'être un aller sim
 | 2 | Le serveur envoie un nom en minuscules | la pastille met en capitale |
 | 3 | Une alerte a une date d'expiration abîmée | aucun délai n'est affiché, pas « NaN » |
 | 4 | Je crée une alerte « 3 mois » le 30 novembre | elle se rouvre sur « 3 mois » |
+
+---
+
+# D106 — Revenir ne doit pas tout effacer (15/11/2026)
+
+## Le besoin
+
+Un Expéditeur parcourt les trajets, ouvre une fiche, revient — et retrouve une page vierge. Il
+doit tout recommencer, sans comprendre ce qu'il a fait de travers.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D106-1** | Revenir sur l'accueil pendant une session rend les résultats qu'on y avait, filtres compris. | Un retour n'est pas une remise à zéro. |
+| **RG-D106-2** | Ce sont les **critères** qui sont mémorisés, jamais les résultats. | Le serveur seul sait ce qui est encore publié ; des résultats gardés seraient périmés. |
+| **RG-D106-3** | Une recherche **large** (« montre-moi tout ») est mémorisée au même titre qu'une recherche ciblée. | C'est la plus fréquente, et c'était justement la seule qu'on perdait. |
+| **RG-D106-4** | La mémoire s'efface à la **déconnexion**. | Un corridor et des filtres de confiance disent quelque chose de celui qui partait. |
+| **RG-D106-5** | Un lancement à froid repart de l'accueil. | La mémoire vaut pour la session, pas au-delà. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Je parcours les trajets, j'ouvre une fiche, je reviens | mes résultats sont là |
+| 2 | J'avais posé un poids et un filtre de confiance | ils sont toujours posés |
+| 3 | Je me déconnecte | l'accueil repart vierge |
+| 4 | Je ferme l'app et la rouvre | l'accueil repart vierge |
+| 5 | Mes résultats sont affichés et je navigue dans l'onglet | rien ne clignote, aucune requête inutile |

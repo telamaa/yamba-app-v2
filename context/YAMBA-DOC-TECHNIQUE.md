@@ -18627,3 +18627,92 @@ intuition.
 ## Reste
 
 **25 fichiers purs** de `src/lib` sans fiches.
+
+---
+
+# D106 — Revenir ne doit pas tout effacer (`fix/retour-aux-resultats`, 15/11/2026)
+
+Retour de recette : « certains retours me renvoient vers cette page qui n'est pas conforme ».
+L'accueil **au repos** — pastille « Partout · Toutes les dates », page vierge — alors que
+l'Expéditeur avait des résultats à l'écran.
+
+## Trois mécanismes justes, un défaut
+
+| | Mécanisme | Fautif ? |
+|---|---|---|
+| ① | les résultats vivent dans un `useState` **local** de l'écran | non, c'est normal pour une liste |
+| ② | la recherche large d'atterrissage part d'un drapeau **une-fois**, consommé au premier montage | non, c'est **voulu** — son commentaire le dit |
+| ③ | une recherche large **ne pose ni ville ni date**, donc le brouillon persistant reste vide | non, c'est la définition d'une recherche large |
+
+**Les trois réunis : rien, nulle part, ne gardait la trace qu'une recherche avait eu lieu.**
+
+Le commentaire du drapeau est explicite, et il a raison dans son périmètre :
+
+> « Drapeau une-fois : l'onglet Rechercher lance la recherche large À L'ARRIVÉE seulement — il
+> garde son état au repos le reste de la session. »
+
+## La leçon, et elle dépasse ce lot
+
+Le brouillon de recherche a été conçu pour survivre, **et il survit**. Mais il ne sait représenter
+qu'une recherche **qualifiée** : une ville, une date. La recherche la plus fréquente du produit —
+« montre-moi tout » — n'a **aucune forme** dans ce modèle : elle est l'absence de critères, donc
+indistinguable de « rien ne s'est passé ».
+
+> **Quand vous persistez un état, demandez-vous ce que vaut sa valeur VIDE.** Ici, elle voulait
+> dire deux choses opposées : « l'utilisateur n'a rien demandé » et « l'utilisateur a tout
+> demandé ».
+
+## On garde l'intention, pas les résultats
+
+```ts
+export function rememberLastSearch(intent: LastSearchIntent): void
+export function readLastSearch(): LastSearchIntent | null
+export function forgetLastSearch(): void
+```
+
+Des résultats mémorisés seraient **périmés** : le serveur est le seul à savoir ce qui est encore
+publié. L'écran rejoue l'**intention** au montage ; le serveur répond à jour.
+
+Mémoire de **processus**, comme `welcome-state.ts` et pour la même raison : un lancement à froid
+doit repartir de l'accueil. Ce qu'on répare, c'est la session en cours. Une fiche vérifie
+d'ailleurs qu'aucun stockage persistant n'apparaît — si c'était le cas un jour, ce serait une
+décision, pas un détail.
+
+## Deux gardes qui comptent autant que la règle
+
+```ts
+export function shouldReplayLastSearch(intent, etat): boolean {
+  return intent !== null && etat === 'idle';
+}
+```
+
+- **`etat === 'idle'`** : rejouer par-dessus des résultats déjà affichés rouvrirait le
+  clignotement du 11/10, que `keepResults` avait justement corrigé.
+- **l'ordre** : le rejeu vient **après** le drapeau d'atterrissage, qui a sa propre raison d'être
+  (motif Airbnb) et ne doit pas être doublé. Une fiche vérifie cet ordre dans le fichier.
+
+## La mémoire s'efface avec la session
+
+`signOut` appelle `forgetLastSearch()` : une recherche porte un corridor et des filtres de
+confiance qui disent quelque chose de celui qui partait, et n'ont pas à s'afficher au visiteur
+suivant sur le même téléphone.
+
+La fiche le vérifie en lisant le **corps** de `signOut` — c'est une composition entre deux modules,
+et aucun des deux ne la porte seul. Même forme que la fiche de D104.
+
+## Ce que ce lot ne fait PAS, et c'est la vraie question
+
+**Pourquoi l'écran se remonte-t-il ?** Un changement de session, un passage par l'écran de
+bienvenue, ou une bascule d'onglet qui démonte — je ne l'ai pas établi.
+
+Le correctif vaut **quelle que soit** la cause, mais la cause mérite d'être trouvée : si l'écran
+se remonte à chaque aller-retour, c'est une requête réseau de plus à chaque fois.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **855 / 44 suites** (842 + 13, sur cette branche) |
+| `nx test user-ui` | 139 / 8 — inchangé |
+| `nx typecheck @yamba-app/mobile` | propre |
+| i18n FR/EN | miroir parfait |
