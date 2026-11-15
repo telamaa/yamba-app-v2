@@ -50,8 +50,14 @@ function ProfileContent() {
 }
 
 export default function ProfileScreen() {
+  // D104 1A — la sortie se passe à la PORTE, pas seulement au contenu.
+  // Le retour de `ProfileContent` ci-dessus est juste, et il était placé du
+  // mauvais côté de la condition : un visiteur non connecté voit la porte,
+  // jamais le contenu — donc jamais le bouton. Profil est le seul des cinq
+  // écrans gardés à être POUSSÉ au-dessus des onglets (A210) : les quatre
+  // autres gardent la barre, qui leur sert de sortie. Lui n'avait plus rien.
   return (
-    <IdentityGate destination="profile">
+    <IdentityGate destination="profile" onDismiss={() => router.back()}>
       <ProfileContent />
     </IdentityGate>
   );
