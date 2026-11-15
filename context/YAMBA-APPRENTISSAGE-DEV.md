@@ -9402,3 +9402,132 @@ est partie au rouge pour rien, et le temps passé à comprendre pourquoi n'a rie
 
 > **Une assertion directe bat une assertion maligne.** `expect(fichier).toMatch(/type=\{filled \?/)`
 > dit la même chose, ne se trompe pas de cible, et se lit sans effort dans six mois.
+
+---
+
+# Chapitre 245 — Tester des valeurs, ou tester des propriétés (A224 lot 2)
+
+## 1. Le piège : figer ce qui doit bouger
+
+`pricing-corridors.ts` porte une matrice de prix au kilo, et son en-tête est explicite :
+
+```
+⚠️ Les valeurs sont des HYPOTHÈSES de marché (étude GP à mener, D15)
+```
+
+La fiche naïve écrirait :
+
+```ts
+expect(corridorBasePerKg("FR", "CD").base).toBe(12.5);   // ← à ne pas faire
+```
+
+Elle serait verte aujourd'hui et **nuisible demain** : le jour de l'étude de marché, elle partirait
+au rouge sans rien avoir trouvé, et quelqu'un la mettrait à jour mécaniquement. Une fiche qui se
+corrige par recopie du résultat ne protège plus rien.
+
+> **Quand les valeurs sont provisoires, testez les PROPRIÉTÉS qui doivent survivre à tout
+> réglage.**
+
+Ici :
+
+```ts
+// la symétrie : un corridor n'a pas de sens
+expect(corridorBasePerKg("FR","CD").base).toBe(corridorBasePerKg("CD","FR").base);
+
+// les bornes : un trajet intérieur reste entre 3 et 6
+expect(base).toBeGreaterThanOrEqual(3);
+
+// le pivot : à 5 000 km, la distance ne corrige rien
+expect(corridorBasePerKg("FR","CD",5000).base).toBe(corridorBasePerKg("FR","CD").base);
+```
+
+Ces trois-là restent vraies quelles que soient les valeurs retenues, et chacune interdit un vrai
+défaut.
+
+## 2. Le balayage qui trouve les trous
+
+La fiche la plus utile du module ne teste aucun cas particulier :
+
+```ts
+const pays = ["FR","RU","MA","SN","CD","KE","AE","IN","CN","TH","KZ","US","BR","GP","AU","ZZ"];
+for (const a of pays) for (const b of pays) {
+  const { base } = corridorBasePerKg(a, b);
+  expect(Number.isFinite(base)).toBe(true);
+  expect(base).toBeGreaterThan(0);
+}
+```
+
+256 combinaisons, une assertion minimale. Pourquoi ça vaut le coup : la matrice a des **trous
+volontaires** (`BASE_PAIRS` ne couvre pas toutes les paires), et ce qui doit tenir partout est le
+**repli**. Un cas particulier bien choisi n'aurait jamais trouvé le trou d'en face.
+
+> **Pour une fonction totale (toute entrée a une sortie), balayez le domaine avec une assertion
+> faible.** C'est moins satisfaisant à écrire qu'un cas précis, et ça trouve davantage.
+
+## 3. L'environnement de test comme cas d'usage réel
+
+Le harnais du site tourne en `node` : il n'y a **pas** de `localStorage`.
+
+C'est généralement vu comme une gêne à contourner. Ici c'est l'inverse : **l'absence de stockage
+est un vrai cas d'usage** — navigation privée, stockage bloqué par une extension, quota plein.
+
+```ts
+it("pas de stockage ⇒ pas de consentement présumé", () => {
+  expect(readConsent()).not.toBe("granted");
+});
+```
+
+Le défaut qu'on ne veut jamais est précis : un **échec de lecture** interprété comme « il avait
+accepté ». Le silence vaut refus.
+
+Et quand il faut vraiment un stockage, on le pose en douze lignes, sans dépendance :
+
+```ts
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: { getItem: (k) => memoire.get(k) ?? null, setItem: (k, v) => void memoire.set(k, v), removeItem: (k) => void memoire.delete(k) },
+});
+```
+
+> **Avant d'installer `jsdom` pour un `localStorage`, demandez-vous si l'absence n'est pas le cas
+> le plus intéressant à tester.**
+
+## 4. Tester ce que le code NE fait pas
+
+Deux fiches de ce lot n'appellent aucune fonction : elles lisent le fichier source.
+
+```ts
+expect(source).toContain('import("posthog-js")');     // import DYNAMIQUE
+expect(source).not.toMatch(/^import .*posthog/m);     // jamais statique
+```
+
+C'est un test de **structure**, pas de comportement, et il est justifié parce que la promesse
+porte sur la structure : un import statique charge le paquet tiers pour tout visiteur, **y compris
+celui qui refuse**, avant même que la question soit posée. Aucun test de comportement ne peut
+observer ça.
+
+> **Quand une garantie porte sur ce qui ne doit PAS arriver avant une décision de l'utilisateur,
+> la fiche regarde le code, pas le résultat.**
+
+## 5. Le défaut que seul le typecheck des fiches pouvait voir
+
+```ts
+otpCodeMessage(true, "OTP_LOCKED")   // la fonction prend le DÉTAIL complet
+```
+
+**Jest est resté vert.** La fonction retombait sur son cas par défaut, qui rend une phrase non
+vide, et l'assertion `.length > 0` passait. La fiche testait donc le cas par défaut en croyant
+tester quatre codes.
+
+C'est `TypeScript (fiches de test)` qui l'a attrapée — le job ajouté le 18/09 précisément parce
+qu'un défaut vivant **seulement** dans un `.spec.ts` est invisible à toute la CI.
+
+> **Une fiche verte n'est pas une fiche juste.** Les deux contrôles sont complémentaires : l'un
+> exécute, l'autre vérifie qu'on exécute ce qu'on croit.
+
+## 6. Pour aller plus loin
+
+- Reprenez vos fiches les plus anciennes et demandez-vous, pour chaque `toBe(valeur)` : *cette
+  valeur est-elle une décision, ou une mesure du moment ?* Les secondes sont de la dette.
+- Les 27 fichiers purs restants de `src/lib` attendent. Le critère de priorité tenu ici —
+  **un accès, un prix, la vie privée** — se transpose à n'importe quel dépôt.

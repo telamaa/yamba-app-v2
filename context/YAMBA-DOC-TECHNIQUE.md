@@ -18333,3 +18333,103 @@ juste peut viser le mauvais bloc.**
 **Non vérifié** : aucun des cinq correctifs n'a été vu **au doigt** — `simctl` ne sait pas toucher
 l'écran. Et le bon message de 3A (« suggestions indisponibles ») n'a pas pu être vu à l'écran, le
 relais Places répondant 503 en local.
+
+---
+
+# A224 lot 2 — Les trois modules qui décident de quelque chose (`chore/fiches-du-site-lot-2`, 15/11/2026)
+
+A224 avait posé le harnais et 35 fiches. Ce lot prend les trois modules de `src/lib` qui décident
+de quelque chose d'**irréversible**, dans cet ordre : un **accès**, un **prix**, la **vie privée**.
+
+## Un accès — `auth/auth-error-codes.ts` (191 lignes)
+
+Ce module décide de ce qu'un visiteur comprend quand on lui refuse l'entrée. **D96 l'avait déjà
+corrigé une fois** : le site lisait le `message` de l'API — normalisé en
+« request failed with status code 401 » — pendant que le téléphone lisait `details.code`. Une
+règle, deux implémentations, dont une fausse. **Rien ne gardait la bonne.**
+
+Ce que les fiches épinglent :
+
+| Règle | Pourquoi |
+|---|---|
+| On lit le **code**, jamais le message | il suffisait qu'un mot change côté serveur |
+| Un refus sans code ne se **devine** pas | sinon on interprète du texte anglais |
+| La liste des codes est **fermée** | un code inconnu affiché tel quel fait fuir un identifiant technique (D83) |
+| Trois types « sûrs », et seulement eux | « ne jamais mettre dans un `details` ce qui n'est pas destiné au client » |
+| L'ordre des critères de mot de passe est **stable** | sinon l'utilisateur croit que la règle change à chaque tentative |
+| Les messages existent dans les **deux** langues | ce module porte encore ~100 ternaires `fr ? … : …` |
+
+Ce dernier point mérite d'être dit : tant que ces ternaires sont là, **ces pages sont invisibles au
+contrôle i18n de la CI**, qui compare des dictionnaires JSON entre eux. C'est cette fiche qui tient
+le rôle en attendant la migration.
+
+## Un prix — `pricing-corridors.ts` (151 lignes)
+
+L'en-tête du module le dit : **les valeurs sont des hypothèses de marché**. Les figer dans une
+fiche interdirait l'étude qui doit les ajuster.
+
+> **On ne teste donc pas les valeurs, on teste les propriétés qui doivent survivre à tout réglage.**
+
+| Propriété | Ce qu'elle interdit |
+|---|---|
+| Symétrie | un corridor n'a pas de sens : aller et retour partagent rareté et formalités |
+| Bornes du tarif intérieur (3 → 6) | un trajet Paris → Lyon facturé comme un Paris → Kinshasa |
+| Pivot à 5 000 km | une correction de distance qui dérive sans qu'on le voie |
+| Correctif borné à ±10 % | la distance qui prendrait le pas sur le corridor |
+| **Balayage 16 × 16 pays** | qu'une paire de zones produise `NaN`, un prix négatif, ou trois décimales |
+
+Ce dernier balayage est le plus utile : la matrice a des **trous volontaires** (`BASE_PAIRS` ne
+couvre pas tout), et c'est le repli qui doit tenir partout.
+
+## La vie privée — `analytics.ts` (80 lignes)
+
+Ce qui part du navigateur d'un visiteur vers un tiers. **Une erreur ici ne produit aucun symptôme
+visible, et c'est ce qui la rend coûteuse.**
+
+Le harnais tourne en `node`, donc **sans `localStorage`** — et c'est une chance : le premier bloc
+vérifie le comportement réel en navigation privée, où l'accès au stockage lève.
+
+```ts
+it("pas de stockage ⇒ pas de consentement présumé", () => {
+  expect(readConsent()).not.toBe("granted");   // le silence vaut refus
+});
+```
+
+Puis : l'oubli à six mois — **y compris d'un refus**, sinon on harcèle de bannières quelqu'un qui a
+déjà dit non ; sept formes de stockage abîmé (texte brut, JSON tronqué, date absente, tableau…)
+dont aucune ne vaut un accord ; et le fait que `posthog-js` soit importé **dynamiquement** :
+
+```ts
+expect(source).toContain('import("posthog-js")');
+expect(source).not.toMatch(/^import .*posthog/m);
+```
+
+Un import statique chargerait le paquet tiers pour **tout** visiteur, y compris celui qui refuse —
+la promesse serait rompue avant même la question.
+
+## Le défaut attrapé en chemin, et il illustre le dix-huitième contrôle
+
+Une fiche passait une **chaîne** à `otpCodeMessage`, qui prend le détail complet :
+
+```ts
+otpCodeMessage(true, "OTP_LOCKED")            // ← faux
+otpCodeMessage(true, { type: "otp", code })   // ← juste
+```
+
+**Jest la laissait verte** : la fonction retombait sur son cas par défaut, qui rend une phrase non
+vide, et l'assertion `.length > 0` passait. C'est `TypeScript (fiches de test)` qui l'a vue — un
+défaut vivant **seulement** dans un fichier de test, exactement la raison pour laquelle ce job
+existe depuis le 18/09.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **101 / 6 suites** (35 + 66) |
+| `nx typecheck user-ui` | propre, les deux programmes |
+| `nx test @yamba-app/mobile` | 829 / 42 — inchangé |
+
+## Reste
+
+**27 fichiers purs** de `src/lib` n'ont pas encore de fiches. Les plus gros :
+`public-trip.helpers.ts` (247), `public-user.helpers.ts` (163), `saved-route.helpers.ts` (146).
