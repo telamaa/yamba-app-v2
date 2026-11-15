@@ -187,3 +187,33 @@ export function isWithin(day: Date, start: Date, end: Date): boolean {
   const value = startOfDay(day).getTime();
   return value >= startOfDay(start).getTime() && value <= startOfDay(end).getTime();
 }
+
+/**
+ * L'index du mois à montrer pour une sélection donnée (D103 2A).
+ * ==============================================================
+ * Le calendrier peignait correctement la fenêtre choisie (`isWithin`) mais ne
+ * REVENAIT pas dessus : capture du 15/11, « This week » sélectionné, la ligne
+ * mangue annonçant « November 15 – November 21 » et la grille restée sur
+ * janvier 2027, sans rien de surligné. Le contrôle disait une chose, la
+ * surface en montrait une autre.
+ *
+ * `null` quand rien n'est choisi, ou quand la cible tombe hors de la fenêtre
+ * de mois construite : mieux vaut ne pas défiler que défiler n'importe où.
+ */
+export function monthIndexFor(months: readonly Date[], target: Date | null | undefined): number | null {
+  if (!target) return null;
+  const index = months.findIndex(
+    (m) => m.getFullYear() === target.getFullYear() && m.getMonth() === target.getMonth()
+  );
+  return index === -1 ? null : index;
+}
+
+/**
+ * La date qui doit être à l'écran pour une recherche donnée : le jour choisi
+ * en mode exact, le PREMIER jour de la fenêtre en mode flexible.
+ */
+export function focusDateOf(value: SearchDate | null | undefined): Date | null {
+  if (!value) return null;
+  if (value.mode === 'exact') return value.date ?? null;
+  return value.rangeStart ?? null;
+}

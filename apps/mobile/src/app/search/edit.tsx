@@ -224,8 +224,13 @@ export default function SearchEditSheet() {
                 </ThemedText>
               </Pressable>
               <ThemedText type="smallBold">{t('edit.title')}</ThemedText>
+              {/* D103 5A — « Tout effacer » était la SEULE couleur de la zone
+                  haute : la mangue, celle de l'action primaire « Rechercher ».
+                  La charte signalait donc de la même façon ce qui construit et
+                  ce qui détruit, et le destructeur arrivait en premier dans la
+                  lecture. Il reste atteignable et nommé ; il cesse d'appeler. */}
               <Pressable onPress={clearSearchDraft} hitSlop={10} accessibilityRole="button">
-                <ThemedText type="smallBold" style={styles.clearAll}>
+                <ThemedText type="small" themeColor="textSecondary">
                   {t('edit.clearAll')}
                 </ThemedText>
               </Pressable>
@@ -355,8 +360,15 @@ function FieldRow({
         <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
           {label}
         </ThemedText>
+        {/* D103 4A — un champ VIDE doit se voir vide. L'espace réservé
+            portait la même graisse et la même taille que la valeur : seule
+            la couleur les séparait, et une différence de couleur SEULE n'est
+            pas une hiérarchie (D99 5C, mesuré sur le pays d'une carte). Sur
+            la capture du 15/11, « Pick a date » se lisait comme une date
+            choisie, au milieu de deux villes réellement choisies. La graisse
+            fait la différence ; la couleur la confirme. */}
         <ThemedText
-          type="smallBold"
+          type={filled ? 'smallBold' : 'small'}
           style={styles.fieldValue}
           themeColor={filled ? 'text' : 'textSecondary'}
           numberOfLines={1}>
@@ -399,9 +411,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.one,
     paddingBottom: Spacing.three,
-  },
-  clearAll: {
-    color: Brand.mango,
   },
   card: {
     marginHorizontal: Spacing.three,
