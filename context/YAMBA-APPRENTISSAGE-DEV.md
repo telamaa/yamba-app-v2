@@ -10058,3 +10058,98 @@ un nom de fournisseur. La confusion parfaite, et elle passerait toutes les revue
 
 > **Toute table de liens sortants mérite une fiche qui vérifie leur forme**, pas seulement leur
 > présence.
+
+---
+
+# Chapitre 251 — Recenser ce qui manque (A224 lot 5)
+
+## 1. Le problème que ce chapitre résout
+
+A224 est née d'un constat simple et dérangeant : **personne n'avait jamais signalé que le site
+n'avait pas de tests.** Pas un ticket, pas une alerte, pas une ligne de log. Ce qui manque ne
+produit aucun symptôme.
+
+Il a fallu cinq lots pour traiter cette dette, et elle a été rappelée à l'ouverture de chacun sans
+jamais l'être.
+
+Le même aveuglement guette la suite d'un harnais tout neuf : on couvre quinze fichiers, on
+s'arrête, et le seizième arrive sans que rien ne le dise.
+
+## 2. Une fiche qui recense, pas qui mesure
+
+```ts
+const oublies = modules()
+  .filter((f) => !FRAMEWORK.test(lire(f)))   // pas un module de framework
+  .filter((f) => !sansExecution(f))           // pas un fichier de types
+  .filter((rel) => !couverts.has(rel))        // pas déjà importé par une fiche
+  .filter((rel) => !(rel in EXCEPTIONS));     // pas nommé comme exception
+
+expect(oublies).toEqual([]);
+```
+
+**Ce n'est pas une mesure de couverture.** Une couverture de lignes répond à « quelle proportion
+du code est exécutée » ; ce recensement répond à « **quel module n'est vu par personne** ». Les
+deux questions sont différentes, et c'est la seconde qui a coûté cinq lots.
+
+Un seuil de couverture à 80 % est d'ailleurs silencieux sur le fichier entier qu'on vient
+d'ajouter : il se dilue dans la moyenne. Une liste d'oubliés, non.
+
+## 3. La liste d'exceptions est le cœur du dispositif
+
+```ts
+const EXCEPTIONS: Record<string, string> = {
+  "googleMaps.ts": "charge un script externe — aucun calcul à vérifier",
+  "api.ts": "enveloppe de `fetch` — pas de règle propre",
+  // …
+};
+```
+
+Deux détails font toute la différence :
+
+- **la raison est obligatoire**, et une fiche vérifie qu'elle fait plus de vingt caractères. Une
+  exception sans raison est un oubli déguisé ;
+- **une exception qui nomme un fichier disparu part au rouge.** Sinon elle survit à son objet et
+  devient un mensonge silencieux — exactement le genre de ligne qu'on relit dix fois sans la voir.
+
+> **Transformez l'oubli en décision.** Ajouter une ligne à cette liste demande d'écrire pourquoi ;
+> ne rien faire fait échouer la CI. Les deux chemins sont explicites, et c'est tout l'objet.
+
+## 4. Garder le garde
+
+```ts
+it("il trouve des modules — sinon il est vert pour rien", () => {
+  expect(modules().length).toBeGreaterThanOrEqual(20);
+});
+```
+
+Un balayage qui ne balaie rien passe toutes ses assertions. On l'a vu au chapitre 246 avec la
+porte d'identité ; la règle vaut pour tout outil d'inventaire :
+
+> **Toute fiche qui compte doit prouver qu'elle a compté.**
+
+## 5. Et l'outil anti-oubli contenait lui-même un oubli
+
+```ts
+/from "@\/lib\/([^"]+)"/g        // guillemets DOUBLES seulement
+```
+
+Sept modules parfaitement couverts — par des fiches écrites avec des guillemets **simples** —
+étaient déclarés « oubliés ».
+
+C'est la **cinquième** occurrence du même piège ce mois-ci (D98 `ActivityIndicator`, D100
+`cursor-not-allowed`, D102 les libellés, A224 lot 1 `jsdom`, et celle-ci). Elle est la plus
+instructive des cinq, parce que le piège était **dans l'outil censé détecter les oublis**.
+
+> **On vise l'usage, jamais une orthographe.** Et quand vous écrivez un détecteur, demandez-vous
+> d'abord : *qu'est-ce qu'il ne verra pas ?*
+
+Une fiche de recensement qui trouve des faux positifs est inconfortable mais récupérable ; une qui
+trouve des faux **négatifs** est pire qu'absente, parce qu'elle rassure.
+
+## 6. Ce que le recensement a trouvé dès sa première exécution
+
+`auth/login-redirect.ts` — il décide **d'où l'on revient après connexion**, et personne ne
+l'avait couvert. Les pages d'auth ne doivent jamais s'y transmettre, et `/refresh` en fait partie :
+c'est l'oubli de D93, qui avait coûté 27 jours.
+
+Un recenseur gagne sa place le jour où il est écrit.
