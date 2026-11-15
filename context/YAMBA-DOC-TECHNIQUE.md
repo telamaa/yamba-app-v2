@@ -18897,3 +18897,102 @@ désormais traités pareil.
 ## Reste
 
 **~20 fichiers purs** de `src/lib` sans fiches, tous de moins de 90 lignes.
+
+---
+
+# A224 lot 5 — Le recensement, et la clôture d'A224 (`chore/fiches-du-site-lot-5`, 15/11/2026)
+
+Dernier lot. **208 fiches / 12 suites** là où il y en avait **zéro** le matin même.
+
+## Les sept petits modules qui décident de ce qui s'écrit
+
+Ils ne décident ni d'un prix ni d'un accès. Ils décident de ce qui s'**écrit** — et une faute
+sur le prénom de quelqu'un se remarque davantage qu'un défaut de calcul.
+
+| Module | Ce qu'une fiche garde |
+|---|---|
+| `elision` | « d'Aminata » mais « de Pauline », **accents compris** (ANO-WEB-49) |
+| `country-name` | le texte stocké plutôt que le **code** quand `Intl` ne connaît pas la région |
+| `country-name` | un drapeau est **décoratif** : tout code malformé rend `null`, il ne casse pas la ligne |
+| `format-user` | aucun espace suspendu — il se voit dans une barre de navigation |
+| `routes` | tout lien de la barre est interne et porte un libellé |
+
+**Observation consignée plutôt que corrigée** : `getUserInitials` est la **cinquième** fonction
+d'initiales du dépôt, et son repli est « U » là où `getInitials` rend « ? ». Les contextes
+diffèrent (soi-même contre autrui), donc c'est peut-être une décision — mais elle n'est écrite
+nulle part. La fiche la rend visible sans trancher à la place de l'équipe.
+
+## Une prémisse fausse, attrapée par sa propre fiche
+
+```ts
+expect(countryName("ZZ", "fr", "Pays inconnu")).toBe("Pays inconnu");   // ← rouge
+// reçu : « région inconnue »
+```
+
+`Intl.DisplayNames` **connaît** « ZZ » (code CLDR de la région inconnue) et le traduit. Le cas que
+je voulais tester — un code rendu **tel quel** — demande « XX » ou « QQ ».
+
+> Une fiche qui part au rouge sur une **prémisse** plutôt que sur un défaut reste une bonne
+> fiche : elle vient de corriger ma description de la réalité.
+
+## Le recensement — la pièce qui clôt A224
+
+```ts
+const oublies = modules()
+  .filter((f) => !FRAMEWORK.test(lire(f)))   // pas un module de framework
+  .filter((f) => !sansExecution(f))           // pas un fichier de types
+  .filter((rel) => !couverts.has(rel))        // pas déjà importé par une fiche
+  .filter((rel) => !(rel in EXCEPTIONS));     // pas nommé comme exception
+
+expect(oublies).toEqual([]);
+```
+
+**Pourquoi c'est la fiche la plus utile du lot.** A224 est née d'un constat : personne n'avait
+jamais signalé l'absence de tests du site, parce que **ce qui manque ne produit aucun symptôme**.
+Il a fallu cinq lots consécutifs pour que la dette soit traitée, et elle a été rappelée à
+l'ouverture de chacun sans jamais l'être.
+
+Le même aveuglement guette la suite : on couvre quinze fichiers, on s'arrête, et le seizième
+arrive sans que rien ne le dise.
+
+> **Désormais : tout module pur est soit couvert, soit NOMMÉ avec sa raison.** Ajouter une ligne
+> à `EXCEPTIONS` est une **décision** ; l'oubli silencieux n'en est pas une.
+
+Elle garde aussi **ses propres angles morts** : une exception qui nomme un fichier disparu (un
+mensonge silencieux), une exception sans raison écrite, et un balayage qui ne trouverait rien.
+
+## Et elle a trouvé un vrai oubli dès sa première exécution
+
+`auth/login-redirect.ts` — **il décide d'où l'on revient après connexion**. Les pages d'auth ne
+doivent jamais s'y transmettre (ce serait une boucle), et `/refresh` en fait partie : c'est
+exactement l'oubli de D93, qui avait coûté 27 jours. Sept fiches le gardent maintenant.
+
+## Et sa première version ne voyait que la moitié du dépôt
+
+```ts
+/from "@\/lib\/([^"]+)"/g      // ← guillemets DOUBLES seulement
+```
+
+Sept modules parfaitement couverts par des fiches écrites avec des **guillemets simples** étaient
+déclarés « oubliés ».
+
+> **On vise l'usage, jamais une orthographe.** Cinquième occurrence ce mois-ci — et cette fois le
+> piège était dans l'outil censé détecter les oublis.
+
+## Bilan d'A224, en une journée
+
+| | Matin | Soir |
+|---|---|---|
+| Cible `test` sur `apps/user-ui` | aucune | ✅ |
+| Fiches | **0** | **208 / 12 suites** |
+| Contrôles CI | 19 | **20** |
+| Défauts trouvés par ces fiches | — | **6** (3 initiales, 2 NaN, 1 asymétrie) |
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **208 / 12 suites** |
+| `nx typecheck user-ui` | propre, les deux programmes |
+| `nx run-many --target=typecheck --all` | 11 projets, verts |
+| `nx test @yamba-app/mobile` | 866 / 45 — inchangé |

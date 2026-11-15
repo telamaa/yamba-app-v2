@@ -9273,3 +9273,28 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 | 3 | Un membre n'a jamais expédié | sa page s'affiche quand même |
 | 4 | Je choisis « Marven2026! » comme mot de passe | il est refusé, et on me dit pourquoi |
 | 5 | Mon adresse est chez un fournisseur inconnu | aucun lien « ouvrir ma messagerie » n'est proposé |
+
+---
+
+# A224 lot 5 — Clôture (15/11/2026)
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-22** | L'élision suit la **prononciation** : « d'Aminata », « d'Élodie », « d'Honoré », mais « de Pauline ». | Une faute sur le prénom de quelqu'un se remarque plus qu'un défaut de calcul. |
+| **RG-A224-23** | Un drapeau est **décoratif** : un code de pays malformé n'affiche rien et ne casse pas la phrase. | Un élément d'illustration ne doit jamais faire tomber une ligne de texte. |
+| **RG-A224-24** | Un nom de pays inconnu affiche le **texte stocké**, jamais le code. | « XX » dans une phrase est un défaut visible. |
+| **RG-A224-25** | Un nom affiché ne porte jamais d'espace suspendu. | Il se voit dans la barre de navigation. |
+| **RG-A224-26** | Après connexion, on revient là où l'on était — **sauf** depuis une page d'authentification. | Y revenir serait une boucle (c'est l'oubli de D93, 27 jours). |
+| **RG-A224-27** | Tout module portant une règle est **couvert par une fiche**, ou **nommé** avec sa raison. | Ce qui manque ne produit aucun symptôme : il faut le recenser pour le voir. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Un message parle d'Aminata | « d'Aminata », pas « de Aminata » |
+| 2 | Un trajet vient d'un pays au code inconnu | le nom stocké s'affiche, jamais le code |
+| 3 | Je me connecte depuis la page d'un trajet | j'y reviens |
+| 4 | Je me connecte depuis la page de connexion | je vais à l'accueil, pas en boucle |
+| 5 | Un nouveau module de règle est ajouté sans fiche | la CI le signale |
