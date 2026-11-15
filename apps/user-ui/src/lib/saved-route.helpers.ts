@@ -70,6 +70,16 @@ export function formatExpiresIn(
 ): string {
   const now = new Date();
   const exp = new Date(expiresAt);
+
+  // A224 lot 3 — une date illisible rendait « Expire dans NaN mois ».
+  // `NaN < 0` est FAUX, donc la garde « Expirée » juste en dessous était
+  // franchie, puis `NaN <= 7` et `NaN <= 60` le sont aussi — toute
+  // comparaison avec NaN est fausse, et le flot tombait dans le dernier cas
+  // sans qu'aucune condition ne l'ait choisi. Le silence vaut mieux qu'un
+  // texte faux sur une alerte : c'est déjà ce que fait `formatMemberSince`
+  // (`public-trip.helpers.ts`) face à la même entrée.
+  if (Number.isNaN(exp.getTime())) return "";
+
   const diffMs = exp.getTime() - now.getTime();
 
   if (diffMs < 0) {

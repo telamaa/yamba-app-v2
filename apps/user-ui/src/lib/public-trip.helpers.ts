@@ -229,9 +229,24 @@ export function formatLocalTime(
   return `${hh}:${mm}`;
 }
 
-export function getInitials(firstName: string, lastInitial: string): string {
-  const first = firstName?.charAt(0).toUpperCase() ?? "";
-  return `${first}${lastInitial}`.trim() || "?";
+/**
+ * Les initiales d'une personne : UNE lettre de prénom, UNE lettre de nom.
+ *
+ * A224 lot 3 — le second argument acceptait n'importe quelle chaîne et la
+ * recopiait TELLE QUELLE : un nom complet rendait « MMABIALA », une minuscule
+ * restait minuscule, un espace de tête passait. **C'est exactement le défaut
+ * que D88 a corrigé sur le TÉLÉPHONE en novembre** (`/auth/me` servait un nom
+ * complet là où la signature attendait une initiale déjà tronquée) — et
+ * personne n'a regardé le jumeau du site, qui porte le même nom de fonction.
+ *
+ * C'est la leçon de D97, mot pour mot : **après avoir réparé un écran, grep
+ * son jumeau.** Les deux implémentations sont désormais identiques, et une
+ * fiche les confronte.
+ */
+export function getInitials(firstName: string, lastNameOrInitial: string): string {
+  const first = firstName?.trim().charAt(0).toUpperCase() ?? "";
+  const last = lastNameOrInitial?.trim().charAt(0).toUpperCase() ?? "";
+  return `${first}${last}` || "?";
 }
 
 export function formatMemberSince(
