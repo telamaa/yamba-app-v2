@@ -9755,6 +9755,105 @@ Et `jest.useFakeTimers().setSystemTime()` suffit — aucune dépendance, aucune 
 
 ---
 
+# Chapitre 248 — Une incohérence se compte, elle ne se lit pas (D105)
+
+## 1. Pourquoi trois jours de lecture n'avaient rien vu
+
+Neuf boutons de retour, répartis dans neuf fichiers. Chacun est **défendable isolément** :
+
+```tsx
+<Ionicons name="chevron-back" size={20} color={theme.text} />   // écran de paiement
+<Ionicons name="chevron-back" size={26} color={theme.text} />   // écran de recherche
+<ThemedText type="linkPrimary">‹ Retour</ThemedText>            // profil
+```
+
+Aucune revue fichier par fichier ne produit le diagnostic, parce que **le défaut n'est dans aucun
+fichier** : il est dans leur collection.
+
+La commande qui l'a rendu en trois secondes :
+
+```sh
+grep -rhn 'chevron-back" size={[0-9]*}' apps/mobile/src | grep -o "size={[0-9]*}" | sort | uniq -c
+#    4 size={20}
+#    2 size={22}
+#    2 size={26}
+```
+
+> **Quand un utilisateur dit « c'est différent des autres », la bonne réponse n'est pas de
+> corriger l'écran qu'il montre : c'est de COMPTER les autres.**
+
+Faites cet inventaire pour : les tailles d'icône, les rayons de bordure, les durées d'animation,
+les `hitSlop`, les mots d'une même action. `sort | uniq -c` est l'outil de revue de charte le plus
+rentable qui existe.
+
+## 2. Le réflexe qui produit la dérive
+
+La flèche que l'utilisateur a repérée venait d'être ajoutée **la veille**, par le lot qui
+corrigeait un autre défaut. Elle copiait le voisin immédiat (un lien texte) au lieu de s'aligner
+sur le motif dominant (une flèche).
+
+C'est le défaut reproché au code depuis trois jours, **commis en le corrigeant**.
+
+> Quand vous ajoutez un élément d'interface, « je copie le voisin » est exactement ce qui fabrique
+> les quatre variantes. Le bon réflexe est le même que pour le diagnostic : **comptez d'abord.**
+
+## 3. Rendre l'oubli impossible plutôt que le repérer
+
+Deux écrans rendaient un chevron **nu** sans nom accessible. Une revue peut le voir ; une revue
+peut aussi passer à côté, et c'est ce qui s'est produit pendant des mois.
+
+```ts
+export function BackButton({ onPress, label, variant }: {
+  onPress: () => void;
+  label: string;      // ← REQUIS
+  variant?: 'bare' | 'boxed';
+})
+```
+
+TypeScript réclame le libellé à chaque appel. **Un type bien choisi remplace une règle de revue** —
+et il ne se fatigue pas.
+
+Notez aussi ce que le composant **n'expose pas** :
+
+```ts
+expect(source).not.toMatch(/size\?:\s*number/);
+```
+
+Une prop `size` optionnelle, et chacun reprend la sienne en six mois. **Une charte ne se défait
+pas par malveillance : elle se défait par une prop de trop.**
+
+## 4. Supprimer les différences sans raison, garder celles qui en ont
+
+Deux variantes survivent :
+
+| Variante | Raison |
+|---|---|
+| `bare` | dans une rangée d'en-tête : rien à surmonter |
+| `boxed` | la flèche **flotte sur du contenu** : il lui faut un fond pour rester lisible |
+
+Et une exception est **nommée** dans la fiche (`auth-screen.tsx`, dont le glyphe alterne entre
+« fermer » et « retour »).
+
+> **Une unification qui écrase les différences justifiées est aussi fautive que la dispersion
+> qu'elle corrige.** Nommez l'exception : elle devient une décision, au lieu de rester un oubli.
+
+## 5. La frontière apprise deux fois dans la journée
+
+```
+Jest encountered an unexpected token
+```
+
+La fiche importait les constantes depuis le composant, qui tire `react-native`. **D102 avait
+rencontré exactement cette frontière huit heures plus tôt**, et le chapitre 242 en avait tiré la
+règle : *déplacez le code, pas la frontière*.
+
+Il a fallu l'apprendre deux fois.
+
+> C'est une donnée utile sur la façon dont on apprend : une leçon écrite n'est pas une leçon
+> acquise. Ce qui empêche la répétition n'est pas le souvenir, c'est **la structure** — ici, le
+> fait que `lib/` soit la maison des règles pures. Quand un fichier refuse de se charger dans une
+> fiche, la question n'est plus « comment le charger » mais « qu'est-ce qui, là-dedans, devrait
+> vivre dans `lib/` ».
 # Chapitre 249 — Que vaut la valeur VIDE de votre état ? (D106)
 
 ## 1. Trois mécanismes justes qui produisent un défaut

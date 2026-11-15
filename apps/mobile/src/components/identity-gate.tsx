@@ -83,6 +83,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslations } from 'use-intl';
 
 import { InviteBody, InviteGutter, useInviteColors } from '@/components/invite-kit';
+import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { Font } from '@/constants/typography';
@@ -155,9 +156,11 @@ export function IdentityGate({
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         {onDismiss !== undefined && (
           <View style={styles.backRow}>
-            <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button">
-              <ThemedText type="linkPrimary">‹ {t('profile.back')}</ThemedText>
-            </Pressable>
+            {/* D105 1B — cette flèche, ajoutée la veille par D104, recopiait le
+                lien texte de `ProfileContent` au lieu de s'aligner sur le motif
+                DOMINANT de l'application. C'est le défaut reproché au code
+                depuis trois jours, commis en le corrigeant. */}
+            <BackButton label={t('profile.back')} onPress={onDismiss} />
           </View>
         )}
 

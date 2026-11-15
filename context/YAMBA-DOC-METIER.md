@@ -9197,6 +9197,16 @@ Il peut dire non. Toucher « Profil » par curiosité cesse d'être un aller sim
 
 ---
 
+# D105 — Un même geste, un seul costume (15/11/2026)
+
+## Le besoin
+
+Revenir en arrière est le geste le plus fréquent d'une application. Il se faisait avec quatre
+apparences différentes selon l'écran : trois tailles de flèche et un lien texte. Un membre
+apprend un geste une fois ; il ne doit pas le réapprendre d'un écran à l'autre.
+
+Et sur deux écrans, ce geste était **invisible aux lecteurs d'écran** : la flèche n'avait aucun
+nom.
 # D106 — Revenir ne doit pas tout effacer (15/11/2026)
 
 ## Le besoin
@@ -9208,6 +9218,10 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 
 | N° | Règle | Pourquoi |
 |---|---|---|
+| **RG-D105-1** | Le retour a **une seule** apparence et **une seule** taille dans toute l'application. | Un geste appris une fois se reconnaît partout. |
+| **RG-D105-2** | Sa zone tactile atteint les 44 pt du système. | C'est le geste le plus fréquent : il ne se vise pas. |
+| **RG-D105-3** | Il porte **toujours** un nom annoncé par un lecteur d'écran. | Une flèche nue n'a pas de nom implicite. |
+| **RG-D105-4** | Une variante n'existe que si elle a une raison nommée. | Le disque existe parce que la flèche flotte sur du contenu ; les trois tailles n'avaient aucune raison. |
 | **RG-D106-1** | Revenir sur l'accueil pendant une session rend les résultats qu'on y avait, filtres compris. | Un retour n'est pas une remise à zéro. |
 | **RG-D106-2** | Ce sont les **critères** qui sont mémorisés, jamais les résultats. | Le serveur seul sait ce qui est encore publié ; des résultats gardés seraient périmés. |
 | **RG-D106-3** | Une recherche **large** (« montre-moi tout ») est mémorisée au même titre qu'une recherche ciblée. | C'est la plus fréquente, et c'était justement la seule qu'on perdait. |
@@ -9218,6 +9232,10 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 
 | N° | Situation | Attendu |
 |---|---|---|
+| 1 | Je compare le retour de deux écrans quelconques | même flèche, même taille |
+| 2 | J'utilise un lecteur d'écran sur l'écran Ville | le bouton s'annonce « Retour » |
+| 3 | Je touche la flèche sans viser | elle répond |
+| 4 | Un écran où la flèche flotte sur du contenu | elle garde son disque, pour rester lisible |
 | 1 | Je parcours les trajets, j'ouvre une fiche, je reviens | mes résultats sont là |
 | 2 | J'avais posé un poids et un filtre de confiance | ils sont toujours posés |
 | 3 | Je me déconnecte | l'accueil repart vierge |

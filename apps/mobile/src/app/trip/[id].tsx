@@ -35,6 +35,7 @@ import { useLocale, useTranslations } from 'use-intl';
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { ReportSheet } from '@/components/report-sheet';
+import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -189,18 +190,7 @@ function TopBar({ trip }: { trip?: PublicTrip }) {
 
   return (
     <View style={styles.topBar}>
-      <Pressable
-        onPress={() => router.back()}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel={t('back')}
-        style={({ pressed }) => [
-          styles.iconButton,
-          { backgroundColor: theme.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        <Ionicons name="chevron-back" size={22} color={theme.text} />
-      </Pressable>
+      <BackButton variant="boxed" label={t('back')} onPress={() => router.back()} />
       {trip ? <FavoriteButton trip={trip} /> : null}
     </View>
   );

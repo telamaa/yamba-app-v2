@@ -30,6 +30,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useTranslations } from 'use-intl';
 
+import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -104,14 +105,7 @@ export function BookingStepFrame({
       <View style={styles.column}>
         <SafeAreaView edges={['top', 'left', 'right']}>
           <View style={styles.header}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('back')}
-              onPress={() => router.back()}
-              hitSlop={10}
-              style={[styles.iconButton, { backgroundColor: theme.backgroundElement }]}>
-              <Ionicons name="chevron-back" size={20} color={theme.text} />
-            </Pressable>
+            <BackButton variant="boxed" label={t('back')} onPress={() => router.back()} />
             {/* Les quatre phases, d'un coup d'œil. `adjustsFontSizeToFit` plutôt
                 qu'une troncature : sur un petit écran les quatre mots rétrécissent,
                 ils ne disparaissent pas — une phase cachée est une phase qui
