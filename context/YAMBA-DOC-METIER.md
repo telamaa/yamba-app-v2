@@ -9207,6 +9207,12 @@ apprend un geste une fois ; il ne doit pas le réapprendre d'un écran à l'autr
 
 Et sur deux écrans, ce geste était **invisible aux lecteurs d'écran** : la flèche n'avait aucun
 nom.
+# D106 — Revenir ne doit pas tout effacer (15/11/2026)
+
+## Le besoin
+
+Un Expéditeur parcourt les trajets, ouvre une fiche, revient — et retrouve une page vierge. Il
+doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 
 ## Les règles
 
@@ -9216,6 +9222,11 @@ nom.
 | **RG-D105-2** | Sa zone tactile atteint les 44 pt du système. | C'est le geste le plus fréquent : il ne se vise pas. |
 | **RG-D105-3** | Il porte **toujours** un nom annoncé par un lecteur d'écran. | Une flèche nue n'a pas de nom implicite. |
 | **RG-D105-4** | Une variante n'existe que si elle a une raison nommée. | Le disque existe parce que la flèche flotte sur du contenu ; les trois tailles n'avaient aucune raison. |
+| **RG-D106-1** | Revenir sur l'accueil pendant une session rend les résultats qu'on y avait, filtres compris. | Un retour n'est pas une remise à zéro. |
+| **RG-D106-2** | Ce sont les **critères** qui sont mémorisés, jamais les résultats. | Le serveur seul sait ce qui est encore publié ; des résultats gardés seraient périmés. |
+| **RG-D106-3** | Une recherche **large** (« montre-moi tout ») est mémorisée au même titre qu'une recherche ciblée. | C'est la plus fréquente, et c'était justement la seule qu'on perdait. |
+| **RG-D106-4** | La mémoire s'efface à la **déconnexion**. | Un corridor et des filtres de confiance disent quelque chose de celui qui partait. |
+| **RG-D106-5** | Un lancement à froid repart de l'accueil. | La mémoire vaut pour la session, pas au-delà. |
 
 ## Tests d'acceptation
 
@@ -9225,3 +9236,8 @@ nom.
 | 2 | J'utilise un lecteur d'écran sur l'écran Ville | le bouton s'annonce « Retour » |
 | 3 | Je touche la flèche sans viser | elle répond |
 | 4 | Un écran où la flèche flotte sur du contenu | elle garde son disque, pour rester lisible |
+| 1 | Je parcours les trajets, j'ouvre une fiche, je reviens | mes résultats sont là |
+| 2 | J'avais posé un poids et un filtre de confiance | ils sont toujours posés |
+| 3 | Je me déconnecte | l'accueil repart vierge |
+| 4 | Je ferme l'app et la rouvre | l'accueil repart vierge |
+| 5 | Mes résultats sont affichés et je navigue dans l'onglet | rien ne clignote, aucune requête inutile |
