@@ -18538,3 +18538,92 @@ cherchait *son* profil (donc qui a déjà un compte) de l'autre. Consigné pour 
 **Non vérifié** : l'écran Profil **déconnecté** n'a pas pu être vu. Le lien profond
 `exp://…/--/profile` retombe sur l'écran d'accueil (redirection au premier lancement), et `simctl`
 ne sait pas toucher l'écran pour y naviguer.
+
+---
+
+# A224 lot 3 — Le harnais du site trouve ses deux premiers défauts (`chore/fiches-du-site-lot-3`, 15/11/2026)
+
+Deux fichiers de plus (`public-trip.helpers.ts`, 247 lignes ; `saved-route.helpers.ts`, 146), et
+**deux vrais défauts** — les premiers que le harnais posé la veille attrape tout seul.
+
+## Défaut 1 — `getInitials`, ou D88 rejoué sur le jumeau
+
+D88 (08/11) avait durci la fonction du **téléphone** : `/auth/me` servait un nom **complet** là où
+la signature attendait une initiale déjà tronquée, et « Marven MABIALA » donnait **« MMABIALA »**
+dans la pastille d'identité.
+
+Le site portait la même fonction, le même nom — et la version fautive :
+
+| | Mobile (corrigé D88) | Site (avant ce lot) |
+|---|---|---|
+| Prénom | 1ʳᵉ lettre, majuscule, trimé | 1ʳᵉ lettre, majuscule |
+| Nom | **1ʳᵉ lettre, majuscule, trimé** | **la chaîne entière, telle quelle** |
+
+> **C'est la leçon de D97, mot pour mot : après avoir réparé un écran, grep son jumeau.**
+
+La fiche qui garde maintenant la parité ne compare pas des sorties mais les **corps** des deux
+implémentations, normalisés :
+
+```ts
+const duSite = corps(readFileSync(join(WEB, "src/lib/public-trip.helpers.ts"), "utf8"));
+const duTel  = corps(readFileSync(join(MOBILE, "src/lib/trip-format.ts"), "utf8"));
+expect(duSite).toBe(duTel);
+```
+
+C'est **la règle** qui doit être la même, et c'est elle qui avait divergé.
+
+## Défaut 2 — « Expire dans NaN mois »
+
+Trouvé par une assertion de principe :
+
+```ts
+expect(rendu).not.toContain("NaN");   // ← rouge
+```
+
+La cause mérite d'être retenue :
+
+```ts
+const diffMs = exp.getTime() - now.getTime();   // NaN
+if (diffMs < 0) return "Expirée";               // NaN < 0 → FAUX, on passe
+if (diffDays <= 7)  …                            // NaN <= 7  → FAUX
+if (diffDays <= 60) …                            // NaN <= 60 → FAUX
+return `Expire dans ${Math.floor(NaN / 30)} mois`;  // ← on arrive ici par défaut
+```
+
+> **Toute comparaison avec `NaN` est fausse.** Un flot construit sur des seuils successifs tombe
+> donc dans son **dernier** cas sans qu'aucune condition ne l'ait choisi. Le cas final d'une
+> cascade de `if` n'est pas un cas, c'est un ramasse-tout.
+
+Le correctif suit le précédent du dépôt : `formatMemberSince`, dans le fichier voisin, rend déjà
+une chaîne **vide** devant la même entrée. Le silence vaut mieux qu'un texte faux sur une alerte.
+
+## La fiche qui n'a rien trouvé, et qui valait quand même d'être écrite
+
+```ts
+it.each([["3months"], ["6months"]])("« %s » se relit à l'identique", (preset) => {
+  for (let i = 0; i < 365; i++) {
+    jest.useFakeTimers().setSystemTime(new Date(Date.UTC(2026, 0, 1 + i, 9)));
+    expect(detectPreset(...applyDateRangePreset(preset))).toBe(preset);
+  }
+});
+```
+
+Poser un préréglage puis le relire doit rendre le même — **quel que soit le jour de l'année où on
+le pose**. C'est là que les mois de longueur inégale piègent : février, les mois de 31 jours, les
+bissextiles. Un défaut y serait apparu **un jour sur 365**, c'est-à-dire jamais reproductible.
+
+**Elle passe.** Et c'est une information : la tolérance de `detectPreset` (80–100 jours,
+170–195 jours) est correctement dimensionnée. Une fiche verte qui couvre 730 cas vaut mieux qu'une
+intuition.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **139 / 8 suites** (101 + 38) |
+| `nx typecheck user-ui` | propre, les deux programmes |
+| `nx test @yamba-app/mobile` | 842 / 43 — inchangé |
+
+## Reste
+
+**25 fichiers purs** de `src/lib` sans fiches.
