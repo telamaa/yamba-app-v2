@@ -9095,3 +9095,43 @@ champ rempli.
 | 5 | Le service de suggestions est en panne | le message parle du **service**, pas de ma saisie |
 | 6 | Je n'ai pas choisi de date | « Choisis une date » se lit comme un champ vide |
 | 7 | Je regarde l'en-tête de la feuille | « Tout effacer » ne m'attire pas l'œil avant « Rechercher » |
+
+---
+
+# A224 lot 2 — Ce que ces fiches protègent (15/11/2026)
+
+Ce lot ne change rien à l'écran. Il met sous garde trois décisions dont **aucune n'est
+rattrapable** une fois prise de travers.
+
+| Si ceci casse… | Le membre vit… | Et personne ne le voit parce que… |
+|---|---|---|
+| La lecture d'un refus de connexion | « Connexion impossible pour le moment » au lieu de la vraie raison | l'écran affiche bien *quelque chose* |
+| La liste fermée des codes d'erreur | un identifiant technique en plein milieu d'un message | ça ressemble à un message |
+| L'ordre des critères de mot de passe | une exigence différente à chaque tentative | chaque message est juste, pris isolément |
+| La base €/kg d'un corridor | des trajets invendables ou bradés | un prix s'affiche toujours |
+| La symétrie des corridors | l'aller et le retour à deux tarifs | il faut comparer les deux pour le voir |
+| Le consentement de mesure | ses données partent sans accord | **rien ne s'affiche jamais** |
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-5** | Un refus d'API est lu par son **code**, jamais par son message. | Le message est une surface publique en anglais, susceptible de changer. |
+| **RG-A224-6** | Un code inconnu n'est **jamais** affiché tel quel. | Sinon un identifiant technique devient un message d'erreur. |
+| **RG-A224-7** | Un corridor et son retour portent **le même** prix de base. | Rareté de l'offre et formalités sont partagées. |
+| **RG-A224-8** | Aucune combinaison de pays ne produit un non-prix. | La matrice a des trous volontaires : c'est le repli qui doit tenir. |
+| **RG-A224-9** | L'absence de consentement lisible vaut **refus**. | Un échec de lecture ne doit jamais être pris pour un accord. |
+| **RG-A224-10** | Un refus de mesure est **oublié** au bout de six mois, comme un accord. | Sinon on harcèle de bannières quelqu'un qui a dit non. |
+| **RG-A224-11** | Aucun paquet de mesure n'est chargé avant « accepter ». | La promesse se tient avant la question, pas après. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Le serveur refuse ma connexion avec un code | je lis la vraie raison, dans ma langue |
+| 2 | Le serveur refuse sans code | je lis un message générique, jamais du texte technique |
+| 3 | Je publie un trajet Paris → Kinshasa, puis Kinshasa → Paris | la base au kilo est la même |
+| 4 | Je publie un trajet entre deux pays exotiques | un prix cohérent s'affiche, jamais « NaN » |
+| 5 | Je navigue en navigation privée | le site fonctionne, la bannière revient |
+| 6 | J'ai refusé il y a sept mois | on me redemande |
+| 7 | Je refuse la mesure | aucun paquet tiers n'est chargé |
