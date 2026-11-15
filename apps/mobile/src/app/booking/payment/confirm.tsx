@@ -27,6 +27,7 @@ import { useTranslations } from 'use-intl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BackButton } from '@/components/back-button';
 import { useTheme } from '@/hooks/use-theme';
 import { getPaymentChoice, getPendingIntent, markPaymentAuthorized } from '@/lib/payment-choice';
 import { authFailureKey, isWallet, type PaymentMethodKey } from '@/lib/payment-methods';
@@ -101,18 +102,7 @@ export default function PaymentConfirmScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('methods.back')}
-            onPress={() => router.back()}
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.backButton,
-              { backgroundColor: theme.backgroundElement },
-              pressed && styles.pressed,
-            ]}>
-            <Ionicons name="chevron-back" size={20} color={theme.text} />
-          </Pressable>
+          <BackButton variant="boxed" label={t('methods.back')} onPress={() => router.back()} />
         </View>
 
         <View style={styles.content}>
