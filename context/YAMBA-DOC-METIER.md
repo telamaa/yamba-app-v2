@@ -9167,3 +9167,30 @@ Il peut dire non. Toucher « Profil » par curiosité cesse d'être un aller sim
 | 2 | Je me connecte depuis cette page | le retour reste au même endroit, l'écran ne saute pas |
 | 3 | Visiteur, j'ouvre Favoris (un onglet) | pas de retour, mais la barre d'onglets est là |
 | 4 | Visiteur, j'ouvre Profil | le contenu est centré, pas tassé en haut d'un écran vide |
+
+---
+
+# A224 lot 3 — Deux défauts trouvés par les fiches (15/11/2026)
+
+| Défaut | Ce que le membre voyait | Pourquoi personne ne le signalait |
+|---|---|---|
+| Initiales | « MMABIALA » dans une pastille, au lieu de « MM » | il faut un nom complet dans un champ « initiale » pour le déclencher |
+| Alerte | « Expire dans **NaN** mois » | il faut une date abîmée, et on ne regarde pas ses alertes tous les jours |
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-12** | Une pastille d'initiales ne montre **jamais** plus d'une lettre par nom, quelle que soit la donnée reçue. | Le serveur peut servir un nom complet dans un champ nommé « initiale » — c'est arrivé (D88). |
+| **RG-A224-13** | Les deux fronts appliquent la **même** règle d'initiales, et une fiche le vérifie. | Une correction sur un seul front laisse l'autre fautif, sans bruit. |
+| **RG-A224-14** | Une date illisible produit le **silence**, jamais un texte calculé. | « NaN » dans une phrase est pire qu'une phrase absente. |
+| **RG-A224-15** | Une alerte posée pour « 3 mois » se relit « 3 mois », **quel que soit le jour où elle est posée**. | Les mois ont des longueurs inégales : un défaut n'apparaîtrait qu'un jour sur 365. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Un Voyageur s'appelle « Marven Mabiala » | sa pastille affiche « MM » |
+| 2 | Le serveur envoie un nom en minuscules | la pastille met en capitale |
+| 3 | Une alerte a une date d'expiration abîmée | aucun délai n'est affiché, pas « NaN » |
+| 4 | Je crée une alerte « 3 mois » le 30 novembre | elle se rouvre sur « 3 mois » |

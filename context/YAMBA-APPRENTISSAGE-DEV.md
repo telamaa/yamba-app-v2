@@ -9641,3 +9641,114 @@ bas d'un écran à un élément absent.
 > **Une justification de mise en page vaut pour le contexte qui l'a motivée.** Quand un composant
 > devient partagé, relisez ses commentaires : ils décrivent souvent le *premier* appelant, et
 > deviennent faux pour le second sans que personne ne les modifie.
+
+---
+
+# Chapitre 247 — Toute comparaison avec NaN est fausse (A224 lot 3)
+
+## 1. Le défaut, et pourquoi il est pédagogique
+
+```ts
+const diffMs = exp.getTime() - now.getTime();   // date illisible → NaN
+
+if (diffMs < 0) return "Expirée";                      // NaN < 0   → faux
+const diffDays = Math.ceil(diffMs / 86_400_000);       // NaN
+if (diffDays <= 7)  return `dans ${diffDays} jours`;   // NaN <= 7  → faux
+if (diffDays <= 60) return `dans ${diffDays} jours`;   // NaN <= 60 → faux
+return `dans ${Math.floor(diffDays / 30)} mois`;       // ← on arrive ICI
+```
+
+Résultat à l'écran : **« Expire dans NaN mois »**.
+
+Chaque `if` a été écrit comme un **filtre**. Mais `NaN` ne satisfait aucune comparaison — ni `<`,
+ni `<=`, ni `>`, ni même `=== NaN`. Il traverse donc tous les filtres et atterrit dans le `return`
+final.
+
+> **Le dernier cas d'une cascade de `if` n'est pas un cas : c'est un ramasse-tout.** Tout ce que
+> vos conditions n'ont pas su classer y tombe, y compris ce que vous n'aviez pas imaginé.
+
+Deux manières de s'en prémunir, et la première est la bonne :
+
+```ts
+if (Number.isNaN(exp.getTime())) return "";   // ① valider à l'ENTRÉE
+```
+
+```ts
+if (diffDays > 60) return `dans ${…} mois`;   // ② rendre le dernier cas EXPLICITE
+return "";                                     //    et garder un vrai défaut
+```
+
+① est préférable : une donnée invalide se refuse à la porte, pas trois branches plus loin.
+
+## 2. La garde qui existait déjà, trois fichiers plus loin
+
+`formatMemberSince`, dans `public-trip.helpers.ts`, fait exactement ce qu'il fallait :
+
+```ts
+const d = new Date(iso);
+if (isNaN(d.getTime())) return "";
+```
+
+Même dépôt, même type d'entrée, même risque — et la garde n'avait pas voyagé jusqu'au module
+voisin.
+
+> **Quand vous corrigez une classe de défaut, cherchez d'abord si la bonne version existe déjà
+> ailleurs dans le dépôt.** C'est plus rapide que de la réinventer, et ça rend la cohérence
+> gratuite.
+
+## 3. Le jumeau qu'on ne regarde jamais
+
+`getInitials` existe sur les deux fronts, sous le même nom. D88 a corrigé celui du **téléphone**
+le 08/11. Celui du **site** est resté fautif jusqu'ici — il recopiait son second argument tel
+quel, sans troncature ni majuscule.
+
+C'est la troisième fois que ce dépôt paie ce motif (D92 `maskEmail`, D99 la mise en forme d'un
+prix, ici les initiales), et D97 en avait tiré la règle :
+
+> **Après avoir réparé un écran ou une fonction, grep son jumeau.**
+
+La fiche qui garde maintenant la parité ne compare pas des **sorties** mais les **corps**
+normalisés des deux implémentations :
+
+```ts
+const corps = (source: string) => source
+  .slice(debut, fin)
+  .replace(/\s+/g, " ")
+  .replace(/lastNameOrInitial|lastInitial/g, "nom");   // les noms d'argument peuvent différer
+expect(duSite).toBe(duTel);
+```
+
+Pourquoi comparer le code plutôt que le comportement : une comparaison de sorties n'attrape que
+les cas qu'on a pensé à écrire. Une comparaison de règle attrape **tout** écart, y compris celui
+qu'on n'a pas imaginé — et c'est exactement le cas dont il s'agit ici.
+
+## 4. La fiche qui ne trouve rien et qu'il fallait écrire
+
+```ts
+for (let i = 0; i < 365; i++) {
+  jest.useFakeTimers().setSystemTime(new Date(Date.UTC(2026, 0, 1 + i, 9)));
+  expect(detectPreset(...applyDateRangePreset(preset))).toBe(preset);
+}
+```
+
+Poser « 3 mois » puis relire doit rendre « 3 mois ». La propriété est évidente ; sa **robustesse**
+ne l'est pas, parce que les mois ont des longueurs inégales. Un défaut y apparaîtrait un jour sur
+365 — c'est-à-dire : jamais reproductible, jamais corrigé, et signalé par un utilisateur qui
+passera pour confus.
+
+**Elle passe**, et c'est une information : la tolérance retenue (80–100 jours, 170–195) est
+correctement dimensionnée. Personne ne le savait avant ; c'était une intuition.
+
+> **Pour une propriété d'aller-retour (`lire(écrire(x)) === x`), balayez le domaine qui vous fait
+> peur.** Ici le temps ; ailleurs les fuseaux, les accents, les chaînes vides. Le coût est de
+> quelques lignes, le gain est une certitude à la place d'une intuition.
+
+Et `jest.useFakeTimers().setSystemTime()` suffit — aucune dépendance, aucune injection de
+`now` à ajouter aux signatures.
+
+## 5. Pour aller plus loin
+
+- Cherchez dans votre code les cascades de `if` qui se terminent par un `return` sans condition.
+  Demandez-vous ce qui y tombe quand l'entrée est `NaN`, `null`, `undefined` ou une chaîne vide.
+- `Number.isNaN(x)` et non `isNaN(x)` : le second convertit son argument, donc `isNaN("abc")` vaut
+  `true` — ce qui est juste ici par accident, et faux dès qu'on lui passe autre chose qu'une date.
