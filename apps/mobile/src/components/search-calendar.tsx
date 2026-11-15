@@ -19,7 +19,7 @@
  * libellés viennent des tables de `trip-format.ts` (jamais `Intl`, dont les
  * données dépendent du moteur Hermes).
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import type { SupportedLocale } from '@packages/api-contracts/locale';
@@ -30,8 +30,10 @@ import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  focusDateOf,
   isSameDay,
   isWithin,
+  monthIndexFor,
   monthMatrix,
   monthsFrom,
   startOfDay,
@@ -63,6 +65,30 @@ export function SearchCalendar({ value, onPickDayAction, locale }: Props) {
   const rangeStart = value?.mode === 'flex' ? (value.rangeStart ?? null) : null;
   const rangeEnd = value?.mode === 'flex' ? (value.rangeEnd ?? null) : null;
 
+  /**
+   * D103 2A — la grille REVIENT sur ce qui est choisi.
+   *
+   * Elle peignait déjà la fenêtre (`isWithin` plus bas) mais ne s'y rendait
+   * pas : capture du 15/11, « Cette semaine » coché, la ligne mangue annonçant
+   * « November 15 – November 21 », et douze mois plus loin à l'écran sans rien
+   * de surligné. Un contrôle qui affirme ce que la surface ne montre pas est
+   * le défaut que D100 a nommé ; ici il se répare en bougeant la LISTE, pas
+   * la règle.
+   *
+   * Le mois cible est calculé par une règle PURE (`focusDateOf` +
+   * `monthIndexFor`, `lib/search-date.ts`), donc testable hors de l'écran.
+   */
+  const liste = useRef<FlatList<Date> | null>(null);
+  const cible = useMemo(() => monthIndexFor(months, focusDateOf(value)), [months, value]);
+
+  useEffect(() => {
+    if (cible === null) return;
+    // Les mois n'ont pas tous la même hauteur (4 à 6 semaines) : sans
+    // `getItemLayout`, `scrollToIndex` peut échouer si le mois visé n'est pas
+    // encore monté. `onScrollToIndexFailed` ci-dessous rattrape ce cas.
+    liste.current?.scrollToIndex({ index: cible, animated: true, viewPosition: 0 });
+  }, [cible]);
+
   const renderMonth = useCallback(
     ({ item }: { item: Date }) => (
       <Month
@@ -92,6 +118,7 @@ export function SearchCalendar({ value, onPickDayAction, locale }: Props) {
         ))}
       </View>
       <FlatList<Date>
+        ref={liste}
         data={months}
         keyExtractor={(month) => `${month.getFullYear()}-${month.getMonth()}`}
         renderItem={renderMonth}
@@ -99,6 +126,14 @@ export function SearchCalendar({ value, onPickDayAction, locale }: Props) {
         windowSize={5}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        // Le mois visé n'était pas encore rendu : on s'approche, puis on
+        // réessaie une fois. Sans ce garde-fou, `scrollToIndex` lève.
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          liste.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+          setTimeout(() => {
+            liste.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+          }, 80);
+        }}
       />
     </View>
   );

@@ -176,9 +176,29 @@ export default function CitySearchScreen() {
             // parle de la saisie, « indisponibles » parle du service, et
             // rappelle que la recherche marche quand même au texte tapé.
             typing && !loading ? (
-              <ThemedText type="small" themeColor="textSecondary" style={styles.noResult}>
-                {available ? t('city.noResult') : t('city.unavailable')}
-              </ThemedText>
+              <View>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.noResult}>
+                  {available ? t('city.noResult') : t('city.unavailable')}
+                </ThemedText>
+                {/* D103 3A — la SORTIE existait déjà : la touche « rechercher »
+                    du clavier valide le texte tapé (`onSubmitEditing`). Mais
+                    rien à l'écran ne le disait : l'Expéditeur lisait « aucune
+                    ville trouvée » sous un « Paris » parfaitement valide, et
+                    voyait un cul-de-sac. Une issue qui n'existe que sur une
+                    touche de clavier n'est pas une issue — c'est un raccourci
+                    pour qui la connaît déjà. */}
+                <Pressable
+                  onPress={() => commit(query)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
+                  <View style={[styles.pin, { backgroundColor: theme.backgroundElement }]}>
+                    <Ionicons name="search" size={18} color={theme.text} />
+                  </View>
+                  <ThemedText numberOfLines={1} style={styles.useTyped}>
+                    {t('city.useTyped', { city: query.trim() })}
+                  </ThemedText>
+                </Pressable>
+              </View>
             ) : null
           }
           renderItem={({ item }) => (
@@ -262,6 +282,12 @@ const styles = StyleSheet.create({
   },
   noResult: {
     paddingTop: Spacing.three,
+  },
+  // D103 3A — la ligne de sortie se lit comme une suggestion, parce qu'elle
+  // en est une : c'est la ville telle qu'elle a été tapée.
+  useTyped: {
+    flex: 1,
+    minWidth: 0,
   },
   suggestion: {
     flexDirection: 'row',

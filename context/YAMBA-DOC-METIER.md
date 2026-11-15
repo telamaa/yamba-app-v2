@@ -9055,3 +9055,43 @@ qui ne casse jamais en développement et se découvre en production.
 | 2 | Une règle de `src/lib` est modifiée à tort | la CI passe au rouge |
 | 3 | Un alias est ajouté d'un seul côté | la fiche des alias part au rouge |
 | 4 | Un composant React est ajouté à une fiche | il n'est pas rendu — la frontière est assumée |
+
+---
+
+# D103 — L'éditeur de recherche dit ce qu'il fait (15/11/2026)
+
+## Le besoin
+
+Modifier sa recherche est le premier geste de tout Expéditeur qui n'a pas trouvé du premier coup.
+Quatre écrans le composent, et chacun affirmait quelque chose de faux : un titre illisible sous
+l'horloge, une période annoncée que la grille ne montrait pas, une ville valide déclarée
+inexistante, un champ vide qui se lisait comme rempli.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D103-1** | Aucun texte d'interface ne passe sous la barre d'état ni sous l'encoche, **sur tous les écrans**. | Un titre illisible n'est pas un défaut d'esthétique : c'est une information perdue. |
+| **RG-D103-2** | Quand une période est choisie, le calendrier **se rend** dessus et la **peint**. | Annoncer « 15 – 21 novembre » en montrant janvier n'est pas une approximation, c'est une contradiction. |
+| **RG-D103-3** | Un écran de saisie ne laisse jamais l'Expéditeur sans issue **visible**. Valider ce qu'il a tapé est toujours proposé à l'écran, jamais seulement au clavier. | Une issue qui n'existe que sur une touche n'existe que pour qui la connaît. |
+| **RG-D103-4** | « Aucun résultat » et « service indisponible » sont **deux** messages distincts. | Le premier parle de la saisie, le second du produit. Les confondre fait dire à l'écran qu'une ville n'existe pas. |
+| **RG-D103-5** | Un champ **vide** se distingue d'un champ rempli par la **graisse**, pas seulement par la couleur. | Une différence de couleur seule n'est pas une hiérarchie (RG-D99). |
+| **RG-D103-6** | L'action destructrice n'utilise jamais la couleur de l'action primaire. | La charte ne doit pas signaler de la même façon ce qui construit et ce qui détruit. |
+
+## Ce que l'Expéditeur gagne
+
+Il lit les titres. Il voit la période qu'il a choisie. Il peut avancer avec le nom de ville qu'il
+connaît, même quand nos suggestions sont muettes. Et il ne confond plus un champ à remplir avec un
+champ rempli.
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre le calendrier depuis la feuille | le titre est entièrement lisible, sous la barre d'état |
+| 2 | Je choisis « Cette semaine » | la grille revient sur la semaine et la peint |
+| 3 | Je choisis une date exacte dans trois mois | la grille se rend sur ce mois |
+| 4 | Je tape une ville et aucune suggestion ne vient | une ligne me propose d'utiliser ce que j'ai tapé |
+| 5 | Le service de suggestions est en panne | le message parle du **service**, pas de ma saisie |
+| 6 | Je n'ai pas choisi de date | « Choisis une date » se lit comme un champ vide |
+| 7 | Je regarde l'en-tête de la feuille | « Tout effacer » ne m'attire pas l'œil avant « Rechercher » |

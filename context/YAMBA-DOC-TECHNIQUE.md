@@ -18210,3 +18210,126 @@ expect(installes.filter((p) => p.includes('jsdom'))).toEqual([]);
 | `nx typecheck user-ui` | propre (les **deux** programmes) |
 | `nx run-many --target=typecheck --all` | **11 projets**, tous verts |
 | `nx test @yamba-app/mobile` | 810 / 41 — inchangé |
+
+---
+
+# D103 — L'éditeur de recherche dit ce qu'il fait (`feat/editeur-de-recherche-honnete`, 15/11/2026)
+
+Revue d'écran sur quatre captures du 15/11, couvrant l'éditeur de bout en bout : feuille,
+calendrier exact, calendrier flexible, saisie de ville.
+
+## 1A — Aucun `SafeAreaProvider` dans tout le dépôt
+
+Le titre du calendrier est posé **sur** l'horloge et la Dynamic Island.
+
+La piste évidente — une déclaration `edges` manquante — était **fausse** :
+
+```tsx
+// date.tsx  : <SafeAreaView edges={['top', 'left', 'right', 'bottom']}>
+// city.tsx  : <SafeAreaView edges={['top', 'left', 'right']}>
+```
+
+Mêmes marges d'en-tête, même conteneur, même pile, même présentation. **Et l'un passait quand
+l'autre non.**
+
+> **Deux écrans au code identique, un résultat différent : la cause n'est pas dans le code
+> comparé.**
+
+Mesure décisive :
+
+```sh
+grep -rn "SafeAreaProvider" apps/mobile/src   # → rien
+grep -rln "safe-area-context" apps/mobile/src | wc -l   # → 25
+```
+
+Sans fournisseur, chaque `SafeAreaView` s'en remet à la mesure de sa propre vue native, qui rend
+**zéro** au premier rendu à l'intérieur d'une pile présentée en `transparentModal` — ce qu'est
+tout l'éditeur de recherche (`_layout.tsx`).
+
+```tsx
+<SafeAreaProvider initialMetrics={initialWindowMetrics}>
+```
+
+`initialMetrics` n'est pas décoratif : **le fournisseur seul corrige au second rendu**, c'est-à-dire
+qu'on troque un chevauchement permanent contre un saut visible. Les deux vont ensemble.
+
+**Ce n'est pas un défaut de deux écrans : c'est un défaut de vingt-cinq, dont deux le montraient.**
+
+## 2A — La grille n'allait pas où le contrôle disait
+
+« Cette semaine » coché, la ligne mangue annonçant **« November 15 – November 21 »**, et la grille
+restée sur **janvier 2027** — sans rien de surligné.
+
+Le calendrier **savait** peindre la fenêtre (`isWithin`, `search-calendar.tsx:152`). Il ne s'y
+rendait pas. On corrige donc la **liste**, pas la règle. Et le mois à montrer devient une règle
+pure, donc testable hors de l'écran :
+
+```ts
+export function focusDateOf(value: SearchDate | null): Date | null
+export function monthIndexFor(months: readonly Date[], target: Date | null): number | null
+```
+
+Deux détails qui comptent :
+
+- `null` quand rien n'est choisi **ou** quand la cible tombe hors des douze mois — mieux vaut ne
+  pas défiler que défiler n'importe où ;
+- `onScrollToIndexFailed` est obligatoire : les mois font 4 à 6 semaines, il n'y a donc pas de
+  `getItemLayout`, et `scrollToIndex` **lève** quand le mois visé n'est pas encore monté.
+
+## 3A — « No city found » était un cul-de-sac qui ment
+
+On tape « Paris », on lit que la ville n'existe pas.
+
+L'écran distinguait pourtant déjà les deux cas :
+
+```tsx
+{available ? t('city.noResult') : t('city.unavailable')}
+```
+
+Et le relais répondait, à la mesure : `503 PLACES_UNAVAILABLE`. Mais **le défaut d'usage est plus
+profond et ne dépend pas du 503** :
+
+> La sortie existait — `onSubmitEditing` valide le texte tapé — et **rien à l'écran ne le disait**.
+> Une issue qui n'existe que sur une touche de clavier n'est pas une issue : c'est un raccourci
+> pour qui la connaît déjà.
+
+L'état vide porte désormais une ligne tapable, « Utiliser "Paris" », avec la même anatomie qu'une
+suggestion — parce qu'elle en est une.
+
+## 4A et 5A — La feuille d'édition
+
+| | Avant | Après |
+|---|---|---|
+| Espace réservé | même graisse et même taille que la valeur, seule la couleur diffère | `type={filled ? 'smallBold' : 'small'}` — la graisse fait la différence, la couleur la confirme |
+| « Tout effacer » | mangue, seule couleur de la zone haute, celle de l'action **primaire** | neutre, toujours atteignable et nommé |
+
+4A est **exactement** le défaut tranché par D99 5C trois jours plus tôt sur le pays d'une carte :
+une différence de couleur seule n'est pas une hiérarchie. Le même défaut se rejouait un écran
+plus loin.
+
+## Ce que les fiches ont appris en route
+
+Une fiche trop maligne se trompe de cible. Celle de 4A découpait le fichier pour isoler un bloc :
+
+```ts
+const debut = feuille.lastIndexOf('<ThemedText', bloc);   // ← trouve le bouton d'envoi
+```
+
+Rouge pour rien. Elle vise désormais les deux expressions directement. Le dépôt avait déjà la
+leçon sur les tranches (D98, l'offset manquant) ; celle-ci en est la variante : **une tranche
+juste peut viser le mauvais bloc.**
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **829 / 42 suites** (810 + 19) |
+| `nx test user-ui` | 35 / 3 — inchangé |
+| `nx run-many --target=typecheck --all` | 11 projets, verts |
+| i18n FR/EN | miroir parfait |
+| Bundle iOS | HTTP 200, **1,35 s**, zéro erreur |
+| Application sur simulateur | démarre, aucune régression d'accueil |
+
+**Non vérifié** : aucun des cinq correctifs n'a été vu **au doigt** — `simctl` ne sait pas toucher
+l'écran. Et le bon message de 3A (« suggestions indisponibles ») n'a pas pu être vu à l'écran, le
+relais Places répondant 503 en local.

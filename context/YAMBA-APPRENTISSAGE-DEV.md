@@ -9278,3 +9278,127 @@ expect(installes.filter((p) => p.includes('jsdom'))).toEqual([]);
   décident d'un **prix** ou d'un **accès**.
 - Un contrôle ajouté à `ci.yml` n'est pas requis tant qu'il n'est pas coché dans
   `branches/dev/protection`. Trois le sont encore, et aucun code ne le corrigera.
+
+---
+
+# Chapitre 244 — Une cause plausible n'est pas une cause (D103)
+
+## 1. Le piège du diagnostic évident
+
+Symptôme : le titre d'un écran chevauche la barre d'état.
+
+L'hypothèse qui vient en premier — et elle est **raisonnable** — est « il manque le `edges` de la
+zone sûre ». On ouvre le fichier, on ajoute `edges={['top']}`, on passe à la suite.
+
+Ici, cette hypothèse était **fausse**, et le correctif aurait été inutile : le `edges` était déjà
+là. Ce qui a tranché n'est pas une intuition, c'est une **comparaison** :
+
+| | `date.tsx` | `city.tsx` |
+|---|---|---|
+| `edges` | `['top','left','right','bottom']` | `['top','left','right']` |
+| marge d'en-tête | `Spacing.two` | `Spacing.two` |
+| conteneur | identique | identique |
+| pile / présentation | la même | la même |
+| **résultat** | **chevauche** | **correct** |
+
+> **Deux écrans au code identique et un résultat différent : la cause n'est pas dans le code
+> comparé.** C'est le moment de remonter d'un cran, pas d'éditer le fichier.
+
+Un cran plus haut :
+
+```sh
+grep -rn "SafeAreaProvider" apps/mobile/src          # → rien
+grep -rln "safe-area-context" apps/mobile/src | wc -l  # → 25
+```
+
+Vingt-cinq consommateurs, zéro fournisseur.
+
+## 2. Le concept : qui mesure la zone sûre
+
+`react-native-safe-area-context` fonctionne en deux temps :
+
+1. un **fournisseur** mesure la fenêtre et diffuse les insets ;
+2. chaque `SafeAreaView` / `useSafeAreaInsets()` les lit.
+
+Sans fournisseur, la vue native se mesure elle-même. Dans un écran plein, ça marche *par accident*.
+Dans une pile présentée en `transparentModal`, le conteneur natif ne s'étend pas sous la barre
+d'état **dans son propre repère** : la mesure rend **zéro**, et le contenu remonte.
+
+Et `initialMetrics` n'est pas une option cosmétique :
+
+```tsx
+<SafeAreaProvider initialMetrics={initialWindowMetrics}>
+```
+
+Sans lui, le fournisseur lui-même part de zéro et corrige au rendu suivant. On échange un
+chevauchement permanent contre un **saut visible**. Les deux vont ensemble, toujours.
+
+> **À emporter** : un symptôme qui apparaît sur un écran et pas sur son jumeau est presque
+> toujours un problème de **contexte**, pas de composant. Cherchez ce qui enveloppe, pas ce qui
+> est enveloppé.
+
+## 3. Réparer la liste, pas la règle
+
+Le calendrier annonçait « 15 – 21 novembre » et montrait janvier 2027.
+
+Réflexe tentant : « la règle de sélection est cassée ». Vérification : non — `isWithin` peignait
+correctement la fenêtre. **Ce qui manquait n'était pas la peinture, c'était le déplacement.**
+
+Le correctif tient en une règle pure et un effet :
+
+```ts
+const cible = useMemo(() => monthIndexFor(months, focusDateOf(value)), [months, value]);
+useEffect(() => {
+  if (cible === null) return;
+  liste.current?.scrollToIndex({ index: cible, animated: true, viewPosition: 0 });
+}, [cible]);
+```
+
+Deux pièges payés au passage :
+
+- **`null` est une réponse, pas un échec.** Rien de choisi, ou cible hors des douze mois
+  construits : on ne défile pas. Défiler « quelque part » est pire que ne pas défiler.
+- **`scrollToIndex` lève** si l'élément visé n'est pas monté, et il n'y a pas de `getItemLayout`
+  possible ici (un mois fait 4 à 6 semaines). `onScrollToIndexFailed` n'est pas une politesse,
+  c'est la moitié du correctif.
+
+## 4. Une issue qui n'existe que sur une touche n'existe pas
+
+L'écran de saisie de ville avait déjà tout ce qu'il fallait :
+
+```tsx
+onSubmitEditing={() => commit(query)}   // la touche « rechercher » du clavier
+```
+
+Et pourtant l'Expéditeur voyait « No city found » sous un « Paris » parfaitement valide, sans un
+bouton à l'écran.
+
+> **Une fonctionnalité invisible est une fonctionnalité absente.** Quand vous écrivez un état vide,
+> demandez-vous : *quelle est l'action suivante, et se voit-elle ?* Si la réponse est « il suffit
+> d'appuyer sur Entrée », vous avez un raccourci, pas une issue.
+
+## 5. Le même défaut se rejoue un écran plus loin
+
+D99 5C, trois jours plus tôt : un pays écrit à la taille de la ville, ne différant que par la
+couleur. D103 4A : un espace réservé écrit à la graisse de la valeur, ne différant que par la
+couleur.
+
+Même maladie, autre écran, trois jours d'écart.
+
+> Quand vous corrigez un défaut de **hiérarchie visuelle**, cherchez immédiatement ses jumeaux.
+> Une règle de mise en forme fausse est rarement appliquée à un seul endroit — c'est une habitude,
+> pas un accident.
+
+## 6. Et la fiche qui se trompe de bloc
+
+Variante de la leçon des tranches (chapitre 240) :
+
+```ts
+const debut = feuille.lastIndexOf('<ThemedText', bloc);  // trouve le bouton d'envoi
+```
+
+La tranche était *valide* — début avant fin, contenu non vide — et visait le **mauvais** bloc. Elle
+est partie au rouge pour rien, et le temps passé à comprendre pourquoi n'a rien produit.
+
+> **Une assertion directe bat une assertion maligne.** `expect(fichier).toMatch(/type=\{filled \?/)`
+> dit la même chose, ne se trompe pas de cible, et se lit sans effort dans six mois.

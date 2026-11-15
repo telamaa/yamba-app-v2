@@ -11,6 +11,8 @@ import { useFonts } from 'expo-font';
 import { AppSplash } from '@/components/app-splash';
 import { Brand } from '@/constants/theme';
 import { FONT_ASSETS } from '@/constants/typography';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+
 import { AppIntlProvider } from '@/i18n/provider';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { handleStripeRedirect } from '@/lib/stripe-sheet';
@@ -118,6 +120,20 @@ export default function RootLayout() {
   if (!fontsReady) return <AppSplash />;
 
   return (
+    /* D103 1A — le dépôt n'avait AUCUN `SafeAreaProvider`, alors que vingt-cinq
+       fichiers consomment `react-native-safe-area-context`. Sans fournisseur,
+       chaque `SafeAreaView` s'en remet à la mesure de sa propre vue native —
+       qui rend ZÉRO au premier rendu à l'intérieur d'une pile présentée en
+       `transparentModal`, ce qu'est tout l'éditeur de recherche ci-dessous.
+       D'où le titre du calendrier posé SUR l'horloge et la Dynamic Island,
+       capture du 15/11, pendant que l'écran VILLE — au code identique, même
+       `edges`, mêmes marges — passait.
+
+       `initialMetrics` est ce qui rend la mesure SYNCHRONE dès le premier
+       rendu : sans lui, le fournisseur lui-même commence à zéro et corrige
+       au rendu suivant, ce qui donne un saut visible plutôt qu'un
+       chevauchement permanent. Les deux vont ensemble. */
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <AppIntlProvider>
       <SessionProvider>
         <ThemeProvider value={theme}>
@@ -157,5 +173,6 @@ export default function RootLayout() {
         </ThemeProvider>
       </SessionProvider>
     </AppIntlProvider>
+    </SafeAreaProvider>
   );
 }

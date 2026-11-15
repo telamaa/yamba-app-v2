@@ -95,7 +95,8 @@
   "city": {
     "clear": "Clear the field",
     "noResult": "No city found",
-    "unavailable": "Suggestions unavailable — type the city, search still works"
+    "unavailable": "Suggestions unavailable — type the city, search still works",
+    "useTyped": "Use \"{city}\""
   },
   "badges": {
     "superTripper": "Super Traveler",
