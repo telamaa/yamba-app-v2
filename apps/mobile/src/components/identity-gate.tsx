@@ -98,9 +98,26 @@ export type GateDestination = 'favorites' | 'activity' | 'messages' | 'publish' 
 export function IdentityGate({
   children,
   destination,
+  onDismiss,
 }: {
   children: ReactNode;
   destination?: GateDestination;
+  /**
+   * D104 1B — de quoi REFERMER l'écran, quand il n'y a pas de barre
+   * d'onglets pour servir de sortie.
+   *
+   * Les quatre onglets derrière cette porte gardent leur barre : elle EST
+   * leur sortie, et un retour y serait faux (il n'y a rien derrière). Un
+   * écran POUSSÉ au-dessus des onglets, lui, n'a plus rien — et c'est
+   * exactement ce qui est arrivé à Profil depuis A210, qui l'a sorti de la
+   * barre : son bouton de retour vivait dans son contenu, donc DERRIÈRE
+   * cette porte, donc invisible à celui qu'elle arrête.
+   *
+   * La sortie devient donc une responsabilité de la PORTE, puisque c'est
+   * elle qui remplace l'écran. L'appelant poussé la fournit ; les onglets
+   * l'omettent. Une fiche de balayage vérifie que personne ne l'oublie.
+   */
+  onDismiss?: () => void;
 }) {
   const { status } = useSession();
   const t = useTranslations('tabs');
@@ -136,6 +153,21 @@ export function IdentityGate({
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+        {onDismiss !== undefined && (
+          <View style={styles.backRow}>
+            <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button">
+              <ThemedText type="linkPrimary">‹ {t('profile.back')}</ThemedText>
+            </Pressable>
+          </View>
+        )}
+
+        {/* D104 2A — un vide AU-DESSUS seulement quand il n'y a pas de barre
+            d'onglets : le bloc se centre alors entre le retour et le bas, au
+            lieu de se tasser en haut d'un écran aux trois quarts vide. La
+            rangée de retour, elle, ne bouge pas — elle reste là où l'œil la
+            cherche. */}
+        {onDismiss !== undefined && <View style={styles.spacer} />}
+
         <View style={styles.block}>
           {/* ① Le titre de page : le plus gros caractère de l'écran. Même
               gabarit que la rangée de titre des écrans CONNECTÉS — il ne doit
@@ -177,7 +209,14 @@ export function IdentityGate({
 
         {/* TOUT le vide est ici, SOUS le contenu : la barre d'onglets y
             flotte sans rien masquer, et rien n'a donc à lui réserver de la
-            place. */}
+            place.
+
+            D104 2A — cette justification vaut pour les ONGLETS, pas au-delà.
+            Un écran poussé (celui qui fournit `onDismiss`) n'a pas de barre :
+            le vide y serait du vide sans emploi, les trois quarts bas de
+            l'écran. Le bloc se recentre alors. Une mise en page se justifie
+            par le contexte qui l'a motivée ; hors de ce contexte, elle n'est
+            plus qu'une habitude. */}
         <View style={styles.spacer} />
       </SafeAreaView>
     </View>
@@ -197,6 +236,13 @@ const styles = StyleSheet.create({
   block: {
     paddingHorizontal: InviteGutter,
     paddingTop: Spacing.four,
+  },
+  // D104 1B — même gabarit que la rangée de retour des écrans connectés
+  // (`profile.tsx`) : l'écran ne doit pas bouger quand la session s'ouvre.
+  backRow: {
+    paddingHorizontal: InviteGutter,
+    paddingTop: Spacing.two,
+    alignSelf: 'flex-start',
   },
   // Le grand écart qui FAIT l'épure : le titre de page vit seul, l'accroche
   // ouvre un second bloc. Mesuré à ~57 pt sur la référence.
