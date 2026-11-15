@@ -7,6 +7,13 @@ import type { PublicTopRoute, PublicUser } from "./public-user.types";
 export function formatMemberSince(isoDate: string, locale: "fr" | "en"): string {
   const date = new Date(isoDate);
 
+  // A224 lot 4 — une date illisible rendait « undefined NaN » : `getMonth()`
+  // vaut NaN, et `months[locale][NaN]` vaut `undefined`. Sur la page de
+  // profil PUBLIC, c'est-à-dire la plus visible du produit.
+  // L'homonyme du fichier voisin (`public-trip.helpers.ts`) portait déjà la
+  // garde — elle n'avait pas voyagé de trois lignes.
+  if (Number.isNaN(date.getTime())) return "";
+
   const months = {
     fr: [
       "janvier", "février", "mars", "avril", "mai", "juin",
@@ -33,6 +40,12 @@ export function formatRelativeDate(
   locale: "fr" | "en"
 ): string {
   const date = new Date(isoDate);
+  // A224 lot 4 — même garde, même raison : sans elle, `diffMs` vaut NaN,
+  // TOUTE comparaison avec NaN est fausse, et le flot tombe dans le dernier
+  // cas de la cascade sans qu'aucune condition ne l'ait choisi — « il y a NaN
+  // mois ». C'est exactement le défaut de `formatExpiresIn`, trouvé ce matin
+  // dans `saved-route.helpers.ts`.
+  if (Number.isNaN(date.getTime())) return "";
   const now = Date.now();
   const diffMs = now - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -62,11 +75,19 @@ export function formatRelativeDate(
  * Récupère les initiales d'un user pour un avatar fallback.
  * Ex: "Enrique", "T" → "ET"
  */
-export function getInitials(firstName: string, lastInitial: string): string {
-  const f = firstName.charAt(0).toUpperCase();
-  const l = lastInitial.toUpperCase();
-  return `${f}${l}`;
-}
+/**
+ * A224 lot 4 — TROISIÈME copie du même défaut, et elle servait la page de
+ * profil PUBLIC (`UserHero`, `TripperBlock`, `ShipperBlock`).
+ *
+ * `lastInitial.toUpperCase()` prenait la chaîne ENTIÈRE : « Marven MABIALA »
+ * rendait « MMABIALA », le défaut que D88 a corrigé sur le téléphone le
+ * 08/11 et que le lot 3 a corrigé sur `public-trip.helpers.ts` ce matin.
+ * Il y avait deux jumeaux, pas un.
+ *
+ * Il n'y a désormais qu'UNE implémentation par front, et une fiche compte
+ * les copies plutôt que de faire confiance à la mémoire.
+ */
+export { getInitials } from "./public-trip.helpers";
 
 /**
  * Calcule la note globale pondérée par nombre de votes.
@@ -81,14 +102,19 @@ export function calculateGlobalRating(user: PublicUser): {
   const tripper = user.tripperRating;
   const shipper = user.shipperRating;
 
+  // A224 lot 4 — les deux rôles sont traités PAREIL. `tripperRating` était
+  // lu avec précaution (`tripper?.count ?? 0`) et `shipperRating` sans :
+  // un profil servi sans ce champ faisait TOMBER la page publique. Une
+  // asymétrie de ce genre ne se voit pas — elle attend une donnée
+  // incomplète, et l'API peut en servir une le jour d'une migration.
   const tripperCount = tripper?.count ?? 0;
-  const shipperCount = shipper.count;
+  const shipperCount = shipper?.count ?? 0;
   const totalCount = tripperCount + shipperCount;
 
   if (totalCount === 0) return null;
 
   const tripperWeighted = (tripper?.average ?? 0) * tripperCount;
-  const shipperWeighted = shipper.average * shipperCount;
+  const shipperWeighted = (shipper?.average ?? 0) * shipperCount;
 
   return {
     average: (tripperWeighted + shipperWeighted) / totalCount,

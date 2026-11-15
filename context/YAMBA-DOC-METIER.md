@@ -9241,3 +9241,35 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 | 3 | Je me déconnecte | l'accueil repart vierge |
 | 4 | Je ferme l'app et la rouvre | l'accueil repart vierge |
 | 5 | Mes résultats sont affichés et je navigue dans l'onglet | rien ne clignote, aucune requête inutile |
+
+---
+
+# A224 lot 4 — Quatre défauts sur le profil public (15/11/2026)
+
+| Défaut | Ce que le visiteur voyait | Où |
+|---|---|---|
+| Initiales | « MMABIALA » au lieu de « MM » | pastille d'identité, avis, blocs Voyageur et Expéditeur |
+| Ancienneté | « **undefined NaN** » | sous le nom |
+| Date d'avis | « il y a **NaN** mois » | chaque avis |
+| Note globale | **la page ne s'affiche pas** | si un rôle manque |
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-16** | Une règle d'affichage n'a **qu'une** implémentation par front, et une fiche **compte** les copies. | « Chercher le jumeau » suppose qu'il n'y en a qu'un : il y en avait deux. |
+| **RG-A224-17** | Aucune date illisible ne produit de texte calculé. | « undefined NaN » sur un profil public est pire qu'une ligne absente. |
+| **RG-A224-18** | Les deux rôles (Voyageur, Expéditeur) sont lus avec la **même** prudence. | Une asymétrie attend une donnée incomplète pour faire tomber la page. |
+| **RG-A224-19** | Un mot de passe ne peut contenir ni le prénom, ni le nom, ni la part locale de l'e-mail. | Sinon « Marven2026! » passe tous les critères et se devine en trois essais. |
+| **RG-A224-20** | Un domaine de messagerie inconnu n'est **jamais** deviné. | Un lien fabriqué enverrait vers une page inexistante, ou pire. |
+| **RG-A224-21** | « Renvoyer le code » n'est proposé qu'une fois le délai écoulé. | Le refus serveur se lit comme une panne. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Je consulte le profil de « Marven Mabiala » | la pastille affiche « MM » |
+| 2 | Un profil a une date abîmée | rien ne s'affiche à cet endroit, jamais « NaN » |
+| 3 | Un membre n'a jamais expédié | sa page s'affiche quand même |
+| 4 | Je choisis « Marven2026! » comme mot de passe | il est refusé, et on me dit pourquoi |
+| 5 | Mon adresse est chez un fournisseur inconnu | aucun lien « ouvrir ma messagerie » n'est proposé |

@@ -9957,3 +9957,104 @@ plus à chaque fois — un coût invisible en Wi-Fi, bien réel en 3G à Brazzav
 
 > Réparer une conséquence sans avoir trouvé la cause est parfois le bon choix ; le dire dans
 > l'entrée du registre est obligatoire.
+
+---
+
+# Chapitre 250 — « Grep ton jumeau » suppose qu'il n'y en a qu'un (A224 lot 4)
+
+## 1. Trois corrections pour un seul défaut
+
+| Date | Corrigé | Ce qu'on croyait |
+|---|---|---|
+| 08/11 | le téléphone | « c'est corrigé » |
+| 15/11 matin | `public-trip.helpers.ts` | « j'ai trouvé le jumeau » |
+| 15/11 après-midi | `public-user.helpers.ts` | il y avait **deux** jumeaux |
+
+La règle du chapitre 247 — *après avoir réparé une fonction, grep son jumeau* — est juste, et
+**insuffisante** : elle contient une hypothèse tacite, celle du singulier.
+
+```sh
+grep -rn "function getInitials" apps --include="*.ts" --include="*.tsx" | grep -v spec
+#  4 résultats
+```
+
+> **Ne cherchez pas « le » jumeau : comptez les copies.** Et mieux encore, faites-les compter par
+> une fiche — elle, elle ne suppose rien :
+>
+> ```ts
+> expect(implementations).toEqual(["lib/public-trip.helpers.ts"]);
+> ```
+
+## 2. Le même correctif, trois fois, et jamais là où il faut
+
+Trois fois dans la même journée, la bonne version **existait déjà** dans le dépôt :
+
+| Défaut | Où vivait la bonne version |
+|---|---|
+| `formatExpiresIn` → « NaN mois » | `formatMemberSince`, trois fichiers plus loin |
+| `formatMemberSince` → « undefined NaN » | son homonyme du fichier **voisin** |
+| `getInitials` → « MMABIALA » | le téléphone, depuis une semaine |
+
+> **Quand vous corrigez une classe de défaut, la première question n'est pas « comment le
+> corriger » mais « où est-ce déjà corrigé ».** C'est plus rapide, et la cohérence devient
+> gratuite au lieu d'être un effort.
+
+## 3. L'asymétrie qui attend
+
+```ts
+const tripperCount = tripper?.count ?? 0;   // prudent
+const shipperCount = shipper.count;          // ← pas prudent
+```
+
+Les deux lignes se suivent. Elles ont été écrites le même jour, par la même personne, pour la
+même chose — et l'une se protège, l'autre non.
+
+Ce type de défaut ne produit **aucun symptôme** tant que la donnée est complète. Il attend une
+migration d'API, un champ retiré, un profil créé avant une colonne.
+
+> **Lisez les lignes voisines ensemble.** Quand deux expressions font la même chose sur deux
+> champs, toute différence entre elles est soit une décision, soit un bug — et si c'est une
+> décision, elle mérite un commentaire.
+
+## 4. Ce qu'une fiche de sécurité doit interdire
+
+Pour un module de force de mot de passe, le réflexe est de tester « un bon mot de passe passe ».
+C'est le test le moins utile. Les trois qui comptent :
+
+```ts
+// ① il refuse ce qui ressemble à son propriétaire
+expect(getPasswordChecks("Marven2026!", { firstName: "Marven" }).personalInfo).toBe(false);
+
+// ② il ne se laisse pas tromper par la casse ni les accents
+expect(getPasswordChecks("elodie2026!", { firstName: "Élodie" }).personalInfo).toBe(false);
+
+// ③ il ne SURESTIME jamais
+expect(getPasswordLevel("Abcdefg1", score)).not.toBe("excellent");
+```
+
+Et une quatrième, moins évidente, qui touche à l'ergonomie plus qu'à la sécurité :
+
+```ts
+// le niveau MONTE avec le score, sans jamais redescendre
+```
+
+Une barre de force qui recule pendant qu'on ajoute des caractères fait croire qu'on s'est trompé.
+C'est une propriété de **monotonie**, et elle se teste en balayant le domaine.
+
+## 5. Ne jamais deviner une URL
+
+```ts
+export function webmailUrl(email: string): string | null {
+  // … WEBMAILS[domain] ?? null
+}
+```
+
+Le commentaire du module dit l'essentiel : deviner `https://webmail.<domaine>` enverrait vers une
+page qui n'existe pas — **ou pire, vers autre chose**. Une table explicite et `null` par défaut.
+
+La fiche vérifie en plus que chaque entrée est **absolue et en https** : une entrée mal recopiée
+(`/mail.google.com` au lieu de `https://…`) enverrait le membre sur une page **du site** portant
+un nom de fournisseur. La confusion parfaite, et elle passerait toutes les revues.
+
+> **Toute table de liens sortants mérite une fiche qui vérifie leur forme**, pas seulement leur
+> présence.
