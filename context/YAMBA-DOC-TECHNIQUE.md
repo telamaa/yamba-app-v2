@@ -18627,3 +18627,110 @@ intuition.
 ## Reste
 
 **25 fichiers purs** de `src/lib` sans fiches.
+
+---
+
+# D105 — Un même geste ne porte pas quatre costumes (`fix/un-seul-retour`, 15/11/2026)
+
+Retour de recette, deux observations : « j'ai souvent ce petit bug sur la flèche de retour mal
+positionnée » et « sur la page profil la flèche ajoutée est différente des autres ».
+
+## L'inventaire, et il est accablant
+
+```sh
+grep -rhn 'chevron-back" size={[0-9]*}' apps/mobile/src | grep -o "size={[0-9]*}" | sort | uniq -c
+#    4 size={20}
+#    2 size={22}
+#    2 size={26}
+```
+
+Plus un **lien texte** « ‹ Retour » sur le profil. Soit **quatre variantes** du même geste, trois
+zones tactiles (`hitSlop` 8, 10, 12), et le mot « Retour » dupliqué en **six clés** i18n.
+
+> **Une incohérence de charte ne se voit pas en LISANT le code, elle se voit en le COMPTANT.**
+> Chacun des neuf retours est défendable isolément — c'est leur collection qui est fautive, et
+> aucune revue fichier par fichier ne peut la produire.
+
+La commande ci-dessus a rendu le diagnostic en trois secondes là où trois jours de lecture
+n'avaient rien vu.
+
+## Et moi aussi
+
+La flèche ajoutée à la porte d'identité **la veille** par D104 — celle que l'utilisateur a
+repérée — recopie le lien texte de `ProfileContent` au lieu de s'aligner sur le motif dominant.
+
+**C'est le défaut reproché au code depuis trois jours, commis en le corrigeant.** Quand on ajoute
+un élément d'interface, le réflexe « je copie le voisin » produit exactement la dérive qu'on
+dénonce ; le bon réflexe est « je compte les autres ».
+
+## 2A — Le nom accessible manquait là où il compte le plus
+
+`city.tsx` et `date.tsx` rendaient un chevron **nu**, sans `accessibilityLabel` : un lecteur
+d'écran y annonçait « bouton », sans plus.
+
+D98 2A avait déjà payé cette leçon sur les boutons d'attente (« quand le texte visible disparaît,
+le bouton perd son NOM »). Elle n'avait pas traversé jusqu'aux en-têtes.
+
+Le composant partagé rend l'oubli **impossible** :
+
+```ts
+label: string;      // requis — un chevron nu n'a pas de nom implicite
+```
+
+TypeScript le réclame à chaque appel. C'est plus solide qu'une revue.
+
+## Ce qui est conservé comme différence légitime
+
+| Variante | Quand | Pourquoi |
+|---|---|---|
+| `bare` | rangée d'en-tête | rien à surmonter, un fond l'alourdirait |
+| `boxed` | le chevron **flotte** sur du contenu | il a besoin d'un fond pour rester lisible |
+
+> **On ne supprime pas une différence qui a une raison — on supprime celles qui n'en ont pas.**
+
+Exception nommée dans la fiche : `auth-screen.tsx`, dont le glyphe **alterne** entre « fermer » et
+« retour » selon la façon dont la feuille a été ouverte. C'est une fermeture, pas un retour.
+
+## La frontière du harnais, repayée le même jour
+
+La première version de la fiche importait les constantes depuis `components/back-button.tsx` :
+
+```
+Jest encountered an unexpected token
+```
+
+Le composant tire `react-native` et `@expo/vector-icons`. **D102 avait rencontré exactement cette
+frontière huit heures plus tôt** sur `lib/api/search.api.ts`, et la leçon était déjà écrite au
+chapitre 242 : *déplacez le code, pas la frontière*.
+
+Les mesures vivent donc dans `lib/back-affordance.ts`, sans aucun import. Il a fallu l'apprendre
+deux fois dans la même journée.
+
+## Ce que le balayage refuse désormais
+
+| Interdit | Pourquoi |
+|---|---|
+| un `chevron-back` hors du composant | c'est ainsi que les quatre variantes sont nées |
+| un lien texte « ‹ Retour » | le quatrième costume |
+| un appel sans libellé | D98 2A |
+| une prop `size` sur le composant | c'est par là qu'une charte se défait |
+| moins de huit appels | une règle extraite que personne n'appelle ne protège rien |
+
+## Sur la position — ce qui est fait et ce qui ne l'est pas
+
+Le `SafeAreaProvider` manquant a été posé par **D103 1A**, il est dans `dev` et dans le bundle
+servi (vérifié : 9 occurrences d'`initialWindowMetrics`). La capture de 12:35 montrant encore le
+chevauchement **peut dater d'avant ce correctif** — l'ambiguïté des horodatages ne permet pas de
+trancher, et je ne l'ai pas vu moi-même.
+
+**Le plancher de marge haute annoncé au registre (3A) n'est PAS dans ce lot.** Il demande de
+toucher les en-têtes de chaque écran poussé, et je préfère d'abord savoir si la cause suffit.
+C'est le premier point à vérifier à l'œil.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **853 / 44 suites** (842 + 11) |
+| `nx typecheck @yamba-app/mobile` | propre, les deux programmes |
+| i18n FR/EN | miroir parfait |
