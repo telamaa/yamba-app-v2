@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslations } from 'use-intl';
 
+import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -46,18 +47,7 @@ export function ShipmentTopBar({ onRefreshAction }: { onRefreshAction?: () => vo
 
   return (
     <View style={styles.topBar}>
-      <Pressable
-        onPress={goBack}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel={t('back')}
-        style={({ pressed }) => [
-          styles.iconButton,
-          { backgroundColor: theme.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        <Ionicons name="chevron-back" size={22} color={theme.text} />
-      </Pressable>
+      <BackButton variant="boxed" label={t('back')} onPress={goBack} />
       {onRefreshAction ? (
         <Pressable
           onPress={onRefreshAction}

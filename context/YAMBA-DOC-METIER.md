@@ -9194,3 +9194,34 @@ Il peut dire non. Toucher « Profil » par curiosité cesse d'être un aller sim
 | 2 | Le serveur envoie un nom en minuscules | la pastille met en capitale |
 | 3 | Une alerte a une date d'expiration abîmée | aucun délai n'est affiché, pas « NaN » |
 | 4 | Je crée une alerte « 3 mois » le 30 novembre | elle se rouvre sur « 3 mois » |
+
+---
+
+# D105 — Un même geste, un seul costume (15/11/2026)
+
+## Le besoin
+
+Revenir en arrière est le geste le plus fréquent d'une application. Il se faisait avec quatre
+apparences différentes selon l'écran : trois tailles de flèche et un lien texte. Un membre
+apprend un geste une fois ; il ne doit pas le réapprendre d'un écran à l'autre.
+
+Et sur deux écrans, ce geste était **invisible aux lecteurs d'écran** : la flèche n'avait aucun
+nom.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D105-1** | Le retour a **une seule** apparence et **une seule** taille dans toute l'application. | Un geste appris une fois se reconnaît partout. |
+| **RG-D105-2** | Sa zone tactile atteint les 44 pt du système. | C'est le geste le plus fréquent : il ne se vise pas. |
+| **RG-D105-3** | Il porte **toujours** un nom annoncé par un lecteur d'écran. | Une flèche nue n'a pas de nom implicite. |
+| **RG-D105-4** | Une variante n'existe que si elle a une raison nommée. | Le disque existe parce que la flèche flotte sur du contenu ; les trois tailles n'avaient aucune raison. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Je compare le retour de deux écrans quelconques | même flèche, même taille |
+| 2 | J'utilise un lecteur d'écran sur l'écran Ville | le bouton s'annonce « Retour » |
+| 3 | Je touche la flèche sans viser | elle répond |
+| 4 | Un écran où la flèche flotte sur du contenu | elle garde son disque, pour rester lisible |

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTranslations } from 'use-intl';
 
+import { BackButton } from '@/components/back-button';
 import { IdentityGate } from '@/components/identity-gate';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -25,10 +26,11 @@ function ProfileContent() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {/* D105 1A — c'était un LIEN TEXTE, quatrième costume du même geste
+            dans l'application. Il porte désormais le chevron commun, comme
+            les huit autres retours. */}
         <View style={styles.backRow}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <ThemedText type="linkPrimary">‹ {t('profile.back')}</ThemedText>
-          </Pressable>
+          <BackButton label={t('profile.back')} onPress={() => router.back()} />
         </View>
         <ThemedText type="subtitle" style={styles.centered}>
           {user !== null ? `${user.firstName} ${user.lastName}` : t('profile.title')}

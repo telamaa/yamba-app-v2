@@ -28,6 +28,7 @@ import { useLocale, useTranslations } from 'use-intl';
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { SearchCalendar } from '@/components/search-calendar';
+import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -90,13 +91,10 @@ export default function DateSearchScreen() {
           gestuelle (iPhone) ni la barre de navigation (Android). */}
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: theme.backgroundElement }]}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            accessibilityRole="button"
-            style={styles.back}>
-            <Ionicons name="chevron-back" size={26} color={theme.text} />
-          </Pressable>
+          {/* D105 2A — ce retour n'avait AUCUN nom accessible : un lecteur
+              d'écran y annonçait « bouton », sans plus. Le composant partagé
+              le rend obligatoire. */}
+          <BackButton label={t('back')} onPress={() => router.back()} />
           <ThemedText type="subtitle" style={styles.title}>
             {t('date.title')}
           </ThemedText>
