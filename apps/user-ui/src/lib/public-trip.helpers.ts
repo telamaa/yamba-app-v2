@@ -8,11 +8,24 @@ import type { TransportMode, TripDates, PublicTrip } from "./public-trip.types";
 // Distance Haversine (km)
 // ─────────────────────────────────────────────────────────────────
 
+/**
+ * A224 lot 3 — `undefined` est accepté au même titre que `null`.
+ *
+ * La signature ne tolérait que `null`, mais un champ ABSENT d'une réponse
+ * d'API arrive en `undefined` : les deux disent « je ne sais pas » et doivent
+ * donner le même résultat. C'est la distinction que ce dépôt a payée six fois
+ * côté Prisma (`field: null` ne matche pas un champ absent) — ici elle ne
+ * coûte qu'un `| undefined`.
+ *
+ * La jumelle de ce module, `haversineKm` (`pricing-corridors.ts`), acceptait
+ * déjà les deux. Deux fonctions de distance dans le même dépôt, deux
+ * tolérances différentes : c'est le motif du jumeau, pour la quatrième fois.
+ */
 export function calculateDistanceKm(
-  lat1: number | null,
-  lng1: number | null,
-  lat2: number | null,
-  lng2: number | null
+  lat1: number | null | undefined,
+  lng1: number | null | undefined,
+  lat2: number | null | undefined,
+  lng2: number | null | undefined
 ): number | null {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
     return null;
