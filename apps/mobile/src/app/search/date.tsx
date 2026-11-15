@@ -34,6 +34,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTopInset } from '@/hooks/use-top-inset';
 import {
   FLEX_TYPES,
   makeExact,
@@ -48,6 +49,7 @@ import { getSearchDraft, setSearchDraft } from '@/lib/search-draft';
 export default function DateSearchScreen() {
   const t = useTranslations('search');
   const theme = useTheme();
+  const topInset = useTopInset();
   const dark = useColorScheme() === 'dark';
   const locale = useLocale() as SupportedLocale;
 
@@ -89,8 +91,19 @@ export default function DateSearchScreen() {
     <ThemedView style={styles.container}>
       {/* Bord BAS compris : « Appliquer » ne doit pas toucher la barre
           gestuelle (iPhone) ni la barre de navigation (Android). */}
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-        <View style={[styles.header, { borderBottomColor: theme.backgroundElement }]}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        {/* D107 — le bord HAUT ne passe plus par `SafeAreaView` : son inset
+            rend ZÉRO dans cette pile (`transparentModal`), mesuré à l'écran
+            le 15/11 à 13:29, soit APRÈS le `SafeAreaProvider` posé par
+            D103 1A — ce fournisseur manquait réellement, sa pose reste juste,
+            et elle n'a pas suffi. On ne cherche plus pourquoi la mesure
+            échoue : on cesse d'en dépendre. `useTopInset` prend le maximum de
+            l'inset et de la hauteur de barre fournie par l'appareil. */}
+        <View
+          style={[
+            styles.header,
+            { borderBottomColor: theme.backgroundElement, paddingTop: topInset + Spacing.two },
+          ]}>
           {/* D105 2A — ce retour n'avait AUCUN nom accessible : un lecteur
               d'écran y annonçait « bouton », sans plus. Le composant partagé
               le rend obligatoire. */}
