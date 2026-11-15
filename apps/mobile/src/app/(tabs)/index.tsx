@@ -82,6 +82,7 @@ import {
   type TripSearchResult,
 } from '@/lib/api/search.api';
 import { useTabBarHideOnScroll } from '@/lib/tab-bar-visibility';
+import { readLastSearch, rememberLastSearch, shouldReplayLastSearch } from '@/lib/last-search';
 import { consumeBrowseOnLanding } from '@/lib/welcome-state';
 
 const PAGE_SIZE = 20;
@@ -302,6 +303,24 @@ export default function SearchScreen() {
 
   const runSearchWith = useCallback(
     async (params: SearchParams, refreshFacets: boolean, keepResults = false) => {
+      // D106 — on retient l'INTENTION de chaque recherche lancée. Pas les
+      // résultats : ils seraient périmés, et le serveur est le seul à savoir
+      // ce qui est encore publié. Ce qu'on garde, c'est ce qu'on avait
+      // demandé — l'écran le rejoue au remontage, le serveur répond à jour.
+      rememberLastSearch({
+        from: params.from,
+        to: params.to,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+        mode: params.mode ?? 'all',
+        sort: params.sort ?? 'relevance',
+        weightKg: params.weightKg,
+        superTripper: params.superTripper,
+        profileVerified: params.profileVerified,
+        instantBooking: params.instantBooking,
+        verifiedTicket: params.verifiedTicket,
+        families: params.families,
+      });
       // Changer de pastille n'est pas une nouvelle recherche : la liste reste
       // à l'écran et se fond pendant l'aller-retour. Repasser par `loading`
       // démontait l'en-tête collant ET la liste — le clignotement du 11/10.
@@ -449,6 +468,39 @@ export default function SearchScreen() {
   useEffect(() => {
     if (consumeBrowseOnLanding()) {
       void runSearchWith(paramsFor({ mode: 'all', sort: 'relevance' }), true);
+      return;
+    }
+    /**
+     * D106 — l'écran a déjà cherché dans cette session, et il revient AU
+     * REPOS : on rejoue.
+     *
+     * Trois mécanismes se combinaient pour perdre les résultats : ils vivent
+     * dans un `useState` LOCAL ; la recherche large d'atterrissage part d'un
+     * drapeau UNE-FOIS, consommé au premier montage ; et une recherche large
+     * ne pose ni ville ni date, donc le brouillon persistant reste vide et ne
+     * peut rien rejouer. Au moindre remontage, l'Expéditeur qui avait des
+     * résultats lisait « Recherche un trajet… ».
+     */
+    const memoire = readLastSearch();
+    if (shouldReplayLastSearch(memoire, 'idle')) {
+      const m = memoire as NonNullable<typeof memoire>;
+      void runSearchWith(
+        paramsFor({
+          from: m.from,
+          to: m.to,
+          mode: m.mode as SearchTransportFilter,
+          sort: m.sort as SearchSort,
+          weightKg: m.weightKg,
+          trust: {
+            superTripper: m.superTripper === true,
+            profileVerified: m.profileVerified === true,
+            instantBooking: m.instantBooking === true,
+            verifiedTicket: m.verifiedTicket === true,
+          },
+          families: (m.families ?? []) as readonly SearchFamily[],
+        }),
+        true
+      );
     }
     // Au montage uniquement : le drapeau est un geste d'atterrissage.
     // eslint-disable-next-line react-hooks/exhaustive-deps

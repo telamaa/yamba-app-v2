@@ -19,6 +19,7 @@ import {
 } from 'react';
 
 import { usePreferredLocaleSetter } from '@/i18n/provider';
+import { forgetLastSearch } from '@/lib/last-search';
 import {
   bootstrapSession,
   login,
@@ -93,6 +94,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setPreferredLocale(null);
     setStatus('anonymous');
+    // D106 — la dernière recherche s'oublie avec la session. Elle peut porter
+    // des filtres de confiance et un corridor qui disent quelque chose de
+    // celui qui partait ; ils n'ont pas à survivre à sa sortie, ni à
+    // s'afficher au visiteur suivant sur le même téléphone.
+    forgetLastSearch();
   }, [setPreferredLocale]);
 
   const value = useMemo(
