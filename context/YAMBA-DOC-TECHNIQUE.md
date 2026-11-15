@@ -18996,3 +18996,96 @@ déclarés « oubliés ».
 | `nx typecheck user-ui` | propre, les deux programmes |
 | `nx run-many --target=typecheck --all` | 11 projets, verts |
 | `nx test @yamba-app/mobile` | 866 / 45 — inchangé |
+
+---
+
+# D107 — Un en-tête ne dépend plus d'une mesure (`fix/en-tete-sous-la-barre`, 15/11/2026)
+
+> « le from est **toujours** trop haut sur certaines pages »
+
+« Toujours » : c'est-à-dire **après** le correctif de D103 1A, fusionné le matin même. Capture
+horodatée à 13:29 à l'appui.
+
+## Ce qu'il faut dire d'abord
+
+**D103 1A était un vrai défaut, et ce n'était pas la cause de celui-ci.**
+
+Le dépôt n'avait aucun `SafeAreaProvider` pour vingt-cinq consommateurs : l'anomalie était réelle,
+la correction reste juste, elle est posée. **Et le symptôme persiste.**
+
+> Le diagnostic était vraisemblable et il était faux — exactement le piège décrit au **chapitre
+> 244**, trois lots plus tôt, par moi.
+
+La différence entre les deux fois n'est pas la qualité du diagnostic : celui de D103 était mieux
+instruit que la moyenne (deux écrans au code identique, un fournisseur absent pour vingt-cinq
+consommateurs). **La différence est qu'aucune des deux fois le résultat n'a été regardé.**
+
+## La décision : cesser de dépendre d'une mesure
+
+Quelle que soit la raison pour laquelle l'inset haut rend zéro dans cette pile
+(`presentation: 'transparentModal'`, un fournisseur intercalé, un ordre de rendu) :
+
+> **Le symptôme est trop coûteux pour dépendre d'une mesure qui peut échouer.** Un titre posé sur
+> l'horloge n'est pas une imperfection, c'est une information perdue.
+
+```ts
+export function plancherHaut(insetMesure, hauteurDeBarre): number {
+  const sain = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+  return Math.max(sain(insetMesure), sain(hauteurDeBarre));
+}
+```
+
+Deux sources, et **chacune peut mentir** :
+
+| Source | Quand elle se tait |
+|---|---|
+| `useSafeAreaInsets().top` | dans la pile `transparentModal` — le défaut mesuré |
+| `Constants.statusBarHeight` | selon la plateforme |
+
+L'une des deux peut rendre zéro ; les deux ensemble, non.
+
+## Pas de nombre en dur, et une fiche l'interdit
+
+Un plancher fixe serait **faux sur la moitié du parc** : 20 pt sur un iPhone SE, 59 sur un
+appareil à Dynamic Island.
+
+```ts
+expect(hook).not.toMatch(/\b(20|44|59)\b/);
+```
+
+`Constants.statusBarHeight` est la seule valeur à la fois **sûre** et **juste par appareil** — et
+elle ne dépend d'aucun arbre de contexte React, ce qui en fait le filet de sécurité de l'inset,
+qui lui en dépend.
+
+## Vérifié à l'œil — et c'est la première fois de la journée
+
+| | Avant (capture 13:29) | Après (vérifié) |
+|---|---|---|
+| « ‹ From » | **sur** l'horloge et la Dynamic Island | franchement dessous |
+
+**La méthode qui l'a permis mérite d'être retenue** : le lien profond
+`exp://127.0.0.1:8081/--/search/city` est écrasé par la redirection d'accueil quand on l'envoie au
+**démarrage**. Envoyé **pendant que l'application tourne déjà**, il navigue correctement.
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/search/city?target=from"   # app déjà lancée
+```
+
+> C'est la réponse partielle à une limite répétée tout au long de cette journée : `simctl` ne sait
+> pas toucher l'écran, mais il sait **naviguer**. Tout écran atteignable par une route est donc
+> vérifiable.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **881 / 46 suites** (866 + 15) |
+| `nx typecheck @yamba-app/mobile` | propre, les deux programmes |
+| Bundle iOS | HTTP 200, 0,42 s |
+| **Écran** | **vu, corrigé** |
+
+## Reste ouvert
+
+La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Ce lot la contourne par
+construction. Si elle est trouvée un jour, le plancher restera : il ne coûte rien et protège d'un
+retour.

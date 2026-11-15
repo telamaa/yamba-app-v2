@@ -9298,3 +9298,31 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 | 3 | Je me connecte depuis la page d'un trajet | j'y reviens |
 | 4 | Je me connecte depuis la page de connexion | je vais à l'accueil, pas en boucle |
 | 5 | Un nouveau module de règle est ajouté sans fiche | la CI le signale |
+
+---
+
+# D107 — Un en-tête lisible, toujours (15/11/2026)
+
+## Le besoin
+
+Sur certaines pages, le titre et la flèche de retour se superposaient à l'heure et à l'encoche du
+téléphone. Ce n'est pas un défaut d'esthétique : **le titre dit où l'on est**, et la flèche est la
+sortie. Les deux devenaient illisibles.
+
+Un premier correctif avait été posé le matin ; il n'a pas suffi.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D107-1** | Aucun élément d'interface ne passe sous la barre d'état, **quelle que soit la façon dont l'écran a été ouvert**. | Une information perdue n'est pas une imperfection. |
+| **RG-D107-2** | La marge haute ne dépend **jamais d'une seule** source de mesure. | Celle qui échouait ici était la seule consultée. |
+| **RG-D107-3** | Elle n'est **jamais** un nombre fixe. | 20 pt sur un iPhone SE, 59 sur un appareil à Dynamic Island : un plancher écrit à la main serait faux sur la moitié du parc. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre « Ville de départ » depuis la recherche | le titre et la flèche sont entièrement sous l'heure |
+| 2 | J'ouvre le calendrier | idem |
+| 3 | J'utilise un téléphone sans encoche | la marge s'adapte, sans espace mort |

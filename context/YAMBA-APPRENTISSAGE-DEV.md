@@ -10153,3 +10153,81 @@ l'avait couvert. Les pages d'auth ne doivent jamais s'y transmettre, et `/refres
 c'est l'oubli de D93, qui avait coûté 27 jours.
 
 Un recenseur gagne sa place le jour où il est écrit.
+
+---
+
+# Chapitre 252 — J'ai écrit la leçon, puis je l'ai enfreinte (D107)
+
+## 1. Les faits, sans arrangement
+
+**Chapitre 244**, écrit trois lots plus tôt, premier paragraphe :
+
+> « Une cause plausible n'est pas une cause. […] Deux écrans au code identique et un résultat
+> différent : la cause n'est pas dans le code comparé. »
+
+Ce chapitre racontait le diagnostic d'un en-tête qui chevauchait la barre d'état. La conclusion —
+un `SafeAreaProvider` absent pour vingt-cinq consommateurs — était **juste comme constat** et
+**fausse comme cause** : le symptôme a persisté après la correction, et l'utilisateur l'a signalé
+avec une capture horodatée.
+
+Je n'ai pas appliqué ma propre leçon. Et le mécanisme de l'erreur mérite d'être nommé, parce qu'il
+n'est pas celui qu'on croit.
+
+## 2. Ce n'était pas un défaut d'analyse
+
+Le diagnostic de D103 était **mieux instruit que la moyenne** : une comparaison de deux fichiers
+identiques, une commande qui révèle un fournisseur absent pour vingt-cinq consommateurs, une
+explication cohérente du mécanisme. Rien à redire à la démarche.
+
+**Ce qui manquait n'était pas une idée, c'était un regard.**
+
+> Une correction d'interface non vue n'est pas une correction : c'est une **hypothèse déployée**.
+
+J'ai écrit « non vérifié — `simctl` ne sait pas toucher l'écran » dans trois lots consécutifs,
+sans en tirer la conséquence : tant que personne ne regarde, le lot n'est pas fini. L'honnêteté
+sur la limite ne remplace pas le franchissement de la limite.
+
+## 3. La contre-mesure n'est pas « mieux diagnostiquer »
+
+Quand un symptôme est **coûteux** (ici : un titre illisible, donc une information perdue) et que
+sa cause dépend d'une **mesure** (un inset, une taille d'écran, un temps de rendu), la bonne
+réponse n'est pas de mieux comprendre la mesure. C'est de **ne plus en dépendre** :
+
+```ts
+return Math.max(sain(insetMesure), sain(hauteurDeBarre));
+```
+
+Deux sources indépendantes, et chacune traitée comme faillible — zéro, négatif, `NaN`, absent.
+
+> **Redondance plutôt que compréhension**, quand le coût de l'échec est supérieur au coût de la
+> redondance. Ici la redondance coûte six lignes.
+
+Notez ce qu'on n'a **pas** fait : écrire `Math.max(inset, 44)`. Un plancher fixe serait faux sur
+la moitié du parc (20 pt sur un iPhone SE, 59 sur un appareil à Dynamic Island). **Une
+redondance doit rester juste, pas seulement sûre** — d'où une seconde source réelle plutôt qu'une
+constante, et une fiche qui interdit le nombre.
+
+## 4. Et la limite est tombée
+
+`simctl` ne sait pas toucher l'écran. Il sait **naviguer** :
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/search/city?target=from"
+```
+
+Avec un détail qui change tout : envoyé **au démarrage**, le lien est écrasé par la redirection
+d'accueil de l'application. Envoyé **pendant que l'app tourne déjà**, il navigue.
+
+C'est ainsi que ce correctif-ci a été **vu** — le premier de la journée.
+
+> **Quand un outil vous bloque, cherchez ce qu'il sait faire d'autre.** Pendant toute une journée
+> j'ai écrit « je ne peux pas vérifier » là où la bonne phrase était « je n'ai pas cherché assez
+> longtemps comment vérifier ».
+
+## 5. Ce qui reste ouvert, et pourquoi c'est acceptable
+
+La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Le lot la contourne.
+
+C'est un choix défendable — le plancher protège quelle que soit la réponse, et il ne coûte rien —
+**à condition de l'écrire**. Une cause non trouvée qui n'est pas consignée devient une cause
+oubliée, et le prochain symptôme du même mécanisme repartira de zéro.
