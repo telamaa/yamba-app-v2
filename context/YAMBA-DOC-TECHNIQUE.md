@@ -18814,3 +18814,86 @@ se remonte à chaque aller-retour, c'est une requête réseau de plus à chaque 
 | `nx test user-ui` | 139 / 8 — inchangé |
 | `nx typecheck @yamba-app/mobile` | propre |
 | i18n FR/EN | miroir parfait |
+
+---
+
+# A224 lot 4 — Quatre défauts sur la page de profil public (`chore/fiches-du-site-lot-4`, 15/11/2026)
+
+Deux fichiers de fiches, **quatre défauts réels** — tous sur la page qu'un inconnu lit avant de
+confier un colis.
+
+## 1 — `getInitials`, TROISIÈME copie du défaut de D88
+
+| Date | Ce qu'on a corrigé | Ce qu'on croyait |
+|---|---|---|
+| 08/11 (D88) | le téléphone | « c'est corrigé » |
+| 15/11 matin (lot 3) | `public-trip.helpers.ts` | « j'ai trouvé le jumeau » |
+| 15/11 après-midi (lot 4) | **`public-user.helpers.ts`** | il y avait **deux** jumeaux |
+
+Et celui-ci servait `UserHero`, `TripperBlock`, `ShipperBlock` — **la page de profil public**.
+« MMABIALA » y était atteignable aujourd'hui.
+
+Le dépôt comptait **quatre** implémentations de `getInitials`. Le fichier ré-exporte désormais
+l'implémentation durcie, et une fiche **compte** les copies :
+
+```ts
+expect(implementations.map((f) => relative(SRC, f))).toEqual(["lib/public-trip.helpers.ts"]);
+```
+
+> **La leçon de D105 appliquée à une fonction : on compte, on ne se fie pas à la mémoire.**
+> « Grep ton jumeau » suppose qu'il n'y en a qu'un ; la fiche n'a pas besoin de le supposer.
+
+La variante à **un** argument (`TripPublicPreview`, qui reçoit un nom d'affichage complet) est
+**nommée** dans la fiche : signature différente, besoin différent. C'est une décision, pas un oubli.
+
+## 2 et 3 — Deux « NaN » affichés à un visiteur
+
+```ts
+formatMemberSince("pas une date", "fr")   // → « undefined NaN »
+formatRelativeDate("pas une date", "fr")  // → « il y a NaN mois »
+```
+
+Le premier : `getMonth()` vaut `NaN`, donc `months[locale][NaN]` vaut `undefined`.
+
+Le second : c'est **exactement** le défaut de `formatExpiresIn` trouvé le matin même — toute
+comparaison avec `NaN` est fausse, le flot traverse la cascade de `if` et tombe dans le dernier
+cas sans qu'aucune condition ne l'ait choisi.
+
+> **L'homonyme du fichier VOISIN portait déjà la garde.** Elle n'avait pas voyagé de trois lignes.
+> C'est la troisième occurrence de ce motif en une journée : la bonne version existe presque
+> toujours déjà quelque part dans le dépôt.
+
+## 4 — Une asymétrie qui fait tomber la page
+
+```ts
+const tripperCount = tripper?.count ?? 0;   // prudent
+const shipperCount = shipper.count;          // ← pas prudent
+```
+
+Un profil servi sans `shipperRating` **faisait tomber la page publique**. Les deux rôles sont
+désormais traités pareil.
+
+> Une asymétrie de ce genre ne se voit pas : elle **attend** une donnée incomplète. Une migration
+> d'API peut en servir une un mardi matin.
+
+## Et le lot a aussi gardé la sécurité d'un compte
+
+`auth/regles-d-acces.spec.ts` couvre trois modules qui n'étaient pas gardés :
+
+| Module | Ce qu'une fiche interdit désormais |
+|---|---|
+| `password-strength` | que « Marven2026! » passe (le prénom doit disqualifier), qu'un niveau **surestime**, qu'une barre de force **recule** pendant qu'on tape |
+| `webmail` | qu'un domaine inconnu soit **deviné**, qu'un lien de la table soit relatif (il enverrait sur une page du **site** portant un nom de fournisseur) |
+| `otp-display` | que « Renvoyer » soit proposé **avant** son délai — le refus serveur se lit comme une panne |
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **177 / 10 suites** (139 + 38) |
+| `nx typecheck user-ui` | propre, les deux programmes |
+| `nx test @yamba-app/mobile` | 866 / 45 — inchangé |
+
+## Reste
+
+**~20 fichiers purs** de `src/lib` sans fiches, tous de moins de 90 lignes.
