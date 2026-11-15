@@ -9135,3 +9135,35 @@ rattrapable** une fois prise de travers.
 | 5 | Je navigue en navigation privée | le site fonctionne, la bannière revient |
 | 6 | J'ai refusé il y a sept mois | on me redemande |
 | 7 | Je refuse la mesure | aucun paquet tiers n'est chargé |
+
+---
+
+# D104 — Une porte n'enferme pas celui qu'elle arrête (15/11/2026)
+
+## Le besoin
+
+Un visiteur touche la pastille de profil pour voir son compte. On lui demande de se connecter —
+c'est légitime. Mais l'écran qui le lui demande **ne lui offre aucun moyen de revenir**. Ni retour,
+ni barre d'onglets. Il est enfermé dans une page qui lui refuse l'entrée.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D104-1** | Un écran **poussé** se referme toujours, **quel que soit** l'état de la session. | Demander de s'identifier ne doit jamais coûter la sortie. |
+| **RG-D104-2** | Quand un écran est remplacé par une porte d'identité, c'est **la porte** qui porte la sortie. | Une sortie déclarée dans le contenu n'existe pas pour celui qui ne voit pas le contenu. |
+| **RG-D104-3** | Un écran d'**onglet** ne porte pas de retour : sa barre est sa sortie. | Un retour y mènerait nulle part. |
+| **RG-D104-4** | Une mise en page justifiée par un élément (la barre flottante) ne s'applique pas là où cet élément est absent. | Sinon on réserve du vide pour rien. |
+
+## Ce que le visiteur gagne
+
+Il peut dire non. Toucher « Profil » par curiosité cesse d'être un aller simple.
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Visiteur non connecté, j'ouvre Profil | un retour visible en haut, qui me ramène |
+| 2 | Je me connecte depuis cette page | le retour reste au même endroit, l'écran ne saute pas |
+| 3 | Visiteur, j'ouvre Favoris (un onglet) | pas de retour, mais la barre d'onglets est là |
+| 4 | Visiteur, j'ouvre Profil | le contenu est centré, pas tassé en haut d'un écran vide |

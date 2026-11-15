@@ -9531,3 +9531,113 @@ qu'un défaut vivant **seulement** dans un `.spec.ts` est invisible à toute la 
   valeur est-elle une décision, ou une mesure du moment ?* Les secondes sont de la dette.
 - Les 27 fichiers purs restants de `src/lib` attendent. Le critère de priorité tenu ici —
   **un accès, un prix, la vie privée** — se transpose à n'importe quel dépôt.
+
+---
+
+# Chapitre 246 — Un défaut qui n'est dans aucun des deux fichiers (D104)
+
+## 1. Le défaut
+
+```tsx
+// profile.tsx
+function ProfileContent() {
+  return (
+    <>
+      <Pressable onPress={() => router.back()}>‹ Retour</Pressable>   {/* ① */}
+      …
+    </>
+  );
+}
+
+export default function ProfileScreen() {
+  return (
+    <IdentityGate destination="profile">   {/* ② */}
+      <ProfileContent />
+    </IdentityGate>
+  );
+}
+```
+
+① est juste. ② est juste. **Leur composition enferme** : la porte ne rend `children` que si la
+session est ouverte, donc le retour n'existe que pour qui n'en a pas besoin.
+
+> **Relire l'un OU l'autre n'aurait rien donné.** C'est un défaut de *rencontre*, et il faut deux
+> fichiers à l'écran en même temps pour le voir — ou l'application dans le bon état.
+
+## 2. L'état qu'on n'essaie jamais
+
+Ce défaut vivait depuis A210 (qui a sorti Profil de la barre d'onglets). Il n'a été trouvé que le
+jour où quelqu'un a ouvert l'écran **déconnecté**.
+
+En développement, on est toujours connecté : la session est en cache, le compte de test est
+ouvert, et les écrans derrière une porte s'affichent directement. **L'état « visiteur » est celui
+qu'on ne traverse jamais.**
+
+> **Pour tout écran derrière une condition d'accès, listez les états et visitez-les tous.**
+> Ici il y en avait trois : *chargement* (la porte affiche un sablier), *visiteur* (la porte
+> affiche son argumentaire), *membre* (le contenu). Deux sur trois étaient regardés en permanence ;
+> le troisième jamais.
+
+## 3. La variante « navigation » d'une leçon connue
+
+Le chapitre 237 (D93) disait : *une règle écrite dans le composant qui l'utilise ne protège que
+lui*. Ici, la variante :
+
+> **Une règle écrite dans un composant enfant CONDITIONNEL ne s'applique que quand la condition
+> est vraie.** Demandez-vous systématiquement ce qui se passe dans la branche `else` — même quand
+> cette branche est écrite ailleurs, par quelqu'un d'autre, pour une autre raison.
+
+La correction suit le même mouvement que D93, D100 et D101 : ce qui doit valoir dans les deux
+branches **remonte** d'un niveau. Ici, la sortie passe à la porte, parce que **c'est la porte qui
+remplace l'écran**.
+
+## 4. Pourquoi un balayage, et pas un `if`
+
+La correction minimale tenait en une ligne dans `profile.tsx`. On a écrit un balayage à la place :
+
+```ts
+const gardes = ecrans().filter((f) => readFileSync(f, 'utf8').includes('<IdentityGate'));
+const estUnOnglet = (c: string) => relative(APP, c).includes('(tabs)');
+
+it.each(gardes.filter((f) => !estUnOnglet(f)))('%s passe une sortie', …);
+it.each(gardes.filter(estUnOnglet))('%s n’en passe pas', …);
+```
+
+La raison tient en une phrase : **le défaut n'est pas né d'une erreur, il est né d'un
+déplacement.** A210 a sorti Profil de la barre, pour une bonne raison (libérer la cinquième place
+au « + »), sans aucune raison de regarder la porte d'identité. Le prochain déplacement de ce genre
+se produira, et personne ne pensera davantage à la porte.
+
+Notez les **deux** sens de la règle : les écrans poussés doivent passer une sortie, **et** les
+onglets ne doivent pas en passer. Une fiche qui ne garderait que le premier sens laisserait
+apparaître des retours inutiles sur les onglets, où ils ne mènent nulle part.
+
+## 5. Garder le balayage lui-même
+
+```ts
+it('il y en a, et le balayage ne rend pas une liste vide', () => {
+  expect(gardes.length).toBeGreaterThanOrEqual(5);
+});
+```
+
+Sans cette ligne, renommer `IdentityGate` rendrait la liste vide — et **toutes** les assertions
+`it.each` disparaîtraient en silence. La suite resterait verte en ne vérifiant plus rien.
+
+> **Toute fiche qui balaie doit prouver qu'elle a balayé.** C'est la même famille que la garde
+> d'offset du chapitre 240 : une fiche verte doit l'être pour la bonne raison.
+
+## 6. Une justification a un périmètre
+
+Le code portait ce commentaire, parfaitement juste :
+
+```
+TOUT le vide est ici, SOUS le contenu : la barre d'onglets y flotte sans
+rien masquer, et rien n'a donc à lui réserver de la place.
+```
+
+Sur un écran **poussé**, il n'y a pas de barre. La mise en page réservait donc les trois quarts
+bas d'un écran à un élément absent.
+
+> **Une justification de mise en page vaut pour le contexte qui l'a motivée.** Quand un composant
+> devient partagé, relisez ses commentaires : ils décrivent souvent le *premier* appelant, et
+> deviennent faux pour le second sans que personne ne les modifie.

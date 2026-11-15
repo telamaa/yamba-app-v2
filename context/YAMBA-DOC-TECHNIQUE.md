@@ -18433,3 +18433,108 @@ existe depuis le 18/09.
 
 **27 fichiers purs** de `src/lib` n'ont pas encore de fiches. Les plus gros :
 `public-trip.helpers.ts` (247), `public-user.helpers.ts` (163), `saved-route.helpers.ts` (146).
+
+---
+
+# D104 — Une porte n'enferme pas celui qu'elle arrête (`fix/porte-sans-sortie`, 15/11/2026)
+
+Retour de recette, six mots : **« on ne peut pas revenir en arrière »**, sur l'écran Profil ouvert
+en visiteur.
+
+## 1A — La sortie vivait derrière la porte qu'elle devait permettre de fuir
+
+```tsx
+export default function ProfileScreen() {
+  return (
+    <IdentityGate destination="profile">
+      <ProfileContent />     {/* ← le bouton de retour est ICI */}
+    </IdentityGate>
+  );
+}
+```
+
+Un visiteur non connecté voit la porte, **jamais** le contenu — donc jamais le bouton.
+
+Le plus instructif : le fichier portait déjà le commentaire exact de ce qui manquait.
+
+> « A210 — Profil n'est PLUS un onglet : il se POUSSE au-dessus des onglets […] **D'où le retour
+> explicite ci-dessous : un écran poussé se referme.** »
+
+**La règle était écrite, juste, et placée du mauvais côté de la condition.**
+
+## 1B — Un seul écran sur cinq, et ce n'est pas un hasard
+
+| Écran | Nature | Sortie disponible |
+|---|---|---|
+| `(tabs)/favorites` | onglet | la barre d'onglets |
+| `(tabs)/activity` | onglet | la barre d'onglets |
+| `(tabs)/messages` | onglet | la barre d'onglets |
+| `(tabs)/publish` | onglet | la barre d'onglets |
+| **`profile`** | **poussé** (A210) | **aucune** |
+
+Le défaut n'est donc **dans aucun des deux fichiers pris séparément** : le retour est correct, la
+porte est correcte, c'est leur **composition** qui enferme. Et il est né d'A210, qui a sorti Profil
+de la barre pour libérer la cinquième place au « + » de publication — un lot qui n'avait aucune
+raison de regarder la porte d'identité.
+
+La sortie devient donc une responsabilité de **la porte**, puisque c'est elle qui remplace
+l'écran :
+
+```tsx
+<IdentityGate destination="profile" onDismiss={() => router.back()}>
+```
+
+Les quatre onglets ne la passent pas — et ne doivent pas : un retour y mènerait nulle part.
+
+## 1C — Un balayage plutôt qu'une correction ponctuelle
+
+```ts
+const gardes = ecrans().filter((f) => readFileSync(f, 'utf8').includes('<IdentityGate'));
+const estUnOnglet = (chemin: string) => relative(APP, chemin).includes('(tabs)');
+
+it.each(gardes.filter((f) => !estUnOnglet(f)))('%s passe une sortie', …);
+it.each(gardes.filter(estUnOnglet))('%s n’en passe pas', …);
+```
+
+Le prochain écran poussé derrière une porte partira au rouge **avant** d'atteindre un simulateur.
+Même motif que `hooks-avant-sortie.spec.ts` (D83), appliqué à la navigation.
+
+Et une fiche garde le balayage lui-même :
+
+```ts
+expect(gardes.length).toBeGreaterThanOrEqual(5);
+```
+
+**Une fiche de balayage qui ne balaie rien est verte pour la pire des raisons.** Si le composant
+est renommé un jour, c'est là qu'on doit le voir.
+
+## 2A — Le vide était dimensionné pour une barre absente
+
+La porte aligne son bloc en haut et laisse tout le vide dessous, avec une raison écrite **et
+juste** : « la barre d'onglets y flotte sans rien masquer ». Sur Profil, cette barre n'existe pas :
+les trois quarts bas de l'écran étaient du vide sans emploi.
+
+> **La justification d'une mise en page vaut pour le contexte qui l'a motivée, pas au-delà.**
+
+Le bloc se centre désormais quand il n'y a pas de barre à ménager — et la rangée de retour, elle,
+ne bouge pas : elle reste là où l'œil la cherche.
+
+## 3A — Examiné et délibérément gardé
+
+L'accueil met « Créer un compte » en primaire ; la porte met « Se connecter ». Ce n'est **pas** une
+incohérence de charte : les intentions diffèrent — un premier contact d'un côté, quelqu'un qui
+cherchait *son* profil (donc qui a déjà un compte) de l'autre. Consigné pour qu'on ne le
+« corrige » pas dans six mois.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **842 / 43 suites** (829 + 13) |
+| `nx test user-ui` | 101 / 6 — inchangé |
+| `nx typecheck @yamba-app/mobile` | propre, les deux programmes |
+| Bundle iOS | HTTP 200, 0,44 s, zéro erreur |
+
+**Non vérifié** : l'écran Profil **déconnecté** n'a pas pu être vu. Le lien profond
+`exp://…/--/profile` retombe sur l'écran d'accueil (redirection au premier lancement), et `simctl`
+ne sait pas toucher l'écran pour y naviguer.
