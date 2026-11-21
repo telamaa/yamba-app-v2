@@ -9,6 +9,7 @@ import AppContainer from "@/components/layout/AppContainer";
 import CityAutocomplete from "./CityAutocomplete";
 import MobileSearchExperience from "./MobileSearchExperience";
 import SmartDatePicker, { type DateValue } from "@/components/ui/SmartDatePicker";
+import { HAUTEUR_D_EN_TETE } from "@/lib/layout/largeur-de-page";
 
 type Mode = "expanded" | "compact" | "auto";
 
@@ -63,7 +64,7 @@ export const initialSearchDraft: TripSearchValue = {
 
 export const SEARCH_VERSION = 2;
 const SCROLL_THRESHOLD = 120;
-const HEADER_HEIGHT = 78;
+const HEADER_HEIGHT = HAUTEUR_D_EN_TETE;
 
 const CITY_AUTOCOMPLETE_NORMAL_CLASSES =
   "[&_input]:h-6 [&_input]:text-[14px] [&_input]:leading-6";

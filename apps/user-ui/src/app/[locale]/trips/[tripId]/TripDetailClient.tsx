@@ -5,6 +5,7 @@ import { AlertCircle, Plane } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { usePublicTrip } from "@/hooks/usePublicTrip";
 import TripDetailView from "@/components/trips/detail/TripDetailView";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   tripId: string;
@@ -62,7 +63,7 @@ export default function TripDetailClient({ tripId }: Props) {
  */
 function TripDetailSkeleton() {
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:pb-12">
+    <div className={conteneurDePage("pb-32 pt-4 sm:pt-6 lg:pb-12")}>
       {/* Back link */}
       <Shimmer className="mb-4 h-3 w-32" />
 

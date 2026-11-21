@@ -24,6 +24,7 @@ import StepTrip from "./steps/StepTrip";
 import StepConditions from "./steps/StepConditions";
 import StepReview from "./steps/StepReview";
 import { ErrorSummary } from "./TripFormUi";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 const MANGO = "#FF9900";
 const TEAL = "#0F766E";
@@ -222,7 +223,7 @@ export default function CreateTripWizard() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
+    <main className={conteneurDePage("py-8 sm:py-10")}>
       <div className="mx-auto max-w-3xl">
         {/* ⭐ Card containment : border subtil + shadow double couche + filet gradient en tête */}
         <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">

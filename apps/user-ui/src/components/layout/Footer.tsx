@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type FooterLink = {
   labelKey: string;
@@ -69,7 +70,7 @@ function FooterDesktop(): ReactNode {
   const year = new Date().getFullYear();
 
   return (
-    <div className="mx-auto max-w-7xl border-t border-slate-200 px-4 py-10 dark:border-slate-800/60">
+    <div className={conteneurDePage("border-t border-slate-200 py-10 dark:border-slate-800/60")}>
       <div className="grid grid-cols-4 gap-8">
         <div>
           <p className="text-sm text-slate-600 dark:text-slate-400">

@@ -1,3 +1,5 @@
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+
 /**
  * BookingTrackerSkeleton.tsx
  * ==========================
@@ -10,7 +12,7 @@
 export default function BookingTrackerSkeleton() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         {/* Header */}
         <div className="mb-3 h-3 w-12 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
         <div className="h-8 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-800 sm:h-9 sm:w-60" />

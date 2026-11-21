@@ -1,3 +1,5 @@
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+
 /**
  * DealRequestSkeleton.tsx
  * =======================
@@ -25,7 +27,7 @@ export default function DealSkeleton() {
       {/* Mobile expiry banner */}
       <div className="h-10 border-b border-slate-200 bg-slate-200/60 lg:hidden dark:border-slate-800 dark:bg-slate-800/60" />
 
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         {/* Desktop header (hidden on mobile) */}
         <div className="hidden lg:block">
           <Bar w="w-16" h="h-4" className="mb-4" />

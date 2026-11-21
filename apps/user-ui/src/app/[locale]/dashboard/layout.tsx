@@ -2,6 +2,7 @@
 import React from "react";
 import DashboardSidebar from "@/components/dashboard/desktop/DashboardSidebar";
 import DashboardMobileNav from "@/components/dashboard/mobile/DashboardMobileNav";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 /**
  * Layout dashboard — app-style plein viewport :
@@ -17,7 +18,7 @@ export default function DashboardLayout({
 }) {
   return (
     <>
-      <div className="mx-auto flex h-[calc(var(--yamba-viewport)-78px)] max-w-7xl gap-8 px-1 py-6">
+      <div className={conteneurDePage("flex h-[calc(var(--yamba-viewport)-78px)] gap-8 py-6")}>
         {/* Sidebar — top aligné sur le padding interne du main */}
         {/*<div className="hidden h-full shrink-0 overflow-y-auto pt-6 md:block md:pt-8">*/}
         <div className="hidden h-full shrink-0 overflow-y-auto md:block">

@@ -54,6 +54,7 @@ import {
 } from "@/lib/auth/otp-display";
 import { webmailUrl } from "@/lib/auth/webmail";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 const OTP_LENGTH = 6;
 
@@ -375,10 +376,10 @@ export default function OtpVerifyView({
     );
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4">
+    <main className={conteneurDePage()}>
       {/* D92 — la largeur du contenu est celle de l'EN-TÊTE, et le contenu
           s'INCRUSTE dans la page : aucune bordure, aucun coin arrondi. */}
-      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
         {/* LEFT — la colonne répond à l'attente, elle ne vend plus (D92 1A) */}
         <div className="hidden lg:block">
           <AuthHeroVisual visual={heroVisual} variant="waiting" action={mailboxButton} />

@@ -16,6 +16,7 @@ import { RatingPersonDealCard, RatingPublishCard } from "./RatingBlocks";
 import RatingComment from "./RatingComment";
 import RatingCriteria from "./RatingCriteria";
 import RatingStars from "./RatingStars";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 export default function RatingDesktop(props: RatingViewProps) {
   const t = useTranslations("rating");
@@ -30,7 +31,7 @@ export default function RatingDesktop(props: RatingViewProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-12 pt-4 sm:pt-6")}>
         <button
           type="button"
           onClick={props.onBackAction}

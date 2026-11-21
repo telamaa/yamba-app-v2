@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 /**
  * Hero CLAIR (revue 18/09) : la coupure sombre/clair disparaît — la barre de
@@ -32,7 +33,7 @@ export default function HeroSection() {
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-8 md:pb-16 md:pt-8">
+      <div className={conteneurDePage("relative pb-12 pt-8 md:pb-16 md:pt-8")}>
         <div className="grid items-center gap-5 md:grid-cols-2 md:gap-8">
           {/* Colonne texte — alignée à gauche */}
           <div className="pb-2 text-center md:pb-10 md:text-left">

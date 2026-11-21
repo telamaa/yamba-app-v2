@@ -17,6 +17,7 @@
 import React, { useState } from "react";
 import useUser from "@/hooks/useUser";
 import Link from "next/link";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 import { X } from "lucide-react"; // or use your icon library
 
 export function OnboardingBanner() {
@@ -30,7 +31,7 @@ export function OnboardingBanner() {
 
   return (
     <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700">
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+      <div className={conteneurDePage("py-3")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           {/* Message */}
           <div className="flex items-center gap-3">

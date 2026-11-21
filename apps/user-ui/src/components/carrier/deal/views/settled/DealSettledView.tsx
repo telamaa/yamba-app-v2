@@ -23,6 +23,7 @@ import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import RatingStatusCard from "@/components/rating/RatingStatusCard";
 import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
 import DisputeStatementCard from "./DisputeStatementCard";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   deal: DealRequest;
@@ -153,7 +154,7 @@ export default function DealSettledView({ deal, variant, onCloseAction }: Props)
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         <DealAcceptedHeader deal={deal} onBackAction={onCloseAction} variant="desktop" />
         {banner}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]">

@@ -70,6 +70,7 @@ import {
 import { readLoginErrorCode, isLoginErrorCode } from "@/lib/auth/auth-error-codes";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 /** Le miroir de `isValidEmail` du mobile, elle-même miroir de la regex serveur. */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -458,10 +459,20 @@ export default function LoginForm({ heroVisual, variant = "page", redirectOverri
   }
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-      {/* LEFT — visuel desktop only */}
-      <div className="hidden lg:block">
-        {heroVisual && <AuthHeroVisual visual={heroVisual} />}
+    <main className={conteneurDePage()}>
+      {/* D110 — la largeur et la gouttière viennent de `conteneurDePage()` :
+          elles sont celles de l'en-tête, et elles n'ont qu'un domicile. D92
+          avait posé la règle sur l'INSCRIPTION le 10/11 en RECOPIANT la
+          classe ; les sept écrans jumeaux sont restés désalignés onze jours,
+          parce qu'une classe recopiée ne dit à personne qu'elle est une
+          règle. La raison, elle, n'a pas changé : bord à bord, le logo et les
+          contrôles de droite seraient les deux seuls éléments à respecter une
+          marge, et la colonne de gauche toucherait le bord d'un grand
+          moniteur. */}
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+        {/* LEFT — visuel desktop only */}
+        <div className="hidden lg:block">
+          {heroVisual && <AuthHeroVisual visual={heroVisual} />}
       </div>
 
       {/* RIGHT — formulaire */}
@@ -479,6 +490,7 @@ export default function LoginForm({ heroVisual, variant = "page", redirectOverri
           {formBlock}
         </div>
       </div>
+    </div>
     </main>
   );
 }

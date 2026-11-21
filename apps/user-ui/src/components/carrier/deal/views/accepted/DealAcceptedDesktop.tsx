@@ -25,6 +25,7 @@ import DealContactShipperCard from "./DealContactShipperCard";
 import DealPaymentBlock from "./DealPaymentBlock";
 import DealTripSidebar from "./DealTripSidebar";
 import DealPickupCta from "@/components/carrier/deal/views/pickup/DealPickupCta";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 
 type Props = {
@@ -53,7 +54,7 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         <DealAcceptedHeader
           deal={deal}
           onBackAction={onCloseAction}

@@ -19,6 +19,7 @@ import BookingAuthGateModal from "./BookingAuthGateModal";
 import BookingMobileBar from "./BookingMobileBar";
 import LocationsCard from "@/components/trips/detail/LocationsCard";
 import { track } from "@/lib/analytics";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 import ReportDialog from "@/components/shared/ReportDialog"; // D68
 
 
@@ -82,7 +83,7 @@ export default function TripDetailView({ trip }: Props) {
     <>
     {/* A58/A63 — la porte ouverte par l'URL, au-dessus du trajet. */}
     <BookingAuthGateModal open={urlGateOpen} tripId={trip.id} onCloseAction={closeUrlGate} />
-    <div className="mx-auto max-w-7xl px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:pb-12">
+    <div className={conteneurDePage("pb-32 pt-4 sm:pt-6 lg:pb-12")}>
       <button
         type="button"
         onClick={() => router.back()}

@@ -20,6 +20,7 @@ import {
 } from "./TrackingSidebarCards";
 import TrackingSpotlight from "./TrackingSpotlight";
 import TrackingTimeline from "./TrackingTimeline";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 export default function DealTrackingDesktop(props: DealTrackingViewProps) {
   const t = useTranslations("carrierDealTracking");
@@ -27,7 +28,7 @@ export default function DealTrackingDesktop(props: DealTrackingViewProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         <button
           type="button"
           onClick={props.onBackAction}
