@@ -30,7 +30,7 @@
     "perKg": "Price per kg",
     "available": "Available",
     "finalAtBooking": "The final price is set at booking.",
-    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum, whatever its weight.",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg, number} kg minimum, whatever its weight.",
     "surcharge": "+{pct}%",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papers",
@@ -44,7 +44,7 @@
     },
     "checkedBag": "Checked bag 23 kg",
     "cabinBag": "Cabin bag 12 kg",
-    "estimateShort": "≈ {price} for a {kg} kg parcel, all in",
+    "estimateShort": "≈ {price} for a {kg, number} kg parcel, all in",
     "priceDetails": "Price details",
     "refusedFamilies": "Refused families"
   },
@@ -117,7 +117,7 @@
   },
   "co2": {
     "prefix": "Shipping with no extra footprint ·",
-    "amount": "{kg} kg of CO₂ saved vs express freight",
+    "amount": "{kg, number} kg of CO₂ saved vs express freight",
     "suffix": "for a {weight} kg parcel"
   },
   "bar": {

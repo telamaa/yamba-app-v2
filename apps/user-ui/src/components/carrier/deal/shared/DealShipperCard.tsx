@@ -11,6 +11,7 @@
 import { BadgeCheck, ChevronRight, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealShipper } from "../deal.types";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   shipper: DealShipper;
@@ -66,7 +67,7 @@ export default function DealShipperCard({
                 {shipper.rating != null && (
                   <span className="flex items-center gap-1">
                     <Star size={11} fill="#BA7517" stroke="#BA7517" />
-                    {shipper.rating.toFixed(1)}
+                    {formatRating(shipper.rating, intlTagFor(locale))}
                   </span>
                 )}
                 {shipper.rating != null && shipper.shipmentCount != null && <span>·</span>}

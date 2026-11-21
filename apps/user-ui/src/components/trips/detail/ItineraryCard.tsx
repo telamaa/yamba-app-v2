@@ -26,6 +26,7 @@ import {
   formatMemberSince,
   getInitials,
 } from "@/lib/public-trip.helpers";
+import { roundToTenth, formatRating, intlTagFor } from "@/lib/number-format";
 import { countryName } from "@/lib/country-name";
 
 type Props = {
@@ -423,7 +424,7 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
               <span className="inline-flex items-baseline gap-0.5 text-xs">
                 <Star size={11} className="fill-[#FFB84D] text-[#FFB84D]" strokeWidth={0} />
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  {trip.tripper.carrier!.ratingsAvg.toFixed(1).replace(".", locale === "fr" ? "," : ".")}
+                  {formatRating(trip.tripper.carrier!.ratingsAvg, intlTagFor(locale))}
                 </span>
                 <span className="text-slate-400 dark:text-slate-500">
                   · {t("reviewsCount", { count: trip.tripper.carrier!.ratingsCount })}
@@ -475,7 +476,7 @@ export default function ItineraryCard({ trip, isOwner = false, weightKg = null }
           <span className="text-[11px] text-slate-600 dark:text-slate-400">
             {t("co2.label")}{" "}
             <span className="font-semibold text-green-700 dark:text-green-400">
-              {t("co2.saved", { kg: co2Saved.toFixed(1).replace(".", locale === "fr" ? "," : ".") })}
+              {t("co2.saved", { kg: roundToTenth(co2Saved) })}
             </span>{" "}
             {t("co2.versus")} · {t("co2.forWeight", { kg: co2Kg })}
           </span>

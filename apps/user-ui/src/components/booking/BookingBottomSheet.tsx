@@ -11,6 +11,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { MANGO } from "./BookingFormUi";
 import type { Draft, PriceBreakdown, Step, TripContext } from "./booking.types";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   trip: TripContext;
@@ -110,7 +111,7 @@ export default function BookingBottomSheet({
                 <Star size={10} fill="#BA7517" stroke="#BA7517" />
                 <span>
                   {trip.carrier.dealCount > 0
-                    ? `${trip.carrier.rating.toFixed(1)} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
+                    ? `${formatRating(trip.carrier.rating, intlTagFor(locale))} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
                     : t("summary.newTripper")} ·{" "}
                   {trip.originCity} → {trip.destinationCity}
                 </span>

@@ -69,6 +69,7 @@ import {
   isPopular,
   showsViews,
 } from '@/lib/trip-format';
+import { roundToTenth, formatRating, intlTagFor } from '@/lib/number-format';
 
 /** Les 8 familles D14, dans l'ordre du site, avec le pictogramme qui les
  *  désigne — une liste d'icônes se balaie, une liste de mots se lit. */
@@ -601,7 +602,7 @@ function Tripper({ trip }: { trip: PublicTrip }) {
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
             {ratedCarrier !== null
               ? t('tripper.rating', {
-                  rating: ratedCarrier.ratingsAvg.toFixed(1),
+                  rating: formatRating(ratedCarrier.ratingsAvg, intlTagFor(locale)),
                   count: ratedCarrier.ratingsCount,
                 })
               : t('tripper.newTripper')}
@@ -634,7 +635,7 @@ function Tripper({ trip }: { trip: PublicTrip }) {
         <View style={styles.co2Row}>
           <Ionicons name="leaf-outline" size={14} color={dark ? '#34D399' : '#047857'} />
           <ThemedText type="small" themeColor="textSecondary" style={styles.co2Text} numberOfLines={1}>
-            {t('co2.amount', { kg: co2.toFixed(1) })}
+            {t('co2.amount', { kg: roundToTenth(co2) })}
           </ThemedText>
         </View>
       )}

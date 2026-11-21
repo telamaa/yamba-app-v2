@@ -52,9 +52,9 @@
   },
   "co2": {
     "label": "Shipment with no extra footprint ·",
-    "saved": "{kg} kg of CO₂ saved",
+    "saved": "{kg, number} kg of CO₂ saved",
     "versus": "vs express freight",
-    "forWeight": "for {kg} kg"
+    "forWeight": "for {kg, number} kg"
   },
   "reviews": {
     "title": "What people say about {firstName}",
@@ -83,13 +83,13 @@
     "trust": {
       "noCharge": "You won't be charged before accept request",
       "protection": "Yamba Protection available",
-      "co2": "~{kg} kg of CO₂ saved"
+      "co2": "~{kg, number} kg of CO₂ saved"
     },
     "perKg": "Price per kg",
-    "perKgHint": "{kg} kg still available · the sender pays weight × price",
+    "perKgHint": "{kg, number} kg still available · the sender pays weight × price",
     "perKgHintNoCap": "The sender pays weight × price per kg",
-    "example": "Estimate: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)",
-    "lightParcel": "Light parcel: billed at {kg} kg minimum."
+    "example": "Estimate: a {kg, number} kg parcel ≈ {price} all-in (transport + Yamba service)",
+    "lightParcel": "Light parcel: billed at {kg, number} kg minimum."
   },
   "notFound": {
     "title": "Trip not found",
@@ -111,8 +111,8 @@
     "hint": "One price per kg, whatever the content. Check below that your parcel type is accepted: some carry a surcharge, some are refused.",
     "perKg": "Price per kg",
     "available": "Available",
-    "example": "Estimate for a {kg} kg parcel: ≈ {price} all-in · final price at booking",
-    "notEnough": "Not enough room left for a {kg} kg parcel",
+    "example": "Estimate for a {kg, number} kg parcel: ≈ {price} all-in · final price at booking",
+    "notEnough": "Not enough room left for a {kg, number} kg parcel",
     "families": "Parcel families",
     "accepted": "Accepted",
     "refused": "Refused by the Traveler",
@@ -130,12 +130,12 @@
       "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Accessories & misc."
     },
-    "exampleFromSearch": "Estimate for a {kg} kg parcel (weight from your search): ≈ {price} all-in · final price at booking",
+    "exampleFromSearch": "Estimate for a {kg, number} kg parcel (weight from your search): ≈ {price} all-in · final price at booking",
     "estimateLabel": "Estimate",
-    "estimateLabel2": "Estimate for a {kg} kg parcel",
-    "estimateLabelFromSearch": "Estimate for your {kg} kg parcel (weight from your search)",
+    "estimateLabel2": "Estimate for a {kg, number} kg parcel",
+    "estimateLabelFromSearch": "Estimate for your {kg, number} kg parcel (weight from your search)",
     "allIn": "all-in (transport + Yamba service)",
     "finalAtBooking": "The final price is set at booking.",
-    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum, whatever its weight."
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg, number} kg minimum, whatever its weight."
   }
 }

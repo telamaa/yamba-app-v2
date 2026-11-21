@@ -48,6 +48,7 @@ import {
 } from '@/lib/api/favorite.api';
 import type { TripSearchResult } from '@/lib/api/search.api';
 import { formatLongDate, getInitials } from '@/lib/trip-format';
+import { formatRating, intlTagFor } from '@/lib/number-format';
 
 const SEGMENTS = ['trips', 'wishes', 'carriers'] as const;
 type Segment = (typeof SEGMENTS)[number];
@@ -284,6 +285,7 @@ function WishesSegment({ wishes }: { wishes: SavedRoute[] }) {
 
 function CarriersSegment({ carriers }: { carriers: FollowedCarrier[] }) {
   const t = useTranslations('favorites');
+  const locale = useLocale();
   const theme = useTheme();
 
   if (carriers.length === 0) {
@@ -324,7 +326,7 @@ function CarriersSegment({ carriers }: { carriers: FollowedCarrier[] }) {
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {user.carrierRatingCount > 0
-                  ? `★ ${(user.carrierRatingAvg ?? 0).toFixed(1)} · ${t('carriers.trips', { count: user.totalTripsPublished })}`
+                  ? `★ ${formatRating(user.carrierRatingAvg ?? 0, intlTagFor(locale))} · ${t('carriers.trips', { count: user.totalTripsPublished })}`
                   : t('carriers.newCarrier')}
               </ThemedText>
               <ThemedText type="small" themeColor={nextTrip ? 'tint' : 'textSecondary'}>

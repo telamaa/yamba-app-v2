@@ -18,6 +18,7 @@ import {
   getInitials,
   getTripDetailHref,
 } from "@/lib/public-user.helpers";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   tripper: PublicTripperBlock;
@@ -36,10 +37,11 @@ export default function TripperBlock({
                                        userSlug,
                                      }: Props) {
   const t = useTranslations("userProfile.tripperBlock");
+  const locale = useLocale();
 
   const ratingLabel =
     tripperRating && tripperRating.count > 0
-      ? tripperRating.average.toFixed(1).replace(".", ",")
+      ? formatRating(tripperRating.average, intlTagFor(locale))
       : "—";
 
   return (
@@ -312,13 +314,14 @@ function ReportReviewLink({ reviewId }: { reviewId: string }) {
 
 function ReputationFacts({ reputation }: { reputation: PublicReputation }) {
   const t = useTranslations("userProfile.reputation");
+  const locale = useLocale();
   const nextKey = reputation.level === "NEW" ? "nextConfirmed" : reputation.level === "CONFIRMED" ? "nextTop" : null;
   return (
     <div className="mb-5 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
       <p className="text-[12.5px] text-slate-700 dark:text-slate-300">
         {t("facts", {
           deals: reputation.completedDealsCount,
-          avg: reputation.ratingsCount > 0 ? reputation.ratingsAvg.toFixed(1).replace(".", ",") : "—",
+          avg: reputation.ratingsCount > 0 ? formatRating(reputation.ratingsAvg, intlTagFor(locale)) : "—",
           count: reputation.ratingsCount,
           late: reputation.lateCancellationsCount,
         })}

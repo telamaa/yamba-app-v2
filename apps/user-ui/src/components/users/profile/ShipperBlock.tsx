@@ -9,6 +9,7 @@ import type {
   PublicReputation,
 } from "@/lib/public-user.types";
 import { formatRelativeDate, getInitials } from "@/lib/public-user.helpers";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   shipper: PublicShipperBlock;
@@ -27,6 +28,7 @@ export default function ShipperBlock({
                                        firstName,
                                      }: Props) {
   const t = useTranslations("userProfile.shipperBlock");
+  const locale = useLocale();
 
   // Mode adaptive : si aucune activité, mode compact
   const hasActivity = parcelsSentCount > 0 || shipperRating.count > 0;
@@ -64,7 +66,7 @@ export default function ShipperBlock({
             {shipperRating.count > 0 ? (
               <>
                 <Star size={17} className="fill-[#0F766E] text-[#0F766E]" />
-                {shipperRating.average.toFixed(1).replace(".", ",")}
+                {formatRating(shipperRating.average, intlTagFor(locale))}
               </>
             ) : (
               <span className="text-sm font-medium italic text-slate-400 dark:text-slate-500">
@@ -210,13 +212,14 @@ function ReportReviewLink({ reviewId }: { reviewId: string }) {
 
 function ReputationFacts({ reputation }: { reputation: PublicReputation }) {
   const t = useTranslations("userProfile.reputation");
+  const locale = useLocale();
   const nextKey = reputation.level === "NEW" ? "nextConfirmed" : reputation.level === "CONFIRMED" ? "nextTop" : null;
   return (
     <div className="mb-5 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
       <p className="text-[12.5px] text-slate-700 dark:text-slate-300">
         {t("facts", {
           deals: reputation.completedDealsCount,
-          avg: reputation.ratingsCount > 0 ? reputation.ratingsAvg.toFixed(1).replace(".", ",") : "—",
+          avg: reputation.ratingsCount > 0 ? formatRating(reputation.ratingsAvg, intlTagFor(locale)) : "—",
           count: reputation.ratingsCount,
           late: reputation.lateCancellationsCount,
         })}

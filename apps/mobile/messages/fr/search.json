@@ -38,7 +38,7 @@
     "weightChosen": "prix et places pour ce poids",
     "lighter": "Colis plus léger",
     "heavier": "Colis plus lourd",
-    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg} kg minimum.",
+    "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : facturé {kg, number} kg minimum.",
     "trustSafety": "Confiance et sécurité",
     "families": "Que veux-tu envoyer ?"
   },
@@ -59,8 +59,8 @@
   },
   "card": {
     "fromPrice": "dès",
-    "remainingKg": "{kg} kg dispo",
-    "totalForWeight": "estimation pour {kg} kg",
+    "remainingKg": "{kg, number} kg dispo",
+    "totalForWeight": "estimation pour {kg, number} kg",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
     "remainingSlots": "{count, plural, one {# place} other {# places}}",

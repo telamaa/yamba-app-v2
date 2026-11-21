@@ -51,7 +51,6 @@ export default function OfferCard({ trip, weightKg }: Props) {
   if (!perKgCents) return null;
 
   const kg = weightKg ?? 2;
-  const kgLabel = kg.toLocaleString(locale === "fr" ? "fr-FR" : "en-US");
   const example = estimateShipperTotalCents(perKgCents, kg).totalCents;
   const conditions = new Map((trip.familyConditions ?? []).map((c) => [c.familyKey, c]));
   const remaining = typeof trip.remainingKg === "number" ? trip.remainingKg : null;
@@ -96,10 +95,10 @@ export default function OfferCard({ trip, weightKg }: Props) {
 
         <div className="mt-4 border-t border-[#0F766E]/15 pt-3.5 dark:border-slate-700">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {notEnough ? t("offer.estimateLabel") : weightKg ? t("offer.estimateLabelFromSearch", { kg: kgLabel }) : t("offer.estimateLabel2", { kg: kgLabel })}
+            {notEnough ? t("offer.estimateLabel") : weightKg ? t("offer.estimateLabelFromSearch", { kg }) : t("offer.estimateLabel2", { kg })}
           </div>
           {notEnough ? (
-            <div className="mt-1 text-[13px] font-semibold text-slate-600 dark:text-slate-300">{t("offer.notEnough", { kg: kgLabel })}</div>
+            <div className="mt-1 text-[13px] font-semibold text-slate-600 dark:text-slate-300">{t("offer.notEnough", { kg })}</div>
           ) : (
             <>
               <div className="mt-1 text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-white">

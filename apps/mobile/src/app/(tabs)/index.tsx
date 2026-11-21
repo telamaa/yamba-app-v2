@@ -1038,7 +1038,7 @@ export default function SearchScreen() {
                   son colis — la carte, elle, ne doit ni le répéter ni le
                   contredire (D99 bis, D100 2A). */}
               <ThemedText type="small" themeColor="textSecondary" style={styles.sheetHint}>
-                {t('filters.lightParcel', { kg: formatParcelKg(BILLING_FLOOR_KG, localeTag) })}
+                {t('filters.lightParcel', { kg: BILLING_FLOOR_KG })}
               </ThemedText>
             </View>
 

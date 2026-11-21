@@ -81,6 +81,7 @@ export function calculateCO2SavedKg(trip: PublicTrip, weightKg: number = 2): num
   return co2Grams / 1000;
 }
 
+
 // ─────────────────────────────────────────────────────────────────
 // Durée du trajet
 // ─────────────────────────────────────────────────────────────────

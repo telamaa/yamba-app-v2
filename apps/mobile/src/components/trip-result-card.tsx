@@ -49,6 +49,7 @@ import {
 } from '@/lib/pricing-example';
 import { useSession } from '@/lib/session-context';
 import { getInitials, isPopular, showsViews } from '@/lib/trip-format';
+import { formatRating, intlTagFor } from '@/lib/number-format';
 
 /**
  * D99 3A — en dessous de ce seuil, la place restante CONTRAINT et mérite d'être
@@ -258,7 +259,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                     colonne (le colis, un prix unitaire, la place du trajet). */}
                 <ThemedText style={styles.price}>
                   {totalCents !== null
-                    ? `${formatAmountFromCents(totalCents, locale === 'fr' ? 'fr-FR' : 'en-US')} ${currency}`
+                    ? `${formatAmountFromCents(totalCents, intlTagFor(locale))} ${currency}`
                     : `${formatTwoDecimals(perKgPrice, locale)} ${currency}`}
                 </ThemedText>
                 {totalCents !== null && (
@@ -301,7 +302,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                 <ThemedText style={[styles.travelerMeta, { color: Brand.mango }]}>★</ThemedText>
                 <ThemedText style={[styles.travelerMeta, { color: theme.textSecondary }]}>
                   {' '}
-                  {formatRating(trip.rating, locale)}
+                  {formatRating(trip.rating, intlTagFor(locale))}
                   {typeof trip.reviewCount === 'number' ? ` (${trip.reviewCount})` : ''}
                 </ThemedText>
               </>
@@ -388,12 +389,6 @@ function formatTwoDecimals(value: number, locale: string): string {
 
 /** Cents → « 11 » / « 20,50 » : les centimes ne s'écrivent que s'il y en a
  *  (« 11,00 € » sous un prix au kilo fait du bruit pour rien). */
-
-/** « 4,8 » en français, "4.8" ailleurs. */
-function formatRating(rating: number, locale: string): string {
-  const fixed = rating.toFixed(1);
-  return locale === 'fr' ? fixed.replace('.', ',') : fixed;
-}
 
 /** Accents hors jetons de thème — mêmes valeurs que la maquette validée
  *  (slate / red / orange Tailwind, mangue #FF9900). */

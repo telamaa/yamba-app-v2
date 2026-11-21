@@ -4,6 +4,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Star, ChevronRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type { PublicTripper } from "@/lib/public-trip.types";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   tripper: PublicTripper;
@@ -17,9 +18,7 @@ export default function ReviewsCard({ tripper }: Props) {
     return null;
   }
 
-  const ratingFormatted = tripper.carrier.ratingsAvg
-    .toFixed(1)
-    .replace(".", locale === "fr" ? "," : ".");
+  const ratingFormatted = formatRating(tripper.carrier.ratingsAvg, intlTagFor(locale));
 
   return (
     <section>

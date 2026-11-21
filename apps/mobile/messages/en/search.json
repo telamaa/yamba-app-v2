@@ -38,7 +38,7 @@
     "weightChosen": "price and space for this weight",
     "lighter": "Lighter parcel",
     "heavier": "Heavier parcel",
-    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg} kg minimum.",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): billed at {kg, number} kg minimum.",
     "trustSafety": "Trust and safety",
     "families": "What are you sending?"
   },
@@ -59,8 +59,8 @@
   },
   "card": {
     "fromPrice": "from",
-    "remainingKg": "{kg} kg left",
-    "totalForWeight": "estimate for {kg} kg",
+    "remainingKg": "{kg, number} kg left",
+    "totalForWeight": "estimate for {kg, number} kg",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
     "remainingSlots": "{count, plural, one {# slot} other {# slots}}",

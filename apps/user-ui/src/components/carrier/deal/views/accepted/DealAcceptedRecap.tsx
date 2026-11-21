@@ -17,6 +17,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   deal: DealRequest;
@@ -29,7 +30,8 @@ export default function DealAcceptedRecap({ deal }: Props) {
 
   const shipperFirstName = deal.shipper.firstName;
   // Stats absentes de l'API réelle (BookingCounterpart) — masquées alors.
-  const ratingFormatted = deal.shipper.rating?.toFixed(1);
+  const ratingFormatted =
+    deal.shipper.rating != null ? formatRating(deal.shipper.rating, intlTagFor(locale)) : undefined;
   const shipmentCount = deal.shipper.shipmentCount;
   const isVerified = deal.shipper.isVerified;
   const hasShipperSub = ratingFormatted != null || shipmentCount != null || isVerified;
