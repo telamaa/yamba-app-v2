@@ -10538,3 +10538,235 @@ hauteur est une **conséquence** : changez l'interligne du mot, la barre suit.
   vérification par `grep` sur le bundle servi ne s'applique plus** : Expo SDK 57 charge les modules
   à la demande, et le bundle d'entrée fait 6 Mo sans contenir un seul écran. Ce qui tranche
   aujourd'hui est un redémarrage à froid suivi d'une capture.
+
+# Chapitre D110 — Une charte ne tient pas parce qu'elle existe, mais parce qu'on ne peut pas la contourner
+
+**Le lot** : `fix/entete-et-page-alignes`, 21/11/2026. Un retour de recette de trois mots —
+« l'en-tête et la page ne sont pas alignés » — qui mène à 37 fichiers, deux défauts mesurés et une
+leçon d'architecture qui vaut bien au-delà du CSS.
+
+## 1. Compter plutôt que lire : l'outil de diagnostic le plus rentable du dépôt
+
+Trente-sept fichiers écrivaient la largeur du cadre de page à la main. **Chacune de ces lignes est
+correcte prise seule.** C'est exactement pour cela qu'une relecture, même attentive, ne trouve
+rien : il n'y a pas de ligne fautive, il y a une COLLECTION incohérente.
+
+L'outil qui tranche en trois secondes :
+
+```sh
+grep -rho "max-w-7xl[^\"\`]*" apps/user-ui/src --include='*.tsx' \
+  | grep -o "px-[0-9]*\( sm:px-[0-9]*\)\?" | sort | uniq -c | sort -rn
+```
+
+```
+  45 px-4
+  20 px-6
+   2 px-3
+   1 px-8
+   1 px-1
+```
+
+Décomposons, car c'est un idiome à avoir dans les doigts :
+
+- `grep -rho` — `r`écursif, `h` sans le nom du fichier (on veut la valeur, pas l'endroit),
+  `o` pour n'imprimer que **ce qui a matché** et non la ligne entière. C'est `-o` qui transforme
+  `grep` en extracteur de valeurs.
+- le second `grep -o` isole la classe de gouttière dans ce qui reste ;
+- `sort | uniq -c | sort -rn` est le **compteur** : `uniq -c` n'agrège que des lignes ADJACENTES,
+  d'où le `sort` obligatoire avant lui ; `sort -rn` classe par fréquence décroissante.
+
+Cette ligne est la même qui a diagnostiqué D105 (`grep -o 'size={[0-9]*}'` → quatre tailles de
+flèche de retour). **Troisième fois en un mois.** La règle générale : quand un utilisateur dit
+« c'est différent des autres », ne corrigez pas l'écran qu'il montre — **comptez les autres**.
+
+## 2. Pourquoi « source de vérité » n'est pas une propriété du code
+
+Le dépôt avait déjà `AppContainer.tsx`, dont l'en-tête disait, textuellement :
+
+> **Source de vérité** pour les dimensions de layout de l'app […] change-les ici **UNE SEULE
+> FOIS** et tout le layout de l'app suivra.
+
+C'était vrai, bien écrit, bien motivé — et **importé par un seul fichier**. Pendant ce temps la
+classe était recopiée 51 fois.
+
+D93 avait écrit la moitié de la leçon : « une règle écrite DANS le composant qui s'en sert ne
+protège qu'une page ». Voici l'autre moitié, et elle est plus traître :
+
+> **Une règle écrite dans un composant PARTAGÉ ne protège personne si rien n'oblige à s'en
+> servir.** Une source de vérité que l'on n'importe pas n'est pas une source de vérité : c'est un
+> commentaire.
+
+La conséquence pratique est une méthode de conception. Quand vous voulez qu'une règle tienne,
+ne vous demandez pas « où l'écrire pour qu'elle soit claire ? » mais **« comment rendre son
+contournement impossible, ou au moins visible ? »**. D105 l'avait déjà conclu en refusant une prop
+`size` au bouton de retour partagé ; le présent lot le refait sur un gabarit :
+
+```ts
+// apps/user-ui/src/lib/layout/largeur-de-page.ts — zéro import
+export const LARGEUR_MAX_DE_PAGE = "max-w-7xl";
+export const GOUTTIERE_DE_PAGE = "px-4 sm:px-6";
+
+export function conteneurDePage(extra = ""): string {
+  return `mx-auto w-full ${LARGEUR_MAX_DE_PAGE} ${GOUTTIERE_DE_PAGE} ${extra}`.trim();
+}
+```
+
+…plus **une fiche qui interdit le littéral partout ailleurs**. Le module ne devient la source de
+vérité qu'avec cette seconde moitié. Sans elle, c'est un quatrième endroit où la valeur est écrite.
+
+## 3. Tailwind lit du TEXTE : ce que cela interdit, et comment vivre avec
+
+Point de théorie, souvent mal compris. Tailwind ne comprend pas votre code : il **scanne le texte**
+des fichiers déclarés dans `content` et génère une classe CSS pour chaque chaîne reconnue.
+
+```js
+// apps/user-ui/tailwind.config.js
+content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+```
+
+Deux conséquences immédiates :
+
+1. **Un module `.ts` qui contient `"max-w-7xl"` est scanné** — le glob couvre `.ts`, pas seulement
+   `.tsx`. C'est ce qui rend la centralisation possible : la classe apparaît littéralement dans le
+   module, donc elle est générée.
+2. **Une classe calculée n'existe pas.** `` className={`h-[${hauteur}px]`} `` ne génère RIEN :
+   Tailwind ne voit que `h-[${hauteur}px]`, qui n'est pas une classe. C'est l'erreur classique du
+   débutant, et elle est silencieuse — le code compile, le style manque.
+
+D'où un compromis à assumer, écrit dans le module :
+
+```ts
+export const HAUTEUR_D_EN_TETE = 78;          // pour le JavaScript
+const CLASSE_HAUTEUR_D_EN_TETE = "h-[78px]";  // pour Tailwind : littéral obligatoire
+```
+
+Le nombre est donc écrit **deux fois**, par nécessité technique. On ne peut pas supprimer la
+duplication : on peut la **surveiller**. C'est le rôle de la fiche, et c'est le motif de D95 6A :
+
+```ts
+expect(rangeeDEnTete(false)).toContain(`h-[${HAUTEUR_D_EN_TETE}px]`);
+expect(trou).toContain(`pt-[${HAUTEUR_D_EN_TETE}px]`);
+```
+
+**L'attendu est CALCULÉ depuis la règle, jamais recopié.** Si quelqu'un change 78 en 80, la fiche
+suit ; si quelqu'un change un seul des littéraux, elle rougit. Écrire `toContain("h-[78px]")`
+aurait l'air identique et ne vérifierait plus rien d'intéressant.
+
+## 4. Écrire un balayage : trois règles, toutes payées
+
+Un « balayage » (sweep) est une fiche qui lit le code source comme une donnée. C'est le seul genre
+de test qui aurait trouvé D110, parce que le défaut n'était pas un calcul faux mais un calcul
+**contourné**.
+
+```ts
+const SRC = resolve(__dirname, "..", "..");
+
+function sources(dossier = SRC): string[] { /* récursif, hors *.spec.ts et *.d.ts */ }
+
+function codeSeul(chemin: string): string {
+  return readFileSync(chemin, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")     // les blocs
+    .replace(/^[ \t]*\/\/.*$/gm, " ");     // les lignes
+}
+```
+
+**Règle 1 — viser l'USAGE, pas une orthographe.** Cinq commentaires du dépôt citent `max-w-7xl`
+pour expliquer la règle. Une fiche qui les compterait serait rouge pour la plus mauvaise raison
+possible. D'où le dépouillement ci-dessus — et c'est le défaut qu'A224 lot 5 avait trouvé **dans
+son propre détecteur**. Cinquième occurrence du mois.
+
+**Règle 2 — un balayage doit prouver qu'il a balayé.** D104 :
+
+```ts
+expect(FICHIERS.length).toBeGreaterThanOrEqual(200);
+```
+
+Sans cette ligne, une faute de chemin rend le balayage vide, donc **vert**. Un test qui ne teste
+rien est pire qu'un test absent : il rassure.
+
+**Règle 3 — un faux positif coûte aussi cher qu'un trou.** Le premier jet du balayage des hauteurs
+ramassait tout `h-[…px]` et rougissait sur l'avatar d'un squelette à 68 px. Un balayage qui crie à
+tort est désactivé dans la semaine. Le remède n'est pas de desserrer le seuil mais de **viser le
+sens** : on ne retient que les écritures dont la sémantique EST la hauteur de l'en-tête
+(soustractions du viewport, constantes nommées).
+
+Et le corollaire, qui s'est vérifié deux fois dans ce lot : **cadrer une fiche est un acte de
+diagnostic.** Le défaut vertical (les 64 px) n'a été vu ni à l'écran ni en relecture — il est sorti
+de la question « quels nombres cette fiche doit-elle tenir ? ».
+
+## 5. Quand la fiche a tort : recenser au lieu d'interdire
+
+Le balayage a d'abord refusé **29 conteneurs centrés** dans 25 fichiers, à cinq largeurs
+(`max-w-6xl` à `max-w-2xl`). Il avait tort : une colonne de lecture étroite centrée dans le cadre
+est un motif légitime — un paragraphe ne se lit pas sur 1280 px.
+
+La mauvaise réaction est de supprimer le test. La bonne est de **changer sa nature** : d'interdire
+à recenser.
+
+```ts
+const COLONNES_ETROITES = [ /* les 25 fichiers, nommés */ ];
+expect([...centres].sort()).toEqual(COLONNES_ETROITES);
+```
+
+La fiche n'exige plus rien de ces colonnes : elle exige qu'une **trentième** ne puisse pas
+apparaître en silence. Son auteur devra choisir entre la charte et cette liste — c'est-à-dire
+**décider**, ce qui est tout ce qu'on demande. C'est la mécanique d'A224 lot 5 (le recensement des
+modules purs), et la différence avec un seuil de couverture mérite d'être comprise : un seuil
+répond à « combien de code est exécuté ? », un recensement répond à « **qu'est-ce que personne ne
+surveille ?** » — et c'est la seconde question qui coûte des mois.
+
+## 6. Vérifier une affirmation de pixels : mesurer le DOM, pas regarder l'écran
+
+D107 avait établi qu'« un correctif d'interface non regardé est une hypothèse déployée ». Mais pour
+une affirmation **chiffrée**, regarder ne suffit pas : 8 px ne se voient pas à l'œil, ils se
+mesurent. Playwright pilote le Chrome du système (`channel: "chrome"`), et `evaluate` exécute du
+JavaScript DANS la page :
+
+```js
+const r = (el) => Math.round(el.getBoundingClientRect().left);
+// écart entre le bord gauche du logo et celui du contenu
+```
+
+| Fenêtre | logo | contenu | écart | débordement |
+|---|---|---|---|---|
+| 390 px | @16 | @16 | 0 px | 0 px |
+| 768 px | @24 | @24 | 0 px | 0 px |
+| 1440 px | @104 | @104 | 0 px | 0 px |
+
+Deux enseignements de méthode, tirés des pièges rencontrés pendant cette mesure :
+
+**① Un premier résultat bizarre est d'abord une faute de mesure.** La hauteur de l'en-tête
+ressortait à **0 px**. Cause : le premier `<header>` du DOM est le **squelette**, monté en
+permanence et caché par `display: none` sur son parent (c'est la structure même de D93). Le vrai
+en-tête est le second, à 79 px (78 + 1 px de bordure). Corollaire utile : `getBoundingClientRect`
+renvoie des zéros pour un élément caché, sans erreur — un `0` est donc toujours ambigu entre
+« collé au bord » et « invisible ».
+
+**② Le contrefactuel vaut le correctif.** Pour prouver que le défaut vertical était réel et non
+théorique, on rebascule **le seul chiffre** et on re-mesure :
+
+```
+avant (64 px) : débordement 14 px, grille 836 px
+après (78 px) : débordement  0 px, grille 822 px
+```
+
+C'est la même logique qu'un test de mutation — et c'est aussi ce qu'il faut faire à sa fiche. La
+nôtre a été validée en réinjectant **deux** régressions (un `max-w-7xl` à la main dans le pied de
+page, un `64px` dans un squelette) : trois tests sont passés au rouge, puis tout est redevenu vert
+après restauration. **Une fiche verte qu'on n'a jamais vue rougir ne prouve rien.**
+
+## Pour aller plus loin
+
+- **`git log -S "<chaîne>"`** (le « pickaxe ») cherche les commits qui ont ajouté ou retiré une
+  chaîne. C'est l'outil qui répond à « d'où vient ce 64 ? » — ici, l'ancienne hauteur `h-16` de
+  l'en-tête, jamais suivie quand il est passé à 78.
+- **Spécificité et ordre des classes Tailwind** : l'ordre dans l'attribut `class` n'a AUCUN effet
+  en CSS (c'est l'ordre de la feuille générée qui compte). Composer une chaîne par concaténation
+  est donc sûr — mais deux classes du même groupe (`px-4` et `px-8`) entrent en conflit de façon
+  imprévisible. C'est la raison de la fiche qui interdit une gouttière dans l'argument
+  `conteneurDePage(extra)` : on ne compte pas sur l'ordre, on interdit le doublon.
+- **Lire `content` de votre `tailwind.config.js` avant de créer un dossier de composants.** Un
+  fichier hors du glob produit des classes silencieusement absentes — le symptôme est « ça marche
+  en dev, pas en prod » quand les globs diffèrent.
+- **`JSX.IntrinsicElements`** : le type qui liste les balises HTML connues de TypeScript. C'est ce
+  qui permet à `AppContainer` d'accepter `as="main"` en restant typé.

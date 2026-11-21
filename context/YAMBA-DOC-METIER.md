@@ -9407,3 +9407,50 @@ logo n'est pas une commande.
 | 4 | Je regarde la barre en thème sombre | il est plus **vif** quand « Publier » est actif |
 | 5 | J'agrandis les textes du système | les mots grossissent sans pousser les icônes hors de l'écran |
 | 6 | Je navigue au lecteur d'écran | chaque onglet annonce son nom et sa position (« 3 sur 5 ») |
+
+# D110 — L'en-tête et la page sont alignés (21/11/2026)
+
+## Le besoin
+
+Retour de recette : l'en-tête et le contenu ne sont pas alignés.
+
+L'énoncé est court, le défaut est partout. Le site place son contenu dans un cadre centré de
+1280 px, et ce cadre était recopié à la main dans **37 fichiers**, avec **cinq gouttières**
+différentes autour de lui. L'en-tête — qui est la référence visuelle de tout le site, puisque le
+logo est le premier repère de la page — portait la plus serrée des cinq.
+
+Ce que voyait un membre, au-delà de 640 px de large : **le contenu commençait 8 px plus à
+l'intérieur que le logo**, sur tout le parcours connecté. Huit pixels ne se nomment pas, mais ils
+se voient : deux lignes verticales presque confondues, c'est ce que l'œil lit comme « mal fini ».
+
+Un second défaut, invisible à la lecture et constant à l'usage : les huit écrans de connexion,
+d'inscription et de mot de passe réservaient la place d'un en-tête de **64 px** là où il en fait
+**78**. Chaque page réclamait donc 14 px de plus que l'écran : **un ascenseur permanent sur un
+formulaire qui tient pourtant dans la hauteur.**
+
+Enfin, le dépôt portait depuis des mois un composant qui se déclarait « source de vérité » pour ces
+dimensions, en demandant par écrit de ne les changer **qu'à un seul endroit**. Un seul fichier
+l'utilisait. Une règle que personne n'applique n'est pas une règle.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D110-1** | Le contenu d'une page commence **exactement** là où commence le logo de l'en-tête. | C'est la seule définition vérifiable d'« aligné ». Un décalage de 8 px ne se nomme pas mais se voit, et il se lit comme un défaut de finition. |
+| **RG-D110-2** | La gouttière est de **16 px** sur téléphone et de **24 px** à partir de 640 px — y compris pour l'en-tête. | Un grand écran a de la place : coller le texte au bord gaspille la lisibilité. Mais la règle ne vaut que si l'en-tête la suit aussi, sinon elle crée le décalage qu'elle prétend corriger. |
+| **RG-D110-3** | La largeur du cadre, sa gouttière et la hauteur de l'en-tête ont **un seul domicile** dans le code. | Une dimension recopiée dérive toujours : cinq gouttières étaient nées d'une seule, recopiée 51 fois. |
+| **RG-D110-4** | Un écran qui réserve la place de l'en-tête réserve **sa hauteur réelle**. | Réserver moins fait défiler une page qui tient à l'écran ; réserver plus laisse un trou blanc. Les deux se voient. |
+| **RG-D110-5** | Un squelette de chargement respecte les mêmes dimensions que l'écran qu'il remplace. | Sinon le contenu **saute** au moment où il apparaît — et c'est le dernier instant où l'on veut donner une impression d'instabilité. |
+| **RG-D110-6** | Une colonne de lecture plus **étroite** que le cadre reste permise, mais elle est recensée. | Un texte long se lit mal sur 1280 px : la colonne étroite est un choix légitime. Ce qui ne l'est pas, c'est qu'elle apparaisse sans que personne ne l'ait décidé. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre n'importe quelle page sur un grand écran | le premier mot du contenu est exactement sous le logo |
+| 2 | Je réduis la fenêtre sous 640 px | la marge passe à 16 px **des deux côtés à la fois** — le logo et le contenu ne se désalignent à aucune largeur |
+| 3 | J'ouvre la page de connexion sur un grand écran | aucun ascenseur vertical : le formulaire tient dans la hauteur |
+| 4 | Même geste sur l'inscription, la vérification, le mot de passe oublié et sa réinitialisation | identique : les huit écrans se comportent pareil |
+| 5 | Je recharge une page et je regarde le squelette | il occupe la même largeur et la même gouttière que la page finale ; rien ne saute à l'affichage |
+| 6 | Je vais au tableau de bord | le contenu ne touche plus le bord de l'écran |
+| 7 | Je consulte un trajet, puis une réservation, puis une notation | la marge gauche ne bouge pas d'une page à l'autre |

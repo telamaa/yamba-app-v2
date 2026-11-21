@@ -19374,3 +19374,145 @@ côté — à côté, il pousse les quatre autres onglets à chaque sélection.
 Le **cube** pour « Activité » : dans une application de colis, une boîte veut dire *colis*, pas
 *activité*. Avec cinq libellés permanents, le mot tranche l'ambiguïté — le renommage éventuel est
 un arbitrage produit, pas un défaut d'interface.
+
+# D110 — La largeur de page n'a qu'un domicile (`fix/entete-et-page-alignes`, 21/11/2026)
+
+## Le diagnostic : il se compte, il ne se lit pas
+
+Le lot part d'un retour de recette sur l'alignement de l'en-tête et du contenu. Trente-sept
+fichiers étaient en cause, et **chacune de leurs lignes est correcte prise seule** — c'est pour
+cela qu'une relecture ne voit rien. Ce qui tranche, c'est un comptage :
+
+```sh
+grep -rn "max-w-7xl" apps/user-ui/src --include='*.tsx' | wc -l     #  51
+grep -rho "max-w-7xl[^\"\`]*" apps/user-ui/src --include='*.tsx' \
+  | grep -o "px-[0-9]*\( sm:px-[0-9]*\)\?" | sort | uniq -c | sort -rn
+#  45 px-4      ← l'en-tête est ici
+#  20 px-6      ← `sm:px-6`, tout le parcours connecté
+#   2 px-3
+#   1 px-8
+#   1 px-1
+```
+
+Cinq gouttières pour un même cadre, et l'en-tête dans le camp le plus serré. **Conséquence
+mesurable : au-delà de 640 px, vingt blocs de contenu commençaient 8 px plus à l'intérieur que le
+logo** — tunnel de réservation, suivi de colis, fiche trajet, notation, affaire du Voyageur.
+
+Et le dépôt avait déjà la solution. `components/layout/AppContainer.tsx` portait en en-tête :
+
+> Container réutilisable qui garantit un **alignement parfait avec le Header**. **Source de
+> vérité** pour les dimensions de layout de l'app […] Si un jour tu changes les dimensions,
+> change-les ici **UNE SEULE FOIS** et tout le layout de l'app suivra.
+
+**Un seul fichier l'importait** (`TripSearchBar`). D92, qui a posé la règle d'alignement sur
+l'inscription le 10/11, a recopié la classe au lieu d'importer le composant situé deux dossiers
+plus loin — et les sept écrans jumeaux sont restés désalignés onze jours.
+
+## Ce qui a été fait
+
+**1. La règle déménage dans un module pur.** `apps/user-ui/src/lib/layout/largeur-de-page.ts`,
+zéro import :
+
+```ts
+export const LARGEUR_MAX_DE_PAGE = "max-w-7xl";
+export const GOUTTIERE_DE_PAGE = "px-4 sm:px-6";
+export const HAUTEUR_D_EN_TETE = 78;
+
+export function conteneurDePage(extra = ""): string {
+  return `mx-auto w-full ${LARGEUR_MAX_DE_PAGE} ${GOUTTIERE_DE_PAGE} ${extra}`.trim();
+}
+
+export function rangeeDEnTete(compact: boolean): string { /* … */ }
+```
+
+C'est la quatrième fois que ce dépôt sort une règle d'un composant pour qu'une fiche puisse
+l'exécuter : `tunnel.ts` (D93), `search-facets.ts` (D100), `parcel-weight.ts` (D101),
+`back-affordance.ts` (D105). La frontière d'A223/A224 est tenue : **une règle qu'on veut tester
+SORT de l'écran.**
+
+**2. La gouttière devient `px-4 sm:px-6` partout, en-tête compris** — arbitrage rendu par
+l'utilisateur sur trois options chiffrées. Sous 640 px rien ne bouge ; au-delà, le logo et les
+contrôles de droite rentrent de 8 px.
+
+**3. Le littéral `max-w-7xl` quitte les 37 fichiers.** 38 occurrences remplacées par
+`conteneurDePage(…)`, l'extra ne portant plus que ce qui appartient à l'appelant :
+
+```tsx
+// avant
+<div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+// après
+<div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
+```
+
+**4. L'en-tête et son squelette partagent leur rangée.** Les deux fichiers portaient la même
+chaîne de 94 caractères, recopiée. `rangeeDEnTete(isCompact)` la leur sert : la leçon de D93
+(« `HeaderSkeleton` est monté en PERMANENCE, toute règle de la branche réelle doit y être aussi »)
+devient **structurelle** au lieu d'être mémorisée. Vérifié sur pièce dans le DOM — le squelette
+est bien le premier `<header>`, à `display: none`, hauteur 0 ; le vrai fait 79 px (78 + bordure).
+
+**5. `AppContainer` cesse de prétendre être la source et le devient.** Il consomme le module. Son
+en-tête de fichier dit maintenant ce qu'il est : un consommateur commode, pas une autorité.
+
+**6. Les trois déviations examinées étaient trois défauts.** `dashboard/layout.tsx` à `px-1` (le
+fichier se vante dans son propre en-tête d'avoir réglé « le décalage » — c'était le décalage
+VERTICAL) ; `SearchResultsView.tsx` à `px-3` deux fois, dont **le squelette de la barre de
+recherche** quand la barre réelle passe par `AppContainer` — le défaut de D93 rejoué ;
+`OnboardingBanner.tsx` avec une troisième valeur à `lg:px-8`.
+
+**7. Le jumeau vertical, trouvé en cadrant la fiche.** Les dix conteneurs d'auth soustrayaient
+**64 px** du viewport — l'ancienne hauteur `h-16` — là où l'en-tête occupe 78 et où les layouts
+marketing et dashboard soustraient bien 78. Les deux `const HEADER_HEIGHT = 78` recopiés dans les
+composants de recherche importent désormais `HAUTEUR_D_EN_TETE`.
+
+## Mesures
+
+Mesuré dans le DOM, en Chrome système, par `getBoundingClientRect` — pas à l'œil.
+
+| Fenêtre | logo | contenu (auth) | écart | débordement vertical |
+|---|---|---|---|---|
+| 390 px | @16 | @16 | **0 px** | 0 px |
+| 768 px | @24 | @24 | **0 px** | 0 px |
+| 1440 px | @104 | @104 | **0 px** | 0 px |
+
+À 1440 px : la rangée d'en-tête est une boîte de 1280 px à @80, son contenu démarre donc à 104 —
+et tous les cadres de page du site démarrent au même 80. Contrefactuel du volet vertical, obtenu
+en rebasculant le seul chiffre 78 → 64 : **débordement 14 px, hauteur de grille 836 px**, contre
+**0 px et 822 px** après. Le défilement permanent des huit écrans d'auth était réel.
+
+Fiches : user-ui **218 → 232** (14 fiches, 13 → 14 suites). Les deux programmes TypeScript du
+site passent, et `run-many --target=typecheck --all` également (exit 0).
+
+## Un piège connu, repayé
+
+**Viser une forme plutôt qu'un sens.** Le premier jet du balayage des hauteurs ramassait tout
+`h-[…px]` du site et rougissait sur l'avatar d'un squelette à 68 px. Le balayage ne retient
+désormais que les écritures dont le SENS est la hauteur de l'en-tête (soustractions du viewport,
+constantes nommées). C'est la cinquième fois en un mois dans ce dépôt, et la leçon se durcit : **un
+faux positif dans un balayage coûte autant qu'un trou, parce qu'on finit par le désactiver.**
+
+Deuxième piège, le même en miroir : la fiche dépouille les commentaires avant de chercher. Cinq
+commentaires du dépôt citent `max-w-7xl` pour EXPLIQUER la règle ; les compter rendrait la fiche
+rouge pour la plus mauvaise raison — c'est le défaut qu'A224 lot 5 avait trouvé dans son propre
+détecteur.
+
+Troisième, payé en direct : un commentaire JSX `{/* … */}` placé **avant** l'élément racine d'un
+`return` est une erreur de syntaxe, pas un commentaire. `tsc` l'a dit immédiatement.
+
+## Examiné et délibérément gardé
+
+- **`max-w-7xl` (1280 px) ne change pas.** Le lot ne touche ni la largeur ni la hauteur, seulement
+  la gouttière et le NOMBRE de domiciles de la règle.
+- **`AppContainer` survit.** Un composant enveloppant reste plus commode qu'une fonction quand on
+  a un sous-arbre à entourer ; il consomme simplement le module.
+- **Les 29 conteneurs centrés plus ÉTROITS** (`max-w-6xl` à `max-w-2xl`, 25 fichiers) ne sont pas
+  alignés de force : une colonne de lecture étroite centrée dans le cadre est un motif légitime.
+  Aucune ne porte la largeur du cadre. Ils sont **recensés** dans la fiche, pas corrigés.
+
+## Reste ouvert
+
+- **« Second cadre ou colonne ? »** Les six pages « preview » recopient `max-w-6xl px-4 sm:px-6` :
+  si c'est un second cadre, il mérite son propre jeton ; si ce sont des colonnes, leurs gouttières
+  doivent disparaître (le cadre les fournit déjà). Arbitrage produit, pas fiche.
+- **Défaut latent NOMMÉ dans le code, non corrigé** : `UserProfileView.tsx` porte
+  `lg:grid-cols-[minmax(0,1fr)_320px]` **sans `lg:grid`** — la grille à deux colonnes de cette page
+  n'a donc jamais fonctionné. Le corriger déplace tout le contenu : c'est un lot de mise en page.
