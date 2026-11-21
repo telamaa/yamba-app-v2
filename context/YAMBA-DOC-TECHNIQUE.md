@@ -19228,3 +19228,149 @@ d'essai.
    d'affichage contre un défaut de saisie.
 3. Déclarer les `inputs` Nx des fiches de parité — touche tous les projets et le comportement de
    la CI.
+
+# D109 — La barre d'onglets nomme ses destinations (`fix/barre-qui-se-nomme`, 21/11/2026)
+
+## Le diagnostic, et pourquoi il ne se lit pas
+
+L'autopsie est partie de deux constats d'écran. Elle a trouvé une **chaîne causale**, pas trois
+défauts séparés.
+
+Mesure sur capture : l'indicateur de sélection vaut `#E8E8E9` sur une barre à `#FAFAFB`, soit
+**1,17:1** — WCAG 1.4.11 demande **3:1** pour un élément d'interface non textuel. Ce n'est donc pas
+un indicateur, c'est une décoration. Et cette décoration occupait **42 des 52 pt** de la barre :
+
+```
+pilule 42  →  fente du libellé 11  →  police 9 pt
+             ↓
+   sous le minimum d'iOS (10) et de Material 3 (11)
+   ratio 9/11 = 1,22, sous le plancher maison de 1,35
+             ↓
+   `typography.spec.ts` exemptait le fichier NOMMÉMENT
+```
+
+Et la raison écrite de l'exception n'était pas une propriété du texte, c'était un **coût** :
+« toucher à la fente rouvre D88 ». L'autre exception du même fichier est légitime (des initiales
+centrées dans un disque ne se lisent pas en lignes). Celle-ci était **une dette déguisée en
+exception**.
+
+Détail qui boucle : le plancher de 1,35 existe parce que Plus Jakarta Sans rogne les jambages, et
+le mot qui avait forcé la descente `13 → 10 → 9` était « Messages », avec son `g`.
+
+## Ce qui a été fait
+
+### 1. Les cinq libellés deviennent permanents (1A)
+
+D88 2A invoquait le mode « étiquette sur le sélectionné » de Material 3. Deux choses lui ont
+échappé : ce mode vise des destinations **déjà apprises**, et M3 recommande l'étiquette permanente
+dès que l'icône est ambiguë — or le raisonnement de D88 2A nommait lui-même deux icônes
+indevinables sur cinq. Surtout, le mot était montré **là où il ne sert à rien**.
+
+Conséquence matérielle : plus de fente réservée. Il n'y a plus de vide à réserver.
+
+### 2. L'indicateur passe derrière l'icône seule (1B) — le geste structurel
+
+C'est la vraie spec de la barre de navigation Material 3, que le fichier citait sans la suivre
+jusqu'au bout : l'indicateur est un bandeau **derrière l'icône**, le libellé vit dessous, dehors.
+Le texte cesse d'être logé dans l'indicateur, donc sa taille cesse d'en dépendre.
+
+### 3. L'indicateur est déclaré décoratif (1C)
+
+On ne le force **pas** à 3:1 : il faudrait un gris sombre qui pèserait plus que la mangue et
+volerait à « Publier » la seule tache chaude de la barre (A210). L'état se dit en **trois signaux
+non colorés** — glyphe plein contre contour (une FORME, donc conforme à WCAG 1.4.1), encre contre
+gris, graisse du mot.
+
+### 4. La hauteur devient une somme (1D)
+
+```ts
+export function barHeight(): number {
+  return INDICATOR_HEIGHT + STACK_GAP + LABEL_LINE_HEIGHT + BAR_BREATHING * 2;
+}           //     32      +     4     +        14        +       5 × 2        = 60
+```
+
+`TabBar.height` appelle cette fonction au lieu de porter un nombre, et `BottomTabInset` suit. Un
+nombre posé une fois devient la contrainte de tout ce qu'il contient : c'est exactement comment 52
+avait produit 9 pt de police.
+
+**L'exception de `typography.spec.ts` est supprimée, pas reconduite.** C'est la mesure du lot, et
+une fiche le vérifie.
+
+### 5. Le « + » est dessiné dans le code (2A)
+
+Avant : `tab-publish.png` en @1x/@2x/@3x, **sans source vectorielle ni variante sombre**. Le seul
+élément de la barre que le fichier de thème ne gouvernait pas — ni teinte, ni état pressé, ni
+Dynamic Type, et toute évolution de la mangue demandait de ré-exporter trois fichiers à la main.
+
+Il portait **trois** éléments dans 27 pt (un plus, un arc, un point) là où Instagram et Vinted en
+posent **un** sur une forme pleine.
+
+Le glyphe est en **encre** et c'est mesuré : du blanc sur `#FF9900` vaut **2,14:1**, sous les 3:1
+de WCAG 1.4.11 ; l'encre `#0B1120` vaut **8,79:1** — et c'est déjà le couple de la pastille de
+badge de cette barre. On suit le précédent de la maison plutôt que d'en inventer un.
+
+### 6. La teinte de la marque dépend du THÈME (2B)
+
+Trouvé en **regardant** le mode sombre, pas en relisant le code. L'état actif employait
+`mangoDark`, dont le jeton dit lui-même « pour l'état actif sur fond **clair** ». Mesuré contre les
+deux fonds de barre :
+
+| | barre claire `#FAFAFB` | barre sombre `#1C1C1E` |
+|---|---|---|
+| `#FF9900` | 2,05:1 | 7,95:1 |
+| `#CC7A00` | **3,17:1** | 5,15:1 |
+
+Assombrir sur une barre sombre rendait donc la marque **moins** visible au moment où elle doit
+l'être le plus. C'est le défaut ① que D88 avait déjà corrigé une fois sur cette même barre : « un
+même jeton ne vaut pas sur deux supports ».
+
+La règle ne dépend d'aucun jeton : **l'état actif s'éloigne toujours de la luminance de sa barre.**
+Elle vit dans `markBackground(dark, focused)` et une fiche la vérifie par le contraste, pas par les
+valeurs.
+
+## Les fiches
+
+`barre-qui-se-nomme.spec.ts`, **19 fiches**. Les mesures vivent dans un module **pur**
+(`lib/tab-bar-geometry.ts`), comme `back-affordance.ts` l'a fait pour le retour (D105) : une fiche
+ne peut pas importer un composant, qui tire `react-native` — le harnais est `testEnvironment: node`
+(A223).
+
+Deux prises réelles pendant l'écriture :
+
+1. **Les en-têtes de `tab-bar.tsx` et de `(tabs)/_layout.tsx` décrivaient encore l'ancien
+   comportement.** Une fiche qui cherche `labelSlot` dans la source trouve aussi la documentation
+   qui le mentionne — ici c'était justifié : la doc mentait.
+2. **Une fiche qui comptait les occurrences de `{label}`** comptait aussi `accessibilityLabel` et
+   partait au rouge pour rien — sixième fois ce mois-ci qu'une fiche vise une orthographe. Elle
+   vérifie désormais que les cinq routes ont un mot, dans les **deux** langues.
+
+## Mesures
+
+mobile **901 → 920** (48 suites). Les deux programmes TypeScript passent.
+
+**Vu à l'écran** : thème clair et thème sombre, onglet « Accueil » actif et onglet « Publier »
+actif — c'est-à-dire l'état où la marque devait montrer sa sélection et ne le pouvait pas.
+
+## Un piège connu, repayé
+
+Au premier rechargement : `ReferenceError: Property 'INDICATOR_RADIUS' doesn't exist`, avec
+typecheck vert et 916 fiches vertes. C'est **D102 au mot près** — un fichier créé dans une passe et
+un `import` ajouté dans une passe suivante font servir à Metro un transform intermédiaire. Remède
+documenté : `npx expo start --go --clear`.
+
+**En revanche, la vérification que CLAUDE.md recommande ne s'applique plus telle quelle** : grep
+sur le bundle servi. Expo SDK 57 charge les modules **à la demande**, et le bundle d'entrée fait
+6 Mo sans contenir un seul écran — `grep YambaTabBar` y rend zéro alors que tout fonctionne. Ce qui
+tranche aujourd'hui est un **redémarrage à froid de l'app** suivi d'une capture.
+
+## Examiné et délibérément gardé
+
+La mangue reste la propriété exclusive de « Publier » (A210) ; la cible tactile reste la cellule
+entière (64 × 60, bien au-delà des 44 pt de RG-D105-2) ; le mot reste **sous** l'icône et non à
+côté — à côté, il pousse les quatre autres onglets à chaque sélection.
+
+## Reste ouvert
+
+Le **cube** pour « Activité » : dans une application de colis, une boîte veut dire *colis*, pas
+*activité*. Avec cinq libellés permanents, le mot tranche l'ambiguïté — le renommage éventuel est
+un arbitrage produit, pas un défaut d'interface.

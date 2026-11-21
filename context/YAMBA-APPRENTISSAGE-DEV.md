@@ -10370,3 +10370,171 @@ t('card.totalForWeight', { kg: poids })    // pour une phrase : le dictionnaire 
   (D100), `parcel-weight.ts` (D101), `number-format.ts` (D108). Quatre fichiers, une fiche de
   comparaison chacun. Ce qu'on achète : un front qui ne tire pas les dépendances de l'autre. Ce
   qu'on paie : une fiche, et la discipline de ne jamais modifier une copie seule.
+
+# Chapitre 254 — L'exception dont la raison est un coût (D109)
+
+## Le point de départ : deux phrases d'utilisateur
+
+« Il y a le texte que sur l'icône active » et « le bouton + n'est pas pro ».
+
+Deux remarques d'apparence esthétique. Elles ont ouvert une chaîne causale de cinq maillons, et
+aucun des maillons n'était visible depuis le code qu'elles désignaient.
+
+## 1. Une incohérence se mesure
+
+Le réflexe utile, déjà écrit par D105 : ne pas *lire* l'interface, la **mesurer**.
+
+```python
+# Luminance relative WCAG, puis le rapport de contraste
+pilule = '#E8E8E9'   # l'indicateur de sélection
+barre  = '#FAFAFB'   # la barre qui le porte
+# → 1,17:1
+```
+
+WCAG 1.4.11 demande **3:1** pour un élément d'interface non textuel. À 1,17, l'indicateur ne
+pouvait pas être le signal de sélection : c'était une décoration.
+
+Et cette décoration occupait 42 des 52 pt de la barre.
+
+## 2. La chaîne, qui ne se voit qu'en entier
+
+```
+indicateur 42 pt  (invisible, mais il occupe la place)
+   └─ fente du libellé : 11 pt
+        └─ police : 9 pt
+             └─ sous le minimum d'iOS (10) et de Material 3 (11)
+             └─ ratio 9/11 = 1,22, sous le plancher maison de 1,35
+                  └─ le fichier est EXEMPTÉ de typography.spec.ts
+```
+
+Chaque maillon, pris seul, était défendable — et chacun portait son commentaire justificatif. C'est
+le propre de ce genre de défaut : **il n'est dans aucune ligne, il est dans leur composition.**
+Même forme que D104 (le retour correct derrière une porte d'identité correcte).
+
+## 3. Le symptôme qui se détecte sans génie
+
+Voici la leçon transposable du chapitre, et elle est mécanique.
+
+```ts
+const EXCEPTIONS = [
+  // Géométrie mesurée de D88 : la barre fait 52, sa pilule 42, et la fente
+  // du libellé 11. Toucher à l'interligne sans toucher à la fente ne
+  // dégagerait rien — et toucher à la fente rouvre D88.
+  'components/tab-bar.tsx',
+  // Un caractère centré dans un disque.
+  'components/profile-avatar-button.tsx',
+];
+```
+
+Lisez les deux raisons. La seconde dit une **propriété de l'objet** : un caractère centré dans un
+disque ne se lit pas en lignes, l'interligne n'a pas de sens pour lui. La première dit un **coût** :
+y toucher rouvrirait une décision.
+
+> **Une exception dont la raison écrite est un COÛT et non une propriété est une dette qui a trouvé
+> où se cacher.** Et la fiche qui la porte la reconduit à chaque passage, avec l'autorité d'un test
+> vert.
+
+C'est détectable à la relecture, sans rien savoir du domaine : demandez-vous si la raison
+expliquerait encore l'exception le jour où le changement serait gratuit. Si non, ce n'est pas une
+exception.
+
+## 4. Une argumentation dense ne protège pas de l'erreur
+
+`tab-bar.tsx` est l'un des fichiers les mieux documentés du dépôt. Chaque nombre y porte sa raison,
+chaque arbitrage son historique de revue. Et deux des défauts corrigés ici sont nés de décisions
+**soigneuses** :
+
+- D88 2A a choisi le mode « étiquette sur le sélectionné » de Material 3 — sans voir que l'énoncé
+  contredit sa propre prémisse. Le raisonnement disait : « deux icônes sur cinq sont
+  indevinables ». La conclusion a nommé… les trois autres.
+- A210 a dessiné une marque pour la rendre mémorable — sans voir qu'à 27 pt, un squircle en dégradé
+  redevient un logo d'application.
+
+> **Une argumentation dense protège une décision du doute, pas de l'erreur.** Et elle la rend plus
+> difficile à rouvrir, ce qui est le vrai danger.
+
+C'est la deuxième fois en un mois (D98 la première) qu'une décision argumentée est défaite par un
+REGARD. Le corollaire opérationnel est déjà écrit au chapitre 252 : **un effet d'interface ne se
+raisonne pas, il se regarde.**
+
+## 5. Où placer un signal : là où l'information manque
+
+Le défaut le plus coûteux du lot tient en une phrase.
+
+> Le libellé était montré sur l'onglet **actif** : c'est-à-dire exactement là où il ne sert à rien,
+> puisque l'écran entier dit déjà où l'on se trouve — pendant que les quatre destinations possibles
+> restaient anonymes.
+
+Règle générale, bien au-delà d'une barre d'onglets : **un libellé sert à choisir, pas à confirmer.**
+Quand vous décidez où afficher une information, demandez-vous qui, à cet endroit, ne la connaît pas
+encore.
+
+## 6. Un même jeton ne vaut pas sur deux supports
+
+Trouvé en regardant le **mode sombre**, après avoir cru le lot terminé.
+
+```ts
+mangoDark: '#CC7A00',  // « pour l'état actif sur fond CLAIR »
+```
+
+Le commentaire du jeton disait la limite, et le code l'employait quand même sur une barre sombre.
+Mesuré :
+
+| | barre claire | barre sombre |
+|---|---|---|
+| `#FF9900` | 2,05:1 | 7,95:1 |
+| `#CC7A00` | 3,17:1 | 5,15:1 |
+
+Assombrir sur fond sombre rendait la marque **moins** visible au moment où elle devait l'être le
+plus. C'est le défaut ① que D88 avait déjà corrigé une fois sur cette barre.
+
+La sortie n'est pas de choisir un meilleur jeton : c'est d'écrire la **règle** et de la vérifier par
+le contraste plutôt que par la valeur.
+
+```ts
+export function markBackground(dark: boolean, focused: boolean): string {
+  if (dark) return focused ? MARK_BG : MARK_BG_DEEP;
+  return focused ? MARK_BG_DEEP : MARK_BG;
+}
+```
+
+```ts
+it('l’état actif s’ÉLOIGNE toujours de la luminance de sa barre', () => {
+  expect(contraste(markBackground(false, true), BAR_LIGHT))
+    .toBeGreaterThan(contraste(markBackground(false, false), BAR_LIGHT));
+  expect(contraste(markBackground(true, true), BAR_DARK))
+    .toBeGreaterThan(contraste(markBackground(true, false), BAR_DARK));
+});
+```
+
+Cette fiche survit à un changement de charte graphique. Une fiche qui aurait épinglé `#CC7A00` non.
+
+## 7. Un nombre posé une fois devient une contrainte
+
+```ts
+// Avant
+height: 52,          // « 52 et non 56 : l'indicateur fait 42… »
+
+// Après
+height: barHeight(), // 32 + 4 + 14 + 5×2
+```
+
+La différence n'est pas cosmétique. Dans la première forme, 52 est un **postulat** : tout ce qui
+vit dedans doit s'y plier, et c'est ainsi qu'on arrive à une police de 9 pt. Dans la seconde, la
+hauteur est une **conséquence** : changez l'interligne du mot, la barre suit.
+
+> Quand une valeur se déduit d'autres valeurs, **écrivez la déduction, pas le résultat**. Sinon le
+> résultat devient la cause.
+
+## Pour aller plus loin
+
+- La spec réelle de la *navigation bar* Material 3 : l'indicateur actif est un bandeau derrière
+  l'**icône**, pas derrière l'ensemble icône + libellé. La différence paraît minime ; c'est elle
+  qui libère la typographie.
+- WCAG **1.4.11** (objets non textuels, 3:1) et **1.4.1** (la couleur n'est jamais le seul moyen) :
+  les deux se répondent. Si votre état tient à trois signaux dont deux ne sont pas des couleurs,
+  1.4.11 ne contraint plus l'indicateur décoratif — mais il faut l'avoir écrit, et le prouver.
+- Le piège Metro de D102, repayé ici : `ReferenceError` avec typecheck et 916 fiches vertes. **La
+  vérification par `grep` sur le bundle servi ne s'applique plus** : Expo SDK 57 charge les modules
+  à la demande, et le bundle d'entrée fait 6 Mo sans contenir un seul écran. Ce qui tranche
+  aujourd'hui est un redémarrage à froid suivi d'une capture.

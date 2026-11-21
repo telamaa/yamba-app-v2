@@ -9369,3 +9369,41 @@ une phrase française se lit comme une référence ou une version, pas comme un 
 | 4 | Une note de 4,8 sur le site **et** sur le téléphone | la même écriture des deux côtés, dans la langue de l'écran |
 | 5 | Une note ronde | « 5,0 » en français, « 5.0 » en anglais — jamais « 5 » |
 | 6 | Le CO₂ évité, affiché avec une décimale | une seule décimale, et le séparateur de la langue |
+
+# D109 — La barre d'onglets nomme ses destinations (21/11/2026)
+
+## Le besoin
+
+Deux constats de l'utilisateur, écran en main : « il y a le texte que sur l'icône active » et
+« le bouton + n'est pas pro ».
+
+Le premier est le plus coûteux : **le mot était montré là où il ne sert à rien.** L'onglet où l'on
+se trouve, l'écran le dit déjà. Les quatre destinations où l'on pourrait aller n'avaient pas de
+nom — dont deux que personne ne devine : un cube pour « Activité », un carré mangue pour
+« Publier ».
+
+Le second est une question de métier autant que de goût : la marque était une image collée, qui
+répétait la forme de l'icône de l'application. Dans une barre, cela se lit comme un **logo**, et un
+logo n'est pas une commande.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D109-1** | Les **cinq** onglets portent leur nom, en permanence. | Un nom sert à choisir où aller, pas à confirmer où l'on est. |
+| **RG-D109-2** | Un libellé d'onglet fait au moins **10 pt**. | C'est le minimum d'iOS ; Material 3 descend à 11. En dessous, on n'écrit plus pour être lu. |
+| **RG-D109-3** | L'état sélectionné se dit par **trois signaux non colorés** : glyphe plein, encre pleine, mot en gras. | Un daltonien doit pouvoir dire où il est. |
+| **RG-D109-4** | L'indicateur de sélection ne **dicte jamais** la taille du texte. | C'est ce qui avait produit une police de 9 pt. |
+| **RG-D109-5** | L'action « Publier » se distingue par sa **forme et sa couleur**, et porte un état actif comme les autres. | Elle se sélectionne : elle doit pouvoir le montrer. |
+| **RG-D109-6** | Un élément actif est **toujours plus contrasté** que le même élément au repos, dans les deux thèmes. | Assombrir sur fond sombre rend invisible ce qui devait ressortir. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'application | les cinq onglets portent leur nom |
+| 2 | Je change d'onglet | le nom de l'onglet quitté reste lisible ; seul le style change |
+| 3 | Je regarde la barre en thème clair | le carré mangue est plus sombre quand « Publier » est actif |
+| 4 | Je regarde la barre en thème sombre | il est plus **vif** quand « Publier » est actif |
+| 5 | J'agrandis les textes du système | les mots grossissent sans pousser les icônes hors de l'écran |
+| 6 | Je navigue au lecteur d'écran | chaque onglet annonce son nom et sa position (« 3 sur 5 ») |
