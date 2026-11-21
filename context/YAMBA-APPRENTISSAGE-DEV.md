@@ -10231,3 +10231,142 @@ La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Le
 C'est un choix défendable — le plancher protège quelle que soit la réponse, et il ne coûte rien —
 **à condition de l'écrire**. Une cause non trouvée qui n'est pas consignée devient une cause
 oubliée, et le prochain symptôme du même mécanisme repartira de zéro.
+
+# Chapitre 253 — Où est-ce déjà corrigé ? (D108)
+
+## Le point de départ : deux lignes qui ne s'accordent pas
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Une virgule, un point, le même bloc, interface française. Le réflexe est de corriger la ligne du
+poids. Le bon réflexe est de demander **pourquoi les deux ne suivent pas la même règle**.
+
+## 1. La théorie : ICU et l'argument simple
+
+ICU MessageFormat distingue l'argument **simple** `{x}` de l'argument **typé** `{x, number}`.
+L'intuition dit que le premier, recevant un nombre, le mettra en forme. Faux :
+
+```js
+new IntlMessageFormat('pour {kg} kg', 'fr').format({ kg: 2.3 })  // « pour 2.3 kg »
+new IntlMessageFormat('pour {kg} kg', 'en').format({ kg: 2.3 })  // « pour 2.3 kg »
+```
+
+L'argument simple fait `String(value)`. `String(2.3)` vaut `"2.3"` — la représentation JavaScript
+d'un nombre, qui n'a **aucune langue**. Seul `{kg, number}` passe par `Intl.NumberFormat`.
+
+Retenir la forme : **annoncer le type, c'est demander la mise en forme.**
+
+## 2. Pourquoi vingt contrôles n'ont rien vu
+
+C'est la partie instructive, et elle se généralise.
+
+- **`tsc`** : un gabarit i18n est une chaîne. `"pour {kg} kg"` et `"pour {kg, number} kg"` se
+  typent identiquement. Le compilateur n'a aucune prise sur le contenu d'une chaîne.
+- **Le contrôle i18n** compare FR et EN **entre eux** : mêmes clés, même arborescence. Les deux
+  étaient faux de la même manière, donc le miroir était parfait.
+- **Les six fiches de parité** comparent des règles, des clés, des seuils, un ordre. Aucune ne
+  **rend** une phrase.
+
+Leçon transposable : **un contrôle ne voit que la dimension qu'il compare.** Trois contrôles sains
+peuvent laisser passer un défaut qui vit dans une quatrième dimension — ici le RENDU.
+
+## 3. La question qui fait gagner une heure
+
+La bonne version existait **déjà**, trois fois, à quelques lignes de la mauvaise :
+
+| Où | Quoi |
+|---|---|
+| `booking.json`, les deux fronts | `{kg, number}`, sept clés |
+| `parcel-weight.ts` | `formatParcelKg`, avec la leçon de D101 **dans son commentaire** |
+| `trip-result-card.tsx` (mobile) | un `formatRating` local, correct |
+
+Pendant ce temps, dix-neuf autres endroits se débrouillaient.
+
+C'est la troisième fois en une semaine (A224 lot 3 pour `formatExpiresIn`, lot 4 pour
+`getInitials`). La règle s'énonce ainsi :
+
+> **Devant une classe de défaut, la première question n'est pas « comment corriger »
+> mais « où est-ce déjà corrigé ».**
+
+Elle a deux vertus. Elle donne la solution gratuitement. Et elle donne le **nombre de copies**, qui
+est la vraie mesure du travail : ici 20, pas 1.
+
+Corollaire, déjà écrit par A224 lot 4 : « grep ton jumeau » contient un singulier trompeur. On ne
+cherche pas **le** jumeau, on **compte** les copies — et c'est une fiche qui compte, parce qu'elle
+ne suppose rien.
+
+## 4. Un contre-test vert est un contre-test qui n'a pas tourné
+
+La discipline : après avoir écrit un garde-fou, **le casser exprès** et vérifier qu'il rougit.
+
+Fait ici — une clé du site remise en `{kg}` nu — et le résultat fut :
+
+```
+Tests:  13 passed, 13 total      ← nx test @yamba-app/mobile
+Tests:  2 failed, 11 passed      ← npx jest, même instant, même code
+```
+
+La fiche était bonne. C'est **le cache Nx** qui rejouait un résultat enregistré. Pourquoi : les
+fiches de parité lisent l'autre front avec `readFileSync`, et `readFileSync` est **invisible au
+graphe de dépendances**. Les fichiers de `user-ui` ne sont donc pas des *entrées* du projet mobile,
+et les modifier n'invalide rien.
+
+Ce que cela vaut pour tout le dépôt : les **six** fiches de parité peuvent rester vertes sur une
+régression de l'autre front, en local.
+
+> **Un contre-test qui ne rougit pas n'a rien prouvé sur la règle. Il a prouvé que rien n'a
+> tourné.** Avant de conclure, demandez-vous toujours si le test a seulement été exécuté.
+
+## 5. Viser l'usage, pas l'orthographe
+
+Deux fois dans le même lot :
+
+- Le balayage « aucune note mise en forme à la main » a mordu sur le **commentaire** de
+  `number-format.ts` — le fichier dont c'est précisément le rôle de nommer la forme interdite.
+  Correction : le balayage retire les commentaires avant de chercher. Il teste du **code**.
+- Une fiche existante (`search-card-parite`) épinglait le littéral `{kg}`. Elle est passée au rouge
+  le jour où la règle qu'elle défend — « la phrase porte le poids en paramètre » — n'avait pas
+  bougé d'un pouce. Elle vise désormais `{kg`.
+
+Cinquième et sixième fois ce mois-ci. La forme générale :
+
+> **Une fiche qui vise une ORTHOGRAPHE casse quand l'orthographe change pour une bonne raison, et
+> se tait quand l'usage change pour une mauvaise.**
+
+## 6. Une mise en forme à la main n'est pas une variante maladroite
+
+C'est le vrai énoncé de D108, et il vaut au-delà des nombres.
+
+```ts
+// Avant — trois façons, toutes « qui marchent »
+rating.toFixed(1)                                        // point toujours
+rating.toFixed(1).replace('.', ',')                      // virgule toujours
+rating.toFixed(1).replace('.', locale === 'fr' ? ',' : '.')  // juste, à la main
+```
+
+Les trois produisent une **chaîne**. Et une chaîne a quitté le seul endroit qui connaît la langue.
+La suite n'est plus rattrapable : passez `"4,8"` à un gabarit `{rating, number}` et vous obtenez
+`NaN`, pas « 4,8 ».
+
+```ts
+// Après — une adresse, un nombre jusqu'au dernier moment
+formatRating(rating, intlTagFor(locale))   // pour un affichage direct
+t('card.totalForWeight', { kg: poids })    // pour une phrase : le dictionnaire décide
+```
+
+> **Mettre en forme trop tôt, c'est perdre une information** — ici la langue. C'est la même famille
+> que « stocker un montant en euros flottants » ou « concaténer une date » : on fige une
+> représentation là où il fallait garder la valeur.
+
+## Pour aller plus loin
+
+- `Intl.NumberFormat` : `minimumFractionDigits` / `maximumFractionDigits`, et pourquoi
+  `style: 'unit'` n'était pas le bon choix ici (le mot « kg » appartient à la phrase traduite,
+  pas au nombre).
+- La duplication **volontaire** octet pour octet : `pricing-example.ts` (D99), `search-facets.ts`
+  (D100), `parcel-weight.ts` (D101), `number-format.ts` (D108). Quatre fichiers, une fiche de
+  comparaison chacun. Ce qu'on achète : un front qui ne tire pas les dépendances de l'autre. Ce
+  qu'on paie : une fiche, et la discipline de ne jamais modifier une copie seule.

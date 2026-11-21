@@ -19089,3 +19089,142 @@ xcrun simctl openurl booted "exp://127.0.0.1:8081/--/search/city?target=from"   
 La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Ce lot la contourne par
 construction. Si elle est trouvée un jour, le plancher restera : il ne coûte rien et protège d'un
 retour.
+
+# D108 — Un nombre montré s'écrit dans la langue du lecteur (`fix/nombres-dans-la-langue`, 21/11/2026)
+
+## Le constat
+
+Capture du simulateur, interface française, carte de résultat :
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Le prix passait par `formatAmountFromCents` (D99). Le poids ne passait par **rien**.
+
+## La cause, mesurée avant d'écrire la correction
+
+En ICU, un argument **simple** `{kg}` n'est pas mis en forme — il est recopié :
+
+```sh
+node -e "const {IntlMessageFormat}=require('intl-messageformat');
+         console.log(new IntlMessageFormat('pour {kg} kg','fr').format({kg:2.3}))"
+# → « pour 2.3 kg »      ... et exactement pareil en 'en'
+```
+
+Il faut **annoncer** la valeur comme un nombre — `{kg, number}` — pour que `Intl.NumberFormat`
+s'applique avec la locale active.
+
+**Pourquoi aucun des vingt contrôles ne le voyait** : `tsc` type toujours un gabarit, quel qu'il
+soit ; le contrôle i18n de la CI compare FR et EN **entre eux**, et les deux étaient faux de la
+même façon ; les six fiches de parité comparent des règles, des clés, des seuils et un ordre —
+jamais un **rendu**.
+
+## Ce qui a été fait
+
+### 1. Le poids — 50 clés
+
+`search` et `trip-detail` / `tripDetail`, les deux fronts, les deux langues, passent de `{kg}` à
+`{kg, number}`. Le miroir FR/EN reste parfait (7/7, 12/12, 3/3, 3/3).
+
+**La forme correcte existait déjà** : `booking.json` écrivait `{kg, number}` sur les deux fronts,
+sept clés, trois dossiers plus loin.
+
+Six sites d'appel passaient une **chaîne déjà mise en forme**. Deux étaient des bombes amorcées —
+`formatParcelKg(...)` et un `.replace('.', locale === "fr" ? "," : ".")` rendaient `"2,3"`, et une
+chaîne `"2,3"` dans un gabarit `{kg, number}` ne se localise pas : elle rend **NaN**.
+
+### 2. Les notes — 20 sites, trois traitements
+
+| Forme | Sites | Faux pour |
+|---|---|---|
+| `toFixed(1)` nu | 10 | les francophones (point toujours) |
+| `toFixed(1).replace(".", ",")` | 8 | les anglophones (virgule toujours) |
+| conscient de la langue, à la main | 2 | personne — mais hors de toute règle |
+
+Conséquence visible : **les deux fronts n'affichaient pas la même note pour le même Voyageur.**
+
+### 3. La règle n'a plus qu'une adresse par front
+
+`apps/mobile/src/lib/number-format.ts` et `apps/user-ui/src/lib/number-format.ts`, **purs, zéro
+import, identiques octet pour octet** — quatrième fichier de ce motif après `pricing-example.ts`
+(D99), `search-facets.ts` (D100) et `parcel-weight.ts` (D101).
+
+```ts
+export function formatRating(rating: number, localeTag: string): string {
+  return new Intl.NumberFormat(localeTag, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(rating);
+}
+
+export function roundToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function intlTagFor(locale: string): string {
+  return locale === 'fr' ? 'fr-FR' : 'en-US';
+}
+```
+
+`roundToTenth` remplace `toFixed(1)` sur le CO₂ : on **arrondit sans mettre en forme**, et la
+langue reste l'affaire du dictionnaire. `intlTagFor` absorbe le ternaire `fr-FR`/`en-US` qui
+existait en six exemplaires.
+
+Là encore, la bonne version dormait dans le dépôt : `trip-result-card.tsx` du téléphone portait un
+`formatRating` local **correct** pendant que dix-neuf autres endroits se débrouillaient. C'est
+cette copie-là qui a déménagé.
+
+## Les fiches
+
+`apps/mobile/src/lib/nombres-dans-la-langue.spec.ts` (20) garde la **règle**, pas la correction du
+jour : aucun `{kg}` nu dans aucun dictionnaire des deux fronts, les deux copies de
+`number-format.ts` comparées octet pour octet, et un balayage des sources qui refuse toute note
+mise en forme à la main. `apps/user-ui/src/lib/number-format.spec.ts` (10) teste le
+**comportement** côté site — l'égalité de deux fichiers ne prouve jamais qu'ils ont raison,
+seulement qu'ils ont tort ensemble.
+
+Le recensement d'A224 lot 5 a fait son travail : il a refusé `number-format.ts` à la seconde où le
+fichier est apparu, tant qu'aucune fiche ne le couvrait.
+
+## Deux pièges payés en route
+
+**① Un contre-test délibéré est resté VERT.** Casser une clé côté site, lancer `nx test` côté
+mobile, attendre le rouge : 13 fiches vertes. C'était le **cache Nx**. `readFileSync` est invisible
+au graphe des dépendances, donc les fichiers de l'autre front ne sont pas des **entrées** du projet
+mobile. `npx jest` du même instant comptait deux échecs.
+
+**Les six fiches de parité du dépôt peuvent donc rester vertes sur une régression de l'autre
+front.** Quand on touche à l'autre front : `npx jest` depuis `apps/mobile`, ou `--skip-nx-cache`.
+
+**② Le balayage a mordu sur le commentaire qui explique l'interdit** — cinquième fois ce mois-ci
+qu'une fiche vise un mot et touche la phrase qui l'explique. Il lit désormais du code, commentaires
+retirés.
+
+## Mesures
+
+| | Avant | Après |
+|---|---|---|
+| mobile | 894 / 47 suites | **901 / 47** |
+| user-ui | 208 / 12 suites | **218 / 13** |
+
+Les trois programmes TypeScript passent, miroir i18n parfait (30 espaces, 60 fichiers).
+
+**Vérifié à l'écran**, les deux langues : téléphone « 29,62 € / estimation pour 2,3 kg » ; site dans
+un vrai Chrome, FR « facturé 2,3 kg minimum », EN « billed at 2.3 kg minimum ».
+
+**Non vérifié à l'écran : les notes.** Aucun Voyageur du jeu de données n'en porte — la carte
+affiche « Thomas N. » sans étoile. Elles sont couvertes par dix fiches unitaires, le typecheck et
+le balayage, pas par un regard. `seed-deals.ts` en donnerait, au prix d'un effacement du jeu
+d'essai.
+
+## Laissé dehors, et nommé
+
+1. Les tailles de fichier (`KB`/`MB`, quatre sites de téléversement) — même maladie, autre parcours.
+2. `booking.state.ts` pré-remplit le champ de poids avec `String(v).replace('.', ',')`, virgule
+   inconditionnelle, donc « 1,5 » dans un champ anglais. C'est une valeur de **saisie**, relue par
+   l'analyseur du formulaire : la corriger sans vérifier ce qu'il accepte échangerait un défaut
+   d'affichage contre un défaut de saisie.
+3. Déclarer les `inputs` Nx des fiches de parité — touche tous les projets et le comportement de
+   la CI.

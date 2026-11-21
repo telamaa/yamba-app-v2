@@ -9326,3 +9326,46 @@ Un premier correctif avait été posé le matin ; il n'a pas suffi.
 | 1 | J'ouvre « Ville de départ » depuis la recherche | le titre et la flèche sont entièrement sous l'heure |
 | 2 | J'ouvre le calendrier | idem |
 | 3 | J'utilise un téléphone sans encoche | la marge s'adapte, sans espace mort |
+
+# D108 — Un nombre s'écrit dans la langue de celui qui le lit (21/11/2026)
+
+## Le besoin
+
+Sur la carte de résultat, en interface française, deux lignes du même bloc :
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Une virgule pour le prix, un point pour le poids. Le même écran écrivait un nombre de deux façons
+à deux centimètres d'écart.
+
+Le même défaut existait sur les **notes** des membres, en plus grave : le site affichait « 4,8 » et
+le téléphone « 4.8 » **pour le même Voyageur**, parce que vingt endroits mettaient une note en
+forme à la main, de trois façons différentes. Dix écrivaient un point quelle que soit la langue
+(faux en français), huit une virgule quelle que soit la langue (faux en anglais).
+
+Ce n'est pas une coquette : un séparateur décimal faux est une **erreur de lecture**. « 2.3 » dans
+une phrase française se lit comme une référence ou une version, pas comme un poids.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D108-1** | Tout nombre **montré à un membre** s'écrit selon sa langue — séparateur décimal compris. | Un nombre mal ponctué n'est pas mal habillé : il est mal lu. |
+| **RG-D108-2** | Un nombre inséré dans une phrase traduite est annoncé comme un **nombre** (`{kg, number}`), jamais comme un texte libre. | Un gabarit simple ne met rien en forme : il recopie. |
+| **RG-D108-3** | Un écran ne transmet **jamais** un nombre déjà mis en forme à une phrase traduite. | Une chaîne « 2,3 » ne se localise plus — et dans un gabarit numérique, elle ne vaut plus rien. |
+| **RG-D108-4** | Une note porte **toujours une décimale**, dans les deux langues. | « 5 » se lit comme un compte, « 5,0 » comme une moyenne. |
+| **RG-D108-5** | La règle d'écriture des nombres a **une seule adresse par front**, et les deux copies sont identiques. | Trois traitements d'une même valeur, c'est trois vérités pour un membre. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Carte de résultat, interface française | « estimation pour 2,3 kg » — virgule, comme le prix juste au-dessus |
+| 2 | Même carte, interface anglaise | « estimate for 2.3 kg » — point, et le prix aussi |
+| 3 | Un colis de 2 kg | « 2 kg » dans les deux langues : un nombre rond ne gagne pas de décimale |
+| 4 | Une note de 4,8 sur le site **et** sur le téléphone | la même écriture des deux côtés, dans la langue de l'écran |
+| 5 | Une note ronde | « 5,0 » en français, « 5.0 » en anglais — jamais « 5 » |
+| 6 | Le CO₂ évité, affiché avec une décimale | une seule décimale, et le séparateur de la langue |
