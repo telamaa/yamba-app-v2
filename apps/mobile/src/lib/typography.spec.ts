@@ -121,10 +121,6 @@ describe('④ aucun interligne ne rogne la police', () => {
    */
   const RATIO_MINIMAL = 1.35;
   const EXCEPTIONS = [
-    // Géométrie mesurée de D88 : la barre fait 52, sa pilule 42, et la fente
-    // du libellé 11. Toucher à l'interligne sans toucher à la fente ne
-    // dégagerait rien — et toucher à la fente rouvre D88.
-    'components/tab-bar.tsx',
     // Un caractère centré dans un disque.
     'components/profile-avatar-button.tsx',
   ];
