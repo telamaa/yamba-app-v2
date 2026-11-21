@@ -27,7 +27,9 @@
  *
  * LA BARRE N'EST PLUS NATIVE (D88). `NativeTabs` est remplacé par le
  * navigateur JS et une barre DESSINÉE (`components/tab-bar.tsx`) : pilule
- * flottante, icônes seules, le mot sur le seul onglet actif, escamotage au
+ * flottante, les CINQ destinations nommées (D109 1A, qui revient sur D88 2A :
+ * le mot n'était que sur l'onglet actif, c'est-à-dire là où l'écran le dit
+ * déjà), indicateur derrière l'icône seule, escamotage au
  * défilement. Le pourquoi — trois demandes hors d'atteinte du natif, et ce
  * qu'on paie en échange — est gravé dans ce fichier-là, au plus près du code
  * qui le porte.
