@@ -18,7 +18,7 @@
  * qui a coûté cinq lots.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 const LIB = resolve(__dirname);
 
@@ -76,6 +76,15 @@ function modulesCouverts(): Set<string> {
     // l'usage, jamais une orthographe — pour la cinquième fois ce mois-ci.
     for (const m of source.matchAll(/from ['"]@\/lib\/([^'"]+)['"]/g)) {
       couverts.add(`${m[1]}.ts`);
+    }
+    // ET les imports RELATIFS d'un module voisin. Le détecteur ne voyait que
+    // l'alias : une fiche posée à côté de son module, qui l'importe en
+    // `./module`, était déclarée absente — un faux positif de plus, après
+    // celui des guillemets. On vise l'USAGE, pas l'orthographe (troisième
+    // rappel de la même leçon dans ce fichier).
+    for (const m of source.matchAll(/from ['"](\.[^'"]+)['"]/g)) {
+      const resolu = resolve(dirname(fiche), m[1]);
+      couverts.add(`${relative(LIB, resolu)}.ts`);
     }
   }
   return couverts;

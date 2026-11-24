@@ -90,7 +90,12 @@ export default function StepReview({
       <ReviewCard
         label={copy.reviewMode}
         value={getTransportLabel(draft, copy)}
-        sub={draft.tripType === "roundTrip" ? copy.roundTrip : copy.oneWay}
+        // D111 — la sous-ligne disait « Aller simple » ou « Aller-retour ».
+        // Le choix a disparu de l'étape ① (il ne créait jamais de second
+        // trajet), donc cette ligne ne dirait plus qu'une seule chose, pour
+        // toujours. Une valeur qui ne peut pas varier n'informe personne :
+        // `getTransportLabel` porte déjà le mode ET son type (vol direct,
+        // avec escale…), qui eux changent.
         onEdit={() => onGoTo(1)}
         editLabel={copy.edit}
       />

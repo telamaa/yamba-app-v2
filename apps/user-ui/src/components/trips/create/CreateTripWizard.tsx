@@ -19,12 +19,14 @@ import {
   type ValidationErrors,
 } from "./create-trip.config";
 import TripStepper from "./TripStepper";
+import { TripPublishedPanel } from "./TripPublishedPanel";
 import TripLiveSummary from "./TripLiveSummary";
 import StepTrip from "./steps/StepTrip";
 import StepConditions from "./steps/StepConditions";
 import StepReview from "./steps/StepReview";
 import { ErrorSummary } from "./TripFormUi";
 import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+import { preparerLeRetour, retourPossible } from "@/lib/trips/retour-de-trajet";
 
 const MANGO = "#FF9900";
 const TEAL = "#0F766E";
@@ -55,6 +57,14 @@ export default function CreateTripWizard() {
       version: DRAFT_VERSION,
     }
   );
+
+  /**
+   * D111 — LA FIN DU TUNNEL. Tant qu'elle est posée, le formulaire laisse la
+   * place au panneau de fin. Le RETOUR y est déjà préparé : on le calcule au
+   * moment du succès, AVANT d'effacer le brouillon — après, il n'y aurait
+   * plus rien à inverser.
+   */
+  const [publie, setPublie] = useState<{ retour: Draft | null } | null>(null);
 
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [shakeFields, setShakeFields] = useState(false);
@@ -194,13 +204,14 @@ export default function CreateTripWizard() {
         { draft, publish: true },
         {
           onSuccess: () => {
+            // On prépare le retour AVANT d'effacer le brouillon, et on ne
+            // redirige plus tout seul : une redirection automatique au bout
+            // d'une seconde et demie fermait la seule porte qui valait la
+            // peine d'être ouverte (D111).
+            const retour = retourPossible(draft) ? preparerLeRetour(draft) : null;
             clearDraft();
-            setFlashToast({
-              type: "success",
-              message: isFr ? "Trajet publié avec succès !" : "Trip published successfully!",
-            });
             triggerConfetti();
-            setTimeout(() => router.push("/dashboard/trips"), 1500);
+            setPublie({ retour });
           },
           onError: (err: any) => {
             const message =
@@ -248,6 +259,22 @@ export default function CreateTripWizard() {
               </p>
             </div>
 
+            {/* D111 — le tunnel terminé laisse la place au panneau de fin :
+                plus de stepper, plus de résumé, plus de boutons d'étape. */}
+            {publie !== null ? (
+              <TripPublishedPanel
+                copy={copy}
+                canPublishReturn={publie.retour !== null}
+                onPublishReturnAction={() => {
+                  if (publie.retour === null) return;
+                  setDraft(publie.retour);
+                  setStep(1);
+                  setPublie(null);
+                }}
+                onSeeTripsAction={() => router.push("/dashboard/trips")}
+              />
+            ) : (
+              <>
             {/* Stepper */}
             <TripStepper step={step} labels={copy.steps} onGoTo={goTo} />
 
@@ -326,6 +353,8 @@ export default function CreateTripWizard() {
                 </button>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       </div>

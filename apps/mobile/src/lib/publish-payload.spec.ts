@@ -41,6 +41,7 @@ function brouillonComplet(): PublishDraft {
     dateArrivee: '2026-11-26',
     heureArrivee: '06:30',
     reference: ' AF1234 ',
+    billet: null,
     prixParKiloEur: 9.5,
     capaciteKg: 23,
     forfaitSouteEur: 40,

@@ -176,8 +176,21 @@ export default function StepTrip({
 
   return (
     <div>
-      {/* Transport + Type — stack on mobile, 2-col on tablet+ */}
-      <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
+      {/*
+        D111 — LE CHOIX « ALLER SIMPLE / ALLER-RETOUR » A ÉTÉ RETIRÉ D'ICI.
+
+        Il partait bien au serveur (`tripType: "ROUND_TRIP"`), mais le mapper
+        envoie `returnDepartureAt: null` DANS LES DEUX CAS et aucun second
+        trajet n'était créé : le Voyageur croyait avoir annoncé son retour, et
+        aucun Expéditeur ne pouvait le trouver — le mot n'apparaissait que sur
+        sa propre fiche. C'est le défaut nommé par D100 : un contrôle qui
+        AFFIRME ce que le produit ne fait pas.
+
+        Le retour est désormais proposé APRÈS la publication
+        (`TripPublishedPanel`), et il crée un VRAI second trajet. Le brouillon
+        garde `tripType: "oneWay"`, que le mapper envoie tel quel.
+      */}
+      <div className="grid grid-cols-1">
         <div>
           <SectionLabel first>{isFr ? "Transport" : "Transport"}</SectionLabel>
           <SegmentedControl
@@ -198,24 +211,6 @@ export default function StepTrip({
               }))
             }
             error={errors.transportMode}
-          />
-        </div>
-        <div>
-          <SectionLabel first>
-            {isFr ? "Type d'annonce" : "Trip type"}
-          </SectionLabel>
-          <SegmentedControl
-            value={draft.tripType}
-            options={[
-              { value: "oneWay", label: copy.oneWay },
-              { value: "roundTrip", label: copy.roundTrip },
-            ]}
-            onChange={(value) =>
-              setDraft((prev) => ({
-                ...prev,
-                tripType: value as Draft["tripType"],
-              }))
-            }
           />
         </div>
       </div>

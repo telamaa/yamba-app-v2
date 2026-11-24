@@ -3,9 +3,7 @@ import type { CategoryOption, CreateTripCopy } from "./create-trip.types";
 export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
   return {
     title: isFr ? "Créer un trajet" : "Create a trip",
-    subtitle: isFr
-      ? "Publie ton trajet en quelques instants."
-      : "Publish your trip in moments.",
+    subtitle: isFr ? "Tes kilos libres rapportent." : "Your spare kilos pay off.",
     firstTripTitle: isFr ? "Publie ton premier trajet" : "Publish your first trip",
     firstTripSub: isFr
       ? "Ça prend 2 minutes, c'est gratuit."
@@ -24,17 +22,11 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     emptyValue: isFr ? "À compléter" : "To complete",
 
     step1Title: isFr ? "Ton trajet" : "Your trip",
-    step1Sub: isFr
-      ? "Mode de transport, itinéraire et dates."
-      : "Transport mode, route and dates.",
+    step1Sub: isFr ? "Mode, villes, dates" : "Mode, cities, dates",
     step2Title: isFr ? "Tes conditions" : "Your conditions",
-    step2Sub: isFr
-      ? "Catégories, prix et lieux de rendez-vous."
-      : "Categories, pricing and meeting points.",
+    step2Sub: isFr ? "Prix, conditions, lieux" : "Price, conditions, places",
     step3Title: isFr ? "Vérification" : "Review",
-    step3Sub: isFr
-      ? "Vérifie et publie ton trajet."
-      : "Review and publish your trip.",
+    step3Sub: isFr ? "Vérifie, puis publie" : "Check, then publish",
 
     plane: isFr ? "Avion" : "Plane",
     train: isFr ? "Train" : "Train",
@@ -77,16 +69,12 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
 
     // ── Pricing PER_KG (D13/D14/D15/D19) ──
     pricePerKg: isFr ? "Ton prix au kilo" : "Your price per kg",
-    pricePerKgSub: isFr
-      ? "Un seul nombre à fixer — la famille du colis ne change pas le prix"
-      : "One number to set — the parcel family never changes the price",
+    pricePerKgSub: isFr ? "Un seul nombre à fixer" : "One number to set",
     capacity: isFr ? "Ta capacité" : "Your capacity",
-    capacitySub: isFr
-      ? "Kilos que tu peux transporter — réservés dès qu'une demande arrive"
-      : "Kilos you can carry — reserved as soon as a request comes in",
+    capacitySub: isFr ? "Réservés dès la première demande" : "Reserved on the first request",
     capacityTolerance: isFr
-      ? "Au pickup, un écart de poids ≤ 10 % est toléré. Au-delà : renégociation ou refus sans pénalité."
-      : "At pickup, a weight gap ≤ 10% is tolerated. Beyond: renegotiation or refusal without penalty.",
+      ? "10 % d'écart tolérés au pickup. Au-delà, tu peux refuser sans pénalité."
+      : "10% weight gap tolerated at pickup. Beyond, you can refuse without penalty.",
     fairPriceOk: isFr ? "✓ Prix juste" : "✓ Fair price",
     fairPriceLow: isFr ? "↓ Sous le marché — tu laisses de l'argent" : "↓ Below market — you're leaving money",
     fairPriceHigh: isFr ? "↑ Au-dessus — moins de demandes probables" : "↑ Above — fewer requests likely",
@@ -98,16 +86,12 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     gaugeMedian: isFr ? "médiane" : "median",
     gaugeHigh: isFr ? "haute" : "high",
     families: isFr ? "Familles de colis" : "Parcel families",
-    familiesSub: isFr
-      ? "Accepter, surcharger (risque) ou refuser — jamais un prix par famille"
-      : "Accept, surcharge (risk) or refuse — never a price per family",
+    familiesSub: isFr ? "Accepter, surtaxer ou refuser" : "Accept, surcharge or refuse",
     familyAccept: "OK",
     familySurcharge: "+%",
     familyRefuse: isFr ? "Non" : "No",
     bags: isFr ? "Bagages entiers — forfait" : "Whole bags — flat rate",
-    bagsSub: isFr
-      ? "Optionnel : tu loues ta franchise complète, hors logique €/kg"
-      : "Optional: rent your full allowance, outside the €/kg logic",
+    bagsSub: isFr ? "Un prix fixe pour une valise" : "A flat price for a suitcase",
     checkedBag23: isFr ? "Bagage soute 23 kg" : "Checked bag 23 kg",
     cabinBag12: isFr ? "Bagage cabine 12 kg" : "Cabin bag 12 kg",
     bagConsumes: (kg: number) =>
@@ -116,8 +100,8 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     netGainIfFull: (kg: number) =>
       isFr ? `Si tes ${kg} kg sont réservés` : `If your ${kg} kg get booked`,
     netGainSub: isFr
-      ? "Versé à J+4 après livraison confirmée · la commission est côté Expéditeur, ton prix = ton net"
-      : "Paid at D+4 after confirmed delivery · commission is on the sender's side, your price = your net",
+      ? "Net, versé 4 jours après la livraison."
+      : "Net, paid 4 days after delivery.",
     // ── Refonte UX step 2 : accordéons, popovers, familles en mots ──
     yourOffer: isFr ? "Ton offre" : "Your offer",
     whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
@@ -188,13 +172,9 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
 
     // ── Locations ─────────────────────────
     pickupLocations: isFr ? "Lieux de remise" : "Pickup locations",
-    pickupLocationsSub: isFr
-      ? "Où l'expéditeur dépose le colis"
-      : "Where the sender drops off the parcel",
+    pickupLocationsSub: isFr ? "Où on te remet le colis" : "Where the parcel is handed to you",
     deliveryLocations: isFr ? "Lieux de livraison" : "Delivery locations",
-    deliveryLocationsSub: isFr
-      ? "Où l'expéditeur récupère le colis"
-      : "Where the sender collects the parcel",
+    deliveryLocationsSub: isFr ? "Où on le récupère" : "Where it is collected",
     atAirport: isFr ? "À l'aéroport" : "At the airport",
     atTrainStation: isFr ? "À la gare" : "At the train station",
     inTheCity: isFr ? "Dans la ville" : "In the city",
@@ -246,6 +226,14 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       : "Your trip is almost ready to publish.",
     stayAndFinish: isFr ? "Terminer" : "Finish",
     leave: isFr ? "Quitter" : "Leave",
+
+    publishedTitle: isFr ? "Ton trajet est en ligne" : "Your trip is live",
+    publishedReturnTitle: isFr ? "Et le retour ?" : "And the way back?",
+    publishedReturnBody: isFr
+      ? "Mêmes kilos, mêmes conditions. Il ne reste que les dates."
+      : "Same kilos, same conditions. Only the dates are left.",
+    publishedReturnCta: isFr ? "Publier le retour" : "Publish the return",
+    publishedTripsCta: isFr ? "Voir mes trajets" : "See my trips",
   };
 }
 
