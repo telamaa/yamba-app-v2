@@ -64,24 +64,10 @@ export async function suggestCities(
 }
 
 /**
- * « Paris » + « France » → « Paris, France ». Le libellé NORMALISÉ que le
- * serveur attend : `placeSearchTerm` (trip-service) ne garde que le premier
- * segment avant la virgule, le pays n'est qu'une aide à la lecture
- * (WEB-ACC-9 — sans cette règle, toute ville étrangère choisie dans la
- * liste rendait zéro résultat).
- *
- * Le contexte de Google peut porter plusieurs segments (« Route de
- * l'Aéroport, Tillé ») : seul le DERNIER est un pays, c'est la règle du
- * site. Divergence assumée : le site replie sur « France » quand le pays
- * est omis (son SDK est chargé avec `region=FR`) ; notre relais n'a pas ce
- * biais, un contexte vide reste donc vide plutôt que d'inventer un pays.
+ * La lecture d'une suggestion (libellé normalisé, pays) vit dans un module
+ * PUR — `lib/place-label.ts` —, parce qu'une règle qui décide de ce que le
+ * serveur reçoit doit être vérifiable par une fiche, et que ce fichier-ci
+ * est inatteignable depuis le harnais (il tire `expo-constants`). Réexporté
+ * ici pour ses appelants : la règle n'a qu'un domicile, pas deux.
  */
-export function placeLabel(suggestion: CitySuggestion): string {
-  const country = suggestion.secondary
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .pop();
-  if (!country || country === suggestion.main) return suggestion.main;
-  return `${suggestion.main}, ${country}`;
-}
+export { placeCountry, placeLabel } from '@/lib/place-label';

@@ -1,0 +1,124 @@
+/**
+ * publish-draft.ts — le trajet en cours d'écriture, en mémoire de PROCESSUS.
+ * ===========================================================================
+ * Même dispositif que `booking-draft.ts`, `search-draft.ts` et
+ * `auth-flow-state.ts` : un objet de module, un `Set` d'abonnés, zéro
+ * contexte React. La raison est la même : le tunnel est une PILE de pages
+ * poussées, et une page poussée ne rend pas de valeur à celle qui l'a
+ * poussée — chaque écran écrit donc dans un brouillon partagé.
+ *
+ * Il meurt avec le processus, et c'est VOULU : un trajet non publié
+ * n'engage rien. Le jour où il devra survivre (brouillon serveur, le site a
+ * déjà le bouton « Brouillon »), ce sera un trajet en base avec son id, pas
+ * un objet persisté sur le téléphone — deux brouillons pour une même chose
+ * divergeraient le premier jour.
+ *
+ * Il est aussi effacé à la DÉCONNEXION : un trajet à demi écrit appartient à
+ * celui qui l'écrivait (D106, `welcome-state`).
+ *
+ * Rien ici ne valide : les règles vivent dans `publish-trip.ts`, le serveur
+ * reste seul juge (RG-MOB-1).
+ */
+import { useSyncExternalStore } from 'react';
+
+import {
+  famillesParDefaut,
+  lieuxParDefaut,
+  type PublishDraft,
+  type TransportMode,
+} from '@/lib/publish-trip';
+
+/**
+ * Le brouillon neuf. Les dates ne sont PAS préremplies ici : ce fichier ne
+ * lit pas l'horloge (les règles reçoivent `maintenant`), et c'est l'écran des
+ * dates qui pose ses valeurs d'office à l'ouverture.
+ */
+const VIDE: PublishDraft = {
+  mode: null,
+  sousType: null,
+  escales: '',
+
+  depart: null,
+  arrivee: null,
+
+  dateDepart: null,
+  heureDepart: '',
+  dateArrivee: null,
+  heureArrivee: '',
+
+  reference: '',
+
+  prixParKiloEur: null,
+  capaciteKg: null,
+  forfaitSouteEur: null,
+  forfaitCabineEur: null,
+  familles: famillesParDefaut(),
+  lieuxRemise: [],
+  lieuxLivraison: [],
+  remiseEnMainPropre: false,
+  reservationInstantanee: false,
+  notes: '',
+};
+
+let brouillon: PublishDraft = VIDE;
+const abonnes = new Set<() => void>();
+
+function prevenir() {
+  abonnes.forEach((abonne) => abonne());
+}
+
+/** La MÊME référence tant que rien n'a changé — contrat de `useSyncExternalStore`. */
+export function getPublishDraft(): PublishDraft {
+  return brouillon;
+}
+
+export function subscribePublishDraft(abonne: () => void): () => void {
+  abonnes.add(abonne);
+  return () => {
+    abonnes.delete(abonne);
+  };
+}
+
+export function setPublishDraft(patch: Partial<PublishDraft>): void {
+  brouillon = { ...brouillon, ...patch };
+  prevenir();
+}
+
+export function clearPublishDraft(): void {
+  brouillon = { ...VIDE, familles: famillesParDefaut(), lieuxRemise: [], lieuxLivraison: [] };
+  prevenir();
+}
+
+/**
+ * Le mode décide des LIEUX proposés (aéroport, gare, ville) : les changer
+ * d'un coup serait effacer ce que le Voyageur a déjà précisé sur les
+ * anciennes cartes. On ne les repose donc QUE si le mode change vraiment.
+ */
+export function choisirMode(mode: TransportMode): void {
+  if (brouillon.mode === mode) return;
+  brouillon = {
+    ...brouillon,
+    mode,
+    // Un sous-type d'avion n'a aucun sens pour une voiture : il repart à zéro.
+    sousType: null,
+    escales: '',
+    lieuxRemise: lieuxParDefaut(mode),
+    lieuxLivraison: lieuxParDefaut(mode),
+  };
+  prevenir();
+}
+
+/** Y a-t-il quelque chose à reprendre ? (la carte « Reprendre » de l'écran d'entrée) */
+export function brouillonCommence(draft: PublishDraft): boolean {
+  return (
+    draft.mode !== null ||
+    draft.depart !== null ||
+    draft.arrivee !== null ||
+    draft.dateDepart !== null ||
+    draft.prixParKiloEur !== null
+  );
+}
+
+export function usePublishDraft(): PublishDraft {
+  return useSyncExternalStore(subscribePublishDraft, getPublishDraft, getPublishDraft);
+}
