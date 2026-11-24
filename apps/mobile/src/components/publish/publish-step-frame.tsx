@@ -43,8 +43,9 @@ type Props = {
   step: number;
   /** Le gain déjà mis en forme, ou l'état du trajet — jamais un zéro muet. */
   valueLabel: string;
-  /** La ligne sous la valeur : ce qu'elle veut dire. */
-  valueHint: string;
+  /** La ligne sous la valeur. Absente tant qu'il n'y a rien à dire : une
+   *  phrase qui annonce une phrase à venir est du bruit. */
+  valueHint?: string;
   ctaLabel: string;
   onContinueAction: () => void;
   children: ReactNode;
@@ -143,9 +144,11 @@ export function PublishStepFrame({
             <ThemedText type="subtitle" numberOfLines={1}>
               {valueLabel}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {valueHint}
-            </ThemedText>
+            {valueHint ? (
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                {valueHint}
+              </ThemedText>
+            ) : null}
           </View>
           <Pressable
             accessibilityRole="button"

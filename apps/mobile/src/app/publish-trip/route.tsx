@@ -54,10 +54,8 @@ export default function PublishRouteScreen() {
   return (
     <PublishStepFrame
       title={t('route.title')}
-      subtitle={t('route.subtitle')}
       step={2}
       valueLabel={route}
-      valueHint={t('bar.gainLater')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
       <View style={[styles.card, { borderColor: theme.backgroundElement }]}>

@@ -46,7 +46,7 @@ import { clearPublishDraft, setPublishDraft, usePublishDraft } from '@/lib/publi
 import { construireCorps } from '@/lib/publish-payload';
 import { gainSiToutPartCents, manquesOffre } from '@/lib/publish-pricing';
 import { FAMILLES, manquesDuTunnel } from '@/lib/publish-trip';
-import { formatLongDate } from '@/lib/trip-format';
+import { formatDayMonth } from '@/lib/trip-format';
 
 /** Les refus que l'écran sait NOMMER ; les autres gardent la phrase générique. */
 const CODES_CONNUS = ['NEW_ACCOUNT_CAP', 'ACCOUNT_RESTRICTED'] as const;
@@ -101,12 +101,11 @@ export default function PublishReviewScreen() {
   return (
     <PublishStepFrame
       title={t('review.title')}
-      subtitle={t('review.subtitle')}
       step={7}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }
-      valueHint={gainCents === null ? t('bar.gainLater') : t('review.barHint')}
+      valueHint={gainCents === null ? undefined : t('review.barHint')}
       ctaLabel={envoiEnCours ? t('review.publishing') : t('review.publish')}
       onContinueAction={() => {
         if (!envoiEnCours) void publier();
@@ -120,13 +119,23 @@ export default function PublishReviewScreen() {
             ? t('review.route', { from: draft.depart.ville, to: draft.arrivee.ville })
             : t('bar.newTrip')}
         </ThemedText>
+        {/* « Samedi 28 novembre 2026 → Samedi 28 novembre 2026 » disait deux
+            fois la même date sur deux lignes. Un récap tient sur une ligne :
+            le jour, puis les deux heures — et le second jour n'apparaît que
+            s'il est différent. */}
         <ThemedText type="small" themeColor="textSecondary">
           {draft.dateDepart === null || draft.dateArrivee === null
             ? t('review.datesMissing')
-            : t('review.dates', {
-                from: formatLongDate(`${draft.dateDepart}T12:00:00`, locale),
-                to: formatLongDate(`${draft.dateArrivee}T12:00:00`, locale),
-              })}
+            : draft.dateDepart === draft.dateArrivee
+              ? t('review.datesSameDay', {
+                  date: formatDayMonth(new Date(`${draft.dateDepart}T12:00:00`), locale),
+                  from: draft.heureDepart,
+                  to: draft.heureArrivee,
+                })
+              : t('review.dates', {
+                  from: `${formatDayMonth(new Date(`${draft.dateDepart}T12:00:00`), locale)} ${draft.heureDepart}`,
+                  to: `${formatDayMonth(new Date(`${draft.dateArrivee}T12:00:00`), locale)} ${draft.heureArrivee}`,
+                })}
         </ThemedText>
         {draft.mode !== null ? (
           <ThemedText type="small" themeColor="textSecondary">
@@ -169,8 +178,9 @@ export default function PublishReviewScreen() {
           <>
             {refusees.length > 0 ? (
               <ThemedText type="small">
-                {refusees.map((f) => tFamilles(`families.${f}`)).join(' · ')}
-                {` — ${t('families.refuse').toLocaleLowerCase(locale)}`}
+                {t('review.refused', {
+                  list: refusees.map((f) => tFamilles(`families.${f}`)).join(' · '),
+                })}
               </ThemedText>
             ) : null}
             {surtaxees.length > 0 ? (

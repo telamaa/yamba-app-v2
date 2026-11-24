@@ -96,12 +96,11 @@ export default function PublishPlacesScreen() {
   return (
     <PublishStepFrame
       title={t('places.title')}
-      subtitle={t('places.subtitle')}
       step={6}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }
-      valueHint={gainCents === null ? t('bar.gainLater') : t('price.gainBarHint')}
+      valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
       <Groupe

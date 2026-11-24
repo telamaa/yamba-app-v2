@@ -38,7 +38,6 @@ import { NumberStepper, ValeursUsuelles } from '@/components/publish/number-step
 import { PublishStepFrame } from '@/components/publish/publish-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { intlTagFor } from '@/lib/number-format';
 import { BILLING_FLOOR_KG, formatAmountFromCents } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
@@ -63,7 +62,6 @@ export default function PublishPriceScreen() {
   const t = useTranslations('publish');
   const locale = useLocale();
   const tag = intlTagFor(locale);
-  const theme = useTheme();
   const draft = usePublishDraft();
   const [montreLesManques, setMontreLesManques] = useState(false);
 
@@ -119,7 +117,7 @@ export default function PublishPriceScreen() {
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }
-      valueHint={gainCents === null ? t('bar.gainLater') : t('price.gainBarHint')}
+      valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
       <View style={styles.group}>
@@ -141,7 +139,9 @@ export default function PublishPriceScreen() {
         <ValeursUsuelles
           valeurs={PRIX_USUELS_PAR_KG}
           choisie={draft.prixParKiloEur}
-          libelle={(valeur) => `${valeur.toLocaleString(tag)} ${t('price.perKgUnit')}`}
+          // « 8 €/kg » × 4 débordait sur deux lignes (le dernier orphelin).
+          // L'unité est déjà sous le pas-à-pas : la pastille garde le symbole.
+          libelle={(valeur) => `${valeur.toLocaleString(tag)} €`}
           onPickAction={(valeur) => setPublishDraft({ prixParKiloEur: ramenePrix(valeur) })}
         />
         {/* D81 — le plancher est en KILOS : c'est la seule formulation vraie
@@ -175,21 +175,10 @@ export default function PublishPriceScreen() {
         />
       </View>
 
-      {/* Le gain, en grand, là où le regard tombe après avoir réglé. La barre
-          du bas le redit en permanence — ici il porte sa PHRASE. */}
-      {gainCents !== null ? (
-        <View style={[styles.gain, { borderColor: theme.backgroundElement }]}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t('price.gainTitle', { kg: draft.capaciteKg ?? 0 })}
-          </ThemedText>
-          <ThemedText type="title" style={styles.gainMontant}>
-            {formatAmountFromCents(gainCents, tag)} €
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t('price.gainHint')}
-          </ThemedText>
-        </View>
-      ) : null}
+      {/* PAS de carte de gain ici : la barre du bas porte le même nombre, à
+          120 px de là. Deux fois le même montant sur un écran, c'est du bruit
+          — et c'est la barre qui gagne, parce qu'elle SUIT le pouce sur les
+          quatre écrans suivants. */}
 
       {montreLesManques && manques.length > 0 ? (
         <View style={styles.manques}>
@@ -210,15 +199,6 @@ export default function PublishPriceScreen() {
 const styles = StyleSheet.create({
   group: {
     gap: Spacing.two,
-  },
-  gain: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: Spacing.four,
-    gap: Spacing.one,
-  },
-  gainMontant: {
-    marginBottom: 0,
   },
   manques: {
     gap: Spacing.one,

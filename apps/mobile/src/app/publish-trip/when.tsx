@@ -40,7 +40,7 @@ import {
   masqueHeure,
   normaliseHeure,
 } from '@/lib/publish-trip';
-import { formatLongDate } from '@/lib/trip-format';
+import { formatDayMonth } from '@/lib/trip-format';
 
 export default function PublishWhenScreen() {
   const t = useTranslations('publish');
@@ -103,10 +103,8 @@ export default function PublishWhenScreen() {
   return (
     <PublishStepFrame
       title={t('when.title')}
-      subtitle={t('when.subtitle')}
       step={3}
       valueLabel={route}
-      valueHint={t('bar.gainLater')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
       <View style={styles.group}>
@@ -217,7 +215,10 @@ export default function PublishWhenScreen() {
     nomComplet: string;
     onPressAction: () => void;
   }) {
-    const ecrit = valeur === null ? '' : formatLongDate(`${valeur}T12:00:00`, locale);
+    // « Samedi 28 novembre 2026 » sur une ligne de formulaire : quatre mots
+    // pour une information qui en demande deux. L'année est celle en cours ou
+    // la suivante — personne ne publie un vol pour 2029.
+    const ecrit = valeur === null ? '' : formatDayMonth(new Date(`${valeur}T12:00:00`), locale);
     return (
       <Pressable
         accessibilityRole="button"

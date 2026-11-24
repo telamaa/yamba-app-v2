@@ -27,7 +27,7 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { useLocale, useTranslations } from 'use-intl';
@@ -97,6 +97,19 @@ export default function PublishFamiliesScreen() {
 
   const refusees = FAMILLES.filter((f) => draft.familles[f].mode === 'REFUSE').length;
   const surtaxees = FAMILLES.filter((f) => draft.familles[f].mode === 'SURCHARGE').length;
+
+  /**
+   * HUIT CARTES REPLIÉES PAR DÉFAUT.
+   *
+   * Le cas courant est « je prends tout » : dérouler huit cartes identiques
+   * pour ne rien y changer, c'est un écran de défilement pour rien. Le site
+   * plie d'ailleurs la même chose derrière « Ajuster ».
+   *
+   * Replié ne veut pas dire caché : la ligne au-dessus DIT l'état (« Tout
+   * accepté », ou le compte des exceptions), et tout écart déplie d'office —
+   * on ne replie jamais une décision déjà prise.
+   */
+  const [deplie, setDeplie] = useState(refusees > 0 || surtaxees > 0);
   const gainCents = gainSiToutPartCents(draft.prixParKiloEur, draft.capaciteKg);
 
   const souteActif = forfaitActif(draft.forfaitSouteEur, FRANCHISE_SOUTE_KG, draft.capaciteKg);
@@ -105,22 +118,40 @@ export default function PublishFamiliesScreen() {
   return (
     <PublishStepFrame
       title={t('families.title')}
-      subtitle={t('families.subtitle')}
       step={5}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }
-      valueHint={gainCents === null ? t('bar.gainLater') : t('price.gainBarHint')}
+      valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
+      {/* Un compte s'écrit au pluriel de sa langue, pas avec « (s) » —
+          « 1 refusée(s), 1 avec supplément » était la phrase d'un formulaire
+          administratif. Deux clés ICU, jointes seulement si les deux comptent. */}
       <ThemedText type="small" themeColor="textSecondary">
         {refusees === 0 && surtaxees === 0
           ? t('families.allAccepted')
-          : t('families.someRefused', { refused: refusees, surcharged: surtaxees })}
+          : [
+              refusees > 0 ? t('families.refusedCount', { count: refusees }) : null,
+              surtaxees > 0 ? t('families.surchargedCount', { count: surtaxees }) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
       </ThemedText>
 
-      <View style={styles.liste}>
-        {FAMILLES.map((famille) => {
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: deplie }}
+        onPress={() => setDeplie((ouvert) => !ouvert)}
+        style={({ pressed }) => [styles.bascule, pressed && styles.pressed]}>
+        <ThemedText type="smallBold" style={{ color: Brand.mango }}>
+          {deplie ? t('families.hide') : t('families.adjust')}
+        </ThemedText>
+        <Ionicons name={deplie ? 'chevron-up' : 'chevron-down'} size={15} color={Brand.mango} />
+      </Pressable>
+
+      <View style={[styles.liste, deplie ? null : styles.replie]}>
+        {deplie ? FAMILLES.map((famille) => {
           const condition = draft.familles[famille];
           return (
             <View
@@ -172,7 +203,7 @@ export default function PublishFamiliesScreen() {
               ) : null}
             </View>
           );
-        })}
+        }) : null}
       </View>
 
       <View style={styles.group}>
@@ -251,10 +282,7 @@ export default function PublishFamiliesScreen() {
           <View style={styles.manque}>
             <Ionicons name="alert-circle-outline" size={15} color={Brand.mango} />
             <ThemedText type="small" style={{ color: Brand.mango }}>
-              {t('families.bagSuspended', {
-                capacity: draft.capaciteKg ?? 0,
-                kg: franchiseKg,
-              })}
+              {t('families.bagSuspended', { kg: franchiseKg })}
             </ThemedText>
           </View>
         ) : null}
@@ -266,6 +294,19 @@ export default function PublishFamiliesScreen() {
 const styles = StyleSheet.create({
   liste: {
     gap: Spacing.two,
+  },
+  replie: {
+    display: 'none',
+  },
+  bascule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    minHeight: 44,
+    marginTop: -Spacing.three,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   group: {
     gap: Spacing.two,

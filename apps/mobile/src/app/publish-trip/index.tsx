@@ -67,10 +67,8 @@ export default function PublishModeScreen() {
   return (
     <PublishStepFrame
       title={t('mode.title')}
-      subtitle={t('mode.subtitle')}
       step={1}
       valueLabel={route}
-      valueHint={t('bar.gainLater')}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
       <View style={styles.modes}>
@@ -117,7 +115,7 @@ export default function PublishModeScreen() {
       {draft.mode !== null ? (
         <View style={styles.group}>
           <ThemedText type="smallBold" themeColor="textSecondary">
-            {t('mode.typeTitle')}
+            {t(`mode.${draft.mode}_typeTitle`)}
           </ThemedText>
           <View style={styles.chips}>
             {SOUS_TYPES[draft.mode].map((sousType) => {
