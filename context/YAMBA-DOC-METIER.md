@@ -9454,3 +9454,56 @@ l'utilisait. Une règle que personne n'applique n'est pas une règle.
 | 5 | Je recharge une page et je regarde le squelette | il occupe la même largeur et la même gouttière que la page finale ; rien ne saute à l'affichage |
 | 6 | Je vais au tableau de bord | le contenu ne touche plus le bord de l'écran |
 | 7 | Je consulte un trajet, puis une réservation, puis une notation | la marge gauche ne bouge pas d'une page à l'autre |
+
+---
+
+# D111 — Publier un trajet depuis le téléphone (24/11/2026)
+
+## Le besoin
+
+Yamba repose sur deux gestes : envoyer un colis, et transporter celui d'un autre. Le premier existe
+sur le téléphone depuis des semaines — sept écrans, du colis au paiement. Le second n'existait
+**que sur le site** : l'app affichait une page qui disait « le parcours arrive ».
+
+C'est le mauvais côté à laisser au site, parce que l'offre est le goulot d'une place de marché :
+sans trajets publiés, aucune recherche ne rend rien. Et le Voyageur de Yamba est *occasionnel* — il
+publie depuis l'aéroport, la veille, dans un train. C'est exactement le moment où il a son téléphone
+et pas son ordinateur.
+
+Le parcours du site a été repris question par question, sur les trois captures du tunnel web du
+21/11, avec un principe : **transposer l'intention, pas la mise en page**. Un curseur qui glisse est
+un geste de souris ; une liste de cinq souplesses dont deux ne veulent rien dire reste une liste de
+trois sur un téléphone.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-1** | Publier se fait en **sept écrans poussés**, une question par écran, sous **trois phases annoncées** (Trajet · Conditions · Vérification). Le nombre d'écrans n'est jamais annoncé. | Un formulaire long sur un téléphone cache son bouton et ses erreurs. Et ce n'est pas le nombre d'écrans qui fait abandonner, c'est le nombre ANNONCÉ : « étape 1 sur 7 » lu avant d'avoir rien saisi est un départ (A213). |
+| **RG-D111-2** | La barre du bas montre en permanence **ce que le trajet rapporte**, jamais ce qu'il coûte. | Le prix du Voyageur EST son net (D16) : chaque réglage rapporte, et il doit le voir rapporter. Un Voyageur qui ne voit pas ce que son tarif produit n'a aucune raison de le monter. |
+| **RG-D111-3** | Tant qu'un prix ou une capacité n'est pas fixé, l'app écrit « à fixer » — **jamais 0 €**. | Zéro est un montant : il dit « ton trajet ne rapporte rien ». L'absence dit « tu n'as pas encore choisi ». Ce ne sont pas les mêmes phrases. |
+| **RG-D111-4** | Les huit familles de colis partent **acceptées**. Refuser ou surtaxer est un choix explicite. | Un Voyageur qui ne touche à rien publie une annonce ouverte — c'est aussi ce que le serveur comprend d'une liste vide. |
+| **RG-D111-5** | Un forfait « bagage entier » dont la franchise dépasse la capacité annoncée est **suspendu**, et l'écran le dit avec les deux nombres. | RG-B-29. Un champ grisé sans raison fait croire à une panne ; une phrase qui nomme les deux nombres fait comprendre quoi changer. |
+| **RG-D111-6** | Les lieux d'échange proposés dépendent du **mode de transport**, et leurs souplesses dépendent du **type de lieu**. | « Exact » sur une zone de ville ne veut rien dire : une zone n'a pas de point. Un choix qui ne veut rien dire se choisit quand même, et fausse l'annonce. |
+| **RG-D111-7** | Le bouton d'étape reste **actif** quand il manque quelque chose : il nomme ce qui manque. | Un bouton gris ne dit pas pourquoi il est gris (A209). |
+| **RG-D111-8** | L'app ne publie pas « aller-retour ». | Le site propose le choix mais ne crée jamais de second trajet : l'Expéditeur ne trouvera jamais le retour. Tant que le retour n'est pas un vrai trajet, l'app ne le promet pas. |
+| **RG-D111-9** | Le brouillon de publication meurt avec l'app et à la **déconnexion**. | Un trajet non publié n'engage rien ; et un trajet à demi écrit appartient à celui qui l'écrivait, pas au prochain qui prend le téléphone. |
+| **RG-D111-10** | Le dernier écran **redit tout** avant de publier, et chaque bloc se modifie sur place. | C'est le seul écran qui engage. Un récap qu'on ne peut pas corriger sans tout refaire n'est pas un récap. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je tape le « + » de la barre | l'écran de seuil explique ce que publier rapporte ; je ne suis pas encore dans le tunnel |
+| 2 | Je commence, puis je quitte, puis je retape le « + » | on me propose de **reprendre** ou de repartir de zéro — rien ne reprend tout seul |
+| 3 | J'ouvre « Comment voyages-tu ? » | trois modes, et chacun dit **où** se fera l'échange si je le choisis |
+| 4 | Je choisis l'avion, puis « avec escale » | on me demande la ou les villes traversées, et pas avant |
+| 5 | J'arrive sur les dates | le départ est proposé à demain, à la prochaine heure pleine ; l'arrivée reste vide |
+| 6 | Je tape « 2135 » dans une heure | le champ écrit « 21:35 » tout seul ; « 2561 » devient « 23:59 » |
+| 7 | J'arrive sur le prix | un prix et une capacité sont proposés, **et la barre du bas annonce déjà le gain correspondant** |
+| 8 | Je monte ma capacité à 23 kg | le forfait « valise en soute » cesse d'être suspendu |
+| 9 | Je laisse ma capacité à 12 kg avec un forfait soute saisi | l'écran dit qu'il est suspendu, avec les deux nombres — et il n'est pas envoyé |
+| 10 | Je refuse l'électronique et je surtaxe l'alimentaire à 25 % | le récap les nomme ; les six autres familles n'apparaissent pas |
+| 11 | Je tape « Publier » sans avoir choisi de lieu | le bouton ne part pas au serveur : il nomme ce qui manque |
+| 12 | Je publie un trajet complet | le trajet est en ligne, et j'arrive sur sa fiche publique |
+| 13 | Je me déconnecte avec un trajet à moitié écrit | il n'existe plus à la reconnexion |

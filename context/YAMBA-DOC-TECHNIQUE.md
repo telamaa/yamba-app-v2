@@ -19516,3 +19516,106 @@ Troisième, payé en direct : un commentaire JSX `{/* … */}` placé **avant** 
 - **Défaut latent NOMMÉ dans le code, non corrigé** : `UserProfileView.tsx` porte
   `lg:grid-cols-[minmax(0,1fr)_320px]` **sans `lg:grid`** — la grille à deux colonnes de cette page
   n'a donc jamais fonctionné. Le corriger déplace tout le contenu : c'est un lot de mise en page.
+
+---
+
+# D111 — Le tunnel natif « publier un trajet » (24/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **920 → 1013 fiches** (52 suites),
+`apps/mobile` seul touché, aucun service modifié.
+
+## Le constat
+
+Le parcours Voyageur n'existait que sur le site : **6 436 lignes, vingt et un fichiers, zéro test**
+(`apps/user-ui/src/components/trips/create/`). Le téléphone portait une **coquille honnête** de
+75 lignes qui disait « le parcours arrive » et ne renvoyait nulle part (A203, doctrine « full natif,
+jamais le site »). C'était le plus gros parcours manquant, et celui de l'**offre** — le goulot d'une
+place de marché.
+
+## Ce qui a été construit
+
+Sept écrans POUSSÉS par-dessus les onglets, une question par écran, dans une pile `publish-trip/` :
+
+| # | Route | Question | Ce qu'elle écrit |
+|---|---|---|---|
+| ① | `publish-trip/index` | Comment voyages-tu ? | `mode`, `sousType`, `escales`, et les lieux par défaut |
+| ② | `publish-trip/route` | Ton itinéraire | `depart`, `arrivee` (via `publish-trip/city`) |
+| ③ | `publish-trip/when` | Quand pars-tu ? | dates et heures (via `publish-trip/date`), référence du billet |
+| ④ | `publish-trip/price` | Ton prix et tes kilos | `prixParKiloEur`, `capaciteKg` |
+| ⑤ | `publish-trip/families` | Ce que tu acceptes | les 8 familles, les 2 forfaits bagage |
+| ⑥ | `publish-trip/places` | Où se fait l'échange | `lieuxRemise`, `lieuxLivraison` |
+| ⑦ | `publish-trip/review` | Vérifie et publie | options, notes, `POST /trips` |
+
+L'onglet « + » (`(tabs)/publish.tsx`) devient le **seuil** du tunnel : il porte la promesse, la carte
+« Reprendre » quand un brouillon existe, et la porte d'identité. Il n'est pas la première étape pour
+une raison mesurable — le cadre d'étape a une **barre d'action permanente** en bas, et dans un onglet
+elle se superposerait à la barre flottante.
+
+## Les fichiers
+
+**Règles pures (zéro import, lisibles par le harnais)**
+
+- `src/lib/publish-trip.ts` — vocabulaire du contrat, brouillon, validation par écran, phases.
+- `src/lib/publish-pricing.ts` — bornes, crans, valeurs d'usage, gain net, forfaits (RG-B-29).
+- `src/lib/publish-payload.ts` — la dernière règle avant le réseau : cents, dates ISO, filtres.
+- `src/lib/place-label.ts` — `placeLabel` / `placeCountry`, sortis de `api/places.api.ts`.
+
+**État** : `src/lib/publish-draft.ts` — mémoire de PROCESSUS (motif `booking-draft` / `search-draft`),
+effacée à la déconnexion comme `last-search` (D106).
+
+**Écrans partagés** : `components/publish/publish-step-frame.tsx` (cadre, jauge, barre de gain),
+`components/publish/number-stepper.tsx` (pas-à-pas 44 pt + valeurs d'usage),
+`components/city-picker.tsx` (l'écran ville, désormais partagé avec la recherche).
+
+**Réseau** : `src/lib/api/publish.api.ts` — `POST /trips`, même endpoint que le site.
+
+## Cinq décisions qui s'écartent du site, et pourquoi
+
+1. **« Aller-retour » n'est pas repris.** Le mapper web envoie `returnDepartureAt: null` dans les
+   deux cas et ne crée aucun second trajet : le choix n'ajoute qu'un mot sur la fiche du Voyageur.
+   Un contrôle qui affirme ce que le produit ne fait pas est le défaut de D100.
+2. **Le brouillon parle la langue du contrat** (`PLANE`, `WITH_LAYOVER`, `CITY_AREA`) : le mapper de
+   318 lignes du site disparaît, et avec lui ses occasions de se tromper.
+3. **Les curseurs deviennent des pas-à-pas** (A207 / D101 2A) : mêmes nombres — une fiche les lit
+   dans `create-trip.config.ts` —, geste natif.
+4. **Les souplesses dépendent du lieu** : « exact » n'est pas proposé sur une zone de ville, « toute
+   la ville » ne l'est pas sur un aéroport.
+5. **Un seul écran ville pour deux parcours** : le composant porte le geste, les routes portent
+   leurs mots et ce qu'elles font du choix.
+
+## Vérification bout en bout
+
+Le corps produit par `construireCorps` (le code livré, pas une maquette) a été envoyé au serveur réel
+via le gateway : **201**, trajet `PUBLISHED`, `pricePerKgCents: 950`, `capacityKg: 23`,
+`familyConditions` réduit aux deux familles qui s'écartent, `pickupLocations` réduit au lieu allumé
+avec ses précisions. Les sept écrans ont été ouverts un à un au simulateur iOS par lien profond
+(`xcrun simctl openurl booted "exp://127.0.0.1:8081/--/publish-trip/<écran>"`, technique de D107).
+
+## Trois défauts qui n'existaient que sur l'écran
+
+- **Le prix affiché que rien n'appliquait.** L'écran montrait « 10,00 €/kg · 12 kg » pendant que le
+  brouillon valait `null` : la barre annonçait « ton gain s'affichera ici » et « Continuer »
+  reprochait « fixe ton prix au kilo » sous un prix affiché. C'est D99 3C, commis dans l'écran dont
+  l'en-tête le cite. **Le site a le même défaut** (son curseur montre la médiane suggérée pendant que
+  `pricePerKg` vaut `""`). Corrigé en ÉCRIVANT les valeurs d'ouverture dans le brouillon au montage.
+- **Le zéro qui ment.** Le récap affichait « 0,00 €/kg · 0 kg » : zéro est un montant, l'absence n'en
+  est pas un.
+- **L'écran muet.** Les lieux se rendaient vides quand le mode n'était pas choisi — deux titres et
+  rien. Il repose les cartes si le mode existe, et le DIT sinon, avec la porte pour y aller.
+
+## Un piège qu'aucun typecheck ne voit
+
+`(tabs)/publish.tsx` et un dossier `src/app/publish/` revendiquent **la même route** `/publish` :
+expo-router génère les deux dans ses types, `tsc` passe, et `router.push('/publish')` depuis l'onglet
+retombe sur l'onglet. Le tunnel s'appelle donc `publish-trip/`.
+
+## Reste ouvert
+
+- **La fourchette de prix par corridor.** `suggestPricePerKg` (site) a besoin du code pays et des
+  coordonnées ; le relais Places (A211) ne rend que deux chaînes. L'afficher quand même montrerait la
+  même médiane sur tous les corridors — le défaut de D100. Chemin : `/places/details` avec le même
+  jeton de session (facturé dans la session Google), ou le code pays ajouté à l'autocomplétion.
+- **Le justificatif de billet** (`expo-image-picker` est déjà présent ; le site le pose à l'étape 1).
+- **Le brouillon serveur** (« Brouillon » du site) : ce doit être un trajet en base, pas un second
+  brouillon local.
+- **Le fuseau horaire** : `departureAt` part dans le fuseau de l'appareil, comme sur le site.

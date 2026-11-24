@@ -10770,3 +10770,250 @@ après restauration. **Une fiche verte qu'on n'a jamais vue rougir ne prouve rie
   en dev, pas en prod » quand les globs diffèrent.
 - **`JSX.IntrinsicElements`** : le type qui liste les balises HTML connues de TypeScript. C'est ce
   qui permet à `AppContainer` d'accepter `as="main"` en restant typé.
+
+---
+
+# Chapitre — Transposer un parcours web en natif sans le recopier (D111)
+
+Ce chapitre raconte comment les 6 436 lignes du tunnel « Créer un trajet » du site sont devenues
+sept écrans natifs, et surtout **ce qu'on a refusé de transposer**. Il est écrit pour quelqu'un qui
+sait lire du TypeScript mais n'a jamais touché à React Native.
+
+## 1. La première question n'est pas « comment », c'est « quoi exactement »
+
+Avant d'écrire une ligne, on lit le parcours existant **jusqu'à ses règles** :
+
+```sh
+find apps/user-ui/src/components/trips/create -type f | xargs wc -l | sort -n
+#  6436 total — dont create-trip.config.ts (511), mapper (318), types (364)
+```
+
+Les trois fichiers qui comptent ne sont pas les composants, ce sont `*.config.ts` (les bornes et la
+validation), `*.mapper.ts` (ce que le serveur reçoit) et `*.types.ts` (la forme du brouillon). Les
+composants, eux, sont du geste — et le geste, justement, va changer.
+
+Puis on lit le **contrat**, qui est la seule vérité commune aux deux fronts :
+
+```ts
+// apps/trip-service/src/schemas/trip.schema.ts
+export const TransportModeEnum = z.enum(["PLANE", "TRAIN", "CAR"]);
+originCity: z.string().trim().min(1).max(150),   // REQUIS
+originCountryCode: isoCodeSchema,                 // facultatif
+originLat: z.number().optional().nullable(),      // facultatif
+```
+
+Ces trois lignes décident de tout le lot : la ville suffit pour publier, le reste est du confort.
+C'est ce qui rend la publication mobile possible **malgré** le point suivant.
+
+## 2. La parité se mesure au contrat, pas à l'écran
+
+Le site obtient le code pays et les coordonnées d'une ville parce qu'il charge le SDK Google dans le
+navigateur. Le téléphone passe par notre relais (A211), qui ne rend que deux chaînes :
+
+```ts
+export type CitySuggestion = { main: string; secondary: string };
+```
+
+Conséquence : la jauge « prix juste » du site — basse / médiane / haute par corridor — **ne peut pas
+être calculée** sur le téléphone. On a trois options :
+
+1. l'afficher quand même avec la base de repli → la même médiane sur tous les corridors, c'est-à-dire
+   un repère qui a l'air d'en être un. C'est le défaut que D100 a nommé ;
+2. ajouter un appel serveur (`/places/details`, même jeton de session) → du vrai travail, un autre lot ;
+3. ne pas l'afficher, et **écrire pourquoi dans le fichier**.
+
+On a pris la troisième, et une fiche grave le constat pour que personne ne croie à un oubli :
+
+```ts
+it('le relais Places ne rend que deux chaînes : ni placeId, ni code pays, ni coordonnées', () => {
+  const type = relais.slice(debut, fin);
+  expect(type).toContain('main');
+  expect(type).not.toContain('countryCode');
+});
+```
+
+**La leçon** : une fiche ne sert pas qu'à empêcher une régression. Elle sert aussi à **tenir un
+constat** — ici « tant que c'est vrai, le brouillon ne doit pas prétendre porter ces champs ».
+
+## 3. Mêmes nombres, autre geste
+
+Le site règle le prix au kilo avec un `<input type="range">`. Sur un téléphone :
+
+```
+(20 − 5) / 0,5 = 31 crans   sur ~360 px de large   →   ~12 px par cran
+```
+
+Douze pixels, c'est moins que la moitié d'un pouce. Et surtout, un Voyageur **vise** un tarif qu'il
+a en tête (« dix euros le kilo »), il n'explore pas un continuum. D'où un pas-à-pas de 44 pt — la
+taille minimale d'une cible tactile chez Apple comme chez Google — plus des valeurs d'usage :
+
+```ts
+export const PRIX_USUELS_PAR_KG = [8, 10, 12, 15] as const;
+export const CAPACITES_USUELLES_KG = [5, 10, 12, 23] as const; // 12 et 23 = les deux franchises
+```
+
+Ce n'est pas une préférence : c'est la troisième fois que ce dépôt tranche ainsi (le calendrier en
+A207, le poids du colis en D101). **Mêmes nombres, geste natif.** Et les nombres sont vérifiés
+contre le site, lu à l'exécution :
+
+```ts
+function litLaBorne(nom: string) { /* lit `export const X = { min, max, step }` dans la source */ }
+expect(litLaBorne('PRICE_PER_KG_RANGE')).toEqual({ min: PRIX_MIN_PAR_KG, max: PRIX_MAX_PAR_KG, step: PRIX_PAS_PAR_KG });
+```
+
+Pourquoi lire le fichier plutôt que l'importer ? Parce qu'un `import` par-dessus la frontière d'un
+projet est une **dépendance de build** (D93) : `nx test @yamba-app/mobile` se mettrait à construire
+le site avant de lancer les fiches.
+
+## 4. Supprimer un traducteur plutôt que le réécrire
+
+Le site garde `"plane"` dans son brouillon et traduit en `"PLANE"` dans un mapper de 318 lignes.
+Cette table existe pour une raison historique : le formulaire est plus vieux que le contrat. La
+recopier, c'est hériter de ses occasions de se tromper. Le brouillon natif écrit donc **directement
+les mots du serveur** :
+
+```ts
+export type TransportMode = 'PLANE' | 'TRAIN' | 'CAR';
+export type SousType = 'DIRECT' | 'WITH_LAYOVER' | 'WITH_CONNECTION' | 'DETOUR_BY_AGREEMENT';
+```
+
+Un seul champ `sousType` côté écran, **trois** côté serveur (`flightType`, `trainTripType`,
+`carTripFlexibility`), et une fonction pure pour passer de l'un à l'autre :
+
+```ts
+export function sousTypePourLApi(mode, sousType) {
+  if (mode === null || sousType === null) return vide;
+  if (!SOUS_TYPES[mode].includes(sousType)) return vide;  // combinaison impossible ⇒ rien
+  …
+}
+```
+
+Le `includes` n'est pas de la paranoïa : une combinaison impossible vient **toujours** d'un état
+d'écran mal remis à zéro (on choisit « avec escale », puis on repasse en voiture). La neutraliser
+ici est moins cher que de la débusquer à la publication.
+
+## 5. `useSyncExternalStore` : partager un brouillon sans contexte React
+
+Un parcours en pile pose un problème simple : **une page poussée ne rend pas de valeur à celle qui
+l'a poussée**. Le dépôt a déjà son motif, et ce lot le reprend tel quel :
+
+```ts
+let brouillon: PublishDraft = VIDE;
+const abonnes = new Set<() => void>();
+
+export function getPublishDraft() { return brouillon; }          // MÊME référence si rien n'a changé
+export function subscribePublishDraft(a: () => void) { abonnes.add(a); return () => { abonnes.delete(a); }; }
+export function setPublishDraft(patch: Partial<PublishDraft>) { brouillon = { ...brouillon, ...patch }; prevenir(); }
+
+export function usePublishDraft() {
+  return useSyncExternalStore(subscribePublishDraft, getPublishDraft, getPublishDraft);
+}
+```
+
+Trois choses à comprendre :
+
+- **`getSnapshot` doit rendre la même référence tant que rien n'a changé.** Rendre un objet neuf à
+  chaque appel ferait boucler React à l'infini — c'est le piège classique de ce hook.
+- La mémoire est **de processus** : l'app tuée, le brouillon disparaît. C'est voulu pour un trajet
+  non publié. Le jour où il devra survivre, ce sera un trajet en base avec son id, pas un second
+  brouillon local — deux brouillons pour une même chose divergent le premier jour.
+- Il s'efface à la déconnexion, à côté de `forgetLastSearch()` (D106).
+
+## 6. Les valeurs d'ouverture : les AFFICHER ne suffit pas
+
+Le premier jet de l'écran du prix faisait ceci :
+
+```tsx
+const prix = draft.prixParKiloEur ?? 10;   // ← affiché
+```
+
+À l'écran : « 10,00 €/kg », une barre qui dit « ton gain s'affichera ici », et un bouton qui
+reproche « fixe ton prix au kilo » **sous un prix affiché**. Le défaut est connu de ce dépôt sous le
+nom de D99 3C (« un contrôle qui affiche une valeur qu'il n'applique pas est pire qu'un contrôle
+vide ») — et il a été recommis dans l'écran dont l'en-tête le cite. Le site a exactement le même.
+
+La correction tient en un effet au montage :
+
+```tsx
+useEffect(() => {
+  const valeurs: { prixParKiloEur?: number; capaciteKg?: number } = {};
+  if (draft.prixParKiloEur === null) valeurs.prixParKiloEur = PRIX_D_OUVERTURE;
+  if (draft.capaciteKg === null) valeurs.capaciteKg = CAPACITE_D_OUVERTURE;
+  if (Object.keys(valeurs).length > 0) setPublishDraft(valeurs);
+}, []);                                  // au MONTAGE, pas à chaque rendu
+```
+
+La condition porte sur **le vide**, pas sur le montage : revenir en arrière ne doit pas écraser ce
+qu'on vient de saisir. Et écrire d'office n'est pas décider à la place — le septième écran redit le
+prix avant de publier.
+
+## 7. Le mapper est la dernière règle avant le réseau : il se teste
+
+Trois règles non négociables passent par là, et chacune a sa fiche :
+
+```ts
+// cents ENTIERS, jamais de flottant monétaire
+expect(centsOuNull(9.5)).toBe(950);
+expect(centsOuNull(0)).toBeNull();         // 0 est un PRIX ; l'absence n'en est pas un
+
+// une famille acceptée ne voyage PAS (liste vide = tout accepté)
+expect(famillesPourLApi(famillesParDefaut())).toEqual([]);
+
+// un rayon ne part qu'avec RADIUS
+expect(api.find((l) => l.flexibility === 'EXACT')?.radiusKm).toBeNull();
+```
+
+Et la vérification qui vaut toutes les autres, faite une fois à la main contre le serveur réel :
+
+```sh
+curl -s -X POST http://localhost:8080/api/trips -H "authorization: Bearer $TOKEN" \
+     -H 'content-type: application/json' --data @/tmp/corps-trajet.json
+# 201 — PUBLISHED, pricePerKgCents 950, capacityKg 23
+```
+
+Le JSON envoyé n'était pas écrit à la main : il a été **produit par le code livré**, via une fiche
+jetable qui appelle `construireCorps` et écrit le résultat dans `/tmp`. Tester la vraie fonction
+contre le vrai serveur, c'est la seule preuve qui ne suppose rien.
+
+## 8. Expo Router : deux pièges payés dans ce lot
+
+**① Deux fichiers peuvent revendiquer la même route sans que rien ne proteste.**
+`src/app/(tabs)/publish.tsx` et `src/app/publish/index.tsx` produisent tous deux `/publish`. Les
+types générés contiennent les deux, `tsc` passe, et `router.push('/publish')` depuis l'onglet
+retombe sur l'onglet. On s'en aperçoit **en naviguant**, pas en compilant. Le tunnel s'appelle
+donc `publish-trip/`.
+
+**② Le cache de transformation de Metro.** Un fichier créé dans une passe et importé dans une passe
+suivante peut être servi à l'état intermédiaire : écran blanc, `ReferenceError`, typecheck et fiches
+vertes. Le remède est connu (D102) :
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo start --go --clear
+```
+
+Le `NODE_PATH` n'est pas décoratif : sans lui, la génération des types de routes meurt en
+`MODULE_NOT_FOUND` (c'est pourquoi les scripts du `package.json` le portent).
+
+## 9. Regarder, pas déduire
+
+Les sept écrans ont été ouverts un à un au simulateur, **par lien profond**, parce qu'on ne peut pas
+taper dans un simulateur depuis un terminal :
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/publish-trip/price"
+xcrun simctl io booted screenshot --type=png ecran.png
+```
+
+Trois défauts du lot n'ont été vus que là : le prix affiché sans être appliqué, le « 0,00 €/kg · 0 kg »
+du récap, l'écran des lieux rendu vide et muet. Aucun n'est visible en lisant le code ; les trois
+sautent aux yeux sur une capture.
+
+C'est la leçon de D98, et elle se vérifie à chaque lot d'interface : **un effet d'interface ne se
+raisonne pas, il se regarde.**
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-trip.ts` — les règles, et leurs raisons, en tête de fichier.
+- `apps/mobile/src/components/publish/number-stepper.tsx` — pourquoi un pas-à-pas et pas un curseur.
+- `apps/mobile/src/lib/publish-payload.spec.ts` — ce que le serveur reçoit, ligne à ligne.
+- Registre, entrée **D111** — la décision, ses exceptions et ses dettes nommées.
