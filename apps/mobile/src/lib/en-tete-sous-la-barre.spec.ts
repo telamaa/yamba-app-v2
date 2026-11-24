@@ -89,12 +89,25 @@ describe('le hook branche les deux sources, et n’en invente pas une troisième
 });
 
 describe('les écrans poussés de l’éditeur l’utilisent', () => {
+  /**
+   * La page VILLE a changé d'adresse (lot « Publier ») : son geste vit
+   * maintenant dans `components/city-picker.tsx`, que DEUX routes consomment
+   * — la recherche et la publication. Les règles de bord haut s'y vérifient
+   * donc une fois pour les deux, et la ROUTE reste vérifiée pour ce qui lui
+   * revient : passer le plancher au composant.
+   */
   const ecrans = [
-    ['ville', join(SRC, 'app/search/city.tsx')],
+    ['ville', join(SRC, 'components/city-picker.tsx')],
     ['date', join(SRC, 'app/search/date.tsx')],
   ] as const;
 
-  it.each(ecrans)('%s consomme le plancher', (_nom, chemin) => {
+  const routes = [
+    ['ville (recherche)', join(SRC, 'app/search/city.tsx')],
+    ['ville (publication)', join(SRC, 'app/publish-trip/city.tsx')],
+    ['date', join(SRC, 'app/search/date.tsx')],
+  ] as const;
+
+  it.each(routes)('%s consomme le plancher', (_nom, chemin) => {
     expect(readFileSync(chemin, 'utf8')).toContain('useTopInset()');
   });
 

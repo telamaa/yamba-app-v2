@@ -111,14 +111,20 @@ describe('2A — la grille revient sur la période choisie', () => {
 });
 
 describe('3A — l’écran ville offre une issue VISIBLE', () => {
-  const ecran = readFileSync(join(SRC, 'app/search/city.tsx'), 'utf8');
+  // Le geste de la page ville vit dans `components/city-picker.tsx` depuis le
+  // lot « Publier » : la recherche et la publication le partagent, donc la
+  // règle se vérifie là où elle est écrite — une fois, pour les deux.
+  const ecran = readFileSync(join(SRC, 'components/city-picker.tsx'), 'utf8');
+  const route = readFileSync(join(SRC, 'app/search/city.tsx'), 'utf8');
 
   it('l’état vide propose d’utiliser ce qui a été tapé', () => {
     // La sortie existait : la touche « rechercher » du clavier
     // (`onSubmitEditing`). Une issue qui n'existe que sur une touche n'est
     // pas une issue — c'est un raccourci pour qui la connaît déjà.
-    expect(ecran).toContain("t('city.useTyped'");
-    expect(ecran).toMatch(/onPress=\{\(\) => commit\(query\)\}/);
+    expect(ecran).toContain('textes.useTyped(');
+    expect(ecran).toMatch(/onPress=\{\(\) => commitTexte\(query\)\}/);
+    // Et la route fournit bien la phrase, dans sa langue.
+    expect(route).toContain("t('city.useTyped'");
   });
 
   it('elle vit DANS l’état vide, pas ailleurs', () => {
@@ -126,14 +132,16 @@ describe('3A — l’écran ville offre une issue VISIBLE', () => {
     expect(vide).toBeGreaterThanOrEqual(0);
     const fin = ecran.indexOf('renderItem=', vide);
     expect(fin).toBeGreaterThan(vide);
-    expect(ecran.slice(vide, fin)).toContain('city.useTyped');
+    expect(ecran.slice(vide, fin)).toContain('textes.useTyped');
   });
 
   it('les deux messages distincts sont conservés', () => {
     // « aucune ville » parle de la SAISIE, « indisponibles » parle du
     // SERVICE : les confondre fait dire à l'écran que Paris n'existe pas.
-    expect(ecran).toContain("t('city.noResult')");
-    expect(ecran).toContain("t('city.unavailable')");
+    expect(ecran).toContain('textes.noResult');
+    expect(ecran).toContain('textes.unavailable');
+    expect(route).toContain("t('city.noResult')");
+    expect(route).toContain("t('city.unavailable')");
   });
 
   it('la clé existe dans les DEUX dictionnaires et porte la ville', () => {
