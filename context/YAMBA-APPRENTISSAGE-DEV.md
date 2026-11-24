@@ -10930,7 +10930,12 @@ const prix = draft.prixParKiloEur ?? 10;   // ← affiché
 À l'écran : « 10,00 €/kg », une barre qui dit « ton gain s'affichera ici », et un bouton qui
 reproche « fixe ton prix au kilo » **sous un prix affiché**. Le défaut est connu de ce dépôt sous le
 nom de D99 3C (« un contrôle qui affiche une valeur qu'il n'applique pas est pire qu'un contrôle
-vide ») — et il a été recommis dans l'écran dont l'en-tête le cite. Le site a exactement le même.
+vide ») — et il a été recommis dans l'écran dont l'en-tête le cite.
+
+> **Rectification du 25/11.** Ce chapitre affirmait que « le site a exactement le même » défaut.
+> Vérification faite dans `StepConditions.tsx`, c'est faux : il écrit la médiane suggérée dans son
+> brouillon au montage. Le site avait raison depuis le début, et le correctif ci-dessous ne fait que
+> le rejoindre. La leçon tient quand même — mais elle n'a qu'un coupable, et ce n'est pas le site.
 
 La correction tient en un effet au montage :
 

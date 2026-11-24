@@ -174,6 +174,15 @@ export function memeFlexibilite(
  * laisse les champs géographiques nuls : ce que le client ne SAIT pas, il ne
  * l'invente pas.
  */
+/** Ce que `POST /trips/:id/documents` attend — rendu par le téléversement. */
+export type DocumentDuBillet = {
+  url: string;
+  fileId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number | null;
+};
+
 export type VilleChoisie = {
   /** « Paris » — c'est ce champ que le serveur exige (`originCity`). */
   ville: string;
@@ -202,6 +211,10 @@ export type PublishDraft = {
 
   /** La référence du billet (optionnelle) — elle ouvre le badge « Voyage vérifié ». */
   reference: string;
+  /** Le billet déjà TÉLÉVERSÉ (ImageKit), prêt à être attaché au trajet.
+   *  Il est envoyé dès qu'il est choisi, pas au moment de publier : un échec
+   *  d'image doit se voir quand on l'ajoute, pas sous le bouton « Publier ». */
+  billet: DocumentDuBillet | null;
 
   /* ── Conditions (lot suivant) ── */
   prixParKiloEur: number | null;
@@ -386,10 +399,14 @@ function memeVille(a: string, b: string): boolean {
  * EXACTEMENT une fois : un manque oublié ne bloquerait nulle part et
  * referait surface à la publication, c'est-à-dire trop tard.
  */
-export const MANQUES_PAR_ECRAN: Record<1 | 2 | 3, readonly Manque[]> = {
-  1: ['mode', 'sousType', 'escales'],
-  2: ['depart', 'arrivee', 'memeVille'],
-  3: [
+export const MANQUES_PAR_ECRAN: Record<1 | 2, readonly Manque[]> = {
+  // ① « Ton voyage » — le mode, son type, et les deux villes. Les écrans ①
+  // et ② d'origine ont FUSIONNÉ : trois taps d'un côté, deux lignes de
+  // l'autre, et les deux tiers de chaque écran vides. Du blanc est une
+  // respiration quand la décision est lourde ; ici elle ne l'était pas.
+  1: ['mode', 'sousType', 'escales', 'depart', 'arrivee', 'memeVille'],
+  // ② « Quand pars-tu ? »
+  2: [
     'dateDepart',
     'dateDepartPassee',
     'heureDepart',
@@ -401,7 +418,7 @@ export const MANQUES_PAR_ECRAN: Record<1 | 2 | 3, readonly Manque[]> = {
 
 /** Les manques que CET écran a le droit de reprocher, dans l'ordre. */
 export function manquesDeLEcran(
-  ecran: 1 | 2 | 3,
+  ecran: 1 | 2,
   draft: PublishDraft,
   maintenant: Date
 ): Manque[] {
@@ -444,21 +461,64 @@ export function manquesDuTunnel(draft: PublishDraft, maintenant: Date): (Manque 
   return [...manquesVoyage(draft, maintenant), ...manquesLieux(draft)];
 }
 
+/**
+ * LE RETOUR, préparé depuis l'aller.
+ *
+ * Le site propose « Aller-retour » et ne crée jamais le second trajet (son
+ * mapper envoie `returnDepartureAt: null` dans les deux cas) : le Voyageur
+ * croit avoir annoncé son retour, et aucun Expéditeur ne le trouvera. Plutôt
+ * que de transposer ce mensonge, le tunnel propose le retour APRÈS la
+ * publication — et il le publie pour de vrai, comme un second trajet.
+ *
+ * Ce qui s'inverse : les deux villes, et les deux listes de lieux. Un lieu de
+ * REMISE était à Paris, il devient un lieu de LIVRAISON à Paris : c'est la
+ * même gare, le même terminal, le même café — seul le sens de l'échange
+ * change. Ne pas les inverser ferait proposer l'aéroport de départ comme
+ * point de récupération à l'arrivée.
+ *
+ * Ce qui se garde : le mode, le type, les villes traversées, le prix, la
+ * capacité, les familles, les forfaits, les options et le mot. C'est tout
+ * l'intérêt : il ne reste QUE les dates à poser.
+ *
+ * Ce qui s'efface : les dates, les heures, et la référence du billet — un
+ * retour est un autre billet.
+ */
+export function preparerLeRetour(aller: PublishDraft): PublishDraft {
+  return {
+    ...aller,
+    depart: aller.arrivee,
+    arrivee: aller.depart,
+    lieuxRemise: aller.lieuxLivraison,
+    lieuxLivraison: aller.lieuxRemise,
+    dateDepart: null,
+    heureDepart: '',
+    dateArrivee: null,
+    heureArrivee: '',
+    reference: '',
+    billet: null,
+  };
+}
+
+/** Un retour n'a de sens que si l'aller portait ses deux villes. */
+export function retourPossible(aller: PublishDraft): boolean {
+  return aller.depart !== null && aller.arrivee !== null;
+}
+
 /* ── Les trois phases annoncées ────────────────────────────────────────── */
 
 /**
- * Le tunnel compte SEPT écrans et n'en annonce JAMAIS le nombre — l'arbitrage
+ * Le tunnel compte SIX écrans et n'en annonce JAMAIS le nombre — l'arbitrage
  * du parcours de réservation (A213), pour la même raison : « étape 1 sur 7 »
  * lu avant d'avoir rien saisi est un départ. Il annonce les TROIS phases du
  * site, mot pour mot, et la jauge avance à chaque écran.
  */
 export const PHASES_PUBLICATION = [
-  { cle: 'trip', dernierEcran: 3 },
-  { cle: 'conditions', dernierEcran: 6 },
-  { cle: 'review', dernierEcran: 7 },
+  { cle: 'trip', dernierEcran: 2 },
+  { cle: 'conditions', dernierEcran: 5 },
+  { cle: 'review', dernierEcran: 6 },
 ] as const;
 
-export const ECRANS_PUBLICATION = 7;
+export const ECRANS_PUBLICATION = 6;
 
 export function phaseDeLEcran(ecran: number): { cle: string; rang: number } {
   const rang = PHASES_PUBLICATION.findIndex((phase) => ecran <= phase.dernierEcran);

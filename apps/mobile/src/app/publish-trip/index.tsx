@@ -1,20 +1,25 @@
 /**
- * publish-trip/index.tsx — ① COMMENT VOYAGES-TU ? (phase « Trajet »)
- * ==============================================================
- * Le site pose cette question dans un formulaire qui en pose six autres en
- * même temps (mode, type d'annonce, itinéraire, dates, horaires, justificatif
- * — capture du 21/11). Sur un téléphone, un formulaire long cache son bouton
- * et ses erreurs : une question par écran (règle « one thing per page »), et
- * celle-ci vient en premier parce qu'elle COMMANDE la suite — le mode décide
- * des lieux d'échange proposés à l'étape ⑥.
+ * publish-trip/index.tsx — ① TON VOYAGE (phase « Trajet »)
+ * =========================================================
+ * Le mode, son type, et les deux villes — sur UN écran.
+ *
+ * POURQUOI LA FUSION (retour de revue du 25/11). Les deux écrans d'origine
+ * demandaient l'un trois taps, l'autre deux lignes, et laissaient chacun les
+ * deux tiers de la hauteur vides. Du blanc est une respiration **quand la
+ * décision est lourde** ; ici elle ne l'était pas — c'était juste du vide.
+ * Réunis, ils forment UN objet (« ton voyage »), le tunnel passe de sept
+ * écrans à six, et la règle « une question par écran » est respectée : la
+ * question est « quel voyage ? », pas « quel mode ? » puis « quelles villes ? ».
+ *
+ * L'ORDRE INTERNE N'EST PAS LIBRE : le mode vient en premier parce qu'il
+ * décide des lieux d'échange proposés à l'étape ⑤ (`choisirMode` les pose).
  *
  * « Aller simple / Aller-retour » du site n'est PAS repris, et c'est une
- * décision, pas un oubli : le mapper web envoie `returnDepartureAt: null`
- * dans les deux cas et aucun second trajet n'est créé — « Aller-retour »
- * n'ajoute qu'un mot sur la fiche du Voyageur, jamais un trajet que les
- * Expéditeurs peuvent trouver. Un contrôle qui affirme ce que le produit ne
- * fait pas est le défaut de D100 ; on ne le transpose pas. Le retour se
- * publiera comme un second trajet, ou comme une vraie fonction serveur.
+ * décision : le mapper web envoie `returnDepartureAt: null` dans les deux cas
+ * et ne crée aucun second trajet — le choix n'ajoute qu'un mot sur la fiche
+ * du Voyageur. Un contrôle qui affirme ce que le produit ne fait pas est le
+ * défaut de D100. Le retour se publie désormais pour de vrai, en un geste,
+ * depuis l'écran de fin (`publish-trip/done`).
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -34,6 +39,7 @@ import {
   demandeDesEscales,
   manquesDeLEcran,
   type TransportMode,
+  type VilleChoisie,
 } from '@/lib/publish-trip';
 
 const ICONES: Record<TransportMode, keyof typeof Ionicons.glyphMap> = {
@@ -42,7 +48,7 @@ const ICONES: Record<TransportMode, keyof typeof Ionicons.glyphMap> = {
   CAR: 'car-outline',
 };
 
-export default function PublishModeScreen() {
+export default function PublishTripScreen() {
   const t = useTranslations('publish');
   const theme = useTheme();
   const draft = usePublishDraft();
@@ -56,8 +62,12 @@ export default function PublishModeScreen() {
       return;
     }
     setMontreLesManques(false);
-    router.push('/publish-trip/route');
+    router.push('/publish-trip/when');
   }, [manques.length]);
+
+  const inverser = useCallback(() => {
+    setPublishDraft({ depart: draft.arrivee, arrivee: draft.depart });
+  }, [draft.depart, draft.arrivee]);
 
   const route =
     draft.depart !== null && draft.arrivee !== null
@@ -95,13 +105,9 @@ export default function PublishModeScreen() {
                 color={choisi ? Brand.mango : theme.textSecondary}
               />
               <ThemedText type="smallBold">{t(`mode.${mode}`)}</ThemedText>
-              {/* La conséquence du choix, écrite SUR le choix. Le sous-titre
-                  annonce que le mode décide des lieux d'échange ; une carte
-                  qui ne dit pas LESQUELS oblige à choisir pour savoir. */}
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={styles.modeHint}>
+              {/* La conséquence du choix, écrite SUR le choix : le mode décide
+                  des lieux d'échange qu'on proposera à l'étape ⑤. */}
+              <ThemedText type="small" themeColor="textSecondary" style={styles.modeHint}>
                 {t(`mode.${mode}_hint`)}
               </ThemedText>
             </Pressable>
@@ -109,9 +115,9 @@ export default function PublishModeScreen() {
         })}
       </View>
 
-      {/* Le sous-type n'apparaît qu'une fois le mode choisi : il n'a aucun
-          sens avant, et trois paires de pastilles affichées d'avance feraient
-          lire un écran deux fois plus long qu'il n'est. */}
+      {/* Le sous-type n'apparaît qu'une fois le mode choisi : il n'a aucun sens
+          avant, et trois paires de pastilles affichées d'avance feraient lire
+          un écran deux fois plus long qu'il n'est. */}
       {draft.mode !== null ? (
         <View style={styles.group}>
           <ThemedText type="smallBold" themeColor="textSecondary">
@@ -150,10 +156,7 @@ export default function PublishModeScreen() {
             {t('mode.stopsTitle')}
           </ThemedText>
           <TextInput
-            style={[
-              styles.input,
-              { color: theme.text, borderColor: theme.backgroundElement },
-            ]}
+            style={[styles.input, { color: theme.text, borderColor: theme.backgroundElement }]}
             value={draft.escales}
             onChangeText={(escales) => setPublishDraft({ escales })}
             placeholder={t('mode.stopsPlaceholder')}
@@ -165,6 +168,38 @@ export default function PublishModeScreen() {
             {t('mode.stopsHint')}
           </ThemedText>
         </View>
+      ) : null}
+
+      {/* Les deux villes. Chacune est une LIGNE pleine largeur qui ouvre la
+          page de saisie — au pouce, deux champs côte à côte donnent deux
+          cibles de 140 px et un bouton d'inversion de 32 px entre elles. */}
+      <View style={[styles.card, { borderColor: theme.backgroundElement }]}>
+        <Ligne
+          label={t('route.from')}
+          placeholder={t('route.fromPlaceholder')}
+          valeur={draft.depart}
+          onPressAction={() => router.push('/publish-trip/city?field=from')}
+        />
+        <View style={[styles.hairline, { backgroundColor: theme.backgroundElement }]} />
+        <Ligne
+          label={t('route.to')}
+          placeholder={t('route.toPlaceholder')}
+          valeur={draft.arrivee}
+          onPressAction={() => router.push('/publish-trip/city?field=to')}
+        />
+      </View>
+
+      {draft.depart !== null || draft.arrivee !== null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('route.swap')}
+          onPress={inverser}
+          style={({ pressed }) => [styles.swap, pressed && styles.pressed]}>
+          <Ionicons name="swap-vertical" size={16} color={theme.textSecondary} />
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('route.swap')}
+          </ThemedText>
+        </Pressable>
       ) : null}
 
       {/* Le bouton reste ACTIF quand l'étape est incomplète (A209) : au tap,
@@ -183,6 +218,44 @@ export default function PublishModeScreen() {
       ) : null}
     </PublishStepFrame>
   );
+
+  function Ligne({
+    label,
+    placeholder,
+    valeur,
+    onPressAction,
+  }: {
+    label: string;
+    placeholder: string;
+    valeur: VilleChoisie | null;
+    onPressAction: () => void;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label} : ${valeur?.libelle ?? placeholder}`}
+        onPress={onPressAction}
+        style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
+        <Ionicons name="location-outline" size={18} color={theme.textSecondary} />
+        <View style={styles.rowTexts}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {label}
+          </ThemedText>
+          {valeur === null ? (
+            // D103 5A — un marque-place ne se met jamais au poids de la valeur.
+            <ThemedText type="small" themeColor="textSecondary">
+              {placeholder}
+            </ThemedText>
+          ) : (
+            <ThemedText type="smallBold" numberOfLines={1}>
+              {valeur.libelle}
+            </ThemedText>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.backgroundSelected} />
+      </Pressable>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
@@ -224,6 +297,33 @@ const styles = StyleSheet.create({
     minHeight: 48,
     fontSize: 15,
   },
+  card: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.four,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.four,
+    minHeight: 64,
+  },
+  rowTexts: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+  },
+  swap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+    marginTop: -Spacing.three,
+  },
   manques: {
     gap: Spacing.one,
   },
@@ -231,5 +331,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

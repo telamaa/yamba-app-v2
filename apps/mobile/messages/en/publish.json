@@ -25,7 +25,7 @@
     "route": "{from} → {to}"
   },
   "mode": {
-    "title": "How do you travel?",
+    "title": "Your trip",
     "PLANE": "Plane",
     "TRAIN": "Train",
     "CAR": "Car",
@@ -65,11 +65,7 @@
     "arrivalDate": "Arrival date",
     "arrivalTime": "Arrival time",
     "sameDay": "Same day",
-    "nextDay": "Next day",
-    "referenceTitle": "Ticket reference",
-    "referenceOptional": "optional",
-    "referenceHint": "It unlocks the “Verified trip” badge.",
-    "referencePlaceholder": "AF1234"
+    "nextDay": "Next day"
   },
   "city": {
     "clear": "Clear",
@@ -195,5 +191,32 @@
     "forfaitCabine": "Cabin-bag rate is 0",
     "lieuRemise": "Offer a pickup place",
     "lieuLivraison": "Offer a delivery place"
+  },
+  "done": {
+    "title": "Your trip is live",
+    "route": "{from} → {to}",
+    "returnTitle": "And the way back?",
+    "returnBody": "Same kilos, same conditions. Only the dates are left.",
+    "returnCta": "Publish the return",
+    "viewCta": "See my trip",
+    "doneCta": "Done"
+  },
+  "ticket": {
+    "title": "Your ticket",
+    "optional": "optional",
+    "hint": "It unlocks the “Verified trip” badge.",
+    "referenceLabel": "Reference",
+    "referencePlaceholder": "AF1234",
+    "add": "Add a photo",
+    "added": "Ticket added",
+    "replace": "Replace",
+    "remove": "Remove",
+    "uploading": "Uploading…",
+    "errorINVALID_TYPE": "Image format not accepted.",
+    "errorTOO_LARGE": "Image too large ({max, number} MB max).",
+    "errorFAILED": "Upload failed. Try again.",
+    "permissionTitle": "Photo access",
+    "permissionBody": "Allow access to pick your ticket.",
+    "notAttached": "Your ticket could not be attached."
   }
 }

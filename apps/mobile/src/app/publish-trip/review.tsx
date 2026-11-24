@@ -1,5 +1,5 @@
 /**
- * publish-trip/review.tsx — ⑦ VÉRIFIE ET PUBLIE (phase « Vérification »)
+ * publish-trip/review.tsx — ⑥ VÉRIFIE ET PUBLIE (phase « Vérification »)
  * =======================================================================
  * Le dernier écran, et le seul qui ÉCRIVE quelque part. Il porte quatre
  * résumés, trois options, et le geste qui engage.
@@ -23,12 +23,14 @@
  *    il les affiche.
  *
  * ④ Le brouillon n'est effacé qu'APRÈS un succès. Un échec réseau au dernier
- *    geste ne doit pas rendre sept écrans de saisie.
+ *    geste ne doit pas rendre six écrans de saisie.
  */
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { useLocale, useTranslations } from 'use-intl';
 
@@ -39,10 +41,16 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
-import { publierLeTrajet } from '@/lib/api/publish.api';
+import { attacherLeBillet, publierLeTrajet } from '@/lib/api/publish.api';
+import { PHOTO_MAX_MB, uploadTripTicket, type UploadFailureCode } from '@/lib/api/upload.api';
 import { intlTagFor } from '@/lib/number-format';
 import { formatAmountFromCents } from '@/lib/pricing-example';
-import { clearPublishDraft, setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import {
+  clearPublishDraft,
+  memoriserLeRetour,
+  setPublishDraft,
+  usePublishDraft,
+} from '@/lib/publish-draft';
 import { construireCorps } from '@/lib/publish-payload';
 import { gainSiToutPartCents, manquesOffre } from '@/lib/publish-pricing';
 import { FAMILLES, manquesDuTunnel } from '@/lib/publish-trip';
@@ -61,6 +69,8 @@ export default function PublishReviewScreen() {
 
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [refus, setRefus] = useState<string | null>(null);
+  const [envoiDuBillet, setEnvoiDuBillet] = useState(false);
+  const [erreurDuBillet, setErreurDuBillet] = useState<UploadFailureCode | null>(null);
   const [montreLesManques, setMontreLesManques] = useState(false);
 
   /**
@@ -77,6 +87,37 @@ export default function PublishReviewScreen() {
   const refusees = FAMILLES.filter((f) => draft.familles[f].mode === 'REFUSE');
   const surtaxees = FAMILLES.filter((f) => draft.familles[f].mode === 'SURCHARGE');
 
+  /**
+   * Le billet part dès qu'il est choisi, PAS au moment de publier.
+   *
+   * Un échec d'image doit se voir là où on l'ajoute — sous le bouton
+   * « Publier », il obligerait à choisir entre publier sans billet et tout
+   * reprendre. Ici, il suffit d'en choisir un autre.
+   */
+  const choisirLeBillet = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(t('ticket.permissionTitle'), t('ticket.permissionBody'));
+      return;
+    }
+    const choix = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (choix.canceled) return;
+    const asset = choix.assets[0];
+    if (!asset) return;
+
+    setErreurDuBillet(null);
+    setEnvoiDuBillet(true);
+    const resultat = await uploadTripTicket({
+      uri: asset.uri,
+      mimeType: asset.mimeType ?? null,
+      fileName: asset.fileName ?? null,
+      sizeBytes: asset.fileSize ?? null,
+    });
+    setEnvoiDuBillet(false);
+    if (resultat.ok) setPublishDraft({ billet: resultat.document });
+    else setErreurDuBillet(resultat.code);
+  }, [t]);
+
   const publier = useCallback(async () => {
     if (manques.length > 0) {
       setMontreLesManques(true);
@@ -87,10 +128,21 @@ export default function PublishReviewScreen() {
     setRefus(null);
     try {
       const trajet = await publierLeTrajet(construireCorps(draft, true));
-      // L'ordre compte : on efface APRÈS le succès, et on REMPLACE l'écran —
-      // revenir en arrière sur un tunnel terminé n'a aucun sens.
+      // L'ordre compte. On MÉMORISE le retour (villes et lieux inversés) avant
+      // d'effacer le brouillon — sans quoi l'écran de fin n'aurait plus rien à
+      // proposer ; on efface APRÈS le succès ; et on REMPLACE l'écran, parce
+      // que revenir en arrière sur un tunnel terminé n'a aucun sens.
+      // Le billet s'attache APRÈS : le serveur le range sous l'id du trajet.
+      // Un échec ici laisse un trajet EN LIGNE sans badge — c'est le bon sens
+      // de l'échec, et l'écran de fin le DIT plutôt que de le taire.
+      const billetJoint =
+        draft.billet === null ? null : await attacherLeBillet(trajet.id, draft.billet);
+      memoriserLeRetour(draft);
       clearPublishDraft();
-      router.replace({ pathname: '/trip/[id]', params: { id: trajet.id } });
+      router.replace({
+        pathname: '/publish-trip/done',
+        params: { id: trajet.id, ...(billetJoint === false ? { billet: 'ko' } : {}) },
+      });
     } catch (erreur) {
       const code = erreur instanceof ApiError ? erreur.code : null;
       setRefus(code !== null && (CODES_CONNUS as readonly string[]).includes(code) ? code : null);
@@ -101,7 +153,7 @@ export default function PublishReviewScreen() {
   return (
     <PublishStepFrame
       title={t('review.title')}
-      step={7}
+      step={6}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }
@@ -238,6 +290,75 @@ export default function PublishReviewScreen() {
             .join(' · ') || '—'}
         </ThemedText>
       </Bloc>
+
+      {/* LE BILLET — déplacé ici depuis l'écran des dates (revue du 25/11).
+          Il y vivait en bas, facultatif, facile à sauter, alors qu'il débloque
+          le badge « Voyage vérifié », donc des réservations. Sa place est à
+          côté de « Publier », quand le Voyageur est déjà engagé. */}
+      <View style={styles.group}>
+        <View style={styles.titreAvecMention}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            {t('ticket.title')}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('ticket.optional')}
+          </ThemedText>
+        </View>
+        <View style={[styles.bloc, { borderColor: theme.backgroundElement }]}>
+          <TextInput
+            style={[styles.reference, { color: theme.text, borderColor: theme.backgroundElement }]}
+            value={draft.reference}
+            onChangeText={(reference) => setPublishDraft({ reference })}
+            placeholder={t('ticket.referencePlaceholder')}
+            placeholderTextColor={theme.textSecondary}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            accessibilityLabel={t('ticket.referenceLabel')}
+          />
+
+          {draft.billet !== null ? (
+            <View style={styles.billet}>
+              <Image source={{ uri: draft.billet.url }} style={styles.vignette} contentFit="cover" />
+              <ThemedText type="small" style={styles.billetTexte}>
+                {t('ticket.added')}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPublishDraft({ billet: null })}
+                hitSlop={8}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  {t('ticket.remove')}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={envoiDuBillet}
+              onPress={() => void choisirLeBillet()}
+              style={({ pressed }) => [styles.ajouter, pressed && styles.pressed]}>
+              {envoiDuBillet ? (
+                <ActivityIndicator size="small" color={Brand.mango} />
+              ) : (
+                <Ionicons name="image-outline" size={18} color={Brand.mango} />
+              )}
+              <ThemedText type="smallBold" style={{ color: Brand.mango }}>
+                {envoiDuBillet ? t('ticket.uploading') : t('ticket.add')}
+              </ThemedText>
+            </Pressable>
+          )}
+
+          {erreurDuBillet !== null ? (
+            <ThemedText type="small" style={{ color: Brand.mango }}>
+              {t(`ticket.error${erreurDuBillet}`, { max: PHOTO_MAX_MB })}
+            </ThemedText>
+          ) : null}
+
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('ticket.hint')}
+          </ThemedText>
+        </View>
+      </View>
 
       <View style={styles.group}>
         <ThemedText type="smallBold" themeColor="textSecondary">
@@ -406,6 +527,37 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 2,
+  },
+  reference: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    minHeight: 48,
+    fontSize: 15,
+  },
+  ajouter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+  },
+  billet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    minHeight: 44,
+  },
+  vignette: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  billetTexte: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   notes: {
     borderWidth: 1,

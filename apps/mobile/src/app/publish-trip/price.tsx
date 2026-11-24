@@ -1,5 +1,5 @@
 /**
- * publish-trip/price.tsx — ④ TON PRIX ET TES KILOS (phase « Conditions »)
+ * publish-trip/price.tsx — ③ TON PRIX ET TES KILOS (phase « Conditions »)
  * ========================================================================
  * L'écran qui décide du revenu. Il tient en deux réglages et une promesse :
  * ce que tu annonces est ce que tu touches (D16 — le prix du Voyageur EST
@@ -76,9 +76,12 @@ export default function PublishPriceScreen() {
    * pas —, commis dans l'écran dont l'en-tête le cite. Vu au simulateur, pas
    * déduit : un effet d'interface se REGARDE (D98).
    *
-   * Le site a d'ailleurs exactement le même défaut (son curseur affiche la
-   * médiane suggérée tandis que `pricePerKg` vaut `""`), et c'est pour cela
-   * que son étape 2 refuse d'avancer en nommant un prix qu'on voit.
+   * CORRECTION DU 25/11 — j'avais écrit ici que « le site a exactement le
+   * même défaut ». C'est FAUX, vérifié dans son code : `StepConditions.tsx`
+   * écrit la médiane suggérée DANS le brouillon au montage (« D15 : la
+   * suggestion guide, le Voyageur ajuste »). Le site avait raison, le défaut
+   * était ici seul, et le correctif ci-dessous ne fait que rejoindre ce
+   * qu'il faisait déjà.
    *
    * Écrire d'office n'est pas décider à la place : le septième écran REDIT
    * le prix et la capacité avant de publier.
@@ -113,7 +116,7 @@ export default function PublishPriceScreen() {
     <PublishStepFrame
       title={t('price.title')}
       subtitle={t('price.subtitle')}
-      step={4}
+      step={3}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }

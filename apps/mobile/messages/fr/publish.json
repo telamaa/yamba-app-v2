@@ -25,7 +25,7 @@
     "route": "{from} → {to}"
   },
   "mode": {
-    "title": "Comment voyages‑tu ?",
+    "title": "Ton voyage",
     "PLANE": "Avion",
     "TRAIN": "Train",
     "CAR": "Voiture",
@@ -65,11 +65,7 @@
     "arrivalDate": "Date d'arrivée",
     "arrivalTime": "Heure d'arrivée",
     "sameDay": "Le jour même",
-    "nextDay": "Le lendemain",
-    "referenceTitle": "Référence du billet",
-    "referenceOptional": "facultatif",
-    "referenceHint": "Elle débloque le badge « Voyage vérifié ».",
-    "referencePlaceholder": "AF1234"
+    "nextDay": "Le lendemain"
   },
   "city": {
     "clear": "Effacer",
@@ -195,5 +191,32 @@
     "forfaitCabine": "Forfait cabine à 0",
     "lieuRemise": "Propose un lieu de remise",
     "lieuLivraison": "Propose un lieu de livraison"
+  },
+  "done": {
+    "title": "Ton trajet est en ligne",
+    "route": "{from} → {to}",
+    "returnTitle": "Et le retour ?",
+    "returnBody": "Mêmes kilos, mêmes conditions. Il ne reste que les dates.",
+    "returnCta": "Publier le retour",
+    "viewCta": "Voir mon trajet",
+    "doneCta": "Terminer"
+  },
+  "ticket": {
+    "title": "Ton billet",
+    "optional": "facultatif",
+    "hint": "Il débloque le badge « Voyage vérifié ».",
+    "referenceLabel": "Référence",
+    "referencePlaceholder": "AF1234",
+    "add": "Ajouter une photo",
+    "added": "Billet ajouté",
+    "replace": "Remplacer",
+    "remove": "Retirer",
+    "uploading": "Envoi…",
+    "errorINVALID_TYPE": "Format d'image non accepté.",
+    "errorTOO_LARGE": "Image trop lourde ({max, number} Mo max).",
+    "errorFAILED": "L'envoi a échoué. Réessaie.",
+    "permissionTitle": "Accès aux photos",
+    "permissionBody": "Autorise l'accès pour choisir ton billet.",
+    "notAttached": "Ton billet n'a pas pu être joint."
   }
 }

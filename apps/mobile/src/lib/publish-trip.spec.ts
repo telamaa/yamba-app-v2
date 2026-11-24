@@ -29,6 +29,8 @@ import {
   memeFlexibilite,
   MODES,
   PHASES_PUBLICATION,
+  preparerLeRetour,
+  retourPossible,
   SOUS_TYPES,
   dateDepartParDefaut,
   dateIso,
@@ -77,6 +79,7 @@ function brouillonVide(): PublishDraft {
     dateArrivee: null,
     heureArrivee: '',
     reference: '',
+    billet: null,
     prixParKiloEur: null,
     capaciteKg: null,
     forfaitSouteEur: null,
@@ -353,11 +356,7 @@ describe('⑥ ce qui manque est nommé, et nommé AU BON ÉCRAN', () => {
     // surface au moment de publier — c'est-à-dire trop tard, après sept
     // écrans. Un manque présent deux fois serait reproché sur un écran où
     // le champ n'est même pas visible.
-    const repartis = [
-      ...MANQUES_PAR_ECRAN[1],
-      ...MANQUES_PAR_ECRAN[2],
-      ...MANQUES_PAR_ECRAN[3],
-    ];
+    const repartis = [...MANQUES_PAR_ECRAN[1], ...MANQUES_PAR_ECRAN[2]];
     const tous: Manque[] = [
       'mode',
       'sousType',
@@ -378,9 +377,9 @@ describe('⑥ ce qui manque est nommé, et nommé AU BON ÉCRAN', () => {
 
   it('un écran ne reproche QUE ses propres champs', () => {
     const vide = brouillonVide();
-    expect(manquesDeLEcran(1, vide, unSoir)).toEqual(['mode']);
-    expect(manquesDeLEcran(2, vide, unSoir)).toEqual(['depart', 'arrivee']);
-    expect(manquesDeLEcran(3, vide, unSoir)).toEqual([
+    // ① « Ton voyage » réunit le mode ET les villes depuis la fusion du 25/11.
+    expect(manquesDeLEcran(1, vide, unSoir)).toEqual(['mode', 'depart', 'arrivee']);
+    expect(manquesDeLEcran(2, vide, unSoir)).toEqual([
       'dateDepart',
       'heureDepart',
       'dateArrivee',
@@ -396,10 +395,10 @@ describe('⑦ les phases annoncées', () => {
 
   it('chaque écran tombe dans une phase, et la dernière attrape les débordements', () => {
     expect(phaseDeLEcran(1).cle).toBe('trip');
-    expect(phaseDeLEcran(3).cle).toBe('trip');
-    expect(phaseDeLEcran(4).cle).toBe('conditions');
-    expect(phaseDeLEcran(6).cle).toBe('conditions');
-    expect(phaseDeLEcran(7).cle).toBe('review');
+    expect(phaseDeLEcran(2).cle).toBe('trip');
+    expect(phaseDeLEcran(3).cle).toBe('conditions');
+    expect(phaseDeLEcran(5).cle).toBe('conditions');
+    expect(phaseDeLEcran(6).cle).toBe('review');
     // Un écran ajouté demain sans toucher la table ne doit pas rendre `-1`.
     expect(phaseDeLEcran(99).cle).toBe('review');
   });
@@ -513,5 +512,79 @@ describe('⑩ le dernier écran voit TOUT ce qui manque', () => {
       lieuxLivraison: lieux,
     };
     expect(manquesDuTunnel(complet, unSoir)).toEqual([]);
+  });
+});
+
+describe('⑪ le retour, préparé depuis l’aller', () => {
+  function aller(): PublishDraft {
+    const lieuxParis = lieuxParDefaut('PLANE').map((l) => ({ ...l, details: 'T2E' }));
+    const lieuxBerlin = lieuxParDefaut('PLANE').map((l) => ({ ...l, details: 'BER T1' }));
+    return {
+      ...brouillonVide(),
+      mode: 'PLANE',
+      sousType: 'WITH_LAYOVER',
+      escales: 'Vienne',
+      depart: ville('Paris'),
+      arrivee: ville('Berlin'),
+      dateDepart: '2026-11-28',
+      heureDepart: '10:00',
+      dateArrivee: '2026-11-28',
+      heureArrivee: '13:12',
+      reference: 'AF1234',
+      billet: { url: 'u', fileId: 'f', name: 'n', mimeType: 'image/jpeg', sizeBytes: 10 },
+      prixParKiloEur: 10,
+      capaciteKg: 12,
+      lieuxRemise: lieuxParis,
+      lieuxLivraison: lieuxBerlin,
+      notes: 'Je réponds vite.',
+    };
+  }
+
+  it('les deux villes sont inversées', () => {
+    const retour = preparerLeRetour(aller());
+    expect(retour.depart?.ville).toBe('Berlin');
+    expect(retour.arrivee?.ville).toBe('Paris');
+  });
+
+  it('les LIEUX suivent les villes — sinon on propose l’aéroport de départ à l’arrivée', () => {
+    // Un lieu de REMISE à Paris devient un lieu de LIVRAISON à Paris : même
+    // terminal, autre sens de l'échange. C'est l'inversion la plus facile à
+    // oublier, et la plus fausse si on l'oublie.
+    const retour = preparerLeRetour(aller());
+    expect(retour.lieuxRemise[0].details).toBe('BER T1');
+    expect(retour.lieuxLivraison[0].details).toBe('T2E');
+  });
+
+  it('ce qui fait l’intérêt du geste est GARDÉ : prix, capacité, conditions, mode', () => {
+    const retour = preparerLeRetour(aller());
+    expect(retour.prixParKiloEur).toBe(10);
+    expect(retour.capaciteKg).toBe(12);
+    expect(retour.mode).toBe('PLANE');
+    expect(retour.sousType).toBe('WITH_LAYOVER');
+    expect(retour.notes).toBe('Je réponds vite.');
+  });
+
+  it('les dates, la référence et le billet sont EFFACÉS — c’est un autre voyage', () => {
+    const retour = preparerLeRetour(aller());
+    expect(retour.dateDepart).toBeNull();
+    expect(retour.heureDepart).toBe('');
+    expect(retour.dateArrivee).toBeNull();
+    expect(retour.heureArrivee).toBe('');
+    expect(retour.reference).toBe('');
+    expect(retour.billet).toBeNull();
+  });
+
+  it('il ne reste QUE les dates à poser', () => {
+    const retour = preparerLeRetour(aller());
+    const unSoir = new Date(2026, 10, 25, 9, 0);
+    // Tout ce qui manque au retour appartient à l'écran des dates : c'est
+    // exactement la promesse faite à l'écran de fin.
+    expect(manquesDeLEcran(1, retour, unSoir)).toEqual([]);
+    expect(manquesDeLEcran(2, retour, unSoir).length).toBeGreaterThan(0);
+  });
+
+  it('sans villes, il n’y a pas de retour à proposer', () => {
+    expect(retourPossible(brouillonVide())).toBe(false);
+    expect(retourPossible(aller())).toBe(true);
   });
 });

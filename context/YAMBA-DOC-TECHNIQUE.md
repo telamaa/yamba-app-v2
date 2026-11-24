@@ -19596,8 +19596,10 @@ avec ses précisions. Les sept écrans ont été ouverts un à un au simulateur 
 - **Le prix affiché que rien n'appliquait.** L'écran montrait « 10,00 €/kg · 12 kg » pendant que le
   brouillon valait `null` : la barre annonçait « ton gain s'affichera ici » et « Continuer »
   reprochait « fixe ton prix au kilo » sous un prix affiché. C'est D99 3C, commis dans l'écran dont
-  l'en-tête le cite. **Le site a le même défaut** (son curseur montre la médiane suggérée pendant que
-  `pricePerKg` vaut `""`). Corrigé en ÉCRIVANT les valeurs d'ouverture dans le brouillon au montage.
+  l'en-tête le cite. Corrigé en ÉCRIVANT les valeurs d'ouverture dans le brouillon au montage.
+  **Rectifié le 25/11** : cette section affirmait que « le site a le même défaut ». C'est faux —
+  `StepConditions.tsx` écrit la médiane suggérée dans son brouillon au montage (D15, « la suggestion
+  guide, le Voyageur ajuste »). Le site avait raison ; le correctif mobile ne fait que le rejoindre.
 - **Le zéro qui ment.** Le récap affichait « 0,00 €/kg · 0 kg » : zéro est un montant, l'absence n'en
   est pas un.
 - **L'écran muet.** Les lieux se rendaient vides quand le mode n'était pas choisi — deux titres et

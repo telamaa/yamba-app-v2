@@ -1,5 +1,5 @@
 /**
- * publish-trip/places.tsx — ⑥ OÙ SE FAIT L'ÉCHANGE (phase « Conditions »)
+ * publish-trip/places.tsx — ⑤ OÙ SE FAIT L'ÉCHANGE (phase « Conditions »)
  * ========================================================================
  * Le Voyageur dit où on lui REMET le colis au départ, et où on le RÉCUPÈRE à
  * l'arrivée. C'est l'écran jumeau de `booking/places.tsx` côté Expéditeur,
@@ -96,7 +96,7 @@ export default function PublishPlacesScreen() {
   return (
     <PublishStepFrame
       title={t('places.title')}
-      step={6}
+      step={5}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }

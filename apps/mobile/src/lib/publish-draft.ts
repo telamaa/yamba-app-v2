@@ -24,6 +24,8 @@ import { useSyncExternalStore } from 'react';
 import {
   famillesParDefaut,
   lieuxParDefaut,
+  preparerLeRetour,
+  retourPossible,
   type PublishDraft,
   type TransportMode,
 } from '@/lib/publish-trip';
@@ -47,6 +49,7 @@ const VIDE: PublishDraft = {
   heureArrivee: '',
 
   reference: '',
+  billet: null,
 
   prixParKiloEur: null,
   capaciteKg: null,
@@ -89,6 +92,12 @@ export function clearPublishDraft(): void {
   prevenir();
 }
 
+/** Tout oublier, retour compris — c'est ce que fait la DÉCONNEXION. */
+export function clearPublishMemory(): void {
+  retour = null;
+  clearPublishDraft();
+}
+
 /**
  * Le mode décide des LIEUX proposés (aéroport, gare, ville) : les changer
  * d'un coup serait effacer ce que le Voyageur a déjà précisé sur les
@@ -106,6 +115,39 @@ export function choisirMode(mode: TransportMode): void {
     lieuxLivraison: lieuxParDefaut(mode),
   };
   prevenir();
+}
+
+/**
+ * LE RETOUR EN ATTENTE — une mémoire à part, et c'est voulu.
+ *
+ * À la publication, le brouillon est EFFACÉ : le laisser vivrait ferait
+ * proposer « Reprendre » pour un trajet déjà en ligne, c'est-à-dire un
+ * mensonge au prochain lancement. Mais l'écran de fin doit encore pouvoir
+ * proposer le retour, avec tout ce que l'aller portait. On garde donc le
+ * retour À PART, et il ne survit pas plus loin : le reprendre le consomme.
+ */
+let retour: PublishDraft | null = null;
+
+/** Appelée juste avant d'effacer le brouillon publié. */
+export function memoriserLeRetour(aller: PublishDraft): void {
+  retour = retourPossible(aller) ? preparerLeRetour(aller) : null;
+}
+
+export function retourEnAttente(): PublishDraft | null {
+  return retour;
+}
+
+/** Reprend le retour comme brouillon courant. Rend `false` s'il n'y en a pas. */
+export function reprendreLeRetour(): boolean {
+  if (retour === null) return false;
+  brouillon = retour;
+  retour = null;
+  prevenir();
+  return true;
+}
+
+export function oublierLeRetour(): void {
+  retour = null;
 }
 
 /** Y a-t-il quelque chose à reprendre ? (la carte « Reprendre » de l'écran d'entrée) */

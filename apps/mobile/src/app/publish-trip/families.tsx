@@ -1,5 +1,5 @@
 /**
- * publish-trip/families.tsx — ⑤ CE QUE TU ACCEPTES (phase « Conditions »)
+ * publish-trip/families.tsx — ④ CE QUE TU ACCEPTES (phase « Conditions »)
  * ========================================================================
  * Les huit familles de risque (D14 / CAT-02) et les deux forfaits « bagage
  * entier » (PRC-04), sur un écran.
@@ -118,7 +118,7 @@ export default function PublishFamiliesScreen() {
   return (
     <PublishStepFrame
       title={t('families.title')}
-      step={5}
+      step={4}
       valueLabel={
         gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
       }

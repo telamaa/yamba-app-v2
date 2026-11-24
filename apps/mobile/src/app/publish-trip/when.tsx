@@ -1,5 +1,5 @@
 /**
- * publish-trip/when.tsx — ③ QUAND PARS-TU ? (phase « Trajet »)
+ * publish-trip/when.tsx — ② QUAND PARS-TU ? (phase « Trajet »)
  * ========================================================
  * Quatre valeurs : deux dates, deux heures. Le site les met dans quatre
  * champs `<input type="date">` / `type="time"` côte à côte — c'est-à-dire
@@ -11,6 +11,11 @@
  * recherche — mois qui défilent, grille à la charte), les HEURES se TAPENT au
  * clavier numérique avec un masque (`masqueHeure`), parce qu'une heure de
  * départ se CONNAÎT et ne s'explore pas.
+ *
+ * La référence du billet a QUITTÉ cet écran (revue du 25/11) : elle vivait
+ * en bas, facultative, facile à sauter — alors qu'elle débloque le badge
+ * « Voyage vérifié », donc des réservations. Sa place est au dernier écran,
+ * à côté de « Publier », quand le Voyageur est déjà engagé.
  *
  * Deux raccourcis portent la moitié des cas réels : « arrivée le jour même »
  * et « le lendemain ». Un vol intérieur et un trajet en voiture arrivent le
@@ -49,7 +54,7 @@ export default function PublishWhenScreen() {
   const draft = usePublishDraft();
   const [montreLesManques, setMontreLesManques] = useState(false);
 
-  const manques = manquesDeLEcran(3, draft, new Date());
+  const manques = manquesDeLEcran(2, draft, new Date());
 
   /**
    * Les valeurs d'office, posées À L'OUVERTURE et jamais après : demain, la
@@ -103,7 +108,7 @@ export default function PublishWhenScreen() {
   return (
     <PublishStepFrame
       title={t('when.title')}
-      step={3}
+      step={2}
       valueLabel={route}
       ctaLabel={t('bar.continue')}
       onContinueAction={onContinue}>
@@ -161,30 +166,6 @@ export default function PublishWhenScreen() {
             />
           </View>
         ) : null}
-      </View>
-
-      <View style={styles.group}>
-        <View style={styles.titreAvecMention}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            {t('when.referenceTitle')}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t('when.referenceOptional')}
-          </ThemedText>
-        </View>
-        <TextInput
-          style={[styles.input, { color: theme.text, borderColor: theme.backgroundElement }]}
-          value={draft.reference}
-          onChangeText={(reference) => setPublishDraft({ reference })}
-          placeholder={t('when.referencePlaceholder')}
-          placeholderTextColor={theme.textSecondary}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          accessibilityLabel={t('when.referenceTitle')}
-        />
-        <ThemedText type="small" themeColor="textSecondary">
-          {t('when.referenceHint')}
-        </ThemedText>
       </View>
 
       {montreLesManques && manques.length > 0 ? (
@@ -343,12 +324,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 24,
   },
-  titreAvecMention: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -360,13 +335,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     minHeight: 44,
     justifyContent: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    minHeight: 48,
-    fontSize: 15,
   },
   manques: {
     gap: Spacing.one,

@@ -1,5 +1,5 @@
 /**
- * publish-step-frame.tsx — le cadre commun des SEPT écrans de publication.
+ * publish-step-frame.tsx — le cadre commun des SIX écrans de publication.
  * =========================================================================
  * Le jumeau du cadre de réservation (`booking/booking-step-frame.tsx`), et
  * c'est délibéré : les deux parcours du produit se tiennent de la même façon,

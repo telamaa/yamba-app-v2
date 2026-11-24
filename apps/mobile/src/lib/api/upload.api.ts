@@ -70,6 +70,24 @@ export type UploadablePhoto = {
 
 export type UploadResult = { ok: true; url: string } | { ok: false; code: UploadFailureCode };
 
+/**
+ * Un DOCUMENT (billet) : le serveur en veut plus qu'une URL — il garde le
+ * `fileId` d'ImageKit pour pouvoir supprimer le fichier avec le document
+ * (`DELETE /trips/:id/documents/:docId`). Une URL seule laisserait des
+ * fichiers orphelins chez le prestataire, facturés et jamais relus.
+ */
+export type DocumentTeleverse = {
+  url: string;
+  fileId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number | null;
+};
+
+export type DocumentUploadResult =
+  | { ok: true; document: DocumentTeleverse }
+  | { ok: false; code: UploadFailureCode };
+
 /** « …/IMG_4312.HEIC » → « heic ». Vide si l'URI n'en porte pas. */
 function extensionOf(uri: string): string {
   const withoutQuery = uri.split('?')[0];
@@ -92,6 +110,10 @@ function resolveFileName(photo: UploadablePhoto, mimeType: string): string {
 /** Les deux dossiers ImageKit de Yamba, les mêmes que ceux du site. */
 const FOLDER_DECLARED = '/bookings/declared';
 const FOLDER_DISPUTE = '/deals/dispute';
+/** Le MÊME dossier que le site (`useImageKitUpload("/trips")`) : deux fronts,
+ *  un seul rangement — un administrateur qui cherche un billet n'a pas à
+ *  savoir par quel appareil il est arrivé. */
+const FOLDER_TRIP = '/trips';
 
 /**
  * Téléverse UNE photo et rend son URL publique. Ne lève jamais : l'appelant
@@ -133,6 +155,64 @@ async function uploadTo(photo: UploadablePhoto, folder: string): Promise<UploadR
 
     const body = (await response.json()) as { url?: string };
     return typeof body.url === 'string' ? { ok: true, url: body.url } : { ok: false, code: 'FAILED' };
+  } catch {
+    return { ok: false, code: 'FAILED' };
+  }
+}
+
+/**
+ * LE BILLET du Voyageur (D111) — il ouvre le badge « Voyage vérifié » après
+ * validation par Yamba.
+ *
+ * Même chemin que les photos (autorisation courte signée par le serveur, le
+ * binaire va directement chez ImageKit), mais le retour garde le `fileId` :
+ * `POST /trips/:id/documents` l'exige, et c'est lui qui permettra d'effacer
+ * le fichier le jour où le document est retiré.
+ */
+export async function uploadTripTicket(photo: UploadablePhoto): Promise<DocumentUploadResult> {
+  const mimeType = resolveMimeType(photo);
+  if (!mimeType) return { ok: false, code: 'INVALID_TYPE' };
+  if (photo.sizeBytes !== null && photo.sizeBytes > PHOTO_MAX_BYTES) {
+    return { ok: false, code: 'TOO_LARGE' };
+  }
+
+  try {
+    const auth = await apiFetch<ImageKitAuth>('/uploads/imagekit-auth');
+    if (!auth.publicKey || !auth.token || !auth.signature || !auth.expire) {
+      return { ok: false, code: 'FAILED' };
+    }
+
+    const name = resolveFileName(photo, mimeType);
+    const form = new FormData();
+    form.append('file', { uri: photo.uri, name, type: mimeType } as unknown as Blob);
+    form.append('fileName', name);
+    form.append('publicKey', auth.publicKey);
+    form.append('signature', auth.signature);
+    form.append('expire', String(auth.expire));
+    form.append('token', auth.token);
+    form.append('useUniqueFileName', 'true');
+    form.append('folder', FOLDER_TRIP);
+
+    const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) return { ok: false, code: 'FAILED' };
+
+    const body = (await response.json()) as { url?: string; fileId?: string };
+    if (typeof body.url !== 'string' || typeof body.fileId !== 'string') {
+      return { ok: false, code: 'FAILED' };
+    }
+    return {
+      ok: true,
+      document: {
+        url: body.url,
+        fileId: body.fileId,
+        name,
+        mimeType,
+        sizeBytes: photo.sizeBytes,
+      },
+    };
   } catch {
     return { ok: false, code: 'FAILED' };
   }

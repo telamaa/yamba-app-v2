@@ -26,3 +26,40 @@ export async function publierLeTrajet(corps: CorpsDeTrajet): Promise<TrajetPubli
   });
   return reponse.trip;
 }
+
+/**
+ * Attache le billet au trajet qui vient d'être publié.
+ *
+ * SÉPARÉ de la création, et c'est imposé par le serveur : le document a
+ * besoin de l'id du trajet (`POST /trips/:id/documents`). Conséquence
+ * assumée — un échec ici laisse un trajet EN LIGNE sans son billet, donc
+ * sans badge. C'est le bon sens de l'échec : mieux vaut un trajet publié
+ * sans badge qu'un trajet perdu parce qu'une image n'est pas passée.
+ *
+ * Le type `TICKET_PROOF` est celui du site (`TripDocumentsManager`).
+ */
+export async function attacherLeBillet(
+  tripId: string,
+  document: { url: string; fileId: string; name: string; mimeType: string; sizeBytes: number | null }
+): Promise<boolean> {
+  try {
+    await apiFetch(`/trips/${tripId}/documents`, {
+      method: 'POST',
+      body: {
+        documents: [
+          {
+            type: 'TICKET_PROOF',
+            fileId: document.fileId,
+            url: document.url,
+            originalName: document.name,
+            mimeType: document.mimeType,
+            ...(document.sizeBytes === null ? {} : { sizeBytes: document.sizeBytes }),
+          },
+        ],
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
