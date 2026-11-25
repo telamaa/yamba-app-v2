@@ -37,6 +37,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import {
   dateDepartParDefaut,
   dateIso,
@@ -84,6 +85,10 @@ export default function PublishWhenScreen() {
       return;
     }
     setMontreLesManques(false);
+    // D111 quater — l'état part au serveur à chaque écran franchi, SANS
+    // attendre : la navigation ne dépend pas du réseau (le brouillon local
+    // reste la copie de travail).
+    void sauvegarderLeBrouillon();
     router.push('/publish-trip/price');
   }, [manques.length]);
 

@@ -31,6 +31,7 @@ const TRIP = resolve(MOBILE, '../trip-service');
 
 function brouillonComplet(): PublishDraft {
   return {
+    tripId: null,
     mode: 'PLANE',
     sousType: 'WITH_LAYOVER',
     escales: 'Istanbul, Doha',

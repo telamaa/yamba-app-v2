@@ -42,6 +42,7 @@ import { Brand, Spacing } from '@/constants/theme';
 import { intlTagFor } from '@/lib/number-format';
 import { BILLING_FLOOR_KG, formatAmountFromCents } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import {
   arrondiCommercial,
   fourchetteDuCorridor,
@@ -138,6 +139,10 @@ export default function PublishPriceScreen() {
       return;
     }
     setMontreLesManques(false);
+    // D111 quater — l'état part au serveur à chaque écran franchi, SANS
+    // attendre : la navigation ne dépend pas du réseau (le brouillon local
+    // reste la copie de travail).
+    void sauvegarderLeBrouillon();
     router.push('/publish-trip/families');
   }, [manques.length]);
 

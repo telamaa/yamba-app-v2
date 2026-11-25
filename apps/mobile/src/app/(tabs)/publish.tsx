@@ -21,7 +21,8 @@
  *     plus quitter (le défaut d'un seul coup de D106, pris par l'autre bout).
  */
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,13 +33,59 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { brouillonCommence, clearPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import { mesBrouillons, supprimerLeBrouillon, type TrajetServeur } from '@/lib/api/publish.api';
+import {
+  brouillonCommence,
+  clearPublishDraft,
+  remplacerLeBrouillon,
+  usePublishDraft,
+} from '@/lib/publish-draft';
+import { brouillonDepuisLeTrajet, resumeDuBrouillon } from '@/lib/publish-reverse';
 
 function PublishContent() {
   const t = useTranslations('publish');
   const theme = useTheme();
   const draft = usePublishDraft();
   const enCours = brouillonCommence(draft);
+
+  /**
+   * D111 quater — LE BROUILLON SERVEUR.
+   *
+   * Le brouillon local meurt avec l'app ; celui-ci survit à tout, y compris
+   * à un changement de téléphone. On le relit À CHAQUE RETOUR sur l'écran
+   * (et non une seule fois au montage) : il a pu être publié, repris ou
+   * supprimé entre deux visites.
+   *
+   * Ordre de priorité quand les deux existent : le LOCAL d'abord — c'est le
+   * plus frais, et c'est lui que le Voyageur vient de quitter.
+   */
+  const [brouillonServeur, setBrouillonServeur] = useState<TrajetServeur | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let vivant = true;
+      void mesBrouillons().then((trajets) => {
+        if (vivant) setBrouillonServeur(trajets[0] ?? null);
+      });
+      return () => {
+        vivant = false;
+      };
+    }, [])
+  );
+
+  const resumeServeur = brouillonServeur === null ? null : resumeDuBrouillon(brouillonServeur);
+  const reprendreLeServeur = useCallback(() => {
+    if (brouillonServeur === null) return;
+    remplacerLeBrouillon(brouillonDepuisLeTrajet(brouillonServeur));
+    router.push('/publish-trip');
+  }, [brouillonServeur]);
+
+  const jeterLeServeur = useCallback(() => {
+    if (brouillonServeur === null) return;
+    void supprimerLeBrouillon(String(brouillonServeur.id));
+    setBrouillonServeur(null);
+    clearPublishDraft();
+  }, [brouillonServeur]);
 
   const route =
     draft.depart !== null && draft.arrivee !== null
@@ -78,12 +125,44 @@ function PublishContent() {
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
+                    // « Recommencer » jette AUSSI la copie serveur quand elle
+                    // existe : la laisser ferait reproposer, au prochain
+                    // lancement, le trajet qu'on vient d'abandonner.
+                    if (draft.tripId !== null) void supprimerLeBrouillon(draft.tripId);
+                    setBrouillonServeur(null);
                     clearPublishDraft();
                     router.push('/publish-trip');
                   }}
                   style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
                   <ThemedText type="smallBold" themeColor="textSecondary">
                     {t('launch.freshCta')}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : resumeServeur !== null ? (
+            <View style={[styles.resume, { borderColor: theme.backgroundElement }]}>
+              <ThemedText type="smallBold">{t('launch.savedTitle')}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('launch.savedBody', {
+                  route: t('bar.route', { from: resumeServeur.depart, to: resumeServeur.arrivee }),
+                })}
+              </ThemedText>
+              <View style={styles.resumeActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={reprendreLeServeur}
+                  style={({ pressed }) => [styles.cta, { opacity: pressed ? 0.85 : 1 }]}>
+                  <ThemedText type="smallBold" style={styles.ctaLabel}>
+                    {t('launch.resumeCta')}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={jeterLeServeur}
+                  style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+                  <ThemedText type="smallBold" themeColor="textSecondary">
+                    {t('launch.deleteCta')}
                   </ThemedText>
                 </Pressable>
               </View>

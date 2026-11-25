@@ -17,7 +17,10 @@
     "resumeBody": "{route}",
     "resumeCta": "Resume",
     "freshCta": "Start over",
-    "newTrip": "New trip"
+    "newTrip": "New trip",
+    "savedTitle": "Draft saved",
+    "savedBody": "{route} — you can pick it up again.",
+    "deleteCta": "Delete"
   },
   "bar": {
     "continue": "Continue",

@@ -45,6 +45,7 @@ import {
   masqueHeure,
   normaliseHeure,
   phaseDeLEcran,
+  pretPourLeServeur,
   sousTypePourLApi,
   type Manque,
   type PublishDraft,
@@ -69,6 +70,7 @@ function litLEnum(nom: string): string[] {
 /** Un brouillon vierge — les écrans posent leurs valeurs d'office eux-mêmes. */
 function brouillonVide(): PublishDraft {
   return {
+    tripId: null,
     mode: null,
     sousType: null,
     escales: '',
@@ -618,5 +620,58 @@ describe('⑪ le retour, préparé depuis l’aller', () => {
   it('sans villes, il n’y a pas de retour à proposer', () => {
     expect(retourPossible(brouillonVide())).toBe(false);
     expect(retourPossible(aller())).toBe(true);
+  });
+});
+
+describe('⑫ à partir de quand le brouillon peut être ENREGISTRÉ (D111 quater)', () => {
+  it('il faut le mode ET les deux villes — ce que le serveur exige, rien de plus', () => {
+    const vide = brouillonVide();
+    expect(pretPourLeServeur(vide)).toBe(false);
+    expect(pretPourLeServeur({ ...vide, mode: 'PLANE' })).toBe(false);
+    expect(pretPourLeServeur({ ...vide, mode: 'PLANE', depart: ville('Paris') })).toBe(false);
+    expect(
+      pretPourLeServeur({
+        ...vide,
+        mode: 'PLANE',
+        depart: ville('Paris'),
+        arrivee: ville('Berlin'),
+      })
+    ).toBe(true);
+  });
+
+  it('une ville faite d’espaces ne compte pas', () => {
+    const draft = {
+      ...brouillonVide(),
+      mode: 'TRAIN' as const,
+      depart: ville('Paris'),
+      arrivee: { ...ville('Berlin'), ville: '   ' },
+    };
+    expect(pretPourLeServeur(draft)).toBe(false);
+  });
+
+  it('c’est exactement la fin du PREMIER écran', () => {
+    // La sauvegarde devient possible au moment où ① n'a plus rien à
+    // reprocher : pas avant, et il ne sert à rien d'attendre plus.
+    const complet = {
+      ...brouillonVide(),
+      mode: 'PLANE' as const,
+      sousType: 'DIRECT' as const,
+      depart: ville('Paris'),
+      arrivee: ville('Berlin'),
+    };
+    expect(manquesDeLEcran(1, complet, new Date(2026, 10, 25))).toEqual([]);
+    expect(pretPourLeServeur(complet)).toBe(true);
+  });
+
+  it('le RETOUR repart sans identifiant — c’est un autre trajet', () => {
+    // Reprendre celui de l'aller écraserait le trajet qu'on vient de publier.
+    const aller = {
+      ...brouillonVide(),
+      tripId: 'trajet-publie',
+      mode: 'PLANE' as const,
+      depart: ville('Paris'),
+      arrivee: ville('Berlin'),
+    };
+    expect(preparerLeRetour(aller).tripId).toBeNull();
   });
 });

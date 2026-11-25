@@ -41,7 +41,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api/client';
-import { attacherLeBillet, publierLeTrajet } from '@/lib/api/publish.api';
+import { attacherLeBillet, publierLeBrouillon, publierLeTrajet } from '@/lib/api/publish.api';
 import { PHOTO_MAX_MB, uploadTripTicket, type UploadFailureCode } from '@/lib/api/upload.api';
 import { intlTagFor } from '@/lib/number-format';
 import { formatAmountFromCents } from '@/lib/pricing-example';
@@ -127,7 +127,15 @@ export default function PublishReviewScreen() {
     setEnvoiEnCours(true);
     setRefus(null);
     try {
-      const trajet = await publierLeTrajet(construireCorps(draft, true));
+      // D111 quater — si un brouillon SERVEUR existe déjà (il existe dès la
+      // fin du premier écran), on le met à jour ET on le publie en une seule
+      // requête. Sans lui — réseau coupé pendant tout le tunnel — on crée le
+      // trajet directement : la publication ne dépend pas de la sauvegarde.
+      const corps = construireCorps(draft, true);
+      const trajet =
+        draft.tripId === null
+          ? await publierLeTrajet(corps)
+          : await publierLeBrouillon(draft.tripId, corps);
       // L'ordre compte. On MÉMORISE le retour (villes et lieux inversés) avant
       // d'effacer le brouillon — sans quoi l'écran de fin n'aurait plus rien à
       // proposer ; on efface APRÈS le succès ; et on REMPLACE l'écran, parce

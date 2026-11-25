@@ -36,6 +36,7 @@ import {
  * dates qui pose ses valeurs d'office à l'ouverture.
  */
 const VIDE: PublishDraft = {
+  tripId: null,
   mode: null,
   sousType: null,
   escales: '',
@@ -84,6 +85,16 @@ export function subscribePublishDraft(abonne: () => void): () => void {
 
 export function setPublishDraft(patch: Partial<PublishDraft>): void {
   brouillon = { ...brouillon, ...patch };
+  prevenir();
+}
+
+/**
+ * Remplace TOUT le brouillon — c'est ce que fait la reprise d'un brouillon
+ * serveur. Distinct de `setPublishDraft`, qui fusionne : reprendre un
+ * trajet ne doit pas laisser traîner les miettes de celui d'avant.
+ */
+export function remplacerLeBrouillon(nouveau: PublishDraft): void {
+  brouillon = nouveau;
   prevenir();
 }
 

@@ -209,6 +209,17 @@ export type VilleChoisie = {
 };
 
 export type PublishDraft = {
+  /**
+   * L'identifiant du brouillon SERVEUR (D111 quater), posé au premier
+   * enregistrement réussi.
+   *
+   * `null` ne veut pas dire « pas encore commencé » : il veut dire « pas
+   * encore sauvegardé ». Le tunnel marche sans — la copie locale reste la
+   * copie de travail, la copie serveur la rattrape quand le réseau le
+   * permet. C'est ce qui permet de remplir un formulaire dans un avion.
+   */
+  tripId: string | null;
+
   mode: TransportMode | null;
   sousType: SousType | null;
   /** Villes traversées, telles que tapées (« Istanbul, Dubaï ») — séparées à l'envoi. */
@@ -502,6 +513,9 @@ export function manquesDuTunnel(draft: PublishDraft, maintenant: Date): (Manque 
 export function preparerLeRetour(aller: PublishDraft): PublishDraft {
   return {
     ...aller,
+    // Le retour est un AUTRE trajet : reprendre l'identifiant de l'aller
+    // écraserait le trajet qu'on vient de publier.
+    tripId: null,
     depart: aller.arrivee,
     arrivee: aller.depart,
     lieuxRemise: aller.lieuxLivraison,
@@ -518,6 +532,25 @@ export function preparerLeRetour(aller: PublishDraft): PublishDraft {
 /** Un retour n'a de sens que si l'aller portait ses deux villes. */
 export function retourPossible(aller: PublishDraft): boolean {
   return aller.depart !== null && aller.arrivee !== null;
+}
+
+/**
+ * Le brouillon peut-il être ENREGISTRÉ côté serveur ?
+ *
+ * `createTripSchema` exige trois choses et trois seulement : le mode de
+ * transport et les deux villes. C'est donc exactement à la fin du premier
+ * écran que la sauvegarde devient possible — pas avant, et il ne sert à
+ * rien d'attendre plus.
+ *
+ * La règle est ICI, pure, plutôt que dans l'écran : le jour où le serveur
+ * exigera autre chose, c'est cette fonction qui rougira, pas un parcours.
+ */
+export function pretPourLeServeur(draft: PublishDraft): boolean {
+  return (
+    draft.mode !== null &&
+    (draft.depart?.ville.trim().length ?? 0) > 0 &&
+    (draft.arrivee?.ville.trim().length ?? 0) > 0
+  );
 }
 
 /* ── Les trois phases annoncées ────────────────────────────────────────── */

@@ -36,6 +36,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { intlTagFor } from '@/lib/number-format';
 import { formatAmountFromCents } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import { gainSiToutPartCents } from '@/lib/publish-pricing';
 import {
   flexibilitesPour,
@@ -80,6 +81,10 @@ export default function PublishPlacesScreen() {
       return;
     }
     setMontreLesManques(false);
+    // D111 quater — l'état part au serveur à chaque écran franchi, SANS
+    // attendre : la navigation ne dépend pas du réseau (le brouillon local
+    // reste la copie de travail).
+    void sauvegarderLeBrouillon();
     router.push('/publish-trip/review');
   }, [manques.length]);
 
