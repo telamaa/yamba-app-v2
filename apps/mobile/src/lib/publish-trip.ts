@@ -186,10 +186,26 @@ export type DocumentDuBillet = {
 export type VilleChoisie = {
   /** « Paris » — c'est ce champ que le serveur exige (`originCity`). */
   ville: string;
-  /** « France » — aide à la lecture, et seul indice de pays dont on dispose. */
+  /** « France » — tel que Google le nomme, dans la langue du lecteur. */
   pays: string;
   /** « Paris, France » — le libellé affiché, tel quel. */
   libelle: string;
+  /** L'identifiant Google, vide pour une saisie libre. */
+  placeId: string;
+  /**
+   * D111 ter — ce que `GET /places/details` ajoute APRÈS le choix, et qui
+   * ouvre la fourchette de prix : le code pays donne la ZONE du corridor,
+   * les coordonnées donnent la distance.
+   *
+   * Tout est nullable, et c'est le point : une saisie libre, un service muet
+   * ou une ville sans pays laissent ces champs à `null`, et le calcul
+   * retombe sur sa base de repli. Ce que le client ne SAIT pas, il ne
+   * l'invente pas — et l'écran le dit plutôt que de présenter une médiane
+   * qui aurait l'air mesurée.
+   */
+  countryCode: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 export type PublishDraft = {

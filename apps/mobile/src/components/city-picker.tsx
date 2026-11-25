@@ -43,8 +43,21 @@ import { placeCountry, placeLabel } from '@/lib/place-label';
 const DEBOUNCE_MS = 220;
 const MIN_CHARS = 2;
 
-/** Ce qu'une page rend à celle qui l'a ouverte : la ville, son pays, le libellé. */
-export type VilleSaisie = { ville: string; pays: string; libelle: string };
+/**
+ * Ce qu'une page rend à celle qui l'a ouverte : la ville, son pays, le
+ * libellé — et l'identifiant Google du lieu quand il y en a un (D111 ter).
+ *
+ * `placeId` est vide pour une saisie LIBRE (texte tapé sans suggestion) :
+ * on ne connaîtra alors ni code pays ni coordonnées, et la fourchette de
+ * prix retombera sur sa base de repli. C'est le prix d'une saisie libre, et
+ * il est explicitement accepté — l'autocomplétion reste un confort (A207).
+ */
+export type VilleSaisie = {
+  ville: string;
+  pays: string;
+  libelle: string;
+  placeId: string;
+};
 
 export type CityPickerTextes = {
   back: string;
@@ -76,7 +89,12 @@ export function CityPicker({
   /** La marge haute de l'écran poussé — `useTopInset`, jamais l'inset seul (D107). */
   topInset: number;
   onCloseAction: () => void;
-  onPickAction: (ville: VilleSaisie) => void;
+  /**
+   * Le second argument porte le jeton de SESSION de cette saisie : qui veut
+   * le détail du lieu doit le relayer, sinon Google facture deux requêtes
+   * au lieu d'une session.
+   */
+  onPickAction: (ville: VilleSaisie, contexte: { jetonDeSession: string }) => void;
 }) {
   const theme = useTheme();
   const locale = useLocale();
@@ -125,14 +143,24 @@ export function CityPicker({
     (texte: string) => {
       const ville = texte.trim();
       if (ville.length === 0) return;
-      onPickAction({ ville, pays: '', libelle: ville });
+      onPickAction({ ville, pays: '', libelle: ville, placeId: '' }, {
+        jetonDeSession: jeton.current,
+      });
     },
     [onPickAction]
   );
 
   const commitSuggestion = useCallback(
     (item: CitySuggestion) => {
-      onPickAction({ ville: item.main, pays: placeCountry(item), libelle: placeLabel(item) });
+      onPickAction(
+        {
+          ville: item.main,
+          pays: placeCountry(item),
+          libelle: placeLabel(item),
+          placeId: item.placeId,
+        },
+        { jetonDeSession: jeton.current }
+      );
     },
     [onPickAction]
   );

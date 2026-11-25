@@ -7,35 +7,69 @@
  * (requis) et `originCountry` (facultatif) en deux champs distincts
  * (`createTripSchema`).
  *
- * CE QUE LE TÉLÉPHONE NE PEUT PAS ENVOYER, ET QU'IL N'INVENTE PAS : le
- * `placeId`, le code pays ISO et les coordonnées. Le site les obtient du SDK
- * Google chargé dans le navigateur ; le relais Places (A211) ne rend que deux
- * chaînes. Conséquence à connaître — et à trancher au lot suivant : la
- * suggestion de prix par corridor a besoin du code pays et des coordonnées.
+ * CE QUE LE CHOIX DÉCLENCHE, DEPUIS D111 ter : un appel à
+ * `GET /places/details`, UNE fois, avec le MÊME jeton de session que
+ * l'autocomplétion — Google facture alors l'ensemble comme une seule
+ * session. Il rend le code pays et les coordonnées, c'est-à-dire la ZONE du
+ * corridor et la distance : sans eux, pas de fourchette de prix.
+ *
+ * L'ÉCRAN NE L'ATTEND PAS. Il se referme immédiatement avec la ville, et le
+ * détail arrive après — le brouillon est une mémoire de module, un écran
+ * dépilé n'empêche pas de l'enrichir. Faire patienter sur un réseau lent
+ * pour un CONFORT serait payer deux fois : l'attente, et l'échec possible.
+ *
+ * LA RÉPONSE EN RETARD EST JETÉE si la ville a changé entre-temps — même
+ * règle que la liste de suggestions, pour la même raison : deux choix
+ * rapprochés, deux réponses, et celle d'avant écraserait celle d'après.
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 import { CityPicker, type VilleSaisie } from '@/components/city-picker';
 import { useTopInset } from '@/hooks/use-top-inset';
-import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import { fetchPlaceDetails } from '@/lib/api/places.api';
+import { getPublishDraft, setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import type { VilleChoisie } from '@/lib/publish-trip';
 
 export default function PublishCityScreen() {
   const { field } = useLocalSearchParams<{ field?: string }>();
   const cible: 'depart' | 'arrivee' = field === 'to' ? 'arrivee' : 'depart';
 
   const t = useTranslations('publish');
+  const locale = useLocale();
   const topInset = useTopInset();
   const draft = usePublishDraft();
 
   const onPick = useCallback(
-    (ville: VilleSaisie) => {
-      setPublishDraft({ [cible]: ville } as { depart: VilleSaisie } | { arrivee: VilleSaisie });
+    (ville: VilleSaisie, contexte: { jetonDeSession: string }) => {
+      const choisie: VilleChoisie = { ...ville, countryCode: null, lat: null, lng: null };
+      setPublishDraft({ [cible]: choisie } as Partial<{ depart: VilleChoisie; arrivee: VilleChoisie }>);
       router.back();
+
+      // Le détail arrive APRÈS la fermeture : il enrichit, il ne retient pas.
+      if (ville.placeId.length === 0) return;
+      void fetchPlaceDetails(ville.placeId, locale, contexte.jetonDeSession).then((details) => {
+        if (details === null) return;
+        // La ville a-t-elle changé pendant l'appel ? Alors ce détail n'est
+        // plus le sien.
+        const courante = getPublishDraft()[cible];
+        if (courante === null || courante.placeId !== ville.placeId) return;
+        setPublishDraft({
+          [cible]: {
+            ...courante,
+            // Le pays en toutes lettres de Google est plus fiable que le
+            // dernier segment du contexte : on le prend quand il existe.
+            pays: details.country ?? courante.pays,
+            countryCode: details.countryCode,
+            lat: details.lat,
+            lng: details.lng,
+          },
+        } as Partial<{ depart: VilleChoisie; arrivee: VilleChoisie }>);
+      });
     },
-    [cible]
+    [cible, locale]
   );
 
   return (

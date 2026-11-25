@@ -93,8 +93,16 @@ function brouillonVide(): PublishDraft {
   };
 }
 
-function ville(nom: string) {
-  return { ville: nom, pays: 'France', libelle: `${nom}, France` };
+function ville(nom: string, codePays: string | null = 'FR') {
+  return {
+    ville: nom,
+    pays: 'France',
+    libelle: `${nom}, France`,
+    placeId: `place-${nom.trim().toLowerCase()}`,
+    countryCode: codePays,
+    lat: 48.85,
+    lng: 2.35,
+  };
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
@@ -410,30 +418,54 @@ describe('⑦ les phases annoncées', () => {
   });
 });
 
-describe('⑧ ce que le téléphone NE PEUT PAS envoyer, et qu’il n’invente pas', () => {
-  it('le relais Places ne rend que deux chaînes : ni `placeId`, ni code pays, ni coordonnées', () => {
-    // D101 : la parité ne se mesure pas écran par écran mais au CONTRAT que
-    // chaque front sait exercer. Le site obtient ces champs du SDK Google
-    // chargé dans le navigateur ; le relais (A211) ne les expose pas.
-    // Tant que c'est vrai, le brouillon ne doit pas prétendre les porter —
-    // un champ qui existe et vaut toujours `null` finit par être envoyé.
+describe('⑧ ce que le téléphone sait ÉMETTRE — et ce qu’il n’invente pas', () => {
+  /**
+   * CETTE FICHE A CHANGÉ DE SENS, ET C’EST LE POINT.
+   *
+   * Écrite le 24/11, elle TENAIT UN CONSTAT : le relais Places ne rendait que
+   * deux chaînes (ni `placeId`, ni code pays, ni coordonnées), donc le
+   * téléphone ne pouvait pas calculer de corridor, donc pas de fourchette de
+   * prix. Elle est passée au ROUGE le jour où ce manque a été comblé
+   * (D111 ter) — exactement ce qu'on lui demandait de faire.
+   *
+   * Elle garde désormais l'inverse : que le chemin EXISTE, de bout en bout.
+   */
+  it('le relais rend l’identifiant du lieu', () => {
     const relais = readFileSync(join(MOBILE, 'src/lib/api/places.api.ts'), 'utf8');
     const debut = relais.indexOf('export type CitySuggestion');
     expect(debut).toBeGreaterThanOrEqual(0);
-    const fin = relais.indexOf('};', debut);
-    const type = relais.slice(debut, fin);
-    expect(type).toContain('main');
-    expect(type).toContain('secondary');
-    expect(type).not.toContain('placeId');
-    expect(type).not.toContain('countryCode');
-    expect(type).not.toContain('lat');
+    const type = relais.slice(debut, relais.indexOf('};', debut));
+    expect(type).toContain('placeId');
   });
 
-  it('le serveur, lui, n’exige que la VILLE — le reste est facultatif', () => {
-    // C'est ce qui rend la publication mobile possible malgré le point
-    // ci-dessus : `originCity` est requis, `originCountryCode` / `originLat`
-    // sont optionnels (`createTripSchema`). Si cela changeait, ce lot
-    // cesserait de pouvoir publier — et cette fiche le dirait.
+  it('et le client sait demander le DÉTAIL d’un lieu choisi', () => {
+    const relais = readFileSync(join(MOBILE, 'src/lib/api/places.api.ts'), 'utf8');
+    expect(relais).toContain('/places/details');
+    // Le jeton de session voyage avec : sans lui, Google facture deux
+    // requêtes au lieu d'une session.
+    expect(relais).toContain('sessionToken');
+  });
+
+  it('le serveur expose bien cette route, et elle est PUBLIQUE comme la recherche', () => {
+    const TRIP = resolve(MOBILE, '../trip-service');
+    const router = readFileSync(join(TRIP, 'src/routes/places.router.ts'), 'utf8');
+    expect(router).toContain('"/details"');
+    expect(router).toContain('isOptionallyAuthenticated');
+  });
+
+  it('le brouillon porte de quoi calculer un corridor, et tout y est NULLABLE', () => {
+    // Une saisie libre, un service muet ou une ville sans pays laissent ces
+    // champs à `null` : le calcul retombe sur sa base de repli, et l'écran
+    // se tait plutôt que d'afficher une médiane qui aurait l'air mesurée.
+    const source = readFileSync(join(MOBILE, 'src/lib/publish-trip.ts'), 'utf8');
+    const debut = source.indexOf('export type VilleChoisie');
+    const type = source.slice(debut, source.indexOf('};', debut));
+    expect(type).toContain('countryCode: string | null');
+    expect(type).toContain('lat: number | null');
+    expect(type).toContain('lng: number | null');
+  });
+
+  it('le serveur n’exige toujours que la VILLE — le reste enrichit', () => {
     expect(CONTRAT).toContain('originCity: z.string().trim().min(1).max(150)');
     expect(CONTRAT).toContain('originCountryCode: isoCodeSchema');
     expect(CONTRAT).toContain('originLat: z.number().optional().nullable()');

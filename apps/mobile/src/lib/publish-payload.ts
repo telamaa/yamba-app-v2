@@ -47,12 +47,20 @@ export type CorpsDeTrajet = {
   tripType: string;
 
   originLabel: string | null;
+  originPlaceId: string | null;
   originCity: string;
   originCountry: string | null;
+  originCountryCode: string | null;
+  originLat: number | null;
+  originLng: number | null;
 
   destinationLabel: string | null;
+  destinationPlaceId: string | null;
   destinationCity: string;
   destinationCountry: string | null;
+  destinationCountryCode: string | null;
+  destinationLat: number | null;
+  destinationLng: number | null;
 
   departureDateLocal: string | null;
   arrivalDateLocal: string | null;
@@ -173,13 +181,25 @@ export function construireCorps(draft: PublishDraft, publier: boolean): CorpsDeT
     // tunnel (il n'ajoutait qu'un mot sur la fiche, jamais un second trajet).
     tripType: 'ONE_WAY',
 
+    // D111 ter — le téléphone sait désormais émettre ce que seul le SDK
+    // Google donnait au site : l'identifiant du lieu, son code pays ISO et
+    // ses coordonnées. Ils servent au serveur (recherche par pays, distance)
+    // autant qu'à la fourchette de prix affichée dans le tunnel.
     originLabel: draft.depart === null ? null : texteOuNull(draft.depart.libelle),
+    originPlaceId: draft.depart === null ? null : texteOuNull(draft.depart.placeId),
     originCity: draft.depart?.ville.trim() ?? '',
     originCountry: draft.depart === null ? null : texteOuNull(draft.depart.pays),
+    originCountryCode: draft.depart?.countryCode ?? null,
+    originLat: draft.depart?.lat ?? null,
+    originLng: draft.depart?.lng ?? null,
 
     destinationLabel: draft.arrivee === null ? null : texteOuNull(draft.arrivee.libelle),
+    destinationPlaceId: draft.arrivee === null ? null : texteOuNull(draft.arrivee.placeId),
     destinationCity: draft.arrivee?.ville.trim() ?? '',
     destinationCountry: draft.arrivee === null ? null : texteOuNull(draft.arrivee.pays),
+    destinationCountryCode: draft.arrivee?.countryCode ?? null,
+    destinationLat: draft.arrivee?.lat ?? null,
+    destinationLng: draft.arrivee?.lng ?? null,
 
     departureDateLocal: draft.dateDepart,
     arrivalDateLocal: draft.dateArrivee,

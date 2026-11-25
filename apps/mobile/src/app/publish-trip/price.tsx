@@ -29,18 +29,23 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useLocale, useTranslations } from 'use-intl';
 
 import { NumberStepper, ValeursUsuelles } from '@/components/publish/number-stepper';
+import { PriceGauge } from '@/components/publish/price-gauge';
 import { PublishStepFrame } from '@/components/publish/publish-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { intlTagFor } from '@/lib/number-format';
 import { BILLING_FLOOR_KG, formatAmountFromCents } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
+import {
+  arrondiCommercial,
+  fourchetteDuCorridor,
+} from '@/lib/publish-price-suggestion';
 import {
   CAPACITES_USUELLES_KG,
   PRIX_USUELS_PAR_KG,
@@ -88,7 +93,14 @@ export default function PublishPriceScreen() {
    */
   useEffect(() => {
     const valeurs: { prixParKiloEur?: number; capaciteKg?: number } = {};
-    if (draft.prixParKiloEur === null) valeurs.prixParKiloEur = PRIX_D_OUVERTURE;
+    if (draft.prixParKiloEur === null) {
+      // La médiane du corridor quand elle est connue, sinon la valeur
+      // d'ouverture : proposer le prix du marché fait gagner un réglage à
+      // celui qui n'a pas d'avis, et n'enlève rien à celui qui en a un.
+      valeurs.prixParKiloEur = fourchette.precis
+        ? ramenePrix(arrondiCommercial(fourchette.mediane))
+        : PRIX_D_OUVERTURE;
+    }
     if (draft.capaciteKg === null) valeurs.capaciteKg = CAPACITE_D_OUVERTURE;
     if (Object.keys(valeurs).length > 0) setPublishDraft(valeurs);
     // Au montage seulement : une proposition d'ouverture, pas une règle qui
@@ -98,6 +110,25 @@ export default function PublishPriceScreen() {
 
   const prix = draft.prixParKiloEur ?? PRIX_D_OUVERTURE;
   const capacite = draft.capaciteKg ?? CAPACITE_D_OUVERTURE;
+
+  /**
+   * D111 ter — LA FOURCHETTE DU MARCHÉ.
+   *
+   * Elle se lit sur les deux codes pays et la distance, que `places/details`
+   * a posés dans le brouillon au moment où les villes ont été choisies. Si
+   * aucun des deux n'est connu (saisie libre, service muet), `precis` est
+   * faux et la jauge ne s'affiche PAS : une médiane de repli serait la même
+   * sur tous les corridors, c'est-à-dire un repère qui a l'air d'en être un.
+   */
+  const fourchette = useMemo(
+    () =>
+      fourchetteDuCorridor(draft.depart, draft.arrivee, {
+        volDirect: draft.mode === 'PLANE' && draft.sousType === 'DIRECT',
+        dateDepart: draft.dateDepart,
+        maintenant: new Date(),
+      }),
+    [draft.depart, draft.arrivee, draft.mode, draft.sousType, draft.dateDepart]
+  );
 
   const manques = manquesOffre(draft);
 
@@ -147,6 +178,26 @@ export default function PublishPriceScreen() {
           libelle={(valeur) => `${valeur.toLocaleString(tag)} €`}
           onPickAction={(valeur) => setPublishDraft({ prixParKiloEur: ramenePrix(valeur) })}
         />
+        {fourchette.precis ? (
+          <PriceGauge
+            prix={prix}
+            fourchette={fourchette}
+            marketLabel={t('price.market', {
+              median: formatAmountFromCents(Math.round(fourchette.mediane * 100), tag),
+            })}
+            verdictLabels={{
+              bas: t('price.verdictBas'),
+              juste: t('price.verdictJuste'),
+              haut: t('price.verdictHaut'),
+            }}
+            accessibilityLabel={t('price.gaugeLabel', {
+              low: formatAmountFromCents(Math.round(fourchette.bas * 100), tag),
+              high: formatAmountFromCents(Math.round(fourchette.haut * 100), tag),
+              price: formatAmountFromCents(Math.round(prix * 100), tag),
+            })}
+          />
+        ) : null}
+
         {/* D81 — le plancher est en KILOS : c'est la seule formulation vraie
             sur tous les corridors, et elle appartient à l'écran où le tarif se
             règle (la carte de résultat, elle, ne doit ni la répéter ni la

@@ -1,4 +1,17 @@
 /**
+ * ⚠️ FICHIER DUPLIQUÉ À L'IDENTIQUE entre `apps/user-ui/src/lib/` et
+ * `apps/mobile/src/lib/`, et une fiche compare les deux copies À L'OCTET
+ * PRÈS (D111 ter). C'est le CINQUIÈME du motif, après `pricing-example.ts`
+ * (D99), `search-facets.ts` (D100), `parcel-weight.ts` (D101) et
+ * `number-format.ts` (D108) — et pour la même raison : un `import` par-dessus
+ * la frontière d'un projet est une dépendance de BUILD (D93), et le
+ * téléphone ne doit pas tirer le site dans son bundle.
+ *
+ * Le prix de la duplication est payé par la fiche qui lui interdit de
+ * diverger ; le prix d'une règle ABSENTE, lui, se paie à l'écran — c'est
+ * exactement ce qui laissait le téléphone sans fourchette de prix.
+ */
+/**
  * pricing-corridors.ts — base €/kg par corridor (D15 V1.5, côté front en
  * attendant `GET /trips/price-suggestion`).
  * ======================================================================

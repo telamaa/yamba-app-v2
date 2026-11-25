@@ -89,7 +89,14 @@
     "floorHint": "Minimum facturé : {kg, number} kg.",
     "gainTitle": "Si tes {kg, number} kg partent",
     "gainHint": "net, 4 jours après la livraison",
-    "gainBarHint": "net, si tout part"
+    "gainBarHint": "net, si tout part",
+    "market": "Marché : {median} €/kg",
+    "verdictJuste": "Prix juste",
+    "verdictBas": "Sous le marché",
+    "verdictHaut": "Au-dessus du marché",
+    "scaleLow": "{value} €",
+    "scaleHigh": "{value} €",
+    "gaugeLabel": "Fourchette du marché : de {low} à {high} €/kg, ton prix {price} €/kg"
   },
   "families": {
     "title": "Ce que tu acceptes",

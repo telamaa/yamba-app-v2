@@ -27,6 +27,21 @@ export type CitySuggestion = {
   main: string;
   /** Le contexte (« France », « Texas, États-Unis ») — affiché en second. */
   secondary: string;
+  /**
+   * L'identifiant Google du lieu (D111 ter), vide quand Google n'en donne
+   * pas. C'est lui qui ouvre `GET /places/details`, donc le code pays, donc
+   * le corridor, donc la fourchette de prix.
+   */
+  placeId: string;
+};
+
+/** Ce que rend `GET /places/details` — tout est nullable sauf la ville. */
+export type CityDetails = {
+  city: string;
+  country: string | null;
+  countryCode: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 /** `unavailable` : réseau coupé, relais muet, ou Google en refus. */
@@ -60,6 +75,38 @@ export async function suggestCities(
       console.warn('[places] suggestions indisponibles :', detail);
     }
     return { status: 'unavailable' };
+  }
+}
+
+/**
+ * Le détail d'une ville CHOISIE — pays, code pays, coordonnées.
+ *
+ * Appelé une seule fois, au moment du choix, avec le MÊME jeton de session
+ * que l'autocomplétion qui l'a précédé : Google facture alors l'ensemble
+ * comme une seule session.
+ *
+ * Rend `null` pour tout échec (service muet, identifiant inconnu, réseau
+ * coupé) : la fourchette de prix est un CONFORT. Sans elle, le tunnel
+ * continue avec la base de repli — il ne s'arrête jamais pour ça.
+ */
+export async function fetchPlaceDetails(
+  placeId: string,
+  locale: string,
+  sessionToken: string
+): Promise<CityDetails | null> {
+  if (placeId.trim().length === 0) return null;
+  const query = new URLSearchParams({ placeId, language: locale, sessionToken });
+  try {
+    return await apiFetch<CityDetails>(`/places/details?${query.toString()}`, {
+      requireAuth: false,
+    });
+  } catch (error) {
+    if (__DEV__) {
+      const detail =
+        error instanceof ApiError ? `${error.status} ${error.code ?? ''}` : String(error);
+      console.warn('[places] détail indisponible :', detail);
+    }
+    return null;
   }
 }
 
