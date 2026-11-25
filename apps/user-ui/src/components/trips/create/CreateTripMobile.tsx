@@ -291,7 +291,9 @@ export default function CreateTripMobile() {
         <div key={step} style={{ animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.2s ease` }}>
           {step === 1 && <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
           {step === 2 && <StepConditions copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
-          {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
+          {step === 3 && (
+            <StepReview copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} onGoTo={goTo} />
+          )}
         </div>
       </div>
 

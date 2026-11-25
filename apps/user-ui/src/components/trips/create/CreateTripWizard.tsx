@@ -305,7 +305,9 @@ export default function CreateTripWizard() {
                   errors={errors}
                 />
               )}
-              {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
+              {step === 3 && (
+            <StepReview copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} onGoTo={goTo} />
+          )}
             </div>
 
             {/* Bottom bar — à l'intérieur de la card, border interne plus subtil */}

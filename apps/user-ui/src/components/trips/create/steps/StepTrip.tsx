@@ -1,6 +1,6 @@
 import { useState } from "react";
 import CityAutocomplete, { type PlaceDetails } from "@/components/search/CityAutocomplete";
-import type { CreateTripCopy, Draft, TripDocumentDraft } from "../create-trip.types";
+import type { CreateTripCopy, Draft } from "../create-trip.types";
 import type { ValidationErrors } from "../create-trip.config";
 import {
   FieldError,
@@ -10,8 +10,6 @@ import {
   SegmentedControl,
   SwapButton,
 } from "../TripFormUi";
-import DocumentUpload from "../DocumentUpload";
-import { Accordion } from "../TripPricingUi";
 
 function toDateInputValue(date?: Date) {
   if (!date) return "";
@@ -152,27 +150,6 @@ export default function StepTrip({
     draft.transportMode === "plane" && draft.flightType === "withLayover";
   const showTrainStopCities =
     draft.transportMode === "train" && draft.trainTripType === "withConnection";
-
-  const refPlaceholder =
-    draft.transportMode === "plane"
-      ? "Ex. AF1234"
-      : draft.transportMode === "train"
-        ? "Ex. TGV 6231"
-        : "Ex. BL-7890";
-
-  const handleAddDocs = (docs: TripDocumentDraft[]) => {
-    setDraft((prev) => ({
-      ...prev,
-      tripDocuments: [...prev.tripDocuments, ...docs],
-    }));
-  };
-
-  const handleRemoveDoc = (id: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      tripDocuments: prev.tripDocuments.filter((d) => d.id !== id),
-    }));
-  };
 
   return (
     <div>
@@ -437,41 +414,11 @@ export default function StepTrip({
         </FormField>
       </div>
 
-      {/* Travel reference + Document upload — optionnels, repliés par défaut
-          (ouverts d'office si déjà renseignés, ex. en édition) */}
-      <Accordion
-        title={isFr ? "Référence & justificatif" : "Reference & proof"}
-        summary={
-          draft.tripDocuments.length > 0
-            ? `${draft.tripDocuments.length} ${copy.docCount}`
-            : draft.travelReference.trim()
-              ? draft.travelReference.trim()
-              : copy.docUploadHint
-        }
-        actionLabel={copy.add}
-        defaultOpen={draft.tripDocuments.length > 0 || draft.travelReference.trim().length > 0}
-      >
-      <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-0">
-        <FormField label={copy.travelReference}>
-          <FormInput
-            value={draft.travelReference}
-            onChange={(v: string) =>
-              setDraft((prev) => ({ ...prev, travelReference: v }))
-            }
-            placeholder={refPlaceholder}
-          />
-        </FormField>
-
-        <DocumentUpload
-          documents={draft.tripDocuments}
-          onAddAction={handleAddDocs}
-          onRemoveAction={handleRemoveDoc}
-          label={copy.docUpload}
-          hint={copy.docUploadSub}
-          limitHint={copy.docLimitReached(5)}
-        />
-      </div>
-      </Accordion>
+      {/* D111 — LE BILLET A QUITTÉ CETTE ÉTAPE pour la vérification.
+          Il vivait ici, replié, facultatif, en bas d'un écran déjà long —
+          alors qu'il débloque le badge « Voyage vérifié », donc des
+          réservations. Sa place est à côté du bouton « Publier », quand le
+          Voyageur est déjà engagé. */}
     </div>
   );
 }
