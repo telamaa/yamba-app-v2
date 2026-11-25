@@ -9555,3 +9555,40 @@ Deux autres choses sont apparues en jouant le parcours en entier :
 | 7 | J'ajoute mon billet au dernier écran | il part tout de suite ; s'il échoue, l'erreur est là, à côté du bouton d'ajout |
 | 8 | Mon billet échoue au moment de l'attacher | le trajet est quand même en ligne, et l'app me dit que le billet n'a pas été joint |
 | 9 | Sur le site, à l'étape ① | plus de « Aller simple / Aller-retour » : le choix ne créait jamais de retour |
+
+---
+
+# D111 ter — Le Voyageur ne fixe plus son prix à l'aveugle (25/11/2026)
+
+## Le besoin
+
+Sur le site, le Voyageur voit sous son curseur ce que les trajets comparables se vendent : une
+fourchette basse / médiane / haute, et un verdict qui lui dit s'il est dans le marché. Sur le
+téléphone, il voyait un nombre et rien d'autre.
+
+Les deux erreurs qu'on fait sans repère sont symétriques et coûteuses : trop bas, on laisse de
+l'argent sur la table à chaque kilo ; trop haut, on ne reçoit aucune demande et on ne sait pas
+pourquoi.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-19** | Quand le corridor est connu, l'app montre la fourchette du marché et dit où le tarif choisi se situe. | C'est la seule information qui transforme un nombre en décision. |
+| **RG-D111-20** | Quand le corridor est **inconnu**, l'app ne montre **aucune** fourchette. | Une médiane de repli serait la même de Paris à Lyon et de Paris à Dubaï. Un repère faux est pire qu'un repère absent. |
+| **RG-D111-21** | Le prix proposé d'office est la médiane du corridor, arrondie au demi-euro. | Ça fait gagner un réglage à qui n'a pas d'avis, et n'enlève rien à qui en a un. Les Voyageurs affichent 11,50, pas 11,47. |
+| **RG-D111-22** | Le détail d'une ville est demandé **une fois**, au moment du choix, jamais à chaque frappe. | Chaque appel est facturé. Et avec le même jeton de session, la saisie entière compte pour une seule session. |
+| **RG-D111-23** | Choisir une ville n'attend jamais le réseau. | La fourchette est un confort : elle arrive après, ou elle n'arrive pas. Le parcours, lui, ne s'arrête pas. |
+| **RG-D111-24** | Un code pays que l'app ne connaît pas reste **vide** — jamais deviné. | Le calcul sait retomber sur sa base de repli ; il ne sait pas qu'un code inventé est faux. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je choisis Paris puis Dubaï, j'arrive sur le prix | une fourchette s'affiche, et le prix proposé est la médiane du corridor |
+| 2 | Je monte mon tarif très au-dessus | le verdict passe à « Au-dessus du marché », le repère se déplace sans sortir de la piste |
+| 3 | Je tape une ville à la main, sans choisir de suggestion | aucune fourchette : l'app ne sait pas situer ce corridor et ne fait pas semblant |
+| 4 | Je choisis une ville alors que le réseau est coupé | la ville est retenue tout de suite ; seule la fourchette manque |
+| 5 | Je change de ville juste après en avoir choisi une | la fourchette correspond à la **dernière** ville, jamais à la précédente |
+| 6 | Je compare un Paris → Lyon et un Paris → Dubaï | la médiane du second est nettement plus élevée |
+| 7 | Mon départ est dans deux jours | la suggestion est légèrement **plus basse** : il reste peu de temps pour vendre ses kilos |

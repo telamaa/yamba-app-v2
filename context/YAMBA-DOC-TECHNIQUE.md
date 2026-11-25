@@ -19724,3 +19724,92 @@ l'importe en `./module`, était déclarée absente. Troisième faux positif du m
   site. Chemin : `placeId` dans l'autocomplétion, `/places/details` côté trip-service (même jeton de
   session), puis le moteur de corridors dupliqué sur le téléphone.
 - **Le brouillon serveur** — il doit être un trajet en base, pas un second brouillon local.
+
+---
+
+# D111 ter — La fourchette de prix par corridor (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : trip-service **414 → 430 fiches**,
+mobile **1019 → 1042 fiches**. Premier lot de la série D99 → D102 à ajouter une ligne à un service.
+
+## Le constat, et il n'était pas d'interface
+
+Le site affiche depuis D15 une fourchette « basse / médiane / haute » sous son curseur de prix ; le
+téléphone n'avait rien — sur l'écran qui décide du revenu du Voyageur. Le calcul existait pourtant
+des deux côtés. Ce qui manquait, c'était sa **matière** : le corridor se lit sur deux codes pays et
+une distance, et le relais Places (A211) ne servait que deux chaînes (`main`, `secondary`).
+
+Le site les obtient du SDK Google chargé dans le navigateur. Une app native ne peut pas embarquer ce
+SDK sans embarquer la clé — donc c'est le **serveur** qui devait bouger.
+
+## Côté serveur
+
+**`placeId` entre dans le contrat d'autocomplétion** (`PlaceSuggestionSchema`), vide quand Google
+n'en donne pas.
+
+**`GET /places/details?placeId=…&language=…&sessionToken=…`** — public comme l'autocomplétion,
+appelé **une fois par ville retenue**.
+
+| Décision | Pourquoi |
+|---|---|
+| Le `sessionToken` est relayé jusqu'ici | Avec le même jeton, Google facture l'autocomplétion **et** ce détail comme une seule session. Un jeton qui s'arrête au milieu du parcours double la facture sans que rien ne le signale. |
+| Masque de champs réduit (`location,displayName,addressComponents`) | La facturation dépend du masque : `*` ferait payer un niveau supérieur pour quatre valeurs. |
+| Cache Redis **24 h** par (lieu, langue) | Le code pays de Paris ne changera pas cette semaine. |
+| 200 / **404** / **503** | Trois sens distincts : le détail ; l'identifiant inconnu (refaire la saisie) ; le tiers muet (réessayer). Les confondre ferait dire « réessaie plus tard » à qui doit recommencer. |
+
+Les règles de projection restent pures (`places.rules.ts`) : la ville vient du composant `locality`
+**ou** du nom affiché (une proposition d'aéroport n'a pas toujours de `locality`), le code pays est
+mis en majuscules et refusé s'il ne fait pas deux lettres (il voyage jusqu'à une table de zones), et
+une coordonnée non finie devient `null` — `NaN` traverse toutes les comparaisons sans en déclencher
+une seule.
+
+## Côté téléphone
+
+```
+CityPicker  ──pick──►  { ville, pays, libelle, placeId }  + jeton de session
+                              │
+                router.back() │  (l'écran se referme TOUT DE SUITE)
+                              ▼
+                   GET /places/details  ──►  { countryCode, lat, lng }
+                              │
+                              ▼          (jetée si la ville a changé)
+                      brouillon enrichi  ──►  fourchetteDuCorridor()
+```
+
+Trois décisions tiennent ce chemin :
+
+1. **Le détail enrichit, il ne retient pas.** Faire patienter sur un réseau lent pour un confort
+   ferait payer deux fois : l'attente, et l'échec possible. Le brouillon est une mémoire de module —
+   un écran dépilé n'empêche pas de l'enrichir.
+2. **Une réponse en retard est jetée** si la ville a changé entre-temps (la règle que la liste de
+   suggestions appliquait déjà).
+3. **La jauge ne s'affiche pas quand le corridor est inconnu** (`precis === false`). Une médiane de
+   repli serait la même sur tous les corridors : un repère qui a l'air d'en être un, c'est-à-dire le
+   défaut de D100.
+
+Et quand le corridor **est** connu, la valeur d'ouverture du prix devient sa médiane arrondie au
+demi-euro : proposer le prix du marché fait gagner un réglage à qui n'a pas d'avis.
+
+## Ce que la jauge montre, et pourquoi si peu
+
+Une piste, un repère, la médiane, un verdict (« Prix juste » / « Sous le marché » / « Au-dessus du
+marché »). Le site ajoute un popover « Pourquoi ce prix ? » détaillant les modificateurs ; sur un
+téléphone, ce détail appartient à une page d'aide, pas à l'écran où l'on règle un curseur.
+
+**La zone « juste » est peinte en teal, pas en gris** : un gris de remplissage sur un gris de piste,
+c'est 3 % d'écart de luminance — le défaut mesuré de D88 ① sur la barre d'onglets. Vu à l'écran
+avant/après.
+
+## Les nombres sont ceux du site
+
+`pricing-corridors.ts` devient le **cinquième fichier dupliqué à l'octet près** entre les deux
+fronts (après `pricing-example`, `search-facets`, `parcel-weight`, `number-format`), avec sa fiche de
+comparaison. Les modificateurs (`lowPct`, `highPct`, `directFlightMod`, les deux paliers de délai)
+sont confrontés à `create-trip.config.ts`, lu à l'exécution.
+
+## Limite connue
+
+`GOOGLE_MAPS_SERVER_API_KEY` est absente du `.env` de ce poste : **l'aller-retour Google n'a pas été
+joué en vrai**. Ce qui a été vérifié : la route à travers le gateway (400 sans `placeId` — aucun
+appel facturé ; 503 sans clé), la projection par ses fiches pures, et la jauge à l'écran sur un
+corridor forcé. Le premier appel avec une vraie clé reste à faire.

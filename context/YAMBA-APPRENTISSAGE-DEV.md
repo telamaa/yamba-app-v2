@@ -11205,3 +11205,170 @@ Un balayage avec un faux positif finit désactivé, ce qui coûte autant qu'un t
 - `apps/user-ui/src/lib/trips/retour-de-trajet.ts` — le jumeau web, et son `context` à retourner.
 - `apps/user-ui/src/components/trips/create/TripPublishedPanel.tsx` — le panneau partagé.
 - Registre, entrée **D111 bis**.
+
+---
+
+# Chapitre — Ouvrir un contrat pour qu'un client puisse calculer (D111 ter)
+
+Les quatre lots de parité précédents (D99 → D102) se sont tous terminés par la même phrase : « le
+serveur avait raison, rien à ajouter ». Celui-ci est l'exception, et c'est ce qui le rend
+instructif.
+
+## 1. Distinguer un manque d'écran d'un manque de contrat
+
+Le symptôme : le site montre une fourchette de prix par corridor, l'app non. Le réflexe serait de
+porter le composant. En remontant la chaîne :
+
+```
+fourchette ← corridor(zoneDépart, zoneArrivée, distance)
+                        ↑              ↑           ↑
+                  codePaysA      codePaysB    lat/lng × 2
+                        └──────────────┴───────────┘
+                                   ↑
+                        GET /places/autocomplete → { main, secondary }   ✗
+```
+
+Le calcul existait des deux côtés. **Ce qui manquait, c'était sa matière.** Et aucune fiche de
+parité ne pouvait le trouver : les deux fronts respectaient chacun le contrat qu'on leur servait.
+
+La question utile, quand un front est plus pauvre que l'autre, n'est donc pas « quel composant
+manque ? » mais **« quelles données chaque front sait-il obtenir ? »** (c'est la leçon de D101,
+poussée d'un cran : non plus ce qu'un client sait *émettre*, mais ce qu'il peut *se procurer*).
+
+## 2. Ajouter un champ à un contrat existant
+
+```ts
+export const PlaceSuggestionSchema = z.object({
+  main: z.string(),
+  secondary: z.string(),
+  placeId: z.string(),      // ← nouveau
+}).strict();
+```
+
+Le typecheck du service part immédiatement au rouge :
+
+```
+places.rules.ts(34,3): Property 'placeId' is missing in type '{ main; secondary }'
+```
+
+C'est le bon ordre : **le contrat d'abord, le code ensuite**. Et deux fiches existantes rougissent
+aussi, parce qu'elles épinglaient la forme exacte de la projection (`toEqual([{ main, secondary }])`).
+Une fiche qui ne rougit pas quand une forme change ne garde pas cette forme.
+
+## 3. Une session de facturation ne s'arrête pas au milieu
+
+Google facture l'autocomplétion **par session** : toutes les frappes d'une même saisie, plus le
+détail du lieu finalement choisi, comptent pour une seule unité — à condition de passer le même
+`sessionToken` partout.
+
+```ts
+const url = new URL(`${DETAILS_ENDPOINT}/${encodeURIComponent(placeId)}`);
+url.searchParams.set("languageCode", language);
+if (sessionToken) url.searchParams.set("sessionToken", sessionToken);
+```
+
+Côté client, le jeton est fabriqué par le sélecteur de ville ; il doit donc **sortir** du composant
+avec le choix :
+
+```tsx
+onPickAction: (ville: VilleSaisie, contexte: { jetonDeSession: string }) => void;
+```
+
+Un jeton qui s'arrête au milieu du parcours double la facture **sans qu'aucun test ne le dise**.
+C'est une décision d'architecture, pas un détail d'implémentation.
+
+Deuxième levier sur la même facture, le masque de champs :
+
+```ts
+const DETAILS_FIELD_MASK = "location,displayName,addressComponents";
+```
+
+Demander `*` ferait payer le niveau supérieur pour quatre valeurs.
+
+## 4. Trois réponses, trois sens
+
+```ts
+export type PlaceDetailsOutcome = PlaceDetails | "unknown" | null;
+```
+
+- `PlaceDetails` → 200, champs éventuellement nuls ;
+- `"unknown"` (Google répond 404) → **404 `PLACE_NOT_FOUND`** : refaire la saisie ;
+- `null` (clé absente, tiers muet) → **503 `PLACES_UNAVAILABLE`** : réessayer.
+
+Confondre les deux derniers ferait dire « réessaie plus tard » à quelqu'un qui doit recommencer sa
+saisie. Un type union de trois cas coûte dix lignes et rend cette confusion impossible.
+
+## 5. Enrichir sans retenir
+
+L'écran de choix de ville se referme **immédiatement** ; le détail arrive après :
+
+```tsx
+setPublishDraft({ [cible]: choisie });
+router.back();
+
+if (ville.placeId.length === 0) return;
+void fetchPlaceDetails(ville.placeId, locale, contexte.jetonDeSession).then((details) => {
+  if (details === null) return;
+  const courante = getPublishDraft()[cible];
+  if (courante === null || courante.placeId !== ville.placeId) return;   // ← réponse en retard
+  setPublishDraft({ [cible]: { ...courante, countryCode: details.countryCode, … } });
+});
+```
+
+Deux choses à retenir :
+
+- **un écran dépilé n'empêche pas d'écrire dans une mémoire de module.** C'est ce qui rend ce motif
+  possible — et c'est aussi pourquoi le brouillon n'est pas un état React local ;
+- **la garde de la réponse en retard** est la même que celle de la liste de suggestions. Deux choix
+  rapprochés, deux réponses : sans elle, la première écraserait la seconde.
+
+## 6. Se taire plutôt qu'inventer
+
+```ts
+precis: (depart?.countryCode ?? null) !== null || (arrivee?.countryCode ?? null) !== null,
+```
+
+```tsx
+{fourchette.precis ? <PriceGauge … /> : null}
+```
+
+Sans aucun code pays, la médiane serait celle de la base de repli — **la même de Paris à Lyon et de
+Paris à Dubaï**. Un repère qui a l'air d'en être un est le défaut que D100 a nommé. L'écran se tait.
+
+C'est la même règle, écrite une troisième fois dans ce dépôt : un contrôle (ou un indicateur) ne doit
+jamais affirmer ce qu'il ne sait pas.
+
+## 7. Un gris sur un gris n'est pas un indicateur
+
+La première version peignait la zone « juste » avec `theme.backgroundSelected` sur une piste en
+`theme.backgroundElement`. À l'écran : invisible. C'est le défaut mesuré de D88 ① (3 % d'écart de
+luminance sur la barre d'onglets), reproduit trois semaines plus tard.
+
+```tsx
+backgroundColor: theme.tint,   // teal
+…
+zoneJuste: { opacity: 0.35 },  // un lavis, pas un aplat
+```
+
+Le teal est déjà la couleur du verdict « Prix juste » affiché juste en dessous : la zone et le mot se
+répondent. **Et la correction n'est pas venue d'une relecture — elle est venue d'une capture.**
+
+## 8. Prouver qu'une fiche mord
+
+Trois régressions injectées, puis annulées :
+
+```ts
+departSous3JoursMod: -0.05  →  0.05      // le signe du modificateur de délai
+precis: (…) !== null        →  true      // le repli déclaré « précis »
+Math.min(Math.max(…, 0), 1) →  (…)       // la position non bornée
+```
+
+Six fiches rouges, revert, vingt vertes. Une fiche écrite le même jour que son code a toujours l'air
+juste : la seule preuve est de casser le code exprès.
+
+## Pour aller plus loin
+
+- `apps/trip-service/src/lib/places.rules.ts` — la projection pure, et ses trois prudences.
+- `apps/mobile/src/lib/publish-price-suggestion.ts` — la fourchette, l'horloge reçue, la jauge.
+- `apps/mobile/src/components/publish/price-gauge.tsx` — ce qui est montré, et ce qui ne l'est pas.
+- Registre, entrée **D111 ter**.
