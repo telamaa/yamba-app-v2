@@ -19621,3 +19621,106 @@ retombe sur l'onglet. Le tunnel s'appelle donc `publish-trip/`.
 - **Le brouillon serveur** (« Brouillon » du site) : ce doit être un trajet en base, pas un second
   brouillon local.
 - **Le fuseau horaire** : `departureAt` part dans le fuseau de l'appareil, comme sur le site.
+
+---
+
+# D111 bis — Le ton, six écrans, et le retour qui existe (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` (suite de D111) · **Mesures** : mobile **1013 → 1019
+fiches**, site **232 → 238 fiches**. Aucun service touché.
+
+## Ce qui a déclenché le lot
+
+Une revue d'écran sur huit captures du tunnel joué de bout en bout
+(`context/captures/25-11`), et une phrase : « les textes des phrases sont trop longues et ça ressent
+trop de l'IA, il faut que les textes soient courts, simples, précis, naturels, humains ».
+
+## 1. Le ton
+
+Le défaut n'était pas le vocabulaire, c'était la **posture** : chaque écran expliquait son propre
+mécanisme (« Le mode de transport décide des lieux d'échange qu'on te proposera »). Un écran qui
+explique comment il marche avoue qu'il n'est pas évident.
+
+Trois règles, appliquées aux deux fronts :
+
+| Règle | Avant | Après |
+|---|---|---|
+| Un titre : une question ou un nom, 4 mots max | « Comment voyages-tu ? » puis « Ton itinéraire » | « Ton voyage » |
+| Pas de sous-titre s'il n'ajoute rien | 9 sous-titres sur le téléphone | 1 (« Ton prix est net. ») |
+| Un libellé est un libellé, pas une phrase | « Remise à l'aéroport ou en ville » | « Aéroport ou ville » |
+
+Côté site, **douze textes** raccourcis dans `create-trip.copy.ts` (sous-titres d'étape, offre,
+familles, bagages, gain net, lieux).
+
+## 2. Quatre défauts lus sur les captures
+
+- **`1 refusée(s), 1 avec supplément`** — le « (s) » d'un formulaire administratif. Deux clés ICU au
+  pluriel, jointes seulement si les deux comptent.
+- **Les pastilles de prix débordaient** sur deux lignes (« 15 €/kg » orphelin) : l'unité vit déjà
+  sous le pas-à-pas, la pastille garde « 8 € ».
+- **Le récap écrivait deux fois la même date** sur deux lignes → « 28 novembre · 10:00 → 13:12 ».
+- **Le marque-place des lieux** était tronqué et parlait de gare sur une carte d'aéroport.
+
+## 3. La fusion ① + ② — sept écrans deviennent six
+
+L'écran du mode demandait trois taps, celui de l'itinéraire deux lignes, et chacun laissait les deux
+tiers de sa hauteur vides. Réunis, ils forment un objet : **« Ton voyage »**. La règle « une question
+par écran » tient toujours — la question est « quel voyage ? ».
+
+Conséquences techniques : `ECRANS_PUBLICATION` passe à 6, `PHASES_PUBLICATION` recalcule ses bornes,
+`MANQUES_PAR_ECRAN` passe de trois clés à deux, `publish-trip/route.tsx` disparaît, et les cinq
+écrans suivants sont renumérotés. Les trois fiches qui encodaient la forme à sept écrans sont
+parties au rouge — elles faisaient leur travail.
+
+## 4. « Publier le retour » — l'aller-retour devient vrai, sur les deux fronts
+
+Le site proposait « Aller simple / Aller-retour ». Le choix partait au serveur, mais le mapper envoie
+`returnDepartureAt: null` **dans les deux cas** et ne crée aucun second trajet.
+
+Le contrôle disparaît (`StepTrip.tsx`), et le retour est proposé **après** la publication :
+
+- téléphone : `publish-trip/done.tsx`, la règle dans `lib/publish-trip.ts` (`preparerLeRetour`) ;
+- site : `TripPublishedPanel.tsx`, partagé par le grand formulaire et la variante mobile, la règle
+  dans `lib/trips/retour-de-trajet.ts` (pure, 6 fiches).
+
+Ce qui s'inverse : les deux villes **et les deux listes de lieux** — côté site, avec le `context` de
+chaque point (`PICKUP` ↔ `DELIVERY`). Ce qui se garde : mode, type, prix, capacité, familles,
+forfaits, options, notes. Ce qui s'efface : dates, heures, référence et justificatifs.
+
+Le site perd sa **redirection automatique** vers `/dashboard/trips` (1,5 s après le toast) : elle
+fermait la seule porte qui valait la peine d'être ouverte.
+
+## 5. Le billet remonte à la vérification
+
+Sur les deux fronts, il vivait loin du bouton « Publier » (bas de l'écran des dates sur le téléphone,
+accordéon de l'étape ① sur le site). Il débloque « Voyage vérifié », donc des réservations : sa place
+est à côté du geste qui engage.
+
+Sur le téléphone il gagne sa photo (`expo-image-picker` + ImageKit, **même dossier `/trips` que le
+site**). Deux décisions d'ordre :
+
+1. **Le fichier part dès qu'il est choisi**, pas au moment de publier — un échec d'image doit se voir
+   là où on l'ajoute, pas sous le bouton « Publier » où il obligerait à choisir entre publier sans
+   billet et tout reprendre.
+2. **L'attachement est séparé de la création** (le serveur range le document sous l'id du trajet) :
+   un échec laisse un trajet en ligne sans badge — le bon sens de l'échec — et l'écran de fin le dit.
+
+## 6. Rectification d'une affirmation gravée la veille
+
+D111 écrivait que « le site a exactement le même défaut » que le premier jet de l'écran du prix (une
+valeur affichée que rien n'applique). **C'est faux** : `StepConditions.tsx` écrit la médiane suggérée
+dans son brouillon au montage (D15). Le site avait raison, le défaut était mobile seul. Corrigé au
+registre, dans les deux cumulatifs et dans l'en-tête de l'écran.
+
+## 7. Le recensement du site apprend les imports relatifs
+
+Son détecteur ne voyait que `from "@/lib/…"` : une fiche posée **à côté** de son module, qui
+l'importe en `./module`, était déclarée absente. Troisième faux positif du même genre dans ce fichier
+(après celui des guillemets). Vérifié dans les deux sens.
+
+## Reste ouvert (inchangé, et c'est l'arbitrage à rendre)
+
+- **La fourchette de prix par corridor** — le seul point où le téléphone reste plus pauvre que le
+  site. Chemin : `placeId` dans l'autocomplétion, `/places/details` côté trip-service (même jeton de
+  session), puis le moteur de corridors dupliqué sur le téléphone.
+- **Le brouillon serveur** — il doit être un trajet en base, pas un second brouillon local.

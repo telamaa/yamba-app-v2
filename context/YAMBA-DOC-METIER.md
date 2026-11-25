@@ -9507,3 +9507,51 @@ trois sur un téléphone.
 | 11 | Je tape « Publier » sans avoir choisi de lieu | le bouton ne part pas au serveur : il nomme ce qui manque |
 | 12 | Je publie un trajet complet | le trajet est en ligne, et j'arrive sur sa fiche publique |
 | 13 | Je me déconnecte avec un trajet à moitié écrit | il n'existe plus à la reconnexion |
+
+---
+
+# D111 bis — Publier le retour, et parler comme un humain (25/11/2026)
+
+## Le besoin
+
+Le tunnel natif fonctionnait. Il parlait mal.
+
+Chaque écran expliquait sa propre mécanique au lieu de poser sa question, et les sous-titres
+servaient surtout à remplir le vide laissé par des écrans trop courts. Lu d'affilée sur huit
+captures, l'ensemble sonnait comme une notice — pas comme un produit.
+
+Deux autres choses sont apparues en jouant le parcours en entier :
+
+1. Le Voyageur **rentre**. Il publie son aller, et son retour n'existe nulle part. Le site lui
+   proposait bien « Aller-retour », mais ce choix ne créait jamais de second trajet : aucun
+   Expéditeur ne pouvait trouver le retour. Une promesse non tenue, des deux côtés.
+2. Le billet — celui qui débloque le badge « Voyage vérifié », donc des réservations — était demandé
+   au début du parcours, replié, facultatif. Au moment où on le demandait, le Voyageur n'était pas
+   encore engagé ; au moment où il l'est, on ne le lui demandait plus.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-11** | Un écran pose sa question ; il n'explique pas son mécanisme. Un titre fait quatre mots au plus, un sous-titre n'existe que s'il ajoute une information. | Un écran qui explique comment il marche avoue qu'il n'est pas évident. Et les textes longs ne se lisent pas sur un téléphone : ils se sautent. |
+| **RG-D111-12** | Un compte s'écrit au pluriel de la langue du lecteur. Jamais « (s) ». | « 1 refusée(s) » est la langue d'un formulaire administratif, pas celle d'un produit. |
+| **RG-D111-13** | Une étape n'existe que si sa décision la mérite. | Deux écrans qui demandent trois taps et deux lignes ne « respirent » pas : ils font attendre. |
+| **RG-D111-14** | Après avoir publié, on propose le **retour** : mêmes conditions, villes et lieux inversés, dates à poser. | C'est le seul moment où le Voyageur est convaincu et disponible — il vient de publier, et il rentre. Et le retour ainsi créé est un vrai trajet, que les Expéditeurs trouvent. |
+| **RG-D111-15** | Un lieu de remise au départ devient un lieu de livraison à l'arrivée, et réciproquement. | Même terminal, même café, autre sens de l'échange. Ne pas l'inverser proposerait l'aéroport de départ comme point de récupération à l'arrivée. |
+| **RG-D111-16** | Le billet se demande **à côté du bouton « Publier »**, jamais au début du parcours. | C'est une pièce justificative : on la fournit quand on est engagé, pas quand on explore. |
+| **RG-D111-17** | Le fichier du billet part dès qu'il est choisi ; s'il ne part pas, on le dit à cet endroit-là. | Sous le bouton « Publier », un échec d'image obligerait à choisir entre publier sans billet et tout reprendre. |
+| **RG-D111-18** | Un trajet publié dont le billet n'a pas pu être joint reste **publié**, et l'app le dit. | Mieux vaut un trajet en ligne sans badge qu'un trajet perdu parce qu'une image n'est pas passée. Mais taire l'échec ferait attendre un badge qui ne viendra pas. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je parcours le tunnel | six écrans, trois phases annoncées, aucun écran ne m'explique son fonctionnement |
+| 2 | J'arrive sur le premier écran | mode, type et les deux villes sur **un seul** écran |
+| 3 | Je refuse une famille et j'en surtaxe une | le résumé dit « 1 refusée · 1 surtaxée », sans « (s) » |
+| 4 | Je regarde le récap d'un aller-retour dans la journée | une seule ligne : le jour, puis les deux heures |
+| 5 | Je publie mon trajet | une page de fin, pas une redirection automatique |
+| 6 | Sur cette page, je tape « Publier le retour » | tout est repris sauf les dates ; les lieux de Paris sont passés du côté livraison |
+| 7 | J'ajoute mon billet au dernier écran | il part tout de suite ; s'il échoue, l'erreur est là, à côté du bouton d'ajout |
+| 8 | Mon billet échoue au moment de l'attacher | le trajet est quand même en ligne, et l'app me dit que le billet n'a pas été joint |
+| 9 | Sur le site, à l'étape ① | plus de « Aller simple / Aller-retour » : le choix ne créait jamais de retour |

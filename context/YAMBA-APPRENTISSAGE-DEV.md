@@ -11022,3 +11022,186 @@ raisonne pas, il se regarde.**
 - `apps/mobile/src/components/publish/number-stepper.tsx` — pourquoi un pas-à-pas et pas un curseur.
 - `apps/mobile/src/lib/publish-payload.spec.ts` — ce que le serveur reçoit, ligne à ligne.
 - Registre, entrée **D111** — la décision, ses exceptions et ses dettes nommées.
+
+---
+
+# Chapitre — Réécrire le ton, fusionner deux écrans, rendre vraie une promesse (D111 bis)
+
+Ce chapitre fait suite au précédent. Il part d'une phrase de revue — « les textes sont trop longs et
+ça ressent trop de l'IA » — et montre ce qu'on en fait concrètement.
+
+## 1. Diagnostiquer un ton
+
+La tentation est de chercher des synonymes. Ce n'est pas là que ça se joue. En relisant les huit
+écrans, le motif saute :
+
+```
+« Le mode de transport décide des lieux d'échange qu'on te proposera. »
+« C'est par ces deux villes que les Expéditeurs te trouveront. »
+« La date est le premier filtre des Expéditeurs. »
+```
+
+Trois sous-titres, trois **explications de mécanique**. Un écran qui explique comment il marche
+avoue qu'il n'est pas évident. La correction n'est pas de raccourcir ces phrases : c'est de les
+**supprimer**, et de mettre l'information là où elle sert — sur le contrôle lui-même :
+
+```tsx
+<ThemedText type="smallBold">{t(`mode.${mode}`)}</ThemedText>
+<ThemedText type="small" themeColor="textSecondary">{t(`mode.${mode}_hint`)}</ThemedText>
+// « Avion » / « Aéroport ou ville »
+```
+
+Les trois règles qu'on en tire tiennent en une ligne chacune : un titre est une question ou un nom
+de quatre mots ; un sous-titre n'existe que s'il ajoute une information ; un libellé est un libellé,
+pas une phrase.
+
+## 2. Un pluriel n'est pas un « (s) »
+
+```json
+"someRefused": "{refused, number} refusée(s), {surcharged, number} avec supplément"
+```
+
+Cette chaîne produit « 1 refusée(s), 1 avec supplément ». ICU sait faire :
+
+```json
+"refusedCount":    "{count, plural, one {# refusée} other {# refusées}}",
+"surchargedCount": "{count, plural, one {# surtaxée} other {# surtaxées}}"
+```
+
+```tsx
+[refusees > 0 ? t('families.refusedCount', { count: refusees }) : null,
+ surtaxees > 0 ? t('families.surchargedCount', { count: surtaxees }) : null]
+  .filter(Boolean).join(' · ')
+```
+
+On joint **seulement ce qui compte** : sans cela, « 0 surtaxée » apparaîtrait, et un zéro affiché
+est une information fausse (c'est la même leçon que le gain nul du chapitre précédent).
+
+## 3. Fusionner deux écrans sans casser la numérotation
+
+Le tunnel comptait sept écrans ; les deux premiers demandaient trois taps et deux lignes. Les
+réunir, c'est toucher à quatre endroits :
+
+```ts
+export const ECRANS_PUBLICATION = 6;                       // la jauge
+export const PHASES_PUBLICATION = [                        // les bornes de phase
+  { cle: 'trip', dernierEcran: 2 }, …
+];
+export const MANQUES_PAR_ECRAN: Record<1 | 2, readonly Manque[]> = {
+  1: ['mode', 'sousType', 'escales', 'depart', 'arrivee', 'memeVille'],
+  …
+};
+```
+
+Et **trois fiches sont parties au rouge immédiatement** — celles qui encodaient la forme à sept
+écrans (la répartition des manques, la phase de chaque écran, les manques par écran). C'est le signe
+qu'elles servaient : une fiche qui ne rougit jamais quand la forme change ne garde rien.
+
+La leçon de méthode : quand une refonte fait rougir des fiches, on lit **ce qu'elles disaient** avant
+de les corriger. Ici elles disaient « l'écran 3 porte les dates » — ce qui est devenu l'écran 2.
+Aucune règle métier n'a bougé, seulement sa répartition.
+
+## 4. Rendre vraie une promesse — sans toucher au serveur
+
+« Aller-retour » existait sur le site depuis l'origine, partait au serveur… et ne créait jamais de
+second trajet. La capacité manquante n'était pas serveur : elle était d'interface.
+
+```ts
+export function preparerLeRetour(aller: Draft): Draft {
+  return {
+    ...aller,
+    from: aller.to, to: aller.from,
+    fromPlace: aller.toPlace, toPlace: aller.fromPlace,
+    pickupLocations: aller.deliveryLocations.map(inverserLeContexte),
+    deliveryLocations: aller.pickupLocations.map(inverserLeContexte),
+    departureDate: undefined, arrivalDate: undefined,
+    departureTime: "", arrivalTime: "",
+    travelReference: "", tripDocuments: [],
+  };
+}
+```
+
+Trois détails qui font la différence entre « ça marche » et « c'est juste » :
+
+- **les lieux s'inversent avec les villes**, et côté site leur `context` avec eux (`PICKUP` ↔
+  `DELIVERY`). L'oublier proposerait l'aéroport de départ comme point de récupération à l'arrivée ;
+- **la référence et les justificatifs s'effacent** : un retour est un autre billet ;
+- **l'aller n'est pas modifié** — la fonction rend un nouvel objet, et une fiche le vérifie, parce
+  que l'écran qui affiche le trajet publié ne doit pas changer sous les pieds de celui qui le lit.
+
+Et une fiche vérifie la promesse elle-même, littéralement :
+
+```ts
+expect(manquesDeLEcran(1, retour, maintenant)).toEqual([]);          // plus rien à dire du voyage
+expect(manquesDeLEcran(2, retour, maintenant).length).toBeGreaterThan(0);  // … sauf les dates
+```
+
+## 5. Deux ordres d'exécution qui ne sont pas interchangeables
+
+**Le fichier du billet part au CHOIX, pas à la publication.**
+
+```tsx
+const resultat = await uploadTripTicket({ uri: asset.uri, … });
+if (resultat.ok) setPublishDraft({ billet: resultat.document });
+else setErreurDuBillet(resultat.code);
+```
+
+Si l'envoi avait lieu sous le bouton « Publier », un échec obligerait à choisir entre publier sans
+billet et tout reprendre. Ici, il suffit d'en choisir un autre.
+
+**L'attachement, lui, vient APRÈS la création** — le serveur range le document sous l'id du trajet
+(`POST /trips/:id/documents`) :
+
+```tsx
+const billetJoint = draft.billet === null ? null : await attacherLeBillet(trajet.id, draft.billet);
+memoriserLeRetour(draft);      // avant d'effacer : sinon il n'y a plus rien à inverser
+clearPublishDraft();
+router.replace({ pathname: '/publish-trip/done', params: { id: trajet.id, …(billetJoint === false ? { billet: 'ko' } : {}) } });
+```
+
+Trois ordres imposés, chacun pour une raison : on mémorise le retour **avant** d'effacer ; on efface
+**après** le succès ; et on **remplace** l'écran, parce que revenir en arrière sur un tunnel terminé
+n'a aucun sens.
+
+## 6. Vérifier avant d'accuser
+
+Le chapitre précédent affirmait que « le site a exactement le même défaut » (afficher une valeur que
+rien n'applique). En allant lire `StepConditions.tsx` pour le port web :
+
+```tsx
+useEffect(() => {
+  if (draft.pricePerKg === "" || draft.capacityKg === "") {
+    setDraft((prev) => ({ ...prev, pricePerKg: prev.pricePerKg === "" ? roundToHalf(suggestion.median) : prev.pricePerKg, … }));
+  }
+}, []);
+```
+
+Le site écrivait sa valeur d'ouverture depuis le début. L'affirmation était **plausible** — et
+fausse. C'est « une cause vraisemblable n'est pas une cause » (D107), appliqué à une accusation.
+Rectifié dans quatre fichiers, et la rectification est datée plutôt que gommée.
+
+## 7. Un détecteur qui vise une orthographe finit par mentir
+
+Le recensement du site (la fiche qui refuse qu'un module pur reste hors du harnais) cherchait :
+
+```ts
+/from ['"]@\/lib\/([^'"]+)['"]/g
+```
+
+Une fiche posée **à côté** de son module et qui l'importe en `./module` n'était donc pas vue : le
+module était déclaré « oublié » alors qu'il était couvert. C'est le troisième faux positif du même
+genre dans ce fichier (le premier ne voyait que les guillemets doubles). Le correctif ajoute la
+forme relative — et surtout, il a été vérifié **dans les deux sens** :
+
+```sh
+# avec l'alias → vert ; avec l'import relatif → vert aussi
+```
+
+Un balayage avec un faux positif finit désactivé, ce qui coûte autant qu'un trou.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-trip.ts` — `preparerLeRetour`, et pourquoi les lieux s'inversent.
+- `apps/user-ui/src/lib/trips/retour-de-trajet.ts` — le jumeau web, et son `context` à retourner.
+- `apps/user-ui/src/components/trips/create/TripPublishedPanel.tsx` — le panneau partagé.
+- Registre, entrée **D111 bis**.
