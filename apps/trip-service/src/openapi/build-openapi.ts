@@ -355,6 +355,53 @@ export function buildOpenApiDocument() {
         },
       },
 
+      /* ── Détail d'un lieu choisi (D111 ter) ───────────────── */
+      "/places/details": {
+        get: {
+          tags: ["places"],
+          summary: "Pays et coordonnées d'un lieu choisi",
+          description:
+            "Appelé UNE fois, quand l'utilisateur retient une ville — jamais à chaque frappe. " +
+            "Avec le même `sessionToken` que l'autocomplétion qui le précède, Google facture " +
+            "l'ensemble comme une seule session. Réponse mise en cache 24 h par (lieu, langue). " +
+            "Sans cet appel, un client sans SDK Google n'a ni code pays ni coordonnées, donc " +
+            "aucune fourchette de prix par corridor. " +
+            "404 PLACE_NOT_FOUND : l'identifiant est inconnu (refaire la saisie). " +
+            "503 PLACES_UNAVAILABLE : le service tiers ne répond pas (le parcours continue sans fourchette).",
+          operationId: "getPlaceDetails",
+          parameters: [
+            {
+              name: "placeId",
+              in: "query",
+              required: true,
+              schema: { type: "string", minLength: 1, maxLength: 300 },
+              description: "L'identifiant rendu par /places/autocomplete",
+            },
+            {
+              name: "language",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["fr", "en"] },
+              description: "Langue du nom de ville et de pays ; à défaut, l'en-tête x-locale",
+            },
+            {
+              name: "sessionToken",
+              in: "query",
+              required: false,
+              schema: { type: "string", maxLength: 36 },
+              description: "Le MÊME jeton que l'autocomplétion de la saisie",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("PlaceDetailsResponse", "Pays et coordonnées, champs éventuellement nuls"),
+            "400": response400,
+            "404": jsonResponse("ErrorResponse", "Identifiant de lieu inconnu (PLACE_NOT_FOUND)"),
+            "503": jsonResponse("ErrorResponse", "Service de lieux indisponible (PLACES_UNAVAILABLE)"),
+            "500": response500,
+          },
+        },
+      },
+
       /* ── Recherche publique ───────────────────────────────── */
       "/trips/search": {
         get: {

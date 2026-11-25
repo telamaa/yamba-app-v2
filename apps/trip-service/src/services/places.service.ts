@@ -16,15 +16,30 @@
  * doit pouvoir dire la vérité à l'utilisateur.
  */
 import redis from "@packages/libs/redis";
-import type { PlaceSuggestion } from "@packages/api-contracts";
+import type { PlaceDetails, PlaceSuggestion } from "@packages/api-contracts";
 
 import {
+  mapGoogleDetails,
   mapGoogleSuggestions,
+  placeDetailsCacheKey,
   placesCacheKey,
   type GoogleAutocompletePayload,
+  type GooglePlaceDetailsPayload,
 } from "../lib/places.rules";
 
 const ENDPOINT = "https://places.googleapis.com/v1/places:autocomplete";
+const DETAILS_ENDPOINT = "https://places.googleapis.com/v1/places";
+/**
+ * Le détail d'un lieu, lui, ne bouge pas : le code pays de Paris ne changera
+ * pas cette semaine. Vingt-quatre heures — c'est autant d'appels facturés en
+ * moins sur les corridors populaires.
+ */
+const DETAILS_CACHE_TTL_SECONDS = 86_400;
+/**
+ * Les SEULS champs demandés. La facturation de Google dépend de ce masque :
+ * demander `*` ferait payer le niveau « Enterprise » pour quatre valeurs.
+ */
+const DETAILS_FIELD_MASK = "location,displayName,addressComponents";
 /** Court : une liste de villes bouge peu, mais une frappe à la mode ne doit
  *  pas rester figée une journée. */
 const CACHE_TTL_SECONDS = 300;
@@ -103,6 +118,93 @@ export async function lookupPlaces({
     return suggestions;
   } catch (error) {
     console.warn("[places] appel Google impossible :", error);
+    return null;
+  }
+}
+
+/* ── Détail d'un lieu (D111 ter) ──────────────────────────────────────── */
+
+async function readDetailsCache(key: string): Promise<PlaceDetails | null> {
+  try {
+    const cached = await redis.get(key);
+    return cached === null ? null : (JSON.parse(cached) as PlaceDetails);
+  } catch {
+    return null;
+  }
+}
+
+export type PlaceDetailsLookup = {
+  placeId: string;
+  language: string;
+  sessionToken?: string;
+};
+
+/**
+ * Trois issues, et elles ne se confondent pas :
+ *   • le détail ;
+ *   • `"unknown"` — Google ne connaît pas cet identifiant (404). Le client a
+ *     envoyé un identifiant périmé ou fabriqué : ce n'est pas une panne ;
+ *   • `null` — le service est indisponible (clé absente, Google muet).
+ * Confondre les deux derniers ferait dire « réessaie plus tard » à qui doit
+ * recommencer sa saisie, et inversement.
+ */
+export type PlaceDetailsOutcome = PlaceDetails | "unknown" | null;
+
+/**
+ * Le pays et les coordonnées d'un lieu CHOISI, ou `null` si indisponible.
+ *
+ * Appelé une fois par ville retenue — jamais à chaque frappe. Le
+ * `sessionToken` est relayé tel quel : avec lui, Google facture
+ * l'autocomplétion et ce détail comme UNE session.
+ *
+ * Jamais d'exception, comme l'autocomplétion : un corridor inconnu fait
+ * retomber le calcul de prix sur sa base de repli, il ne casse pas un écran.
+ */
+export async function lookupPlaceDetails({
+  placeId,
+  language,
+  sessionToken,
+}: PlaceDetailsLookup): Promise<PlaceDetailsOutcome> {
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY;
+  if (!apiKey) {
+    console.warn("[places] GOOGLE_MAPS_SERVER_API_KEY absente — détail de lieu désactivé");
+    return null;
+  }
+
+  const key = placeDetailsCacheKey(placeId, language);
+  const cached = await readDetailsCache(key);
+  if (cached !== null) return cached;
+
+  try {
+    const url = new URL(`${DETAILS_ENDPOINT}/${encodeURIComponent(placeId)}`);
+    url.searchParams.set("languageCode", language);
+    if (sessionToken) url.searchParams.set("sessionToken", sessionToken);
+
+    const response = await fetch(url, {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": DETAILS_FIELD_MASK,
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+
+    if (response.status === 404) return "unknown";
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.warn(`[places] détail refusé (HTTP ${response.status}) : ${body.slice(0, 300)}`);
+      return null;
+    }
+
+    const details = mapGoogleDetails((await response.json()) as GooglePlaceDetailsPayload);
+    try {
+      await redis.set(key, JSON.stringify(details), "EX", DETAILS_CACHE_TTL_SECONDS);
+    } catch {
+      // Cache muet : la réponse part quand même.
+    }
+    return details;
+  } catch (error) {
+    console.warn("[places] détail de lieu impossible :", error);
     return null;
   }
 }

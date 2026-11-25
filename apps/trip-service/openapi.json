@@ -174,6 +174,104 @@
         }
       }
     },
+    "/places/details": {
+      "get": {
+        "tags": [
+          "places"
+        ],
+        "summary": "Pays et coordonnées d'un lieu choisi",
+        "description": "Appelé UNE fois, quand l'utilisateur retient une ville — jamais à chaque frappe. Avec le même `sessionToken` que l'autocomplétion qui le précède, Google facture l'ensemble comme une seule session. Réponse mise en cache 24 h par (lieu, langue). Sans cet appel, un client sans SDK Google n'a ni code pays ni coordonnées, donc aucune fourchette de prix par corridor. 404 PLACE_NOT_FOUND : l'identifiant est inconnu (refaire la saisie). 503 PLACES_UNAVAILABLE : le service tiers ne répond pas (le parcours continue sans fourchette).",
+        "operationId": "getPlaceDetails",
+        "parameters": [
+          {
+            "name": "placeId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "description": "L'identifiant rendu par /places/autocomplete"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fr",
+                "en"
+              ]
+            },
+            "description": "Langue du nom de ville et de pays ; à défaut, l'en-tête x-locale"
+          },
+          {
+            "name": "sessionToken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 36
+            },
+            "description": "Le MÊME jeton que l'autocomplétion de la saisie"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pays et coordonnées, champs éventuellement nuls",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDetailsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifiant de lieu inconnu (PLACE_NOT_FOUND)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service de lieux indisponible (PLACES_UNAVAILABLE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/trips/search": {
       "get": {
         "tags": [
@@ -14285,11 +14383,15 @@
           },
           "secondary": {
             "type": "string"
+          },
+          "placeId": {
+            "type": "string"
           }
         },
         "required": [
           "main",
-          "secondary"
+          "secondary",
+          "placeId"
         ],
         "additionalProperties": false,
         "description": "Une proposition de ville ou d'aéroport"
@@ -14309,6 +14411,91 @@
         ],
         "additionalProperties": false,
         "description": "Propositions de villes (8 au plus, dans la langue demandée)"
+      },
+      "PlaceDetailsQuery": {
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "sessionToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{1,36}$"
+          }
+        },
+        "required": [
+          "placeId"
+        ],
+        "additionalProperties": false,
+        "description": "Paramètres du détail d'un lieu"
+      },
+      "PlaceDetailsResponse": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "city",
+          "country",
+          "countryCode",
+          "lat",
+          "lng"
+        ],
+        "additionalProperties": false,
+        "description": "Pays et coordonnées d'un lieu choisi (pour le corridor de prix)"
       },
       "ArbitrationKind": {
         "type": "string",
