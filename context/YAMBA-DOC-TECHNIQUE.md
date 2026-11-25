@@ -19813,3 +19813,113 @@ sont confrontés à `create-trip.config.ts`, lu à l'exécution.
 joué en vrai**. Ce qui a été vérifié : la route à travers le gateway (400 sans `placeId` — aucun
 appel facturé ; 503 sans clé), la projection par ses fiches pures, et la jauge à l'écran sur un
 corridor forcé. Le premier appel avec une vraie clé reste à faire.
+
+---
+
+# D111 quater — Le brouillon serveur (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **1042 → 1065 fiches** (54
+suites). **Aucune ligne de serveur** — le serveur savait déjà tout faire.
+
+## Le constat
+
+Le brouillon de publication vivait en mémoire de processus (`publish-draft.ts`) : l'app tuée, le
+trajet était perdu. Pour un Voyageur qui commence sa saisie à l'aéroport et embarque, c'est le pire
+moment possible.
+
+Le serveur, lui, enregistre un trajet `DRAFT` depuis toujours — c'est le bouton « Brouillon » du
+site. Les cinq routes nécessaires existaient :
+
+| Route | Usage |
+|---|---|
+| `POST /trips` (`publish: false`) | créer le brouillon |
+| `PUT /trips/:id` (`publish: false`) | le mettre à jour |
+| `PUT /trips/:id` (`publish: true`) | le publier |
+| `GET /trips/my?status=DRAFT` | le retrouver |
+| `DELETE /trips/:id?hard=true` | le jeter |
+
+## Quatre décisions
+
+### ① La copie locale reste la copie de travail
+
+C'est la décision qui commande les trois autres. La sauvegarde est un **filet**, pas une étape :
+elle ne bloque jamais la navigation (`void sauvegarderLeBrouillon()`), et son échec ne se montre
+pas. Refuser l'écran suivant parce que le réseau tousse ferait perdre exactement ce que la
+sauvegarde protège.
+
+Conséquence : il n'y a jamais deux sources de vérité en concurrence. La copie serveur **rattrape**
+la locale ; l'inverse n'arrive qu'à la reprise explicite.
+
+### ② Elle commence à la fin du premier écran
+
+`createTripSchema` exige trois champs et trois seulement : `transportMode`, `originCity`,
+`destinationCity`. La règle est pure et vit dans `publish-trip.ts` :
+
+```ts
+export function pretPourLeServeur(draft: PublishDraft): boolean
+```
+
+Une fiche la confronte à `manquesDeLEcran(1)` : le jour où le serveur exigera autre chose, c'est
+cette fonction qui rougira, pas un parcours.
+
+### ③ Les enregistrements sont sérialisés
+
+Deux « Continuer » rapprochés lanceraient deux créations concurrentes — **deux brouillons pour un
+seul trajet**. Une file d'attente d'une ligne garantit que le second appel voit l'identifiant posé
+par le premier :
+
+```ts
+let enVol: Promise<void> = Promise.resolve();
+export function sauvegarderLeBrouillon(): Promise<void> {
+  const suite = enVol.then(executer);
+  enVol = suite.catch(() => undefined);   // la file ne se rompt pas sur un échec
+  return suite;
+}
+```
+
+### ④ La reprise passe par un mapper inverse, pur et défensif
+
+`publish-reverse.ts` fait le chemin inverse de `publish-payload.ts`. La base contient des trajets
+écrits par le site, par des versions antérieures de l'app et par des seeds : tout champ peut
+manquer, tout type peut surprendre.
+
+Trois règles méritent d'être nommées :
+
+- **Les cartes de lieux éteintes sont reconstruites.** Le serveur ne garde que les lieux actifs ;
+  l'écran a besoin des deux pour qu'on puisse en rallumer un d'un geste. Un lieu inconnu du jeu par
+  défaut (un aéroport sur un trajet en voiture, saisi depuis le site) est **ajouté** plutôt
+  qu'ignoré : perdre un lieu que le Voyageur a saisi serait pire qu'afficher une carte inattendue.
+- **Le billet ne revient pas.** Ses documents sont déjà attachés au trajet côté serveur ; les
+  re-téléverser en ferait des doublons. La référence, elle, revient — c'est un texte du trajet.
+- **Les dates ne se déduisent pas de `departureAt`** quand les champs locaux manquent. C'est un
+  instant UTC : en déduire un jour local décalerait d'une journée près de minuit, et publier à la
+  mauvaise date est pire que redemander la date.
+
+## L'écran de seuil
+
+Il relit les brouillons **à chaque retour** (`useFocusEffect`, pas au seul montage : un brouillon a
+pu être publié, repris ou supprimé entre deux visites). Ordre de priorité quand les deux existent :
+le **local** d'abord — c'est le plus frais, et c'est celui que le Voyageur vient de quitter.
+
+« Recommencer » jette aussi la copie serveur : la laisser ferait reproposer, au prochain lancement,
+le trajet qu'on vient d'abandonner.
+
+## Vérifié contre le serveur réel
+
+```
+POST /trips publish:false        → 201 DRAFT, pays FR → AE, lat 48.8566
+GET  /trips/my?status=DRAFT      → 1 brouillon : Paris → Dubaï, 950 c/kg, 2 familles, 1 lieu
+mapper inverse sur CETTE réponse → villes + codes pays + coordonnées + dates + prix + lieux
+PUT  /trips/:id                  → 200, capacité mise à jour
+PUT  /trips/:id publish:true     → 200 PUBLISHED
+```
+
+Deux refus du serveur reçus en chemin, et tous deux instructifs : un forfait soute de 23 kg sur une
+capacité de 18 (**RG-B-29** — que le mapper de l'app retire de lui-même : client et serveur disent
+la même chose), et `cancel` interdit depuis `DRAFT` (un brouillon se **supprime**, il ne s'annule
+pas — la machine à états l'a dit mieux que la documentation).
+
+## Reste ouvert
+
+Une vraie page « Mes trajets » sur le mobile. Aujourd'hui le seuil ne propose que le brouillon **le
+plus récent** : ça suffit tant qu'on en a un, pas quand on en a trois.

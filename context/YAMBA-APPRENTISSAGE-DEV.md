@@ -11372,3 +11372,151 @@ juste : la seule preuve est de casser le code exprès.
 - `apps/mobile/src/lib/publish-price-suggestion.ts` — la fourchette, l'horloge reçue, la jauge.
 - `apps/mobile/src/components/publish/price-gauge.tsx` — ce qui est montré, et ce qui ne l'est pas.
 - Registre, entrée **D111 ter**.
+
+---
+
+# Chapitre — Faire survivre un brouillon sans en faire une dépendance (D111 quater)
+
+Dernier chapitre du tunnel de publication. Il montre comment ajouter une sauvegarde serveur à un
+parcours **sans** le rendre dépendant du réseau — et pourquoi cet ordre de priorité change tout.
+
+## 1. Vérifier ce que le serveur sait déjà faire
+
+Le réflexe serait d'écrire un endpoint « brouillon ». En lisant le routeur :
+
+```ts
+router.post("/", …, createTrip);            // publish:false → DRAFT
+router.get("/my", …, getMyTrips);           // ?status=DRAFT
+router.put("/:id", …, updateTrip);          // publish:true publie au passage
+router.delete("/:id", …, deleteTrip);       // ?hard=true → effacement doux d'un brouillon
+```
+
+Tout y était : c'est le bouton « Brouillon » du site, qui existe depuis des mois. **Le lot est donc
+entièrement client.** Avant d'ouvrir un service, lire son routeur coûte deux minutes.
+
+## 2. Qui est la source de vérité ?
+
+C'est LA question d'un lot de persistance, et elle se tranche avant d'écrire une ligne.
+
+| Si la source est… | Alors… |
+|---|---|
+| le **serveur** | chaque étape devient une occasion de tomber en panne ; six écrans = six pannes possibles |
+| le **local** | la sauvegarde est un filet ; son échec ne coûte rien de plus qu'un filet absent |
+
+On choisit le local, et tout le reste en découle :
+
+```tsx
+void sauvegarderLeBrouillon();     // ← `void` : on n'attend pas
+router.push('/publish-trip/when'); // ← la navigation part tout de suite
+```
+
+```ts
+export async function enregistrerLeBrouillon(…): Promise<string | null> {
+  try { … } catch { return null; }   // ← ne jette JAMAIS
+}
+```
+
+**Une sauvegarde qui peut bloquer n'est pas une sauvegarde, c'est une dépendance.**
+
+## 3. Sérialiser pour ne pas créer deux brouillons
+
+Deux taps rapprochés sur « Continuer », deux `POST /trips` en vol, deux trajets `DRAFT`. Le remède
+tient en trois lignes :
+
+```ts
+let enVol: Promise<void> = Promise.resolve();
+
+export function sauvegarderLeBrouillon(): Promise<void> {
+  const suite = enVol.then(executer);
+  enVol = suite.catch(() => undefined);   // la file ne se rompt pas sur un échec
+  return suite;
+}
+```
+
+Deux détails comptent : `enVol` est réassigné **avant** de rendre la promesse (sinon deux appels
+synchrones partagent la même queue), et on recolle la chaîne avec `.catch` — sans lui, un seul échec
+empoisonnerait toutes les sauvegardes suivantes.
+
+## 4. Écrire le mapper inverse, et le tester par l'ALLER-RETOUR
+
+`publish-payload.ts` transforme un brouillon en corps ; `publish-reverse.ts` fait le contraire. Deux
+mappers écrits à la main, l'un en face de l'autre : ils divergeront, et pas sur le champ qu'on
+surveille.
+
+La fiche qui attrape ça n'est pas une comparaison champ par champ — c'est l'aller-retour :
+
+```ts
+const corps = construireCorps(brouillonComplet(), false);
+const relu  = brouillonDepuisLeTrajet({ ...corps, id: 'trajet-1' });
+expect(relu.depart).toEqual(brouillonComplet().depart);
+```
+
+Et la vérification qui vaut toutes les autres, faite une fois à la main : **rejouer le mapper sur la
+réponse RÉELLE du serveur**, obtenue par `curl`, à travers une fiche jetable. Les fixtures mentent
+toujours un peu ; une réponse de production ne ment pas.
+
+## 5. Lire une réponse d'API comme un terrain miné
+
+La base contient des trajets écrits par le site, par des versions antérieures de l'app et par des
+seeds :
+
+```ts
+function texte(valeur: unknown): string {
+  return typeof valeur === 'string' ? valeur : '';
+}
+function nombreOuNull(valeur: unknown): number | null {
+  return typeof valeur === 'number' && Number.isFinite(valeur) ? valeur : null;
+}
+```
+
+Trois décisions valent d'être expliquées plutôt que codées en silence :
+
+- **un sous-type qui n'appartient pas au mode est ignoré** (`SOUS_TYPES[mode].includes(valeur)`) :
+  un `flightType` traîné sur un trajet en voiture referait une combinaison que le serveur refuse ;
+- **les lieux éteints sont reconstruits**, parce que le serveur ne stocke que les actifs — et un
+  lieu inconnu du jeu par défaut est **ajouté**, jamais perdu ;
+- **les dates ne se déduisent pas de `departureAt`** : c'est un instant UTC, et en tirer un jour
+  local décale d'une journée près de minuit. Redemander la date est moins grave que publier à la
+  mauvaise.
+
+## 6. Deux refus du serveur valent une revue de code
+
+Pendant la vérification manuelle, deux `400` :
+
+```
+A 23kg checked bag flat rate requires a capacity of at least 23kg.   (RG-B-29)
+Action "cancel" is not allowed from status DRAFT.
+```
+
+Le premier venait de mon `curl` — j'avais changé la capacité à la main, **contournant le mapper**
+qui retire justement un forfait que la capacité ne peut pas contenir. Le client et le serveur
+disaient la même chose : c'est la vérification qui trichait.
+
+Le second est une leçon de domaine : un brouillon **se supprime**, il ne s'annule pas. La machine à
+états l'a dit plus clairement que n'importe quelle documentation — et c'est exactement pour cela que
+ce dépôt la traite comme un miroir exécutable de la spec.
+
+## 7. `useFocusEffect` plutôt que `useEffect`
+
+L'écran de seuil doit relire les brouillons **à chaque retour**, pas une fois au montage : entre
+deux visites, le brouillon a pu être publié, repris ou supprimé.
+
+```tsx
+useFocusEffect(
+  useCallback(() => {
+    let vivant = true;
+    void mesBrouillons().then((trajets) => { if (vivant) setBrouillonServeur(trajets[0] ?? null); });
+    return () => { vivant = false; };
+  }, [])
+);
+```
+
+Le drapeau `vivant` n'est pas décoratif : sans lui, une réponse qui arrive après la sortie de
+l'écran provoque un `setState` sur un composant démonté.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-sauvegarde.ts` — la file d'attente, et pourquoi elle existe.
+- `apps/mobile/src/lib/publish-reverse.ts` — la relecture défensive, règle par règle.
+- `apps/mobile/src/lib/publish-reverse.spec.ts` — l'aller-retour, et les cas tordus de la base.
+- Registre, entrée **D111 quater**.

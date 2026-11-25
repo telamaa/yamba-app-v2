@@ -9592,3 +9592,38 @@ pourquoi.
 | 5 | Je change de ville juste après en avoir choisi une | la fourchette correspond à la **dernière** ville, jamais à la précédente |
 | 6 | Je compare un Paris → Lyon et un Paris → Dubaï | la médiane du second est nettement plus élevée |
 | 7 | Mon départ est dans deux jours | la suggestion est légèrement **plus basse** : il reste peu de temps pour vendre ses kilos |
+
+---
+
+# D111 quater — Un trajet commencé ne se perd plus (25/11/2026)
+
+## Le besoin
+
+Un Voyageur commence à publier son trajet dans la file d'embarquement. On l'appelle, il range son
+téléphone, l'app est fermée par le système. Jusqu'ici : tout était perdu.
+
+Le site savait déjà enregistrer un brouillon — l'app non. C'était d'autant plus visible que
+l'onglet Activité comptait déjà les « trajets à finaliser » … que le mobile ne savait pas créer.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-25** | Dès que le trajet a un mode et deux villes, il est enregistré comme brouillon, puis à chaque étape franchie. | C'est le minimum que le serveur accepte, et c'est exactement la fin du premier écran. |
+| **RG-D111-26** | L'enregistrement ne bloque jamais la saisie, et son échec ne s'affiche pas. | Sans réseau, le Voyageur doit pouvoir finir. Lui refuser l'écran suivant lui ferait perdre ce que la sauvegarde protège. |
+| **RG-D111-27** | En rouvrant l'app, on propose de reprendre le trajet commencé. | C'est la raison d'être du lot. |
+| **RG-D111-28** | « Recommencer » supprime le brouillon, en mémoire **et** sur le serveur. | Sinon le trajet abandonné serait reproposé au lancement suivant. |
+| **RG-D111-29** | Reprendre un brouillon restaure les lieux **proposés** comme les lieux **en réserve**. | Le serveur ne garde que les lieux actifs ; l'écran doit pouvoir en rallumer un sans tout ressaisir. |
+| **RG-D111-30** | Un billet déjà envoyé n'est pas redemandé à la reprise. | Il est attaché au trajet. Le renvoyer en ferait un doublon. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je remplis le premier écran, puis je tue l'app | en rouvrant, l'onglet Publier propose de reprendre, avec mes deux villes |
+| 2 | Je reprends | tout est là : mode, dates, prix, kilos, conditions, lieux — y compris les lieux que j'avais laissés éteints |
+| 3 | Je passe deux écrans sans réseau | la saisie continue normalement ; rien ne me le signale |
+| 4 | Le réseau revient, je passe l'écran suivant | le brouillon est enregistré, sans que j'aie rien à faire |
+| 5 | Je tape « Recommencer » | le trajet abandonné ne m'est plus proposé, ni maintenant ni au prochain lancement |
+| 6 | Je publie un trajet repris | il part en ligne ; aucun brouillon ne reste derrière |
+| 7 | Je tape deux fois « Continuer » très vite | un seul brouillon est créé, pas deux |
