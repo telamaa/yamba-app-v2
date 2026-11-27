@@ -138,7 +138,7 @@ describe("largeur-de-page — le balayage : aucun contournement", () => {
 
   it("les colonnes plus ÉTROITES que le cadre sont recensées, pas libres", () => {
     // Le premier jet de cette fiche refusait TOUT conteneur centré et plafonné.
-    // Elle en a trouvé 29 dans 25 fichiers, à cinq largeurs — `max-w-6xl` à
+    // Elle en a trouvé 28 dans 24 fichiers, à cinq largeurs — `max-w-6xl` à
     // `max-w-2xl` — et elle avait tort de les refuser : une colonne de lecture
     // plus étroite CENTRÉE DANS le cadre est un motif légitime, pas un
     // contournement de la charte. Aucune ne porte la largeur du cadre : D110
@@ -152,7 +152,6 @@ describe("largeur-de-page — le balayage : aucun contournement", () => {
     // liste. C'est la mécanique d'A224 lot 5, sans ses raisons obligatoires :
     // ici le groupe a UNE raison, écrite ci-dessus, pas vingt-cinq.
     const COLONNES_ETROITES = [
-      "app/[locale]/(auth)/login/LoginFormSkeleton.tsx",
       "app/[locale]/(marketing)/help/page.tsx",
       "app/[locale]/dashboard/favorites/page.tsx",
       "app/[locale]/dashboard/finances/preview/page.tsx",
