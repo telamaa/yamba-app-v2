@@ -20709,3 +20709,200 @@ navigateur, lui, ne voit pas zod — l'application n'importe pas cet alias.
   `fileId`, que ce chemin ne garde pas.
 * Aucun écran de ce lot n'a été **vu** : il faut une session Voyageur avec un deal ACCEPTED sur le
   simulateur.
+
+---
+
+# D116 — La remise, et le transport raconté en trois jalons (27/11/2026)
+
+`POST /deals/:id/deliver` et `POST /deals/:id/events` existaient depuis B3-PR1 et **n'avaient aucun
+client mobile**. Le parcours natif du Voyageur s'arrêtait donc au milieu d'un métier : il savait
+accepter (D113) et prendre en charge (D115), puis il devait ouvrir le site pour remettre — le geste
+qui clôt le transport et déclenche le versement.
+
+**Zéro ligne de serveur, pour la cinquième fois d'affilée.**
+
+## Trois fichiers, trois frontières
+
+| Fichier | Rôle | Imports |
+|---|---|---|
+| `lib/remise.ts` | l'ÉTAT de la saisie : ce qui retient l'envoi, le verrou, le corps de la requête | `lib/photos` seul |
+| `lib/jalons.ts` | le RÉCIT : trois crans, et le seul geste proposé est le suivant | **zéro** |
+| `components/code-input.tsx` | les PIXELS des six cases, pour toute l'app | React Native |
+| `app/deal/[id]/deliver.tsx` | l'écran : les effets, et rien d'autre | — |
+
+## Ce qui retient l'envoi est une LISTE, jamais un booléen
+
+C'est la leçon de D115 2A, et elle vaut ici double parce que le site venait de montrer ce qu'elle
+coûte quand on l'oublie (voir D116 bis) :
+
+```ts
+export type ManqueDeLaRemise =
+  | { quoi: 'verrou'; restantMs: number }
+  | { quoi: 'code'; chiffres: number }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' };
+```
+
+L'ORDRE est une décision, pas un détail : **le verrou passe avant le code**. Dire « il manque deux
+chiffres » quand la saisie est bloquée quinze minutes est exact et hors sujet. Le bouton n'est jamais
+désactivé en silence (A209) : il dit ce qui le retient, et une fiche épingle l'ordre des `push`.
+
+## Le serveur compte, l'écran lit (A38)
+
+`essaisRestants` et `verrouJusqua` arrivent de la vue Voyageur à l'ouverture, puis des `details` des
+409 (`DELIVERY_CODE_INVALID` porte `attemptsLeft`, `DELIVERY_LOCKED` porte `lockedUntil`). D'où trois
+choix dans `remise.ts` :
+
+* `apresLeRefus` ne touche l'état **que** pour ces deux codes — `TRANSITION_NOT_ALLOWED` ou
+  `DELIVERY_CODE_UNAVAILABLE` ne consomment pas d'essai, donc ne décrémentent rien ;
+* `resteDuVerrouMs` rend une **valeur**, dont l'écran tire ses deux besoins : le compte à rebours, et
+  « est-ce verrouillé ? » (`> 0`). Une date illisible ne verrouille pas pour toujours ;
+* le compte à rebours ARRONDIT AU SUPÉRIEUR — afficher `0:00` pendant la dernière seconde ferait
+  croire que c'est fini alors que le serveur refuse encore. À son terme l'écran ne décide rien, il
+  **relit** (`verrouExpire`).
+
+**Aucune constante d'essais dans l'app.** Un `ESSAIS_MAX = 3` est né ici le temps d'une relecture :
+personne ne l'appelait, et sa seule fiche INTERDISAIT de s'en servir. Une constante dont l'unique
+règle est « ne t'en sers pas » est une seconde vérité qui attend son premier lecteur.
+
+## Les six cases n'ont qu'une géométrie (D116 2A)
+
+`OtpInput` portait ces cases depuis le lot auth, soudées à deux choses qui n'ont rien à voir avec
+elles : la palette « slate » des écrans d'auth, et un nom accessible lu dans le dictionnaire `auth`.
+La remise avait donc le choix entre importer l'ambiance d'un autre tunnel, ou recopier la géométrie.
+
+`components/code-input.tsx` applique **la forme de `BackButton` (D105)** :
+
+* le nom accessible est **EXIGÉ par la signature** — on ne peut pas poser un champ muet ;
+* **aucune prop de taille**, de couleur de case ou de rayon : une charte ne se défait pas par
+  malveillance, elle se défait par une prop de trop ;
+* les couleurs arrivent en `palette`, parce que les deux appelants vivent dans deux ambiances
+  assumées — c'est une AMBIANCE, pas une géométrie ;
+* `autofill` est **explicite, sans valeur par défaut**. Un code reçu par SMS mérite
+  `textContentType: "oneTimeCode"` ; un code **DICTÉ** ne doit pas le porter (voir le chapitre
+  d'apprentissage : c'est la bonne pratique qui devient un défaut).
+
+`OtpInput` devient son habillage auth : **108 lignes → 50**, un seul appelant à recâbler
+(`otp-verify-view.tsx`), et `OTP_LENGTH = CODE_LENGTH` pour ne pas casser ses lecteurs.
+
+## Les jalons : un récit, pas un formulaire (A39)
+
+Le serveur n'accepte les trois crans que **dans l'ordre** et refuse celui qui saute son tour
+(`TRACKING_STEP_NOT_ALLOWED`). Trois cases à cocher librement inviteraient donc un refus que rien
+n'explique : l'app n'offre que `jalonSuivant(confirmes)`.
+
+Deux détails qui se paient :
+
+* `jalonsConfirmes` **filtre** sur les trois codes connus plutôt que de faire confiance à la liste
+  reçue — un cran inconnu, ajouté côté serveur avant que l'app ne le connaisse, décalerait la
+  séquence et ferait proposer le mauvais geste ; et il réordonne selon le RÉCIT, parce que deux
+  événements écrits dans la même seconde peuvent revenir inversés ;
+* `jalonEnvoyable` est **relu à l'appui**, pas seulement au rendu. Le cran peut avoir été confirmé
+  entre le rendu et le doigt (double appui, relecture arrivée entre-temps).
+
+Ils restent **facultatifs** : ne rien cocher n'empêche pas de remettre, et la liste des manques de la
+remise ne les mentionne nulle part — une fiche le vérifie en lisant `remise.ts`.
+
+## Ce que l'écran ne calcule pas
+
+`payoutDueAt` est **servi par le serveur** (J+4) et affiché tel quel (`versementDeLaReponse`).
+Recalculer « dans quatre jours » côté client créerait une seconde vérité le jour où le délai change —
+et une réponse sans date lisible ne fabrique pas d'échéance, elle n'en montre aucune.
+
+Le destinataire entre dans la projection (`mes-demandes.ts`) : prénom, et téléphone à partir de la
+prise en charge. **L'app n'ajoute AUCUN filtre** — elle affiche ce que le serveur MINIMISE
+(ANO-API-15), sans quoi il existerait deux règles de confidentialité et l'une serait fausse. D113 ne
+le projetait pas et avait raison : ni la liste ni la fiche de demande n'en avaient l'usage.
+
+## Le carrefour accueille « remettre », et la fiche change de camp une seconde fois
+
+`ORDRE` passe de quatre à cinq : répondre, prendre, **remettre**, confirmer, noter. Remettre passe
+après prendre (on ne remet pas ce qu'on n'a pas pris) et avant confirmer — quelqu'un attend le colis,
+et le versement du Voyageur dort jusque-là, alors que « confirmer » se débloque seul. Son échéance
+est `null`, volontairement : le rendez-vous d'arrivée n'arrive pas dans l'app sous forme d'instant,
+et un « dans 3 h » calculé là-dessus serait inventé (D100).
+
+**C'est la troisième fois que la fiche de D114 fait son travail** (prendre en D115, remettre ici) :
+une fiche qui refuse quelque chose doit dire à quelle condition elle changera d'avis.
+
+## Un refus a une SUITE — trouvé en relisant la décision
+
+La décision du lot interdit « action impossible » en propres termes (« ce que lisait le Voyageur avant
+ANO-API-15 »), et le dictionnaire de l'écran la portait quand même, en repli générique. **Écrite une
+fois, une règle ne se relit pas toute seule.** Deux faits distincts, donc deux phrases, et chacune
+donne la suite : le RÉSEAU (rien n'est parti, le geste se refait tel quel) et un refus que l'app ne
+sait pas lire (on retourne voir où en est le colis) — jamais le code technique (D83).
+
+Et le constat se **compte** : la phrase vit dans quatre autres dictionnaires (`pickup` de D115,
+`myDeals`, `myTrips`). On ne les aligne pas d'autorité — chaque écran mérite sa phrase, et une
+réécriture en bloc dirait la même chose partout, qui est le choix de D115 3A sur les copies de la
+prise de photo. Une fiche les **compte à trois** : le prochain qui en ajoute une rougit, celui qui en
+corrige une doit baisser le chiffre. Une dette comptée se rembourse, une dette promise s'oublie.
+
+## D116 bis — le site, challengé par son jumeau natif
+
+Écrire l'écran natif a mis trois défauts du site en pleine lumière. Aucun n'était visible à la
+lecture ; tous l'étaient en demandant « et ici, qu'est-ce qui bloque le bouton ? ».
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | `isSubmitting={props.isSubmitting \|\| !props.photosReady}` | une photo de remise en échec mettait le bouton en « Vérification… » **pour toujours**, debout devant le destinataire |
+| ② | `getDealRequest(dealId).then(…)` **sans `.catch`** | une lecture qui échoue laissait un squelette perpétuel — et le rejet n'était même pas attrapé |
+| ③ | `t("otp.wrongCode", { recipientFirstName: deal.recipient?.firstName ?? "" })` | « Vérifie avec  et réessaye » quand le prénom n'est pas servi (famille D100) |
+
+Le ① est la pièce maîtresse, et c'est **la même famille que D115 bis** : un état d'attente qui ne
+finit jamais est un mensonge, et il se fabrique toujours pareil — en fusionnant deux conditions dans
+une seule variable. Le bouton ne sait plus POURQUOI il travaille, donc il ne peut plus le dire. La
+parade est structurelle : `photoHint` nomme ce que les photos retiennent, et `isSubmitting` ne porte
+plus que « je travaille ».
+
+La règle sort du composant vers `apps/user-ui/src/lib/carrier/remise.ts` (pur, zéro import, jouable
+par le harnais A224) — **cinquième règle sortie d'un composant du site** après `tunnel.ts` (D93),
+`search-facets.ts` (D100), `parcel-weight.ts` (D101) et `prise-en-charge.ts` (D115 bis).
+
+## Le défaut de D110, commis dans les fichiers écrits pour en appliquer la leçon
+
+Relecture avant commit, et le même mal des deux côtés : **des exports écrits « pour la complétude »
+que personne n'appelle.**
+
+| Export | Ce qu'il était | Verdict |
+|---|---|---|
+| `ESSAIS_MAX` (les deux fronts) | aucun appelant ; côté site, un **second domicile** pour le 3 de `MAX_DELIVERY_ATTEMPTS` (`deal.api.ts`), qui lui a de vrais lecteurs | supprimé |
+| `photosRetiennent` (site) | aucun appelant — et son unique client **recopiait son corps en ligne** pour connaître la RAISON à écrire sous le bouton | devenu `manqueDesPhotos(): Manque \| null` |
+| `peutRemettre` (site) | aucun appelant **possible** : le code vit dans l'état local du champ, et le remonter ferait rentrer la règle dans un composant | supprimé |
+| `verrouActif` (natif) | aucun appelant ; l'écran refait `restantMs > 0` | supprimé |
+| `avancementDesJalons` (natif) | une jauge « 2 sur 3 » devant trois lignes déjà visibles | supprimé |
+| `jalonEnvoyable` (natif) | aucun appelant, alors qu'il protège vraiment | **câblé** à l'appui |
+
+Un prédicat qui oblige son lecteur à refaire le calcul pour en connaître la raison n'est pas le bon
+prédicat. Et une source de vérité que l'on n'importe pas est un commentaire (D110) — ici, écrit dans
+les fichiers mêmes qui appliquaient cette leçon.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1241 (61 suites) | **1294 (63 suites)** |
+| Fiches user-ui | 273 (17 suites) | **291 (18 suites)** |
+| `otp-input.tsx` | 108 lignes | **50** (habillage) |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* `nx typecheck @yamba-app/mobile` (deux programmes) et `nx typecheck user-ui` : verts.
+* `node scripts/check-i18n-messages.mjs` : 30 espaces de noms, 60 fichiers, miroir parfait.
+* Remettre `isSubmitting || !photosReady` dans une des deux vues du site → **une** fiche rouge.
+* Rendre un cran non suivant envoyable → **deux** fiches rouges (la règle, et l'appel à l'appui).
+* Réintroduire « action impossible » dans `deliver.json` → **une** fiche rouge ; en ajouter une
+  cinquième ailleurs → la fiche de comptage rougit.
+
+## Reste ouvert
+
+* **Aucun écran de ce lot n'a été VU** : il faut une session Voyageur avec un deal `PICKED_UP` sur le
+  simulateur. D107 a gravé qu'un correctif d'interface non vu est une hypothèse déployée — c'est
+  assumé ici, et c'est le premier point de la prochaine passe.
+* La **régénération** du code est un geste de l'EXPÉDITEUR (`/code/regenerate`, cinq au plus) : elle
+  vit dans le suivi d'envoi, pas ici.
+* Quatre dictionnaires portent encore la phrase de cul-de-sac, **comptés** par une fiche.
+* **Suit** : le bloc MESSAGES + NOTIFICATIONS — `message-service` (fil, rendez-vous, numéro révélé à
+  H-2) et les notifications in-app n'ont aucun client natif, et l'onglet Messages est une coquille.

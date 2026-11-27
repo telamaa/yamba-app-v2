@@ -12269,3 +12269,199 @@ Types écrits en six secondes. Avant de contourner un outil, demande-toi **où i
 * `apps/user-ui/tsconfig.spec.json` : comment un harnais peut déclarer **plus** d'alias que son
   application (ici `@packages/api-contracts`, pour confronter une copie au contrat Zod sans embarquer
   zod dans le navigateur).
+
+
+---
+
+# Chapitre — La remise : quand une bonne pratique devient un défaut (D116)
+
+Ce chapitre parle de quatre choses utiles partout : une **bonne pratique qui se retourne**, un
+**booléen qui fait perdre une information**, un **export que personne n'appelle**, et la différence
+entre une règle *écrite* et une règle *relue*.
+
+## 1. `oneTimeCode` : la bonne pratique qui devient un défaut
+
+Un champ à six chiffres sur un téléphone appelle mécaniquement ceci :
+
+```tsx
+<TextInput textContentType="oneTimeCode" autoComplete="sms-otp" />
+```
+
+C'est documenté par Apple et Google, c'est recommandé partout, et **c'est faux ici**. Le code de
+livraison ne vient pas d'un SMS : le destinataire le lit **à voix haute** (D43). Le téléphone
+proposerait donc au Voyageur un code reçu pour autre chose — une banque, un autre service — devant
+quelqu'un qui attend.
+
+> **Une bonne pratique est un pari sur un contexte.** `oneTimeCode` parie que le code arrive par
+> message. Quand le contexte change, la bonne pratique devient un défaut poli.
+
+La parade n'est pas de l'oublier dans ce fichier-là : c'est de rendre le choix **obligatoire et
+nommé** dans la primitive partagée.
+
+```ts
+export function CodeInput({
+  autofill,            // ← pas de valeur par défaut : l'appelant DOIT choisir
+  accessibilityLabel,  // ← EXIGÉ par le type : on ne peut pas poser un champ muet
+  palette,             // ← une AMBIANCE, pas une géométrie
+}: { autofill: boolean; accessibilityLabel: string; palette: CodeInputPalette }) {
+```
+
+Pas de `autofill = true` silencieux. Un défaut silencieux est une décision prise par celui qui a
+écrit le composant à la place de celui qui l'utilise — et il la prendra toujours pour le premier
+appelant, jamais pour le cinquième.
+
+À retenir sur la forme : `accessibilityLabel: string` **non optionnel** est plus fort que n'importe
+quelle convention écrite, parce que `tsc` la fait respecter. C'est la leçon de `BackButton` (D105),
+et sa réciproque : **n'expose aucune prop de taille**. Une charte ne se défait pas par malveillance,
+elle se défait par une prop de trop.
+
+## 2. Un booléen perd l'information que son lecteur doit dire
+
+Voici la ligne qui a tenu un mois sur le site, et le défaut qu'elle cache :
+
+```tsx
+// ✗ LE DÉFAUT
+isSubmitting={props.isSubmitting || !props.photosReady}
+```
+
+Lis le composant qui la reçoit : il affiche « Vérification… » quand `isSubmitting` est vrai. Donc une
+photo en échec — qui n'est pas une vérification en cours — affiche « Vérification… » **pour
+toujours**, debout devant le destinataire.
+
+Le bug n'est pas le `||`. Le bug est **l'effacement du motif** : deux faits distincts entrent, un
+seul bit sort, et le bouton ne sait plus pourquoi il attend — donc il ne peut plus le dire.
+
+```ts
+// ✓ LA PARADE : on rend ce qui RETIENT, pas un bit
+export type ManqueDeLaRemise =
+  | { quoi: 'verrou'; restantMs: number }
+  | { quoi: 'code'; chiffres: number }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' };
+
+export function manquesDeLaRemise({ code, photos, verrouille }): ManqueDeLaRemise[]
+```
+
+Deux conséquences qu'on ne voit qu'après coup :
+
+* **l'ordre devient une décision.** Le verrou passe avant le code : dire « il manque deux chiffres »
+  à quelqu'un dont la saisie est bloquée quinze minutes est *exact et hors sujet*. Un booléen ne
+  pouvait pas porter cette nuance ;
+* **le bouton n'a plus besoin d'être muet** (A209) : il dit ce qui le retient, et il n'est jamais
+  éteint sans raison lisible.
+
+Règle générale : *quand un état est consommé par du texte affiché, ne le réduis pas à un booléen
+avant de l'avoir affiché.*
+
+## 3. Un prédicat qui oblige à refaire le calcul n'est pas le bon prédicat
+
+Variante du même mal, trouvée en relisant ce lot avant commit :
+
+```ts
+// Le module exportait ceci…
+export function photosRetiennent(photos): boolean { … }
+
+// …et son UNIQUE appelant écrivait ceci, parce qu'il voulait la RAISON :
+const manques = manquesDeLaRemise({ code: '0'.repeat(6), photos, verrouille: false });
+const hint = manques[0]?.quoi === 'televersement' ? t('photos.uploading') : t('photos.uploadError');
+```
+
+Le prédicat était inutilisable : son client avait besoin du motif, donc il a recopié le corps de la
+fonction. Le bon export rend **le manque**, pas un oui/non :
+
+```ts
+export function manqueDesPhotos(photos): ManqueDeLaRemise | null
+```
+
+> Quand ton seul appelant contourne ta fonction, ce n'est pas lui qui a tort.
+
+## 4. Un export que personne n'appelle est un commentaire — et parfois une seconde vérité
+
+Même passe de relecture, six exports des deux fronts n'avaient **aucun appelant**. Le contrôle tient
+en une ligne de shell, et il est à faire *avant* de committer un module neuf :
+
+```sh
+for f in $(grep -oE '^export (const|function) [A-Za-z_]+' lib/remise.ts | awk '{print $3}'); do
+  printf '%-22s : ' "$f"; grep -rln "\b$f\b" src | grep -v 'lib/remise'; echo
+done
+```
+
+Les verdicts ne sont pas tous les mêmes, et c'est l'intérêt :
+
+| Cas | Verdict |
+|---|---|
+| `ESSAIS_MAX = 3`, alors que `MAX_DELIVERY_ATTEMPTS = 3` existe et a des lecteurs | **supprimer** : un second domicile pour le même chiffre |
+| `verrouActif(etat, t)`, alors que l'écran fait `resteDuVerrouMs(…) > 0` | **supprimer** : deux façons de poser la même question |
+| `avancementDesJalons()` (« 2 sur 3 ») devant trois lignes déjà visibles | **supprimer** : il compte ce qu'on voit |
+| `jalonEnvoyable(confirmes, jalon)`, qui protège d'un cran périmé | **câbler** : il manquait à l'appui |
+
+Le cas le plus instructif est `ESSAIS_MAX`. Sa seule fiche disait :
+
+```ts
+expect(source).not.toMatch(/ESSAIS_MAX\s*-/);   // « ne t'en sers pas pour soustraire »
+```
+
+**Une constante dont l'unique règle est « ne t'en sers pas » est une seconde vérité qui attend son
+premier lecteur.** On ne la garde pas en l'interdisant : on la supprime, et la fiche vise désormais
+les deux fichiers qui pourraient la refaire.
+
+Attention au piège en écrivant cette fiche — ce dépôt l'a payé cinq fois ce mois-ci, dont une fois
+*dans le détecteur lui-même* (A224 lot 5) : le module **explique en commentaire** pourquoi la
+constante est absente, donc chercher le mot trouve l'explication.
+
+```ts
+expect(sansCommentaires(source)).not.toMatch(/ESSAIS_MAX|MAX_ESSAIS/);   // on vise l'USAGE
+```
+
+## 5. Une règle écrite n'est pas une règle relue
+
+La décision du lot interdisait « action impossible » en propres termes. Le dictionnaire de l'écran
+la portait quand même. Personne n'avait désobéi : la phrase venait d'un dictionnaire voisin, recopiée
+comme repli générique, et la décision n'était pas *présente* au moment du copier-coller.
+
+Deux parades, et seule la seconde survit à l'oubli :
+
+1. réécrire la phrase — nécessaire, insuffisant ;
+2. **la faire compter par une fiche.** Elle vit dans quatre autres dictionnaires ; on ne les aligne
+   pas d'autorité (chaque écran mérite sa phrase), mais la fiche fixe le nombre :
+
+```ts
+expect(porteurs).toEqual(['myDeals', 'myTrips', 'pickup']);
+```
+
+Le prochain qui en ajoute une rougit ; celui qui en corrige une doit **baisser le chiffre**. Une
+dette comptée se rembourse, une dette promise s'oublie — c'est la forme déjà retenue en D115 3A pour
+les trois copies de la prise de photo.
+
+## 6. Détail de langage : `return` dans un `catch`, et le `finally` qui sauve
+
+```ts
+setEnvoi(true);
+try {
+  await remettre(id, corps);
+} catch (e) {
+  if (!(e instanceof ApiError)) {
+    setErreur(t('networkFailed'));
+    return;                 // ← sortie anticipée DANS le catch
+  }
+  …
+} finally {
+  setEnvoi(false);          // ← s'exécute quand même, y compris sur ce return
+}
+```
+
+Le `return` d'un `catch` n'échappe pas au `finally` : c'est précisément ce qui évite ici l'état
+d'attente perpétuel. Sans `finally`, ce `return` laissait `envoi` à `true` pour toujours — le même
+mensonge que le `isSubmitting || !photosReady` du site, fabriqué autrement. **Un état d'attente a
+exactement une sortie, et elle doit être inconditionnelle.**
+
+## Pour aller plus loin
+
+* Séquences imposées par un serveur : n'offre jamais la liste complète si le serveur refuse l'ordre.
+  Ici `jalonSuivant(confirmes)` est la *même* règle que celle du serveur (`SEQUENCE[confirmés.length]`),
+  recopiée et confrontée au contrat Zod par une fiche — le mobile ne peut pas importer le contrat
+  (A223), donc la copie est assumée et **gardée**.
+* Lecture défensive d'une liste venue du réseau : `jalonsConfirmes` filtre sur les codes connus et
+  **réordonne** — deux événements écrits dans la même seconde peuvent revenir inversés, et un cran
+  inconnu décalerait la séquence.
+* `payoutDueAt` vient du serveur : ne recalcule jamais une échéance que quelqu'un d'autre décide.

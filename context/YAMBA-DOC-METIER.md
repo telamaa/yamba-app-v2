@@ -9872,3 +9872,75 @@ Et son issue légitime — refuser un colis douteux — n'existait pas davantage
 | 1 | Je tape 500 caractères puis un de plus | le champ s'arrête, le compteur est visible |
 | 2 | J'ouvre l'écran avec une remarque trop longue collée | le bouton est inactif ET la phrase dit pourquoi |
 | 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette prise en charge ne se lit pas » et un bouton me ramène à la demande |
+
+
+---
+
+# D116 — Le Voyageur remet le colis, et raconte le transport (27/11/2026)
+
+## Le besoin
+
+Le Voyageur avait appris à accepter (D113) et à prendre en charge (D115). Puis il atterrissait, et le
+geste qui CLÔT le transport — se faire dicter six chiffres par le destinataire, dans une rue, un hall
+ou un parking — n'existait que sur le site. Il devait sortir de l'app au moment où elle sert le plus,
+et son versement (J+4) attendait ce geste. Entre les deux, pendant le vol, l'Expéditeur regardait un
+suivi que personne ne nourrissait.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D116-1** | Le code à six chiffres est **dicté par le destinataire**, jamais reçu par le Voyageur. | Il part à l'Expéditeur (D43), qui le transmet. Le Voyageur ne l'a jamais vu (D115 2A). |
+| **RG-D116-2** | Le champ ne propose **aucun remplissage automatique**. | Le téléphone proposerait un code SMS reçu pour autre chose — un contresens, et une erreur devant quelqu'un qui attend. |
+| **RG-D116-3** | Le collage est permis et il n'y a **pas d'autofocus arraché**. | On se fait parfois envoyer le code par message, et le Voyageur peut vouloir photographier d'abord. |
+| **RG-D116-4** | Les essais restants et le verrou viennent du **serveur**, jamais d'un calcul de l'app. | Trois échecs verrouillent quinze minutes ET remettent le compteur à zéro côté serveur (A38). Deux arithmétiques divergent. |
+| **RG-D116-5** | Un refus dit **ce qui s'est passé et ce qui suit** : « ce n'est pas le bon code » puis « réessaye dans 14:59 ». | « Action impossible » est ce que lisait le Voyageur avant ANO-API-15 : vrai, inutile, sans suite. |
+| **RG-D116-6** | Le compte à rebours est un **affichage** : à son terme l'écran relit, il ne déverrouille rien. | Seul le serveur sait si la fenêtre est rouverte. |
+| **RG-D116-7** | Quand le prénom du destinataire n'est pas servi, la phrase existe en **seconde version**. | « Fais-le répéter à  » ne nomme personne (famille D100). |
+| **RG-D116-8** | Les photos de remise sont **facultatives** (deux au plus) et ne bloquent **jamais en silence**. | Le code prouve la remise, la photo prouve l'état (A76). Une photo en échec se réessaie ou se retire, et le bouton dit ce qui le retient. |
+| **RG-D116-9** | Les trois jalons sont **strictement séquentiels** et l'app n'offre que le suivant. | Le serveur refuse celui qui saute son tour (`TRACKING_STEP_NOT_ALLOWED`) ; trois cases libres inviteraient ce refus. |
+| **RG-D116-10** | Les jalons sont **facultatifs** : ne rien cocher n'empêche pas de remettre. | Ils servent l'Expéditeur qui suit son colis, ils ne sont pas une condition du métier. |
+| **RG-D116-11** | Un jalon refusé **n'empêche pas** la remise, et le dit sans drame. | Le récit est un confort ; le colis, lui, doit arriver. |
+| **RG-D116-12** | La date de versement est **servie par le serveur** et affichée telle quelle. | Recalculer « dans quatre jours » créerait une seconde vérité le jour où le délai change. |
+| **RG-D116-13** | Le téléphone du destinataire s'affiche **tel que le serveur le sert**, sans filtre ajouté par l'app. | Il est révélé à partir de la prise en charge (ANO-API-15). Deux règles de confidentialité, et l'une serait fausse. |
+| **RG-D116-14** | Le droit de remettre vient du serveur (`allowedActions`), jamais d'un statut déduit. | Seule la machine à états connaît la fenêtre. |
+| **RG-D116-15** | Le carrefour annonce « remets le colis » **après** « prends en charge » et **avant** « confirmer ». | On ne remet pas ce qu'on n'a pas pris ; et quelqu'un attend le colis, alors que « confirmer » se débloque seul. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre une réservation dont le colis est pris en charge | je vois « Valider la remise » |
+| 2 | Je cherche le code sur mon écran | il n'y est nulle part ; on me dit de le demander au destinataire |
+| 3 | Je touche le champ | clavier numérique, **aucune** proposition de code SMS |
+| 4 | Je tape le bouton avec quatre chiffres | on me dit qu'il manque deux chiffres ; rien n'est envoyé |
+| 5 | Je colle un code reçu par message | il se répartit dans les six cases |
+| 6 | Je me trompe une fois | on me dit de le faire répéter, et combien d'essais restent |
+| 7 | Je me trompe trois fois | la saisie se bloque avec un compte à rebours visible, pas avec « action impossible » |
+| 8 | J'attends la fin du compte à rebours | l'écran **relit** l'état auprès du serveur ; il ne se déverrouille pas seul |
+| 9 | Le destinataire n'est pas nommé par le serveur | la phrase du mauvais code reste entière et ne nomme personne |
+| 10 | Une photo de remise échoue à partir | le bouton dit qu'une photo n'est pas partie ; je la réessaie ou je la retire |
+| 11 | Je remets sans aucune photo | c'est accepté : le code suffit |
+| 12 | J'ouvre les jalons avant d'être à l'aéroport | un seul geste est proposé : « je suis à l'aéroport » |
+| 13 | Je confirme les trois crans | on me dit que tout est dit, et qu'il ne reste que la remise |
+| 14 | Un jalon n'est pas accepté | on me le dit, et je peux quand même remettre le colis |
+| 15 | Je valide la remise | on me dit que c'est terminé et **quand** mon paiement part, sans que l'app le calcule |
+| 16 | Le réseau tombe pendant l'envoi | on me dit que rien n'est parti et que je peux refaire le geste |
+| 17 | Je perds le destinataire de vue | je peux l'appeler depuis l'écran, si le serveur a servi son numéro |
+| 18 | J'ouvre la remise d'un colis qui n'en attend pas | l'écran me le dit et me ramène à la réservation |
+| 19 | J'ouvre l'onglet Activité avec un colis à prendre et un à remettre | prendre est au-dessus de remettre |
+
+## D116 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D116bis-1** | « Je travaille » et « j'attends une photo » sont **deux états distincts**, jamais fondus dans la même variable. | Une photo en échec mettait le bouton en « Vérification… » pour toujours : il avait perdu la raison de son attente, donc sa capacité à la dire. |
+| **RG-D116bis-2** | Une lecture qui échoue **le dit** et offre une sortie vers la réservation. | Sans `.catch`, le rejet n'était pas même attrapé : squelette perpétuel. |
+| **RG-D116bis-3** | Sur le site aussi, un prénom absent ne troue pas la phrase du mauvais code. | Deux versions de la phrase, comme sur le téléphone. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Une photo de remise échoue, je tape Valider | le bouton reste inactif ET une phrase dit que la photo retient l'envoi |
+| 2 | Je retire la photo fautive | l'envoi repart |
+| 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette remise ne se lit pas » et un bouton me ramène à la réservation |
+| 4 | Le serveur refuse le code sans servir le prénom | la phrase reste entière |
