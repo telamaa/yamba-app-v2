@@ -33,8 +33,8 @@
     }
   },
   "publish": {
-    "title": "Publish your trip",
-    "body": "Destination, date, available kilos, your price per kilo: publishing arrives in an upcoming batch of the app."
+    "title": "Publie ton trajet",
+    "body": "Tes kilos libres rapportent."
   },
   "messages": {
     "title": "Messages",
@@ -51,9 +51,10 @@
     "title": "Activity",
     "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",
     "draftTrips": "{count, plural, =0 {No trips to finish} one {# trip to finish} other {# trips to finish}}",
-    "note": "Trip and request details arrive in an upcoming batch.",
+    "note": "Request details arrive in an upcoming batch.",
     "publishTitle": "Publish your trip",
     "publishBody": "Your spare kilos can earn. Announce your next journey and receive requests.",
-    "publishSoon": "Publishing arrives in an upcoming batch of the app."
+    "myTrips": "My trips",
+    "publishCta": "Publish a trip"
   }
 }
