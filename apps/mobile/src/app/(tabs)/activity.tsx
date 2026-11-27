@@ -48,6 +48,25 @@ function ActivityContent() {
           <ProfileAvatarButton />
         </View>
 
+        {/* D112 — LA FACE EXPÉDITEUR, qui n'existait pas. `isCarrier &&`
+            masquait les seuls compteurs de l'écran : un compte sans rôle
+            Voyageur ne voyait qu'une phrase d'attente et une invitation à
+            devenir Voyageur, sur l'onglet censé servir « les deux faces ».
+            Cette porte est ouverte à TOUT LE MONDE — tout compte peut
+            envoyer, et c'est par ici qu'on retrouve le suivi d'un colis. */}
+        <View style={styles.counters}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/shipments/mine')}
+            style={({ pressed }) => [styles.lien, pressed && styles.pressed]}>
+            <ThemedText type="smallBold">{t('activity.myShipments')}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.lienCompte}>
+              {t('activity.shipmentsToHandle', { count: badges.shipmentsToHandle })}
+            </ThemedText>
+            <Ionicons name="chevron-forward" size={16} color={Brand.mango} />
+          </Pressable>
+        </View>
+
         {isCarrier && (
           <View style={styles.counters}>
             <ThemedText>{t('activity.pendingDeals', { count: badges.pendingDeals })}</ThemedText>

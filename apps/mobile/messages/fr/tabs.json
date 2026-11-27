@@ -51,10 +51,12 @@
     "title": "Activité",
     "pendingDeals": "{count, plural, =0 {Aucune demande en attente} one {# demande en attente} other {# demandes en attente}}",
     "draftTrips": "{count, plural, =0 {Aucun trajet à finaliser} one {# trajet à finaliser} other {# trajets à finaliser}}",
-    "note": "Le détail des demandes arrive dans un prochain lot.",
+    "note": "Le détail des demandes reçues arrive dans un prochain lot.",
     "publishTitle": "Publie ton trajet",
     "publishBody": "Tes kilos libres peuvent rapporter. Annonce ton prochain voyage et reçois des demandes.",
     "myTrips": "Mes trajets",
-    "publishCta": "Publier un trajet"
+    "publishCta": "Publier un trajet",
+    "myShipments": "Mes envois",
+    "shipmentsToHandle": "{count, plural, =0 {Rien à traiter} one {# envoi à traiter} other {# envois à traiter}}"
   }
 }

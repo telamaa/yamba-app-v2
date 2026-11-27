@@ -162,6 +162,10 @@ export default function RootLayout() {
             {/* « Mes trajets » : une DESTINATION, pas un tunnel — on y revient
                 entre deux voyages. Poussée par-dessus les onglets. */}
             <Stack.Screen name="trips/mine" />
+            {/* « Mes envois » : la porte qui manquait au suivi (D112). Le
+                PLURIEL n'est pas un caprice — `shipment/mine` serait capté
+                par `shipment/[id]` avec id = « mine ». */}
+            <Stack.Screen name="shipments/mine" />
             {/* La PUBLICATION d'un trajet : sept écrans poussés, le pendant
                 Voyageur du tunnel de réservation. Son seuil est l'onglet
                 « + » ; ici vit la pile qui se pousse par-dessus les onglets. */}

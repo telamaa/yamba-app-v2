@@ -1,0 +1,36 @@
+{
+  "title": "My shipments",
+  "back": "Back",
+  "count": "{count, plural, =0 {No shipment in progress} one {# shipment in progress} other {# shipments in progress}}",
+  "sections": {
+    "aTraiter": "Needs you",
+    "enCours": "In progress",
+    "passes": "Past"
+  },
+  "status": {
+    "PENDING": "Awaiting reply",
+    "ACCEPTED": "Accepted",
+    "PICKED_UP": "On the way",
+    "DELIVERED": "Handed over",
+    "COMPLETED": "Completed",
+    "DECLINED": "Declined",
+    "EXPIRED": "No reply",
+    "CANCELLED": "Cancelled",
+    "DISPUTED": "Dispute open"
+  },
+  "route": "{from} → {to}",
+  "noRoute": "Trip without a city",
+  "noDate": "Date unknown",
+  "carrier": "with {name}",
+  "noCarrier": "Unknown Traveler",
+  "expiresIn": "Reply expected within {remaining}",
+  "expired": "The request has expired",
+  "actions": {
+    "confirmer": "Confirm receipt",
+    "noter": "Rate the Traveler"
+  },
+  "emptyTitle": "No shipment yet",
+  "emptyBody": "Find a Traveler on your route and send your first parcel.",
+  "emptyCta": "Find a trip",
+  "loadError": "Your shipments cannot be loaded right now."
+}
