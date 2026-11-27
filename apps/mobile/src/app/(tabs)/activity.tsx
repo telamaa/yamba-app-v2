@@ -35,7 +35,7 @@ import { useTranslations } from 'use-intl';
 import { Ionicons } from '@expo/vector-icons';
 
 import { IdentityGate } from '@/components/identity-gate';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
+import { HeaderActions } from '@/components/header-actions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -127,7 +127,7 @@ function ActivityContent() {
           <ThemedText type="title" style={styles.title}>
             {t('activity.title')}
           </ThemedText>
-          <ProfileAvatarButton />
+          <HeaderActions />
         </View>
 
         {/* ① CE QUI T'ATTEND. En tête, parce que c'est la seule chose de cet

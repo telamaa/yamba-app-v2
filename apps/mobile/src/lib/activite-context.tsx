@@ -23,8 +23,10 @@ import { AppState } from 'react-native';
 
 import { apiFetch } from '@/lib/api/client';
 import { mesConversations } from '@/lib/api/messages.api';
+import { mesNotifications } from '@/lib/api/notifications.api';
 import { mesDemandes } from '@/lib/api/my-deals.api';
 import { mesEnvois } from '@/lib/api/shipment.api';
+import { boiteDeLApi, type NotificationDeLaBoite } from '@/lib/boite';
 import { conversationsDeLApi, type ConversationDeLaListe } from '@/lib/fil';
 import { demandeDeLApi, sectionDeLaDemande, type DemandeDeLaListe } from '@/lib/mes-demandes';
 import { envoiDeLApi, sectionDeLEnvoi, type EnvoiDeLaListe } from '@/lib/mes-envois';
@@ -76,6 +78,17 @@ type ActiviteState = {
    * pas avec la même phrase.
    */
   conversationsEnEchec: boolean;
+  /**
+   * D119 — la boîte aux lettres, lue ICI comme tout le reste.
+   *
+   * Cinquième requête de ce contexte, et c'est une décision : la cloche et
+   * l'écran qu'elle ouvre doivent compter la MÊME chose (doctrine D114 —
+   * une lecture, une vérité). Deux lectures à deux instants peuvent se
+   * contredire, et la pastille annoncerait alors autre chose que l'écran.
+   */
+  notifications: NotificationDeLaBoite[];
+  notificationsNonLues: number;
+  notificationsEnEchec: boolean;
   /** `false` tant que la première lecture n'est pas revenue. */
   pret: boolean;
 };
@@ -96,6 +109,9 @@ const VIDE: ActiviteState = {
   demandes: [],
   conversations: [],
   conversationsEnEchec: false,
+  notifications: [],
+  notificationsNonLues: 0,
+  notificationsEnEchec: false,
   pret: false,
 };
 
@@ -117,16 +133,19 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
   const isCarrier = user?.roles.includes('CARRIER') ?? false;
 
   const relire = useCallback(async () => {
-    const [deals, trips, conversations, envoisBruts] = await Promise.all([
+    const [deals, trips, conversations, envoisBruts, boite] = await Promise.all([
       isCarrier ? mesDemandes() : Promise.resolve([]),
       apiFetch<MyTripsResponse>('/trips/my').catch(() => null),
       mesConversations().catch(() => ECHEC),
       mesEnvois(),
+      mesNotifications().catch(() => ECHEC),
     ]);
 
     // La réponse ENTIÈRE, enfin lue (D117 0A).
     const enEchec = conversations === ECHEC;
     const fils = conversationsDeLApi(enEchec ? null : conversations);
+    const boiteEnEchec = boite === ECHEC;
+    const lettres = boiteDeLApi(boiteEnEchec ? null : boite, user?.id ?? null);
     const demandes = deals
       .map(demandeDeLApi)
       .filter((d): d is DemandeDeLaListe => d !== null);
@@ -157,9 +176,17 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
       // pendant que le réseau hoquette est pire qu'un écran un peu vieux.
       conversations: enEchec ? precedent.conversations : fils.items,
       conversationsEnEchec: enEchec,
+      // Même traitement que les conversations : une panne garde la dernière
+      // liste connue et ne remet pas le compteur à zéro — « tout est lu »
+      // est la version silencieuse du mensonge « rien n'est arrivé ».
+      notifications: boiteEnEchec ? precedent.notifications : lettres.items,
+      notificationsNonLues: boiteEnEchec
+        ? precedent.notificationsNonLues
+        : lettres.nonLues,
+      notificationsEnEchec: boiteEnEchec,
       pret: true,
     }));
-  }, [isCarrier]);
+  }, [isCarrier, user?.id]);
 
   useEffect(() => {
     if (status !== 'authenticated') {

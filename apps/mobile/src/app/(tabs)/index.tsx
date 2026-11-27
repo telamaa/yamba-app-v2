@@ -41,7 +41,7 @@ import { useLocale, useTranslations } from 'use-intl';
 
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
+import { HeaderActions } from '@/components/header-actions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
@@ -642,7 +642,7 @@ export default function SearchScreen() {
           </ThemedText>
         </View>
       </Pressable>
-      <ProfileAvatarButton />
+      <HeaderActions />
     </View>
   );
 
