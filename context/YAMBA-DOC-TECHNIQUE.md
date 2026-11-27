@@ -21195,3 +21195,110 @@ n'en porte.
 * **Suit** : lot 3, les notifications in-app — et la question à trancher AVANT d'écrire : le mobile
   n'a **aucune** notification push, et c'est un chantier entier (jetons de device, APNs, Expo
   Notifications) qui n'existe nulle part dans le dépôt.
+
+---
+
+# D119 — La boîte aux lettres, en natif (27/11/2026)
+
+Troisième et dernier lot du bloc communication. `GET /me/notifications` et ses deux routes de
+lecture existent depuis PR4bis ; **aucun client mobile**.
+
+**Zéro ligne de serveur, huitième fois d'affilée.**
+
+## Le lot n'est pas « une liste de plus », c'est un RECENSEMENT
+
+Écrire la boîte oblige à nommer les vingt-cinq événements du produit. En les comptant **avant**
+d'écrire une ligne, on découvre que **quatre tombaient dans un repli intitulé « Notification »** sur
+le site :
+
+| Type | Pourquoi il était muet |
+|---|---|
+| `conversation.meetup_proposed` | aucune ligne de présentation |
+| `conversation.meetup_accepted` | aucune ligne de présentation |
+| `conversation.phone_revealed` | aucune ligne de présentation |
+| `booking.dispute_carrier_responded` | **ses phrases étaient écrites**, pas sa ligne de présentation |
+
+Le quatrième est le plus instructif : **écrit, puis oublié à mi-chemin**. Le site a deux portes
+(`PRESENTATION` décide du repli, `copy` écrit les phrases) et **une seule suffit à tout bloquer**.
+
+Et les trois premiers sont exactement ce que D117 et D118 viennent de rendre quotidien : **l'alerte
+qui va devenir la plus fréquente du produit était la plus muette.**
+
+C'est **ANO-API-16 rejoué côté CLIENT**. Cette recette-là fut BLOQUANTE : l'union ne couvrait pas
+`conversation.*` et **toute la boîte répondait 500**. Elle a été complétée côté serveur ; côté
+client, personne n'avait compté.
+
+> **Une union fermée se couvre en entier, et la couverture se COMPTE.** Le repli reste — un client
+> ne doit jamais rester muet sur un type que le serveur a déployé avant lui — mais il cesse d'être
+> l'endroit où des événements vont mourir. C'est un filet, pas une traduction.
+
+**Correction d'une mesure annoncée fausse en cours de route** : le premier décompte disait « neuf
+types sans libellé », en mesurant la table `items`… qui n'est que le repli. **Mesurer la mauvaise
+table, c'est compter juste la mauvaise chose.**
+
+## Deux arbitrages qui se voient à l'écran
+
+**Ouvrir la boîte ne marque RIEN.** Contrairement au fil — où ouvrir une conversation EST la lire —
+une liste parcourue des yeux n'a pas été lue. Vider la pastille à l'ouverture ferait perdre ce qu'on
+n'a pas eu le temps de voir. On marque en touchant une ligne, ou avec un bouton explicite qui
+n'apparaît **que s'il reste quelque chose à marquer**.
+
+**Les titres sont neutres, parce qu'ils sont sans rôle.** « Ta demande a été acceptée » est écrit du
+point de vue de l'Expéditeur ; le même événement, lu par le Voyageur, veut dire « tu as accepté ».
+Le site tient deux tables par rôle ; le natif tient la table courte de la cloche, rédigée neutre
+(« Demande acceptée »), plus le prénom servi par le DTO. **Une phrase neutre est moins riche ; une
+phrase au mauvais rôle est fausse.**
+
+## La boîte n'est pas le carrefour
+
+D114 a fait de l'onglet Activité « ce qui attend un **geste** » ; une notification est « ce qui s'est
+**passé** ». Les confondre remplirait le carrefour de choses sur lesquelles il n'y a rien à faire.
+
+La boîte est donc un écran **poussé**, atteint par une cloche posée à côté de la pastille Profil —
+sur les quatre destinations, exactement par le raisonnement d'A210. Et les deux voyagent dans **un
+seul composant** (`header-actions.tsx`) : quatre copies d'une rangée d'en-tête divergent toujours par
+un écart, un ordre ou une taille (leçon D105 — une incohérence de charte se COMPTE).
+
+Le compteur rejoint `activite-context` : **cinquième requête assumée**, pour que la cloche et l'écran
+comptent la même chose (doctrine D114 — une lecture, une vérité).
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1401 (67 suites) | **1428 (68 suites)** |
+| Fiches user-ui | 317 (20 suites) | **322 (21 suites)** |
+| Types de notification nommés par le site | 21 / 25 | **25 / 25** |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* **Deux erreurs de fiche corrigées en route, et toutes deux sont des classiques du dépôt** : viser
+  un mot qui vit aussi dans le commentaire (**huitième fois ce mois-ci**), et un découpage qui part
+  de l'`import` au lieu de l'`appel` — le cousin LARGE du découpage vide de D98. *Un découpage trop
+  large ne rougit pas pour rien : il rougit pour autre chose.*
+* La fiche du site a trouvé `booking.tracking_event`, qui a une forme **à part** (des phrases par
+  jalon). Elle connaît désormais cette forme plutôt que de l'excepter — *une exception se contourne,
+  une forme se vérifie.*
+* **Le bundle SERVI vérifié**, pas le typecheck : 12,8 Mo, les quatre modules présents. URL utile
+  pour SDK 57 — `/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true` (`/index.bundle` répond
+  404).
+
+## D120 — le push, gravé SANS code
+
+Décision candidate prise le même jour, à la demande de l'utilisateur, **sans une ligne de code**.
+Ce qui la décide n'est pas la technique mais **le droit d'interrompre** : les 25 événements se
+trient en trois classes, et la troisième est sa raison d'être — **ce qui ne doit jamais sortir du
+téléphone**, parce qu'un bandeau s'affiche sur un écran verrouillé, devant n'importe qui (le code de
+livraison D43, les coordonnées du destinataire). *Un push mal trié n'est pas une gêne, c'est une
+fuite.*
+
+Note mesurée pour le jour venu : **Expo Go ne reçoit plus de push depuis le SDK 53** — la recette du
+push ne se fera donc pas dans l'outil où se fait toute la recette actuelle.
+
+## Reste ouvert
+
+* `notification-service` ne tourne pas localement (consommateur Kafka, `KAFKA_BROKERS` vide) : la
+  boîte se lit « en panne » sur la pile de développement, ce qui est le comportement voulu — mais
+  elle n'a donc **pas été vue remplie**.
+* Aucun écran du lot n'a été vu connecté.
