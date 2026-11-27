@@ -19923,3 +19923,178 @@ pas — la machine à états l'a dit mieux que la documentation).
 
 Une vraie page « Mes trajets » sur le mobile. Aujourd'hui le seuil ne propose que le brouillon **le
 plus récent** : ça suffit tant qu'on en a un, pas quand on en a trois.
+
+---
+
+# D111 quinquies — Mes trajets, et les dates qui manquaient (27/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **1066 → 1103 fiches** (54 → 56
+suites), user-ui **238 → 253 fiches** (15 → 16 suites). **Aucune ligne de serveur**, aucune
+dépendance nouvelle.
+
+> **Correction de référence.** La clôture de D111 quater annonçait 1065 fiches côté mobile.
+> Mesuré **1066** sur la branche avant toute modification de ce lot. C'est la mécanique habituelle
+> de ce dépôt : un chiffre recopié se périme, un chiffre mesuré ne ment pas.
+
+## Le constat
+
+D111 quater faisait survivre le brouillon à l'app tuée. Mais le seuil de publication ne proposait
+que le brouillon **le plus récent** — ce qui suffit tant qu'on en a un, pas quand on en a trois. Et
+l'onglet Activité affichait, depuis le lot « onglets », un compteur de brouillons sur lequel **rien
+ne permettait de taper**. Un chiffre qu'on ne peut pas suivre est une information qui se périme
+toute seule.
+
+## L'écran
+
+`apps/mobile/src/app/trips/mine.tsx`, poussé par-dessus les onglets — une **destination**, pas un
+tunnel : on y revient entre deux voyages. Il est derrière `IdentityGate`, à qui il passe sa sortie
+(`onDismiss`), comme D104 l'exige pour tout écran poussé.
+
+**Trois sections, pas de filtre** (`À finaliser · En ligne · Passés`). Des pastilles de filtre
+donneraient un écran vide dès qu'on en tape une qui ne correspond à rien, et un écran vide qu'on a
+provoqué soi-même se lit comme une panne. Les sections montrent tout d'un coup d'œil, et celles qui
+n'ont rien disparaissent.
+
+**Une action par carte** : celle qui fait avancer le trajet — finir un brouillon, mettre en pause,
+remettre en ligne. Les gestes qui défont (annuler, supprimer) viennent en second et demandent
+confirmation ; les plus rares ne sont pas là du tout. Une liste n'est pas un tableau de bord.
+
+## La règle vit hors de l'écran
+
+`apps/mobile/src/lib/mes-trajets.ts` — pur, zéro import, donc jouable par le harnais (frontière
+A223) :
+
+| Fonction | Ce qu'elle décide |
+|---|---|
+| `trajetDeLApi` | la projection défensive : une ligne sans identifiant ni statut connu ne s'affiche pas |
+| `peut` | le serveur autorise-t-il cette action ? **lu**, jamais déduit |
+| `sectionDuStatut` / `grouperLesTrajets` | les trois sections, leur ordre, et le tri interne |
+| `actionMiseEnAvant` | l'action unique de la carte |
+| `compteEnCours` | le compte annoncé en tête — ce qui est en cours, pas ce qui est passé |
+
+**L'app ne décide jamais ce qu'elle peut faire.** Chaque trajet arrive avec ses `allowedActions`,
+calculées par la machine à états du serveur, qui connaît les réservations en cours (D72).
+Réimplémenter « on peut annuler un trajet publié » côté app, ce serait promettre un bouton que le
+serveur refusera.
+
+La base réelle a immédiatement donné raison à ce choix contre la règle écrite : un trajet
+**annulé** y arrive avec `["view", "duplicate", "archive"]` et **sans `restore`**. L'écran ne
+propose donc pas « Restaurer », alors que `actionMiseEnAvant` l'y autorise sur le papier. C'est
+exactement ce qu'on gagne à lire plutôt qu'à déduire.
+
+## Le défaut de date — le vrai butin du lot
+
+Dix-huit fiches vertes, typecheck vert. Et la **première** réponse du serveur réel montre ceci :
+
+```
+PUBLISHED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-18T07:18:42Z | tz= Europe/Paris
+PUBLISHED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-02T07:18:42Z | tz= Europe/Paris
+COMPLETED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-23T07:18:42Z | tz= Europe/Paris
+PUBLISHED | Paris → Dubaï       | dateLocal= "2026-11-25" | departureAt= …T20:00:00Z | tz= null
+CANCELLED | Paris → Dubaï       | dateLocal= "2026-11-25" | departureAt= …T20:00:00Z | tz= null
+```
+
+`departureDateLocal` est **optionnel** en base, et le serveur ne le calcule jamais :
+
+```ts
+// apps/trip-service/src/controllers/trip.controller.ts:284
+departureDateLocal: data.departureDateLocal ?? null,
+```
+
+Seul un formulaire de création l'écrit. **Trois trajets sur cinq ne l'avaient pas, dont deux
+publiés et trouvables en recherche** — et la carte annonçait « Date à choisir » sur des trajets qui
+ont une date de départ. Le tri « prochain voyage d'abord » les renvoyait en fin de liste par-dessus
+le marché, puisqu'un trajet sans date passe en dernier.
+
+Deux populations cohabitent, et **elles se couvrent l'une l'autre** : les trajets écrits par l'app
+portent les chaînes locales mais pas le fuseau ; ceux du seed portent le fuseau et pas les chaînes.
+
+## La correction existait déjà
+
+`trip-local-dates.ts` avait été écrit pour clore `ANO-WEB-41` — anomalie **majeure** de recette
+(« jeu. 1 janv. » sur toutes les lignes, soit l'époque Unix). Son en-tête nommait même la cause :
+
+> « Un trajet créé par un autre canal (API, seed, **futur client mobile**) n'en a pas. »
+
+On ne le réécrit donc pas. On le **déplace** et on le **duplique** :
+
+```
+apps/user-ui/src/components/trips/list/trip-local-dates.ts   (avant)
+apps/user-ui/src/lib/trip-local-dates.ts                     (après — dans la frontière du harnais)
+apps/mobile/src/lib/trip-local-dates.ts                      (copie octet pour octet)
+```
+
+Il vivait **hors de la frontière du harnais** : A224 ne joue que `src/lib`. Un module pur, central,
+qui décidait des dates de tout le tableau de bord Voyageur — et que **zéro fiche ne regardait**.
+
+C'est le **quatrième** fichier pur dupliqué octet pour octet entre les deux fronts, après
+`pricing-example.ts` (D99), `search-facets.ts` (D100) et `parcel-weight.ts` (D101), pour la même
+raison : un `import` par-dessus la frontière d'un projet est une dépendance de **build** (D93).
+
+### Dérivation n'est pas déduction
+
+```ts
+new Intl.DateTimeFormat('en-CA', { ...options, timeZone }).formatToParts(instant)
+```
+
+Avec le fuseau du lieu, la conversion est **exacte**. C'est sans fuseau qu'elle devient une
+devinette — et c'est pour cela que D111 quater 2C la refuse pour **publier**. La frontière est donc
+maintenue, et une fiche la tient :
+
+| Chemin | Normalise ? | Pourquoi |
+|---|---|---|
+| `mesTrajets()` (la liste) | **oui** | on AFFICHE une ligne ; une date juste vaut mieux qu'un « Date à choisir » faux |
+| `mesBrouillons()` + `publish-reverse.ts` (la reprise) | **non** | on PRÉREMPLIT une publication ; publier à la mauvaise date est pire que redemander la date |
+
+Le branchement se fait **au bord de la lecture**, une seule fois, exactement là où le site le fait
+dans ses hooks (`useMyTrips`, `useTrip`). Normaliser dans chaque écran, ce serait la règle recopiée
+vingt fois — le défaut que D110 a corrigé.
+
+## La signature mentait
+
+Jest passait les 34 nouvelles fiches ; `tsc -p tsconfig.spec.json` en trouvait **six erreurs**, des
+deux côtés. Et ces erreurs ne disaient pas « la fiche est mal écrite » :
+
+```
+Property 'departureDateLocal' does not exist on type '{ departureAt: string; originTimezone: string; }'.
+```
+
+`withLocalDates<T extends TripDatesLike>(trip: T): T` prétendait rendre **son entrée**, alors
+qu'elle y **ajoute** des champs. Le type rendait donc inaccessible le champ que l'appel venait
+d'écrire. Le retour devient `T & TripDatesLike`, et `TripDatesLike` est exporté — un type qu'on ne
+peut pas nommer pousse le lecteur à écrire des `any`.
+
+C'est la raison d'être du contrôle **TypeScript (fiches de test)**, ajouté le 18/09 : un défaut qui
+ne vit que dans un `.spec.ts` est invisible de toute la CI.
+
+## Vérifié contre le serveur réel
+
+Session ouverte avec un compte de seed, puis `GET /trips/my` rejoué à travers la vraie projection :
+
+```
+reçus 5 → projetés 5 (aucun rejeté)      compte « en cours » = 3
+
+AVANT  [enLigne]  Paris → Brazzaville  SANS DATE   Paris → Brazzaville  SANS DATE   Paris → Dubaï  2026-11-25
+APRÈS  [enLigne]  Paris → Brazzaville  2026-11-02  Paris → Brazzaville  2026-11-18  Paris → Dubaï  2026-11-25
+```
+
+Le tri par date de départ fonctionne enfin, et le trajet de Dubaï garde `21:00` — la chaîne saisie
+l'emporte sur la chaîne calculée (20:00 UTC = 21:00 à Paris : les deux disent la même chose, mais
+c'est la saisie qui fait foi).
+
+## Chaque fiche a été prouvée en la faisant rougir
+
+- retirer `withLocalDates` de `mesTrajets()` → **une** fiche rouge, la bonne (18 autres vertes) ;
+- retirer la fiche du site → le **recensement** d'A224 lot 5 rougit en nommant `trip-local-dates.ts`
+  parmi les modules que personne ne regarde.
+
+## Reste ouvert
+
+- Le serveur autorise `archive` sur un trajet terminé ou annulé ; **aucun écran ne le propose**.
+- `my-deals.adapter.ts` garde un repli sur l'époque Unix (`new Date(0)`), hérité d'avant
+  ANO-WEB-41. Il est aujourd'hui **inatteignable** — ses deux consommateurs passent par
+  `useMyTrips`, qui normalise — mais il mériterait de disparaître. Une fiche tient au moins la
+  frontière : l'adaptateur ne doit jamais devenir une **seconde** dérivation de date.
+- **L'écran n'a pas été vu.** Il demande une session connectée sur le simulateur, et ce poste ne
+  peut pas taper dedans (`simctl` sait naviguer, pas toucher — D107). Sa logique est vérifiée
+  contre la base réelle de bout en bout ; sa mise en page reste une hypothèse.

@@ -11520,3 +11520,202 @@ l'écran provoque un `setState` sur un composant démonté.
 - `apps/mobile/src/lib/publish-reverse.ts` — la relecture défensive, règle par règle.
 - `apps/mobile/src/lib/publish-reverse.spec.ts` — l'aller-retour, et les cas tordus de la base.
 - Registre, entrée **D111 quater**.
+
+---
+
+# Chapitre — Valider un écran contre la vraie base, pas contre ses propres fixtures (D111 quinquies)
+
+Ce chapitre raconte un lot qui s'est fait démentir par sa première requête réelle, et ce que cela
+apprend sur la valeur d'une fiche.
+
+## 1. Le point de départ : tout était vert
+
+L'écran « Mes trajets » était écrit, sa règle sortie dans un fichier pur, dix-huit fiches écrites,
+le typecheck des deux programmes TypeScript du mobile au vert. Dans beaucoup d'équipes, c'est
+l'état « prêt à relire ».
+
+Il restait pourtant une question simple : **qu'est-ce que le serveur rend vraiment ?**
+
+```sh
+curl -c jar.txt -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"thomas.carrier@seed.yamba.dev","password":"…"}'
+
+curl -b jar.txt http://localhost:8080/api/trips/my -o mes-trajets.json
+```
+
+Puis la **vraie** projection rejouée sur cette **vraie** réponse, avec `tsx` — pas une fixture,
+pas un mock :
+
+```ts
+import { trajetDeLApi, grouperLesTrajets } from '…/apps/mobile/src/lib/mes-trajets.ts';
+const trajets = JSON.parse(readFileSync(fichier, 'utf8')).trips.map(trajetDeLApi).filter(Boolean);
+```
+
+C'est possible **parce que** le module est pur et sans import : la même propriété qui le rend
+jouable par le harnais (frontière A223) le rend jouable par un script de dix lignes.
+
+## 2. Ce que la vraie base a dit
+
+```
+Paris → Brazzaville   SANS DATE   PUBLISHED
+Paris → Brazzaville   SANS DATE   PUBLISHED
+Paris → Dubaï         2026-11-25  PUBLISHED
+```
+
+Deux trajets **publiés**, trouvables en recherche, affichant « Date à choisir ». La leçon
+générale :
+
+> **Une fiche ne teste que les cas auxquels on a pensé.** Les miennes tenaient les règles que
+> j'avais en tête ; la base contenait ce que personne n'avait en tête.
+
+Ici, deux **populations** de trajets cohabitaient, et aucune fixture ne les décrivait :
+
+| Écrits par | `departureDateLocal` | `originTimezone` |
+|---|---|---|
+| le formulaire de création | **oui** | non |
+| le seed, l'API, un import | non | **oui** |
+
+Elles se couvrent exactement l'une l'autre — ce qui est la condition pour que la correction soit
+possible sans rien deviner.
+
+## 3. La vraie question n'est pas « comment », c'est « où est-ce déjà corrigé »
+
+Réflexe à prendre avant d'écrire la moindre ligne :
+
+```sh
+grep -rn "departureDateLocal" apps/user-ui/src | head
+```
+
+Réponse : `trip-local-dates.ts`, écrit pour clore une anomalie **majeure** de recette
+(`ANO-WEB-41` — « jeu. 1 janv. » sur toutes les lignes, soit l'époque Unix). Et son en-tête
+nommait déjà le coupable à venir :
+
+> « Un trajet créé par un autre canal (API, seed, **futur client mobile**) n'en a pas. »
+
+C'est la quatrième fois ce mois-ci que ce dépôt paie la même leçon, et elle s'est affinée à chaque
+fois :
+
+1. D88 → « après avoir corrigé une fonction, **grep son jumeau** » ;
+2. A224 lot 4 → « ne cherche pas **LE** jumeau, **COMPTE** les copies » (il y en avait quatre) ;
+3. ici → « avant de corriger, **cherche la correction** ». Elle était écrite, testée en recette, et
+   jusqu'au commentaire qui annonçait qui allait en souffrir.
+
+## 4. Dérivation n'est pas déduction
+
+Le dépôt avait une règle en apparence contraire, D111 quater 2C : **ne jamais déduire une date
+locale depuis `departureAt`**, parce que `departureAt` est un instant UTC et qu'en déduire un jour
+décalerait d'une journée près de minuit.
+
+Les deux règles coexistent, parce qu'elles ne parlent pas de la même chose :
+
+```ts
+new Intl.DateTimeFormat('en-CA', { ...options, timeZone }).formatToParts(instant)
+```
+
+Avec le **fuseau du lieu**, ce n'est plus une déduction, c'est une **conversion exacte**. La fiche
+le montre mieux qu'un paragraphe :
+
+```ts
+// 23:30 UTC le 24, c'est déjà le 25 à Dubaï.
+expect(localDateTime('2026-11-24T23:30:00.000Z', 'Asia/Dubai')?.date).toBe('2026-11-25');
+```
+
+Et là où le fuseau manque — la reprise d'un brouillon — la règle d'origine tient toujours. **Les
+deux chemins sont épinglés par une fiche**, parce qu'une frontière que rien ne garde se déplace
+toute seule :
+
+```ts
+it('la REPRISE d’un brouillon ne normalise pas — et c’est D111 quater 2C', () => {
+  expect(readFileSync(join(MOBILE, 'src/lib/api/publish.api.ts'), 'utf8'))
+    .not.toContain('trip-local-dates');
+});
+```
+
+**Pourquoi lire le fichier au lieu de l'importer ?** Parce que `publish.api.ts` tire `client.ts` →
+`base-url.ts` → `expo-constants`, que le harnais (`testEnvironment: node`) ne sait pas charger.
+C'est la frontière A223, payée pour la troisième fois (D102, D105). Quand un test ne peut pas
+charger votre code, il vous dit où est la frontière : **déplacez le code, pas la frontière**.
+
+## 5. Normaliser au BORD, une seule fois
+
+```ts
+export async function mesTrajets(): Promise<TrajetBrut[]> {
+  const reponse = await apiFetch<{ trips?: TrajetBrut[] } | TrajetBrut[]>('/trips/my');
+  const trajets = Array.isArray(reponse) ? reponse : (reponse.trips ?? []);
+  return trajets.map((trajet) => withLocalDates(trajet));
+}
+```
+
+Une ligne, à l'endroit exact où le site fait la même chose dans ses hooks. L'alternative —
+normaliser dans chaque écran qui affiche une date — serait la règle recopiée vingt fois, c'est-à-dire
+le défaut que D110 a corrigé (`max-w-7xl` écrit 51 fois dans 37 fichiers).
+
+> **Une règle de lecture s'applique au bord de la lecture.** En dessous, tout le monde peut
+> supposer qu'elle est vraie.
+
+## 6. Un type qui ment, et le contrôle qui le dit
+
+Jest passait les 34 nouvelles fiches. `tsc` en trouvait six, des deux côtés :
+
+```
+Property 'departureDateLocal' does not exist on type '{ departureAt: string; originTimezone: string; }'.
+```
+
+La tentation est de « corriger la fiche ». Lisez l'erreur une deuxième fois : elle dit que **juste
+après l'appel qui vient d'écrire le champ, le type prétend que le champ n'existe pas.**
+
+```ts
+// avant — le type prétend rendre exactement son entrée
+export function withLocalDates<T extends TripDatesLike>(trip: T): T
+
+// après — la fonction AJOUTE des champs, le type le dit
+export function withLocalDates<T extends TripDatesLike>(trip: T): T & TripDatesLike
+```
+
+C'est la raison d'être du contrôle **TypeScript (fiches de test)** : les tsconfig par projet
+**excluent** `*.spec.ts`, donc un défaut qui ne vit que dans un fichier de test est invisible de
+toute la CI. Ici il ne vivait même pas dans le test — le test ne faisait que le **révéler**.
+
+> **Une fiche verte n'est pas une fiche correcte**, et une fiche rouge ne veut pas dire que la
+> fiche a tort.
+
+Au passage : `TripDatesLike` est devenu **exporté**. Un type qu'on ne peut pas nommer pousse le
+lecteur à écrire `any`.
+
+## 7. Prouver que chaque fiche mord
+
+Une fiche qui n'a jamais rougi ne prouve rien. Deux contre-épreuves, trente secondes chacune :
+
+```sh
+# on retire la normalisation…
+Tests: 1 failed, 18 passed        # une seule rougit, et c'est la bonne
+
+# on retire la fiche du site…
+● aucun module PUR ne reste hors du harnais
++   "trip-local-dates.ts",        # le recensement d'A224 lot 5 nomme le module oublié
+```
+
+La seconde est la plus intéressante : elle prouve que **l'outil anti-omission fonctionne encore**.
+C'est utile, parce que ce même outil contenait lui-même une omission à sa naissance (son motif ne
+reconnaissait que les guillemets doubles).
+
+## 8. Le détail qui aurait pu passer : un faux positif dans sa propre détection
+
+En attendant le bundle iOS, cette commande semblait raisonnable :
+
+```sh
+grep -qiE "bundl" expo.log && echo "BUNDLING DÉTECTÉ"
+```
+
+Elle s'est déclenchée tout de suite — sur la ligne `Starting Metro Bundler`, écrite au démarrage.
+**Viser une orthographe plutôt qu'un usage**, pour la sixième fois en un mois. Le remède n'a pas
+été d'affiner le motif mais de changer de source : une capture d'écran du simulateur.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-trajets.ts` — la règle de la liste, pure et sans import.
+- `apps/mobile/src/lib/trip-local-dates.ts` — la dérivation, et sa copie côté site.
+- `apps/mobile/src/lib/trip-local-dates.spec.ts` — les deux chemins, et l'égalité des copies.
+- `apps/user-ui/src/lib/recensement.spec.ts` — le recensement qui a réclamé la fiche du site.
+- Registre, entrée **D111 quinquies**.

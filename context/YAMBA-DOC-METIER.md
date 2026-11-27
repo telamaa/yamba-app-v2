@@ -9627,3 +9627,55 @@ l'onglet Activité comptait déjà les « trajets à finaliser » … que le mob
 | 5 | Je tape « Recommencer » | le trajet abandonné ne m'est plus proposé, ni maintenant ni au prochain lancement |
 | 6 | Je publie un trajet repris | il part en ligne ; aucun brouillon ne reste derrière |
 | 7 | Je tape deux fois « Continuer » très vite | un seul brouillon est créé, pas deux |
+
+---
+
+# D111 quinquies — Le Voyageur voit tous ses trajets (27/11/2026)
+
+## Le besoin
+
+Un Voyageur qui publie régulièrement a plusieurs trajets en même temps : un brouillon commencé
+l'autre jour, deux annonces en ligne, un voyage déjà fait. Jusqu'ici l'app ne lui en montrait
+**aucun**. Le seuil de publication proposait de reprendre le brouillon **le plus récent**, et c'est
+tout — ce qui suffit tant qu'on en a un, pas quand on en a trois.
+
+Pire, l'onglet Activité affichait un compteur « trajets à finaliser » sur lequel **rien ne
+permettait de taper**. Un chiffre qu'on ne peut pas suivre ne sert à personne : il se périme tout
+seul.
+
+Et un défaut trouvé en chemin, sur de vraies données : **deux trajets publiés, visibles par les
+Expéditeurs, affichaient « Date à choisir »** alors qu'ils ont une date de départ.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-31** | « Mes trajets » montre **tous** les trajets du Voyageur, groupés en trois sections : à finaliser, en ligne, passés. | Trois questions différentes : qu'est-ce que je dois finir, qu'est-ce qui travaille pour moi, qu'est-ce qui est derrière moi. |
+| **RG-D111-32** | Une section sans trajet **disparaît** ; elle ne s'affiche pas vide. | Une section vide fait croire à une panne ou à un filtre mal réglé. |
+| **RG-D111-33** | Aucun filtre à choisir. | Une pastille de filtre donne un écran vide dès qu'on en tape une qui ne correspond à rien — et un écran vide qu'on a provoqué soi-même se lit comme une panne. |
+| **RG-D111-34** | Les trajets en ligne sont triés par **date de départ croissante** ; un trajet sans date passe en dernier, jamais au milieu. | Le prochain voyage est celui qui demande une décision. |
+| **RG-D111-35** | Le compte annoncé en tête compte ce qui est **en cours** : brouillons et trajets en ligne, jamais les trajets passés. | « 3 trajets en cours » doit répondre à « combien de choses me demandent quelque chose ». |
+| **RG-D111-36** | Chaque carte met en avant **une seule** action, celle qui fait avancer le trajet. | Une liste n'est pas un tableau de bord. Six boutons par ligne, c'est aucun bouton. |
+| **RG-D111-37** | Un bouton n'apparaît que si le **serveur** autorise le geste. L'app ne le déduit jamais du statut. | Un trajet qui porte une réservation vivante ne s'annule pas (D72), et seul le serveur connaît les réservations. Promettre un geste qu'il refusera est pire que ne pas le proposer. |
+| **RG-D111-38** | Annuler un trajet ou supprimer un brouillon **demande confirmation**. | Ces gestes retirent une annonce que des Expéditeurs ont peut-être déjà repérée. |
+| **RG-D111-39** | Un trajet qui porte des réservations et qu'on tente d'annuler le dit **avec ses mots** : « Ce trajet porte des réservations : annule-les d'abord. » | Un refus technique sans explication laisse le Voyageur croire à une panne. |
+| **RG-D111-40** | La date affichée d'un trajet est **toujours** la date locale du lieu de départ. Quand elle n'a pas été saisie, elle est calculée depuis l'instant de départ **dans le fuseau du lieu**. | Un trajet publié qui annonce « Date à choisir » est un mensonge, et il se range au mauvais endroit dans le tri. |
+| **RG-D111-41** | Ce que le Voyageur a **saisi** l'emporte toujours sur ce qui est calculé. | Les chaînes saisies disent ce qu'il a voulu, pas ce qu'un calcul en pense. |
+| **RG-D111-42** | Au moment de **reprendre un brouillon**, aucune date n'est calculée : si elle manque, elle est redemandée. | Afficher une ligne et préremplir une publication ne se paient pas pareil. Publier à la mauvaise date est pire que redemander la date (D111 quater). |
+| **RG-D111-43** | Le bouton « Publier un trajet » de l'onglet Activité est **actif dès le premier jour**. | C'est ce que la coquille promettait depuis le lot « onglets » : « le bouton naîtra avec le formulaire ». Le même jour, la phrase « arrive dans un prochain lot » disparaît — une coquille honnête cesse de l'être le jour où elle ment. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité et je tape sur le compteur de brouillons | j'arrive sur « Mes trajets » |
+| 2 | J'ai un brouillon, deux trajets en ligne et un voyage fait | trois sections, dans cet ordre, et « 3 trajets en cours » en tête |
+| 3 | Je n'ai aucun brouillon | la section « À finaliser » n'apparaît pas du tout |
+| 4 | Je regarde mes trajets en ligne | le prochain départ est en haut |
+| 5 | Je tape « Continuer » sur un brouillon | le tunnel de publication s'ouvre là où je l'avais laissé |
+| 6 | Je tape « Mettre en pause » sur un trajet en ligne | il quitte la recherche ; il n'est pas annulé |
+| 7 | J'annule un trajet qui porte une réservation | le refus me dit d'annuler les réservations d'abord |
+| 8 | Je supprime un brouillon | on me demande confirmation, et on me dit que personne ne l'a vu |
+| 9 | Je regarde un trajet publié depuis le site ou par un import | sa date de départ s'affiche, juste, dans l'heure du lieu de départ |
+| 10 | Mon trajet part de Dubaï à 03:30, heure locale | c'est bien le jour local de Dubaï qui s'affiche, pas celui de Greenwich |
+| 11 | Je n'ai encore aucun trajet | l'écran le dit et propose d'en publier un |
