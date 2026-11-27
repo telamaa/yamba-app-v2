@@ -21056,3 +21056,142 @@ site** après `tunnel.ts` (D93), `search-facets.ts` (D100), `parcel-weight.ts` (
 * **Les photos de message** : le contrat en accepte cinq, **aucun front n'en émet** (famille D101).
 * **Suit** : lot 2 — le rendez-vous comme objet et le numéro révélé à H-2 ; lot 3 — les notifications
   in-app, et la question qu'il faudra trancher alors : le mobile n'a **aucune** notification push.
+
+---
+
+# D118 — Le rendez-vous et le numéro, en natif (27/11/2026)
+
+`Meetup` est un objet de première classe depuis F-PR1 (quatre routes) et
+`POST /conversations/:id/phone` ouvre le numéro de l'autre partie. **Aucun client mobile pour l'un
+ni pour l'autre.**
+
+**Zéro ligne de LOGIQUE serveur** — une seule ligne de serveur a bougé, et c'est un commentaire (3B).
+
+## Un contrôle est une grammaire : il décide de ce qui est DICIBLE
+
+C'est l'arbitrage central du lot, et c'est une forme, pas une fonctionnalité.
+
+| | Le site | Le natif |
+|---|---|---|
+| Saisie | deux `datetime-local` (début, fin) | **un jour, une heure, une durée** |
+| `END_BEFORE_START` | possible → il faut l'expliquer | **inexprimable** (la fin est calculée) |
+| `WINDOW_TOO_LONG` | possible → il faut l'expliquer | **inexprimable** (durée en paliers) |
+| `TOO_FAR` | possible → il faut l'expliquer | **inexprimable** (bande de 14 jours, bornée à 90) |
+| `TOO_SOON` | possible → il faut l'expliquer | **inexprimable** (les heures trop proches ne sont pas offertes) |
+
+```ts
+export const DUREES_MINUTES = [30, 60, 120, 180] as const;   // toutes < 12 h
+
+export function heuresProposables(jour: JourProposable, maintenantMs: number): number[] {
+  const plancher = maintenantMs + AVANCE_MINIMALE_MINUTES * 60_000;
+  // … on n'offre que ce qui est au-delà du plancher
+}
+```
+
+**On ne recopie pas les bornes du serveur pour DÉCIDER — on compose un contrôle dont la sortie est
+toujours dans leur domaine.** Elles restent dans le module pour que les fiches les confrontent à
+`meetup.rules.ts` lu avec `readFileSync`, jamais pour trancher un refus.
+
+C'est le même mouvement que les jalons de D116 (n'offrir que le cran suivant) et que le plancher de
+poids de D101 : **la forme de garde-fou qui ne demande à personne de s'en souvenir.**
+
+Deux détails que seule l'implémentation révèle :
+
+* **l'instant est figé à l'OUVERTURE de la feuille** (`useState(() => Date.now())`) — le recalculer
+  à chaque rendu ferait disparaître une heure sous le doigt au passage d'un quart d'heure ;
+* **changer de jour RELÂCHE l'heure choisie** — « demain 8 h » existe, « aujourd'hui 8 h » non ; la
+  garder en silence enverrait un créneau que le serveur refuserait.
+
+## Ce que le serveur a déjà tranché n'est pas recalculé
+
+`nextMeetupOf` décide lequel des rendez-vous compte — le confirmé à venir, **sauf** si une
+proposition est plus récente que l'acceptation, auquel cas c'est une contre-proposition et elle doit
+passer devant (ANO-WEB-47, déjà payé une fois). Le serveur le sert dans `conversation.nextMeetup` :
+le client le **lit**.
+
+Conséquence assumée : **`meetups` reste ignoré par la projection**, et c'est écrit dans le module.
+Lire la liste entière pour refaire ce choix donnerait deux vérités.
+
+## La porte du numéro a quatre états, et aucun n'est muet
+
+| État | Ce que l'écran fait |
+|---|---|
+| `revele` | **appeler d'un geste** (`tel:`) — c'est pour cela qu'on l'a ouvert |
+| `ouvrable` | le bouton qui ouvre (geste **idempotent** côté serveur) |
+| `trop-tot` | on dit **QUAND** la porte s'ouvre |
+| `sans-ancre` | on dit **QUOI FAIRE** : convenir d'un rendez-vous de prise en charge |
+
+Sur le site, ce motif ne vivait que dans un attribut `title` — **qui n'existe pas sur un
+téléphone** (ANO-WEB-85 n'en avait corrigé que la moitié, via une bannière conditionnée à
+`focusPhone`).
+
+## La fiche écrite au lot 1 a rougi, exactement comme prévu
+
+D117 9A avait nommé `meetups` et `phone` comme hors périmètre et posé une fiche dessus. Elle est
+passée au rouge **à la seconde où ce lot a importé `phone`** :
+
+```
+● ⑦ ce que le lot ignore à dessein › le fil se lit sans rendez-vous ni numéro
+● ⑦ ce que le lot ignore à dessein › le jour où le lot 2 arrive, cette fiche le dit
+```
+
+On n'a pas eu à s'en souvenir. **C'est la seule forme de rappel qui survive à l'oubli** — et c'est
+la troisième fois ce mois-ci qu'une fiche de refus change de camp au bon moment (D114 deux fois,
+D117 ici).
+
+## Un commentaire qui nomme le mauvais objet (3B)
+
+`phone-reveal.rules.ts` disait « Ancre : le début du rendez-vous de **REMISE** accepté » alors que
+le code filtre `kind: "PICKUP"`. Dans ce dépôt, la **remise** est le geste final vers le
+destinataire (D43, D116) et la **prise en charge** le premier : la ligne désignait l'autre bout du
+transport. Le code a raison — au moment de la remise, c'est le destinataire qu'on appelle, et son
+téléphone vient du deal.
+
+**Une ligne de commentaire qui nomme le mauvais objet est pire qu'une absence de commentaire : elle
+finit recopiée dans un client.** La fiche qui la garde vise ce que la documentation doit
+**affirmer** (`PRISE EN CHARGE`, `kind: "PICKUP"`), pas ce qu'elle doit taire — parce qu'une
+interdiction de mot rend impossible d'expliquer ce mot (voir Contre-épreuves).
+
+## D118 bis — le site, challengé par son jumeau
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | **aucune** borne sur le lieu (3..160) ni sur le repère (≤ 500) | on tapait jusqu'à l'échec, et le refus arrivait générique — `PickupNotes` de D115 bis, **troisième fois** |
+| ② | 2 des 5 motifs de créneau tombaient dans la phrase générique | celui qui intervertit début et fin lisait « n'a pas pu être proposé », c'est-à-dire rien |
+
+**On ne transpose pas le contrôle du natif** (jour + heure + durée) : sur un écran large, à la
+souris, deux champs de date sont un geste légitime. **On transpose ce que le contrôle DIT, pas sa
+forme.** Et une fiche vérifie désormais que *toute clé que la règle peut produire a une phrase dans
+le composant* — c'est exactement le défaut corrigé : une règle qui produit plus de clés que la table
+n'en porte.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1357 (66 suites) | **1401 (67 suites)** |
+| Fiches user-ui | 309 (19 suites) | **317 (20 suites)** |
+| Lignes de logique serveur | — | **zéro** (un commentaire corrigé) |
+
+## Contre-épreuves
+
+* Deux défauts injectés dans la feuille (le relâchement de l'heure au changement de jour, le plafond
+  du lieu dans le champ) → **deux fiches rouges**, puis restauration.
+* **La fiche de l'ancre a rougi sur la correction elle-même** : elle interdisait le mot
+  « rendez-vous de REMISE », et la correction CITE ce mot pour expliquer pourquoi il était faux.
+  **Septième fois ce mois-ci qu'on vise un mot au lieu d'un sens — et la plus nette, puisqu'une
+  interdiction de mot rend impossible d'expliquer ce mot.**
+* Le balayage anti-export-mort de D117 a rougi **en ayant raison sur la question et tort sur sa
+  portée** : sa liste d'appelants était écrite EN DUR, et le lot a ajouté un cinquième fichier. Il
+  balaie désormais tout `src` — *un balayage qui se tient à jour tout seul vaut mieux qu'une liste
+  qu'il faut penser à rallonger.*
+* `nx typecheck` (deux programmes mobile + user-ui), `check-i18n-messages` : verts.
+
+## Reste ouvert
+
+* **L'annulation d'un rendez-vous** : le statut `CANCELLED` existe en base, mais **aucune route
+  membre** ne l'expose. On ne l'invente pas depuis le client.
+* **Aucun écran de ce lot n'a été vu connecté** (`simctl` ne tape pas).
+* **Suit** : lot 3, les notifications in-app — et la question à trancher AVANT d'écrire : le mobile
+  n'a **aucune** notification push, et c'est un chantier entier (jetons de device, APNs, Expo
+  Notifications) qui n'existe nulle part dans le dépôt.

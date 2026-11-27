@@ -10013,3 +10013,69 @@ l'onglet Messages affichait un compteur et une phrase d'attente.
 | 1 | J'écris un numéro de téléphone | l'avertissement apparaît sous mon message, et sous le mien seulement |
 | 2 | J'ouvre un fil qui se ferme demain | le bandeau l'annonce |
 | 3 | J'ouvre un fil déjà lu | aucune requête de lecture n'est postée |
+
+
+---
+
+# D118 — Le rendez-vous et le numéro (27/11/2026)
+
+## Le besoin
+
+Deux inconnus doivent se retrouver — dans un hall d'aéroport, devant un comptoir, à une sortie de
+métro. Le fil permettait d'en parler ; il ne permettait pas de **convenir**. Et au moment précis où
+le téléphone est le seul canal qui marche, le numéro n'existait nulle part sur le mobile : les deux
+parties n'avaient d'autre choix que de se l'échanger dans le fil, ce qui rend toute détection
+absurde et fait sortir la transaction de la plateforme.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D118-1** | Un rendez-vous est un **objet** : un moment (prise en charge / remise), un lieu, un créneau, un statut. | Un chat transfère toute la charge de coordination aux utilisateurs ; un objet la structure (D61 1A). |
+| **RG-D118-2** | On choisit **un jour, une heure et une durée** — jamais une heure de fin. | Une fin saisie permet d'écrire « fin avant début ». Une fin calculée ne le permet pas. |
+| **RG-D118-3** | Les heures déjà passées ou à moins de **30 minutes** ne sont pas proposées. | Le serveur les refuse : on ne propose pas ce qui sera refusé. |
+| **RG-D118-4** | Les jours proposés s'arrêtent **bien avant** les 90 jours du contrat. | Même raison, dans l'autre sens. |
+| **RG-D118-5** | Changer de jour **efface** l'heure choisie. | « Demain 8 h » existe, « aujourd'hui 8 h » non : garder l'heure en silence enverrait un créneau refusé. |
+| **RG-D118-6** | Le lieu est plafonné à 160 caractères et le repère à 500, **dans le champ**. | Le contrat les refuse. Plafonner vaut mieux que refuser après. |
+| **RG-D118-7** | Une nouvelle proposition **remplace** la précédente du même type. | C'est une contre-proposition ; deux propositions ouvertes à la fois n'auraient pas de sens (serveur). |
+| **RG-D118-8** | **On n'accepte pas sa propre proposition** : celui qui a proposé lit qu'il attend une réponse. | Le serveur refuse (`OWN_PROPOSAL`) ; un bouton qu'on sait condamné ne s'affiche pas. |
+| **RG-D118-9** | Une contre-proposition **passe devant** un rendez-vous déjà confirmé. | Sinon on ne pourrait pas l'accepter (défaut ANO-WEB-47). |
+| **RG-D118-10** | Le numéro de l'autre partie s'ouvre au plus tôt **2 h avant** le rendez-vous de prise en charge ; à défaut, avant le départ. | Le numéro finira par s'échanger : autant que ce soit la plateforme qui l'ouvre, tard, et qui le trace (D61 4A). |
+| **RG-D118-11** | Avant l'heure, l'écran dit **QUAND** la porte s'ouvre. | Un bouton mort que rien n'explique est un cul-de-sac. |
+| **RG-D118-12** | Quand aucun rendez-vous ni départ n'est connu, l'écran dit **QUOI FAIRE**. | « Pas d'heure » n'est pas une réponse ; « conviens d'un rendez-vous » en est une. |
+| **RG-D118-13** | Une fois ouvert, le numéro s'**appelle d'un geste**. | C'est pour cela qu'on l'a ouvert. |
+| **RG-D118-14** | Ouvrir le numéro deux fois donne le **même** numéro, pas une erreur. | Le geste est idempotent et tracé une seule fois (serveur). |
+| **RG-D118-15** | Le rendez-vous vit **en tête du fil**, la proposition dans une parenthèse. | C'est la réponse à « où et quand », et le fil est l'endroit où la question se pose. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre un fil sans rendez-vous | on me propose d'en convenir un |
+| 2 | Je propose un rendez-vous | un jour, une heure, une durée, un lieu — jamais une heure de fin |
+| 3 | Je cherche une heure déjà passée aujourd'hui | elle n'est pas dans la liste |
+| 4 | Je choisis une heure puis je change de jour | l'heure est à rechoisir, et on me le dit |
+| 5 | Je colle 200 caractères dans le lieu | le champ s'arrête à 160 |
+| 6 | Je tape « Proposer » sans lieu | on me dit combien de caractères il manque |
+| 7 | L'autre a proposé | je vois « Accepter » |
+| 8 | C'est moi qui ai proposé | je vois que j'attends sa réponse, et aucun bouton Accepter |
+| 9 | J'accepte | le rendez-vous passe à « Confirmé », et le fil porte un message |
+| 10 | L'autre re-propose après confirmation | la nouvelle proposition passe devant, et je peux l'accepter |
+| 11 | J'ouvre le fil plus de 2 h avant le rendez-vous | on me dit à quelle heure le numéro s'ouvrira |
+| 12 | Aucun rendez-vous n'est convenu et le trajet n'a pas de date | on me dit qu'il faut d'abord convenir d'un rendez-vous |
+| 13 | Moins de 2 h avant | je peux ouvrir le numéro |
+| 14 | J'ouvre le numéro | je peux appeler d'un geste, et le fil garde une trace de l'ouverture |
+| 15 | J'ouvre le numéro deux fois | même numéro, aucune erreur |
+| 16 | La conversation est en lecture seule | ni proposition ni acceptation ne sont offertes |
+
+## D118 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D118bis-1** | Sur le site aussi, le lieu et le repère sont plafonnés **dans le champ**, avec un compteur à l'approche. | Aucune borne n'était posée : on tapait jusqu'à l'échec. |
+| **RG-D118bis-2** | Les **cinq** motifs de refus de créneau ont chacun leur phrase. | Deux tombaient dans la générique, dont « fin avant début » — l'erreur la plus probable du formulaire. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Je colle 200 caractères dans le lieu | le champ s'arrête à 160 et le compteur apparaît |
+| 2 | Je mets une fin avant le début | on me dit exactement cela |
