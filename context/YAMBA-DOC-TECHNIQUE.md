@@ -20569,3 +20569,143 @@ d'une demi-seconde, mais un mensonge.
 - `pickup` / `deliver` / `refusePickup` : le plus gros du chantier Voyageur.
 - Aucun écran de ce chantier n'a été **vu** (session requise, et macOS refuse les Apple Events).
 - L'état partagé doit rester petit : il porte deux listes, pas un cache général.
+
+
+---
+
+# D115 — La prise en charge, en natif (27/11/2026)
+
+`POST /deals/:id/pickup` existait depuis B3-PR1 et **n'avait aucun client mobile**. C'est pourtant
+LE geste qui justifie une app : il se fait dans un hall de gare ou devant un comptoir
+d'enregistrement, colis ouvert entre les mains, l'Expéditeur en face. Jamais devant un ordinateur.
+
+**Zéro ligne de serveur, pour la quatrième fois d'affilée.**
+
+## La demande devient une PILE
+
+`deal/[id].tsx` était un écran seul. Il devient `deal/[id]/index.tsx`, avec `deal/_layout.tsx` et
+`deal/[id]/pickup.tsx` à côté — même parti pris que `shipment/` : aucun en-tête natif, chaque écran
+porte son bandeau. Le retour depuis l'inspection retombe sur la demande, pas sur la liste.
+
+Deux détails qui se paient si on les oublie :
+
+* la déclaration racine passe de `<Stack.Screen name="deal/[id]" />` à `name="deal"` — c'est la
+  PILE qu'on déclare, plus l'écran ;
+* **les types de routes d'Expo ne se régénèrent pas tout seuls ici.** `npx expo start` plante sur
+  `Cannot find module 'expo-router/_ctx-shared'` : `@expo/router-server` vit à la racine du dépôt,
+  `expo-router` sous `apps/mobile/node_modules` (niché à dessein, pour Metro et react 19.2.3). La
+  parade mesurée :
+
+```sh
+cd apps/mobile
+NODE_PATH=$PWD/node_modules npx expo start --go   # les types sont écrits en ~6 s, puis on arrête
+```
+
+Sans cela, `nx typecheck @yamba-app/mobile` refuse tout `router.push('/deal/[id]/pickup')` avec un
+TS2322 qui donne l'impression que la route est fausse — alors que c'est le fichier généré qui est
+périmé. Le fichier n'est pas versionné : le symptôme est **local**, et la CI n'en voit rien.
+
+## L'étagère à photos : on factorise au moment où l'on devient le quatrième
+
+Trois écrans sélectionnaient déjà des images, chacun pour soi. Ce lot en aurait fait un quatrième et
+D116 un cinquième. Trois fichiers nouveaux, et une frontière nette :
+
+| Fichier | Rôle | Imports |
+|---|---|---|
+| `lib/photos.ts` | l'ÉTAT d'un lot de photos (pur) | **zéro** |
+| `hooks/use-photos.ts` | les EFFETS : permission, sélection, téléversement, réessai | `expo-image-picker` |
+| `components/photo-shelf.tsx` | les PIXELS : vignettes, voile, croix, boutons | React Native |
+
+Et le compte a **corrigé la décision qui l'a demandé**. D115 3A annonçait « recopiée TROIS fois » ;
+`grep -rln launchCameraAsync` dit deux (`booking/content.tsx`, `shipment/[id]/report.tsx`) —
+`publish-trip/review.tsx` ne prend pas de photo, il **joint un billet**, qui est un fichier déjà
+reçu. La nuance n'est pas comptable : un billet ne se photographie pas, donc cet écran n'était pas
+candidat au composant. Une fiche porte les deux comptes, pas une promesse.
+
+Ce que l'étagère ajoute aux copies : un **réessai par photo**. Les trois copies ne savent que
+*retirer* une photo en échec — le Voyageur devait reprendre la photo du colis ouvert, debout, devant
+l'Expéditeur. Le fichier est déjà sur l'appareil : on le renvoie.
+
+## Ce qui manque est une LISTE, pas un booléen
+
+```ts
+export type ManqueDeLaPriseEnCharge =
+  | { quoi: 'points'; combien: number }
+  | { quoi: 'photo' }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' }
+  | { quoi: 'notes'; deTrop: number };
+```
+
+`canConfirm: boolean` ne permet qu'un bouton éteint. La liste permet une phrase — « il reste deux
+vérifications », « une photo n'est pas partie » — et l'écran n'a **rien à re-déduire** : deux
+déductions divergent, et c'est l'écran qui aurait tort (doctrine A209).
+
+`corpsDeLaPriseEnCharge()` rend `null` plutôt que de jeter : l'écran a déjà la liste des manques, et
+une fonction qui répond à une question ne lève pas d'exception pour dire « pas encore » (CQS, D83).
+La checklist part dans l'ordre du **contrat**, pas dans celui des clics : le serveur vérifie une
+présence, mais un dossier de litige se relit mieux quand deux réservations identiques s'archivent
+pareil.
+
+## Le carrefour tient la promesse de D114
+
+D114 1C avait laissé `pickup` et `deliver` dehors — leurs écrans n'existaient pas — et sa fiche avait
+promis d'être « la première à le rappeler ». L'écran existe : `prendre` entre dans `ORDRE`, à sa
+place nommée (**après** répondre, **avant** confirmer : quelqu'un attend DEBOUT avec un colis, donc
+ce geste passe devant tout ce qui peut se faire assis). `remettre` reste dehors, et la fiche
+continue de le refuser — ce n'est pas un oubli, c'est la même règle qui tient.
+
+Son échéance est `null`, **volontairement** : le rendez-vous a une heure, mais l'app ne reçoit du
+trajet qu'une date locale. Un « dans 3 h » calculé là-dessus serait inventé (D100).
+
+## D115 bis — le site, challengé par son jumeau natif
+
+En écrivant l'écran natif, trois défauts du site se sont montrés. Aucun n'était visible à la
+lecture ; tous l'étaient en demandant « et ici, qu'est-ce qui bloque le bouton ? ».
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | `PickupNotes` n'avait **aucun** `maxLength` alors que le contrat refuse au-delà de 500 | les photos partaient chez ImageKit, puis la confirmation échouait sur un toast générique — et il fallait tout refaire, debout |
+| ② | « ce qui manque » était un ternaire **recopié deux fois** (`DealPickupMobile`, `PickupConfirmCard`), aveugle à la remarque trop longue | bouton ACTIF pour un envoi voué à l'échec |
+| ③ | `if (loadError \|\| !deal) return <DealSkeleton />` | une lecture qui échoue affichait un **squelette perpétuel**, sans un mot ni une sortie (famille D100) |
+
+La règle vit maintenant dans `apps/user-ui/src/lib/carrier/prise-en-charge.ts` (pur, zéro import) et
+descend aux deux arbres. **C'est la quatrième fois qu'une règle sort d'un composant du site** après
+`tunnel.ts` (D93), `search-facets.ts` (D100) et `parcel-weight.ts` (D101) — exactement ce que
+`jest.config.ts` d'A224 annonçait : « le jour où un composant portera une règle qu'on veut tester,
+c'est la règle qu'il faudra sortir, pas le harnais qu'il faudra grossir ».
+
+Trouvé en passant, **mesuré et non lu** : `grep -rn PickupFooter` dit que ce composant n'est importé
+que par la vue téléphone, avec `variant="mobile"`. Sa branche bureau — quarante lignes, ses propres
+boutons, sa propre phrase de blocage — n'était atteinte par **aucun rendu** depuis son écriture (le
+bureau pose sa confirmation en colonne latérale). Du code qu'aucun chemin n'atteint est un piège :
+on l'édite en croyant corriger l'écran, et rien ne change. Supprimée.
+
+Et le harnais du site déclare désormais `@packages/api-contracts` (dans `jest.config.ts` ET
+`tsconfig.spec.json` — `alias.spec.ts` vérifie l'alignement des trois copies) : ses fiches peuvent
+confronter une constante **recopiée** au contrat Zod réel, comme le mobile depuis A223. Le bundle du
+navigateur, lui, ne voit pas zod — l'application n'importe pas cet alias.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1192 (59 suites) | **1241 (61 suites)** |
+| Fiches user-ui | 253 (16 suites) | **273 (17 suites)** |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* `nx typecheck @yamba-app/mobile` (deux programmes) et `nx typecheck user-ui` : verts.
+* `node scripts/check-i18n-messages.mjs` : 30 espaces de noms, miroir parfait.
+* La fiche de recensement du site (`largeur-de-page`) a **rougi** sur la colonne étroite du nouveau
+  message d'erreur, et c'est son travail : elle est désormais recensée avec sa raison (D110).
+
+## Reste ouvert
+
+* **La remise** (`deliver`), le code à six chiffres et les jalons de transport — D116.
+* Côté site, le téléversement reste fait **à la confirmation**, et un échec au milieu laisse les
+  photos déjà montées orphelines chez ImageKit. Nommé, non corrigé : les supprimer demanderait le
+  `fileId`, que ce chemin ne garde pas.
+* Aucun écran de ce lot n'a été **vu** : il faut une session Voyageur avec un deal ACCEPTED sur le
+  simulateur.

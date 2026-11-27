@@ -9813,3 +9813,62 @@ heures et un Voyageur à noter devait ouvrir trois écrans pour l'apprendre.
 | 6 | Je n'ai rien à faire | l'écran me dit que tout est à jour |
 | 7 | Je tape une ligne | j'arrive directement là où le geste se fait |
 | 8 | Je compare le badge de la barre et l'écran | ils disent le même nombre |
+
+
+---
+
+# D115 — Le Voyageur prend le colis en charge (27/11/2026)
+
+## Le besoin
+
+Le Voyageur accepte une demande, retrouve l'Expéditeur à la gare — et là, plus rien. Le geste qui
+transforme un accord en transport (ouvrir le colis, vérifier, photographier, confirmer) n'existait
+que sur le site, c'est-à-dire **nulle part** au moment où il se joue : debout, à deux, colis ouvert.
+Et son issue légitime — refuser un colis douteux — n'existait pas davantage.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D115-1** | Les **cinq** points d'inspection sont obligatoires ; le serveur refuse une inspection partielle. | CNF-04. Le Voyageur déclare avoir vu le contenu ouvert : c'est ce qui le protège en cas de contrôle. |
+| **RG-D115-2** | Les points sont écrits en **phrases**, pas en étiquettes, et « le contenu correspond » passe en tête. | C'est le point qui protège le Voyageur en douane. On déclare, on ne remplit pas un formulaire. |
+| **RG-D115-3** | De **1 à 5 photos** du colis ouvert, et l'appareil photo est proposé **avant** la photothèque. | C'est une preuve, pas une décoration — et on est devant le colis. |
+| **RG-D115-4** | Un téléversement en échec **bloque** l'envoi, et se **réessaie** photo par photo. | Partir sans sa preuve vide l'inspection de son sens. Retirer la photo obligerait à la reprendre, debout. |
+| **RG-D115-5** | Une remarque est facultative, et plafonnée à **500 caractères** — annoncés quand on s'en approche. | C'est le plafond du contrat. Le découvrir au refus du serveur, après le téléversement, est un piège. |
+| **RG-D115-6** | Le bouton **dit ce qui manque** : « il reste deux vérifications », « ajoute une photo ». Jamais muet. | A209. Un bouton éteint que rien n'explique est un cul-de-sac. |
+| **RG-D115-7** | Le Voyageur **ne voit jamais** le code de livraison. | D43 / INV-1 : le serveur le génère à la prise en charge et le révèle à l'Expéditeur seul. Le destinataire le dictera à la remise. |
+| **RG-D115-8** | **Refuser** est une issue visible, en second : remboursement intégral de l'Expéditeur, kilos restitués, aucune pénalité pour le Voyageur. | A40 / CNF-07. Cacher le refus pousserait à accepter un colis douteux — exactement ce que l'inspection cherche à éviter. |
+| **RG-D115-9** | Le refus propose **cinq raisons** du contrat, ou aucune. Jamais un texte libre. | « Sans préciser » est une réponse valable ; un champ libre deviendrait une pièce de dossier non maîtrisée. |
+| **RG-D115-10** | Le **droit** de prendre en charge vient du serveur (`allowedActions`), jamais d'un statut déduit. | Seule la machine à états connaît la fenêtre. Sinon l'écran montrerait un formulaire qu'on ne pourrait pas envoyer. |
+| **RG-D115-11** | Le carrefour annonce « prends en charge le colis de X » **sans compte à rebours**. | L'app ne reçoit du trajet qu'une date locale : un « dans 3 h » serait inventé. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre une demande acceptée | je vois « Confirmer la prise en charge » |
+| 2 | Je tape le bouton sans rien cocher | on me dit qu'il reste cinq vérifications ; rien n'est envoyé |
+| 3 | Je coche les cinq points, sans photo | on me demande une photo |
+| 4 | Une photo échoue à partir | je la touche, elle repart ; l'envoi reste bloqué tant qu'elle n'est pas montée |
+| 5 | Je colle 600 caractères de remarque | on me dit de combien je dépasse, et le champ s'arrête au plafond |
+| 6 | Je confirme | l'écran me dit que l'Expéditeur reçoit son code — et ne me le montre pas |
+| 7 | Je cherche le code à six chiffres sur cet écran | il n'y est pas, nulle part |
+| 8 | Je refuse sans donner de raison | c'est accepté ; l'Expéditeur est remboursé intégralement |
+| 9 | Je choisis une raison, puis la retape | elle se décoche, et « sans préciser » redevient possible |
+| 10 | J'ouvre l'inspection d'un colis déjà pris en charge | l'écran me le dit et me ramène, au lieu d'un formulaire inutile |
+| 11 | J'ouvre l'onglet Activité avec une demande à répondre et un colis à prendre | répondre est au-dessus de prendre en charge |
+| 12 | Je tape « prends en charge le colis de X » | j'arrive directement sur l'inspection, pas sur la demande |
+
+## D115 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D115bis-1** | Sur le site aussi, la remarque est plafonnée **dans le champ** et le compteur apparaît à l'approche. | Le refus arrivait après le téléversement des photos, sur un message générique. |
+| **RG-D115bis-2** | « Ce qui manque » est calculé **une seule fois** et descend au bureau comme au téléphone. | Deux copies de la phrase, c'était deux vérités à tenir d'accord — et aucune ne voyait la remarque trop longue. |
+| **RG-D115bis-3** | Une lecture qui échoue **le dit** et offre une sortie. | Un squelette perpétuel prétend charger pour toujours. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Je tape 500 caractères puis un de plus | le champ s'arrête, le compteur est visible |
+| 2 | J'ouvre l'écran avec une remarque trop longue collée | le bouton est inactif ET la phrase dit pourquoi |
+| 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette prise en charge ne se lit pas » et un bouton me ramène à la demande |

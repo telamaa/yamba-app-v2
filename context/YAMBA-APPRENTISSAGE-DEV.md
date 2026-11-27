@@ -12107,3 +12107,165 @@ Le jour où ces écrans naissent, cette fiche rougit, et c'est elle qui dira à 
 - `apps/mobile/src/lib/carrefour.ts` — la fusion, l'ordre, la tête de pile.
 - `apps/mobile/src/lib/activite-context.tsx` — une lecture, une vérité.
 - Registre, entrée **D114**.
+
+
+---
+
+# Chapitre — La prise en charge : trois frontières et un grep (D115)
+
+Ce chapitre est utile même si tu ne touches jamais à Yamba : il parle de **où poser une règle**, de
+**ce qu'un hook ne doit pas faire**, et de la différence entre lire du code et le **mesurer**.
+
+## 1. Trois fichiers pour une photo, et pourquoi pas un seul
+
+La prise de photo, c'est trois choses qui n'ont pas la même durée de vie :
+
+```
+lib/photos.ts            ← l'ÉTAT   (pur, zéro import)      : testable sous Node
+hooks/use-photos.ts      ← les EFFETS (expo-image-picker)    : non testable sans simulateur
+components/photo-shelf.tsx ← les PIXELS (React Native)       : non testable sans jsdom
+```
+
+La règle générale : **ce qui décide descend, ce qui a un effet reste en haut.** Si tu mélanges, la
+seule façon de tester « rechoisir la même image ne consomme pas une place » est de lancer un
+téléphone. Séparés, c'est une ligne :
+
+```ts
+expect(ajouterPhotos([photo({ id: 'asset-1' })], [{ id: 'asset-1', uri: '…' }], 5)).toHaveLength(1);
+```
+
+Dans ce dépôt la frontière a un nom (A223 pour le mobile, A224 pour le site) et une conséquence
+mesurée : `apps/mobile` n'a **aucun** test de composant, et 1 241 fiches de règles.
+
+## 2. Un « updater » React doit être PUR — le miroir en `useRef`
+
+Tentation naturelle dans `use-photos.ts` : lire l'état courant au moment où on l'écrit.
+
+```ts
+// ✗ NE FAIS PAS ÇA
+setPhotos((avant) => {
+  const apres = ajouterPhotos(avant, candidates, max);
+  for (const c of candidates) televerser(c);   // ← un EFFET dans un updater
+  return apres;
+});
+```
+
+React peut **rejouer** un updater (mode strict, rendu concurrent) : l'effet part deux fois. Et une
+lecture qui écrit provoque l'erreur que ce dépôt a payée en D83 — « Cannot update a component while
+rendering a different component ». La parade est un miroir explicite :
+
+```ts
+const courant = useRef<readonly PhotoLocale[]>([]);
+const poser = useCallback((suite: readonly PhotoLocale[]) => {
+  courant.current = suite;      // pour LIRE sans rendre
+  setPhotos(suite);             // pour RENDRE
+}, []);
+```
+
+C'est l'application de **CQS** (*Command-Query Separation*) : une fonction qui répond à une question
+n'écrit jamais ; une fonction qui écrit ne répond pas.
+
+Deuxième piège du même fichier, plus subtil : le nombre de places libres est relu **après** l'attente
+de la permission.
+
+```ts
+const permission = await ImagePicker.requestCameraPermissionsAsync();   // ← await
+const places = Math.max(0, max - courant.current.length);               // relu ICI
+```
+
+Toute valeur capturée avant un `await` peut être périmée après. C'est le même raisonnement qu'un
+verrou optimiste côté base.
+
+## 3. Un booléen ne sait pas expliquer
+
+```ts
+// ✗ ce que le site faisait
+const canConfirm = ITEMS.every((id) => checked.has(id)) && photos.length >= 1;
+```
+
+Avec ça, un bouton ne peut qu'être éteint. Pour qu'il **parle**, il faut une liste discriminée :
+
+```ts
+type Manque =
+  | { quoi: 'points'; combien: number }
+  | { quoi: 'photo' }
+  | { quoi: 'notes'; deTrop: number };
+```
+
+TypeScript te donne alors le narrowing gratuitement :
+
+```ts
+manque.quoi === 'points' ? t('missing.points', { count: manque.combien })
+: manque.quoi === 'notes' ? t('missing.notes', { count: manque.deTrop })
+: t(`missing.${manque.quoi}`)
+```
+
+Et le corollaire d'architecture : **l'écran ne re-déduit rien**. S'il recalculait « il manque une
+photo » de son côté, il existerait deux règles, et l'une serait fausse un jour.
+
+## 4. Mesurer plutôt que lire : trois fois dans un seul lot
+
+| Question | Ce que la lecture disait | Ce que le grep a dit |
+|---|---|---|
+| Combien de copies de la prise de photo ? | « trois » (écrit dans la décision) | **deux** pour l'appareil photo, trois pour la photothèque — un billet ne se photographie pas |
+| Qui rend la barre du bas du site ? | un composant à deux variantes | **une seule** ; la variante bureau n'est atteinte par aucun rendu |
+| Où est calculée la phrase de blocage ? | « dans le parent » | **deux copies**, dans deux arbres |
+
+```sh
+grep -rln launchCameraAsync apps/mobile/src
+grep -rn  PickupFooter apps/user-ui/src | grep -v 'PickupFooter.tsx'
+```
+
+Trois secondes chacune. Trois mois d'invisibilité à la lecture. C'est la leçon D105 (« une
+incohérence de charte ne se lit pas, elle se COMPTE ») appliquée à autre chose qu'une charte.
+
+## 5. Une fiche doit viser un USAGE, jamais une orthographe
+
+Premier jet de la fiche qui interdit d'afficher le code de livraison :
+
+```ts
+expect(ecran).not.toMatch(/\bcode\b\s*[:=]/);   // ✗
+```
+
+Rouge immédiatement — sur `erreur.code === 'TRANSITION_NOT_ALLOWED'`, qui n'a rien à voir. **Sixième
+fois ce mois-ci** dans ce dépôt (A224 lot 5 l'avait même trouvé dans son propre détecteur). La
+version qui tient vise les trois façons d'afficher ou de saisir six chiffres :
+
+```ts
+expect(ecran).not.toContain('deliveryCode');
+expect(ecran).not.toContain('maxLength={6}');
+expect(ecran).not.toContain('number-pad');
+expect(Object.keys(corpsDeLaPriseEnCharge(formulaire()) ?? {})).toEqual([
+  'checklist', 'photoUrls', 'notes',
+]);
+```
+
+La dernière ligne est la meilleure : elle ne regarde plus le texte du fichier, elle regarde **ce qui
+part sur le réseau**.
+
+## 6. Un outil qui bloque n'est pas forcément un mur
+
+`npx expo start` refusait de régénérer les types de routes :
+
+```
+Error: Cannot find module 'expo-router/_ctx-shared'
+```
+
+`@expo/router-server` est à la racine, `expo-router` est niché sous `apps/mobile/node_modules` (voulu,
+pour Metro). Node résout `require` depuis le fichier appelant — donc il cherche au mauvais endroit.
+`NODE_PATH` est le **repli** historique de la résolution CJS :
+
+```sh
+NODE_PATH=$PWD/node_modules npx expo start --go
+```
+
+Types écrits en six secondes. Avant de contourner un outil, demande-toi **où il cherche**.
+
+## Pour aller plus loin
+
+* `apps/mobile/src/lib/photos.ts` et sa fiche : un modèle d'état minuscule, dix-neuf fiches.
+* `apps/user-ui/src/lib/carrier/prise-en-charge.ts` : la **quatrième** règle sortie d'un composant du
+  site, après `tunnel.ts` (D93), `search-facets.ts` (D100) et `parcel-weight.ts` (D101).
+* `apps/user-ui/tsconfig.spec.json` : comment un harnais peut déclarer **plus** d'alias que son
+  application (ici `@packages/api-contracts`, pour confronter une copie au contrat Zod sans embarquer
+  zod dans le navigateur).
