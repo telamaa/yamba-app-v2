@@ -18,6 +18,8 @@ import {
   Star,
   Wallet,
   MessageSquare,
+  CalendarClock,
+  Phone,
   type LucideIcon,
   Scale,
 } from "lucide-react";
@@ -96,6 +98,16 @@ export type NotificationPresentation = {
 };
 
 const PRESENTATION: Record<string, Omit<NotificationPresentation, "i18nKey">> = {
+  // D119 bis — QUATRE types tombaient dans le repli « Notification » faute
+  // d'une ligne ici. Trois sont les rendez-vous et le numéro que D118 vient
+  // de rendre quotidiens ; le quatrième, `dispute_carrier_responded`, avait
+  // ses PHRASES écrites et pas sa ligne de présentation — écrit, puis
+  // oublié à mi-chemin. Une union fermée se couvre en entier, et la
+  // couverture se COMPTE (fiche `boite.spec.ts`, leçon ANO-API-16).
+  "booking.dispute_carrier_responded": { icon: Scale, tone: "amber" },
+  "conversation.meetup_proposed": { icon: CalendarClock, tone: "amber" },
+  "conversation.meetup_accepted": { icon: CalendarClock, tone: "emerald" },
+  "conversation.phone_revealed": { icon: Phone, tone: "teal" },
   "booking.requested": { icon: Mail, tone: "amber" },
   "booking.accepted": { icon: BadgeCheck, tone: "emerald" },
   "booking.declined": { icon: Mail, tone: "slate" },
