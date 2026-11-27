@@ -61,7 +61,9 @@
     "declined": "Demande refusée",
     "failed": "Action impossible pour l'instant.",
     "loadError": "Impossible d'ouvrir cette demande.",
-    "wrongRole": "Cette réservation est l'un de tes envois, pas une demande reçue."
+    "wrongRole": "Cette réservation est l'un de tes envois, pas une demande reçue.",
+    "pickupCta": "Confirmer la prise en charge",
+    "pickupCtaWhy": "Tu es devant l'Expéditeur ? Ouvre le colis, vérifie, prends les photos."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

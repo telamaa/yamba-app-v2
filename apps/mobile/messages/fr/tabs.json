@@ -61,6 +61,7 @@
     "waitingTitle": "Ce qui t'attend",
     "nothingWaiting": "Rien ne t'attend. Tout est à jour.",
     "waitingRepondre": "Répondre à {name}",
+    "waitingPrendre": "Prends en charge le colis de {name}",
     "waitingConfirmer": "Confirmer la réception",
     "waitingNoter": "Noter {name}",
     "waitingSomeone": "quelqu'un",

@@ -73,3 +73,36 @@ export function accepterLaDemande(dealId: string): Promise<unknown> {
 export function refuserLaDemande(dealId: string): Promise<unknown> {
   return apiFetch(`/deals/${dealId}/decline`, { method: 'POST' });
 }
+
+/* ── Le transport (D115) ─────────────────────────────────────────────────── */
+
+/**
+ * Je prends le colis en charge. Le serveur exige les CINQ points
+ * d'inspection (CNF-04) et de 1 à 5 photos déjà chez ImageKit.
+ *
+ * C'est LUI qui génère le code de livraison (bcrypt + AES, D43) et le
+ * révèle à l'Expéditeur SEUL : la réponse ne le contient pas, et le
+ * Voyageur ne doit jamais le voir (INV-1).
+ */
+export function prendreEnCharge(
+  dealId: string,
+  corps: { checklist: string[]; photoUrls: string[]; notes: string | null }
+): Promise<unknown> {
+  return apiFetch(`/deals/${dealId}/pickup`, { method: 'POST', body: corps });
+}
+
+/**
+ * Je refuse le colis au rendez-vous. L'Expéditeur est remboursé
+ * INTÉGRALEMENT, les kilos lui sont restitués, et le Voyageur n'est PAS
+ * pénalisé (A40, CNF-07). La raison est l'une des cinq du contrat, ou
+ * aucune — jamais un texte libre.
+ */
+export function refuserLaPriseEnCharge(
+  dealId: string,
+  raison: string | null
+): Promise<unknown> {
+  return apiFetch(`/deals/${dealId}/pickup/refuse`, {
+    method: 'POST',
+    body: raison === null ? {} : { reason: raison },
+  });
+}

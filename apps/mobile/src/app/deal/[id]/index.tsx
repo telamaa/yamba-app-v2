@@ -162,6 +162,9 @@ function DemandeContent() {
   const description = typeof parcel.description === 'string' ? parcel.description.trim() : '';
 
   const peutRepondre = peut(demande, 'accept');
+  // LA PORTE vers l'inspection (D115). Elle n'est pas déduite d'un statut :
+  // seule la machine à états sait si la fenêtre est ouverte.
+  const peutPrendreEnCharge = peut(demande, 'pickup');
 
   return (
     <ThemedView style={styles.container}>
@@ -222,6 +225,24 @@ function DemandeContent() {
               {t('detail.gainNote')}
             </ThemedText>
           </Section>
+
+          {peutPrendreEnCharge && (
+            <View style={styles.reponses}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('detail.pickupCtaWhy')}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({ pathname: '/deal/[id]/pickup', params: { id: demande.id } })
+                }
+                style={({ pressed }) => [styles.principal, { opacity: pressed ? 0.85 : 1 }]}>
+                <ThemedText type="smallBold" style={styles.principalLabel}>
+                  {t('detail.pickupCta')}
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
 
           {peutRepondre && (
             <View style={styles.reponses}>

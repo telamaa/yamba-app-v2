@@ -174,7 +174,9 @@ export default function RootLayout() {
             {/* Les DEMANDES REÇUES et la demande elle-même (D113). Même
                 convention : pluriel pour la liste, singulier pour la fiche. */}
             <Stack.Screen name="deals/mine" />
-            <Stack.Screen name="deal/[id]" />
+            {/* `deal` est une PILE depuis D115 : la demande, puis l'inspection
+                poussée par-dessus — le retour retombe sur la demande. */}
+            <Stack.Screen name="deal" />
             {/* La PUBLICATION d'un trajet : sept écrans poussés, le pendant
                 Voyageur du tunnel de réservation. Son seuil est l'onglet
                 « + » ; ici vit la pile qui se pousse par-dessus les onglets. */}

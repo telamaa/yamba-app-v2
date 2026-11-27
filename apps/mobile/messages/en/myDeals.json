@@ -61,7 +61,9 @@
     "declined": "Request declined",
     "failed": "This action is not possible right now.",
     "loadError": "This request cannot be opened.",
-    "wrongRole": "This booking is one of your shipments, not a request you received."
+    "wrongRole": "This booking is one of your shipments, not a request you received.",
+    "pickupCta": "Confirm hand-over",
+    "pickupCtaWhy": "Are you with the Shipper? Open the parcel, check it, take the photos."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

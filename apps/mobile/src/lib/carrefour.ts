@@ -10,12 +10,15 @@
  * le réseau ni l'écran : on lui donne les projections déjà faites.
  *
  * ── CE QU'ON NE MET PAS DEDANS, ET POURQUOI ─────────────────────────────
- * UNIQUEMENT ce que le membre peut FAIRE AUJOURD'HUI dans l'app. Prendre en
- * charge et remettre un colis sont des gestes autorisés par le serveur, mais
- * leurs écrans n'existent pas encore (hors périmètre D113) : les annoncer
- * ici recréerait exactement le défaut que les trois derniers lots ont
- * corrigé — une porte vers rien. Le jour où ces écrans naissent, ils
- * entrent ici, et une fiche le rappelle.
+ * UNIQUEMENT ce que le membre peut FAIRE AUJOURD'HUI dans l'app. D114 avait
+ * laissé dehors `pickup` et `deliver` : le serveur les autorisait, leurs
+ * écrans n'existaient pas, et les annoncer aurait recréé le défaut que les
+ * trois lots précédents venaient de corriger — une porte vers rien.
+ *
+ * **D115 fait naître l'écran de la PRISE EN CHARGE, donc elle entre ici**,
+ * exactement comme la fiche de D114 l'avait prévu. La REMISE reste dehors
+ * jusqu'à ce que son écran existe (D116), et la fiche continue de la
+ * refuser : ce n'est pas un oubli, c'est la même règle qui tient.
  *
  * ── L'ORDRE EST NOMMÉ, PAS NUMÉROTÉ ─────────────────────────────────────
  * Le site classe par `{ RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 }` : une
@@ -24,25 +27,29 @@
  * valeur n'est à inventer.
  */
 import type { DemandeDeLaListe } from '@/lib/mes-demandes';
-import { sectionDeLaDemande } from '@/lib/mes-demandes';
+import { peut, sectionDeLaDemande } from '@/lib/mes-demandes';
 import type { EnvoiDeLaListe } from '@/lib/mes-envois';
 import { actionMiseEnAvant } from '@/lib/mes-envois';
 
 /** Ce qu'il y a à faire, du plus pressant au moins pressant. */
-export type TypeDeChose = 'repondre' | 'confirmer' | 'noter';
+export type TypeDeChose = 'repondre' | 'prendre' | 'confirmer' | 'noter';
 
 /**
  * L'ordre de traitement, et sa raison :
  *   ① RÉPONDRE — c'est le seul où quelqu'un d'AUTRE perd quelque chose si
  *     l'on tarde : la demande meurt en 24 h et l'Expéditeur perd son colis ;
- *   ② CONFIRMER — l'argent du Voyageur est bloqué tant qu'on ne confirme
+ *   ② PRENDRE EN CHARGE — quelqu'un attend DEBOUT avec un colis, et le
+ *     trajet part : c'est le seul geste de la liste qui ait un rendez-vous.
+ *     Il passe donc devant tout ce qui peut se faire assis ;
+ *   ③ CONFIRMER — l'argent du Voyageur est bloqué tant qu'on ne confirme
  *     pas ; cela se débloque tout seul, mais plus tard ;
- *   ③ NOTER — personne n'attend après, c'est une dette de politesse.
+ *   ④ NOTER — personne n'attend après, c'est une dette de politesse.
  */
-export const ORDRE: readonly TypeDeChose[] = ['repondre', 'confirmer', 'noter'];
+export const ORDRE: readonly TypeDeChose[] = ['repondre', 'prendre', 'confirmer', 'noter'];
 
 export type ChoseQuiAttend =
   | { type: 'repondre'; id: string; echeance: string | null; demande: DemandeDeLaListe }
+  | { type: 'prendre'; id: string; echeance: string | null; demande: DemandeDeLaListe }
   | { type: 'confirmer'; id: string; echeance: string | null; envoi: EnvoiDeLaListe }
   | { type: 'noter'; id: string; echeance: string | null; envoi: EnvoiDeLaListe };
 
@@ -67,8 +74,21 @@ export function choseQuiAttendent(
   const choses: ChoseQuiAttend[] = [];
 
   for (const demande of demandes) {
-    if (sectionDeLaDemande(demande) !== 'aRepondre') continue;
-    choses.push({ type: 'repondre', id: demande.id, echeance: demande.expireLe, demande });
+    if (sectionDeLaDemande(demande) === 'aRepondre') {
+      choses.push({ type: 'repondre', id: demande.id, echeance: demande.expireLe, demande });
+      continue;
+    }
+    // Le DROIT vient du serveur (`allowedActions`), jamais d'un statut : la
+    // machine à états connaît la fenêtre de prise en charge, pas l'app.
+    //
+    // ÉCHÉANCE À `null`, et c'est voulu : le rendez-vous a une heure, mais
+    // l'app ne reçoit du trajet qu'une date LOCALE (`dateDepart`), pas un
+    // instant. Afficher « dans 3 h » à partir d'une date sans heure serait
+    // inventer un compte à rebours — un écran sans mensonge préfère se taire
+    // (D100).
+    if (peut(demande, 'pickup')) {
+      choses.push({ type: 'prendre', id: demande.id, echeance: null, demande });
+    }
   }
 
   for (const envoi of envois) {

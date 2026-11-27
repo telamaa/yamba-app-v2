@@ -56,22 +56,64 @@ function demande(extra: Partial<DemandeDeLaListe> = {}): DemandeDeLaListe {
 }
 
 describe('① l’ordre est nommé, et il ne promet que l’existant', () => {
-  it('trois choses, dans cet ordre', () => {
+  it('quatre choses, dans cet ordre', () => {
     // Le site classe par { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 } :
     // une échelle à trous, où personne ne sait ce que vaudrait un 2. Une
-    // liste de noms se lit, et s'étend en insérant un mot.
-    expect(ORDRE).toEqual(['repondre', 'confirmer', 'noter']);
+    // liste de noms se lit, et s'étend en INSÉRANT un mot — ce que D115 a
+    // fait, exactement là où sa raison le place.
+    expect(ORDRE).toEqual(['repondre', 'prendre', 'confirmer', 'noter']);
   });
 
-  it('PRENDRE EN CHARGE et REMETTRE n’y sont PAS — leurs écrans n’existent pas', () => {
-    // Les annoncer recréerait le défaut que les trois derniers lots ont
-    // corrigé : une porte vers rien. Le jour où ces écrans naissent, ils
-    // entrent ici — et cette fiche sera la première à le rappeler.
-    expect(ORDRE).not.toContain('prendreEnCharge');
+  it('PRENDRE EN CHARGE est entrée le jour où son écran est né (D115)', () => {
+    // D114 l'avait laissée dehors parce que l'écran n'existait pas, et cette
+    // fiche avait promis d'être la première à le rappeler. L'écran existe :
+    // elle vérifie maintenant que la PORTE existe aussi, sans quoi on aurait
+    // remplacé « un geste sans écran » par « un geste sans chemin ».
+    expect(ORDRE).toContain('prendre');
+    const regle = readFileSync(join(MOBILE, 'src/lib/carrefour.ts'), 'utf8');
+    expect(regle).toContain("'pickup'");
+    const onglet = readFileSync(join(MOBILE, 'src/app/(tabs)/activity.tsx'), 'utf8');
+    expect(onglet).toContain("'/deal/[id]/pickup'");
+  });
+
+  it('REMETTRE n’y est toujours PAS — son écran n’existe pas (D116)', () => {
+    // Ce n'est pas un oubli : c'est la même règle qui tient. Annoncer un
+    // geste dont l'écran n'existe pas recrée une porte vers rien.
     expect(ORDRE).not.toContain('remettre');
     const regle = readFileSync(join(MOBILE, 'src/lib/carrefour.ts'), 'utf8');
-    expect(regle).not.toContain("'pickup'");
     expect(regle).not.toContain("'deliver'");
+  });
+
+  it('une demande ACCEPTÉE qu’on peut prendre en charge attend quelque chose', () => {
+    const choses = choseQuiAttendent(
+      [],
+      [demande({ statut: 'ACCEPTED', expireLe: null, actions: ['pickup', 'refusePickup'] })]
+    );
+    expect(choses.map((c) => c.type)).toEqual(['prendre']);
+  });
+
+  it('prendre en charge passe APRÈS répondre et AVANT confirmer', () => {
+    // Quelqu'un attend debout avec un colis : ce geste passe devant tout ce
+    // qui peut se faire assis. Mais répondre reste devant — une demande sans
+    // réponse meurt en 24 h et l'Expéditeur perd son colis.
+    const choses = choseQuiAttendent(
+      [envoi({ id: 'a-confirmer', actions: ['confirmEarly'] })],
+      [
+        demande({ id: 'a-prendre', statut: 'ACCEPTED', expireLe: null, actions: ['pickup'] }),
+        demande({ id: 'a-repondre' }),
+      ]
+    );
+    expect(choses.map((c) => c.id)).toEqual(['a-repondre', 'a-prendre', 'a-confirmer']);
+  });
+
+  it('une prise en charge n’affiche AUCUN compte à rebours', () => {
+    // L'app ne reçoit du trajet qu'une date locale, pas un instant : un
+    // « dans 3 h » calculé là-dessus serait inventé (D100).
+    const [chose] = choseQuiAttendent(
+      [],
+      [demande({ statut: 'ACCEPTED', expireLe: null, actions: ['pickup'] })]
+    );
+    expect(chose.echeance).toBeNull();
   });
 
   it('une demande qui n’attend plus de réponse n’attend rien', () => {

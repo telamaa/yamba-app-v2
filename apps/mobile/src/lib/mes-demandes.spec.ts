@@ -265,7 +265,9 @@ describe('④ l’urgence a trois crans, et se tait quand il n’y a rien à dir
 describe('⑤ le contrat, la porte, et ce qui ne doit JAMAIS s’afficher', () => {
   const api = readFileSync(join(MOBILE, 'src/lib/api/my-deals.api.ts'), 'utf8');
   const liste = readFileSync(join(MOBILE, 'src/app/deals/mine.tsx'), 'utf8');
-  const fiche = readFileSync(join(MOBILE, 'src/app/deal/[id].tsx'), 'utf8');
+  // `deal/[id].tsx` est devenu `deal/[id]/index.tsx` en D115 : la demande
+  // n'est plus un écran seul, c'est une PILE (la demande, puis l'inspection).
+  const fiche = readFileSync(join(MOBILE, 'src/app/deal/[id]/index.tsx'), 'utf8');
 
   it('l’app sait ÉMETTRE les trois appels', () => {
     expect(api).toContain("'/me/deals'");
@@ -309,7 +311,9 @@ describe('⑤ le contrat, la porte, et ce qui ne doit JAMAIS s’afficher', () =
     expect(onglet).toContain("'/deals/mine'");
     const pile = readFileSync(join(MOBILE, 'src/app/_layout.tsx'), 'utf8');
     expect(pile).toContain('name="deals/mine"');
-    expect(pile).toContain('name="deal/[id]"');
+    // `deal` déclare une PILE depuis D115 (la demande, puis l'inspection) :
+    // ce qui compte est que la pile soit déclarée, pas son nombre d'écrans.
+    expect(pile).toContain('name="deal"');
   });
 
   it('la coquille « arrive dans un prochain lot » a DISPARU le jour où elle mentait', () => {
@@ -374,7 +378,7 @@ describe('⑥ le mot du colis existe dans les DEUX langues', () => {
   });
 
   it('aucun écran n’affiche un code brut', () => {
-    for (const fichier of ['src/app/deals/mine.tsx', 'src/app/deal/[id].tsx']) {
+    for (const fichier of ['src/app/deals/mine.tsx', 'src/app/deal/[id]/index.tsx']) {
       const source = sansCommentaires(readFileSync(join(MOBILE, fichier), 'utf8'));
       expect(source).toContain('motDuColis');
       expect(source).not.toMatch(/demande\.colis\.code/);
