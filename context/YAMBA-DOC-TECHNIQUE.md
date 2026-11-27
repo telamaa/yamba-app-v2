@@ -20245,3 +20245,199 @@ réservations.
   est tenue par les fiches, pas par la donnée réelle.
 - Le chemin par **notification** (« ton colis est arrivé ») n'existe sur aucun des deux fronts.
 - `getMyShipmentsPreview()` du site renvoie `mockShipments`, qui part dans le bundle de production.
+
+---
+
+# D112 bis — La porte ne centre plus son contenu (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : `porte-avec-sortie.spec.ts` 15 → 18 fiches.
+
+## Le fichier se contredisait lui-même
+
+`identity-gate.tsx` déclare dans son en-tête, depuis le 08/11 :
+
+> ① **LE CONTENU EST EN HAUT, le vide en bas.** On lisait à 55 % de la hauteur, sous un vide que
+> rien ne justifiait. […] ici l'écran a un titre de page, et un titre de page est en haut.
+
+Et cent lignes plus bas, D104 2A avait ajouté :
+
+```tsx
+{onDismiss !== undefined && <View style={styles.spacer} />}
+```
+
+soit un ressort **au-dessus** du bloc pour les écrans poussés, qui centrait leur contenu. Vu à
+l'écran le 27/11 : le titre de page flottait à ~40 % de la hauteur, sous un vide que rien ne
+justifiait. **Le défaut que l'en-tête déclare avoir corrigé, reproduit dans les mêmes mots.**
+
+Personne ne pouvait le voir en lisant : **les deux moitiés sont justes séparément.**
+
+## Pourquoi D104 2A avait tort
+
+Sa justification : « un écran poussé n'a pas de barre d'onglets, donc le vide du bas est du vide
+sans emploi ». Elle confond deux énoncés :
+
+| Énoncé | Dépend de la barre ? |
+|---|---|
+| le contenu commence en HAUT | **non** — c'est un titre de page |
+| le vide du BAS est inoffensif | oui — la barre y flotte |
+
+Retirer la barre ne change donc rien à **où commence le contenu**. Le ressort disparaît ; il n'en
+reste qu'un, sous le bloc.
+
+## La fiche qui avait tort a été RETOURNÉE, pas supprimée
+
+Une fiche de D104 exigeait littéralement le ressort conditionnel. Elle exige désormais son
+absence, et sa raison est écrite dans son corps — **une fiche qui a tort change de nature, elle ne
+disparaît pas** (leçon D110), sinon la règle qu'elle tenait redevient une opinion.
+
+Deux fiches s'ajoutent : un seul ressort dans la porte, et il vient **après** le bloc (avec la
+garde `indexOf > 0` des deux repères, sans quoi la comparaison passerait pour la pire des raisons
+— D98). L'amorçage, lui, reste centré, et une fiche le dit pour qu'on ne « simplifie » pas les deux
+cas en un seul.
+
+**Correction constatée à l'écran**, pas raisonnée (D98).
+
+---
+
+# D113 — Le Voyageur répond à ses demandes (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1137 → 1175 fiches** (57 → 58
+suites). **Aucune ligne de serveur** — la troisième fois d'affilée.
+
+## Le constat : troisième porte manquante en trois jours
+
+```sh
+grep -rn "me/deals" apps/mobile/src
+# → apps/mobile/src/hooks/use-tab-badges.ts   (et rien d'autre)
+```
+
+Le nombre de demandes en attente s'affichait sur l'onglet Activité, et **rien ne permettait d'y
+aller**. Après le compteur de brouillons (D111 quinquies) et le suivi d'envoi (D112), c'est la
+même famille pour la troisième fois — mais la plus chère : une demande **meurt en 24 h** (DEA-01),
+et l'Expéditeur sans réponse ne reçoit pas un écran vide, il perd son colis.
+
+Le Voyageur n'avait **aucun** écran natif : ni liste, ni demande, ni réponse.
+
+## Le périmètre : « répondre », et il est complet
+
+La machine à états accorde six gestes au Voyageur :
+
+| Geste | Depuis | Dans ce lot ? |
+|---|---|---|
+| `accept` / `decline` | PENDING | **oui** |
+| `cancel` | ACCEPTED | non (annuler un deal accepté : ANN-02) |
+| `pickup` / `refusePickup` | ACCEPTED | non — caméra + liste d'inspection 5/5 (CNF-04) |
+| `deliver` | PICKED_UP | non — code à 6 chiffres, bcrypt, 3 essais, verrou 15 min |
+
+Un lot se borne par un **métier**, pas par une couche technique. « Répondre » a une fin nette, une
+horloge et une preuve.
+
+## On n'accepte pas depuis une ligne de liste
+
+Accepter engage le Voyageur **et déclenche le débit** de l'Expéditeur (capture manuelle, D39). Il
+faut donc avoir vu le colis, sa valeur déclarée, l'Expéditeur, les lieux et le gain. D'où deux
+écrans :
+
+```
+apps/mobile/src/app/deals/mine.tsx    la liste — elle mène, elle ne tranche pas
+apps/mobile/src/app/deal/[id].tsx     la demande — elle porte les deux réponses
+```
+
+Le pluriel/singulier n'est pas une coquetterie : `deals/mine` sous une route dynamique
+`deals/[id]` serait capté avec `id = "mine"`, et Expo Router ne signalerait rien.
+
+**Refuser confirme, accepter non**, et l'asymétrie est raisonnée : l'écran de la demande *est* la
+délibération d'une acceptation ; y ajouter une alerte ferait répéter une décision déjà prise,
+écran en main. Le refus, lui, est terminal pour l'Expéditeur et se tape vite pour « faire de la
+place ». En revanche l'acceptation **dit ce qu'elle engage**, juste au-dessus du bouton.
+
+## Le tri suit l'horloge
+
+`grouperLesDemandes` trie « à répondre » par **échéance croissante**, là où `grouperLesEnvois`
+garde l'ordre du serveur. Deux listes voisines, deux tris, et c'est délibéré : on suit un colis,
+on **répond** à quelqu'un.
+
+Trois crans d'urgence, pas davantage — au-delà c'est un nuancier que personne ne décode :
+
+| Reste | Cran |
+|---|---|
+| ≤ 3 h | `bientot` (liseré mangue sur la carte) |
+| ≤ 12 h | `aujourdhui` |
+| au-delà | `calme` |
+| échue, ou pas d'horloge | `null` — **une demande acceptée n'est pas « calme », elle est hors sujet** |
+
+Les bornes appartiennent au cran le plus urgent : exactement 3 h restantes, c'est « bientôt ». Une
+borne qui penche vers le calme fait rater la dernière heure utile.
+
+## Le défaut trouvé contre la vraie base
+
+Comme à chaque lot, la projection a été rejouée sur le serveur réel — 13 demandes d'un Voyageur de
+seed. Résultat du premier jet :
+
+```
+ACCEPTED   Pauline L.   CLOTHES
+DECLINED   João S.      OTHER_ELECTRONICS
+DISPUTED   Chinwe E.    SMALL_TOYS
+```
+
+**Des codes techniques affichés à un Voyageur** — le défaut D83. Deux populations cohabitent, et
+c'est le même schéma que les dates de D112 :
+
+| Écrites par | `categoryFamily` | `category` |
+|---|---|---|
+| le parcours actuel (`booking-request.ts:301`) | famille D14 | code legacy |
+| le seed, les anciennes réservations | **null** | code legacy (A29) |
+
+La règle rend donc un **code et sa provenance**, jamais un mot :
+
+```ts
+export type FamilleDuColis =
+  | { source: 'famille'; code: string }
+  | { source: 'categorie'; code: string }
+  | null;
+```
+
+et les écrans vont chercher le mot dans l'un des deux dictionnaires. Les libellés sont **recopiés
+mot pour mot** : les huit familles D14 depuis `search.json` du mobile, les douze catégories legacy
+depuis `shipments.json` du site. Trois fiches tiennent l'absence de dérive et l'existence de chaque
+clé **calculée** dans les deux langues — angle mort que ni `tsc` (un gabarit se type toujours) ni
+le contrôle i18n de la CI (il compare FR et EN entre eux) ne couvre.
+
+Après correction, les treize lignes rendent « Vêtements », « Autre électronique », « Petits
+jouets » — et aucune clé absente.
+
+## Ce que ces écrans ne lisent jamais
+
+| Interdit | Pourquoi | Garde |
+|---|---|---|
+| `totalShipperCents`, `commissionCents` | la vue Voyageur ne porte que le GAIN (A13) | fiche |
+| `recipient` | minimisé côté serveur : nom à l'acceptation, téléphone à la prise en charge, jamais l'email (ANO-API-15) | fiche |
+
+Filtrer dans l'app créerait une **seconde** règle de confidentialité, et l'une des deux serait
+fausse un jour.
+
+## Un faux positif dans ma propre fiche, pour la sixième fois du mois
+
+La fiche « aucun écran ne lit le destinataire » est partie au rouge… sur le **commentaire** qui
+explique pourquoi le destinataire est interdit. Le remède n'est pas d'affiner le motif mais de
+viser l'usage :
+
+```ts
+function sansCommentaires(source: string): string {
+  const net = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  expect(net.length).toBeGreaterThan(source.length / 3); // un dépouillement qui vide tout passe tout
+  return net;
+}
+```
+
+Deuxième faux positif du même jet : « la coquille *arrive dans un prochain lot* a disparu »
+rougissait sur celles de **Messages** et **Profil**, qui disent encore la vérité. Condamner le mot
+partout revenait à interdire d'être honnête ; la fiche ne vise plus que l'onglet Activité.
+
+## Reste ouvert
+
+- `pickup`, `deliver`, `refusePickup` — le plus gros lot du chantier Voyageur.
+- **Aucun écran n'a été vu** : la session manque sur le simulateur, et macOS refuse
+  l'automatisation (`osascript` → `-1743`), donc aucun clic programmable.
+- Les familles D14 sont désormais recopiées dans **quatre** dictionnaires du mobile (booking,
+  tripDetail, search, myDeals). La dette est nommée ; la dérive, elle, est tenue par une fiche.

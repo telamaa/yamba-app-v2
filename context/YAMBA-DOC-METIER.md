@@ -9729,3 +9729,51 @@ invitation à devenir Voyageur.
 | 10 | Je tape une carte | le suivi s'ouvre — le même que juste après le paiement |
 | 11 | Je n'ai aucun envoi | l'écran le dit et propose de chercher un trajet |
 | 12 | Je regarde la liste dans une file d'embarquement | aucun code de livraison n'y est visible |
+
+---
+
+# D113 — Le Voyageur répond à ses demandes (27/11/2026)
+
+## Le besoin
+
+Un Voyageur publie son trajet, des Expéditeurs lui demandent d'emporter un colis… et il ne pouvait
+rien en faire depuis son téléphone. L'app affichait le **nombre** de demandes en attente sur
+l'onglet Activité, et rien ne permettait d'y aller.
+
+C'est le plus coûteux des trois trous : une demande **meurt en 24 h**. L'Expéditeur qui n'obtient
+pas de réponse ne perd pas un écran, il perd son colis — et le Voyageur perd son gain.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D113-1** | « Demandes reçues » montre toutes les demandes du Voyageur, en trois sections : à répondre, en cours, passées. | Trois questions : qu'est-ce qu'on attend de moi, qu'est-ce qui roule, qu'est-ce qui est derrière. |
+| **RG-D113-2** | Une demande n'est « à répondre » que si le **serveur** autorise encore de l'accepter. | Capacité épuisée, trajet annulé, compte restreint : lui seul le sait. Proposer « Accepter » serait promettre un refus. |
+| **RG-D113-3** | La section « à répondre » est triée par **échéance croissante**. | Celle qui tombe en premier se répond en premier. C'est la seule liste où attendre coûte quelque chose à quelqu'un d'autre. |
+| **RG-D113-4** | Une demande sans échéance lisible passe en dernier, jamais au milieu. | Mieux vaut une place assumée qu'un rang inventé. |
+| **RG-D113-5** | L'urgence a **trois** crans : moins de 3 h, moins de 12 h, au-delà. | Au-delà de trois, c'est un nuancier que personne ne décode. Les bornes appartiennent au cran le plus urgent. |
+| **RG-D113-6** | Une demande sans horloge n'affiche **aucune** urgence. | « Calme » dirait « tu as le temps » à propos d'une décision déjà prise. |
+| **RG-D113-7** | On ne peut **pas** accepter depuis la liste. | Accepter engage à transporter le colis et déclenche le débit de l'Expéditeur. Il faut avoir vu ce qu'on accepte. |
+| **RG-D113-8** | L'écran de la demande montre le colis, sa valeur déclarée, l'Expéditeur, le trajet, les deux lieux et le gain. | C'est la matière de la décision. |
+| **RG-D113-9** | Refuser demande confirmation ; accepter non — mais l'acceptation **dit** ce qu'elle engage juste au-dessus du bouton. | L'écran est déjà la délibération. Le refus, lui, est définitif pour l'Expéditeur et se tape vite. |
+| **RG-D113-10** | Le Voyageur voit son **gain**, jamais le total payé par l'Expéditeur ni la commission. | Ce n'est pas son affaire, et le serveur ne le lui sert pas. |
+| **RG-D113-11** | Le **destinataire** n'apparaît pas avant l'acceptation, et son téléphone pas avant la prise en charge. | C'est un tiers qui n'a rien signé, dont les coordonnées ont été confiées pour un seul usage. |
+| **RG-D113-12** | Le contenu du colis s'écrit **en toutes lettres**, jamais en code. | « OTHER_ELECTRONICS » n'est pas une information, c'est un identifiant technique. |
+| **RG-D113-13** | Le compteur de l'onglet Activité mène à la liste. | Un chiffre sur lequel on ne peut pas taper se périme tout seul. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité | je vois « Demandes reçues » et combien m'attendent |
+| 2 | Je tape dessus | mes demandes, celle qui expire le plus tôt en haut |
+| 3 | Une demande expire dans 2 h | elle porte un liseré et le temps restant, en évidence |
+| 4 | Une demande expire dans 20 h | le temps restant s'affiche sans alarme |
+| 5 | Une demande est déjà acceptée | aucun décompte, aucune urgence |
+| 6 | Je tape une demande | je vois le colis, sa valeur, l'Expéditeur, mon trajet, les lieux et mon gain |
+| 7 | Je lis l'écran d'une demande | nulle part le total payé par l'Expéditeur, nulle part le destinataire |
+| 8 | J'accepte | on m'a prévenu que l'Expéditeur est débité maintenant, et je reviens à la liste |
+| 9 | Je refuse | on me demande confirmation et on me dit que c'est définitif |
+| 10 | Le colis est « OTHER_ELECTRONICS » en base | je lis « Autre électronique » |
+| 11 | Je change la langue en anglais | je lis « Other electronics » |
+| 12 | Je n'ai aucune demande | l'écran le dit et propose de publier un trajet |

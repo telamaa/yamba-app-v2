@@ -11877,3 +11877,131 @@ segment.
 - `apps/mobile/src/lib/mes-envois.spec.ts` — le désaccord avec le site, écrit noir sur blanc.
 - `apps/deal-service/src/services/booking-state-machine.ts` — les trois gestes de l'Expéditeur.
 - Registre, entrée **D112**.
+
+---
+
+# Chapitre — Quand un fichier se contredit, et quand une liste court après une horloge (D112 bis, D113)
+
+## 1. Un fichier peut se contredire sans qu'aucune relecture ne le voie
+
+`identity-gate.tsx` déclare dans son en-tête que **le contenu est en haut et le vide en bas**,
+avec sa mesure (« on lisait à 55 % de la hauteur »). Cent lignes plus bas, un correctif ultérieur
+posait un ressort au-dessus du bloc et recentrait tout.
+
+Les deux moitiés sont **justes séparément**. C'est ce qui rend ce défaut invisible à la lecture :
+il n'y a pas de ligne fausse, il y a deux lignes qui ne se parlent pas.
+
+> **Ce qui attrape ce défaut n'est pas une relecture, c'est un regard** — et une fiche pour que le
+> regard n'ait pas à revenir.
+
+```ts
+it('le ressort vient APRÈS le bloc de contenu, jamais avant', () => {
+  const bloc = porte.indexOf('style={styles.block}');
+  const ressort = porte.indexOf('style={styles.spacer}');
+  expect(bloc).toBeGreaterThan(0);      // les deux repères existent vraiment
+  expect(ressort).toBeGreaterThan(0);
+  expect(ressort).toBeGreaterThan(bloc);
+});
+```
+
+Les deux `toBeGreaterThan(0)` ne sont pas décoratifs : `indexOf` rend `-1` quand le repère a bougé,
+et `-1 > -1` est faux — la fiche passerait pour la pire des raisons (D98).
+
+**Et la fiche qui avait tort a été retournée, pas supprimée.** Une fiche de D104 exigeait
+littéralement le ressort conditionnel ; elle exige désormais son absence, avec sa raison écrite
+dans son corps. Supprimer une fiche fausse fait disparaître la règle avec elle.
+
+## 2. Borner un lot par un métier, pas par une couche
+
+Le Voyageur n'avait rien. La machine à états lui accorde six gestes. La tentation est de « faire la
+liste » et de voir ensuite. Mais une liste de demandes auxquelles on ne peut pas répondre, c'est
+une porte vers un écran absent — le défaut qu'on venait de corriger deux fois.
+
+Le lot s'est donc borné à **répondre** : accepter, refuser. `pickup` et `deliver` restent dehors
+parce qu'ils demandent la caméra, une liste d'inspection et un code à six chiffres — un parcours,
+pas un bouton.
+
+> « Répondre » a une fin nette, une horloge et une preuve. « La liste » n'en a aucune.
+
+## 3. Deux listes voisines, deux tris — et il faut le dire
+
+`grouperLesEnvois` garde l'ordre du serveur. `grouperLesDemandes` trie par échéance croissante.
+C'est délibéré : on **suit** un colis, on **répond** à quelqu'un. Le risque est qu'un jour
+quelqu'un « harmonise » les deux. D'où une fiche qui ne teste pas un tri mais une **intention** :
+
+```ts
+it('« à répondre » est triée par échéance CROISSANTE', () => { … });
+it('les autres sections gardent l’ordre du serveur', () => { … });
+```
+
+## 4. Un seuil se place du côté de l'urgence
+
+```ts
+if (reste <= BIENTOT_MS) return 'bientot';
+```
+
+`<=` et non `<` : à exactement trois heures, c'est « bientôt ». Une borne qui penche vers le calme
+fait rater la dernière heure utile. La fiche épingle la borne, pas seulement l'intervalle.
+
+Et l'absence d'horloge rend `null`, pas « calme » : **« calme » dirait « tu as le temps » à propos
+d'une décision déjà prise.** Un état neutre et une absence d'état ne sont pas la même chose — c'est
+la leçon de D106 sur la valeur vide, transposée à un affichage.
+
+## 5. La vraie base, encore — et cette fois elle montre un code
+
+Treize demandes réelles rejouées à travers la projection :
+
+```
+ACCEPTED   Pauline L.   CLOTHES
+DECLINED   João S.      OTHER_ELECTRONICS
+```
+
+Des **identifiants techniques** affichés à un Voyageur. Deux populations cohabitent, comme les
+dates de D112 : les réservations récentes portent une famille D14, les anciennes une catégorie
+legacy. La règle ne doit donc pas choisir un mot, elle doit dire **quel dictionnaire lire** :
+
+```ts
+export type FamilleDuColis =
+  | { source: 'famille'; code: string }
+  | { source: 'categorie'; code: string }
+  | null;
+```
+
+`null` quand on ne sait rien — afficher le code serait pire que ne rien dire.
+
+**Les clés deviennent alors CALCULÉES** (`families.${code}`), ce qui est un angle mort complet :
+`tsc` ne voit rien (un gabarit se type toujours), et le contrôle i18n de la CI compare FR et EN
+*entre eux* sans savoir quelles clés sont utilisées. D'où une fiche qui énumère les vingt codes et
+vérifie leur présence dans les deux langues — le dispositif de `payment-i18n.spec.ts` (D83).
+
+## 6. Mon propre détecteur s'est trompé, pour la sixième fois du mois
+
+```ts
+expect(source).not.toContain('recipient');   // ROUGE
+```
+
+…sur le **commentaire** qui explique pourquoi `recipient` est interdit. Viser une orthographe
+plutôt qu'un usage, encore. Le remède :
+
+```ts
+function sansCommentaires(source: string): string {
+  const net = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  expect(net.length).toBeGreaterThan(source.length / 3);
+  return net;
+}
+```
+
+La garde sur la longueur est l'autre moitié de la leçon : **un dépouillement qui vide tout fait
+passer toutes les fiches suivantes.**
+
+Second faux positif du même jet : « la coquille *arrive dans un prochain lot* a disparu »
+rougissait sur celles de Messages et Profil — qui **disent encore la vérité**. Interdire le mot
+partout revenait à interdire d'être honnête. Une fiche doit viser la coquille qui ment, pas le
+mot.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-demandes.ts` — l'urgence, le tri, et le code du colis.
+- `apps/mobile/src/lib/mes-demandes.spec.ts` — les deux dictionnaires et le dépouillement.
+- `apps/mobile/src/lib/porte-avec-sortie.spec.ts` — la fiche retournée.
+- Registre, entrées **D112 bis** et **D113**.
