@@ -7,7 +7,7 @@
  * page de résultats resté dans l'ancien gabarit (D100) et une porte sans
  * sortie (D104).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { RYTHME_DE_LA_LISTE_MS, RYTHME_DU_FIL_MS } from '@/lib/fil';
@@ -16,6 +16,18 @@ const MOBILE = resolve(__dirname, '../..');
 
 function lire(chemin: string): string {
   return readFileSync(join(MOBILE, chemin), 'utf8');
+}
+
+/** Tous les fichiers de source sous un dossier, en profondeur. */
+function sourcesDe(racine: string): string[] {
+  const trouves: string[] = [];
+  for (const entree of readdirSync(racine, { withFileTypes: true })) {
+    const chemin = join(racine, entree.name);
+    if (entree.isDirectory()) trouves.push(...sourcesDe(chemin));
+    else if (/\.tsx?$/.test(entree.name) && !entree.name.endsWith('.spec.ts'))
+      trouves.push(chemin);
+  }
+  return trouves;
 }
 
 function sansCommentaires(source: string): string {
@@ -173,8 +185,13 @@ describe('⑤ ce qu’on compte plutôt que de le promettre', () => {
     const noms = [...api.matchAll(/export function ([A-Za-z]+)/g)].map((m) => m[1]);
     expect(noms.length).toBeGreaterThanOrEqual(5);
 
-    const appelants = [FIL, LISTE, 'src/components/message-report-sheet.tsx', 'src/lib/activite-context.tsx']
-      .map(lire)
+    // La liste des appelants était ÉCRITE EN DUR, et D118 a ajouté un
+    // cinquième fichier : la fiche a rougi en ayant raison sur la question
+    // et tort sur sa portée. Un balayage qui se tient à jour tout seul vaut
+    // mieux qu'une liste qu'il faut penser à rallonger.
+    const appelants = sourcesDe(join(MOBILE, 'src'))
+      .filter((chemin) => !chemin.endsWith('messages.api.ts'))
+      .map((chemin) => readFileSync(chemin, 'utf8'))
       .join('\n');
     for (const nom of noms) {
       expect(`${nom} → ${appelants.includes(`${nom}(`)}`).toBe(`${nom} → true`);

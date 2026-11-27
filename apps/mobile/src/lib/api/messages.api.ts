@@ -63,6 +63,60 @@ export function reponsesRapides(): Promise<unknown> {
   return apiFetch<unknown>('/messages/quick-replies');
 }
 
+/**
+ * Je propose un rendez-vous (D118). Une proposition ouverte du même genre
+ * est ANNULÉE par le serveur : c'est une contre-proposition, jamais deux
+ * propositions ouvertes à la fois.
+ *
+ * Elle JETTE : `INVALID_MEETUP_SLOT` porte la borne en cause dans
+ * `details.reason`, et `CONVERSATION_READ_ONLY` dit que le fil s'est fermé
+ * entre-temps.
+ */
+export function proposerLeRendezVous(
+  conversationId: string,
+  corps: {
+    kind: string;
+    placeLabel: string;
+    placeDetails?: string;
+    startAt: string;
+    endAt: string;
+  }
+): Promise<unknown> {
+  return apiFetch<unknown>(`/messages/conversations/${conversationId}/meetups`, {
+    method: 'POST',
+    body: corps,
+  });
+}
+
+/**
+ * J'accepte le rendez-vous de l'AUTRE partie.
+ *
+ * Le serveur refuse ma propre proposition (`OWN_PROPOSAL`) et une
+ * proposition qui a bougé entre l'affichage et l'appui (`MEETUP_CHANGED`,
+ * verrou optimiste sur `PROPOSED`).
+ */
+export function accepterLeRendezVous(
+  conversationId: string,
+  meetupId: string
+): Promise<unknown> {
+  return apiFetch<unknown>(
+    `/messages/conversations/${conversationId}/meetups/${meetupId}/accept`,
+    { method: 'POST' }
+  );
+}
+
+/**
+ * J'ouvre le numéro de l'autre partie (D61 4A).
+ *
+ * Geste IDEMPOTENT côté serveur : un second appui rend le même numéro et la
+ * même trace, pas une erreur. Refus possibles : `TOO_EARLY` (la porte n'est
+ * pas encore ouverte) et `NO_ANCHOR` (ni rendez-vous de prise en charge
+ * accepté, ni date de départ lisible).
+ */
+export function revelerLeNumero(conversationId: string): Promise<unknown> {
+  return apiFetch<unknown>(`/messages/conversations/${conversationId}/phone`, { method: 'POST' });
+}
+
 /** Je signale un message de l'autre partie (D61 7A). */
 export function signalerLeMessage(
   conversationId: string,

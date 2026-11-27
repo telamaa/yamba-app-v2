@@ -393,30 +393,49 @@ describe('⑥ la copie du contrat, confrontée au Zod réel', () => {
   });
 });
 
-describe('⑦ ce que le lot ignore à dessein, et qui est GARDÉ', () => {
-  it('le fil se lit sans rendez-vous ni numéro — ils sont le lot 2', () => {
+describe('⑦ ce que le lot lit, et ce qu’il ignore ENCORE à dessein', () => {
+  it('le numéro est lu depuis D118 — cette fiche a ROUGI pour le dire', () => {
+    // Écrite au lot 1 pour épingler une absence DÉLIBÉRÉE, elle est passée
+    // au rouge à la seconde où D118 a importé `phone`. C'est la seule forme
+    // de rappel qui survive à l'oubli : on n'a pas eu à s'en souvenir.
     const lu = filDeLApi({
       conversation: conversationBrute(),
       messages: [message()],
       meetups: [{ id: 'r1' }],
       nextCursor: null,
-      phone: { revealed: false, phoneE164: null, opensAt: null },
+      phone: { revealed: false, phoneE164: null, opensAt: '2026-12-02T06:00:00.000Z' },
     });
     expect(lu?.messages).toHaveLength(1);
-    expect(lu?.curseur).toBeNull();
-    // Deux champs NOMMÉS comme hors périmètre (D117 9A). La différence
-    // entre un périmètre et un oubli est qu'un périmètre est écrit.
-    expect(Object.keys(lu ?? {})).toEqual(['conversation', 'messages', 'curseur']);
+    expect(lu?.numero.ouvreA).toBe('2026-12-02T06:00:00.000Z');
+    expect(lu?.numero.revele).toBe(false);
   });
 
-  it('le jour où le lot 2 arrive, cette fiche le dit', () => {
-    // Elle ne garde pas une absence pour l'éternité : elle garde le fait
-    // que l'absence est DÉLIBÉRÉE. Ajouter `meetups` ou `phone` au module
-    // fera rougir cette ligne, et c'est le rappel qu'on veut.
+  it('`meetups` reste ignoré, et c’est une DÉCISION', () => {
+    // Le serveur calcule déjà LEQUEL des rendez-vous compte
+    // (`nextMeetupOf`) et le sert dans `conversation.nextMeetup`. Lire la
+    // liste entière pour refaire ce choix donnerait deux vérités — et le
+    // jour où ANO-WEB-47 se rejoue, l'une des deux serait fausse.
+    const lu = filDeLApi({
+      conversation: conversationBrute({
+        nextMeetup: {
+          id: 'r1',
+          kind: 'PICKUP',
+          status: 'PROPOSED',
+          proposedByRole: 'SHIPPER',
+          placeLabel: 'Terminal 2E, porte 4',
+          placeDetails: null,
+          startAt: '2026-12-02T08:00:00.000Z',
+          endAt: '2026-12-02T09:00:00.000Z',
+        },
+      }),
+      messages: [],
+      meetups: [{ id: 'autre' }, { id: 'encore' }],
+      phone: { revealed: false, phoneE164: null, opensAt: null },
+    });
+    expect(lu?.conversation.prochainRendezVous?.id).toBe('r1');
     const source = readFileSync(join(MOBILE, 'src/lib/fil.ts'), 'utf8');
-    expect(source).toContain('meetups');
-    expect(source).toMatch(/lot 2/);
-    expect(source).not.toMatch(/export function (meetups|rendezVous|numero)/);
+    expect(source).toContain('`meetups` reste ignoré');
+    expect(source).not.toMatch(/corps\.meetups/);
   });
 
   it('un fil sans conversation lisible ne s’ouvre pas', () => {
