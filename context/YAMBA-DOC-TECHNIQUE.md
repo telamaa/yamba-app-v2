@@ -14635,7 +14635,7 @@ toE164('+242', '06 000 0000')  →  '+24260000000'   (mesuré, FAUX)
 
 Pourquoi c'est grave et pourquoi rien ne l'avait vu :
 
-- **Brazzaville est le corridor de référence** de Yamba, présent dans tous les jeux d'essai ;
+- Brazzaville est présent dans tous les jeux d'essai — mais ce n'est **pas** un « corridor de référence » : Yamba est internationale et n'en a aucun (correction du 28/11/2026, la formule s'était recopiée depuis `phone-prefixes.spec.ts`) ;
 - c'est par ce numéro que le **destinataire** reçoit le code de livraison (D43) ;
 - le serveur ne rattrape pas : il ne contrôle que la **forme** E.164
   (`^\+[1-9]\d{6,14}$`, `booking-request.schema.ts`), que le numéro amputé respecte ;

@@ -81,9 +81,12 @@ describe('toE164 — les trois nettoyages payés sur de vraies saisies', () => {
      il n'y a PAS de préfixe d'acheminement : le 0 appartient au numéro de
      l'abonné, et le retirer fabrique un numéro injoignable.
 
-     La portée est la pire possible : Brazzaville est le corridor de
-     référence de Yamba, et c'est par ce numéro que le DESTINATAIRE reçoit le
-     code de livraison (D43). Le serveur ne peut pas rattraper : il ne
+     La portée ne tient à aucun corridor en particulier — **Yamba est
+     internationale et n'a pas de corridor de référence** (correction de
+     l'utilisateur, 28/11/2026 ; la formule venait d'ici et s'était recopiée
+     dans trois documents). Elle tient à ceci : c'est par ce numéro que le
+     DESTINATAIRE reçoit le code de livraison (D43), donc dans les pays
+     concernés le colis arrive et le code n'arrive pas. Le serveur ne peut pas rattraper : il ne
      contrôle que la FORME E.164 (`^\+[1-9]\d{6,14}$`), que le numéro
      amputé respecte. Et le défaut est dans le MIROIR web autant qu'ici
      (`apps/user-ui/src/components/booking/booking.config.ts`, même fonction
