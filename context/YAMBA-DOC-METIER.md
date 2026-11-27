@@ -9679,3 +9679,53 @@ Expéditeurs, affichaient « Date à choisir »** alors qu'ils ont une date de d
 | 9 | Je regarde un trajet publié depuis le site ou par un import | sa date de départ s'affiche, juste, dans l'heure du lieu de départ |
 | 10 | Mon trajet part de Dubaï à 03:30, heure locale | c'est bien le jour local de Dubaï qui s'affiche, pas celui de Greenwich |
 | 11 | Je n'ai encore aucun trajet | l'écran le dit et propose d'en publier un |
+
+---
+
+# D112 — L'Expéditeur retrouve ses envois (27/11/2026)
+
+## Le besoin
+
+Un Expéditeur réserve, paie, et voit son suivi : où en est le colis, le code à donner au
+destinataire, le point de rendez-vous. Puis il ferme l'app.
+
+Jusqu'ici, **il ne pouvait plus jamais y revenir**. Le suivi n'était atteignable que depuis l'écran
+qui suit le paiement. Ni le code de livraison, ni le rendez-vous, ni la notation, ni le
+signalement : tout était écrit, et tout était injoignable.
+
+Son onglet Activité, lui, ne lui parlait pas : il n'y voyait qu'une phrase d'attente et une
+invitation à devenir Voyageur.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D112-1** | « Mes envois » montre **tous** les envois de l'Expéditeur, groupés en trois sections : à traiter, en cours, passés. | Trois questions différentes : qu'est-ce qui m'attend, qu'est-ce qui roule, qu'est-ce qui est derrière moi. |
+| **RG-D112-2** | Un envoi n'est « à traiter » que si l'Expéditeur peut le faire **avancer** : confirmer la réception, ou noter le Voyageur. | Un colis en route ne lui demande rien — c'est au Voyageur de déclarer son passage. Une tâche posée sur le bureau de quelqu'un qui ne peut rien faire n'est pas un rappel, c'est un reproche. |
+| **RG-D112-3** | Annuler et signaler ne sont **jamais** des tâches en attente. | Sinon la liste des envois deviendrait une liste de regrets : tout ce qui est annulable y serait « à traiter ». |
+| **RG-D112-4** | Confirmer la réception passe **avant** noter. | Tant que la réception n'est pas confirmée, l'argent du Voyageur est bloqué. Noter peut attendre, pas être payé. |
+| **RG-D112-5** | Une section sans envoi **disparaît**, et il n'y a **aucun filtre** à choisir. | Un écran vide qu'on a provoqué soi-même se lit comme une panne — et un filtre peut cacher ce qui réclame un geste. |
+| **RG-D112-6** | Un bouton n'apparaît que si le **serveur** autorise le geste. | Lui seul connaît le barème d'annulation et l'instant du départ. Promettre une annulation qu'il refusera est pire que ne rien proposer. |
+| **RG-D112-7** | Le compteur de l'onglet Activité et l'écran appliquent la **même** règle. | Un compteur calculé à part finit par dire autre chose que l'écran vers lequel il mène. |
+| **RG-D112-8** | Seule une demande **en attente de réponse** affiche un décompte. | C'est la seule qui meurt toute seule (24 h). Un décompte ailleurs ferait croire que tout expire. |
+| **RG-D112-9** | La date d'un envoi est celle du **lieu de départ**, pas celle du téléphone. | Un vol qui part à 00 h 30 à Dubaï ne part pas « la veille » parce qu'on le regarde depuis Paris. |
+| **RG-D112-10** | Le **code de livraison** n'apparaît jamais dans la liste. | Une liste se regarde par-dessus l'épaule dans une file d'embarquement. Il reste réservé au suivi, pendant le transport. |
+| **RG-D112-11** | Un envoi dont on a perdu le Voyageur reste **lisible**. | C'est le colis de quelqu'un, pas une ligne de base de données. |
+| **RG-D112-12** | La porte « Mes envois » est visible par **tout le monde**, pas seulement par les Voyageurs. | Tout compte peut envoyer un colis, et c'est par là qu'on retrouve son suivi. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité sans être Voyageur | je vois « Mes envois », et ce qu'il me reste à traiter |
+| 2 | Je tape dessus | la liste de mes envois, la plus récente en haut |
+| 3 | Mon colis est en route | il est « En cours » — l'app ne me réclame rien que je ne puisse faire |
+| 4 | Le Voyageur a remis mon colis | l'envoi passe en tête, avec « Confirmer la réception » |
+| 5 | Je confirme | l'envoi quitte « À traiter » dès mon retour sur la liste |
+| 6 | Mon envoi est terminé et la notation est ouverte | il est en tête avec « Noter le Voyageur » |
+| 7 | J'ai déjà noté | il redescend dans « Passés » |
+| 8 | Ma demande attend une réponse | je vois sous combien de temps elle est attendue |
+| 9 | La demande a expiré | on me le dit, on ne montre pas un décompte à zéro |
+| 10 | Je tape une carte | le suivi s'ouvre — le même que juste après le paiement |
+| 11 | Je n'ai aucun envoi | l'écran le dit et propose de chercher un trajet |
+| 12 | Je regarde la liste dans une file d'embarquement | aucun code de livraison n'y est visible |

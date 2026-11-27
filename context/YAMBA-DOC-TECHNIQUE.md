@@ -20098,3 +20098,150 @@ c'est la saisie qui fait foi).
 - **L'écran n'a pas été vu.** Il demande une session connectée sur le simulateur, et ce poste ne
   peut pas taper dedans (`simctl` sait naviguer, pas toucher — D107). Sa logique est vérifiée
   contre la base réelle de bout en bout ; sa mise en page reste une hypothèse.
+
+---
+
+# D112 — Mes envois, et la porte qui manquait au suivi (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1103 → 1134 fiches** (56 → 57
+suites). **Aucune ligne de serveur**, aucun type nouveau, aucune dépendance.
+
+## Le constat — ce n'est pas « une liste manque »
+
+L'app portait déjà **2 903 lignes** de suivi d'envoi :
+
+```
+apps/mobile/src/app/shipment/[id]/index.tsx    1 455 l.  (suivi, code de livraison, rendez-vous)
+apps/mobile/src/app/shipment/[id]/rate.tsx       661 l.  (notation)
+apps/mobile/src/app/shipment/[id]/report.tsx     718 l.  (signalement)
+```
+
+Un seul chemin y menait :
+
+```tsx
+// apps/mobile/src/app/booking/confirmation.tsx:133
+router.replace({ pathname: '/shipment/[id]', params: { id: bookingId } })
+```
+
+L'écran qui suit le paiement, **en `replace`**. Aucun lien profond, aucune notification, aucune
+liste. L'Expéditeur payait, voyait son suivi une fois, fermait l'app — et ne pouvait plus jamais y
+revenir. **Un écran sans porte n'est pas un écran, c'est du code mort qui s'ignore.**
+
+Et l'onglet Activité était **vide** pour lui : `isCarrier &&` masquait les seuls compteurs, il ne
+restait qu'une phrase d'attente et une carte l'invitant à devenir Voyageur. L'onglet censé servir
+« les deux faces » n'en servait qu'une.
+
+## Zéro ligne de serveur, et même zéro type
+
+`GET /me/bookings` sert la vue Expéditeur **complète** — le `ShipperShipmentDto` que l'écran de
+détail relit déjà : statut, instantané de trajet, prix gelé, `rating`, `trackingEvents`,
+`allowedActions`. La liste ne demandait pas un contrat, elle demandait une **porte**.
+
+```ts
+// apps/mobile/src/lib/api/shipment.api.ts
+export async function mesEnvois(): Promise<ShipperShipmentDto[]> { … }
+```
+
+## « À traiter » se déduit de ce que le serveur accorde
+
+C'est le désaccord assumé avec le site. `getShipmentPresentation` y range un envoi par une **table
+de statuts**, qui met `PICKED_UP` sans événement de suivi dans « À traiter », en urgent.
+
+Or les gestes que la machine à états accorde à l'Expéditeur sont exactement trois :
+
+| Geste | Depuis | Ce qu'il fait |
+|---|---|---|
+| `cancel` | PENDING, ACCEPTED | **défait** |
+| `dispute` | PICKED_UP, DELIVERED | **escalade** |
+| `confirmEarly` | DELIVERED | **fait avancer** |
+
+Plus la notation, qui n'est pas une transition (`rating.canRate`).
+
+En `PICKED_UP`, l'Expéditeur n'a donc **aucun** geste qui fasse avancer l'envoi. Celui qui doit
+agir est le Voyageur : il doit déclarer son passage à l'aéroport. **Une tâche posée sur le bureau
+de quelqu'un qui ne peut rien faire n'est pas un rappel, c'est un reproche.**
+
+```ts
+// apps/mobile/src/lib/mes-envois.ts
+export function sectionDeLEnvoi(envoi: EnvoiDeLaListe): SectionDesEnvois {
+  if (peut(envoi, 'confirmEarly') || envoi.peutNoter) return 'aTraiter';
+  return TERMINES.includes(envoi.statut) ? 'passes' : 'enCours';
+}
+```
+
+Si la machine ouvre un jour un quatrième geste à l'Expéditeur, il entre ici sans qu'on touche à une
+table. Et `cancel` / `dispute` n'y entrent pas : sans quoi la liste des envois deviendrait une
+**liste de regrets** — tout ce qui est annulable serait « à traiter ».
+
+## Trois sections, pas de filtre — ce qu'on refuse de transposer
+
+Le site pose **quatre pastilles** (`Tous · À traiter · En cours · Terminés`) au-dessus d'une liste
+**déjà sectionnée** par les trois mêmes groupes, avec les mêmes comptes affichés **deux fois** (la
+pastille, puis `· N` près du titre).
+
+Trois défauts mesurés le même jour, et aucun n'est un bug — ce sont trois décisions prises
+séparément, chacune défendable seule :
+
+| # | Constat | Où |
+|---|---|---|
+| 1 | taper « En cours » affiche la section déjà visible ; taper « Terminés » **cache les deux groupes qui réclament une action** | `ShipmentsClient.tsx:134` |
+| 2 | « En cours » porte **deux nombres** : le sous-titre somme `action + ongoing`, la pastille n'en compte qu'un | `ShipmentsClient.tsx:127` vs `:194` |
+| 3 | le même ensemble est « **Terminés** » dans la pastille et « **Historique** » dans le titre | `messages/fr/shipments.json` |
+
+**Une incohérence de charte ne se lit pas, elle se compte** (D105).
+
+## Le badge et l'écran disent le même nombre
+
+Conséquence directe du constat n° 2 : le compteur de l'onglet Activité est calculé par
+`sectionDeLEnvoi`, **la règle même qu'applique l'écran** — et une fiche l'exige.
+
+```ts
+// apps/mobile/src/hooks/use-tab-badges.ts
+shipmentsToHandle: envois
+  .map(envoiDeLApi)
+  .filter((envoi) => envoi !== null && sectionDeLEnvoi(envoi) === 'aTraiter').length,
+```
+
+Noter que le badge dit « **N à traiter** » et l'en-tête de l'écran « **N en cours** » : deux
+nombres différents, mais **deux mots différents** pour deux idées différentes. C'est précisément
+ce qui manque au site.
+
+## Au passage : le décompte sort de l'écran de suivi
+
+Le choix de la clé (`remainingDays` / `remainingHours` / `remainingMinutes`) vivait en dur dans
+`shipment/[id]/index.tsx`. La liste en a besoin du même coup — et deux cascades divergent. Elle
+devient `remainingLabel(left)` dans `lib/shipment-view.ts`, appelée des deux côtés. Le libellé,
+lui, reste dans le dictionnaire `shipment` : **un décompte s'écrit pareil partout**.
+
+## Vérifié contre le serveur réel
+
+Trois Expéditeurs de seed, **13 réservations**, la vraie projection rejouée dessus :
+
+```
+aminata : reçus 6 → projetés 6 · en cours = 1
+  [enCours] Paris → Brazzaville  2026-11-02 08:18  PICKED_UP  Thomas N.  4480c  actions=[dispute]
+  [passes]  CANCELLED · COMPLETED · COMPLETED · CANCELLED · EXPIRED
+chinwe  : reçus 3 → projetés 3 · en cours = 2
+  [enCours] Londres → Lagos  2026-11-06 07:18  PICKED_UP  Adebayo O.  5600c
+            Paris → Brazzaville  DISPUTED  Thomas N.
+```
+
+Aucune ligne rejetée, dates dans le fuseau du lieu de départ, actions lues et non déduites.
+**Aucun envoi ne tombe dans « À traiter »** — vérifié, ce n'est pas un trou : `rating` est bien
+servi, avec `canRate: false`, parce que la fenêtre de notation est close sur toutes ces
+réservations.
+
+## Chaque fiche prouvée en la faisant rougir
+
+- on remplace la cible de la porte → **une** fiche rouge (« la porte existe ») ;
+- on fait calculer le badge par un filtre de statut → **une** fiche rouge (« le badge applique la
+  même règle que l'écran »).
+
+## Reste ouvert
+
+- **L'écran n'a pas été vu** : il demande une session connectée sur le simulateur, et `simctl` sait
+  naviguer mais pas taper (D107).
+- **Aucune réservation `DELIVERED` n'existe dans le seed** : la branche « confirmer la réception »
+  est tenue par les fiches, pas par la donnée réelle.
+- Le chemin par **notification** (« ton colis est arrivé ») n'existe sur aucun des deux fronts.
+- `getMyShipmentsPreview()` du site renvoie `mockShipments`, qui part dans le bundle de production.

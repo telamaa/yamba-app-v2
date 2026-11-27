@@ -11719,3 +11719,161 @@ Elle s'est déclenchée tout de suite — sur la ligne `Starting Metro Bundler`,
 - `apps/mobile/src/lib/trip-local-dates.spec.ts` — les deux chemins, et l'égalité des copies.
 - `apps/user-ui/src/lib/recensement.spec.ts` — le recensement qui a réclamé la fiche du site.
 - Registre, entrée **D111 quinquies**.
+
+---
+
+# Chapitre — Trouver la porte avant d'écrire l'écran (D112)
+
+Ce chapitre raconte un lot où presque tout était déjà écrit, et où le travail a consisté à
+découvrir **pourquoi personne ne pouvait s'en servir**.
+
+## 1. Commencer par l'inventaire, pas par la maquette
+
+La demande était large : « attaque les parties Activité, en natif ». Le réflexe serait d'ouvrir
+l'écran et de dessiner. Le bon premier geste est de **compter ce qui existe** :
+
+```sh
+ls apps/mobile/src/app/\(tabs\)/          # ce que l'app montre
+ls -d apps/mobile/src/app/*/              # ce qu'elle pousse
+grep -rn "me/bookings" apps/mobile/src    # ce qu'elle sait appeler
+```
+
+Le troisième grep n'a **rien** rendu. C'est le genre de silence qui vaut une heure de lecture.
+
+## 2. Un écran orphelin se trouve en cherchant qui l'appelle
+
+```sh
+grep -rn "pathname: '/shipment" apps/mobile/src
+```
+
+Une seule entrée, dans `booking/confirmation.tsx`, en `router.replace`. Et derrière cette unique
+porte : **2 903 lignes** de suivi, de notation et de signalement.
+
+> **Un écran sans porte n'est pas un écran, c'est du code mort qui s'ignore.**
+
+La leçon de méthode vaut au-delà de ce lot : quand vous héritez d'un code, demandez-vous pour
+chaque écran **par où l'on y entre**, et combien de fois. Un seul chemin est un signal ; un seul
+chemin en `replace`, dans un tunnel, en est un plus fort encore.
+
+## 3. Lire la machine à états avant de dessiner des sections
+
+Le site range un envoi par une table de statuts. Tentation : la recopier. Avant cela, on regarde
+ce que le serveur **accorde** vraiment :
+
+```sh
+awk 'NR>=318 && NR<=425 && (/actor: "SHIPPER"/ || /action:/ || /from:/)' \
+  apps/deal-service/src/services/booking-state-machine.ts
+```
+
+Trois gestes, et un seul fait **avancer** l'envoi (`confirmEarly`). Les deux autres défont
+(`cancel`) ou escaladent (`dispute`).
+
+D'où une règle qui ne contient aucune liste de statuts pour sa partie la plus importante :
+
+```ts
+export function sectionDeLEnvoi(envoi: EnvoiDeLaListe): SectionDesEnvois {
+  if (peut(envoi, 'confirmEarly') || envoi.peutNoter) return 'aTraiter';
+  return TERMINES.includes(envoi.statut) ? 'passes' : 'enCours';
+}
+```
+
+Le jour où la machine ouvre un quatrième geste à l'Expéditeur, il entre ici **tout seul**.
+
+## 4. Challenger un écran existant : compter, pas opiner
+
+Trois constats sur « Mes envois » du site, tous vérifiables, aucun affaire de goût :
+
+1. quatre pastilles de filtre au-dessus d'une liste **déjà sectionnée** par les trois mêmes
+   groupes — et « Terminés » cache les deux groupes qui réclament une action ;
+2. « En cours » porte **deux nombres** sur le même écran : le sous-titre somme `action + ongoing`
+   (`ShipmentsClient.tsx:127`), la pastille n'en compte qu'un (`:194`) ;
+3. le même ensemble est « Terminés » dans la pastille et « Historique » dans le titre.
+
+Aucun n'est un bug. Ce sont trois décisions prises séparément, **chacune défendable seule**. C'est
+la marque d'une incohérence de charte, et la méthode pour la voir est toujours la même :
+
+> **Une incohérence de charte ne se lit pas, elle se compte** (D105).
+
+## 5. Ne pas commettre le défaut qu'on dénonce
+
+Le constat n° 2 condamne un compteur calculé à part. Or ce lot ajoute… un compteur, sur l'onglet
+Activité. Il devait donc appeler **la règle de l'écran** :
+
+```ts
+shipmentsToHandle: envois
+  .map(envoiDeLApi)
+  .filter((envoi) => envoi !== null && sectionDeLEnvoi(envoi) === 'aTraiter').length,
+```
+
+et une fiche l'exige en **lisant la source** — car ce fichier tire `expo-constants`, que le harnais
+ne sait pas charger (frontière A223) :
+
+```ts
+expect(badges).toContain("from '@/lib/mes-envois'");
+expect(badges).not.toMatch(/status === 'DELIVERED'/);
+```
+
+Noter la **deuxième** assertion : vérifier que la bonne règle est importée ne suffit pas, il faut
+interdire la mauvaise. Un fichier peut importer ce qu'il n'utilise pas.
+
+Détail qui compte : le badge dit « **N à traiter** », l'écran « **N en cours** ». Deux nombres
+différents — mais **deux mots différents**, pour deux idées différentes. C'est exactement ce qui
+manque au site.
+
+## 6. Tester le contrat dans les deux sens
+
+Leçon D101/D102, appliquée ici à un cas précis : un statut inconnu de la projection fait
+**disparaître** l'envoi de la liste (`envoiDeLApi` rend `null`). Si le serveur en ajoute un, la
+perte serait silencieuse.
+
+```ts
+const unionDuDto = api.slice(
+  api.indexOf('export type ShipmentServerStatus'),
+  api.indexOf('export type ShipmentTrackingStep')
+);
+expect(unionDuDto.length).toBeGreaterThan(0); // la découpe a bien mordu
+const statutsDuDto = [...unionDuDto.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+expect(statutsDuDto).toHaveLength(9);
+```
+
+La ligne `expect(unionDuDto.length).toBeGreaterThan(0)` n'est pas décorative : `slice` entre deux
+`indexOf` rend une chaîne **vide** si l'un des deux repères a bougé, et toutes les assertions
+suivantes passeraient alors pour la pire des raisons (D98).
+
+## 7. Valider contre la vraie base — encore
+
+Comme au lot précédent, les fiches jouent contre des envois que j'ai inventés. La vraie base :
+
+```sh
+curl -c jar.txt -X POST …/auth/login -d '{"email":"aminata.shipper@seed.yamba.dev",…}'
+curl -b jar.txt …/me/bookings -o bk.json
+npx tsx --tsconfig apps/mobile/tsconfig.json verif-envois.ts bk.json
+```
+
+Le `--tsconfig` n'est pas un détail : sans lui, `tsx` ne résout pas l'alias `@/` et le script
+meurt sur `Cannot find module '@/lib/trip-local-dates'`.
+
+Résultat : 13 réservations, 13 projetées, dates dans le fuseau du lieu de départ. **Et aucune dans
+« À traiter »** — ce qui méritait vérification plutôt que soulagement :
+
+```sh
+python3 -c "… print(b.get('rating'))"
+# {"windowEndsAt": "2026-11-27T12:20:00Z", "ratedByMe": false, "canRate": false}
+```
+
+`rating` est bien servi ; la fenêtre de notation est simplement **close**. La règle est juste, pas
+aveugle. **Un résultat vide se vérifie comme un résultat plein.**
+
+## 8. Un détail de nommage qui aurait coûté une soirée
+
+La liste est à `shipments/mine` — au **pluriel**. `shipment/mine` aurait été capté par
+`shipment/[id]` avec `id = "mine"`, et l'écran de suivi aurait tenté de charger une réservation
+nommée « mine ». Expo Router n'aurait rien signalé : une route dynamique accepte n'importe quel
+segment.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-envois.ts` — la règle, et pourquoi elle ne contient pas de table.
+- `apps/mobile/src/lib/mes-envois.spec.ts` — le désaccord avec le site, écrit noir sur blanc.
+- `apps/deal-service/src/services/booking-state-machine.ts` — les trois gestes de l'Expéditeur.
+- Registre, entrée **D112**.
