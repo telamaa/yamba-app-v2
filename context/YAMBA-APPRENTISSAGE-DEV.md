@@ -12947,3 +12947,122 @@ grep -c "HeaderActions" /tmp/bundle.js     # les modules du lot sont-ils SERVIS 
   même jour, sans une ligne : l'arbitrage qui compte, *quels événements ont le droit d'interrompre
   quelqu'un et lesquels ne doivent jamais apparaître sur un écran verrouillé*, se raisonne mieux à
   froid qu'au milieu d'une intégration d'APNs.
+
+
+---
+
+# Chapitre — Un défaut qu'on n'épingle pas devient la doctrine (D121)
+
+Ce chapitre raconte un bug de cinq lignes et ce qu'il apprend sur les tests, les tables de
+données, et la façon dont une phrase fausse voyage.
+
+## 1. Le bug : une règle vraie, appliquée partout
+
+```ts
+n = n.replace(/^0+/, '');     // « le zéro national ne survit pas au passage en E.164 »
+```
+
+La phrase du commentaire est juste… **pour certains pays**. En France, au Royaume-Uni, en RD Congo,
+le 0 est un préfixe d'**acheminement** : on le retire. Au Congo-Brazzaville et en Côte d'Ivoire, il
+appartient au numéro de l'abonné : le retirer fabrique un numéro **injoignable**.
+
+Et rien ne le rattrape, parce que la validation serveur porte sur la **forme** :
+
+```
+^\+[1-9]\d{6,14}$     // +24260000000 la respecte parfaitement
+```
+
+> **Une validation de forme ne dit rien de la justesse.** Un numéro amputé est un E.164 valide. Le
+> seul signal aurait été un humain qui n'a jamais reçu son code.
+
+## 2. `it.failing` : épingler un défaut sans le normaliser
+
+Le défaut a été trouvé cinq semaines avant d'être corrigé. La tentation, à ce moment-là, est
+d'écrire un test qui décrit le comportement **actuel** pour « figer l'existant ». C'est un piège :
+
+```ts
+// ✗ le défaut devient la référence, et personne ne le saura jamais
+expect(toE164('+242', '06 000 0000')).toBe('+24260000000');
+
+// ✓ l'attendu CORRECT, marqué en échec attendu
+it.failing('un numéro congolais garde son zéro', () => {
+  expect(toE164('+242', '06 000 0000')).toBe('+242060000000');
+});
+```
+
+`it.failing` passe tant que le test échoue, et **échoue le jour où il passe**. Autrement dit : le
+jour de la correction, la fiche devient rouge et oblige à lever le marqueur. Le défaut ne peut pas
+être oublié, et il ne peut pas devenir la norme.
+
+## 3. …mais le voisin, lui, avait déjà cédé
+
+C'est la partie intéressante. Trois lignes plus haut dans le **même fichier**, une autre fiche
+utilisait un numéro congolais comme exemple pour tester tout autre chose (l'indicatif retapé en
+double) :
+
+```ts
+expect(toE164('+242', '242060000000')).toBe('+24260000000');   // le numéro AMPUTÉ, en vert
+```
+
+Elle n'avait pas pour sujet le zéro ; elle l'a enshriné quand même. Le garde écrit à l'avance
+protégeait la règle **qu'il nommait** — il ne pouvait rien pour un test voisin qui prenait le
+résultat du bug comme décor.
+
+> Quand tu épingles un défaut, **cherche les autres tests qui l'utilisent comme donnée**. C'est la
+> version « tests » du `grep ton jumeau » de D97.
+
+Un titre a dû changer pour la même raison : « ne rend jamais un numéro qui commence par zéro après
+l'indicatif » énonçait une règle **universelle** qui était fausse. Un nom de test est une affirmation.
+
+## 4. Une table de données se remplit par preuves, pas par intuition
+
+La correction demande une table « ce pays retire-t-il le zéro ? » pour vingt pays. La tentation est
+de la remplir de mémoire. **Une entrée fausse casse un pays qui marchait** — on répare deux pays et
+on en casse trois.
+
+La forme retenue :
+
+```ts
+// ── ÉTABLIS : le 0 APPARTIENT au numéro, on le garde ──
+CG: false,   // prouvé par les données de recette : +242061234567
+CI: false,   // dix chiffres depuis 2021, le 0 en fait partie
+
+// ── HÉRITAGE : comportement d'avant D121, non revérifié ──
+CH: true, NL: true, DE: true, /* … */
+```
+
+Trois propriétés qui valent au-delà de ce cas :
+
+* **le défaut par défaut est le comportement d'avant** — un lot de correction ne doit pas introduire
+  de régression là où il ne sait pas ;
+* **l'incertitude est écrite**, pas masquée : dix-huit entrées disent « héritage » ;
+* **une fiche exige la preuve** de chaque exception (le commentaire doit citer sa source).
+
+Et les preuves étaient **dans le dépôt** : les données de recette contenaient `+242061234567` et
+`+243812345678` — deux pays frontaliers, deux règles opposées, établies sans chercher plus loin.
+
+## 5. Une phrase fausse voyage plus vite qu'un bug
+
+Le commentaire qui décrivait ce défaut justifiait sa gravité par « Brazzaville est le corridor de
+référence de Yamba ». C'est faux — la plateforme est internationale et n'a pas de corridor de
+référence. En cinq semaines, la phrase s'était recopiée dans **trois documents**.
+
+C'est exactement ce que D118 3B venait de nommer (« une ligne de commentaire qui nomme le mauvais
+objet finit recopiée »), et je l'ai commis **en la citant**. Deux remarques :
+
+* **corrige à la source**, pas seulement à l'endroit où tu l'as lue ;
+* **distingue les documents vivants des archives.** Les références qu'on consulte se corrigent ; les
+  handoffs et les décisions passées sont un journal — on n'y réécrit pas l'histoire, on grave la
+  correction dans l'entrée suivante.
+
+Et surtout : la gravité du bug ne dépendait pas de cette phrase. **Quand un argument s'appuie sur un
+fait faux, vérifie d'abord si l'argument en avait besoin.** Ici, non : un numéro injoignable ne
+reçoit jamais son code, où que ce soit.
+
+## Pour aller plus loin
+
+* **Un miroir assumé doit être un miroir surveillé.** Le site portait la même fonction, le même
+  défaut, et zéro fiche. Deux copies sans fiche de comparaison ne sont pas un miroir, ce sont deux
+  fichiers qui se ressemblent encore.
+* **Contre-épreuve systématique** : le défaut remis en place a fait rougir 3 fiches côté mobile et 2
+  côté site. Une correction dont on n'a pas vu les tests échouer n'est pas une correction vérifiée.

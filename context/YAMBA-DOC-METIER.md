@@ -10136,3 +10136,41 @@ le titre « Notification » — dont les trois que la messagerie venait de rendr
 | # | Geste (site) | Attendu |
 |---|---|---|
 | 1 | Je reçois une proposition de rendez-vous | la cloche dit « Rendez-vous proposé », plus « Notification » |
+
+
+---
+
+# D121 — Le zéro qui appartient au numéro (28/11/2026) — **clôt ANO-MOB-01**
+
+## Le besoin
+
+Le destinataire d'un colis reçoit son **code de livraison** par son numéro de téléphone (D43). Dans
+deux des pays proposés par l'application, ce numéro était fabriqué **injoignable** : le colis
+arrivait, le code n'arrivait pas, et personne ne pouvait le savoir — le serveur ne vérifie que la
+forme du numéro, que le numéro amputé respecte.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D121-1** | Le zéro de tête n'est retiré que dans les pays où il est un **préfixe d'acheminement**. | Ailleurs, il appartient au numéro de l'abonné. |
+| **RG-D121-2** | Au Congo-Brazzaville (+242) et en Côte d'Ivoire (+225), le zéro est **conservé**. | Établi, et prouvé par les données de recette du dépôt. |
+| **RG-D121-3** | En RD Congo (+243), il est **retiré** — pays frontalier, règle opposée. | Deux voisins ne partagent pas forcément un plan de numérotation. |
+| **RG-D121-4** | Tout pays sans règle établie garde le comportement **d'avant** ce lot. | Une table remplie à l'intuition casserait des pays qui marchent pour en réparer deux. |
+| **RG-D121-5** | Chaque pays proposé au choix a une entrée explicite dans la table. | Un pays sans règle retomberait sur un défaut que personne n'a décidé. |
+| **RG-D121-6** | On retire **un** zéro, jamais plusieurs. | Un préfixe d'acheminement est un chiffre ; le reste est une faute de frappe. |
+| **RG-D121-7** | Les deux fronts portent la **même** table. | Un pays ajouté d'un seul côté donnerait un numéro juste ici et faux là-bas. |
+| **RG-D121-8** | Un numéro qui ne peut pas être formé proprement est **refusé**, jamais fabriqué à moitié. | Règle d'origine, inchangée. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je saisis un destinataire français « 06 42 18 81 12 » | `+33642188112` |
+| 2 | Je saisis un destinataire congolais « 06 000 0000 » (+242) | `+242060000000` — **le zéro reste** |
+| 3 | Je saisis un destinataire ivoirien « 07 00 00 00 00 » (+225) | `+2250700000000` |
+| 4 | Je saisis un destinataire de RD Congo « 081 234 5678 » (+243) | `+243812345678` — le zéro part |
+| 5 | Je retape l'indicatif devant le numéro congolais | le zéro reste quand même |
+| 6 | Je tape deux zéros par erreur devant un numéro français | un seul est retiré, l'autre aussi via le « 00 » international |
+| 7 | Je saisis un numéro trop court ou illisible | il est refusé, aucun numéro n'est fabriqué |
+| 8 | Je compare la table des deux fronts | elles sont identiques, entrée par entrée |
