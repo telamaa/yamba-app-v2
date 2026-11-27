@@ -25,6 +25,8 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { useLocale, useTranslations } from 'use-intl';
 
 import type { SupportedLocale } from '@packages/api-contracts/locale';
@@ -34,6 +36,7 @@ import { IdentityGate } from '@/components/identity-gate';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Font } from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 import { useTopInset } from '@/hooks/use-top-inset';
 import {
@@ -43,6 +46,7 @@ import {
   refuserLaDemande,
 } from '@/lib/api/my-deals.api';
 import { demandeDeLApi, peut, type DemandeDeLaListe } from '@/lib/mes-demandes';
+import { useActivite } from '@/lib/activite-context';
 import { intlTagFor } from '@/lib/number-format';
 import { formatAmountFromCents } from '@/lib/pricing-example';
 import { formatDayMonth } from '@/lib/trip-format';
@@ -55,8 +59,14 @@ type Etat =
 function DemandeContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const t = useTranslations('myDeals');
+  const tMessagerie = useTranslations('messaging');
+  const { conversations, rafraichir } = useActivite();
   const locale = useLocale() as SupportedLocale;
   const tag = intlTagFor(locale);
+
+  // Le fil de CE deal, s'il existe. `bookingId` est la clé : l'écran
+  // connaît une demande, pas une conversation.
+  const conversation = conversations.find((c) => c.bookingId === id);
   const theme = useTheme();
   const topInset = useTopInset();
 
@@ -92,6 +102,10 @@ function DemandeContent() {
       setOccupe(true);
       try {
         await geste();
+        // ACCEPTER fait NAÎTRE une conversation (D61) : le contexte doit
+        // l'apprendre maintenant, sans quoi la porte vers le fil
+        // n'apparaîtrait qu'au prochain passage au premier plan.
+        void rafraichir();
         // On REVIENT à la liste : la décision est prise, et la liste la
         // reflétera (elle relit à chaque retour). Rester sur une demande
         // qu'on vient de trancher n'a rien à proposer.
@@ -103,7 +117,7 @@ function DemandeContent() {
         setOccupe(false);
       }
     },
-    [t]
+    [t, rafraichir]
   );
 
   const entete = (
@@ -228,6 +242,39 @@ function DemandeContent() {
               {t('detail.gainNote')}
             </ThemedText>
           </Section>
+
+          {/* D117 — la porte vers le fil. Elle n'apparaît QUE si une
+              conversation existe : un fil naît à l'acceptation (D61), donc
+              une demande en attente n'en a pas, et un bouton qui mène à
+              rien est pire qu'un bouton absent.
+
+              La conversation se trouve dans le contexte d'activité, qui la
+              porte déjà (D117 0A) : aucune requête de plus pour ouvrir une
+              porte qu'on ne franchira peut-être pas. */}
+          {conversation !== undefined && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({ pathname: '/conversation/[id]', params: { id: conversation.id } })
+              }
+              style={({ pressed }) => [
+                styles.secondaire,
+                styles.porteDuFil,
+                { borderColor: theme.backgroundElement, opacity: pressed ? 0.85 : 1 },
+              ]}>
+              <Ionicons name="chatbubble-outline" size={16} color={theme.text} />
+              <ThemedText type="smallBold">
+                {tMessagerie('entry.open', { name: conversation.interlocuteur.prenom })}
+              </ThemedText>
+              {conversation.nonLus > 0 ? (
+                <View style={[styles.pastilleNonLus, { backgroundColor: Brand.mango }]}>
+                  <ThemedText type="small" style={styles.pastilleTexte}>
+                    {conversation.nonLus.toLocaleString(tag)}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
+          )}
 
           {peutPrendreEnCharge && (
             <View style={styles.reponses}>
@@ -401,6 +448,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  porteDuFil: { flexDirection: 'row', gap: Spacing.two },
+  pastilleNonLus: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pastilleTexte: { color: '#1A1A1A', fontFamily: Font.bold },
 });
 
 /**

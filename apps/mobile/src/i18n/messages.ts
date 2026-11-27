@@ -14,6 +14,7 @@ import authEn from '../../messages/en/auth.json';
 import bookingEn from '../../messages/en/booking.json';
 import favoritesEn from '../../messages/en/favorites.json';
 import myDealsEn from '../../messages/en/myDeals.json';
+import messagingEn from '../../messages/en/messaging.json';
 import myShipmentsEn from '../../messages/en/myShipments.json';
 import deliverEn from '../../messages/en/deliver.json';
 import pickupEn from '../../messages/en/pickup.json';
@@ -28,6 +29,7 @@ import authFr from '../../messages/fr/auth.json';
 import bookingFr from '../../messages/fr/booking.json';
 import favoritesFr from '../../messages/fr/favorites.json';
 import myDealsFr from '../../messages/fr/myDeals.json';
+import messagingFr from '../../messages/fr/messaging.json';
 import myShipmentsFr from '../../messages/fr/myShipments.json';
 import deliverFr from '../../messages/fr/deliver.json';
 import pickupFr from '../../messages/fr/pickup.json';
@@ -45,6 +47,7 @@ export const MESSAGES = {
     booking: bookingFr,
     favorites: favoritesFr,
     myDeals: myDealsFr,
+    messaging: messagingFr,
     myShipments: myShipmentsFr,
     deliver: deliverFr,
     pickup: pickupFr,
@@ -61,6 +64,7 @@ export const MESSAGES = {
     booking: bookingEn,
     favorites: favoritesEn,
     myDeals: myDealsEn,
+    messaging: messagingEn,
     myShipments: myShipmentsEn,
     deliver: deliverEn,
     pickup: pickupEn,
