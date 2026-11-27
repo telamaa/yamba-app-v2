@@ -20441,3 +20441,131 @@ partout revenait à interdire d'être honnête ; la fiche ne vise plus que l'ong
   l'automatisation (`osascript` → `-1743`), donc aucun clic programmable.
 - Les familles D14 sont désormais recopiées dans **quatre** dictionnaires du mobile (booking,
   tripDetail, search, myDeals). La dette est nommée ; la dérive, elle, est tenue par une fiche.
+
+---
+
+# D114 — L'onglet Activité devient un carrefour (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1175 → 1192 fiches** (58 → 59
+suites). Aucune ligne de serveur.
+
+## Le constat
+
+Après les trois lots précédents, l'onglet portait quatre liens et un compteur chacun. **Une porte
+dit où aller ; elle ne dit pas ce qu'il faut faire, ni dans quel ordre.** Un membre ayant un colis
+à confirmer, une demande qui expire dans deux heures et un Voyageur à noter devait ouvrir trois
+écrans pour l'apprendre.
+
+## Les deux rôles confondus, pas juxtaposés
+
+C'est le modèle de la page d'accueil du site (`deriveHomeActions`), et il est juste : **personne ne
+pense « en tant qu'Expéditeur » puis « en tant que Voyageur »**, on pense « qu'est-ce que je dois
+faire ».
+
+```ts
+// apps/mobile/src/lib/carrefour.ts — pur, il ne connaît ni réseau ni écran
+export function choseQuiAttendent(
+  envois: EnvoiDeLaListe[],
+  demandes: DemandeDeLaListe[]
+): ChoseQuiAttend[]
+```
+
+Il réutilise les dérivations existantes — `sectionDeLaDemande` et `actionMiseEnAvant` — sans
+réécrire une seule règle métier.
+
+## L'ordre est nommé, pas numéroté
+
+Le site classe par :
+
+```ts
+const CARRIER_PRIORITY = { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 };
+```
+
+Une échelle **à trous** (personne ne sait ce que vaudrait un 2) avec **deux ex æquo muets**. Ici :
+
+```ts
+export const ORDRE: readonly TypeDeChose[] = ['repondre', 'confirmer', 'noter'];
+```
+
+| Rang | Pourquoi |
+|---|---|
+| **répondre** | le seul où quelqu'un d'**autre** perd quelque chose si l'on tarde (24 h, DEA-01) |
+| **confirmer** | l'argent du Voyageur est bloqué ; cela se débloque seul, mais plus tard |
+| **noter** | personne n'attend après — une dette de politesse |
+
+Une liste de noms ne peut pas avoir de trou, et l'étendre oblige à **nommer** ce qu'on ajoute.
+
+Le tri est ensuite : type d'abord, échéance ensuite, sans échéance en dernier **à type égal** — un
+colis à confirmer sans date reste devant une note à donner, parce que l'argent de quelqu'un dort.
+
+## On n'y met que ce que l'app sait faire
+
+`pickup` et `deliver` sont autorisés par le serveur mais leurs écrans n'existent pas (hors
+périmètre D113). Les annoncer recréerait **le défaut que les trois lots précédents ont corrigé**.
+Une fiche l'interdit, et servira de rappel le jour où ces écrans naîtront :
+
+```ts
+expect(ORDRE).not.toContain('prendreEnCharge');
+expect(regle).not.toContain("'pickup'");
+```
+
+## Une seule lecture — et c'est la moitié du lot
+
+`use-tab-badges.ts` était un hook à état **local** avec trois consommateurs :
+
+```
+src/components/tab-bar.tsx        (monté en permanence)
+src/app/(tabs)/messages.tsx
+src/app/(tabs)/activity.tsx
+```
+
+Chacun avec son `useState`/`useEffect`, donc **jusqu'à trois jeux de quatre requêtes** à chaque
+passage de l'app au premier plan — et le carrefour en aurait fait un quatrième.
+
+Le gaspillage n'est pas le pire. **Trois lectures à trois instants peuvent se contredire** : le
+badge de la barre annoncerait deux demandes pendant que l'écran en montre une. C'est le défaut
+mesuré sur le site (« En cours » affichant deux nombres à quarante pixels d'écart), mais séparé
+ici par une barre d'onglets — donc bien plus difficile à voir.
+
+Le hook devient un **fournisseur** (`lib/activite-context.tsx`), monté une fois dans la pile
+racine, et les compteurs **dérivent** des mêmes listes projetées que les écrans :
+
+```ts
+badges: {
+  pendingDeals: demandes.filter((d) => sectionDeLaDemande(d) === 'aRepondre').length,
+  shipmentsToHandle: envois.filter((e) => sectionDeLEnvoi(e) === 'aTraiter').length,
+  …
+}
+```
+
+`useTabBadges()` garde son nom et sa forme : ses trois appelants n'ont rien à changer.
+
+**La règle posée par une fiche en D112 devient structurelle** : il n'y a plus deux calculs à garder
+d'accord, il n'y en a qu'un. La fiche reste quand même — une structure se défait aussi — et elle a
+été mise à jour pour lire le nouveau fichier, avec sa raison écrite.
+
+Une fiche garde enfin l'**unicité** du fournisseur (`match(/<ActiviteProvider>/g)` de longueur 1) :
+deux fournisseurs liraient deux fois et divergeraient, le défaut que D103 a payé avec les
+`SafeAreaProvider`.
+
+## Le vide est une bonne nouvelle
+
+```tsx
+{attendent.length > 0 ? ( … ) : pret && <ThemedText>{t('activity.nothingWaiting')}</ThemedText>}
+```
+
+La section **disparaît** au lieu d'afficher un « 0 » permanent : un signal toujours présent n'est
+pas un signal (quatrième fois dans ce dépôt). Et `pret` évite d'annoncer « tout est à jour » avant
+que la première lecture soit revenue — annoncer le calme pendant le chargement serait un mensonge
+d'une demi-seconde, mais un mensonge.
+
+## Contre-épreuves
+
+- inverser l'ordre → **deux** fiches rouges (la liste nommée, et le tri) ;
+- monter le fournisseur deux fois → **une** fiche rouge.
+
+## Reste ouvert
+
+- `pickup` / `deliver` / `refusePickup` : le plus gros du chantier Voyageur.
+- Aucun écran de ce chantier n'a été **vu** (session requise, et macOS refuse les Apple Events).
+- L'état partagé doit rester petit : il porte deux listes, pas un cache général.

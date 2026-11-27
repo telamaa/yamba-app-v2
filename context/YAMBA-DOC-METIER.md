@@ -9777,3 +9777,39 @@ pas de réponse ne perd pas un écran, il perd son colis — et le Voyageur perd
 | 10 | Le colis est « OTHER_ELECTRONICS » en base | je lis « Autre électronique » |
 | 11 | Je change la langue en anglais | je lis « Other electronics » |
 | 12 | Je n'ai aucune demande | l'écran le dit et propose de publier un trajet |
+
+---
+
+# D114 — Un seul écran dit ce qu'il y a à faire (27/11/2026)
+
+## Le besoin
+
+Après trois lots, le membre avait quatre listes et quatre compteurs. Aucun ne lui disait **par quoi
+commencer**. Un Expéditeur-Voyageur avec un colis à confirmer, une demande qui expire dans deux
+heures et un Voyageur à noter devait ouvrir trois écrans pour l'apprendre.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D114-1** | L'onglet Activité montre d'abord **ce qui attend le membre**, les deux rôles confondus. | Personne ne pense « en tant qu'Expéditeur » puis « en tant que Voyageur » : on pense « qu'est-ce que je dois faire ». |
+| **RG-D114-2** | L'ordre est : répondre à une demande, puis confirmer une réception, puis noter. | Répondre est le seul où quelqu'un d'autre perd quelque chose si l'on tarde. Confirmer débloque l'argent du Voyageur. Noter n'attend personne. |
+| **RG-D114-3** | À rang égal, l'échéance la plus proche d'abord ; sans échéance, en dernier. | Mais jamais devant un rang plus pressant. |
+| **RG-D114-4** | N'apparaît que ce que le membre peut **faire aujourd'hui dans l'app**. | Annoncer un geste dont l'écran n'existe pas, c'est une porte vers rien. |
+| **RG-D114-5** | Quatre lignes au plus, et le reste est annoncé par son nombre. | Un carrefour montre le haut de la pile ; dérouler tout en ferait une quatrième liste. |
+| **RG-D114-6** | Quand rien n'attend, l'écran le **dit** : « tout est à jour ». | C'est une bonne nouvelle, pas un écran vide. |
+| **RG-D114-7** | La section disparaît quand elle est vide — jamais un « 0 » permanent. | Un signal toujours présent n'est pas un signal. |
+| **RG-D114-8** | Le compteur d'un onglet et l'écran vers lequel il mène disent **toujours** le même nombre. | Sinon le membre doute des deux. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité avec une demande et un colis à confirmer | la demande est au-dessus du colis |
+| 2 | J'ai deux demandes, l'une expire dans 2 h, l'autre dans 20 h | celle de 2 h est au-dessus |
+| 3 | J'ai un colis à confirmer et un Voyageur à noter | confirmer est au-dessus de noter |
+| 4 | Mon colis est en route | rien ne m'est réclamé à son sujet |
+| 5 | J'ai sept choses en attente | j'en vois quatre, et on me dit qu'il en reste trois |
+| 6 | Je n'ai rien à faire | l'écran me dit que tout est à jour |
+| 7 | Je tape une ligne | j'arrive directement là où le geste se fait |
+| 8 | Je compare le badge de la barre et l'écran | ils disent le même nombre |

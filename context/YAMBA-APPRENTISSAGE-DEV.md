@@ -12005,3 +12005,105 @@ mot.
 - `apps/mobile/src/lib/mes-demandes.spec.ts` — les deux dictionnaires et le dépouillement.
 - `apps/mobile/src/lib/porte-avec-sortie.spec.ts` — la fiche retournée.
 - Registre, entrées **D112 bis** et **D113**.
+
+---
+
+# Chapitre — Une priorité se nomme, une lecture se partage (D114)
+
+## 1. Une échelle numérique est un choix par défaut qui coûte cher
+
+Le site ordonne ses actions ainsi :
+
+```ts
+const CARRIER_PRIORITY = { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 };
+```
+
+Trois défauts, et aucun n'est un bug :
+
+- **un trou** — personne ne sait ce que vaudrait un 2, donc le prochain qui insère une action
+  devra inventer un nombre ;
+- **deux ex æquo muets** — `PICKUP` et `DELIVER` valent 1 sans que rien ne dise pourquoi ;
+- **aucune raison écrite** — `0` ne dit pas *pourquoi* répondre passe en premier.
+
+```ts
+export const ORDRE: readonly TypeDeChose[] = ['repondre', 'confirmer', 'noter'];
+```
+
+Une liste ordonnée de noms **ne peut pas avoir de trou**, l'étendre oblige à nommer ce qu'on
+ajoute, et le tri se lit : `ORDRE.indexOf(a.type) - ORDRE.indexOf(b.type)`.
+
+> Quand vous écrivez une priorité, demandez-vous si le nombre porte une **information** ou
+> seulement un **rang**. S'il ne porte qu'un rang, écrivez le rang.
+
+## 2. Un hook à état local n'est pas un cache
+
+```ts
+export function useTabBadges(): TabBadges {
+  const [badges, setBadges] = useState(ZERO);
+  useEffect(() => { void refresh(); … }, [status, refresh]);
+  return badges;
+}
+```
+
+Ce code est correct. Il devient coûteux au moment où on l'appelle **plusieurs fois** : chaque
+consommateur a son `useState`, son `useEffect`, et refait les requêtes. Ils étaient trois.
+
+Le repérer ne demande pas un profileur :
+
+```sh
+grep -rn "useTabBadges" apps/mobile/src | grep -v "use-tab-badges.ts"
+# → trois fichiers
+```
+
+**Et le gaspillage n'est pas le pire.** Trois lectures à trois instants peuvent se **contredire** :
+le badge de la barre annonce deux demandes, l'écran en montre une. Séparés par une barre d'onglets,
+les deux nombres ne se voient jamais ensemble — le défaut est donc plus durable que celui du site,
+où les deux nombres sont à quarante pixels l'un de l'autre.
+
+Le remède est le motif déjà présent dans le dépôt (`session-context.tsx`) : un fournisseur, une
+lecture, et des compteurs qui **dérivent** des mêmes listes que les écrans.
+
+> Une garantie tenue par une fiche est une garantie **surveillée**. Une garantie tenue par la
+> structure est une garantie **impossible à rater**. On garde la fiche quand même : une structure
+> se défait aussi.
+
+## 3. Le vide a deux sens, et il faut les distinguer
+
+```tsx
+{attendent.length > 0 ? ( … ) : pret && <ThemedText>{t('activity.nothingWaiting')}</ThemedText>}
+```
+
+`pret` n'est pas une coquetterie. Sans lui, l'écran annonce « tout est à jour » **pendant le
+chargement** — un mensonge d'une demi-seconde, mais un mensonge, et celui-là se reproduit à chaque
+ouverture. C'est la leçon de D106 (« quand vous persistez un état, demandez ce que son vide
+signifie ») appliquée à un rendu : *rien à faire* et *je ne sais pas encore* ne s'affichent pas
+pareil.
+
+## 4. Un carrefour n'est pas une quatrième liste
+
+```ts
+export const TETE_DE_PILE = 4;
+export function teteDePile(choses, combien = TETE_DE_PILE) {
+  return { visibles: choses.slice(0, combien), reste: Math.max(0, choses.length - combien) };
+}
+```
+
+Le `Math.max(0, …)` évite d'annoncer « −2 autres » quand la liste est plus courte que la tête — et
+la fiche le vérifie, parce que c'est exactement le genre de ligne qu'on écrit sans y penser.
+
+## 5. Refuser d'afficher ce qu'on ne sait pas faire
+
+Le serveur autorise `pickup` et `deliver` ; leurs écrans n'existent pas. Les mettre dans le
+carrefour aurait été facile et faux. La fiche qui l'interdit est aussi un **rappel daté** :
+
+```ts
+it('PRENDRE EN CHARGE et REMETTRE n’y sont PAS — leurs écrans n’existent pas', () => { … });
+```
+
+Le jour où ces écrans naissent, cette fiche rougit, et c'est elle qui dira à quoi il faut penser.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/carrefour.ts` — la fusion, l'ordre, la tête de pile.
+- `apps/mobile/src/lib/activite-context.tsx` — une lecture, une vérité.
+- Registre, entrée **D114**.
