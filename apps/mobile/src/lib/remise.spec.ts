@@ -326,4 +326,44 @@ describe('⑤ le contrat, et ce que l’écran n’affiche pas', () => {
       }
     }
   });
+
+  it('aucun refus ne se termine en CUL-DE-SAC (D116 1C, ANO-API-15)', () => {
+    // « Action impossible pour l'instant » est exactement ce que lisait le
+    // Voyageur avant ANO-API-15 : vrai, inutile, et sans suite. Les deux
+    // faits que cet écran peut rencontrer sont DISTINCTS et le disent —
+    // le réseau (rien n'est parti, on refait le geste) et un refus que
+    // l'app ne sait pas lire (on retourne voir où en est le colis). Un
+    // code technique ne s'affiche jamais tel quel (D83).
+    for (const locale of ['fr', 'en']) {
+      const dict = JSON.parse(
+        readFileSync(join(MOBILE, `messages/${locale}/deliver.json`), 'utf8')
+      ) as Record<string, string>;
+      expect(dict.networkFailed).toBeTruthy();
+      for (const cle of ['failed', 'networkFailed', 'notAllowedBody', 'loadError']) {
+        expect(dict[cle]).not.toMatch(/Action impossible|not possible right now/i);
+      }
+    }
+    // Et l'écran distingue les deux : le réseau n'est pas un refus.
+    const ecran = readFileSync(join(MOBILE, 'src/app/deal/[id]/deliver.tsx'), 'utf8');
+    expect(ecran).toMatch(/instanceof ApiError\)\) \{[\s\S]{0,400}t\('networkFailed'\)/);
+  });
+
+  it('la phrase de cul-de-sac est COMPTÉE ailleurs, pas promise', () => {
+    // Elle vit dans QUATRE autres dictionnaires (`pickup` D115, `myDeals`,
+    // `myTrips`). On ne les aligne pas d'autorité : chaque écran mérite sa
+    // propre phrase, et une réécriture en bloc dirait la même chose
+    // partout — c'est le choix de D115 3A sur les copies de la prise de
+    // photo. Mais une dette COMPTÉE se rembourse, une dette promise
+    // s'oublie : le prochain qui en ajoute une rougit ici, et celui qui en
+    // corrige une doit baisser ce chiffre.
+    const dictionnaires = ['myDeals', 'myTrips', 'pickup', 'deliver'];
+    const porteurs = dictionnaires.filter((nom) =>
+      ['fr', 'en'].some((locale) =>
+        /Action impossible|not possible right now/i.test(
+          readFileSync(join(MOBILE, `messages/${locale}/${nom}.json`), 'utf8')
+        )
+      )
+    );
+    expect(porteurs).toEqual(['myDeals', 'myTrips', 'pickup']);
+  });
 });

@@ -203,7 +203,10 @@ function RemiseContent() {
       setRemis(versementDeLaReponse(reponse) ?? '');
     } catch (e) {
       if (!(e instanceof ApiError)) {
-        setErreur(t('failed'));
+        // Le réseau n'est PAS un refus : rien n'est parti, et le geste se
+        // refait tel quel. Le dire évite la question qui vient debout
+        // devant le destinataire — « est-ce que c'est passé ? ».
+        setErreur(t('networkFailed'));
         return;
       }
       // Le serveur est la SEULE source du compteur et du verrou.
