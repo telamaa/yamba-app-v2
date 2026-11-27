@@ -91,5 +91,9 @@
     "meetupTooFar": "Le rendez-vous doit avoir lieu dans les 90 jours.",
     "meetupTooLong": "Un rendez-vous dure 12 heures au plus.",
     "meetupChanged": "Ce rendez-vous vient de changer. Recharge la conversation."
+  },
+  "contactWarning": "Yamba a vu des coordonnées dans ce message. Rester sur la plateforme, c'est garder la protection en cas de problème.",
+  "notice": {
+    "closing": "{count, plural, =0 {Cette conversation se ferme aujourd'hui} one {Cette conversation se ferme demain} other {Cette conversation se ferme dans # jours}}"
   }
 }

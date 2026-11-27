@@ -6,13 +6,30 @@
  * Affiche ce que le serveur décide : `access.canWrite` ferme la saisie (litige en cours,
  * fenêtre de 14 jours écoulée), `phone.opensAt` dit quand le numéro s'ouvre. Le refus du code
  * de livraison remonte tel quel : c'est une règle, pas une erreur technique.
+ *
+ * D117 bis — QUATRE CORRECTIONS VENUES DE L'ÉCRAN NATIF :
+ *   ① `flaggedContact` était servi, marqué par le serveur, affiché par l'ADMIN — et
+ *      par aucun front membre, alors que le contrat dit « averti, jamais bloqué » ;
+ *   ② `access.writeClosesAt` était TYPÉ et lu nulle part : la conversation se
+ *      fermait sans prévenir ;
+ *   ③ le plafond de 2 000 caractères était écrit deux fois EN DUR ici même ;
+ *   ④ `unreadCount >= 0` est toujours vrai — un compteur n'est jamais négatif.
+ * Les règles vivent désormais dans `@/lib/messaging/fil` (pur, zéro import).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { AlertTriangle, ArrowLeft, Flag, Phone, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Eye, Flag, Phone, Send } from "lucide-react";
 import { useMarkConversationRead, usePostMessage, useQuickReplies, useRevealPhone, useThread } from "@/hooks/useMessaging";
 import MeetupPanel from "./MeetupPanel";
 import ReportMessageDialog from "./ReportMessageDialog";
+import {
+  MESSAGE_MAX,
+  avertirDesCoordonnees,
+  estDeMoi,
+  fautIlMarquerLu,
+  motifDeFermeture,
+  preavisDeFermeture,
+} from "@/lib/messaging/fil";
 import type { ChatMessage } from "./messaging.types";
 
 function dayLabel(iso: string, locale: string): string {
@@ -43,6 +60,14 @@ export default function ConversationThread({
   const [error, setError] = useState<string | null>(null);
   // F-PR3 (D61 7A) — message en cours de signalement (bulle de l'autre partie seulement)
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
+  // D117 bis — UN COMPOSANT CLIENT EST AUSSI RENDU SUR LE SERVEUR (doc Next
+  // 16, « Server and Client Boundary ») : la passe serveur et l'hydratation
+  // doivent produire le MÊME balisage. Un `Date.now()` lu pendant le rendu
+  // peut donner deux réponses de part et d'autre d'une frontière de jour —
+  // donc l'heure n'entre dans le rendu qu'APRÈS le montage, et le bandeau
+  // qui en dépend est simplement absent du HTML initial.
+  const [monte, setMonte] = useState(false);
+  useEffect(() => setMonte(true), []);
   const bottomRef = useRef<HTMLDivElement>(null);
   // A142 — la réponse rapide remplit la saisie, elle n'envoie jamais : le geste d'envoi reste à l'utilisateur.
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -50,7 +75,10 @@ export default function ConversationThread({
 
   // Marque lu à l'ouverture et à chaque nouveau message reçu.
   useEffect(() => {
-    if (data && data.conversation.unreadCount >= 0) markRead.mutate();
+    // D117 bis ④ — la question n'est pas « le compteur existe-t-il » mais
+    // « y a-t-il quelque chose à marquer ». `>= 0` postait une lecture à
+    // chaque ouverture, même quand tout était déjà lu.
+    if (data && fautIlMarquerLu(data.conversation)) markRead.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, lastMessageId]);
 
@@ -75,6 +103,7 @@ export default function ConversationThread({
 
   const { conversation, phone } = data;
   const access = conversation.access;
+  const preavis = monte ? preavisDeFermeture(access.writeClosesAt, Date.now()) : null;
 
   async function send(text: string) {
     const value = text.trim();
@@ -139,7 +168,7 @@ export default function ConversationThread({
                 {phone.phoneE164}
               </a>
             </>
-          ) : phone.opensAt && new Date(phone.opensAt).getTime() <= Date.now() ? (
+          ) : monte && phone.opensAt && new Date(phone.opensAt).getTime() <= Date.now() ? (
             <>
               <span>{t("phone.banner.available")}</span>
               <button onClick={() => reveal.mutate()} disabled={reveal.isPending} className="font-semibold underline disabled:opacity-60">
@@ -151,6 +180,19 @@ export default function ConversationThread({
           ) : (
             <span>{t("phone.banner.needsMeetup")}</span>
           )}
+        </div>
+      )}
+
+      {/* D117 bis ② — une porte qui se ferme le dit AVANT. `writeClosesAt`
+          était typé et lu nulle part : la conversation se fermait sans
+          prévenir, et c'est la même famille que le bouton muet (A209). */}
+      {preavis !== null && (
+        <div
+          className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-[12.5px] text-slate-600 dark:border-slate-800 dark:text-slate-300"
+          role="status"
+        >
+          <AlertTriangle size={13} className="shrink-0" />
+          <span>{t("notice.closing", { count: preavis })}</span>
         </div>
       )}
 
@@ -172,9 +214,10 @@ export default function ConversationThread({
                     </p>
                   );
                 }
-                const mine = m.authorRole === conversation.role;
+                const mine = estDeMoi(m, conversation.role);
                 return (
-                  <div key={m.id} className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id}>
+                  <div className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`max-w-[80%] rounded-2xl px-3 py-2 text-[13.5px] ${
                         mine ? "bg-[#FF9900] text-slate-950" : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
@@ -195,6 +238,20 @@ export default function ConversationThread({
                       </button>
                     )}
                   </div>
+                  {/* D117 bis ① — on avertit l'AUTEUR, et lui seul : une
+                      pastille sur la bulle de l'autre le désignerait du doigt
+                      sur la foi d'une regex qui ne distingue pas un numéro de
+                      vol d'un téléphone. */}
+                  {avertirDesCoordonnees(m, conversation.role) && (
+                    <p
+                      className="mt-0.5 flex items-start justify-end gap-1 text-right text-[11px] text-slate-500 dark:text-slate-400"
+                      role="status"
+                    >
+                      <Eye size={11} className="mt-0.5 shrink-0" />
+                      <span className="max-w-[80%]">{t("contactWarning")}</span>
+                    </p>
+                  )}
+                  </div>
                 );
               })}
             </div>
@@ -214,7 +271,7 @@ export default function ConversationThread({
                   key={q.key}
                   type="button"
                   onClick={() => {
-                    setBody(q.text.slice(0, 2000));
+                    setBody(q.text.slice(0, MESSAGE_MAX));
                     composerRef.current?.focus();
                   }}
                   className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-[12px] text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -240,7 +297,7 @@ export default function ConversationThread({
             <textarea
               ref={composerRef}
               value={body}
-              onChange={(e) => setBody(e.target.value.slice(0, 2000))}
+              onChange={(e) => setBody(e.target.value.slice(0, MESSAGE_MAX))}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -263,9 +320,12 @@ export default function ConversationThread({
         </div>
       ) : (
         <div className="border-t border-slate-200 p-3 text-center text-[12.5px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          {access.reason === "DISPUTE_OPEN"
+          {/* Une clé INCONNUE ferme quand même : `motifDeFermeture` rend
+              « autre » plutôt que `null`, pour ne pas prétendre que c'est
+              ouvert quand le serveur dit que non. */}
+          {motifDeFermeture(access.reason) === "litige"
             ? t("closed.dispute")
-            : access.reason === "WRITE_WINDOW_OVER"
+            : motifDeFermeture(access.reason) === "fenetre"
               ? t("closed.window")
               : t("closed.generic")}
         </div>

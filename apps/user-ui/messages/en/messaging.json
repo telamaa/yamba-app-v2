@@ -91,5 +91,9 @@
     "meetupTooFar": "The meeting must take place within 90 days.",
     "meetupTooLong": "A meeting lasts 12 hours at most.",
     "meetupChanged": "This meeting just changed. Reload the conversation."
+  },
+  "contactWarning": "Yamba spotted contact details in this message. Staying on the platform is what keeps you covered if anything goes wrong.",
+  "notice": {
+    "closing": "{count, plural, =0 {This conversation closes today} one {This conversation closes tomorrow} other {This conversation closes in # days}}"
   }
 }
