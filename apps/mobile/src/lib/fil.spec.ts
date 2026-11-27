@@ -315,8 +315,8 @@ describe('⑤ aucun message ne disparaît faute de date lisible', () => {
   });
 
   it('une date ILLISIBLE rejoint le groupe courant plutôt que de se perdre', () => {
-    const messages = [
-      messageDeLApi(message({ id: 'a' })),
+    const messages: MessageDuFil[] = [
+      messageDeLApi(message({ id: 'a' })) as MessageDuFil,
       { ...(messageDeLApi(message({ id: 'b' })) as MessageDuFil), creeA: 'nawak' },
     ];
     const groupes = groupesParJour(messages);
