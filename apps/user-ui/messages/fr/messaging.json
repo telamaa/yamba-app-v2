@@ -51,7 +51,8 @@
     "end": "Fin",
     "send": "Proposer ce rendez-vous",
     "sending": "Envoi…",
-    "proposeFailed": "Le rendez-vous n'a pas pu être proposé."
+    "proposeFailed": "Le rendez-vous n'a pas pu être proposé.",
+    "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}"
   },
   "system": {
     "meetup": {
@@ -90,7 +91,11 @@
     "meetupTooSoon": "Le rendez-vous doit commencer au moins 30 minutes à l'avance.",
     "meetupTooFar": "Le rendez-vous doit avoir lieu dans les 90 jours.",
     "meetupTooLong": "Un rendez-vous dure 12 heures au plus.",
-    "meetupChanged": "Ce rendez-vous vient de changer. Recharge la conversation."
+    "meetupChanged": "Ce rendez-vous vient de changer. Recharge la conversation.",
+    "meetupFinAvantDebut": "La fin doit venir après le début.",
+    "meetupCreneau": "Ce créneau n'est pas valable. Vérifie le jour et les heures.",
+    "meetupSienne": "C'est toi qui as proposé ce créneau : c'est à l'autre de l'accepter.",
+    "meetupIntrouvable": "Ce rendez-vous n'existe plus."
   },
   "contactWarning": "Yamba a vu des coordonnées dans ce message. Rester sur la plateforme, c'est garder la protection en cas de problème.",
   "notice": {

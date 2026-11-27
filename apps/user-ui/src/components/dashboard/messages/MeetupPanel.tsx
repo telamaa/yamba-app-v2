@@ -6,11 +6,27 @@
  * Le rendez-vous est un OBJET : on le voit, on l'accepte, on en propose un autre. Le front
  * n'invente rien : il affiche ce que le serveur a validé (créneau, statut, qui a proposé) et
  * n'autorise « Accepter » que sur une proposition de l'AUTRE partie.
+ *
+ * D118 bis — DEUX CORRECTIONS VENUES DE L'ÉCRAN NATIF :
+ *   ① aucune borne de longueur n'était posée sur le lieu (3..160) ni sur le repère
+ *      (≤ 500), que le contrat refuse : on tapait jusqu'à l'échec, et le refus
+ *      arrivait sur un message générique. C'est `PickupNotes` de D115 bis, replayé ;
+ *   ② sur les CINQ motifs de refus de créneau, deux tombaient dans le message
+ *      générique — dont `END_BEFORE_START`, l'erreur la plus probable d'un
+ *      formulaire à deux `datetime-local`.
+ * Les règles vivent dans `@/lib/messaging/rendez-vous` (pur, zéro import).
  */
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarClock, Check, MapPin, Plus } from "lucide-react";
 import { useAcceptMeetup, useProposeMeetup } from "@/hooks/useMessaging";
+import {
+  DETAIL_MAX,
+  LIEU_MAX,
+  LIEU_MIN,
+  cleDuRefusDuRendezVous,
+  restantDuChamp,
+} from "@/lib/messaging/rendez-vous";
 import type { ConversationThread, Meetup } from "./messaging.types";
 
 function formatSlot(startAt: string, endAt: string, locale: string): string {
@@ -56,16 +72,22 @@ export default function MeetupPanel({ thread }: { thread: ConversationThread }) 
       // ANO-WEB-45 (recette 5.15) : les bornes (30 min / 90 j / 12 h) se disent dans la langue du lecteur,
       // à partir du `details` du refus (A146) — plus jamais le `message` anglais de l'API.
       const details = (err as { response?: { data?: { details?: { code?: string; reason?: string } } } })?.response?.data?.details;
-      const bornes: Record<string, string> = { TOO_SOON: t("errors.meetupTooSoon"), TOO_FAR: t("errors.meetupTooFar"), WINDOW_TOO_LONG: t("errors.meetupTooLong") };
-      setError(
-        details?.code === "INVALID_MEETUP_SLOT" && details.reason && bornes[details.reason]
-          ? bornes[details.reason]
-          : details?.code === "MEETUP_CHANGED"
-            ? t("errors.meetupChanged")
-            : details?.code === "CONVERSATION_READ_ONLY"
-              ? t("closed.generic")
-              : t("meetup.proposeFailed")
-      );
+      // D118 bis ② — LES CINQ motifs de créneau sont nommés, pas trois : un
+      // refus qui tombe dans un message générique ne dit rien à celui qui
+      // doit le corriger.
+      const phrases: Record<string, string> = {
+        ferme: t("closed.generic"),
+        change: t("errors.meetupChanged"),
+        sienne: t("errors.meetupSienne"),
+        introuvable: t("errors.meetupIntrouvable"),
+        tropTot: t("errors.meetupTooSoon"),
+        tropLoin: t("errors.meetupTooFar"),
+        tropLong: t("errors.meetupTooLong"),
+        finAvantDebut: t("errors.meetupFinAvantDebut"),
+        creneau: t("errors.meetupCreneau"),
+        echec: t("meetup.proposeFailed"),
+      };
+      setError(phrases[cleDuRefusDuRendezVous(details?.code, details?.reason)] ?? t("meetup.proposeFailed"));
     }
   }
 
@@ -143,12 +165,18 @@ export default function MeetupPanel({ thread }: { thread: ConversationThread }) 
             {t("meetup.place")}
             <input
               required
-              minLength={3}
+              minLength={LIEU_MIN}
+              maxLength={LIEU_MAX}
               value={form.placeLabel}
-              onChange={(e) => setForm({ ...form, placeLabel: e.target.value })}
+              onChange={(e) => setForm({ ...form, placeLabel: e.target.value.slice(0, LIEU_MAX) })}
               placeholder={t("meetup.placePlaceholder")}
               className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-[13px] dark:border-slate-700 dark:bg-slate-900"
             />
+            {restantDuChamp(form.placeLabel, LIEU_MAX) !== null && (
+              <span className="mt-0.5 block text-[11px] text-slate-400">
+                {t("meetup.remaining", { count: restantDuChamp(form.placeLabel, LIEU_MAX) ?? 0 })}
+              </span>
+            )}
           </label>
           <label className="text-[12px] text-slate-600 dark:text-slate-300">
             {t("meetup.start")}
@@ -160,7 +188,18 @@ export default function MeetupPanel({ thread }: { thread: ConversationThread }) 
           </label>
           <label className="text-[12px] text-slate-600 dark:text-slate-300 sm:col-span-2">
             {t("meetup.details")}
-            <input value={form.placeDetails} onChange={(e) => setForm({ ...form, placeDetails: e.target.value })} placeholder={t("meetup.detailsPlaceholder")} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-[13px] dark:border-slate-700 dark:bg-slate-900" />
+            <input
+              maxLength={DETAIL_MAX}
+              value={form.placeDetails}
+              onChange={(e) => setForm({ ...form, placeDetails: e.target.value.slice(0, DETAIL_MAX) })}
+              placeholder={t("meetup.detailsPlaceholder")}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-[13px] dark:border-slate-700 dark:bg-slate-900"
+            />
+            {restantDuChamp(form.placeDetails, DETAIL_MAX) !== null && (
+              <span className="mt-0.5 block text-[11px] text-slate-400">
+                {t("meetup.remaining", { count: restantDuChamp(form.placeDetails, DETAIL_MAX) ?? 0 })}
+              </span>
+            )}
           </label>
           {error && <p className="text-[12px] text-red-600 sm:col-span-2">{error}</p>}
           <div className="flex gap-2 sm:col-span-2">
