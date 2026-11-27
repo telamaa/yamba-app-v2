@@ -165,6 +165,9 @@ function DemandeContent() {
   // LA PORTE vers l'inspection (D115). Elle n'est pas déduite d'un statut :
   // seule la machine à états sait si la fenêtre est ouverte.
   const peutPrendreEnCharge = peut(demande, 'pickup');
+  // LA PORTE vers la remise (D116). Même règle : le serveur seul sait si le
+  // colis est en transit et si le verrou de saisie est levé.
+  const peutRemettre = peut(demande, 'deliver');
 
   return (
     <ThemedView style={styles.container}>
@@ -239,6 +242,24 @@ function DemandeContent() {
                 style={({ pressed }) => [styles.principal, { opacity: pressed ? 0.85 : 1 }]}>
                 <ThemedText type="smallBold" style={styles.principalLabel}>
                   {t('detail.pickupCta')}
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
+          {peutRemettre && (
+            <View style={styles.reponses}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('detail.deliverCtaWhy')}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({ pathname: '/deal/[id]/deliver', params: { id: demande.id } })
+                }
+                style={({ pressed }) => [styles.principal, { opacity: pressed ? 0.85 : 1 }]}>
+                <ThemedText type="smallBold" style={styles.principalLabel}>
+                  {t('detail.deliverCta')}
                 </ThemedText>
               </Pressable>
             </View>

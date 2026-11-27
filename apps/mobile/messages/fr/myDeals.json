@@ -63,7 +63,9 @@
     "loadError": "Impossible d'ouvrir cette demande.",
     "wrongRole": "Cette réservation est l'un de tes envois, pas une demande reçue.",
     "pickupCta": "Confirmer la prise en charge",
-    "pickupCtaWhy": "Tu es devant l'Expéditeur ? Ouvre le colis, vérifie, prends les photos."
+    "pickupCtaWhy": "Tu es devant l'Expéditeur ? Ouvre le colis, vérifie, prends les photos.",
+    "deliverCta": "Valider la remise",
+    "deliverCtaWhy": "Tu es devant le destinataire ? Il a reçu un code à six chiffres."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",

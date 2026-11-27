@@ -105,6 +105,26 @@ export type DemandeDeLaListe = {
   expireLe: string | null;
   /** Ce que le SERVEUR autorise. Lu, jamais déduit. */
   actions: ActionDemande[];
+  /**
+   * LA REMISE (D116) — ce que le serveur annonce de la saisie du code (A38).
+   * `essaisRestants` vaut `null` quand le champ n'est pas servi : on ne
+   * suppose pas trois essais, on ne montre rien.
+   */
+  essaisRestants: number | null;
+  verrouJusqua: string | null;
+  /** Les jalons déjà confirmés, bruts — `lib/jalons.ts` les ordonne. */
+  jalons: unknown;
+  /**
+   * LE DESTINATAIRE, tel que le serveur le MINIMISE (ANO-API-15) : prénom à
+   * l'acceptation, téléphone à partir de la prise en charge, jamais l'email.
+   *
+   * D113 ne le projetait pas, et avait raison : ni la liste ni la fiche de
+   * demande n'en ont l'usage. La REMISE, elle, en a besoin — c'est lui qui
+   * dicte le code, et c'est lui qu'on appelle quand on ne le trouve pas.
+   * L'app n'ajoute AUCUN filtre : elle affiche ce qu'on lui sert, sans quoi
+   * il existerait deux règles de confidentialité et l'une serait fausse.
+   */
+  destinataire: { prenom: string; telephone: string | null };
 };
 
 /* ── Projection défensive ─────────────────────────────────────────────── */
@@ -166,6 +186,28 @@ export function demandeDeLApi(brut: unknown): DemandeDeLaListe | null {
     devise: texte(pricing.currencyCode) || 'EUR',
     expireLe: statut === 'PENDING' ? texte(demande.expiresAt) || null : null,
     actions,
+    essaisRestants: nombreOuNull(demande.deliveryAttemptsLeft),
+    verrouJusqua: texte(demande.deliveryLockedUntil) || null,
+    jalons: demande.trackingEvents,
+    destinataire: destinataireDuServeur(objet(demande.recipient)),
+  };
+}
+
+/**
+ * Le destinataire : ce que le serveur sert, pas davantage. Un champ absent
+ * devient une chaîne vide ou `null` — jamais un « — » ni un nom inventé.
+ */
+function destinataireDuServeur(recipient: Record<string, unknown>): {
+  prenom: string;
+  telephone: string | null;
+} {
+  // `phoneE164`, le NOM EXACT du contrat (`CarrierRecipientView`) — pas
+  // `phone`. Un champ mal nommé est silencieux : il traverse le réseau et
+  // disparaît au `JSON.parse`, et l'écran affiche simplement « pas de
+  // numéro » (le défaut D102, cinq compteurs perdus de la même façon).
+  return {
+    prenom: texte(recipient.firstName).trim(),
+    telephone: texte(recipient.phoneE164).trim() || null,
   };
 }
 

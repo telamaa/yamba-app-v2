@@ -62,6 +62,7 @@
     "nothingWaiting": "Nothing needs you. You are up to date.",
     "waitingRepondre": "Reply to {name}",
     "waitingPrendre": "Take {name}'s parcel",
+    "waitingRemettre": "Hand over {name}'s parcel",
     "waitingConfirmer": "Confirm receipt",
     "waitingNoter": "Rate {name}",
     "waitingSomeone": "someone",

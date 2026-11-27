@@ -1,0 +1,59 @@
+{
+  "title": "Remise du colis",
+  "back": "Retour",
+  "codeTitle": "Le code de livraison",
+  "codeWhy": "{name} a reçu un code à six chiffres. Demande-lui de te le dire.",
+  "codeWhyNoName": "Le destinataire a reçu un code à six chiffres. Demande-lui de te le dire.",
+  "codeLabel": "Code de livraison à six chiffres",
+  "attemptsLeft": "{count, plural, one {Encore # essai} other {Encore # essais}}",
+  "lockedBody": "Trop d'essais. La saisie se rouvre dans {countdown}.",
+  "wrongCode": "Ce n'est pas le bon code. Fais-le répéter, chiffre par chiffre.",
+  "wrongCodeNamed": "Ce n'est pas le bon code. Fais-le répéter à {name}, chiffre par chiffre.",
+  "codeUnavailable": "Ce colis n'a pas de code. Contacte Yamba avant de le remettre.",
+  "dealChanged": "Cette réservation a changé entre-temps. Reviens pour la relire.",
+  "call": "Appeler le destinataire",
+  "callNamed": "Appeler {name}",
+  "photosTitle": "Une photo de la remise ?",
+  "photosWhy": "Facultatif, jusqu'à {max}. Le code prouve la remise ; la photo prouve l'état du colis.",
+  "takePhoto": "Prendre une photo",
+  "fromLibrary": "Depuis la photothèque",
+  "retry": "Réessayer",
+  "remove": "Retirer",
+  "uploadErrors": {
+    "INVALID_TYPE": "Format non accepté — JPEG, PNG, HEIC ou WebP.",
+    "TOO_LARGE": "Photo trop lourde ({maxMb} Mo maximum).",
+    "FAILED": "Envoi échoué. Touche la photo pour réessayer."
+  },
+  "milestones": {
+    "title": "Où en est le colis ?",
+    "why": "Facultatif : l'Expéditeur suit son colis pendant que tu voyages.",
+    "steps": {
+      "AT_AIRPORT": "Je suis à l'aéroport avec le colis",
+      "FLIGHT_DEPARTED": "L'avion a décollé",
+      "FLIGHT_ARRIVED": "L'avion a atterri"
+    },
+    "confirm": "Confirmer : {step}",
+    "allDone": "Tout est dit. Il ne reste que la remise.",
+    "failed": "Ce jalon n'est pas passé. Ce n'est pas grave : tu peux remettre le colis."
+  },
+  "submit": "Valider la remise",
+  "missing": {
+    "code": "{count, plural, one {Il manque # chiffre} other {Il manque # chiffres}}",
+    "locked": "Saisie bloquée — réessaye dans {countdown}",
+    "televersement": "Envoi de la photo en cours…",
+    "echec": "Une photo n'est pas partie"
+  },
+  "doneTitle": "Colis remis",
+  "doneBody": "C'est terminé pour toi. Ton paiement part après la fenêtre de vérification de l'Expéditeur.",
+  "doneBodyWithDate": "C'est terminé pour toi. Ton paiement part le {date}, après la fenêtre de vérification de l'Expéditeur.",
+  "keep": "Revenir",
+  "failed": "Action impossible pour l'instant.",
+  "loadError": "Cette réservation ne se lit pas pour l'instant.",
+  "wrongRole": "Cette réservation se lit côté Expéditeur.",
+  "notAllowedTitle": "Pas encore, ou plus",
+  "notAllowedBody": "Ce colis n'attend pas de remise. Reviens à la réservation pour voir où il en est.",
+  "permissionCameraTitle": "Appareil photo",
+  "permissionCameraBody": "Autorise l'appareil photo pour photographier la remise.",
+  "permissionLibraryTitle": "Photothèque",
+  "permissionLibraryBody": "Autorise l'accès aux photos pour en choisir une."
+}

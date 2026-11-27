@@ -84,7 +84,43 @@ describe('① la projection ne fait pas confiance à la base', () => {
       devise: 'EUR',
       expireLe: '2026-11-28T10:00:00.000Z',
       actions: ['accept', 'decline'],
+      // D116 — ce que le serveur annonce de la REMISE. Une demande en
+      // attente n'a ni essai consommé, ni verrou, ni jalon, et son
+      // destinataire n'est pas encore servi : la projection le dit en
+      // `null` et en chaîne vide, jamais en « — » ni en valeur inventée.
+      essaisRestants: null,
+      verrouJusqua: null,
+      jalons: undefined,
+      destinataire: { prenom: '', telephone: null },
     });
+  });
+
+  it('lit les trois champs de la REMISE quand le serveur les sert (D116)', () => {
+    // Le nom du téléphone est `phoneE164`, celui du CONTRAT — pas `phone`.
+    // Un champ mal nommé est silencieux : il traverse le réseau et
+    // disparaît au `JSON.parse` (le défaut D102, cinq compteurs perdus
+    // ainsi). Cette fiche est la seule chose qui l'attrape.
+    const demande = demandeDeLApi({
+      ...brut({ status: 'PICKED_UP', allowedActions: ['deliver'] }),
+      deliveryAttemptsLeft: 2,
+      deliveryLockedUntil: '2026-11-27T12:15:00.000Z',
+      trackingEvents: [{ step: 'AT_AIRPORT' }],
+      recipient: { firstName: 'Awa', lastName: 'K.', phoneE164: '+242060000000' },
+    });
+    expect(demande?.essaisRestants).toBe(2);
+    expect(demande?.verrouJusqua).toBe('2026-11-27T12:15:00.000Z');
+    expect(demande?.jalons).toEqual([{ step: 'AT_AIRPORT' }]);
+    expect(demande?.destinataire).toEqual({ prenom: 'Awa', telephone: '+242060000000' });
+  });
+
+  it('un destinataire SANS téléphone n’en invente pas', () => {
+    // Le serveur ne l'ouvre qu'à partir de la prise en charge (ANO-API-15) :
+    // avant, le champ est `null`, et l'app n'a rien à proposer d'autre.
+    const demande = demandeDeLApi({
+      ...brut({ status: 'ACCEPTED', allowedActions: ['pickup'] }),
+      recipient: { firstName: 'Awa', lastName: 'K.', phoneE164: null },
+    });
+    expect(demande?.destinataire).toEqual({ prenom: 'Awa', telephone: null });
   });
 
   it('jette une ligne sans identifiant ou sans statut connu', () => {

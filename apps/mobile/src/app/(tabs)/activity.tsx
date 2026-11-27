@@ -60,7 +60,7 @@ function ActivityContent() {
   /** Une ligne du carrefour : ce qu'il y a à faire, et où cela mène. */
   function Attente({ chose }: { chose: ChoseQuiAttend }) {
     const nom =
-      chose.type === 'repondre' || chose.type === 'prendre'
+      chose.type === 'repondre' || chose.type === 'prendre' || chose.type === 'remettre'
         ? chose.demande.expediteur
         : chose.type === 'noter'
           ? chose.envoi.voyageur
@@ -71,9 +71,11 @@ function ActivityContent() {
         ? t('activity.waitingRepondre', { name: quelquun })
         : chose.type === 'prendre'
           ? t('activity.waitingPrendre', { name: quelquun })
-          : chose.type === 'noter'
-            ? t('activity.waitingNoter', { name: quelquun })
-            : t('activity.waitingConfirmer');
+          : chose.type === 'remettre'
+            ? t('activity.waitingRemettre', { name: quelquun })
+            : chose.type === 'noter'
+              ? t('activity.waitingNoter', { name: quelquun })
+              : t('activity.waitingConfirmer');
 
     // Recalculé au rendu, pas à la seconde.
     const left = chose.echeance ? remainingUntil(chose.echeance, Date.now()) : null;
@@ -86,6 +88,8 @@ function ActivityContent() {
       // de trop quand quelqu'un attend debout.
       else if (chose.type === 'prendre')
         router.push({ pathname: '/deal/[id]/pickup', params: { id: chose.id } });
+      else if (chose.type === 'remettre')
+        router.push({ pathname: '/deal/[id]/deliver', params: { id: chose.id } });
       else if (chose.type === 'noter')
         router.push({ pathname: '/shipment/[id]/rate', params: { id: chose.id } });
       else router.push({ pathname: '/shipment/[id]', params: { id: chose.id } });

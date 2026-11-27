@@ -63,7 +63,9 @@
     "loadError": "This request cannot be opened.",
     "wrongRole": "This booking is one of your shipments, not a request you received.",
     "pickupCta": "Confirm hand-over",
-    "pickupCtaWhy": "Are you with the Shipper? Open the parcel, check it, take the photos."
+    "pickupCtaWhy": "Are you with the Shipper? Open the parcel, check it, take the photos.",
+    "deliverCta": "Confirm hand-over",
+    "deliverCtaWhy": "Are you with the recipient? They received a six-digit code."
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papers",

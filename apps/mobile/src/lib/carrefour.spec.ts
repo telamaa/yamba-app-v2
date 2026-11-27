@@ -51,17 +51,21 @@ function demande(extra: Partial<DemandeDeLaListe> = {}): DemandeDeLaListe {
     devise: 'EUR',
     expireLe: '2026-11-28T10:00:00.000Z',
     actions: ['accept', 'decline'],
+    essaisRestants: null,
+    verrouJusqua: null,
+    jalons: [],
+    destinataire: { prenom: '', telephone: null },
     ...extra,
   };
 }
 
 describe('① l’ordre est nommé, et il ne promet que l’existant', () => {
-  it('quatre choses, dans cet ordre', () => {
+  it('cinq choses, dans cet ordre', () => {
     // Le site classe par { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 } :
     // une échelle à trous, où personne ne sait ce que vaudrait un 2. Une
     // liste de noms se lit, et s'étend en INSÉRANT un mot — ce que D115 a
     // fait, exactement là où sa raison le place.
-    expect(ORDRE).toEqual(['repondre', 'prendre', 'confirmer', 'noter']);
+    expect(ORDRE).toEqual(['repondre', 'prendre', 'remettre', 'confirmer', 'noter']);
   });
 
   it('PRENDRE EN CHARGE est entrée le jour où son écran est né (D115)', () => {
@@ -76,12 +80,34 @@ describe('① l’ordre est nommé, et il ne promet que l’existant', () => {
     expect(onglet).toContain("'/deal/[id]/pickup'");
   });
 
-  it('REMETTRE n’y est toujours PAS — son écran n’existe pas (D116)', () => {
-    // Ce n'est pas un oubli : c'est la même règle qui tient. Annoncer un
-    // geste dont l'écran n'existe pas recrée une porte vers rien.
-    expect(ORDRE).not.toContain('remettre');
+  it('REMETTRE est entrée à son tour, avec sa porte (D116)', () => {
+    // Deuxième fois que cette fiche change de camp en deux lots, sans
+    // qu'on ait eu besoin de s'en souvenir : une fiche qui refuse quelque
+    // chose doit dire à quelle condition elle changera d'avis.
+    expect(ORDRE).toContain('remettre');
     const regle = readFileSync(join(MOBILE, 'src/lib/carrefour.ts'), 'utf8');
-    expect(regle).not.toContain("'deliver'");
+    expect(regle).toContain("'deliver'");
+    const onglet = readFileSync(join(MOBILE, 'src/app/(tabs)/activity.tsx'), 'utf8');
+    expect(onglet).toContain("'/deal/[id]/deliver'");
+  });
+
+  it('une demande EN TRANSIT qu’on peut remettre attend quelque chose', () => {
+    const choses = choseQuiAttendent(
+      [],
+      [demande({ statut: 'PICKED_UP', expireLe: null, actions: ['deliver'] })]
+    );
+    expect(choses.map((c) => c.type)).toEqual(['remettre']);
+  });
+
+  it('remettre passe APRÈS prendre et AVANT confirmer', () => {
+    const choses = choseQuiAttendent(
+      [envoi({ id: 'a-confirmer', actions: ['confirmEarly'] })],
+      [
+        demande({ id: 'a-remettre', statut: 'PICKED_UP', expireLe: null, actions: ['deliver'] }),
+        demande({ id: 'a-prendre', statut: 'ACCEPTED', expireLe: null, actions: ['pickup'] }),
+      ]
+    );
+    expect(choses.map((c) => c.id)).toEqual(['a-prendre', 'a-remettre', 'a-confirmer']);
   });
 
   it('une demande ACCEPTÉE qu’on peut prendre en charge attend quelque chose', () => {

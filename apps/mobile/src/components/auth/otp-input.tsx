@@ -1,108 +1,50 @@
 /**
- * otp-input.tsx — la saisie du code à 6 chiffres (lot auth mobile).
- * =================================================================
- * Le motif natif : UN `TextInput` invisible porte toute la valeur (clavier
- * numérique, collage d'un code entier, remplissage automatique iOS
- * `oneTimeCode` / Android `sms-otp`), six cases l'AFFICHENT — toucher les
- * cases redonne le focus. Pas de gestion de focus case par case comme les
- * six `<input>` du web : c'est le champ unique qui rend le collage et
- * l'autofill natifs gratuits.
+ * otp-input.tsx — la saisie du code à 6 chiffres, côté AUTH.
+ * ===========================================================
+ * Depuis D116, ce fichier n'est plus que l'HABILLAGE auth de la primitive
+ * partagée `components/code-input.tsx` : il lui donne la palette « slate »
+ * des écrans d'auth (A208), le nom accessible du dictionnaire `auth`, et
+ * dit `autofill: true` — ici le code est REÇU (mail), donc le système a
+ * raison de le proposer.
+ *
+ * La remise d'un colis, elle, dit `autofill: false` : son code est DICTÉ par
+ * le destinataire (D43), et proposer un code SMS reçu pour autre chose
+ * serait une erreur devant quelqu'un qui attend.
+ *
+ * Ce qui reste ici : rien de géométrique. Deux jeux de cases à six chiffres
+ * dans une même app seraient une incohérence de charte (D105).
  */
-import { useRef } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-
 import { useTranslations } from 'use-intl';
 
-import { Brand, Spacing } from '@/constants/theme';
-import { Font } from '@/constants/typography';
-import { AuthRadius, useAuthPalette } from '@/components/auth/auth-theme';
+import { useAuthPalette } from '@/components/auth/auth-theme';
+import { CODE_LENGTH, CodeInput } from '@/components/code-input';
 
-export const OTP_LENGTH = 6;
+/** Conservé : trois écrans d'auth importent cette constante par ce nom. */
+export const OTP_LENGTH = CODE_LENGTH;
 
-type Props = {
+export function OtpInput({
+  value,
+  onChangeAction,
+  disabled = false,
+}: {
   value: string;
   onChangeAction: (digits: string) => void;
   disabled?: boolean;
-};
-
-export function OtpInput({ value, onChangeAction, disabled = false }: Props) {
+}) {
   const t = useTranslations('auth');
   const palette = useAuthPalette();
-  const input = useRef<TextInput>(null);
-
-  const onChange = (text: string) => {
-    onChangeAction(text.replace(/\D/g, '').slice(0, OTP_LENGTH));
-  };
 
   return (
-    <Pressable onPress={() => input.current?.focus()} disabled={disabled}>
-      <View style={styles.cells} pointerEvents="none">
-        {Array.from({ length: OTP_LENGTH }, (_, i) => {
-          const active = !disabled && value.length === i;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.cell,
-                { backgroundColor: palette.card, borderColor: palette.border },
-                active && styles.cellActive,
-                disabled && styles.cellDisabled,
-              ]}>
-              <Text style={[styles.digit, { color: palette.title }]}>{value[i] ?? ''}</Text>
-            </View>
-          );
-        })}
-      </View>
-      <TextInput
-        ref={input}
-        style={styles.hidden}
-        value={value}
-        onChangeText={onChange}
-        editable={!disabled}
-        accessibilityLabel={t('otp.enterCode')}
-        autoFocus
-        keyboardType="number-pad"
-        textContentType={Platform.OS === 'ios' ? 'oneTimeCode' : undefined}
-        autoComplete={Platform.OS === 'android' ? 'sms-otp' : undefined}
-        maxLength={OTP_LENGTH}
-        caretHidden
-      />
-    </Pressable>
+    <CodeInput
+      value={value}
+      onChangeAction={onChangeAction}
+      accessibilityLabel={t('otp.enterCode')}
+      palette={{ card: palette.card, border: palette.border, digit: palette.title }}
+      // Le code d'auth arrive par mail : le remplissage automatique est un
+      // geste économisé, pas un piège.
+      autofill
+      autoFocus
+      disabled={disabled}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  cells: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.two,
-  },
-  cell: {
-    width: 48,
-    height: 60,
-    borderRadius: AuthRadius,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  cellActive: {
-    borderColor: Brand.mango,
-  },
-  cellDisabled: {
-    opacity: 0.5,
-  },
-  digit: {
-    fontSize: 24,
-    // 600 : les chiffres restent nets sans devenir le centre de gravité de
-    // l'écran. Ce qui les désigne est la case et le focus, pas la graisse.
-    fontFamily: Font.semibold,
-  },
-  hidden: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 1,
-    height: 1,
-    opacity: 0,
-  },
-});

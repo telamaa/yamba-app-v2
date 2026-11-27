@@ -1,0 +1,59 @@
+{
+  "title": "Hand the parcel over",
+  "back": "Back",
+  "codeTitle": "The delivery code",
+  "codeWhy": "{name} received a six-digit code. Ask them to read it out.",
+  "codeWhyNoName": "The recipient received a six-digit code. Ask them to read it out.",
+  "codeLabel": "Six-digit delivery code",
+  "attemptsLeft": "{count, plural, one {# attempt left} other {# attempts left}}",
+  "lockedBody": "Too many attempts. Entry reopens in {countdown}.",
+  "wrongCode": "That is not the right code. Have it read out again, digit by digit.",
+  "wrongCodeNamed": "That is not the right code. Ask {name} to read it out again, digit by digit.",
+  "codeUnavailable": "This parcel has no code. Contact Yamba before handing it over.",
+  "dealChanged": "This booking has changed in the meantime. Go back to read it again.",
+  "call": "Call the recipient",
+  "callNamed": "Call {name}",
+  "photosTitle": "A photo of the hand-over?",
+  "photosWhy": "Optional, up to {max}. The code proves the hand-over; the photo proves the parcel's state.",
+  "takePhoto": "Take a photo",
+  "fromLibrary": "From the library",
+  "retry": "Try again",
+  "remove": "Remove",
+  "uploadErrors": {
+    "INVALID_TYPE": "Format not accepted — JPEG, PNG, HEIC or WebP.",
+    "TOO_LARGE": "Photo too heavy ({maxMb} MB maximum).",
+    "FAILED": "Upload failed. Tap the photo to try again."
+  },
+  "milestones": {
+    "title": "Where is the parcel?",
+    "why": "Optional: the Shipper follows their parcel while you travel.",
+    "steps": {
+      "AT_AIRPORT": "I am at the airport with the parcel",
+      "FLIGHT_DEPARTED": "The plane has taken off",
+      "FLIGHT_ARRIVED": "The plane has landed"
+    },
+    "confirm": "Confirm: {step}",
+    "allDone": "Everything is said. Only the hand-over is left.",
+    "failed": "That milestone did not go through. No harm done: you can still hand the parcel over."
+  },
+  "submit": "Confirm hand-over",
+  "missing": {
+    "code": "{count, plural, one {# digit missing} other {# digits missing}}",
+    "locked": "Entry locked — try again in {countdown}",
+    "televersement": "Uploading the photo…",
+    "echec": "One photo did not upload"
+  },
+  "doneTitle": "Parcel handed over",
+  "doneBody": "You are done. Your payment leaves after the Shipper's verification window.",
+  "doneBodyWithDate": "You are done. Your payment leaves on {date}, after the Shipper's verification window.",
+  "keep": "Go back",
+  "failed": "This action is not possible right now.",
+  "loadError": "This booking cannot be read right now.",
+  "wrongRole": "This booking is read from the Shipper's side.",
+  "notAllowedTitle": "Not yet, or no longer",
+  "notAllowedBody": "This parcel is not waiting to be handed over. Go back to the booking to see where it stands.",
+  "permissionCameraTitle": "Camera",
+  "permissionCameraBody": "Allow the camera to photograph the hand-over.",
+  "permissionLibraryTitle": "Photo library",
+  "permissionLibraryBody": "Allow access to your photos to pick one."
+}

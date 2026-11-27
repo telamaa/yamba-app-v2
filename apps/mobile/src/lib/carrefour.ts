@@ -15,10 +15,10 @@
  * écrans n'existaient pas, et les annoncer aurait recréé le défaut que les
  * trois lots précédents venaient de corriger — une porte vers rien.
  *
- * **D115 fait naître l'écran de la PRISE EN CHARGE, donc elle entre ici**,
- * exactement comme la fiche de D114 l'avait prévu. La REMISE reste dehors
- * jusqu'à ce que son écran existe (D116), et la fiche continue de la
- * refuser : ce n'est pas un oubli, c'est la même règle qui tient.
+ * **D115 fait naître l'écran de la PRISE EN CHARGE et D116 celui de la
+ * REMISE : toutes deux entrent ici**, exactement comme la fiche de D114
+ * l'avait prévu. La fiche a donc changé de camp deux fois en deux lots —
+ * c'est la seule forme de rappel qui survive à l'oubli.
  *
  * ── L'ORDRE EST NOMMÉ, PAS NUMÉROTÉ ─────────────────────────────────────
  * Le site classe par `{ RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 }` : une
@@ -32,7 +32,7 @@ import type { EnvoiDeLaListe } from '@/lib/mes-envois';
 import { actionMiseEnAvant } from '@/lib/mes-envois';
 
 /** Ce qu'il y a à faire, du plus pressant au moins pressant. */
-export type TypeDeChose = 'repondre' | 'prendre' | 'confirmer' | 'noter';
+export type TypeDeChose = 'repondre' | 'prendre' | 'remettre' | 'confirmer' | 'noter';
 
 /**
  * L'ordre de traitement, et sa raison :
@@ -41,15 +41,25 @@ export type TypeDeChose = 'repondre' | 'prendre' | 'confirmer' | 'noter';
  *   ② PRENDRE EN CHARGE — quelqu'un attend DEBOUT avec un colis, et le
  *     trajet part : c'est le seul geste de la liste qui ait un rendez-vous.
  *     Il passe donc devant tout ce qui peut se faire assis ;
- *   ③ CONFIRMER — l'argent du Voyageur est bloqué tant qu'on ne confirme
+ *   ③ REMETTRE — quelqu'un attend le colis, et rien n'avance avant ce
+ *     geste : il passe après PRENDRE (on ne remet pas ce qu'on n'a pas
+ *     pris) et avant CONFIRMER (qui, lui, se débloque seul) ;
+ *   ④ CONFIRMER — l'argent du Voyageur est bloqué tant qu'on ne confirme
  *     pas ; cela se débloque tout seul, mais plus tard ;
- *   ④ NOTER — personne n'attend après, c'est une dette de politesse.
+ *   ⑤ NOTER — personne n'attend après, c'est une dette de politesse.
  */
-export const ORDRE: readonly TypeDeChose[] = ['repondre', 'prendre', 'confirmer', 'noter'];
+export const ORDRE: readonly TypeDeChose[] = [
+  'repondre',
+  'prendre',
+  'remettre',
+  'confirmer',
+  'noter',
+];
 
 export type ChoseQuiAttend =
   | { type: 'repondre'; id: string; echeance: string | null; demande: DemandeDeLaListe }
   | { type: 'prendre'; id: string; echeance: string | null; demande: DemandeDeLaListe }
+  | { type: 'remettre'; id: string; echeance: string | null; demande: DemandeDeLaListe }
   | { type: 'confirmer'; id: string; echeance: string | null; envoi: EnvoiDeLaListe }
   | { type: 'noter'; id: string; echeance: string | null; envoi: EnvoiDeLaListe };
 
@@ -88,6 +98,11 @@ export function choseQuiAttendent(
     // (D100).
     if (peut(demande, 'pickup')) {
       choses.push({ type: 'prendre', id: demande.id, echeance: null, demande });
+    }
+    // La REMISE (D116). Même échéance absente, et pour la même raison : le
+    // rendez-vous d'arrivée n'arrive pas dans l'app sous forme d'instant.
+    if (peut(demande, 'deliver')) {
+      choses.push({ type: 'remettre', id: demande.id, echeance: null, demande });
     }
   }
 

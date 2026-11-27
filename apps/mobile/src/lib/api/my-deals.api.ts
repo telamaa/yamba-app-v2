@@ -106,3 +106,32 @@ export function refuserLaPriseEnCharge(
     body: raison === null ? {} : { reason: raison },
   });
 }
+
+/**
+ * Je remets le colis. Le code est comparé par bcrypt côté serveur (A38) :
+ * trois essais, puis quinze minutes de verrou ET le compteur remis à zéro.
+ *
+ * Elle JETTE, et c'est indispensable : `DELIVERY_CODE_INVALID` porte
+ * `details.attemptsLeft`, `DELIVERY_LOCKED` porte `details.lockedUntil`.
+ * Avaler l'exception laisserait le Voyageur devant un écran muet, debout.
+ *
+ * Les photos sont OPTIONNELLES (A76, deux au plus) : le code prouve la
+ * remise, la photo prouve l'état.
+ */
+export function remettre(
+  dealId: string,
+  corps: { code: string; photoUrls: string[] }
+): Promise<unknown> {
+  return apiFetch(`/deals/${dealId}/deliver`, { method: 'POST', body: corps });
+}
+
+/**
+ * Je confirme un jalon de transport (A39). Séquence STRICTE côté serveur :
+ * l'app n'envoie que le cran suivant (`lib/jalons.ts`), sinon le refus
+ * `TRACKING_STEP_NOT_ALLOWED` arrive sans que rien ne l'explique.
+ *
+ * Aucune transition d'état : le colis reste PICKED_UP.
+ */
+export function confirmerLeJalon(dealId: string, jalon: string): Promise<unknown> {
+  return apiFetch(`/deals/${dealId}/events`, { method: 'POST', body: { step: jalon } });
+}
