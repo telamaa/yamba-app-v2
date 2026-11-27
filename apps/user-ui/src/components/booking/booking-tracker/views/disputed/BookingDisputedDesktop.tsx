@@ -8,6 +8,7 @@ import type { Booking } from "@/components/booking/booking-tracker/booking-track
 import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
 import BookingCarrierCard from "../accepted/BookingCarrierCard";
 import { DisputeFileCard, DisputeProcessCard, DisputeSupportCard, DisputedBanner, DisputedPaymentCard } from "./DisputedCards";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   booking: Booking;
@@ -18,7 +19,7 @@ export default function BookingDisputedDesktop({ booking, onCloseAction }: Props
   const t = useTranslations("bookingTracker.disputed");
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         <BookingAcceptedHeader booking={booking} onBackAction={onCloseAction} variant="desktop" />
         <DisputedBanner booking={booking} />
 

@@ -1,9 +1,10 @@
 import { FileText, ShieldCheck } from "lucide-react";
-import type { CreateTripCopy, Draft, Step } from "../create-trip.types";
+import type { CreateTripCopy, Draft, Step, TripDocumentDraft } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
 import { CABIN_BAG_KG, CHECKED_BAG_KG, PARCEL_FAMILIES, estimateNetGain, isBagActive } from "../create-trip.config";
 import { formatEur } from "../TripPricingUi";
-import { ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
+import { FormField, FormInput, ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
+import DocumentUpload from "../DocumentUpload";
 import TripPublicPreview, { summarizeLocations } from "../TripPublicPreview";
 
 const MANGO = "#FF9900";
@@ -50,14 +51,35 @@ export default function StepReview({
                                      copy,
                                      isFr,
                                      draft,
+                                     setDraft,
                                      onGoTo,
                                    }: {
   copy: CreateTripCopy;
   isFr: boolean;
   draft: Draft;
+  /** D111 — la vérification ÉCRIT désormais : elle porte le billet. */
+  setDraft: React.Dispatch<React.SetStateAction<Draft>>;
   onGoTo: (step: Step) => void;
 }) {
   const categoryOptions = getCategoryOptions(isFr);
+
+  const refPlaceholder =
+    draft.transportMode === "plane"
+      ? "Ex. AF1234"
+      : draft.transportMode === "train"
+        ? "Ex. TGV 6231"
+        : "Ex. BL-7890";
+
+  const handleAddDocs = (docs: TripDocumentDraft[]) => {
+    setDraft((prev) => ({ ...prev, tripDocuments: [...prev.tripDocuments, ...docs] }));
+  };
+
+  const handleRemoveDoc = (id: string) => {
+    setDraft((prev) => ({
+      ...prev,
+      tripDocuments: prev.tripDocuments.filter((d) => d.id !== id),
+    }));
+  };
 
   const optionsList: string[] = [];
   if (draft.handDeliveryOnly) optionsList.push(copy.handOnly);
@@ -90,7 +112,12 @@ export default function StepReview({
       <ReviewCard
         label={copy.reviewMode}
         value={getTransportLabel(draft, copy)}
-        sub={draft.tripType === "roundTrip" ? copy.roundTrip : copy.oneWay}
+        // D111 — la sous-ligne disait « Aller simple » ou « Aller-retour ».
+        // Le choix a disparu de l'étape ① (il ne créait jamais de second
+        // trajet), donc cette ligne ne dirait plus qu'une seule chose, pour
+        // toujours. Une valeur qui ne peut pas varier n'informe personne :
+        // `getTransportLabel` porte déjà le mode ET son type (vol direct,
+        // avec escale…), qui eux changent.
         onEdit={() => onGoTo(1)}
         editLabel={copy.edit}
       />
@@ -312,6 +339,43 @@ export default function StepReview({
           editLabel={copy.edit}
         />
       )}
+
+      {/* D111 — LE BILLET, remonté de l'étape ① jusqu'ici.
+          Il y vivait replié, facultatif, en bas d'un écran déjà long, alors
+          qu'il débloque le badge « Voyage vérifié » — donc des réservations.
+          Ici, il est à côté du bouton « Publier », au moment où le Voyageur
+          est déjà engagé : c'est là qu'une pièce justificative se fournit. */}
+      <div className="mt-6">
+        <SectionLabel first>
+          {isFr ? "Ton billet" : "Your ticket"}{" "}
+          <span className="font-normal text-slate-400 dark:text-slate-500">
+            · {isFr ? "facultatif" : "optional"}
+          </span>
+        </SectionLabel>
+        <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-0">
+          <FormField label={copy.travelReference}>
+            <FormInput
+              value={draft.travelReference}
+              onChange={(v: string) => setDraft((prev) => ({ ...prev, travelReference: v }))}
+              placeholder={refPlaceholder}
+            />
+          </FormField>
+
+          <DocumentUpload
+            documents={draft.tripDocuments}
+            onAddAction={handleAddDocs}
+            onRemoveAction={handleRemoveDoc}
+            label={copy.docUpload}
+            hint={copy.docUploadSub}
+            limitHint={copy.docLimitReached(5)}
+          />
+        </div>
+        <p className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">
+          {isFr
+            ? "Il débloque le badge « Voyage vérifié »."
+            : "It unlocks the “Verified trip” badge."}
+        </p>
+      </div>
     </div>
   );
 }

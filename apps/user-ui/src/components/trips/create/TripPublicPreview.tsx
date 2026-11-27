@@ -13,6 +13,7 @@ import type {
 import { getCategoryOptions } from "./create-trip.copy";
 import { PARCEL_FAMILIES } from "./create-trip.config";
 import { formatEur } from "./TripPricingUi";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 const MANGO = "#FF9900";
 const TEAL = "#0F766E";
@@ -173,7 +174,7 @@ export default function TripPublicPreview({
   const dateLabel = formatPreviewDate(draft.departureDate, isFr);
   const hasRating = !!(carrierPage?.ratingsCount && carrierPage.ratingsCount > 0);
   const ratingText = hasRating
-    ? `${(carrierPage!.ratingsAvg ?? 0).toFixed(1)} (${carrierPage!.ratingsCount})`
+    ? `${formatRating(carrierPage!.ratingsAvg ?? 0, intlTagFor(isFr ? "fr" : "en"))} (${carrierPage!.ratingsCount})`
     : null;
 
   const route =

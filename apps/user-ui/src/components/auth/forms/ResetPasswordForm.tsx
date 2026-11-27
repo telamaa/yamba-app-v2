@@ -50,6 +50,7 @@ import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 import { useToast } from "@/components/ui/Toast";
 import PasswordStrengthIndicator from "@/components/auth/shared/PasswordStrengthIndicator";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   heroVisual: HeroVisual;
@@ -189,15 +190,29 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
   // ── Pendant l'hydratation : la forme de l'écran, sans son contenu ──
   if (!hydrated) {
     return (
-      <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-        {colonneGauche}
-        <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
-          <div className="w-full max-w-[400px] animate-pulse">
-            <div className="h-8 w-64 rounded bg-slate-200 dark:bg-slate-800" />
-            <div className="mt-2 h-4 w-72 rounded bg-slate-200 dark:bg-slate-800" />
-            <div className="mt-6 h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />
-            <div className="mt-4 h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />
-          </div>
+      <main className={conteneurDePage()}>
+        {/* D110 — la largeur et la gouttière viennent de `conteneurDePage()` :
+          elles sont celles de l'en-tête, et elles n'ont qu'un domicile. D92
+          avait posé la règle sur l'INSCRIPTION le 10/11 en RECOPIANT la
+          classe ; les sept écrans jumeaux sont restés désalignés onze jours,
+          parce qu'une classe recopiée ne dit à personne qu'elle est une
+          règle. La raison, elle, n'a pas changé : bord à bord, le logo et les
+          contrôles de droite seraient les deux seuls éléments à respecter une
+          marge, et la colonne de gauche toucherait le bord d'un grand
+          moniteur.
+
+          Les TROIS états de cet écran portent le même conteneur : n'en
+          aligner qu'un ferait sauter la page d'un état à l'autre. */}
+        <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+          {colonneGauche}
+          <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
+            <div className="w-full max-w-[400px] animate-pulse">
+              <div className="h-8 w-64 rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="mt-2 h-4 w-72 rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="mt-6 h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />
+              <div className="mt-4 h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />
+            </div>
+        </div>
         </div>
       </main>
     );
@@ -206,128 +221,134 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
   // ── L'étape a expiré : on ne laisse personne devant un formulaire mort ──
   if (sessionExpired) {
     return (
-      <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-        {colonneGauche}
-        <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
-          <div className="w-full max-w-[400px] text-center">
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-              {t("sessionExpiredTitle")}
-            </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("sessionExpired")}</p>
-            <Link
-              href="/password/forgot"
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm hover:bg-[#F08700] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
-            >
-              {t("restart")}
-            </Link>
-            {retourConnexion}
-          </div>
+      <main className={conteneurDePage()}>
+        {/* Même conteneur que l'état précédent — voir plus haut. */}
+        <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+          {colonneGauche}
+          <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
+            <div className="w-full max-w-[400px] text-center">
+              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                {t("sessionExpiredTitle")}
+              </h1>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("sessionExpired")}</p>
+              <Link
+                href="/password/forgot"
+                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm hover:bg-[#F08700] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
+              >
+                {t("restart")}
+              </Link>
+              {retourConnexion}
+            </div>
+        </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-      {colonneGauche}
+    <main className={conteneurDePage()}>
+      {/* Même conteneur que l'état précédent — voir plus haut. */}
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+        {colonneGauche}
 
-      <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
-        <div className="w-full max-w-[400px]">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
-            {t("title")}
-          </h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("subtitle")}</p>
+        <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
+          <div className="w-full max-w-[400px]">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
+              {t("title")}
+            </h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("subtitle")}</p>
 
-          {/* L'adresse EN CLAIR (D92 2A) : c'est celle qu'on vient de saisir,
-              et elle dit POUR QUEL compte on change le mot de passe. */}
-          {resetEmail && (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {t("forAccount")}
-              </p>
-              <p className="mt-0.5 break-all font-mono text-sm text-slate-900 dark:text-white">
-                {resetEmail}
-              </p>
-            </div>
-          )}
-
-          <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
-            <div className="relative">
-              <label
-                htmlFor="new-password"
-                className="block text-xs font-semibold text-slate-700 dark:text-slate-200"
-              >
-                {t("passwordLabel")}
-              </label>
-              <div className="relative mt-1.5">
-                <input
-                  id="new-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  autoFocus
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setServerError(null);
-                  }}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => setIsPasswordFocused(false)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-[#FFAE33]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? t("hidePassword") : t("showPassword")}
-                  aria-pressed={showPassword}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-
-              <PasswordStrengthIndicator
-                password={password}
-                context={passwordContext}
-                isFocused={isPasswordFocused}
-                copy={passwordStrengthCopy}
-                onCloseAction={() => setIsPasswordFocused(false)}
-              />
-            </div>
-
-            {serverError && (
-              <div
-                role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
-              >
-                {serverError}
+            {/* L'adresse EN CLAIR (D92 2A) : c'est celle qu'on vient de saisir,
+                et elle dit POUR QUEL compte on change le mot de passe. */}
+            {resetEmail && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t("forAccount")}
+                </p>
+                <p className="mt-0.5 break-all font-mono text-sm text-slate-900 dark:text-white">
+                  {resetEmail}
+                </p>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={resetPasswordMutation.isPending}
-              aria-busy={resetPasswordMutation.isPending}
-              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
-            >
-              {/* La vague de trois points PREND la place du libellé (arbitrage à l'écran du
-                  13/11/2026). Le bouton ne change pas de taille pour autant : il est en
-                  pleine largeur et sa hauteur vient de son padding.
-                  Le `sr-only` garde le NOM du bouton pour un lecteur d'écran — sans lui, le
-                  bouton devient anonyme pendant toute l'attente, et c'est le seul coût réel
-                  de cette disposition. */}
-              {resetPasswordMutation.isPending ? (
-                <>
-                  <LoadingDots />
-                  <span className="sr-only">{t("submit")}</span>
-                </>
-              ) : (
-                t("submit")
-              )}
-            </button>
+            <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
+              <div className="relative">
+                <label
+                  htmlFor="new-password"
+                  className="block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  {t("passwordLabel")}
+                </label>
+                <div className="relative mt-1.5">
+                  <input
+                    id="new-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    autoFocus
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setServerError(null);
+                    }}
+                    onFocus={() => setIsPasswordFocused(true)}
+                    onBlur={() => setIsPasswordFocused(false)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-[#FFAE33]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                    aria-pressed={showPassword}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
 
-            <div className="pt-2 text-center">{retourConnexion}</div>
-          </form>
-        </div>
+                <PasswordStrengthIndicator
+                  password={password}
+                  context={passwordContext}
+                  isFocused={isPasswordFocused}
+                  copy={passwordStrengthCopy}
+                  onCloseAction={() => setIsPasswordFocused(false)}
+                />
+              </div>
+
+              {serverError && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+                >
+                  {serverError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={resetPasswordMutation.isPending}
+                aria-busy={resetPasswordMutation.isPending}
+                className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
+              >
+                {/* La vague de trois points PREND la place du libellé (arbitrage à l'écran du
+                    13/11/2026). Le bouton ne change pas de taille pour autant : il est en
+                    pleine largeur et sa hauteur vient de son padding.
+                    Le `sr-only` garde le NOM du bouton pour un lecteur d'écran — sans lui, le
+                    bouton devient anonyme pendant toute l'attente, et c'est le seul coût réel
+                    de cette disposition. */}
+                {resetPasswordMutation.isPending ? (
+                  <>
+                    <LoadingDots />
+                    <span className="sr-only">{t("submit")}</span>
+                  </>
+                ) : (
+                  t("submit")
+                )}
+              </button>
+
+              <div className="pt-2 text-center">{retourConnexion}</div>
+            </form>
+          </div>
+      </div>
       </div>
     </main>
   );

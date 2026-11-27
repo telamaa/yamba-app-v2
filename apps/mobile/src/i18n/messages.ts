@@ -13,6 +13,8 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 import authEn from '../../messages/en/auth.json';
 import bookingEn from '../../messages/en/booking.json';
 import favoritesEn from '../../messages/en/favorites.json';
+import myTripsEn from '../../messages/en/myTrips.json';
+import publishEn from '../../messages/en/publish.json';
 import searchEn from '../../messages/en/search.json';
 import shipmentEn from '../../messages/en/shipment.json';
 import tabsEn from '../../messages/en/tabs.json';
@@ -21,6 +23,8 @@ import welcomeEn from '../../messages/en/welcome.json';
 import authFr from '../../messages/fr/auth.json';
 import bookingFr from '../../messages/fr/booking.json';
 import favoritesFr from '../../messages/fr/favorites.json';
+import myTripsFr from '../../messages/fr/myTrips.json';
+import publishFr from '../../messages/fr/publish.json';
 import searchFr from '../../messages/fr/search.json';
 import shipmentFr from '../../messages/fr/shipment.json';
 import tabsFr from '../../messages/fr/tabs.json';
@@ -32,6 +36,8 @@ export const MESSAGES = {
     auth: authFr,
     booking: bookingFr,
     favorites: favoritesFr,
+    myTrips: myTripsFr,
+    publish: publishFr,
     search: searchFr,
     shipment: shipmentFr,
     tabs: tabsFr,
@@ -42,6 +48,8 @@ export const MESSAGES = {
     auth: authEn,
     booking: bookingEn,
     favorites: favoritesEn,
+    myTrips: myTripsEn,
+    publish: publishEn,
     search: searchEn,
     shipment: shipmentEn,
     tabs: tabsEn,

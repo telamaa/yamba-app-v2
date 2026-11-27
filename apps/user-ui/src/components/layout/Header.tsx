@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { loginHrefFor } from "@/lib/auth/login-redirect";
 import { tunnelModeFor } from "@/lib/layout/tunnel";
+import { rangeeDEnTete } from "@/lib/layout/largeur-de-page";
 import CommandPalette, { type CommandAction } from "./CommandPalette";
 import HeaderLogo from "./header/HeaderLogo";
 import HeaderLocaleSwitcher from "./header/HeaderLocaleSwitcher";
@@ -108,9 +109,7 @@ export default function Header() {
           style={{ zIndex: HEADER_Z_INDEX }}
         >
           <div
-            className={`mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4 transition-all ${
-              isCompact ? "py-2" : "py-3"
-            }`}
+            className={rangeeDEnTete(isCompact)}
           >
             <div className="hidden md:flex">
               <HeaderLogo compact={isCompact} mobile={false} />

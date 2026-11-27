@@ -27,6 +27,21 @@ export type CitySuggestion = {
   main: string;
   /** Le contexte (« France », « Texas, États-Unis ») — affiché en second. */
   secondary: string;
+  /**
+   * L'identifiant Google du lieu (D111 ter), vide quand Google n'en donne
+   * pas. C'est lui qui ouvre `GET /places/details`, donc le code pays, donc
+   * le corridor, donc la fourchette de prix.
+   */
+  placeId: string;
+};
+
+/** Ce que rend `GET /places/details` — tout est nullable sauf la ville. */
+export type CityDetails = {
+  city: string;
+  country: string | null;
+  countryCode: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 /** `unavailable` : réseau coupé, relais muet, ou Google en refus. */
@@ -64,24 +79,42 @@ export async function suggestCities(
 }
 
 /**
- * « Paris » + « France » → « Paris, France ». Le libellé NORMALISÉ que le
- * serveur attend : `placeSearchTerm` (trip-service) ne garde que le premier
- * segment avant la virgule, le pays n'est qu'une aide à la lecture
- * (WEB-ACC-9 — sans cette règle, toute ville étrangère choisie dans la
- * liste rendait zéro résultat).
+ * Le détail d'une ville CHOISIE — pays, code pays, coordonnées.
  *
- * Le contexte de Google peut porter plusieurs segments (« Route de
- * l'Aéroport, Tillé ») : seul le DERNIER est un pays, c'est la règle du
- * site. Divergence assumée : le site replie sur « France » quand le pays
- * est omis (son SDK est chargé avec `region=FR`) ; notre relais n'a pas ce
- * biais, un contexte vide reste donc vide plutôt que d'inventer un pays.
+ * Appelé une seule fois, au moment du choix, avec le MÊME jeton de session
+ * que l'autocomplétion qui l'a précédé : Google facture alors l'ensemble
+ * comme une seule session.
+ *
+ * Rend `null` pour tout échec (service muet, identifiant inconnu, réseau
+ * coupé) : la fourchette de prix est un CONFORT. Sans elle, le tunnel
+ * continue avec la base de repli — il ne s'arrête jamais pour ça.
  */
-export function placeLabel(suggestion: CitySuggestion): string {
-  const country = suggestion.secondary
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .pop();
-  if (!country || country === suggestion.main) return suggestion.main;
-  return `${suggestion.main}, ${country}`;
+export async function fetchPlaceDetails(
+  placeId: string,
+  locale: string,
+  sessionToken: string
+): Promise<CityDetails | null> {
+  if (placeId.trim().length === 0) return null;
+  const query = new URLSearchParams({ placeId, language: locale, sessionToken });
+  try {
+    return await apiFetch<CityDetails>(`/places/details?${query.toString()}`, {
+      requireAuth: false,
+    });
+  } catch (error) {
+    if (__DEV__) {
+      const detail =
+        error instanceof ApiError ? `${error.status} ${error.code ?? ''}` : String(error);
+      console.warn('[places] détail indisponible :', detail);
+    }
+    return null;
+  }
 }
+
+/**
+ * La lecture d'une suggestion (libellé normalisé, pays) vit dans un module
+ * PUR — `lib/place-label.ts` —, parce qu'une règle qui décide de ce que le
+ * serveur reçoit doit être vérifiable par une fiche, et que ce fichier-ci
+ * est inatteignable depuis le harnais (il tire `expo-constants`). Réexporté
+ * ici pour ses appelants : la règle n'a qu'un domicile, pas deux.
+ */
+export { placeCountry, placeLabel } from '@/lib/place-label';

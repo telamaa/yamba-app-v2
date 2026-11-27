@@ -11,9 +11,10 @@
 "use client";
 
 import { MessageSquare, User } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import { useOpenDealThread } from "@/hooks/useMessaging";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   booking: Booking;
@@ -22,6 +23,7 @@ type Props = {
 
 export default function BookingCarrierCard({ booking, compact = false }: Props) {
   const t = useTranslations("bookingTracker");
+  const locale = useLocale();
 
   const carrierFirstName = booking.carrier.firstName;
   const carrierFullName = `${booking.carrier.firstName} ${booking.carrier.lastInitial}.`;
@@ -30,7 +32,7 @@ export default function BookingCarrierCard({ booking, compact = false }: Props) 
   // ne les sert pas, on n'invente jamais un 0 étoile.
   const ratingFormatted =
     booking.carrier.rating !== undefined
-      ? booking.carrier.rating.toFixed(1)
+      ? formatRating(booking.carrier.rating, intlTagFor(locale))
       : null;
 
   const thread = useOpenDealThread();

@@ -9,6 +9,7 @@ import HeaderThemeToggle from "./header/HeaderThemeToggle";
 import HeaderShareTripCTA from "./header/HeaderShareTripCTA";
 import { HEADER_Z_INDEX } from "./header/header.constants";
 import type { TunnelMode } from "@/lib/layout/tunnel";
+import { rangeeDEnTete } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   isCompact?: boolean;
@@ -62,9 +63,7 @@ export default function HeaderSkeleton({
       style={{ zIndex: HEADER_Z_INDEX }}
     >
       <div
-        className={`mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4 transition-all ${
-          isCompact ? "py-2" : "py-3"
-        }`}
+        className={rangeeDEnTete(isCompact)}
       >
         <div className="hidden md:flex">
           <HeaderLogo compact={isCompact} mobile={false} />

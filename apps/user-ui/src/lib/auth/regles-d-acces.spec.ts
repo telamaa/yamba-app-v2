@@ -13,6 +13,12 @@ import {
   getPasswordScore,
   isPasswordValid,
 } from "@/lib/auth/password-strength";
+import {
+  bookingRedirectFor,
+  loginHrefFor,
+  registerHrefFor,
+  shouldCarryRedirect,
+} from "@/lib/auth/login-redirect";
 import { webmailUrl } from "@/lib/auth/webmail";
 import {
   HELP_AFTER_SECONDS,
@@ -170,5 +176,44 @@ describe("le code à usage unique — ce que l’écran montre, et quand", () =>
 
   it("un compteur négatif vaut « disponible », pas une quatrième phase", () => {
     expect(resendPhase(-5)).toBe("ready");
+  });
+});
+
+describe("login-redirect — où l’on revient après s’être connecté", () => {
+  it("le chemin courant est transmis", () => {
+    expect(loginHrefFor("/trips/abc")).toContain("redirect=");
+    expect(registerHrefFor("/dashboard")).toContain("redirect=");
+  });
+
+  it("l’accueil NE l’est pas — c’est déjà le retour par défaut", () => {
+    expect(loginHrefFor("/")).toBe("/login");
+    expect(shouldCarryRedirect("/")).toBe(false);
+  });
+
+  it("les pages d’auth ne se transmettent JAMAIS — ce serait une boucle", () => {
+    // D93 : ce fichier tenait sa propre copie de la liste
+    // (`NO_REDIRECT_PREFIXES`) et les deux avaient divergé — `/refresh`
+    // manquait, donc le header proposait d'y revenir après connexion. La
+    // liste vit désormais dans `layout/tunnel.ts`, UNE fois.
+    for (const chemin of ["/login", "/register", "/password", "/refresh"]) {
+      expect(shouldCarryRedirect(chemin)).toBe(false);
+      expect(loginHrefFor(chemin)).toBe("/login");
+    }
+  });
+
+  it("une sous-page d’auth non plus", () => {
+    expect(shouldCarryRedirect("/register/verify")).toBe(false);
+  });
+
+  it("un chemin absent ne transmet rien, et ne lève pas", () => {
+    expect(loginHrefFor(null)).toBe("/login");
+    expect(loginHrefFor(undefined)).toBe("/login");
+    expect(registerHrefFor("")).toBe("/register");
+  });
+
+  it("la porte de réservation ramène DANS le tunnel, pas devant", () => {
+    // L'intention était de réserver : revenir sur la page du trajet
+    // obligerait à recommencer le geste.
+    expect(bookingRedirectFor("abc123")).toBe("/trips/abc123/book");
   });
 });

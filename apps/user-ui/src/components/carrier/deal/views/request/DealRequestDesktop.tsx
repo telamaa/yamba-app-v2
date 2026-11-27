@@ -32,6 +32,7 @@ import DealCoverageCard from "./DealCoverageCard";
 import DealDeclineModal from "./DealDeclineModal";
 import DealEarningsBreakdown from "./DealEarningsBreakdown";
 import DealExpiryBanner from "./DealExpiryBanner";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   deal: DealRequest;
@@ -98,7 +99,7 @@ export default function DealRequestDesktop({
   return (
     <>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+        <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
           {/* Lien retour discret — un seul */}
           <button
             type="button"

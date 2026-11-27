@@ -10058,3 +10058,1664 @@ un nom de fournisseur. La confusion parfaite, et elle passerait toutes les revue
 
 > **Toute table de liens sortants mérite une fiche qui vérifie leur forme**, pas seulement leur
 > présence.
+
+---
+
+# Chapitre 251 — Recenser ce qui manque (A224 lot 5)
+
+## 1. Le problème que ce chapitre résout
+
+A224 est née d'un constat simple et dérangeant : **personne n'avait jamais signalé que le site
+n'avait pas de tests.** Pas un ticket, pas une alerte, pas une ligne de log. Ce qui manque ne
+produit aucun symptôme.
+
+Il a fallu cinq lots pour traiter cette dette, et elle a été rappelée à l'ouverture de chacun sans
+jamais l'être.
+
+Le même aveuglement guette la suite d'un harnais tout neuf : on couvre quinze fichiers, on
+s'arrête, et le seizième arrive sans que rien ne le dise.
+
+## 2. Une fiche qui recense, pas qui mesure
+
+```ts
+const oublies = modules()
+  .filter((f) => !FRAMEWORK.test(lire(f)))   // pas un module de framework
+  .filter((f) => !sansExecution(f))           // pas un fichier de types
+  .filter((rel) => !couverts.has(rel))        // pas déjà importé par une fiche
+  .filter((rel) => !(rel in EXCEPTIONS));     // pas nommé comme exception
+
+expect(oublies).toEqual([]);
+```
+
+**Ce n'est pas une mesure de couverture.** Une couverture de lignes répond à « quelle proportion
+du code est exécutée » ; ce recensement répond à « **quel module n'est vu par personne** ». Les
+deux questions sont différentes, et c'est la seconde qui a coûté cinq lots.
+
+Un seuil de couverture à 80 % est d'ailleurs silencieux sur le fichier entier qu'on vient
+d'ajouter : il se dilue dans la moyenne. Une liste d'oubliés, non.
+
+## 3. La liste d'exceptions est le cœur du dispositif
+
+```ts
+const EXCEPTIONS: Record<string, string> = {
+  "googleMaps.ts": "charge un script externe — aucun calcul à vérifier",
+  "api.ts": "enveloppe de `fetch` — pas de règle propre",
+  // …
+};
+```
+
+Deux détails font toute la différence :
+
+- **la raison est obligatoire**, et une fiche vérifie qu'elle fait plus de vingt caractères. Une
+  exception sans raison est un oubli déguisé ;
+- **une exception qui nomme un fichier disparu part au rouge.** Sinon elle survit à son objet et
+  devient un mensonge silencieux — exactement le genre de ligne qu'on relit dix fois sans la voir.
+
+> **Transformez l'oubli en décision.** Ajouter une ligne à cette liste demande d'écrire pourquoi ;
+> ne rien faire fait échouer la CI. Les deux chemins sont explicites, et c'est tout l'objet.
+
+## 4. Garder le garde
+
+```ts
+it("il trouve des modules — sinon il est vert pour rien", () => {
+  expect(modules().length).toBeGreaterThanOrEqual(20);
+});
+```
+
+Un balayage qui ne balaie rien passe toutes ses assertions. On l'a vu au chapitre 246 avec la
+porte d'identité ; la règle vaut pour tout outil d'inventaire :
+
+> **Toute fiche qui compte doit prouver qu'elle a compté.**
+
+## 5. Et l'outil anti-oubli contenait lui-même un oubli
+
+```ts
+/from "@\/lib\/([^"]+)"/g        // guillemets DOUBLES seulement
+```
+
+Sept modules parfaitement couverts — par des fiches écrites avec des guillemets **simples** —
+étaient déclarés « oubliés ».
+
+C'est la **cinquième** occurrence du même piège ce mois-ci (D98 `ActivityIndicator`, D100
+`cursor-not-allowed`, D102 les libellés, A224 lot 1 `jsdom`, et celle-ci). Elle est la plus
+instructive des cinq, parce que le piège était **dans l'outil censé détecter les oublis**.
+
+> **On vise l'usage, jamais une orthographe.** Et quand vous écrivez un détecteur, demandez-vous
+> d'abord : *qu'est-ce qu'il ne verra pas ?*
+
+Une fiche de recensement qui trouve des faux positifs est inconfortable mais récupérable ; une qui
+trouve des faux **négatifs** est pire qu'absente, parce qu'elle rassure.
+
+## 6. Ce que le recensement a trouvé dès sa première exécution
+
+`auth/login-redirect.ts` — il décide **d'où l'on revient après connexion**, et personne ne
+l'avait couvert. Les pages d'auth ne doivent jamais s'y transmettre, et `/refresh` en fait partie :
+c'est l'oubli de D93, qui avait coûté 27 jours.
+
+Un recenseur gagne sa place le jour où il est écrit.
+
+---
+
+# Chapitre 252 — J'ai écrit la leçon, puis je l'ai enfreinte (D107)
+
+## 1. Les faits, sans arrangement
+
+**Chapitre 244**, écrit trois lots plus tôt, premier paragraphe :
+
+> « Une cause plausible n'est pas une cause. […] Deux écrans au code identique et un résultat
+> différent : la cause n'est pas dans le code comparé. »
+
+Ce chapitre racontait le diagnostic d'un en-tête qui chevauchait la barre d'état. La conclusion —
+un `SafeAreaProvider` absent pour vingt-cinq consommateurs — était **juste comme constat** et
+**fausse comme cause** : le symptôme a persisté après la correction, et l'utilisateur l'a signalé
+avec une capture horodatée.
+
+Je n'ai pas appliqué ma propre leçon. Et le mécanisme de l'erreur mérite d'être nommé, parce qu'il
+n'est pas celui qu'on croit.
+
+## 2. Ce n'était pas un défaut d'analyse
+
+Le diagnostic de D103 était **mieux instruit que la moyenne** : une comparaison de deux fichiers
+identiques, une commande qui révèle un fournisseur absent pour vingt-cinq consommateurs, une
+explication cohérente du mécanisme. Rien à redire à la démarche.
+
+**Ce qui manquait n'était pas une idée, c'était un regard.**
+
+> Une correction d'interface non vue n'est pas une correction : c'est une **hypothèse déployée**.
+
+J'ai écrit « non vérifié — `simctl` ne sait pas toucher l'écran » dans trois lots consécutifs,
+sans en tirer la conséquence : tant que personne ne regarde, le lot n'est pas fini. L'honnêteté
+sur la limite ne remplace pas le franchissement de la limite.
+
+## 3. La contre-mesure n'est pas « mieux diagnostiquer »
+
+Quand un symptôme est **coûteux** (ici : un titre illisible, donc une information perdue) et que
+sa cause dépend d'une **mesure** (un inset, une taille d'écran, un temps de rendu), la bonne
+réponse n'est pas de mieux comprendre la mesure. C'est de **ne plus en dépendre** :
+
+```ts
+return Math.max(sain(insetMesure), sain(hauteurDeBarre));
+```
+
+Deux sources indépendantes, et chacune traitée comme faillible — zéro, négatif, `NaN`, absent.
+
+> **Redondance plutôt que compréhension**, quand le coût de l'échec est supérieur au coût de la
+> redondance. Ici la redondance coûte six lignes.
+
+Notez ce qu'on n'a **pas** fait : écrire `Math.max(inset, 44)`. Un plancher fixe serait faux sur
+la moitié du parc (20 pt sur un iPhone SE, 59 sur un appareil à Dynamic Island). **Une
+redondance doit rester juste, pas seulement sûre** — d'où une seconde source réelle plutôt qu'une
+constante, et une fiche qui interdit le nombre.
+
+## 4. Et la limite est tombée
+
+`simctl` ne sait pas toucher l'écran. Il sait **naviguer** :
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/search/city?target=from"
+```
+
+Avec un détail qui change tout : envoyé **au démarrage**, le lien est écrasé par la redirection
+d'accueil de l'application. Envoyé **pendant que l'app tourne déjà**, il navigue.
+
+C'est ainsi que ce correctif-ci a été **vu** — le premier de la journée.
+
+> **Quand un outil vous bloque, cherchez ce qu'il sait faire d'autre.** Pendant toute une journée
+> j'ai écrit « je ne peux pas vérifier » là où la bonne phrase était « je n'ai pas cherché assez
+> longtemps comment vérifier ».
+
+## 5. Ce qui reste ouvert, et pourquoi c'est acceptable
+
+La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Le lot la contourne.
+
+C'est un choix défendable — le plancher protège quelle que soit la réponse, et il ne coûte rien —
+**à condition de l'écrire**. Une cause non trouvée qui n'est pas consignée devient une cause
+oubliée, et le prochain symptôme du même mécanisme repartira de zéro.
+
+# Chapitre 253 — Où est-ce déjà corrigé ? (D108)
+
+## Le point de départ : deux lignes qui ne s'accordent pas
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Une virgule, un point, le même bloc, interface française. Le réflexe est de corriger la ligne du
+poids. Le bon réflexe est de demander **pourquoi les deux ne suivent pas la même règle**.
+
+## 1. La théorie : ICU et l'argument simple
+
+ICU MessageFormat distingue l'argument **simple** `{x}` de l'argument **typé** `{x, number}`.
+L'intuition dit que le premier, recevant un nombre, le mettra en forme. Faux :
+
+```js
+new IntlMessageFormat('pour {kg} kg', 'fr').format({ kg: 2.3 })  // « pour 2.3 kg »
+new IntlMessageFormat('pour {kg} kg', 'en').format({ kg: 2.3 })  // « pour 2.3 kg »
+```
+
+L'argument simple fait `String(value)`. `String(2.3)` vaut `"2.3"` — la représentation JavaScript
+d'un nombre, qui n'a **aucune langue**. Seul `{kg, number}` passe par `Intl.NumberFormat`.
+
+Retenir la forme : **annoncer le type, c'est demander la mise en forme.**
+
+## 2. Pourquoi vingt contrôles n'ont rien vu
+
+C'est la partie instructive, et elle se généralise.
+
+- **`tsc`** : un gabarit i18n est une chaîne. `"pour {kg} kg"` et `"pour {kg, number} kg"` se
+  typent identiquement. Le compilateur n'a aucune prise sur le contenu d'une chaîne.
+- **Le contrôle i18n** compare FR et EN **entre eux** : mêmes clés, même arborescence. Les deux
+  étaient faux de la même manière, donc le miroir était parfait.
+- **Les six fiches de parité** comparent des règles, des clés, des seuils, un ordre. Aucune ne
+  **rend** une phrase.
+
+Leçon transposable : **un contrôle ne voit que la dimension qu'il compare.** Trois contrôles sains
+peuvent laisser passer un défaut qui vit dans une quatrième dimension — ici le RENDU.
+
+## 3. La question qui fait gagner une heure
+
+La bonne version existait **déjà**, trois fois, à quelques lignes de la mauvaise :
+
+| Où | Quoi |
+|---|---|
+| `booking.json`, les deux fronts | `{kg, number}`, sept clés |
+| `parcel-weight.ts` | `formatParcelKg`, avec la leçon de D101 **dans son commentaire** |
+| `trip-result-card.tsx` (mobile) | un `formatRating` local, correct |
+
+Pendant ce temps, dix-neuf autres endroits se débrouillaient.
+
+C'est la troisième fois en une semaine (A224 lot 3 pour `formatExpiresIn`, lot 4 pour
+`getInitials`). La règle s'énonce ainsi :
+
+> **Devant une classe de défaut, la première question n'est pas « comment corriger »
+> mais « où est-ce déjà corrigé ».**
+
+Elle a deux vertus. Elle donne la solution gratuitement. Et elle donne le **nombre de copies**, qui
+est la vraie mesure du travail : ici 20, pas 1.
+
+Corollaire, déjà écrit par A224 lot 4 : « grep ton jumeau » contient un singulier trompeur. On ne
+cherche pas **le** jumeau, on **compte** les copies — et c'est une fiche qui compte, parce qu'elle
+ne suppose rien.
+
+## 4. Un contre-test vert est un contre-test qui n'a pas tourné
+
+La discipline : après avoir écrit un garde-fou, **le casser exprès** et vérifier qu'il rougit.
+
+Fait ici — une clé du site remise en `{kg}` nu — et le résultat fut :
+
+```
+Tests:  13 passed, 13 total      ← nx test @yamba-app/mobile
+Tests:  2 failed, 11 passed      ← npx jest, même instant, même code
+```
+
+La fiche était bonne. C'est **le cache Nx** qui rejouait un résultat enregistré. Pourquoi : les
+fiches de parité lisent l'autre front avec `readFileSync`, et `readFileSync` est **invisible au
+graphe de dépendances**. Les fichiers de `user-ui` ne sont donc pas des *entrées* du projet mobile,
+et les modifier n'invalide rien.
+
+Ce que cela vaut pour tout le dépôt : les **six** fiches de parité peuvent rester vertes sur une
+régression de l'autre front, en local.
+
+> **Un contre-test qui ne rougit pas n'a rien prouvé sur la règle. Il a prouvé que rien n'a
+> tourné.** Avant de conclure, demandez-vous toujours si le test a seulement été exécuté.
+
+## 5. Viser l'usage, pas l'orthographe
+
+Deux fois dans le même lot :
+
+- Le balayage « aucune note mise en forme à la main » a mordu sur le **commentaire** de
+  `number-format.ts` — le fichier dont c'est précisément le rôle de nommer la forme interdite.
+  Correction : le balayage retire les commentaires avant de chercher. Il teste du **code**.
+- Une fiche existante (`search-card-parite`) épinglait le littéral `{kg}`. Elle est passée au rouge
+  le jour où la règle qu'elle défend — « la phrase porte le poids en paramètre » — n'avait pas
+  bougé d'un pouce. Elle vise désormais `{kg`.
+
+Cinquième et sixième fois ce mois-ci. La forme générale :
+
+> **Une fiche qui vise une ORTHOGRAPHE casse quand l'orthographe change pour une bonne raison, et
+> se tait quand l'usage change pour une mauvaise.**
+
+## 6. Une mise en forme à la main n'est pas une variante maladroite
+
+C'est le vrai énoncé de D108, et il vaut au-delà des nombres.
+
+```ts
+// Avant — trois façons, toutes « qui marchent »
+rating.toFixed(1)                                        // point toujours
+rating.toFixed(1).replace('.', ',')                      // virgule toujours
+rating.toFixed(1).replace('.', locale === 'fr' ? ',' : '.')  // juste, à la main
+```
+
+Les trois produisent une **chaîne**. Et une chaîne a quitté le seul endroit qui connaît la langue.
+La suite n'est plus rattrapable : passez `"4,8"` à un gabarit `{rating, number}` et vous obtenez
+`NaN`, pas « 4,8 ».
+
+```ts
+// Après — une adresse, un nombre jusqu'au dernier moment
+formatRating(rating, intlTagFor(locale))   // pour un affichage direct
+t('card.totalForWeight', { kg: poids })    // pour une phrase : le dictionnaire décide
+```
+
+> **Mettre en forme trop tôt, c'est perdre une information** — ici la langue. C'est la même famille
+> que « stocker un montant en euros flottants » ou « concaténer une date » : on fige une
+> représentation là où il fallait garder la valeur.
+
+## Pour aller plus loin
+
+- `Intl.NumberFormat` : `minimumFractionDigits` / `maximumFractionDigits`, et pourquoi
+  `style: 'unit'` n'était pas le bon choix ici (le mot « kg » appartient à la phrase traduite,
+  pas au nombre).
+- La duplication **volontaire** octet pour octet : `pricing-example.ts` (D99), `search-facets.ts`
+  (D100), `parcel-weight.ts` (D101), `number-format.ts` (D108). Quatre fichiers, une fiche de
+  comparaison chacun. Ce qu'on achète : un front qui ne tire pas les dépendances de l'autre. Ce
+  qu'on paie : une fiche, et la discipline de ne jamais modifier une copie seule.
+
+# Chapitre 254 — L'exception dont la raison est un coût (D109)
+
+## Le point de départ : deux phrases d'utilisateur
+
+« Il y a le texte que sur l'icône active » et « le bouton + n'est pas pro ».
+
+Deux remarques d'apparence esthétique. Elles ont ouvert une chaîne causale de cinq maillons, et
+aucun des maillons n'était visible depuis le code qu'elles désignaient.
+
+## 1. Une incohérence se mesure
+
+Le réflexe utile, déjà écrit par D105 : ne pas *lire* l'interface, la **mesurer**.
+
+```python
+# Luminance relative WCAG, puis le rapport de contraste
+pilule = '#E8E8E9'   # l'indicateur de sélection
+barre  = '#FAFAFB'   # la barre qui le porte
+# → 1,17:1
+```
+
+WCAG 1.4.11 demande **3:1** pour un élément d'interface non textuel. À 1,17, l'indicateur ne
+pouvait pas être le signal de sélection : c'était une décoration.
+
+Et cette décoration occupait 42 des 52 pt de la barre.
+
+## 2. La chaîne, qui ne se voit qu'en entier
+
+```
+indicateur 42 pt  (invisible, mais il occupe la place)
+   └─ fente du libellé : 11 pt
+        └─ police : 9 pt
+             └─ sous le minimum d'iOS (10) et de Material 3 (11)
+             └─ ratio 9/11 = 1,22, sous le plancher maison de 1,35
+                  └─ le fichier est EXEMPTÉ de typography.spec.ts
+```
+
+Chaque maillon, pris seul, était défendable — et chacun portait son commentaire justificatif. C'est
+le propre de ce genre de défaut : **il n'est dans aucune ligne, il est dans leur composition.**
+Même forme que D104 (le retour correct derrière une porte d'identité correcte).
+
+## 3. Le symptôme qui se détecte sans génie
+
+Voici la leçon transposable du chapitre, et elle est mécanique.
+
+```ts
+const EXCEPTIONS = [
+  // Géométrie mesurée de D88 : la barre fait 52, sa pilule 42, et la fente
+  // du libellé 11. Toucher à l'interligne sans toucher à la fente ne
+  // dégagerait rien — et toucher à la fente rouvre D88.
+  'components/tab-bar.tsx',
+  // Un caractère centré dans un disque.
+  'components/profile-avatar-button.tsx',
+];
+```
+
+Lisez les deux raisons. La seconde dit une **propriété de l'objet** : un caractère centré dans un
+disque ne se lit pas en lignes, l'interligne n'a pas de sens pour lui. La première dit un **coût** :
+y toucher rouvrirait une décision.
+
+> **Une exception dont la raison écrite est un COÛT et non une propriété est une dette qui a trouvé
+> où se cacher.** Et la fiche qui la porte la reconduit à chaque passage, avec l'autorité d'un test
+> vert.
+
+C'est détectable à la relecture, sans rien savoir du domaine : demandez-vous si la raison
+expliquerait encore l'exception le jour où le changement serait gratuit. Si non, ce n'est pas une
+exception.
+
+## 4. Une argumentation dense ne protège pas de l'erreur
+
+`tab-bar.tsx` est l'un des fichiers les mieux documentés du dépôt. Chaque nombre y porte sa raison,
+chaque arbitrage son historique de revue. Et deux des défauts corrigés ici sont nés de décisions
+**soigneuses** :
+
+- D88 2A a choisi le mode « étiquette sur le sélectionné » de Material 3 — sans voir que l'énoncé
+  contredit sa propre prémisse. Le raisonnement disait : « deux icônes sur cinq sont
+  indevinables ». La conclusion a nommé… les trois autres.
+- A210 a dessiné une marque pour la rendre mémorable — sans voir qu'à 27 pt, un squircle en dégradé
+  redevient un logo d'application.
+
+> **Une argumentation dense protège une décision du doute, pas de l'erreur.** Et elle la rend plus
+> difficile à rouvrir, ce qui est le vrai danger.
+
+C'est la deuxième fois en un mois (D98 la première) qu'une décision argumentée est défaite par un
+REGARD. Le corollaire opérationnel est déjà écrit au chapitre 252 : **un effet d'interface ne se
+raisonne pas, il se regarde.**
+
+## 5. Où placer un signal : là où l'information manque
+
+Le défaut le plus coûteux du lot tient en une phrase.
+
+> Le libellé était montré sur l'onglet **actif** : c'est-à-dire exactement là où il ne sert à rien,
+> puisque l'écran entier dit déjà où l'on se trouve — pendant que les quatre destinations possibles
+> restaient anonymes.
+
+Règle générale, bien au-delà d'une barre d'onglets : **un libellé sert à choisir, pas à confirmer.**
+Quand vous décidez où afficher une information, demandez-vous qui, à cet endroit, ne la connaît pas
+encore.
+
+## 6. Un même jeton ne vaut pas sur deux supports
+
+Trouvé en regardant le **mode sombre**, après avoir cru le lot terminé.
+
+```ts
+mangoDark: '#CC7A00',  // « pour l'état actif sur fond CLAIR »
+```
+
+Le commentaire du jeton disait la limite, et le code l'employait quand même sur une barre sombre.
+Mesuré :
+
+| | barre claire | barre sombre |
+|---|---|---|
+| `#FF9900` | 2,05:1 | 7,95:1 |
+| `#CC7A00` | 3,17:1 | 5,15:1 |
+
+Assombrir sur fond sombre rendait la marque **moins** visible au moment où elle devait l'être le
+plus. C'est le défaut ① que D88 avait déjà corrigé une fois sur cette barre.
+
+La sortie n'est pas de choisir un meilleur jeton : c'est d'écrire la **règle** et de la vérifier par
+le contraste plutôt que par la valeur.
+
+```ts
+export function markBackground(dark: boolean, focused: boolean): string {
+  if (dark) return focused ? MARK_BG : MARK_BG_DEEP;
+  return focused ? MARK_BG_DEEP : MARK_BG;
+}
+```
+
+```ts
+it('l’état actif s’ÉLOIGNE toujours de la luminance de sa barre', () => {
+  expect(contraste(markBackground(false, true), BAR_LIGHT))
+    .toBeGreaterThan(contraste(markBackground(false, false), BAR_LIGHT));
+  expect(contraste(markBackground(true, true), BAR_DARK))
+    .toBeGreaterThan(contraste(markBackground(true, false), BAR_DARK));
+});
+```
+
+Cette fiche survit à un changement de charte graphique. Une fiche qui aurait épinglé `#CC7A00` non.
+
+## 7. Un nombre posé une fois devient une contrainte
+
+```ts
+// Avant
+height: 52,          // « 52 et non 56 : l'indicateur fait 42… »
+
+// Après
+height: barHeight(), // 32 + 4 + 14 + 5×2
+```
+
+La différence n'est pas cosmétique. Dans la première forme, 52 est un **postulat** : tout ce qui
+vit dedans doit s'y plier, et c'est ainsi qu'on arrive à une police de 9 pt. Dans la seconde, la
+hauteur est une **conséquence** : changez l'interligne du mot, la barre suit.
+
+> Quand une valeur se déduit d'autres valeurs, **écrivez la déduction, pas le résultat**. Sinon le
+> résultat devient la cause.
+
+## Pour aller plus loin
+
+- La spec réelle de la *navigation bar* Material 3 : l'indicateur actif est un bandeau derrière
+  l'**icône**, pas derrière l'ensemble icône + libellé. La différence paraît minime ; c'est elle
+  qui libère la typographie.
+- WCAG **1.4.11** (objets non textuels, 3:1) et **1.4.1** (la couleur n'est jamais le seul moyen) :
+  les deux se répondent. Si votre état tient à trois signaux dont deux ne sont pas des couleurs,
+  1.4.11 ne contraint plus l'indicateur décoratif — mais il faut l'avoir écrit, et le prouver.
+- Le piège Metro de D102, repayé ici : `ReferenceError` avec typecheck et 916 fiches vertes. **La
+  vérification par `grep` sur le bundle servi ne s'applique plus** : Expo SDK 57 charge les modules
+  à la demande, et le bundle d'entrée fait 6 Mo sans contenir un seul écran. Ce qui tranche
+  aujourd'hui est un redémarrage à froid suivi d'une capture.
+
+# Chapitre D110 — Une charte ne tient pas parce qu'elle existe, mais parce qu'on ne peut pas la contourner
+
+**Le lot** : `fix/entete-et-page-alignes`, 21/11/2026. Un retour de recette de trois mots —
+« l'en-tête et la page ne sont pas alignés » — qui mène à 37 fichiers, deux défauts mesurés et une
+leçon d'architecture qui vaut bien au-delà du CSS.
+
+## 1. Compter plutôt que lire : l'outil de diagnostic le plus rentable du dépôt
+
+Trente-sept fichiers écrivaient la largeur du cadre de page à la main. **Chacune de ces lignes est
+correcte prise seule.** C'est exactement pour cela qu'une relecture, même attentive, ne trouve
+rien : il n'y a pas de ligne fautive, il y a une COLLECTION incohérente.
+
+L'outil qui tranche en trois secondes :
+
+```sh
+grep -rho "max-w-7xl[^\"\`]*" apps/user-ui/src --include='*.tsx' \
+  | grep -o "px-[0-9]*\( sm:px-[0-9]*\)\?" | sort | uniq -c | sort -rn
+```
+
+```
+  45 px-4
+  20 px-6
+   2 px-3
+   1 px-8
+   1 px-1
+```
+
+Décomposons, car c'est un idiome à avoir dans les doigts :
+
+- `grep -rho` — `r`écursif, `h` sans le nom du fichier (on veut la valeur, pas l'endroit),
+  `o` pour n'imprimer que **ce qui a matché** et non la ligne entière. C'est `-o` qui transforme
+  `grep` en extracteur de valeurs.
+- le second `grep -o` isole la classe de gouttière dans ce qui reste ;
+- `sort | uniq -c | sort -rn` est le **compteur** : `uniq -c` n'agrège que des lignes ADJACENTES,
+  d'où le `sort` obligatoire avant lui ; `sort -rn` classe par fréquence décroissante.
+
+Cette ligne est la même qui a diagnostiqué D105 (`grep -o 'size={[0-9]*}'` → quatre tailles de
+flèche de retour). **Troisième fois en un mois.** La règle générale : quand un utilisateur dit
+« c'est différent des autres », ne corrigez pas l'écran qu'il montre — **comptez les autres**.
+
+## 2. Pourquoi « source de vérité » n'est pas une propriété du code
+
+Le dépôt avait déjà `AppContainer.tsx`, dont l'en-tête disait, textuellement :
+
+> **Source de vérité** pour les dimensions de layout de l'app […] change-les ici **UNE SEULE
+> FOIS** et tout le layout de l'app suivra.
+
+C'était vrai, bien écrit, bien motivé — et **importé par un seul fichier**. Pendant ce temps la
+classe était recopiée 51 fois.
+
+D93 avait écrit la moitié de la leçon : « une règle écrite DANS le composant qui s'en sert ne
+protège qu'une page ». Voici l'autre moitié, et elle est plus traître :
+
+> **Une règle écrite dans un composant PARTAGÉ ne protège personne si rien n'oblige à s'en
+> servir.** Une source de vérité que l'on n'importe pas n'est pas une source de vérité : c'est un
+> commentaire.
+
+La conséquence pratique est une méthode de conception. Quand vous voulez qu'une règle tienne,
+ne vous demandez pas « où l'écrire pour qu'elle soit claire ? » mais **« comment rendre son
+contournement impossible, ou au moins visible ? »**. D105 l'avait déjà conclu en refusant une prop
+`size` au bouton de retour partagé ; le présent lot le refait sur un gabarit :
+
+```ts
+// apps/user-ui/src/lib/layout/largeur-de-page.ts — zéro import
+export const LARGEUR_MAX_DE_PAGE = "max-w-7xl";
+export const GOUTTIERE_DE_PAGE = "px-4 sm:px-6";
+
+export function conteneurDePage(extra = ""): string {
+  return `mx-auto w-full ${LARGEUR_MAX_DE_PAGE} ${GOUTTIERE_DE_PAGE} ${extra}`.trim();
+}
+```
+
+…plus **une fiche qui interdit le littéral partout ailleurs**. Le module ne devient la source de
+vérité qu'avec cette seconde moitié. Sans elle, c'est un quatrième endroit où la valeur est écrite.
+
+## 3. Tailwind lit du TEXTE : ce que cela interdit, et comment vivre avec
+
+Point de théorie, souvent mal compris. Tailwind ne comprend pas votre code : il **scanne le texte**
+des fichiers déclarés dans `content` et génère une classe CSS pour chaque chaîne reconnue.
+
+```js
+// apps/user-ui/tailwind.config.js
+content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+```
+
+Deux conséquences immédiates :
+
+1. **Un module `.ts` qui contient `"max-w-7xl"` est scanné** — le glob couvre `.ts`, pas seulement
+   `.tsx`. C'est ce qui rend la centralisation possible : la classe apparaît littéralement dans le
+   module, donc elle est générée.
+2. **Une classe calculée n'existe pas.** `` className={`h-[${hauteur}px]`} `` ne génère RIEN :
+   Tailwind ne voit que `h-[${hauteur}px]`, qui n'est pas une classe. C'est l'erreur classique du
+   débutant, et elle est silencieuse — le code compile, le style manque.
+
+D'où un compromis à assumer, écrit dans le module :
+
+```ts
+export const HAUTEUR_D_EN_TETE = 78;          // pour le JavaScript
+const CLASSE_HAUTEUR_D_EN_TETE = "h-[78px]";  // pour Tailwind : littéral obligatoire
+```
+
+Le nombre est donc écrit **deux fois**, par nécessité technique. On ne peut pas supprimer la
+duplication : on peut la **surveiller**. C'est le rôle de la fiche, et c'est le motif de D95 6A :
+
+```ts
+expect(rangeeDEnTete(false)).toContain(`h-[${HAUTEUR_D_EN_TETE}px]`);
+expect(trou).toContain(`pt-[${HAUTEUR_D_EN_TETE}px]`);
+```
+
+**L'attendu est CALCULÉ depuis la règle, jamais recopié.** Si quelqu'un change 78 en 80, la fiche
+suit ; si quelqu'un change un seul des littéraux, elle rougit. Écrire `toContain("h-[78px]")`
+aurait l'air identique et ne vérifierait plus rien d'intéressant.
+
+## 4. Écrire un balayage : trois règles, toutes payées
+
+Un « balayage » (sweep) est une fiche qui lit le code source comme une donnée. C'est le seul genre
+de test qui aurait trouvé D110, parce que le défaut n'était pas un calcul faux mais un calcul
+**contourné**.
+
+```ts
+const SRC = resolve(__dirname, "..", "..");
+
+function sources(dossier = SRC): string[] { /* récursif, hors *.spec.ts et *.d.ts */ }
+
+function codeSeul(chemin: string): string {
+  return readFileSync(chemin, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")     // les blocs
+    .replace(/^[ \t]*\/\/.*$/gm, " ");     // les lignes
+}
+```
+
+**Règle 1 — viser l'USAGE, pas une orthographe.** Cinq commentaires du dépôt citent `max-w-7xl`
+pour expliquer la règle. Une fiche qui les compterait serait rouge pour la plus mauvaise raison
+possible. D'où le dépouillement ci-dessus — et c'est le défaut qu'A224 lot 5 avait trouvé **dans
+son propre détecteur**. Cinquième occurrence du mois.
+
+**Règle 2 — un balayage doit prouver qu'il a balayé.** D104 :
+
+```ts
+expect(FICHIERS.length).toBeGreaterThanOrEqual(200);
+```
+
+Sans cette ligne, une faute de chemin rend le balayage vide, donc **vert**. Un test qui ne teste
+rien est pire qu'un test absent : il rassure.
+
+**Règle 3 — un faux positif coûte aussi cher qu'un trou.** Le premier jet du balayage des hauteurs
+ramassait tout `h-[…px]` et rougissait sur l'avatar d'un squelette à 68 px. Un balayage qui crie à
+tort est désactivé dans la semaine. Le remède n'est pas de desserrer le seuil mais de **viser le
+sens** : on ne retient que les écritures dont la sémantique EST la hauteur de l'en-tête
+(soustractions du viewport, constantes nommées).
+
+Et le corollaire, qui s'est vérifié deux fois dans ce lot : **cadrer une fiche est un acte de
+diagnostic.** Le défaut vertical (les 64 px) n'a été vu ni à l'écran ni en relecture — il est sorti
+de la question « quels nombres cette fiche doit-elle tenir ? ».
+
+## 5. Quand la fiche a tort : recenser au lieu d'interdire
+
+Le balayage a d'abord refusé **29 conteneurs centrés** dans 25 fichiers, à cinq largeurs
+(`max-w-6xl` à `max-w-2xl`). Il avait tort : une colonne de lecture étroite centrée dans le cadre
+est un motif légitime — un paragraphe ne se lit pas sur 1280 px.
+
+La mauvaise réaction est de supprimer le test. La bonne est de **changer sa nature** : d'interdire
+à recenser.
+
+```ts
+const COLONNES_ETROITES = [ /* les 25 fichiers, nommés */ ];
+expect([...centres].sort()).toEqual(COLONNES_ETROITES);
+```
+
+La fiche n'exige plus rien de ces colonnes : elle exige qu'une **trentième** ne puisse pas
+apparaître en silence. Son auteur devra choisir entre la charte et cette liste — c'est-à-dire
+**décider**, ce qui est tout ce qu'on demande. C'est la mécanique d'A224 lot 5 (le recensement des
+modules purs), et la différence avec un seuil de couverture mérite d'être comprise : un seuil
+répond à « combien de code est exécuté ? », un recensement répond à « **qu'est-ce que personne ne
+surveille ?** » — et c'est la seconde question qui coûte des mois.
+
+## 6. Vérifier une affirmation de pixels : mesurer le DOM, pas regarder l'écran
+
+D107 avait établi qu'« un correctif d'interface non regardé est une hypothèse déployée ». Mais pour
+une affirmation **chiffrée**, regarder ne suffit pas : 8 px ne se voient pas à l'œil, ils se
+mesurent. Playwright pilote le Chrome du système (`channel: "chrome"`), et `evaluate` exécute du
+JavaScript DANS la page :
+
+```js
+const r = (el) => Math.round(el.getBoundingClientRect().left);
+// écart entre le bord gauche du logo et celui du contenu
+```
+
+| Fenêtre | logo | contenu | écart | débordement |
+|---|---|---|---|---|
+| 390 px | @16 | @16 | 0 px | 0 px |
+| 768 px | @24 | @24 | 0 px | 0 px |
+| 1440 px | @104 | @104 | 0 px | 0 px |
+
+Deux enseignements de méthode, tirés des pièges rencontrés pendant cette mesure :
+
+**① Un premier résultat bizarre est d'abord une faute de mesure.** La hauteur de l'en-tête
+ressortait à **0 px**. Cause : le premier `<header>` du DOM est le **squelette**, monté en
+permanence et caché par `display: none` sur son parent (c'est la structure même de D93). Le vrai
+en-tête est le second, à 79 px (78 + 1 px de bordure). Corollaire utile : `getBoundingClientRect`
+renvoie des zéros pour un élément caché, sans erreur — un `0` est donc toujours ambigu entre
+« collé au bord » et « invisible ».
+
+**② Le contrefactuel vaut le correctif.** Pour prouver que le défaut vertical était réel et non
+théorique, on rebascule **le seul chiffre** et on re-mesure :
+
+```
+avant (64 px) : débordement 14 px, grille 836 px
+après (78 px) : débordement  0 px, grille 822 px
+```
+
+C'est la même logique qu'un test de mutation — et c'est aussi ce qu'il faut faire à sa fiche. La
+nôtre a été validée en réinjectant **deux** régressions (un `max-w-7xl` à la main dans le pied de
+page, un `64px` dans un squelette) : trois tests sont passés au rouge, puis tout est redevenu vert
+après restauration. **Une fiche verte qu'on n'a jamais vue rougir ne prouve rien.**
+
+## Pour aller plus loin
+
+- **`git log -S "<chaîne>"`** (le « pickaxe ») cherche les commits qui ont ajouté ou retiré une
+  chaîne. C'est l'outil qui répond à « d'où vient ce 64 ? » — ici, l'ancienne hauteur `h-16` de
+  l'en-tête, jamais suivie quand il est passé à 78.
+- **Spécificité et ordre des classes Tailwind** : l'ordre dans l'attribut `class` n'a AUCUN effet
+  en CSS (c'est l'ordre de la feuille générée qui compte). Composer une chaîne par concaténation
+  est donc sûr — mais deux classes du même groupe (`px-4` et `px-8`) entrent en conflit de façon
+  imprévisible. C'est la raison de la fiche qui interdit une gouttière dans l'argument
+  `conteneurDePage(extra)` : on ne compte pas sur l'ordre, on interdit le doublon.
+- **Lire `content` de votre `tailwind.config.js` avant de créer un dossier de composants.** Un
+  fichier hors du glob produit des classes silencieusement absentes — le symptôme est « ça marche
+  en dev, pas en prod » quand les globs diffèrent.
+- **`JSX.IntrinsicElements`** : le type qui liste les balises HTML connues de TypeScript. C'est ce
+  qui permet à `AppContainer` d'accepter `as="main"` en restant typé.
+
+---
+
+# Chapitre — Transposer un parcours web en natif sans le recopier (D111)
+
+Ce chapitre raconte comment les 6 436 lignes du tunnel « Créer un trajet » du site sont devenues
+sept écrans natifs, et surtout **ce qu'on a refusé de transposer**. Il est écrit pour quelqu'un qui
+sait lire du TypeScript mais n'a jamais touché à React Native.
+
+## 1. La première question n'est pas « comment », c'est « quoi exactement »
+
+Avant d'écrire une ligne, on lit le parcours existant **jusqu'à ses règles** :
+
+```sh
+find apps/user-ui/src/components/trips/create -type f | xargs wc -l | sort -n
+#  6436 total — dont create-trip.config.ts (511), mapper (318), types (364)
+```
+
+Les trois fichiers qui comptent ne sont pas les composants, ce sont `*.config.ts` (les bornes et la
+validation), `*.mapper.ts` (ce que le serveur reçoit) et `*.types.ts` (la forme du brouillon). Les
+composants, eux, sont du geste — et le geste, justement, va changer.
+
+Puis on lit le **contrat**, qui est la seule vérité commune aux deux fronts :
+
+```ts
+// apps/trip-service/src/schemas/trip.schema.ts
+export const TransportModeEnum = z.enum(["PLANE", "TRAIN", "CAR"]);
+originCity: z.string().trim().min(1).max(150),   // REQUIS
+originCountryCode: isoCodeSchema,                 // facultatif
+originLat: z.number().optional().nullable(),      // facultatif
+```
+
+Ces trois lignes décident de tout le lot : la ville suffit pour publier, le reste est du confort.
+C'est ce qui rend la publication mobile possible **malgré** le point suivant.
+
+## 2. La parité se mesure au contrat, pas à l'écran
+
+Le site obtient le code pays et les coordonnées d'une ville parce qu'il charge le SDK Google dans le
+navigateur. Le téléphone passe par notre relais (A211), qui ne rend que deux chaînes :
+
+```ts
+export type CitySuggestion = { main: string; secondary: string };
+```
+
+Conséquence : la jauge « prix juste » du site — basse / médiane / haute par corridor — **ne peut pas
+être calculée** sur le téléphone. On a trois options :
+
+1. l'afficher quand même avec la base de repli → la même médiane sur tous les corridors, c'est-à-dire
+   un repère qui a l'air d'en être un. C'est le défaut que D100 a nommé ;
+2. ajouter un appel serveur (`/places/details`, même jeton de session) → du vrai travail, un autre lot ;
+3. ne pas l'afficher, et **écrire pourquoi dans le fichier**.
+
+On a pris la troisième, et une fiche grave le constat pour que personne ne croie à un oubli :
+
+```ts
+it('le relais Places ne rend que deux chaînes : ni placeId, ni code pays, ni coordonnées', () => {
+  const type = relais.slice(debut, fin);
+  expect(type).toContain('main');
+  expect(type).not.toContain('countryCode');
+});
+```
+
+**La leçon** : une fiche ne sert pas qu'à empêcher une régression. Elle sert aussi à **tenir un
+constat** — ici « tant que c'est vrai, le brouillon ne doit pas prétendre porter ces champs ».
+
+## 3. Mêmes nombres, autre geste
+
+Le site règle le prix au kilo avec un `<input type="range">`. Sur un téléphone :
+
+```
+(20 − 5) / 0,5 = 31 crans   sur ~360 px de large   →   ~12 px par cran
+```
+
+Douze pixels, c'est moins que la moitié d'un pouce. Et surtout, un Voyageur **vise** un tarif qu'il
+a en tête (« dix euros le kilo »), il n'explore pas un continuum. D'où un pas-à-pas de 44 pt — la
+taille minimale d'une cible tactile chez Apple comme chez Google — plus des valeurs d'usage :
+
+```ts
+export const PRIX_USUELS_PAR_KG = [8, 10, 12, 15] as const;
+export const CAPACITES_USUELLES_KG = [5, 10, 12, 23] as const; // 12 et 23 = les deux franchises
+```
+
+Ce n'est pas une préférence : c'est la troisième fois que ce dépôt tranche ainsi (le calendrier en
+A207, le poids du colis en D101). **Mêmes nombres, geste natif.** Et les nombres sont vérifiés
+contre le site, lu à l'exécution :
+
+```ts
+function litLaBorne(nom: string) { /* lit `export const X = { min, max, step }` dans la source */ }
+expect(litLaBorne('PRICE_PER_KG_RANGE')).toEqual({ min: PRIX_MIN_PAR_KG, max: PRIX_MAX_PAR_KG, step: PRIX_PAS_PAR_KG });
+```
+
+Pourquoi lire le fichier plutôt que l'importer ? Parce qu'un `import` par-dessus la frontière d'un
+projet est une **dépendance de build** (D93) : `nx test @yamba-app/mobile` se mettrait à construire
+le site avant de lancer les fiches.
+
+## 4. Supprimer un traducteur plutôt que le réécrire
+
+Le site garde `"plane"` dans son brouillon et traduit en `"PLANE"` dans un mapper de 318 lignes.
+Cette table existe pour une raison historique : le formulaire est plus vieux que le contrat. La
+recopier, c'est hériter de ses occasions de se tromper. Le brouillon natif écrit donc **directement
+les mots du serveur** :
+
+```ts
+export type TransportMode = 'PLANE' | 'TRAIN' | 'CAR';
+export type SousType = 'DIRECT' | 'WITH_LAYOVER' | 'WITH_CONNECTION' | 'DETOUR_BY_AGREEMENT';
+```
+
+Un seul champ `sousType` côté écran, **trois** côté serveur (`flightType`, `trainTripType`,
+`carTripFlexibility`), et une fonction pure pour passer de l'un à l'autre :
+
+```ts
+export function sousTypePourLApi(mode, sousType) {
+  if (mode === null || sousType === null) return vide;
+  if (!SOUS_TYPES[mode].includes(sousType)) return vide;  // combinaison impossible ⇒ rien
+  …
+}
+```
+
+Le `includes` n'est pas de la paranoïa : une combinaison impossible vient **toujours** d'un état
+d'écran mal remis à zéro (on choisit « avec escale », puis on repasse en voiture). La neutraliser
+ici est moins cher que de la débusquer à la publication.
+
+## 5. `useSyncExternalStore` : partager un brouillon sans contexte React
+
+Un parcours en pile pose un problème simple : **une page poussée ne rend pas de valeur à celle qui
+l'a poussée**. Le dépôt a déjà son motif, et ce lot le reprend tel quel :
+
+```ts
+let brouillon: PublishDraft = VIDE;
+const abonnes = new Set<() => void>();
+
+export function getPublishDraft() { return brouillon; }          // MÊME référence si rien n'a changé
+export function subscribePublishDraft(a: () => void) { abonnes.add(a); return () => { abonnes.delete(a); }; }
+export function setPublishDraft(patch: Partial<PublishDraft>) { brouillon = { ...brouillon, ...patch }; prevenir(); }
+
+export function usePublishDraft() {
+  return useSyncExternalStore(subscribePublishDraft, getPublishDraft, getPublishDraft);
+}
+```
+
+Trois choses à comprendre :
+
+- **`getSnapshot` doit rendre la même référence tant que rien n'a changé.** Rendre un objet neuf à
+  chaque appel ferait boucler React à l'infini — c'est le piège classique de ce hook.
+- La mémoire est **de processus** : l'app tuée, le brouillon disparaît. C'est voulu pour un trajet
+  non publié. Le jour où il devra survivre, ce sera un trajet en base avec son id, pas un second
+  brouillon local — deux brouillons pour une même chose divergent le premier jour.
+- Il s'efface à la déconnexion, à côté de `forgetLastSearch()` (D106).
+
+## 6. Les valeurs d'ouverture : les AFFICHER ne suffit pas
+
+Le premier jet de l'écran du prix faisait ceci :
+
+```tsx
+const prix = draft.prixParKiloEur ?? 10;   // ← affiché
+```
+
+À l'écran : « 10,00 €/kg », une barre qui dit « ton gain s'affichera ici », et un bouton qui
+reproche « fixe ton prix au kilo » **sous un prix affiché**. Le défaut est connu de ce dépôt sous le
+nom de D99 3C (« un contrôle qui affiche une valeur qu'il n'applique pas est pire qu'un contrôle
+vide ») — et il a été recommis dans l'écran dont l'en-tête le cite.
+
+> **Rectification du 25/11.** Ce chapitre affirmait que « le site a exactement le même » défaut.
+> Vérification faite dans `StepConditions.tsx`, c'est faux : il écrit la médiane suggérée dans son
+> brouillon au montage. Le site avait raison depuis le début, et le correctif ci-dessous ne fait que
+> le rejoindre. La leçon tient quand même — mais elle n'a qu'un coupable, et ce n'est pas le site.
+
+La correction tient en un effet au montage :
+
+```tsx
+useEffect(() => {
+  const valeurs: { prixParKiloEur?: number; capaciteKg?: number } = {};
+  if (draft.prixParKiloEur === null) valeurs.prixParKiloEur = PRIX_D_OUVERTURE;
+  if (draft.capaciteKg === null) valeurs.capaciteKg = CAPACITE_D_OUVERTURE;
+  if (Object.keys(valeurs).length > 0) setPublishDraft(valeurs);
+}, []);                                  // au MONTAGE, pas à chaque rendu
+```
+
+La condition porte sur **le vide**, pas sur le montage : revenir en arrière ne doit pas écraser ce
+qu'on vient de saisir. Et écrire d'office n'est pas décider à la place — le septième écran redit le
+prix avant de publier.
+
+## 7. Le mapper est la dernière règle avant le réseau : il se teste
+
+Trois règles non négociables passent par là, et chacune a sa fiche :
+
+```ts
+// cents ENTIERS, jamais de flottant monétaire
+expect(centsOuNull(9.5)).toBe(950);
+expect(centsOuNull(0)).toBeNull();         // 0 est un PRIX ; l'absence n'en est pas un
+
+// une famille acceptée ne voyage PAS (liste vide = tout accepté)
+expect(famillesPourLApi(famillesParDefaut())).toEqual([]);
+
+// un rayon ne part qu'avec RADIUS
+expect(api.find((l) => l.flexibility === 'EXACT')?.radiusKm).toBeNull();
+```
+
+Et la vérification qui vaut toutes les autres, faite une fois à la main contre le serveur réel :
+
+```sh
+curl -s -X POST http://localhost:8080/api/trips -H "authorization: Bearer $TOKEN" \
+     -H 'content-type: application/json' --data @/tmp/corps-trajet.json
+# 201 — PUBLISHED, pricePerKgCents 950, capacityKg 23
+```
+
+Le JSON envoyé n'était pas écrit à la main : il a été **produit par le code livré**, via une fiche
+jetable qui appelle `construireCorps` et écrit le résultat dans `/tmp`. Tester la vraie fonction
+contre le vrai serveur, c'est la seule preuve qui ne suppose rien.
+
+## 8. Expo Router : deux pièges payés dans ce lot
+
+**① Deux fichiers peuvent revendiquer la même route sans que rien ne proteste.**
+`src/app/(tabs)/publish.tsx` et `src/app/publish/index.tsx` produisent tous deux `/publish`. Les
+types générés contiennent les deux, `tsc` passe, et `router.push('/publish')` depuis l'onglet
+retombe sur l'onglet. On s'en aperçoit **en naviguant**, pas en compilant. Le tunnel s'appelle
+donc `publish-trip/`.
+
+**② Le cache de transformation de Metro.** Un fichier créé dans une passe et importé dans une passe
+suivante peut être servi à l'état intermédiaire : écran blanc, `ReferenceError`, typecheck et fiches
+vertes. Le remède est connu (D102) :
+
+```sh
+cd apps/mobile && NODE_PATH=./node_modules npx expo start --go --clear
+```
+
+Le `NODE_PATH` n'est pas décoratif : sans lui, la génération des types de routes meurt en
+`MODULE_NOT_FOUND` (c'est pourquoi les scripts du `package.json` le portent).
+
+## 9. Regarder, pas déduire
+
+Les sept écrans ont été ouverts un à un au simulateur, **par lien profond**, parce qu'on ne peut pas
+taper dans un simulateur depuis un terminal :
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/publish-trip/price"
+xcrun simctl io booted screenshot --type=png ecran.png
+```
+
+Trois défauts du lot n'ont été vus que là : le prix affiché sans être appliqué, le « 0,00 €/kg · 0 kg »
+du récap, l'écran des lieux rendu vide et muet. Aucun n'est visible en lisant le code ; les trois
+sautent aux yeux sur une capture.
+
+C'est la leçon de D98, et elle se vérifie à chaque lot d'interface : **un effet d'interface ne se
+raisonne pas, il se regarde.**
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-trip.ts` — les règles, et leurs raisons, en tête de fichier.
+- `apps/mobile/src/components/publish/number-stepper.tsx` — pourquoi un pas-à-pas et pas un curseur.
+- `apps/mobile/src/lib/publish-payload.spec.ts` — ce que le serveur reçoit, ligne à ligne.
+- Registre, entrée **D111** — la décision, ses exceptions et ses dettes nommées.
+
+---
+
+# Chapitre — Réécrire le ton, fusionner deux écrans, rendre vraie une promesse (D111 bis)
+
+Ce chapitre fait suite au précédent. Il part d'une phrase de revue — « les textes sont trop longs et
+ça ressent trop de l'IA » — et montre ce qu'on en fait concrètement.
+
+## 1. Diagnostiquer un ton
+
+La tentation est de chercher des synonymes. Ce n'est pas là que ça se joue. En relisant les huit
+écrans, le motif saute :
+
+```
+« Le mode de transport décide des lieux d'échange qu'on te proposera. »
+« C'est par ces deux villes que les Expéditeurs te trouveront. »
+« La date est le premier filtre des Expéditeurs. »
+```
+
+Trois sous-titres, trois **explications de mécanique**. Un écran qui explique comment il marche
+avoue qu'il n'est pas évident. La correction n'est pas de raccourcir ces phrases : c'est de les
+**supprimer**, et de mettre l'information là où elle sert — sur le contrôle lui-même :
+
+```tsx
+<ThemedText type="smallBold">{t(`mode.${mode}`)}</ThemedText>
+<ThemedText type="small" themeColor="textSecondary">{t(`mode.${mode}_hint`)}</ThemedText>
+// « Avion » / « Aéroport ou ville »
+```
+
+Les trois règles qu'on en tire tiennent en une ligne chacune : un titre est une question ou un nom
+de quatre mots ; un sous-titre n'existe que s'il ajoute une information ; un libellé est un libellé,
+pas une phrase.
+
+## 2. Un pluriel n'est pas un « (s) »
+
+```json
+"someRefused": "{refused, number} refusée(s), {surcharged, number} avec supplément"
+```
+
+Cette chaîne produit « 1 refusée(s), 1 avec supplément ». ICU sait faire :
+
+```json
+"refusedCount":    "{count, plural, one {# refusée} other {# refusées}}",
+"surchargedCount": "{count, plural, one {# surtaxée} other {# surtaxées}}"
+```
+
+```tsx
+[refusees > 0 ? t('families.refusedCount', { count: refusees }) : null,
+ surtaxees > 0 ? t('families.surchargedCount', { count: surtaxees }) : null]
+  .filter(Boolean).join(' · ')
+```
+
+On joint **seulement ce qui compte** : sans cela, « 0 surtaxée » apparaîtrait, et un zéro affiché
+est une information fausse (c'est la même leçon que le gain nul du chapitre précédent).
+
+## 3. Fusionner deux écrans sans casser la numérotation
+
+Le tunnel comptait sept écrans ; les deux premiers demandaient trois taps et deux lignes. Les
+réunir, c'est toucher à quatre endroits :
+
+```ts
+export const ECRANS_PUBLICATION = 6;                       // la jauge
+export const PHASES_PUBLICATION = [                        // les bornes de phase
+  { cle: 'trip', dernierEcran: 2 }, …
+];
+export const MANQUES_PAR_ECRAN: Record<1 | 2, readonly Manque[]> = {
+  1: ['mode', 'sousType', 'escales', 'depart', 'arrivee', 'memeVille'],
+  …
+};
+```
+
+Et **trois fiches sont parties au rouge immédiatement** — celles qui encodaient la forme à sept
+écrans (la répartition des manques, la phase de chaque écran, les manques par écran). C'est le signe
+qu'elles servaient : une fiche qui ne rougit jamais quand la forme change ne garde rien.
+
+La leçon de méthode : quand une refonte fait rougir des fiches, on lit **ce qu'elles disaient** avant
+de les corriger. Ici elles disaient « l'écran 3 porte les dates » — ce qui est devenu l'écran 2.
+Aucune règle métier n'a bougé, seulement sa répartition.
+
+## 4. Rendre vraie une promesse — sans toucher au serveur
+
+« Aller-retour » existait sur le site depuis l'origine, partait au serveur… et ne créait jamais de
+second trajet. La capacité manquante n'était pas serveur : elle était d'interface.
+
+```ts
+export function preparerLeRetour(aller: Draft): Draft {
+  return {
+    ...aller,
+    from: aller.to, to: aller.from,
+    fromPlace: aller.toPlace, toPlace: aller.fromPlace,
+    pickupLocations: aller.deliveryLocations.map(inverserLeContexte),
+    deliveryLocations: aller.pickupLocations.map(inverserLeContexte),
+    departureDate: undefined, arrivalDate: undefined,
+    departureTime: "", arrivalTime: "",
+    travelReference: "", tripDocuments: [],
+  };
+}
+```
+
+Trois détails qui font la différence entre « ça marche » et « c'est juste » :
+
+- **les lieux s'inversent avec les villes**, et côté site leur `context` avec eux (`PICKUP` ↔
+  `DELIVERY`). L'oublier proposerait l'aéroport de départ comme point de récupération à l'arrivée ;
+- **la référence et les justificatifs s'effacent** : un retour est un autre billet ;
+- **l'aller n'est pas modifié** — la fonction rend un nouvel objet, et une fiche le vérifie, parce
+  que l'écran qui affiche le trajet publié ne doit pas changer sous les pieds de celui qui le lit.
+
+Et une fiche vérifie la promesse elle-même, littéralement :
+
+```ts
+expect(manquesDeLEcran(1, retour, maintenant)).toEqual([]);          // plus rien à dire du voyage
+expect(manquesDeLEcran(2, retour, maintenant).length).toBeGreaterThan(0);  // … sauf les dates
+```
+
+## 5. Deux ordres d'exécution qui ne sont pas interchangeables
+
+**Le fichier du billet part au CHOIX, pas à la publication.**
+
+```tsx
+const resultat = await uploadTripTicket({ uri: asset.uri, … });
+if (resultat.ok) setPublishDraft({ billet: resultat.document });
+else setErreurDuBillet(resultat.code);
+```
+
+Si l'envoi avait lieu sous le bouton « Publier », un échec obligerait à choisir entre publier sans
+billet et tout reprendre. Ici, il suffit d'en choisir un autre.
+
+**L'attachement, lui, vient APRÈS la création** — le serveur range le document sous l'id du trajet
+(`POST /trips/:id/documents`) :
+
+```tsx
+const billetJoint = draft.billet === null ? null : await attacherLeBillet(trajet.id, draft.billet);
+memoriserLeRetour(draft);      // avant d'effacer : sinon il n'y a plus rien à inverser
+clearPublishDraft();
+router.replace({ pathname: '/publish-trip/done', params: { id: trajet.id, …(billetJoint === false ? { billet: 'ko' } : {}) } });
+```
+
+Trois ordres imposés, chacun pour une raison : on mémorise le retour **avant** d'effacer ; on efface
+**après** le succès ; et on **remplace** l'écran, parce que revenir en arrière sur un tunnel terminé
+n'a aucun sens.
+
+## 6. Vérifier avant d'accuser
+
+Le chapitre précédent affirmait que « le site a exactement le même défaut » (afficher une valeur que
+rien n'applique). En allant lire `StepConditions.tsx` pour le port web :
+
+```tsx
+useEffect(() => {
+  if (draft.pricePerKg === "" || draft.capacityKg === "") {
+    setDraft((prev) => ({ ...prev, pricePerKg: prev.pricePerKg === "" ? roundToHalf(suggestion.median) : prev.pricePerKg, … }));
+  }
+}, []);
+```
+
+Le site écrivait sa valeur d'ouverture depuis le début. L'affirmation était **plausible** — et
+fausse. C'est « une cause vraisemblable n'est pas une cause » (D107), appliqué à une accusation.
+Rectifié dans quatre fichiers, et la rectification est datée plutôt que gommée.
+
+## 7. Un détecteur qui vise une orthographe finit par mentir
+
+Le recensement du site (la fiche qui refuse qu'un module pur reste hors du harnais) cherchait :
+
+```ts
+/from ['"]@\/lib\/([^'"]+)['"]/g
+```
+
+Une fiche posée **à côté** de son module et qui l'importe en `./module` n'était donc pas vue : le
+module était déclaré « oublié » alors qu'il était couvert. C'est le troisième faux positif du même
+genre dans ce fichier (le premier ne voyait que les guillemets doubles). Le correctif ajoute la
+forme relative — et surtout, il a été vérifié **dans les deux sens** :
+
+```sh
+# avec l'alias → vert ; avec l'import relatif → vert aussi
+```
+
+Un balayage avec un faux positif finit désactivé, ce qui coûte autant qu'un trou.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-trip.ts` — `preparerLeRetour`, et pourquoi les lieux s'inversent.
+- `apps/user-ui/src/lib/trips/retour-de-trajet.ts` — le jumeau web, et son `context` à retourner.
+- `apps/user-ui/src/components/trips/create/TripPublishedPanel.tsx` — le panneau partagé.
+- Registre, entrée **D111 bis**.
+
+---
+
+# Chapitre — Ouvrir un contrat pour qu'un client puisse calculer (D111 ter)
+
+Les quatre lots de parité précédents (D99 → D102) se sont tous terminés par la même phrase : « le
+serveur avait raison, rien à ajouter ». Celui-ci est l'exception, et c'est ce qui le rend
+instructif.
+
+## 1. Distinguer un manque d'écran d'un manque de contrat
+
+Le symptôme : le site montre une fourchette de prix par corridor, l'app non. Le réflexe serait de
+porter le composant. En remontant la chaîne :
+
+```
+fourchette ← corridor(zoneDépart, zoneArrivée, distance)
+                        ↑              ↑           ↑
+                  codePaysA      codePaysB    lat/lng × 2
+                        └──────────────┴───────────┘
+                                   ↑
+                        GET /places/autocomplete → { main, secondary }   ✗
+```
+
+Le calcul existait des deux côtés. **Ce qui manquait, c'était sa matière.** Et aucune fiche de
+parité ne pouvait le trouver : les deux fronts respectaient chacun le contrat qu'on leur servait.
+
+La question utile, quand un front est plus pauvre que l'autre, n'est donc pas « quel composant
+manque ? » mais **« quelles données chaque front sait-il obtenir ? »** (c'est la leçon de D101,
+poussée d'un cran : non plus ce qu'un client sait *émettre*, mais ce qu'il peut *se procurer*).
+
+## 2. Ajouter un champ à un contrat existant
+
+```ts
+export const PlaceSuggestionSchema = z.object({
+  main: z.string(),
+  secondary: z.string(),
+  placeId: z.string(),      // ← nouveau
+}).strict();
+```
+
+Le typecheck du service part immédiatement au rouge :
+
+```
+places.rules.ts(34,3): Property 'placeId' is missing in type '{ main; secondary }'
+```
+
+C'est le bon ordre : **le contrat d'abord, le code ensuite**. Et deux fiches existantes rougissent
+aussi, parce qu'elles épinglaient la forme exacte de la projection (`toEqual([{ main, secondary }])`).
+Une fiche qui ne rougit pas quand une forme change ne garde pas cette forme.
+
+## 3. Une session de facturation ne s'arrête pas au milieu
+
+Google facture l'autocomplétion **par session** : toutes les frappes d'une même saisie, plus le
+détail du lieu finalement choisi, comptent pour une seule unité — à condition de passer le même
+`sessionToken` partout.
+
+```ts
+const url = new URL(`${DETAILS_ENDPOINT}/${encodeURIComponent(placeId)}`);
+url.searchParams.set("languageCode", language);
+if (sessionToken) url.searchParams.set("sessionToken", sessionToken);
+```
+
+Côté client, le jeton est fabriqué par le sélecteur de ville ; il doit donc **sortir** du composant
+avec le choix :
+
+```tsx
+onPickAction: (ville: VilleSaisie, contexte: { jetonDeSession: string }) => void;
+```
+
+Un jeton qui s'arrête au milieu du parcours double la facture **sans qu'aucun test ne le dise**.
+C'est une décision d'architecture, pas un détail d'implémentation.
+
+Deuxième levier sur la même facture, le masque de champs :
+
+```ts
+const DETAILS_FIELD_MASK = "location,displayName,addressComponents";
+```
+
+Demander `*` ferait payer le niveau supérieur pour quatre valeurs.
+
+## 4. Trois réponses, trois sens
+
+```ts
+export type PlaceDetailsOutcome = PlaceDetails | "unknown" | null;
+```
+
+- `PlaceDetails` → 200, champs éventuellement nuls ;
+- `"unknown"` (Google répond 404) → **404 `PLACE_NOT_FOUND`** : refaire la saisie ;
+- `null` (clé absente, tiers muet) → **503 `PLACES_UNAVAILABLE`** : réessayer.
+
+Confondre les deux derniers ferait dire « réessaie plus tard » à quelqu'un qui doit recommencer sa
+saisie. Un type union de trois cas coûte dix lignes et rend cette confusion impossible.
+
+## 5. Enrichir sans retenir
+
+L'écran de choix de ville se referme **immédiatement** ; le détail arrive après :
+
+```tsx
+setPublishDraft({ [cible]: choisie });
+router.back();
+
+if (ville.placeId.length === 0) return;
+void fetchPlaceDetails(ville.placeId, locale, contexte.jetonDeSession).then((details) => {
+  if (details === null) return;
+  const courante = getPublishDraft()[cible];
+  if (courante === null || courante.placeId !== ville.placeId) return;   // ← réponse en retard
+  setPublishDraft({ [cible]: { ...courante, countryCode: details.countryCode, … } });
+});
+```
+
+Deux choses à retenir :
+
+- **un écran dépilé n'empêche pas d'écrire dans une mémoire de module.** C'est ce qui rend ce motif
+  possible — et c'est aussi pourquoi le brouillon n'est pas un état React local ;
+- **la garde de la réponse en retard** est la même que celle de la liste de suggestions. Deux choix
+  rapprochés, deux réponses : sans elle, la première écraserait la seconde.
+
+## 6. Se taire plutôt qu'inventer
+
+```ts
+precis: (depart?.countryCode ?? null) !== null || (arrivee?.countryCode ?? null) !== null,
+```
+
+```tsx
+{fourchette.precis ? <PriceGauge … /> : null}
+```
+
+Sans aucun code pays, la médiane serait celle de la base de repli — **la même de Paris à Lyon et de
+Paris à Dubaï**. Un repère qui a l'air d'en être un est le défaut que D100 a nommé. L'écran se tait.
+
+C'est la même règle, écrite une troisième fois dans ce dépôt : un contrôle (ou un indicateur) ne doit
+jamais affirmer ce qu'il ne sait pas.
+
+## 7. Un gris sur un gris n'est pas un indicateur
+
+La première version peignait la zone « juste » avec `theme.backgroundSelected` sur une piste en
+`theme.backgroundElement`. À l'écran : invisible. C'est le défaut mesuré de D88 ① (3 % d'écart de
+luminance sur la barre d'onglets), reproduit trois semaines plus tard.
+
+```tsx
+backgroundColor: theme.tint,   // teal
+…
+zoneJuste: { opacity: 0.35 },  // un lavis, pas un aplat
+```
+
+Le teal est déjà la couleur du verdict « Prix juste » affiché juste en dessous : la zone et le mot se
+répondent. **Et la correction n'est pas venue d'une relecture — elle est venue d'une capture.**
+
+## 8. Prouver qu'une fiche mord
+
+Trois régressions injectées, puis annulées :
+
+```ts
+departSous3JoursMod: -0.05  →  0.05      // le signe du modificateur de délai
+precis: (…) !== null        →  true      // le repli déclaré « précis »
+Math.min(Math.max(…, 0), 1) →  (…)       // la position non bornée
+```
+
+Six fiches rouges, revert, vingt vertes. Une fiche écrite le même jour que son code a toujours l'air
+juste : la seule preuve est de casser le code exprès.
+
+## Pour aller plus loin
+
+- `apps/trip-service/src/lib/places.rules.ts` — la projection pure, et ses trois prudences.
+- `apps/mobile/src/lib/publish-price-suggestion.ts` — la fourchette, l'horloge reçue, la jauge.
+- `apps/mobile/src/components/publish/price-gauge.tsx` — ce qui est montré, et ce qui ne l'est pas.
+- Registre, entrée **D111 ter**.
+
+---
+
+# Chapitre — Faire survivre un brouillon sans en faire une dépendance (D111 quater)
+
+Dernier chapitre du tunnel de publication. Il montre comment ajouter une sauvegarde serveur à un
+parcours **sans** le rendre dépendant du réseau — et pourquoi cet ordre de priorité change tout.
+
+## 1. Vérifier ce que le serveur sait déjà faire
+
+Le réflexe serait d'écrire un endpoint « brouillon ». En lisant le routeur :
+
+```ts
+router.post("/", …, createTrip);            // publish:false → DRAFT
+router.get("/my", …, getMyTrips);           // ?status=DRAFT
+router.put("/:id", …, updateTrip);          // publish:true publie au passage
+router.delete("/:id", …, deleteTrip);       // ?hard=true → effacement doux d'un brouillon
+```
+
+Tout y était : c'est le bouton « Brouillon » du site, qui existe depuis des mois. **Le lot est donc
+entièrement client.** Avant d'ouvrir un service, lire son routeur coûte deux minutes.
+
+## 2. Qui est la source de vérité ?
+
+C'est LA question d'un lot de persistance, et elle se tranche avant d'écrire une ligne.
+
+| Si la source est… | Alors… |
+|---|---|
+| le **serveur** | chaque étape devient une occasion de tomber en panne ; six écrans = six pannes possibles |
+| le **local** | la sauvegarde est un filet ; son échec ne coûte rien de plus qu'un filet absent |
+
+On choisit le local, et tout le reste en découle :
+
+```tsx
+void sauvegarderLeBrouillon();     // ← `void` : on n'attend pas
+router.push('/publish-trip/when'); // ← la navigation part tout de suite
+```
+
+```ts
+export async function enregistrerLeBrouillon(…): Promise<string | null> {
+  try { … } catch { return null; }   // ← ne jette JAMAIS
+}
+```
+
+**Une sauvegarde qui peut bloquer n'est pas une sauvegarde, c'est une dépendance.**
+
+## 3. Sérialiser pour ne pas créer deux brouillons
+
+Deux taps rapprochés sur « Continuer », deux `POST /trips` en vol, deux trajets `DRAFT`. Le remède
+tient en trois lignes :
+
+```ts
+let enVol: Promise<void> = Promise.resolve();
+
+export function sauvegarderLeBrouillon(): Promise<void> {
+  const suite = enVol.then(executer);
+  enVol = suite.catch(() => undefined);   // la file ne se rompt pas sur un échec
+  return suite;
+}
+```
+
+Deux détails comptent : `enVol` est réassigné **avant** de rendre la promesse (sinon deux appels
+synchrones partagent la même queue), et on recolle la chaîne avec `.catch` — sans lui, un seul échec
+empoisonnerait toutes les sauvegardes suivantes.
+
+## 4. Écrire le mapper inverse, et le tester par l'ALLER-RETOUR
+
+`publish-payload.ts` transforme un brouillon en corps ; `publish-reverse.ts` fait le contraire. Deux
+mappers écrits à la main, l'un en face de l'autre : ils divergeront, et pas sur le champ qu'on
+surveille.
+
+La fiche qui attrape ça n'est pas une comparaison champ par champ — c'est l'aller-retour :
+
+```ts
+const corps = construireCorps(brouillonComplet(), false);
+const relu  = brouillonDepuisLeTrajet({ ...corps, id: 'trajet-1' });
+expect(relu.depart).toEqual(brouillonComplet().depart);
+```
+
+Et la vérification qui vaut toutes les autres, faite une fois à la main : **rejouer le mapper sur la
+réponse RÉELLE du serveur**, obtenue par `curl`, à travers une fiche jetable. Les fixtures mentent
+toujours un peu ; une réponse de production ne ment pas.
+
+## 5. Lire une réponse d'API comme un terrain miné
+
+La base contient des trajets écrits par le site, par des versions antérieures de l'app et par des
+seeds :
+
+```ts
+function texte(valeur: unknown): string {
+  return typeof valeur === 'string' ? valeur : '';
+}
+function nombreOuNull(valeur: unknown): number | null {
+  return typeof valeur === 'number' && Number.isFinite(valeur) ? valeur : null;
+}
+```
+
+Trois décisions valent d'être expliquées plutôt que codées en silence :
+
+- **un sous-type qui n'appartient pas au mode est ignoré** (`SOUS_TYPES[mode].includes(valeur)`) :
+  un `flightType` traîné sur un trajet en voiture referait une combinaison que le serveur refuse ;
+- **les lieux éteints sont reconstruits**, parce que le serveur ne stocke que les actifs — et un
+  lieu inconnu du jeu par défaut est **ajouté**, jamais perdu ;
+- **les dates ne se déduisent pas de `departureAt`** : c'est un instant UTC, et en tirer un jour
+  local décale d'une journée près de minuit. Redemander la date est moins grave que publier à la
+  mauvaise.
+
+## 6. Deux refus du serveur valent une revue de code
+
+Pendant la vérification manuelle, deux `400` :
+
+```
+A 23kg checked bag flat rate requires a capacity of at least 23kg.   (RG-B-29)
+Action "cancel" is not allowed from status DRAFT.
+```
+
+Le premier venait de mon `curl` — j'avais changé la capacité à la main, **contournant le mapper**
+qui retire justement un forfait que la capacité ne peut pas contenir. Le client et le serveur
+disaient la même chose : c'est la vérification qui trichait.
+
+Le second est une leçon de domaine : un brouillon **se supprime**, il ne s'annule pas. La machine à
+états l'a dit plus clairement que n'importe quelle documentation — et c'est exactement pour cela que
+ce dépôt la traite comme un miroir exécutable de la spec.
+
+## 7. `useFocusEffect` plutôt que `useEffect`
+
+L'écran de seuil doit relire les brouillons **à chaque retour**, pas une fois au montage : entre
+deux visites, le brouillon a pu être publié, repris ou supprimé.
+
+```tsx
+useFocusEffect(
+  useCallback(() => {
+    let vivant = true;
+    void mesBrouillons().then((trajets) => { if (vivant) setBrouillonServeur(trajets[0] ?? null); });
+    return () => { vivant = false; };
+  }, [])
+);
+```
+
+Le drapeau `vivant` n'est pas décoratif : sans lui, une réponse qui arrive après la sortie de
+l'écran provoque un `setState` sur un composant démonté.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/publish-sauvegarde.ts` — la file d'attente, et pourquoi elle existe.
+- `apps/mobile/src/lib/publish-reverse.ts` — la relecture défensive, règle par règle.
+- `apps/mobile/src/lib/publish-reverse.spec.ts` — l'aller-retour, et les cas tordus de la base.
+- Registre, entrée **D111 quater**.
+
+---
+
+# Chapitre — Valider un écran contre la vraie base, pas contre ses propres fixtures (D111 quinquies)
+
+Ce chapitre raconte un lot qui s'est fait démentir par sa première requête réelle, et ce que cela
+apprend sur la valeur d'une fiche.
+
+## 1. Le point de départ : tout était vert
+
+L'écran « Mes trajets » était écrit, sa règle sortie dans un fichier pur, dix-huit fiches écrites,
+le typecheck des deux programmes TypeScript du mobile au vert. Dans beaucoup d'équipes, c'est
+l'état « prêt à relire ».
+
+Il restait pourtant une question simple : **qu'est-ce que le serveur rend vraiment ?**
+
+```sh
+curl -c jar.txt -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"thomas.carrier@seed.yamba.dev","password":"…"}'
+
+curl -b jar.txt http://localhost:8080/api/trips/my -o mes-trajets.json
+```
+
+Puis la **vraie** projection rejouée sur cette **vraie** réponse, avec `tsx` — pas une fixture,
+pas un mock :
+
+```ts
+import { trajetDeLApi, grouperLesTrajets } from '…/apps/mobile/src/lib/mes-trajets.ts';
+const trajets = JSON.parse(readFileSync(fichier, 'utf8')).trips.map(trajetDeLApi).filter(Boolean);
+```
+
+C'est possible **parce que** le module est pur et sans import : la même propriété qui le rend
+jouable par le harnais (frontière A223) le rend jouable par un script de dix lignes.
+
+## 2. Ce que la vraie base a dit
+
+```
+Paris → Brazzaville   SANS DATE   PUBLISHED
+Paris → Brazzaville   SANS DATE   PUBLISHED
+Paris → Dubaï         2026-11-25  PUBLISHED
+```
+
+Deux trajets **publiés**, trouvables en recherche, affichant « Date à choisir ». La leçon
+générale :
+
+> **Une fiche ne teste que les cas auxquels on a pensé.** Les miennes tenaient les règles que
+> j'avais en tête ; la base contenait ce que personne n'avait en tête.
+
+Ici, deux **populations** de trajets cohabitaient, et aucune fixture ne les décrivait :
+
+| Écrits par | `departureDateLocal` | `originTimezone` |
+|---|---|---|
+| le formulaire de création | **oui** | non |
+| le seed, l'API, un import | non | **oui** |
+
+Elles se couvrent exactement l'une l'autre — ce qui est la condition pour que la correction soit
+possible sans rien deviner.
+
+## 3. La vraie question n'est pas « comment », c'est « où est-ce déjà corrigé »
+
+Réflexe à prendre avant d'écrire la moindre ligne :
+
+```sh
+grep -rn "departureDateLocal" apps/user-ui/src | head
+```
+
+Réponse : `trip-local-dates.ts`, écrit pour clore une anomalie **majeure** de recette
+(`ANO-WEB-41` — « jeu. 1 janv. » sur toutes les lignes, soit l'époque Unix). Et son en-tête
+nommait déjà le coupable à venir :
+
+> « Un trajet créé par un autre canal (API, seed, **futur client mobile**) n'en a pas. »
+
+C'est la quatrième fois ce mois-ci que ce dépôt paie la même leçon, et elle s'est affinée à chaque
+fois :
+
+1. D88 → « après avoir corrigé une fonction, **grep son jumeau** » ;
+2. A224 lot 4 → « ne cherche pas **LE** jumeau, **COMPTE** les copies » (il y en avait quatre) ;
+3. ici → « avant de corriger, **cherche la correction** ». Elle était écrite, testée en recette, et
+   jusqu'au commentaire qui annonçait qui allait en souffrir.
+
+## 4. Dérivation n'est pas déduction
+
+Le dépôt avait une règle en apparence contraire, D111 quater 2C : **ne jamais déduire une date
+locale depuis `departureAt`**, parce que `departureAt` est un instant UTC et qu'en déduire un jour
+décalerait d'une journée près de minuit.
+
+Les deux règles coexistent, parce qu'elles ne parlent pas de la même chose :
+
+```ts
+new Intl.DateTimeFormat('en-CA', { ...options, timeZone }).formatToParts(instant)
+```
+
+Avec le **fuseau du lieu**, ce n'est plus une déduction, c'est une **conversion exacte**. La fiche
+le montre mieux qu'un paragraphe :
+
+```ts
+// 23:30 UTC le 24, c'est déjà le 25 à Dubaï.
+expect(localDateTime('2026-11-24T23:30:00.000Z', 'Asia/Dubai')?.date).toBe('2026-11-25');
+```
+
+Et là où le fuseau manque — la reprise d'un brouillon — la règle d'origine tient toujours. **Les
+deux chemins sont épinglés par une fiche**, parce qu'une frontière que rien ne garde se déplace
+toute seule :
+
+```ts
+it('la REPRISE d’un brouillon ne normalise pas — et c’est D111 quater 2C', () => {
+  expect(readFileSync(join(MOBILE, 'src/lib/api/publish.api.ts'), 'utf8'))
+    .not.toContain('trip-local-dates');
+});
+```
+
+**Pourquoi lire le fichier au lieu de l'importer ?** Parce que `publish.api.ts` tire `client.ts` →
+`base-url.ts` → `expo-constants`, que le harnais (`testEnvironment: node`) ne sait pas charger.
+C'est la frontière A223, payée pour la troisième fois (D102, D105). Quand un test ne peut pas
+charger votre code, il vous dit où est la frontière : **déplacez le code, pas la frontière**.
+
+## 5. Normaliser au BORD, une seule fois
+
+```ts
+export async function mesTrajets(): Promise<TrajetBrut[]> {
+  const reponse = await apiFetch<{ trips?: TrajetBrut[] } | TrajetBrut[]>('/trips/my');
+  const trajets = Array.isArray(reponse) ? reponse : (reponse.trips ?? []);
+  return trajets.map((trajet) => withLocalDates(trajet));
+}
+```
+
+Une ligne, à l'endroit exact où le site fait la même chose dans ses hooks. L'alternative —
+normaliser dans chaque écran qui affiche une date — serait la règle recopiée vingt fois, c'est-à-dire
+le défaut que D110 a corrigé (`max-w-7xl` écrit 51 fois dans 37 fichiers).
+
+> **Une règle de lecture s'applique au bord de la lecture.** En dessous, tout le monde peut
+> supposer qu'elle est vraie.
+
+## 6. Un type qui ment, et le contrôle qui le dit
+
+Jest passait les 34 nouvelles fiches. `tsc` en trouvait six, des deux côtés :
+
+```
+Property 'departureDateLocal' does not exist on type '{ departureAt: string; originTimezone: string; }'.
+```
+
+La tentation est de « corriger la fiche ». Lisez l'erreur une deuxième fois : elle dit que **juste
+après l'appel qui vient d'écrire le champ, le type prétend que le champ n'existe pas.**
+
+```ts
+// avant — le type prétend rendre exactement son entrée
+export function withLocalDates<T extends TripDatesLike>(trip: T): T
+
+// après — la fonction AJOUTE des champs, le type le dit
+export function withLocalDates<T extends TripDatesLike>(trip: T): T & TripDatesLike
+```
+
+C'est la raison d'être du contrôle **TypeScript (fiches de test)** : les tsconfig par projet
+**excluent** `*.spec.ts`, donc un défaut qui ne vit que dans un fichier de test est invisible de
+toute la CI. Ici il ne vivait même pas dans le test — le test ne faisait que le **révéler**.
+
+> **Une fiche verte n'est pas une fiche correcte**, et une fiche rouge ne veut pas dire que la
+> fiche a tort.
+
+Au passage : `TripDatesLike` est devenu **exporté**. Un type qu'on ne peut pas nommer pousse le
+lecteur à écrire `any`.
+
+## 7. Prouver que chaque fiche mord
+
+Une fiche qui n'a jamais rougi ne prouve rien. Deux contre-épreuves, trente secondes chacune :
+
+```sh
+# on retire la normalisation…
+Tests: 1 failed, 18 passed        # une seule rougit, et c'est la bonne
+
+# on retire la fiche du site…
+● aucun module PUR ne reste hors du harnais
++   "trip-local-dates.ts",        # le recensement d'A224 lot 5 nomme le module oublié
+```
+
+La seconde est la plus intéressante : elle prouve que **l'outil anti-omission fonctionne encore**.
+C'est utile, parce que ce même outil contenait lui-même une omission à sa naissance (son motif ne
+reconnaissait que les guillemets doubles).
+
+## 8. Le détail qui aurait pu passer : un faux positif dans sa propre détection
+
+En attendant le bundle iOS, cette commande semblait raisonnable :
+
+```sh
+grep -qiE "bundl" expo.log && echo "BUNDLING DÉTECTÉ"
+```
+
+Elle s'est déclenchée tout de suite — sur la ligne `Starting Metro Bundler`, écrite au démarrage.
+**Viser une orthographe plutôt qu'un usage**, pour la sixième fois en un mois. Le remède n'a pas
+été d'affiner le motif mais de changer de source : une capture d'écran du simulateur.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-trajets.ts` — la règle de la liste, pure et sans import.
+- `apps/mobile/src/lib/trip-local-dates.ts` — la dérivation, et sa copie côté site.
+- `apps/mobile/src/lib/trip-local-dates.spec.ts` — les deux chemins, et l'égalité des copies.
+- `apps/user-ui/src/lib/recensement.spec.ts` — le recensement qui a réclamé la fiche du site.
+- Registre, entrée **D111 quinquies**.

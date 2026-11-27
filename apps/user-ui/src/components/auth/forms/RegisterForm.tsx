@@ -36,6 +36,7 @@ import {
 } from "@/lib/auth/auth-error-codes";
 import PasswordStrengthIndicator from "../shared/PasswordStrengthIndicator";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type RegisterFormData = {
   firstName: string;
@@ -301,13 +302,16 @@ export default function RegisterForm({ heroVisual }: Props) {
     "dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]";
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4">
-      {/* D92 — la largeur du contenu est celle de l'EN-TÊTE : `mx-auto
-          max-w-7xl px-4`, la même ligne que `Header.tsx:99`. La page partait
-          auparavant bord à bord, si bien que le logo et « Connexion » étaient
-          les deux seuls éléments à respecter une marge : rien en dessous ne
-          s'alignait sur eux, et la colonne de gauche touchait le bord de
-          l'écran sur un grand moniteur.
+    <main className={conteneurDePage()}>
+      {/* D92 puis D110 — la largeur et la gouttière du contenu sont celles
+          de l'en-tête, et viennent de `conteneurDePage()` : un seul domicile,
+          vérifié par `largeur-de-page.spec.ts`. D92 avait posé la règle ici le
+          10/11 en RECOPIANT la classe, si bien que les sept écrans jumeaux
+          sont restés désalignés onze jours. La raison d'origine tient : la
+          page partait auparavant bord à bord, si bien que le logo et
+          « Connexion » étaient les deux seuls éléments à respecter une marge,
+          rien en dessous ne s'alignait sur eux, et la colonne de gauche
+          touchait le bord de l'écran sur un grand moniteur.
 
           AUCUNE BORDURE, AUCUN COIN ARRONDI, AUCUNE MARGE VERTICALE (revue du
           10/11) : le contenu s'INCRUSTE dans la page. Un cadre ferait de
@@ -317,10 +321,10 @@ export default function RegisterForm({ heroVisual }: Props) {
           qui ne le soit déjà, il ajoute seulement une frontière à lire.
           `overflow-hidden` est parti avec les coins : il n'était là que pour
           les rogner, et il met en péril tout `position: sticky` à venir. */}
-      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-      {/* LEFT — visuel desktop */}
-      <div className="hidden lg:block">
-        <AuthHeroVisual visual={heroVisual} />
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+        {/* LEFT — visuel desktop */}
+        <div className="hidden lg:block">
+          <AuthHeroVisual visual={heroVisual} />
       </div>
 
       {/* RIGHT — formulaire */}

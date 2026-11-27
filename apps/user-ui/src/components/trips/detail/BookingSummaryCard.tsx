@@ -13,6 +13,7 @@ import {
   formatPrice,
   calculateCO2SavedKg,
 } from "@/lib/public-trip.helpers";
+import { roundToTenth } from "@/lib/number-format";
 import { BILLING_FLOOR_KG, estimateShipperTotalCents } from "@/lib/pricing-example";
 
 type Props = {
@@ -119,11 +120,7 @@ export default function BookingSummaryCard({ trip, weightKg = null }: Props) {
               className="mt-0.5 shrink-0 text-green-600 dark:text-green-500"
             />
             <span>
-              {t("booking.trust.co2", {
-                kg: co2Saved
-                  .toFixed(1)
-                  .replace(".", locale === "fr" ? "," : "."),
-              })}
+              {t("booking.trust.co2", { kg: roundToTenth(co2Saved) })}
             </span>
           </div>
         )}

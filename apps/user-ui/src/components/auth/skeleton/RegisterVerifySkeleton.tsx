@@ -1,5 +1,7 @@
 "use client";
 
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+
 const skel = "animate-pulse rounded-md bg-slate-200 dark:bg-slate-800";
 
 function SkeletonBlock({ className = "" }: { className?: string }) {
@@ -8,23 +10,33 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 
 export default function RegisterVerifySkeleton() {
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
-      {/* LEFT */}
-      <div className="hidden lg:flex lg:flex-col lg:justify-between lg:gap-4 lg:bg-gradient-to-b lg:from-[#FFF7E8] lg:to-white lg:p-6 dark:lg:from-[#1F1408] dark:lg:to-slate-950">
-        <div className="space-y-2">
-          <SkeletonBlock className="h-6 w-3/4" />
-          <SkeletonBlock className="h-3 w-full" />
-          <SkeletonBlock className="h-3 w-2/3" />
-        </div>
-        <div className="flex items-center justify-center">
-          <SkeletonBlock className="h-32 w-60 rounded-xl" />
-        </div>
-        <div className="grid grid-cols-3 gap-2 border-y border-slate-200 py-3 dark:border-slate-800">
-          <SkeletonBlock className="h-8" />
-          <SkeletonBlock className="h-8" />
-          <SkeletonBlock className="h-8" />
-        </div>
-        <SkeletonBlock className="h-14 rounded-lg" />
+    <main className={conteneurDePage()}>
+      {/* D110 — la largeur et la gouttière viennent de `conteneurDePage()` :
+          elles sont celles de l'en-tête, et elles n'ont qu'un domicile. D92
+          avait posé la règle sur l'INSCRIPTION le 10/11 en RECOPIANT la
+          classe ; les sept écrans jumeaux sont restés désalignés onze jours,
+          parce qu'une classe recopiée ne dit à personne qu'elle est une
+          règle. La raison, elle, n'a pas changé : bord à bord, le logo et les
+          contrôles de droite seraient les deux seuls éléments à respecter une
+          marge, et la colonne de gauche toucherait le bord d'un grand
+          moniteur. */}
+      <div className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-78px)]">
+        {/* LEFT */}
+        <div className="hidden lg:flex lg:flex-col lg:justify-between lg:gap-4 lg:bg-gradient-to-b lg:from-[#FFF7E8] lg:to-white lg:p-6 dark:lg:from-[#1F1408] dark:lg:to-slate-950">
+          <div className="space-y-2">
+            <SkeletonBlock className="h-6 w-3/4" />
+            <SkeletonBlock className="h-3 w-full" />
+            <SkeletonBlock className="h-3 w-2/3" />
+          </div>
+          <div className="flex items-center justify-center">
+            <SkeletonBlock className="h-32 w-60 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-y border-slate-200 py-3 dark:border-slate-800">
+            <SkeletonBlock className="h-8" />
+            <SkeletonBlock className="h-8" />
+            <SkeletonBlock className="h-8" />
+          </div>
+          <SkeletonBlock className="h-14 rounded-lg" />
       </div>
 
       {/* RIGHT */}
@@ -63,6 +75,7 @@ export default function RegisterVerifySkeleton() {
           {/* Cancel */}
           <SkeletonBlock className="mx-auto h-3 w-32" />
         </div>
+      </div>
       </div>
     </main>
   );

@@ -12,14 +12,16 @@
  *     conclure qu'aucune ville ne correspond.
  */
 import type { Request, Response, NextFunction } from "express";
-import { AppError, ValidationError } from "@packages/error-handler";
+import { AppError, NotFoundError, ValidationError } from "@packages/error-handler";
 import {
   PlaceAutocompleteQuerySchema,
+  PlaceDetailsQuerySchema,
   resolveViewerLocale,
   type PlaceAutocompleteResponse,
+  type PlaceDetails,
 } from "@packages/api-contracts";
 
-import { lookupPlaces } from "../services/places.service";
+import { lookupPlaceDetails, lookupPlaces } from "../services/places.service";
 
 export const autocompletePlaces = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -60,6 +62,68 @@ export const autocompletePlaces = async (req: Request, res: Response, next: Next
     const body: PlaceAutocompleteResponse = { suggestions };
     // Le service cache déjà 5 minutes côté serveur ; le client, lui, ne doit
     // pas garder une liste qui a changé de langue ou de saisie.
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json(body);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * GET /places/details — le pays et les coordonnées d'un lieu CHOISI (D111 ter)
+ * ============================================================================
+ * Public comme l'autocomplétion qui le précède, et appelé UNE fois : au
+ * moment où l'utilisateur retient une ville, jamais à chaque frappe.
+ *
+ * Sans lui, un client qui n'embarque pas le SDK Google (le mobile) ne peut
+ * obtenir ni code pays ni coordonnées — donc ni corridor ni distance, donc
+ * aucune fourchette de prix. C'est exactement ce qui laissait le téléphone
+ * plus pauvre que le site sur l'écran qui décide du revenu du Voyageur.
+ *
+ * Trois réponses, trois sens :
+ *   • 200 — le détail, éventuellement incomplet (un `countryCode` à `null`
+ *     vaut mieux qu'un code inventé : le calcul sait retomber sur sa base) ;
+ *   • 404 `PLACE_NOT_FOUND` — Google ne connaît pas cet identifiant. Le
+ *     client doit refaire sa saisie, pas réessayer ;
+ *   • 503 `PLACES_UNAVAILABLE` — le service tiers ne répond pas. Le parcours
+ *     continue SANS fourchette, il ne s'arrête pas.
+ */
+export const getPlaceDetails = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = PlaceDetailsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      throw new ValidationError("Invalid place details query", {
+        type: "places",
+        code: "INVALID_QUERY",
+      });
+    }
+
+    const language = resolveViewerLocale({
+      query: parsed.data.language ?? null,
+      preferred: (req as { user?: { preferredLocale?: string | null } }).user?.preferredLocale,
+      header: req.headers["x-locale"] as string | undefined,
+      acceptLanguage: req.headers["accept-language"],
+    });
+
+    const details = await lookupPlaceDetails({
+      placeId: parsed.data.placeId,
+      language,
+      sessionToken: parsed.data.sessionToken,
+    });
+
+    if (details === "unknown") {
+      throw new NotFoundError("Place not found", { type: "places", code: "PLACE_NOT_FOUND" });
+    }
+    if (details === null) {
+      throw new AppError("Place details are unavailable", 503, true, {
+        type: "places",
+        code: "PLACES_UNAVAILABLE",
+      });
+    }
+
+    const body: PlaceDetails = details;
+    // Le serveur cache déjà 24 h ; le client, lui, ne garde rien — il ne
+    // demande ce détail qu'au moment où une ville est retenue.
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(body);
   } catch (error) {

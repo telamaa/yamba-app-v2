@@ -8,7 +8,7 @@
 import { Router } from "express";
 import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
 
-import { autocompletePlaces } from "../controllers/places.controller";
+import { autocompletePlaces, getPlaceDetails } from "../controllers/places.controller";
 
 const router = Router();
 
@@ -16,5 +16,10 @@ const router = Router();
 // reçoit ses propositions dans la langue de son COMPTE (D44), un visiteur
 // reçoit la même réponse dans celle de son appareil.
 router.get("/autocomplete", isOptionallyAuthenticated, autocompletePlaces);
+
+// D111 ter — le détail d'un lieu CHOISI (pays, coordonnées) : une fois par
+// ville retenue, avec le même jeton de session que l'autocomplétion, pour que
+// Google facture l'ensemble comme UNE session.
+router.get("/details", isOptionallyAuthenticated, getPlaceDetails);
 
 export default router;

@@ -14,6 +14,7 @@ import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
 import { SurchargePills } from "./SurchargePills";
 import { countryName } from "@/lib/country-name";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   item: YambaTripResult;
@@ -249,7 +250,7 @@ export default function YambaTripResultCardMobile({
                 {typeof item.rating === "number" && (
                   <>
                     <span className="text-[#FF9900]">★</span>{" "}
-                    {item.rating.toFixed(1).replace(".", ",")}{" "}
+                    {formatRating(item.rating, intlTagFor(locale))}{" "}
                     {typeof item.reviewCount === "number" && (
                       <span className="text-slate-400 dark:text-slate-500">
                         ({item.reviewCount})

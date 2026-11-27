@@ -11727,11 +11727,15 @@
           },
           "secondary": {
             "type": "string"
+          },
+          "placeId": {
+            "type": "string"
           }
         },
         "required": [
           "main",
-          "secondary"
+          "secondary",
+          "placeId"
         ],
         "additionalProperties": false,
         "description": "Une proposition de ville ou d'aéroport"
@@ -11751,6 +11755,91 @@
         ],
         "additionalProperties": false,
         "description": "Propositions de villes (8 au plus, dans la langue demandée)"
+      },
+      "PlaceDetailsQuery": {
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "sessionToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{1,36}$"
+          }
+        },
+        "required": [
+          "placeId"
+        ],
+        "additionalProperties": false,
+        "description": "Paramètres du détail d'un lieu"
+      },
+      "PlaceDetailsResponse": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "city",
+          "country",
+          "countryCode",
+          "lat",
+          "lng"
+        ],
+        "additionalProperties": false,
+        "description": "Pays et coordonnées d'un lieu choisi (pour le corridor de prix)"
       },
       "ArbitrationKind": {
         "type": "string",

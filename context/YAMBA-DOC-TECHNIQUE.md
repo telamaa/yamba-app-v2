@@ -18897,3 +18897,1204 @@ désormais traités pareil.
 ## Reste
 
 **~20 fichiers purs** de `src/lib` sans fiches, tous de moins de 90 lignes.
+
+---
+
+# A224 lot 5 — Le recensement, et la clôture d'A224 (`chore/fiches-du-site-lot-5`, 15/11/2026)
+
+Dernier lot. **208 fiches / 12 suites** là où il y en avait **zéro** le matin même.
+
+## Les sept petits modules qui décident de ce qui s'écrit
+
+Ils ne décident ni d'un prix ni d'un accès. Ils décident de ce qui s'**écrit** — et une faute
+sur le prénom de quelqu'un se remarque davantage qu'un défaut de calcul.
+
+| Module | Ce qu'une fiche garde |
+|---|---|
+| `elision` | « d'Aminata » mais « de Pauline », **accents compris** (ANO-WEB-49) |
+| `country-name` | le texte stocké plutôt que le **code** quand `Intl` ne connaît pas la région |
+| `country-name` | un drapeau est **décoratif** : tout code malformé rend `null`, il ne casse pas la ligne |
+| `format-user` | aucun espace suspendu — il se voit dans une barre de navigation |
+| `routes` | tout lien de la barre est interne et porte un libellé |
+
+**Observation consignée plutôt que corrigée** : `getUserInitials` est la **cinquième** fonction
+d'initiales du dépôt, et son repli est « U » là où `getInitials` rend « ? ». Les contextes
+diffèrent (soi-même contre autrui), donc c'est peut-être une décision — mais elle n'est écrite
+nulle part. La fiche la rend visible sans trancher à la place de l'équipe.
+
+## Une prémisse fausse, attrapée par sa propre fiche
+
+```ts
+expect(countryName("ZZ", "fr", "Pays inconnu")).toBe("Pays inconnu");   // ← rouge
+// reçu : « région inconnue »
+```
+
+`Intl.DisplayNames` **connaît** « ZZ » (code CLDR de la région inconnue) et le traduit. Le cas que
+je voulais tester — un code rendu **tel quel** — demande « XX » ou « QQ ».
+
+> Une fiche qui part au rouge sur une **prémisse** plutôt que sur un défaut reste une bonne
+> fiche : elle vient de corriger ma description de la réalité.
+
+## Le recensement — la pièce qui clôt A224
+
+```ts
+const oublies = modules()
+  .filter((f) => !FRAMEWORK.test(lire(f)))   // pas un module de framework
+  .filter((f) => !sansExecution(f))           // pas un fichier de types
+  .filter((rel) => !couverts.has(rel))        // pas déjà importé par une fiche
+  .filter((rel) => !(rel in EXCEPTIONS));     // pas nommé comme exception
+
+expect(oublies).toEqual([]);
+```
+
+**Pourquoi c'est la fiche la plus utile du lot.** A224 est née d'un constat : personne n'avait
+jamais signalé l'absence de tests du site, parce que **ce qui manque ne produit aucun symptôme**.
+Il a fallu cinq lots consécutifs pour que la dette soit traitée, et elle a été rappelée à
+l'ouverture de chacun sans jamais l'être.
+
+Le même aveuglement guette la suite : on couvre quinze fichiers, on s'arrête, et le seizième
+arrive sans que rien ne le dise.
+
+> **Désormais : tout module pur est soit couvert, soit NOMMÉ avec sa raison.** Ajouter une ligne
+> à `EXCEPTIONS` est une **décision** ; l'oubli silencieux n'en est pas une.
+
+Elle garde aussi **ses propres angles morts** : une exception qui nomme un fichier disparu (un
+mensonge silencieux), une exception sans raison écrite, et un balayage qui ne trouverait rien.
+
+## Et elle a trouvé un vrai oubli dès sa première exécution
+
+`auth/login-redirect.ts` — **il décide d'où l'on revient après connexion**. Les pages d'auth ne
+doivent jamais s'y transmettre (ce serait une boucle), et `/refresh` en fait partie : c'est
+exactement l'oubli de D93, qui avait coûté 27 jours. Sept fiches le gardent maintenant.
+
+## Et sa première version ne voyait que la moitié du dépôt
+
+```ts
+/from "@\/lib\/([^"]+)"/g      // ← guillemets DOUBLES seulement
+```
+
+Sept modules parfaitement couverts par des fiches écrites avec des **guillemets simples** étaient
+déclarés « oubliés ».
+
+> **On vise l'usage, jamais une orthographe.** Cinquième occurrence ce mois-ci — et cette fois le
+> piège était dans l'outil censé détecter les oublis.
+
+## Bilan d'A224, en une journée
+
+| | Matin | Soir |
+|---|---|---|
+| Cible `test` sur `apps/user-ui` | aucune | ✅ |
+| Fiches | **0** | **208 / 12 suites** |
+| Contrôles CI | 19 | **20** |
+| Défauts trouvés par ces fiches | — | **6** (3 initiales, 2 NaN, 1 asymétrie) |
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test user-ui` | **208 / 12 suites** |
+| `nx typecheck user-ui` | propre, les deux programmes |
+| `nx run-many --target=typecheck --all` | 11 projets, verts |
+| `nx test @yamba-app/mobile` | 866 / 45 — inchangé |
+
+---
+
+# D107 — Un en-tête ne dépend plus d'une mesure (`fix/en-tete-sous-la-barre`, 15/11/2026)
+
+> « le from est **toujours** trop haut sur certaines pages »
+
+« Toujours » : c'est-à-dire **après** le correctif de D103 1A, fusionné le matin même. Capture
+horodatée à 13:29 à l'appui.
+
+## Ce qu'il faut dire d'abord
+
+**D103 1A était un vrai défaut, et ce n'était pas la cause de celui-ci.**
+
+Le dépôt n'avait aucun `SafeAreaProvider` pour vingt-cinq consommateurs : l'anomalie était réelle,
+la correction reste juste, elle est posée. **Et le symptôme persiste.**
+
+> Le diagnostic était vraisemblable et il était faux — exactement le piège décrit au **chapitre
+> 244**, trois lots plus tôt, par moi.
+
+La différence entre les deux fois n'est pas la qualité du diagnostic : celui de D103 était mieux
+instruit que la moyenne (deux écrans au code identique, un fournisseur absent pour vingt-cinq
+consommateurs). **La différence est qu'aucune des deux fois le résultat n'a été regardé.**
+
+## La décision : cesser de dépendre d'une mesure
+
+Quelle que soit la raison pour laquelle l'inset haut rend zéro dans cette pile
+(`presentation: 'transparentModal'`, un fournisseur intercalé, un ordre de rendu) :
+
+> **Le symptôme est trop coûteux pour dépendre d'une mesure qui peut échouer.** Un titre posé sur
+> l'horloge n'est pas une imperfection, c'est une information perdue.
+
+```ts
+export function plancherHaut(insetMesure, hauteurDeBarre): number {
+  const sain = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+  return Math.max(sain(insetMesure), sain(hauteurDeBarre));
+}
+```
+
+Deux sources, et **chacune peut mentir** :
+
+| Source | Quand elle se tait |
+|---|---|
+| `useSafeAreaInsets().top` | dans la pile `transparentModal` — le défaut mesuré |
+| `Constants.statusBarHeight` | selon la plateforme |
+
+L'une des deux peut rendre zéro ; les deux ensemble, non.
+
+## Pas de nombre en dur, et une fiche l'interdit
+
+Un plancher fixe serait **faux sur la moitié du parc** : 20 pt sur un iPhone SE, 59 sur un
+appareil à Dynamic Island.
+
+```ts
+expect(hook).not.toMatch(/\b(20|44|59)\b/);
+```
+
+`Constants.statusBarHeight` est la seule valeur à la fois **sûre** et **juste par appareil** — et
+elle ne dépend d'aucun arbre de contexte React, ce qui en fait le filet de sécurité de l'inset,
+qui lui en dépend.
+
+## Vérifié à l'œil — et c'est la première fois de la journée
+
+| | Avant (capture 13:29) | Après (vérifié) |
+|---|---|---|
+| « ‹ From » | **sur** l'horloge et la Dynamic Island | franchement dessous |
+
+**La méthode qui l'a permis mérite d'être retenue** : le lien profond
+`exp://127.0.0.1:8081/--/search/city` est écrasé par la redirection d'accueil quand on l'envoie au
+**démarrage**. Envoyé **pendant que l'application tourne déjà**, il navigue correctement.
+
+```sh
+xcrun simctl openurl booted "exp://127.0.0.1:8081/--/search/city?target=from"   # app déjà lancée
+```
+
+> C'est la réponse partielle à une limite répétée tout au long de cette journée : `simctl` ne sait
+> pas toucher l'écran, mais il sait **naviguer**. Tout écran atteignable par une route est donc
+> vérifiable.
+
+## Contrôles
+
+| Contrôle | Résultat |
+|---|---|
+| `nx test @yamba-app/mobile` | **881 / 46 suites** (866 + 15) |
+| `nx typecheck @yamba-app/mobile` | propre, les deux programmes |
+| Bundle iOS | HTTP 200, 0,42 s |
+| **Écran** | **vu, corrigé** |
+
+## Reste ouvert
+
+La **cause** de l'inset à zéro dans cette pile n'est toujours pas établie. Ce lot la contourne par
+construction. Si elle est trouvée un jour, le plancher restera : il ne coûte rien et protège d'un
+retour.
+
+# D108 — Un nombre montré s'écrit dans la langue du lecteur (`fix/nombres-dans-la-langue`, 21/11/2026)
+
+## Le constat
+
+Capture du simulateur, interface française, carte de résultat :
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Le prix passait par `formatAmountFromCents` (D99). Le poids ne passait par **rien**.
+
+## La cause, mesurée avant d'écrire la correction
+
+En ICU, un argument **simple** `{kg}` n'est pas mis en forme — il est recopié :
+
+```sh
+node -e "const {IntlMessageFormat}=require('intl-messageformat');
+         console.log(new IntlMessageFormat('pour {kg} kg','fr').format({kg:2.3}))"
+# → « pour 2.3 kg »      ... et exactement pareil en 'en'
+```
+
+Il faut **annoncer** la valeur comme un nombre — `{kg, number}` — pour que `Intl.NumberFormat`
+s'applique avec la locale active.
+
+**Pourquoi aucun des vingt contrôles ne le voyait** : `tsc` type toujours un gabarit, quel qu'il
+soit ; le contrôle i18n de la CI compare FR et EN **entre eux**, et les deux étaient faux de la
+même façon ; les six fiches de parité comparent des règles, des clés, des seuils et un ordre —
+jamais un **rendu**.
+
+## Ce qui a été fait
+
+### 1. Le poids — 50 clés
+
+`search` et `trip-detail` / `tripDetail`, les deux fronts, les deux langues, passent de `{kg}` à
+`{kg, number}`. Le miroir FR/EN reste parfait (7/7, 12/12, 3/3, 3/3).
+
+**La forme correcte existait déjà** : `booking.json` écrivait `{kg, number}` sur les deux fronts,
+sept clés, trois dossiers plus loin.
+
+Six sites d'appel passaient une **chaîne déjà mise en forme**. Deux étaient des bombes amorcées —
+`formatParcelKg(...)` et un `.replace('.', locale === "fr" ? "," : ".")` rendaient `"2,3"`, et une
+chaîne `"2,3"` dans un gabarit `{kg, number}` ne se localise pas : elle rend **NaN**.
+
+### 2. Les notes — 20 sites, trois traitements
+
+| Forme | Sites | Faux pour |
+|---|---|---|
+| `toFixed(1)` nu | 10 | les francophones (point toujours) |
+| `toFixed(1).replace(".", ",")` | 8 | les anglophones (virgule toujours) |
+| conscient de la langue, à la main | 2 | personne — mais hors de toute règle |
+
+Conséquence visible : **les deux fronts n'affichaient pas la même note pour le même Voyageur.**
+
+### 3. La règle n'a plus qu'une adresse par front
+
+`apps/mobile/src/lib/number-format.ts` et `apps/user-ui/src/lib/number-format.ts`, **purs, zéro
+import, identiques octet pour octet** — quatrième fichier de ce motif après `pricing-example.ts`
+(D99), `search-facets.ts` (D100) et `parcel-weight.ts` (D101).
+
+```ts
+export function formatRating(rating: number, localeTag: string): string {
+  return new Intl.NumberFormat(localeTag, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(rating);
+}
+
+export function roundToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function intlTagFor(locale: string): string {
+  return locale === 'fr' ? 'fr-FR' : 'en-US';
+}
+```
+
+`roundToTenth` remplace `toFixed(1)` sur le CO₂ : on **arrondit sans mettre en forme**, et la
+langue reste l'affaire du dictionnaire. `intlTagFor` absorbe le ternaire `fr-FR`/`en-US` qui
+existait en six exemplaires.
+
+Là encore, la bonne version dormait dans le dépôt : `trip-result-card.tsx` du téléphone portait un
+`formatRating` local **correct** pendant que dix-neuf autres endroits se débrouillaient. C'est
+cette copie-là qui a déménagé.
+
+## Les fiches
+
+`apps/mobile/src/lib/nombres-dans-la-langue.spec.ts` (20) garde la **règle**, pas la correction du
+jour : aucun `{kg}` nu dans aucun dictionnaire des deux fronts, les deux copies de
+`number-format.ts` comparées octet pour octet, et un balayage des sources qui refuse toute note
+mise en forme à la main. `apps/user-ui/src/lib/number-format.spec.ts` (10) teste le
+**comportement** côté site — l'égalité de deux fichiers ne prouve jamais qu'ils ont raison,
+seulement qu'ils ont tort ensemble.
+
+Le recensement d'A224 lot 5 a fait son travail : il a refusé `number-format.ts` à la seconde où le
+fichier est apparu, tant qu'aucune fiche ne le couvrait.
+
+## Deux pièges payés en route
+
+**① Un contre-test délibéré est resté VERT.** Casser une clé côté site, lancer `nx test` côté
+mobile, attendre le rouge : 13 fiches vertes. C'était le **cache Nx**. `readFileSync` est invisible
+au graphe des dépendances, donc les fichiers de l'autre front ne sont pas des **entrées** du projet
+mobile. `npx jest` du même instant comptait deux échecs.
+
+**Les six fiches de parité du dépôt peuvent donc rester vertes sur une régression de l'autre
+front.** Quand on touche à l'autre front : `npx jest` depuis `apps/mobile`, ou `--skip-nx-cache`.
+
+**② Le balayage a mordu sur le commentaire qui explique l'interdit** — cinquième fois ce mois-ci
+qu'une fiche vise un mot et touche la phrase qui l'explique. Il lit désormais du code, commentaires
+retirés.
+
+## Mesures
+
+| | Avant | Après |
+|---|---|---|
+| mobile | 894 / 47 suites | **901 / 47** |
+| user-ui | 208 / 12 suites | **218 / 13** |
+
+Les trois programmes TypeScript passent, miroir i18n parfait (30 espaces, 60 fichiers).
+
+**Vérifié à l'écran**, les deux langues : téléphone « 29,62 € / estimation pour 2,3 kg » ; site dans
+un vrai Chrome, FR « facturé 2,3 kg minimum », EN « billed at 2.3 kg minimum ».
+
+**Non vérifié à l'écran : les notes.** Aucun Voyageur du jeu de données n'en porte — la carte
+affiche « Thomas N. » sans étoile. Elles sont couvertes par dix fiches unitaires, le typecheck et
+le balayage, pas par un regard. `seed-deals.ts` en donnerait, au prix d'un effacement du jeu
+d'essai.
+
+## Laissé dehors, et nommé
+
+1. Les tailles de fichier (`KB`/`MB`, quatre sites de téléversement) — même maladie, autre parcours.
+2. `booking.state.ts` pré-remplit le champ de poids avec `String(v).replace('.', ',')`, virgule
+   inconditionnelle, donc « 1,5 » dans un champ anglais. C'est une valeur de **saisie**, relue par
+   l'analyseur du formulaire : la corriger sans vérifier ce qu'il accepte échangerait un défaut
+   d'affichage contre un défaut de saisie.
+3. Déclarer les `inputs` Nx des fiches de parité — touche tous les projets et le comportement de
+   la CI.
+
+# D109 — La barre d'onglets nomme ses destinations (`fix/barre-qui-se-nomme`, 21/11/2026)
+
+## Le diagnostic, et pourquoi il ne se lit pas
+
+L'autopsie est partie de deux constats d'écran. Elle a trouvé une **chaîne causale**, pas trois
+défauts séparés.
+
+Mesure sur capture : l'indicateur de sélection vaut `#E8E8E9` sur une barre à `#FAFAFB`, soit
+**1,17:1** — WCAG 1.4.11 demande **3:1** pour un élément d'interface non textuel. Ce n'est donc pas
+un indicateur, c'est une décoration. Et cette décoration occupait **42 des 52 pt** de la barre :
+
+```
+pilule 42  →  fente du libellé 11  →  police 9 pt
+             ↓
+   sous le minimum d'iOS (10) et de Material 3 (11)
+   ratio 9/11 = 1,22, sous le plancher maison de 1,35
+             ↓
+   `typography.spec.ts` exemptait le fichier NOMMÉMENT
+```
+
+Et la raison écrite de l'exception n'était pas une propriété du texte, c'était un **coût** :
+« toucher à la fente rouvre D88 ». L'autre exception du même fichier est légitime (des initiales
+centrées dans un disque ne se lisent pas en lignes). Celle-ci était **une dette déguisée en
+exception**.
+
+Détail qui boucle : le plancher de 1,35 existe parce que Plus Jakarta Sans rogne les jambages, et
+le mot qui avait forcé la descente `13 → 10 → 9` était « Messages », avec son `g`.
+
+## Ce qui a été fait
+
+### 1. Les cinq libellés deviennent permanents (1A)
+
+D88 2A invoquait le mode « étiquette sur le sélectionné » de Material 3. Deux choses lui ont
+échappé : ce mode vise des destinations **déjà apprises**, et M3 recommande l'étiquette permanente
+dès que l'icône est ambiguë — or le raisonnement de D88 2A nommait lui-même deux icônes
+indevinables sur cinq. Surtout, le mot était montré **là où il ne sert à rien**.
+
+Conséquence matérielle : plus de fente réservée. Il n'y a plus de vide à réserver.
+
+### 2. L'indicateur passe derrière l'icône seule (1B) — le geste structurel
+
+C'est la vraie spec de la barre de navigation Material 3, que le fichier citait sans la suivre
+jusqu'au bout : l'indicateur est un bandeau **derrière l'icône**, le libellé vit dessous, dehors.
+Le texte cesse d'être logé dans l'indicateur, donc sa taille cesse d'en dépendre.
+
+### 3. L'indicateur est déclaré décoratif (1C)
+
+On ne le force **pas** à 3:1 : il faudrait un gris sombre qui pèserait plus que la mangue et
+volerait à « Publier » la seule tache chaude de la barre (A210). L'état se dit en **trois signaux
+non colorés** — glyphe plein contre contour (une FORME, donc conforme à WCAG 1.4.1), encre contre
+gris, graisse du mot.
+
+### 4. La hauteur devient une somme (1D)
+
+```ts
+export function barHeight(): number {
+  return INDICATOR_HEIGHT + STACK_GAP + LABEL_LINE_HEIGHT + BAR_BREATHING * 2;
+}           //     32      +     4     +        14        +       5 × 2        = 60
+```
+
+`TabBar.height` appelle cette fonction au lieu de porter un nombre, et `BottomTabInset` suit. Un
+nombre posé une fois devient la contrainte de tout ce qu'il contient : c'est exactement comment 52
+avait produit 9 pt de police.
+
+**L'exception de `typography.spec.ts` est supprimée, pas reconduite.** C'est la mesure du lot, et
+une fiche le vérifie.
+
+### 5. Le « + » est dessiné dans le code (2A)
+
+Avant : `tab-publish.png` en @1x/@2x/@3x, **sans source vectorielle ni variante sombre**. Le seul
+élément de la barre que le fichier de thème ne gouvernait pas — ni teinte, ni état pressé, ni
+Dynamic Type, et toute évolution de la mangue demandait de ré-exporter trois fichiers à la main.
+
+Il portait **trois** éléments dans 27 pt (un plus, un arc, un point) là où Instagram et Vinted en
+posent **un** sur une forme pleine.
+
+Le glyphe est en **encre** et c'est mesuré : du blanc sur `#FF9900` vaut **2,14:1**, sous les 3:1
+de WCAG 1.4.11 ; l'encre `#0B1120` vaut **8,79:1** — et c'est déjà le couple de la pastille de
+badge de cette barre. On suit le précédent de la maison plutôt que d'en inventer un.
+
+### 6. La teinte de la marque dépend du THÈME (2B)
+
+Trouvé en **regardant** le mode sombre, pas en relisant le code. L'état actif employait
+`mangoDark`, dont le jeton dit lui-même « pour l'état actif sur fond **clair** ». Mesuré contre les
+deux fonds de barre :
+
+| | barre claire `#FAFAFB` | barre sombre `#1C1C1E` |
+|---|---|---|
+| `#FF9900` | 2,05:1 | 7,95:1 |
+| `#CC7A00` | **3,17:1** | 5,15:1 |
+
+Assombrir sur une barre sombre rendait donc la marque **moins** visible au moment où elle doit
+l'être le plus. C'est le défaut ① que D88 avait déjà corrigé une fois sur cette même barre : « un
+même jeton ne vaut pas sur deux supports ».
+
+La règle ne dépend d'aucun jeton : **l'état actif s'éloigne toujours de la luminance de sa barre.**
+Elle vit dans `markBackground(dark, focused)` et une fiche la vérifie par le contraste, pas par les
+valeurs.
+
+## Les fiches
+
+`barre-qui-se-nomme.spec.ts`, **19 fiches**. Les mesures vivent dans un module **pur**
+(`lib/tab-bar-geometry.ts`), comme `back-affordance.ts` l'a fait pour le retour (D105) : une fiche
+ne peut pas importer un composant, qui tire `react-native` — le harnais est `testEnvironment: node`
+(A223).
+
+Deux prises réelles pendant l'écriture :
+
+1. **Les en-têtes de `tab-bar.tsx` et de `(tabs)/_layout.tsx` décrivaient encore l'ancien
+   comportement.** Une fiche qui cherche `labelSlot` dans la source trouve aussi la documentation
+   qui le mentionne — ici c'était justifié : la doc mentait.
+2. **Une fiche qui comptait les occurrences de `{label}`** comptait aussi `accessibilityLabel` et
+   partait au rouge pour rien — sixième fois ce mois-ci qu'une fiche vise une orthographe. Elle
+   vérifie désormais que les cinq routes ont un mot, dans les **deux** langues.
+
+## Mesures
+
+mobile **901 → 920** (48 suites). Les deux programmes TypeScript passent.
+
+**Vu à l'écran** : thème clair et thème sombre, onglet « Accueil » actif et onglet « Publier »
+actif — c'est-à-dire l'état où la marque devait montrer sa sélection et ne le pouvait pas.
+
+## Un piège connu, repayé
+
+Au premier rechargement : `ReferenceError: Property 'INDICATOR_RADIUS' doesn't exist`, avec
+typecheck vert et 916 fiches vertes. C'est **D102 au mot près** — un fichier créé dans une passe et
+un `import` ajouté dans une passe suivante font servir à Metro un transform intermédiaire. Remède
+documenté : `npx expo start --go --clear`.
+
+**En revanche, la vérification que CLAUDE.md recommande ne s'applique plus telle quelle** : grep
+sur le bundle servi. Expo SDK 57 charge les modules **à la demande**, et le bundle d'entrée fait
+6 Mo sans contenir un seul écran — `grep YambaTabBar` y rend zéro alors que tout fonctionne. Ce qui
+tranche aujourd'hui est un **redémarrage à froid de l'app** suivi d'une capture.
+
+## Examiné et délibérément gardé
+
+La mangue reste la propriété exclusive de « Publier » (A210) ; la cible tactile reste la cellule
+entière (64 × 60, bien au-delà des 44 pt de RG-D105-2) ; le mot reste **sous** l'icône et non à
+côté — à côté, il pousse les quatre autres onglets à chaque sélection.
+
+## Reste ouvert
+
+Le **cube** pour « Activité » : dans une application de colis, une boîte veut dire *colis*, pas
+*activité*. Avec cinq libellés permanents, le mot tranche l'ambiguïté — le renommage éventuel est
+un arbitrage produit, pas un défaut d'interface.
+
+# D110 — La largeur de page n'a qu'un domicile (`fix/entete-et-page-alignes`, 21/11/2026)
+
+## Le diagnostic : il se compte, il ne se lit pas
+
+Le lot part d'un retour de recette sur l'alignement de l'en-tête et du contenu. Trente-sept
+fichiers étaient en cause, et **chacune de leurs lignes est correcte prise seule** — c'est pour
+cela qu'une relecture ne voit rien. Ce qui tranche, c'est un comptage :
+
+```sh
+grep -rn "max-w-7xl" apps/user-ui/src --include='*.tsx' | wc -l     #  51
+grep -rho "max-w-7xl[^\"\`]*" apps/user-ui/src --include='*.tsx' \
+  | grep -o "px-[0-9]*\( sm:px-[0-9]*\)\?" | sort | uniq -c | sort -rn
+#  45 px-4      ← l'en-tête est ici
+#  20 px-6      ← `sm:px-6`, tout le parcours connecté
+#   2 px-3
+#   1 px-8
+#   1 px-1
+```
+
+Cinq gouttières pour un même cadre, et l'en-tête dans le camp le plus serré. **Conséquence
+mesurable : au-delà de 640 px, vingt blocs de contenu commençaient 8 px plus à l'intérieur que le
+logo** — tunnel de réservation, suivi de colis, fiche trajet, notation, affaire du Voyageur.
+
+Et le dépôt avait déjà la solution. `components/layout/AppContainer.tsx` portait en en-tête :
+
+> Container réutilisable qui garantit un **alignement parfait avec le Header**. **Source de
+> vérité** pour les dimensions de layout de l'app […] Si un jour tu changes les dimensions,
+> change-les ici **UNE SEULE FOIS** et tout le layout de l'app suivra.
+
+**Un seul fichier l'importait** (`TripSearchBar`). D92, qui a posé la règle d'alignement sur
+l'inscription le 10/11, a recopié la classe au lieu d'importer le composant situé deux dossiers
+plus loin — et les sept écrans jumeaux sont restés désalignés onze jours.
+
+## Ce qui a été fait
+
+**1. La règle déménage dans un module pur.** `apps/user-ui/src/lib/layout/largeur-de-page.ts`,
+zéro import :
+
+```ts
+export const LARGEUR_MAX_DE_PAGE = "max-w-7xl";
+export const GOUTTIERE_DE_PAGE = "px-4 sm:px-6";
+export const HAUTEUR_D_EN_TETE = 78;
+
+export function conteneurDePage(extra = ""): string {
+  return `mx-auto w-full ${LARGEUR_MAX_DE_PAGE} ${GOUTTIERE_DE_PAGE} ${extra}`.trim();
+}
+
+export function rangeeDEnTete(compact: boolean): string { /* … */ }
+```
+
+C'est la quatrième fois que ce dépôt sort une règle d'un composant pour qu'une fiche puisse
+l'exécuter : `tunnel.ts` (D93), `search-facets.ts` (D100), `parcel-weight.ts` (D101),
+`back-affordance.ts` (D105). La frontière d'A223/A224 est tenue : **une règle qu'on veut tester
+SORT de l'écran.**
+
+**2. La gouttière devient `px-4 sm:px-6` partout, en-tête compris** — arbitrage rendu par
+l'utilisateur sur trois options chiffrées. Sous 640 px rien ne bouge ; au-delà, le logo et les
+contrôles de droite rentrent de 8 px.
+
+**3. Le littéral `max-w-7xl` quitte les 37 fichiers.** 38 occurrences remplacées par
+`conteneurDePage(…)`, l'extra ne portant plus que ce qui appartient à l'appelant :
+
+```tsx
+// avant
+<div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+// après
+<div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
+```
+
+**4. L'en-tête et son squelette partagent leur rangée.** Les deux fichiers portaient la même
+chaîne de 94 caractères, recopiée. `rangeeDEnTete(isCompact)` la leur sert : la leçon de D93
+(« `HeaderSkeleton` est monté en PERMANENCE, toute règle de la branche réelle doit y être aussi »)
+devient **structurelle** au lieu d'être mémorisée. Vérifié sur pièce dans le DOM — le squelette
+est bien le premier `<header>`, à `display: none`, hauteur 0 ; le vrai fait 79 px (78 + bordure).
+
+**5. `AppContainer` cesse de prétendre être la source et le devient.** Il consomme le module. Son
+en-tête de fichier dit maintenant ce qu'il est : un consommateur commode, pas une autorité.
+
+**6. Les trois déviations examinées étaient trois défauts.** `dashboard/layout.tsx` à `px-1` (le
+fichier se vante dans son propre en-tête d'avoir réglé « le décalage » — c'était le décalage
+VERTICAL) ; `SearchResultsView.tsx` à `px-3` deux fois, dont **le squelette de la barre de
+recherche** quand la barre réelle passe par `AppContainer` — le défaut de D93 rejoué ;
+`OnboardingBanner.tsx` avec une troisième valeur à `lg:px-8`.
+
+**7. Le jumeau vertical, trouvé en cadrant la fiche.** Les dix conteneurs d'auth soustrayaient
+**64 px** du viewport — l'ancienne hauteur `h-16` — là où l'en-tête occupe 78 et où les layouts
+marketing et dashboard soustraient bien 78. Les deux `const HEADER_HEIGHT = 78` recopiés dans les
+composants de recherche importent désormais `HAUTEUR_D_EN_TETE`.
+
+## Mesures
+
+Mesuré dans le DOM, en Chrome système, par `getBoundingClientRect` — pas à l'œil.
+
+| Fenêtre | logo | contenu (auth) | écart | débordement vertical |
+|---|---|---|---|---|
+| 390 px | @16 | @16 | **0 px** | 0 px |
+| 768 px | @24 | @24 | **0 px** | 0 px |
+| 1440 px | @104 | @104 | **0 px** | 0 px |
+
+À 1440 px : la rangée d'en-tête est une boîte de 1280 px à @80, son contenu démarre donc à 104 —
+et tous les cadres de page du site démarrent au même 80. Contrefactuel du volet vertical, obtenu
+en rebasculant le seul chiffre 78 → 64 : **débordement 14 px, hauteur de grille 836 px**, contre
+**0 px et 822 px** après. Le défilement permanent des huit écrans d'auth était réel.
+
+Fiches : user-ui **218 → 232** (14 fiches, 13 → 14 suites). Les deux programmes TypeScript du
+site passent, et `run-many --target=typecheck --all` également (exit 0).
+
+## Un piège connu, repayé
+
+**Viser une forme plutôt qu'un sens.** Le premier jet du balayage des hauteurs ramassait tout
+`h-[…px]` du site et rougissait sur l'avatar d'un squelette à 68 px. Le balayage ne retient
+désormais que les écritures dont le SENS est la hauteur de l'en-tête (soustractions du viewport,
+constantes nommées). C'est la cinquième fois en un mois dans ce dépôt, et la leçon se durcit : **un
+faux positif dans un balayage coûte autant qu'un trou, parce qu'on finit par le désactiver.**
+
+Deuxième piège, le même en miroir : la fiche dépouille les commentaires avant de chercher. Cinq
+commentaires du dépôt citent `max-w-7xl` pour EXPLIQUER la règle ; les compter rendrait la fiche
+rouge pour la plus mauvaise raison — c'est le défaut qu'A224 lot 5 avait trouvé dans son propre
+détecteur.
+
+Troisième, payé en direct : un commentaire JSX `{/* … */}` placé **avant** l'élément racine d'un
+`return` est une erreur de syntaxe, pas un commentaire. `tsc` l'a dit immédiatement.
+
+## Examiné et délibérément gardé
+
+- **`max-w-7xl` (1280 px) ne change pas.** Le lot ne touche ni la largeur ni la hauteur, seulement
+  la gouttière et le NOMBRE de domiciles de la règle.
+- **`AppContainer` survit.** Un composant enveloppant reste plus commode qu'une fonction quand on
+  a un sous-arbre à entourer ; il consomme simplement le module.
+- **Les 29 conteneurs centrés plus ÉTROITS** (`max-w-6xl` à `max-w-2xl`, 25 fichiers) ne sont pas
+  alignés de force : une colonne de lecture étroite centrée dans le cadre est un motif légitime.
+  Aucune ne porte la largeur du cadre. Ils sont **recensés** dans la fiche, pas corrigés.
+
+## Reste ouvert
+
+- **« Second cadre ou colonne ? »** Les six pages « preview » recopient `max-w-6xl px-4 sm:px-6` :
+  si c'est un second cadre, il mérite son propre jeton ; si ce sont des colonnes, leurs gouttières
+  doivent disparaître (le cadre les fournit déjà). Arbitrage produit, pas fiche.
+- **Défaut latent NOMMÉ dans le code, non corrigé** : `UserProfileView.tsx` porte
+  `lg:grid-cols-[minmax(0,1fr)_320px]` **sans `lg:grid`** — la grille à deux colonnes de cette page
+  n'a donc jamais fonctionné. Le corriger déplace tout le contenu : c'est un lot de mise en page.
+
+---
+
+# D111 — Le tunnel natif « publier un trajet » (24/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **920 → 1013 fiches** (52 suites),
+`apps/mobile` seul touché, aucun service modifié.
+
+## Le constat
+
+Le parcours Voyageur n'existait que sur le site : **6 436 lignes, vingt et un fichiers, zéro test**
+(`apps/user-ui/src/components/trips/create/`). Le téléphone portait une **coquille honnête** de
+75 lignes qui disait « le parcours arrive » et ne renvoyait nulle part (A203, doctrine « full natif,
+jamais le site »). C'était le plus gros parcours manquant, et celui de l'**offre** — le goulot d'une
+place de marché.
+
+## Ce qui a été construit
+
+Sept écrans POUSSÉS par-dessus les onglets, une question par écran, dans une pile `publish-trip/` :
+
+| # | Route | Question | Ce qu'elle écrit |
+|---|---|---|---|
+| ① | `publish-trip/index` | Comment voyages-tu ? | `mode`, `sousType`, `escales`, et les lieux par défaut |
+| ② | `publish-trip/route` | Ton itinéraire | `depart`, `arrivee` (via `publish-trip/city`) |
+| ③ | `publish-trip/when` | Quand pars-tu ? | dates et heures (via `publish-trip/date`), référence du billet |
+| ④ | `publish-trip/price` | Ton prix et tes kilos | `prixParKiloEur`, `capaciteKg` |
+| ⑤ | `publish-trip/families` | Ce que tu acceptes | les 8 familles, les 2 forfaits bagage |
+| ⑥ | `publish-trip/places` | Où se fait l'échange | `lieuxRemise`, `lieuxLivraison` |
+| ⑦ | `publish-trip/review` | Vérifie et publie | options, notes, `POST /trips` |
+
+L'onglet « + » (`(tabs)/publish.tsx`) devient le **seuil** du tunnel : il porte la promesse, la carte
+« Reprendre » quand un brouillon existe, et la porte d'identité. Il n'est pas la première étape pour
+une raison mesurable — le cadre d'étape a une **barre d'action permanente** en bas, et dans un onglet
+elle se superposerait à la barre flottante.
+
+## Les fichiers
+
+**Règles pures (zéro import, lisibles par le harnais)**
+
+- `src/lib/publish-trip.ts` — vocabulaire du contrat, brouillon, validation par écran, phases.
+- `src/lib/publish-pricing.ts` — bornes, crans, valeurs d'usage, gain net, forfaits (RG-B-29).
+- `src/lib/publish-payload.ts` — la dernière règle avant le réseau : cents, dates ISO, filtres.
+- `src/lib/place-label.ts` — `placeLabel` / `placeCountry`, sortis de `api/places.api.ts`.
+
+**État** : `src/lib/publish-draft.ts` — mémoire de PROCESSUS (motif `booking-draft` / `search-draft`),
+effacée à la déconnexion comme `last-search` (D106).
+
+**Écrans partagés** : `components/publish/publish-step-frame.tsx` (cadre, jauge, barre de gain),
+`components/publish/number-stepper.tsx` (pas-à-pas 44 pt + valeurs d'usage),
+`components/city-picker.tsx` (l'écran ville, désormais partagé avec la recherche).
+
+**Réseau** : `src/lib/api/publish.api.ts` — `POST /trips`, même endpoint que le site.
+
+## Cinq décisions qui s'écartent du site, et pourquoi
+
+1. **« Aller-retour » n'est pas repris.** Le mapper web envoie `returnDepartureAt: null` dans les
+   deux cas et ne crée aucun second trajet : le choix n'ajoute qu'un mot sur la fiche du Voyageur.
+   Un contrôle qui affirme ce que le produit ne fait pas est le défaut de D100.
+2. **Le brouillon parle la langue du contrat** (`PLANE`, `WITH_LAYOVER`, `CITY_AREA`) : le mapper de
+   318 lignes du site disparaît, et avec lui ses occasions de se tromper.
+3. **Les curseurs deviennent des pas-à-pas** (A207 / D101 2A) : mêmes nombres — une fiche les lit
+   dans `create-trip.config.ts` —, geste natif.
+4. **Les souplesses dépendent du lieu** : « exact » n'est pas proposé sur une zone de ville, « toute
+   la ville » ne l'est pas sur un aéroport.
+5. **Un seul écran ville pour deux parcours** : le composant porte le geste, les routes portent
+   leurs mots et ce qu'elles font du choix.
+
+## Vérification bout en bout
+
+Le corps produit par `construireCorps` (le code livré, pas une maquette) a été envoyé au serveur réel
+via le gateway : **201**, trajet `PUBLISHED`, `pricePerKgCents: 950`, `capacityKg: 23`,
+`familyConditions` réduit aux deux familles qui s'écartent, `pickupLocations` réduit au lieu allumé
+avec ses précisions. Les sept écrans ont été ouverts un à un au simulateur iOS par lien profond
+(`xcrun simctl openurl booted "exp://127.0.0.1:8081/--/publish-trip/<écran>"`, technique de D107).
+
+## Trois défauts qui n'existaient que sur l'écran
+
+- **Le prix affiché que rien n'appliquait.** L'écran montrait « 10,00 €/kg · 12 kg » pendant que le
+  brouillon valait `null` : la barre annonçait « ton gain s'affichera ici » et « Continuer »
+  reprochait « fixe ton prix au kilo » sous un prix affiché. C'est D99 3C, commis dans l'écran dont
+  l'en-tête le cite. Corrigé en ÉCRIVANT les valeurs d'ouverture dans le brouillon au montage.
+  **Rectifié le 25/11** : cette section affirmait que « le site a le même défaut ». C'est faux —
+  `StepConditions.tsx` écrit la médiane suggérée dans son brouillon au montage (D15, « la suggestion
+  guide, le Voyageur ajuste »). Le site avait raison ; le correctif mobile ne fait que le rejoindre.
+- **Le zéro qui ment.** Le récap affichait « 0,00 €/kg · 0 kg » : zéro est un montant, l'absence n'en
+  est pas un.
+- **L'écran muet.** Les lieux se rendaient vides quand le mode n'était pas choisi — deux titres et
+  rien. Il repose les cartes si le mode existe, et le DIT sinon, avec la porte pour y aller.
+
+## Un piège qu'aucun typecheck ne voit
+
+`(tabs)/publish.tsx` et un dossier `src/app/publish/` revendiquent **la même route** `/publish` :
+expo-router génère les deux dans ses types, `tsc` passe, et `router.push('/publish')` depuis l'onglet
+retombe sur l'onglet. Le tunnel s'appelle donc `publish-trip/`.
+
+## Reste ouvert
+
+- **La fourchette de prix par corridor.** `suggestPricePerKg` (site) a besoin du code pays et des
+  coordonnées ; le relais Places (A211) ne rend que deux chaînes. L'afficher quand même montrerait la
+  même médiane sur tous les corridors — le défaut de D100. Chemin : `/places/details` avec le même
+  jeton de session (facturé dans la session Google), ou le code pays ajouté à l'autocomplétion.
+- **Le justificatif de billet** (`expo-image-picker` est déjà présent ; le site le pose à l'étape 1).
+- **Le brouillon serveur** (« Brouillon » du site) : ce doit être un trajet en base, pas un second
+  brouillon local.
+- **Le fuseau horaire** : `departureAt` part dans le fuseau de l'appareil, comme sur le site.
+
+---
+
+# D111 bis — Le ton, six écrans, et le retour qui existe (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` (suite de D111) · **Mesures** : mobile **1013 → 1019
+fiches**, site **232 → 238 fiches**. Aucun service touché.
+
+## Ce qui a déclenché le lot
+
+Une revue d'écran sur huit captures du tunnel joué de bout en bout
+(`context/captures/25-11`), et une phrase : « les textes des phrases sont trop longues et ça ressent
+trop de l'IA, il faut que les textes soient courts, simples, précis, naturels, humains ».
+
+## 1. Le ton
+
+Le défaut n'était pas le vocabulaire, c'était la **posture** : chaque écran expliquait son propre
+mécanisme (« Le mode de transport décide des lieux d'échange qu'on te proposera »). Un écran qui
+explique comment il marche avoue qu'il n'est pas évident.
+
+Trois règles, appliquées aux deux fronts :
+
+| Règle | Avant | Après |
+|---|---|---|
+| Un titre : une question ou un nom, 4 mots max | « Comment voyages-tu ? » puis « Ton itinéraire » | « Ton voyage » |
+| Pas de sous-titre s'il n'ajoute rien | 9 sous-titres sur le téléphone | 1 (« Ton prix est net. ») |
+| Un libellé est un libellé, pas une phrase | « Remise à l'aéroport ou en ville » | « Aéroport ou ville » |
+
+Côté site, **douze textes** raccourcis dans `create-trip.copy.ts` (sous-titres d'étape, offre,
+familles, bagages, gain net, lieux).
+
+## 2. Quatre défauts lus sur les captures
+
+- **`1 refusée(s), 1 avec supplément`** — le « (s) » d'un formulaire administratif. Deux clés ICU au
+  pluriel, jointes seulement si les deux comptent.
+- **Les pastilles de prix débordaient** sur deux lignes (« 15 €/kg » orphelin) : l'unité vit déjà
+  sous le pas-à-pas, la pastille garde « 8 € ».
+- **Le récap écrivait deux fois la même date** sur deux lignes → « 28 novembre · 10:00 → 13:12 ».
+- **Le marque-place des lieux** était tronqué et parlait de gare sur une carte d'aéroport.
+
+## 3. La fusion ① + ② — sept écrans deviennent six
+
+L'écran du mode demandait trois taps, celui de l'itinéraire deux lignes, et chacun laissait les deux
+tiers de sa hauteur vides. Réunis, ils forment un objet : **« Ton voyage »**. La règle « une question
+par écran » tient toujours — la question est « quel voyage ? ».
+
+Conséquences techniques : `ECRANS_PUBLICATION` passe à 6, `PHASES_PUBLICATION` recalcule ses bornes,
+`MANQUES_PAR_ECRAN` passe de trois clés à deux, `publish-trip/route.tsx` disparaît, et les cinq
+écrans suivants sont renumérotés. Les trois fiches qui encodaient la forme à sept écrans sont
+parties au rouge — elles faisaient leur travail.
+
+## 4. « Publier le retour » — l'aller-retour devient vrai, sur les deux fronts
+
+Le site proposait « Aller simple / Aller-retour ». Le choix partait au serveur, mais le mapper envoie
+`returnDepartureAt: null` **dans les deux cas** et ne crée aucun second trajet.
+
+Le contrôle disparaît (`StepTrip.tsx`), et le retour est proposé **après** la publication :
+
+- téléphone : `publish-trip/done.tsx`, la règle dans `lib/publish-trip.ts` (`preparerLeRetour`) ;
+- site : `TripPublishedPanel.tsx`, partagé par le grand formulaire et la variante mobile, la règle
+  dans `lib/trips/retour-de-trajet.ts` (pure, 6 fiches).
+
+Ce qui s'inverse : les deux villes **et les deux listes de lieux** — côté site, avec le `context` de
+chaque point (`PICKUP` ↔ `DELIVERY`). Ce qui se garde : mode, type, prix, capacité, familles,
+forfaits, options, notes. Ce qui s'efface : dates, heures, référence et justificatifs.
+
+Le site perd sa **redirection automatique** vers `/dashboard/trips` (1,5 s après le toast) : elle
+fermait la seule porte qui valait la peine d'être ouverte.
+
+## 5. Le billet remonte à la vérification
+
+Sur les deux fronts, il vivait loin du bouton « Publier » (bas de l'écran des dates sur le téléphone,
+accordéon de l'étape ① sur le site). Il débloque « Voyage vérifié », donc des réservations : sa place
+est à côté du geste qui engage.
+
+Sur le téléphone il gagne sa photo (`expo-image-picker` + ImageKit, **même dossier `/trips` que le
+site**). Deux décisions d'ordre :
+
+1. **Le fichier part dès qu'il est choisi**, pas au moment de publier — un échec d'image doit se voir
+   là où on l'ajoute, pas sous le bouton « Publier » où il obligerait à choisir entre publier sans
+   billet et tout reprendre.
+2. **L'attachement est séparé de la création** (le serveur range le document sous l'id du trajet) :
+   un échec laisse un trajet en ligne sans badge — le bon sens de l'échec — et l'écran de fin le dit.
+
+## 6. Rectification d'une affirmation gravée la veille
+
+D111 écrivait que « le site a exactement le même défaut » que le premier jet de l'écran du prix (une
+valeur affichée que rien n'applique). **C'est faux** : `StepConditions.tsx` écrit la médiane suggérée
+dans son brouillon au montage (D15). Le site avait raison, le défaut était mobile seul. Corrigé au
+registre, dans les deux cumulatifs et dans l'en-tête de l'écran.
+
+## 7. Le recensement du site apprend les imports relatifs
+
+Son détecteur ne voyait que `from "@/lib/…"` : une fiche posée **à côté** de son module, qui
+l'importe en `./module`, était déclarée absente. Troisième faux positif du même genre dans ce fichier
+(après celui des guillemets). Vérifié dans les deux sens.
+
+## Reste ouvert (inchangé, et c'est l'arbitrage à rendre)
+
+- **La fourchette de prix par corridor** — le seul point où le téléphone reste plus pauvre que le
+  site. Chemin : `placeId` dans l'autocomplétion, `/places/details` côté trip-service (même jeton de
+  session), puis le moteur de corridors dupliqué sur le téléphone.
+- **Le brouillon serveur** — il doit être un trajet en base, pas un second brouillon local.
+
+---
+
+# D111 ter — La fourchette de prix par corridor (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : trip-service **414 → 430 fiches**,
+mobile **1019 → 1042 fiches**. Premier lot de la série D99 → D102 à ajouter une ligne à un service.
+
+## Le constat, et il n'était pas d'interface
+
+Le site affiche depuis D15 une fourchette « basse / médiane / haute » sous son curseur de prix ; le
+téléphone n'avait rien — sur l'écran qui décide du revenu du Voyageur. Le calcul existait pourtant
+des deux côtés. Ce qui manquait, c'était sa **matière** : le corridor se lit sur deux codes pays et
+une distance, et le relais Places (A211) ne servait que deux chaînes (`main`, `secondary`).
+
+Le site les obtient du SDK Google chargé dans le navigateur. Une app native ne peut pas embarquer ce
+SDK sans embarquer la clé — donc c'est le **serveur** qui devait bouger.
+
+## Côté serveur
+
+**`placeId` entre dans le contrat d'autocomplétion** (`PlaceSuggestionSchema`), vide quand Google
+n'en donne pas.
+
+**`GET /places/details?placeId=…&language=…&sessionToken=…`** — public comme l'autocomplétion,
+appelé **une fois par ville retenue**.
+
+| Décision | Pourquoi |
+|---|---|
+| Le `sessionToken` est relayé jusqu'ici | Avec le même jeton, Google facture l'autocomplétion **et** ce détail comme une seule session. Un jeton qui s'arrête au milieu du parcours double la facture sans que rien ne le signale. |
+| Masque de champs réduit (`location,displayName,addressComponents`) | La facturation dépend du masque : `*` ferait payer un niveau supérieur pour quatre valeurs. |
+| Cache Redis **24 h** par (lieu, langue) | Le code pays de Paris ne changera pas cette semaine. |
+| 200 / **404** / **503** | Trois sens distincts : le détail ; l'identifiant inconnu (refaire la saisie) ; le tiers muet (réessayer). Les confondre ferait dire « réessaie plus tard » à qui doit recommencer. |
+
+Les règles de projection restent pures (`places.rules.ts`) : la ville vient du composant `locality`
+**ou** du nom affiché (une proposition d'aéroport n'a pas toujours de `locality`), le code pays est
+mis en majuscules et refusé s'il ne fait pas deux lettres (il voyage jusqu'à une table de zones), et
+une coordonnée non finie devient `null` — `NaN` traverse toutes les comparaisons sans en déclencher
+une seule.
+
+## Côté téléphone
+
+```
+CityPicker  ──pick──►  { ville, pays, libelle, placeId }  + jeton de session
+                              │
+                router.back() │  (l'écran se referme TOUT DE SUITE)
+                              ▼
+                   GET /places/details  ──►  { countryCode, lat, lng }
+                              │
+                              ▼          (jetée si la ville a changé)
+                      brouillon enrichi  ──►  fourchetteDuCorridor()
+```
+
+Trois décisions tiennent ce chemin :
+
+1. **Le détail enrichit, il ne retient pas.** Faire patienter sur un réseau lent pour un confort
+   ferait payer deux fois : l'attente, et l'échec possible. Le brouillon est une mémoire de module —
+   un écran dépilé n'empêche pas de l'enrichir.
+2. **Une réponse en retard est jetée** si la ville a changé entre-temps (la règle que la liste de
+   suggestions appliquait déjà).
+3. **La jauge ne s'affiche pas quand le corridor est inconnu** (`precis === false`). Une médiane de
+   repli serait la même sur tous les corridors : un repère qui a l'air d'en être un, c'est-à-dire le
+   défaut de D100.
+
+Et quand le corridor **est** connu, la valeur d'ouverture du prix devient sa médiane arrondie au
+demi-euro : proposer le prix du marché fait gagner un réglage à qui n'a pas d'avis.
+
+## Ce que la jauge montre, et pourquoi si peu
+
+Une piste, un repère, la médiane, un verdict (« Prix juste » / « Sous le marché » / « Au-dessus du
+marché »). Le site ajoute un popover « Pourquoi ce prix ? » détaillant les modificateurs ; sur un
+téléphone, ce détail appartient à une page d'aide, pas à l'écran où l'on règle un curseur.
+
+**La zone « juste » est peinte en teal, pas en gris** : un gris de remplissage sur un gris de piste,
+c'est 3 % d'écart de luminance — le défaut mesuré de D88 ① sur la barre d'onglets. Vu à l'écran
+avant/après.
+
+## Les nombres sont ceux du site
+
+`pricing-corridors.ts` devient le **cinquième fichier dupliqué à l'octet près** entre les deux
+fronts (après `pricing-example`, `search-facets`, `parcel-weight`, `number-format`), avec sa fiche de
+comparaison. Les modificateurs (`lowPct`, `highPct`, `directFlightMod`, les deux paliers de délai)
+sont confrontés à `create-trip.config.ts`, lu à l'exécution.
+
+## Limite connue
+
+`GOOGLE_MAPS_SERVER_API_KEY` est absente du `.env` de ce poste : **l'aller-retour Google n'a pas été
+joué en vrai**. Ce qui a été vérifié : la route à travers le gateway (400 sans `placeId` — aucun
+appel facturé ; 503 sans clé), la projection par ses fiches pures, et la jauge à l'écran sur un
+corridor forcé. Le premier appel avec une vraie clé reste à faire.
+
+---
+
+# D111 quater — Le brouillon serveur (25/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **1042 → 1065 fiches** (54
+suites). **Aucune ligne de serveur** — le serveur savait déjà tout faire.
+
+## Le constat
+
+Le brouillon de publication vivait en mémoire de processus (`publish-draft.ts`) : l'app tuée, le
+trajet était perdu. Pour un Voyageur qui commence sa saisie à l'aéroport et embarque, c'est le pire
+moment possible.
+
+Le serveur, lui, enregistre un trajet `DRAFT` depuis toujours — c'est le bouton « Brouillon » du
+site. Les cinq routes nécessaires existaient :
+
+| Route | Usage |
+|---|---|
+| `POST /trips` (`publish: false`) | créer le brouillon |
+| `PUT /trips/:id` (`publish: false`) | le mettre à jour |
+| `PUT /trips/:id` (`publish: true`) | le publier |
+| `GET /trips/my?status=DRAFT` | le retrouver |
+| `DELETE /trips/:id?hard=true` | le jeter |
+
+## Quatre décisions
+
+### ① La copie locale reste la copie de travail
+
+C'est la décision qui commande les trois autres. La sauvegarde est un **filet**, pas une étape :
+elle ne bloque jamais la navigation (`void sauvegarderLeBrouillon()`), et son échec ne se montre
+pas. Refuser l'écran suivant parce que le réseau tousse ferait perdre exactement ce que la
+sauvegarde protège.
+
+Conséquence : il n'y a jamais deux sources de vérité en concurrence. La copie serveur **rattrape**
+la locale ; l'inverse n'arrive qu'à la reprise explicite.
+
+### ② Elle commence à la fin du premier écran
+
+`createTripSchema` exige trois champs et trois seulement : `transportMode`, `originCity`,
+`destinationCity`. La règle est pure et vit dans `publish-trip.ts` :
+
+```ts
+export function pretPourLeServeur(draft: PublishDraft): boolean
+```
+
+Une fiche la confronte à `manquesDeLEcran(1)` : le jour où le serveur exigera autre chose, c'est
+cette fonction qui rougira, pas un parcours.
+
+### ③ Les enregistrements sont sérialisés
+
+Deux « Continuer » rapprochés lanceraient deux créations concurrentes — **deux brouillons pour un
+seul trajet**. Une file d'attente d'une ligne garantit que le second appel voit l'identifiant posé
+par le premier :
+
+```ts
+let enVol: Promise<void> = Promise.resolve();
+export function sauvegarderLeBrouillon(): Promise<void> {
+  const suite = enVol.then(executer);
+  enVol = suite.catch(() => undefined);   // la file ne se rompt pas sur un échec
+  return suite;
+}
+```
+
+### ④ La reprise passe par un mapper inverse, pur et défensif
+
+`publish-reverse.ts` fait le chemin inverse de `publish-payload.ts`. La base contient des trajets
+écrits par le site, par des versions antérieures de l'app et par des seeds : tout champ peut
+manquer, tout type peut surprendre.
+
+Trois règles méritent d'être nommées :
+
+- **Les cartes de lieux éteintes sont reconstruites.** Le serveur ne garde que les lieux actifs ;
+  l'écran a besoin des deux pour qu'on puisse en rallumer un d'un geste. Un lieu inconnu du jeu par
+  défaut (un aéroport sur un trajet en voiture, saisi depuis le site) est **ajouté** plutôt
+  qu'ignoré : perdre un lieu que le Voyageur a saisi serait pire qu'afficher une carte inattendue.
+- **Le billet ne revient pas.** Ses documents sont déjà attachés au trajet côté serveur ; les
+  re-téléverser en ferait des doublons. La référence, elle, revient — c'est un texte du trajet.
+- **Les dates ne se déduisent pas de `departureAt`** quand les champs locaux manquent. C'est un
+  instant UTC : en déduire un jour local décalerait d'une journée près de minuit, et publier à la
+  mauvaise date est pire que redemander la date.
+
+## L'écran de seuil
+
+Il relit les brouillons **à chaque retour** (`useFocusEffect`, pas au seul montage : un brouillon a
+pu être publié, repris ou supprimé entre deux visites). Ordre de priorité quand les deux existent :
+le **local** d'abord — c'est le plus frais, et c'est celui que le Voyageur vient de quitter.
+
+« Recommencer » jette aussi la copie serveur : la laisser ferait reproposer, au prochain lancement,
+le trajet qu'on vient d'abandonner.
+
+## Vérifié contre le serveur réel
+
+```
+POST /trips publish:false        → 201 DRAFT, pays FR → AE, lat 48.8566
+GET  /trips/my?status=DRAFT      → 1 brouillon : Paris → Dubaï, 950 c/kg, 2 familles, 1 lieu
+mapper inverse sur CETTE réponse → villes + codes pays + coordonnées + dates + prix + lieux
+PUT  /trips/:id                  → 200, capacité mise à jour
+PUT  /trips/:id publish:true     → 200 PUBLISHED
+```
+
+Deux refus du serveur reçus en chemin, et tous deux instructifs : un forfait soute de 23 kg sur une
+capacité de 18 (**RG-B-29** — que le mapper de l'app retire de lui-même : client et serveur disent
+la même chose), et `cancel` interdit depuis `DRAFT` (un brouillon se **supprime**, il ne s'annule
+pas — la machine à états l'a dit mieux que la documentation).
+
+## Reste ouvert
+
+Une vraie page « Mes trajets » sur le mobile. Aujourd'hui le seuil ne propose que le brouillon **le
+plus récent** : ça suffit tant qu'on en a un, pas quand on en a trois.
+
+---
+
+# D111 quinquies — Mes trajets, et les dates qui manquaient (27/11/2026)
+
+**Branche** : `feat/publier-un-trajet-natif` · **Mesures** : mobile **1066 → 1103 fiches** (54 → 56
+suites), user-ui **238 → 253 fiches** (15 → 16 suites). **Aucune ligne de serveur**, aucune
+dépendance nouvelle.
+
+> **Correction de référence.** La clôture de D111 quater annonçait 1065 fiches côté mobile.
+> Mesuré **1066** sur la branche avant toute modification de ce lot. C'est la mécanique habituelle
+> de ce dépôt : un chiffre recopié se périme, un chiffre mesuré ne ment pas.
+
+## Le constat
+
+D111 quater faisait survivre le brouillon à l'app tuée. Mais le seuil de publication ne proposait
+que le brouillon **le plus récent** — ce qui suffit tant qu'on en a un, pas quand on en a trois. Et
+l'onglet Activité affichait, depuis le lot « onglets », un compteur de brouillons sur lequel **rien
+ne permettait de taper**. Un chiffre qu'on ne peut pas suivre est une information qui se périme
+toute seule.
+
+## L'écran
+
+`apps/mobile/src/app/trips/mine.tsx`, poussé par-dessus les onglets — une **destination**, pas un
+tunnel : on y revient entre deux voyages. Il est derrière `IdentityGate`, à qui il passe sa sortie
+(`onDismiss`), comme D104 l'exige pour tout écran poussé.
+
+**Trois sections, pas de filtre** (`À finaliser · En ligne · Passés`). Des pastilles de filtre
+donneraient un écran vide dès qu'on en tape une qui ne correspond à rien, et un écran vide qu'on a
+provoqué soi-même se lit comme une panne. Les sections montrent tout d'un coup d'œil, et celles qui
+n'ont rien disparaissent.
+
+**Une action par carte** : celle qui fait avancer le trajet — finir un brouillon, mettre en pause,
+remettre en ligne. Les gestes qui défont (annuler, supprimer) viennent en second et demandent
+confirmation ; les plus rares ne sont pas là du tout. Une liste n'est pas un tableau de bord.
+
+## La règle vit hors de l'écran
+
+`apps/mobile/src/lib/mes-trajets.ts` — pur, zéro import, donc jouable par le harnais (frontière
+A223) :
+
+| Fonction | Ce qu'elle décide |
+|---|---|
+| `trajetDeLApi` | la projection défensive : une ligne sans identifiant ni statut connu ne s'affiche pas |
+| `peut` | le serveur autorise-t-il cette action ? **lu**, jamais déduit |
+| `sectionDuStatut` / `grouperLesTrajets` | les trois sections, leur ordre, et le tri interne |
+| `actionMiseEnAvant` | l'action unique de la carte |
+| `compteEnCours` | le compte annoncé en tête — ce qui est en cours, pas ce qui est passé |
+
+**L'app ne décide jamais ce qu'elle peut faire.** Chaque trajet arrive avec ses `allowedActions`,
+calculées par la machine à états du serveur, qui connaît les réservations en cours (D72).
+Réimplémenter « on peut annuler un trajet publié » côté app, ce serait promettre un bouton que le
+serveur refusera.
+
+La base réelle a immédiatement donné raison à ce choix contre la règle écrite : un trajet
+**annulé** y arrive avec `["view", "duplicate", "archive"]` et **sans `restore`**. L'écran ne
+propose donc pas « Restaurer », alors que `actionMiseEnAvant` l'y autorise sur le papier. C'est
+exactement ce qu'on gagne à lire plutôt qu'à déduire.
+
+## Le défaut de date — le vrai butin du lot
+
+Dix-huit fiches vertes, typecheck vert. Et la **première** réponse du serveur réel montre ceci :
+
+```
+PUBLISHED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-18T07:18:42Z | tz= Europe/Paris
+PUBLISHED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-02T07:18:42Z | tz= Europe/Paris
+COMPLETED | Paris → Brazzaville | dateLocal= null | departureAt= 2026-11-23T07:18:42Z | tz= Europe/Paris
+PUBLISHED | Paris → Dubaï       | dateLocal= "2026-11-25" | departureAt= …T20:00:00Z | tz= null
+CANCELLED | Paris → Dubaï       | dateLocal= "2026-11-25" | departureAt= …T20:00:00Z | tz= null
+```
+
+`departureDateLocal` est **optionnel** en base, et le serveur ne le calcule jamais :
+
+```ts
+// apps/trip-service/src/controllers/trip.controller.ts:284
+departureDateLocal: data.departureDateLocal ?? null,
+```
+
+Seul un formulaire de création l'écrit. **Trois trajets sur cinq ne l'avaient pas, dont deux
+publiés et trouvables en recherche** — et la carte annonçait « Date à choisir » sur des trajets qui
+ont une date de départ. Le tri « prochain voyage d'abord » les renvoyait en fin de liste par-dessus
+le marché, puisqu'un trajet sans date passe en dernier.
+
+Deux populations cohabitent, et **elles se couvrent l'une l'autre** : les trajets écrits par l'app
+portent les chaînes locales mais pas le fuseau ; ceux du seed portent le fuseau et pas les chaînes.
+
+## La correction existait déjà
+
+`trip-local-dates.ts` avait été écrit pour clore `ANO-WEB-41` — anomalie **majeure** de recette
+(« jeu. 1 janv. » sur toutes les lignes, soit l'époque Unix). Son en-tête nommait même la cause :
+
+> « Un trajet créé par un autre canal (API, seed, **futur client mobile**) n'en a pas. »
+
+On ne le réécrit donc pas. On le **déplace** et on le **duplique** :
+
+```
+apps/user-ui/src/components/trips/list/trip-local-dates.ts   (avant)
+apps/user-ui/src/lib/trip-local-dates.ts                     (après — dans la frontière du harnais)
+apps/mobile/src/lib/trip-local-dates.ts                      (copie octet pour octet)
+```
+
+Il vivait **hors de la frontière du harnais** : A224 ne joue que `src/lib`. Un module pur, central,
+qui décidait des dates de tout le tableau de bord Voyageur — et que **zéro fiche ne regardait**.
+
+C'est le **quatrième** fichier pur dupliqué octet pour octet entre les deux fronts, après
+`pricing-example.ts` (D99), `search-facets.ts` (D100) et `parcel-weight.ts` (D101), pour la même
+raison : un `import` par-dessus la frontière d'un projet est une dépendance de **build** (D93).
+
+### Dérivation n'est pas déduction
+
+```ts
+new Intl.DateTimeFormat('en-CA', { ...options, timeZone }).formatToParts(instant)
+```
+
+Avec le fuseau du lieu, la conversion est **exacte**. C'est sans fuseau qu'elle devient une
+devinette — et c'est pour cela que D111 quater 2C la refuse pour **publier**. La frontière est donc
+maintenue, et une fiche la tient :
+
+| Chemin | Normalise ? | Pourquoi |
+|---|---|---|
+| `mesTrajets()` (la liste) | **oui** | on AFFICHE une ligne ; une date juste vaut mieux qu'un « Date à choisir » faux |
+| `mesBrouillons()` + `publish-reverse.ts` (la reprise) | **non** | on PRÉREMPLIT une publication ; publier à la mauvaise date est pire que redemander la date |
+
+Le branchement se fait **au bord de la lecture**, une seule fois, exactement là où le site le fait
+dans ses hooks (`useMyTrips`, `useTrip`). Normaliser dans chaque écran, ce serait la règle recopiée
+vingt fois — le défaut que D110 a corrigé.
+
+## La signature mentait
+
+Jest passait les 34 nouvelles fiches ; `tsc -p tsconfig.spec.json` en trouvait **six erreurs**, des
+deux côtés. Et ces erreurs ne disaient pas « la fiche est mal écrite » :
+
+```
+Property 'departureDateLocal' does not exist on type '{ departureAt: string; originTimezone: string; }'.
+```
+
+`withLocalDates<T extends TripDatesLike>(trip: T): T` prétendait rendre **son entrée**, alors
+qu'elle y **ajoute** des champs. Le type rendait donc inaccessible le champ que l'appel venait
+d'écrire. Le retour devient `T & TripDatesLike`, et `TripDatesLike` est exporté — un type qu'on ne
+peut pas nommer pousse le lecteur à écrire des `any`.
+
+C'est la raison d'être du contrôle **TypeScript (fiches de test)**, ajouté le 18/09 : un défaut qui
+ne vit que dans un `.spec.ts` est invisible de toute la CI.
+
+## Vérifié contre le serveur réel
+
+Session ouverte avec un compte de seed, puis `GET /trips/my` rejoué à travers la vraie projection :
+
+```
+reçus 5 → projetés 5 (aucun rejeté)      compte « en cours » = 3
+
+AVANT  [enLigne]  Paris → Brazzaville  SANS DATE   Paris → Brazzaville  SANS DATE   Paris → Dubaï  2026-11-25
+APRÈS  [enLigne]  Paris → Brazzaville  2026-11-02  Paris → Brazzaville  2026-11-18  Paris → Dubaï  2026-11-25
+```
+
+Le tri par date de départ fonctionne enfin, et le trajet de Dubaï garde `21:00` — la chaîne saisie
+l'emporte sur la chaîne calculée (20:00 UTC = 21:00 à Paris : les deux disent la même chose, mais
+c'est la saisie qui fait foi).
+
+## Chaque fiche a été prouvée en la faisant rougir
+
+- retirer `withLocalDates` de `mesTrajets()` → **une** fiche rouge, la bonne (18 autres vertes) ;
+- retirer la fiche du site → le **recensement** d'A224 lot 5 rougit en nommant `trip-local-dates.ts`
+  parmi les modules que personne ne regarde.
+
+## Reste ouvert
+
+- Le serveur autorise `archive` sur un trajet terminé ou annulé ; **aucun écran ne le propose**.
+- `my-deals.adapter.ts` garde un repli sur l'époque Unix (`new Date(0)`), hérité d'avant
+  ANO-WEB-41. Il est aujourd'hui **inatteignable** — ses deux consommateurs passent par
+  `useMyTrips`, qui normalise — mais il mériterait de disparaître. Une fiche tient au moins la
+  frontière : l'adaptateur ne doit jamais devenir une **seconde** dérivation de date.
+- **L'écran n'a pas été vu.** Il demande une session connectée sur le simulateur, et ce poste ne
+  peut pas taper dedans (`simctl` sait naviguer, pas toucher — D107). Sa logique est vérifiée
+  contre la base réelle de bout en bout ; sa mise en page reste une hypothèse.

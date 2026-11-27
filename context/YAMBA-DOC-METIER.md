@@ -9273,3 +9273,409 @@ doit tout recommencer, sans comprendre ce qu'il a fait de travers.
 | 3 | Un membre n'a jamais expédié | sa page s'affiche quand même |
 | 4 | Je choisis « Marven2026! » comme mot de passe | il est refusé, et on me dit pourquoi |
 | 5 | Mon adresse est chez un fournisseur inconnu | aucun lien « ouvrir ma messagerie » n'est proposé |
+
+---
+
+# A224 lot 5 — Clôture (15/11/2026)
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-A224-22** | L'élision suit la **prononciation** : « d'Aminata », « d'Élodie », « d'Honoré », mais « de Pauline ». | Une faute sur le prénom de quelqu'un se remarque plus qu'un défaut de calcul. |
+| **RG-A224-23** | Un drapeau est **décoratif** : un code de pays malformé n'affiche rien et ne casse pas la phrase. | Un élément d'illustration ne doit jamais faire tomber une ligne de texte. |
+| **RG-A224-24** | Un nom de pays inconnu affiche le **texte stocké**, jamais le code. | « XX » dans une phrase est un défaut visible. |
+| **RG-A224-25** | Un nom affiché ne porte jamais d'espace suspendu. | Il se voit dans la barre de navigation. |
+| **RG-A224-26** | Après connexion, on revient là où l'on était — **sauf** depuis une page d'authentification. | Y revenir serait une boucle (c'est l'oubli de D93, 27 jours). |
+| **RG-A224-27** | Tout module portant une règle est **couvert par une fiche**, ou **nommé** avec sa raison. | Ce qui manque ne produit aucun symptôme : il faut le recenser pour le voir. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Un message parle d'Aminata | « d'Aminata », pas « de Aminata » |
+| 2 | Un trajet vient d'un pays au code inconnu | le nom stocké s'affiche, jamais le code |
+| 3 | Je me connecte depuis la page d'un trajet | j'y reviens |
+| 4 | Je me connecte depuis la page de connexion | je vais à l'accueil, pas en boucle |
+| 5 | Un nouveau module de règle est ajouté sans fiche | la CI le signale |
+
+---
+
+# D107 — Un en-tête lisible, toujours (15/11/2026)
+
+## Le besoin
+
+Sur certaines pages, le titre et la flèche de retour se superposaient à l'heure et à l'encoche du
+téléphone. Ce n'est pas un défaut d'esthétique : **le titre dit où l'on est**, et la flèche est la
+sortie. Les deux devenaient illisibles.
+
+Un premier correctif avait été posé le matin ; il n'a pas suffi.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D107-1** | Aucun élément d'interface ne passe sous la barre d'état, **quelle que soit la façon dont l'écran a été ouvert**. | Une information perdue n'est pas une imperfection. |
+| **RG-D107-2** | La marge haute ne dépend **jamais d'une seule** source de mesure. | Celle qui échouait ici était la seule consultée. |
+| **RG-D107-3** | Elle n'est **jamais** un nombre fixe. | 20 pt sur un iPhone SE, 59 sur un appareil à Dynamic Island : un plancher écrit à la main serait faux sur la moitié du parc. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre « Ville de départ » depuis la recherche | le titre et la flèche sont entièrement sous l'heure |
+| 2 | J'ouvre le calendrier | idem |
+| 3 | J'utilise un téléphone sans encoche | la marge s'adapte, sans espace mort |
+
+# D108 — Un nombre s'écrit dans la langue de celui qui le lit (21/11/2026)
+
+## Le besoin
+
+Sur la carte de résultat, en interface française, deux lignes du même bloc :
+
+```
+29,62 €
+estimation pour 2.3 kg
+```
+
+Une virgule pour le prix, un point pour le poids. Le même écran écrivait un nombre de deux façons
+à deux centimètres d'écart.
+
+Le même défaut existait sur les **notes** des membres, en plus grave : le site affichait « 4,8 » et
+le téléphone « 4.8 » **pour le même Voyageur**, parce que vingt endroits mettaient une note en
+forme à la main, de trois façons différentes. Dix écrivaient un point quelle que soit la langue
+(faux en français), huit une virgule quelle que soit la langue (faux en anglais).
+
+Ce n'est pas une coquette : un séparateur décimal faux est une **erreur de lecture**. « 2.3 » dans
+une phrase française se lit comme une référence ou une version, pas comme un poids.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D108-1** | Tout nombre **montré à un membre** s'écrit selon sa langue — séparateur décimal compris. | Un nombre mal ponctué n'est pas mal habillé : il est mal lu. |
+| **RG-D108-2** | Un nombre inséré dans une phrase traduite est annoncé comme un **nombre** (`{kg, number}`), jamais comme un texte libre. | Un gabarit simple ne met rien en forme : il recopie. |
+| **RG-D108-3** | Un écran ne transmet **jamais** un nombre déjà mis en forme à une phrase traduite. | Une chaîne « 2,3 » ne se localise plus — et dans un gabarit numérique, elle ne vaut plus rien. |
+| **RG-D108-4** | Une note porte **toujours une décimale**, dans les deux langues. | « 5 » se lit comme un compte, « 5,0 » comme une moyenne. |
+| **RG-D108-5** | La règle d'écriture des nombres a **une seule adresse par front**, et les deux copies sont identiques. | Trois traitements d'une même valeur, c'est trois vérités pour un membre. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | Carte de résultat, interface française | « estimation pour 2,3 kg » — virgule, comme le prix juste au-dessus |
+| 2 | Même carte, interface anglaise | « estimate for 2.3 kg » — point, et le prix aussi |
+| 3 | Un colis de 2 kg | « 2 kg » dans les deux langues : un nombre rond ne gagne pas de décimale |
+| 4 | Une note de 4,8 sur le site **et** sur le téléphone | la même écriture des deux côtés, dans la langue de l'écran |
+| 5 | Une note ronde | « 5,0 » en français, « 5.0 » en anglais — jamais « 5 » |
+| 6 | Le CO₂ évité, affiché avec une décimale | une seule décimale, et le séparateur de la langue |
+
+# D109 — La barre d'onglets nomme ses destinations (21/11/2026)
+
+## Le besoin
+
+Deux constats de l'utilisateur, écran en main : « il y a le texte que sur l'icône active » et
+« le bouton + n'est pas pro ».
+
+Le premier est le plus coûteux : **le mot était montré là où il ne sert à rien.** L'onglet où l'on
+se trouve, l'écran le dit déjà. Les quatre destinations où l'on pourrait aller n'avaient pas de
+nom — dont deux que personne ne devine : un cube pour « Activité », un carré mangue pour
+« Publier ».
+
+Le second est une question de métier autant que de goût : la marque était une image collée, qui
+répétait la forme de l'icône de l'application. Dans une barre, cela se lit comme un **logo**, et un
+logo n'est pas une commande.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D109-1** | Les **cinq** onglets portent leur nom, en permanence. | Un nom sert à choisir où aller, pas à confirmer où l'on est. |
+| **RG-D109-2** | Un libellé d'onglet fait au moins **10 pt**. | C'est le minimum d'iOS ; Material 3 descend à 11. En dessous, on n'écrit plus pour être lu. |
+| **RG-D109-3** | L'état sélectionné se dit par **trois signaux non colorés** : glyphe plein, encre pleine, mot en gras. | Un daltonien doit pouvoir dire où il est. |
+| **RG-D109-4** | L'indicateur de sélection ne **dicte jamais** la taille du texte. | C'est ce qui avait produit une police de 9 pt. |
+| **RG-D109-5** | L'action « Publier » se distingue par sa **forme et sa couleur**, et porte un état actif comme les autres. | Elle se sélectionne : elle doit pouvoir le montrer. |
+| **RG-D109-6** | Un élément actif est **toujours plus contrasté** que le même élément au repos, dans les deux thèmes. | Assombrir sur fond sombre rend invisible ce qui devait ressortir. |
+
+## Tests d'acceptation
+
+| N° | Situation | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'application | les cinq onglets portent leur nom |
+| 2 | Je change d'onglet | le nom de l'onglet quitté reste lisible ; seul le style change |
+| 3 | Je regarde la barre en thème clair | le carré mangue est plus sombre quand « Publier » est actif |
+| 4 | Je regarde la barre en thème sombre | il est plus **vif** quand « Publier » est actif |
+| 5 | J'agrandis les textes du système | les mots grossissent sans pousser les icônes hors de l'écran |
+| 6 | Je navigue au lecteur d'écran | chaque onglet annonce son nom et sa position (« 3 sur 5 ») |
+
+# D110 — L'en-tête et la page sont alignés (21/11/2026)
+
+## Le besoin
+
+Retour de recette : l'en-tête et le contenu ne sont pas alignés.
+
+L'énoncé est court, le défaut est partout. Le site place son contenu dans un cadre centré de
+1280 px, et ce cadre était recopié à la main dans **37 fichiers**, avec **cinq gouttières**
+différentes autour de lui. L'en-tête — qui est la référence visuelle de tout le site, puisque le
+logo est le premier repère de la page — portait la plus serrée des cinq.
+
+Ce que voyait un membre, au-delà de 640 px de large : **le contenu commençait 8 px plus à
+l'intérieur que le logo**, sur tout le parcours connecté. Huit pixels ne se nomment pas, mais ils
+se voient : deux lignes verticales presque confondues, c'est ce que l'œil lit comme « mal fini ».
+
+Un second défaut, invisible à la lecture et constant à l'usage : les huit écrans de connexion,
+d'inscription et de mot de passe réservaient la place d'un en-tête de **64 px** là où il en fait
+**78**. Chaque page réclamait donc 14 px de plus que l'écran : **un ascenseur permanent sur un
+formulaire qui tient pourtant dans la hauteur.**
+
+Enfin, le dépôt portait depuis des mois un composant qui se déclarait « source de vérité » pour ces
+dimensions, en demandant par écrit de ne les changer **qu'à un seul endroit**. Un seul fichier
+l'utilisait. Une règle que personne n'applique n'est pas une règle.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D110-1** | Le contenu d'une page commence **exactement** là où commence le logo de l'en-tête. | C'est la seule définition vérifiable d'« aligné ». Un décalage de 8 px ne se nomme pas mais se voit, et il se lit comme un défaut de finition. |
+| **RG-D110-2** | La gouttière est de **16 px** sur téléphone et de **24 px** à partir de 640 px — y compris pour l'en-tête. | Un grand écran a de la place : coller le texte au bord gaspille la lisibilité. Mais la règle ne vaut que si l'en-tête la suit aussi, sinon elle crée le décalage qu'elle prétend corriger. |
+| **RG-D110-3** | La largeur du cadre, sa gouttière et la hauteur de l'en-tête ont **un seul domicile** dans le code. | Une dimension recopiée dérive toujours : cinq gouttières étaient nées d'une seule, recopiée 51 fois. |
+| **RG-D110-4** | Un écran qui réserve la place de l'en-tête réserve **sa hauteur réelle**. | Réserver moins fait défiler une page qui tient à l'écran ; réserver plus laisse un trou blanc. Les deux se voient. |
+| **RG-D110-5** | Un squelette de chargement respecte les mêmes dimensions que l'écran qu'il remplace. | Sinon le contenu **saute** au moment où il apparaît — et c'est le dernier instant où l'on veut donner une impression d'instabilité. |
+| **RG-D110-6** | Une colonne de lecture plus **étroite** que le cadre reste permise, mais elle est recensée. | Un texte long se lit mal sur 1280 px : la colonne étroite est un choix légitime. Ce qui ne l'est pas, c'est qu'elle apparaisse sans que personne ne l'ait décidé. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre n'importe quelle page sur un grand écran | le premier mot du contenu est exactement sous le logo |
+| 2 | Je réduis la fenêtre sous 640 px | la marge passe à 16 px **des deux côtés à la fois** — le logo et le contenu ne se désalignent à aucune largeur |
+| 3 | J'ouvre la page de connexion sur un grand écran | aucun ascenseur vertical : le formulaire tient dans la hauteur |
+| 4 | Même geste sur l'inscription, la vérification, le mot de passe oublié et sa réinitialisation | identique : les huit écrans se comportent pareil |
+| 5 | Je recharge une page et je regarde le squelette | il occupe la même largeur et la même gouttière que la page finale ; rien ne saute à l'affichage |
+| 6 | Je vais au tableau de bord | le contenu ne touche plus le bord de l'écran |
+| 7 | Je consulte un trajet, puis une réservation, puis une notation | la marge gauche ne bouge pas d'une page à l'autre |
+
+---
+
+# D111 — Publier un trajet depuis le téléphone (24/11/2026)
+
+## Le besoin
+
+Yamba repose sur deux gestes : envoyer un colis, et transporter celui d'un autre. Le premier existe
+sur le téléphone depuis des semaines — sept écrans, du colis au paiement. Le second n'existait
+**que sur le site** : l'app affichait une page qui disait « le parcours arrive ».
+
+C'est le mauvais côté à laisser au site, parce que l'offre est le goulot d'une place de marché :
+sans trajets publiés, aucune recherche ne rend rien. Et le Voyageur de Yamba est *occasionnel* — il
+publie depuis l'aéroport, la veille, dans un train. C'est exactement le moment où il a son téléphone
+et pas son ordinateur.
+
+Le parcours du site a été repris question par question, sur les trois captures du tunnel web du
+21/11, avec un principe : **transposer l'intention, pas la mise en page**. Un curseur qui glisse est
+un geste de souris ; une liste de cinq souplesses dont deux ne veulent rien dire reste une liste de
+trois sur un téléphone.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-1** | Publier se fait en **sept écrans poussés**, une question par écran, sous **trois phases annoncées** (Trajet · Conditions · Vérification). Le nombre d'écrans n'est jamais annoncé. | Un formulaire long sur un téléphone cache son bouton et ses erreurs. Et ce n'est pas le nombre d'écrans qui fait abandonner, c'est le nombre ANNONCÉ : « étape 1 sur 7 » lu avant d'avoir rien saisi est un départ (A213). |
+| **RG-D111-2** | La barre du bas montre en permanence **ce que le trajet rapporte**, jamais ce qu'il coûte. | Le prix du Voyageur EST son net (D16) : chaque réglage rapporte, et il doit le voir rapporter. Un Voyageur qui ne voit pas ce que son tarif produit n'a aucune raison de le monter. |
+| **RG-D111-3** | Tant qu'un prix ou une capacité n'est pas fixé, l'app écrit « à fixer » — **jamais 0 €**. | Zéro est un montant : il dit « ton trajet ne rapporte rien ». L'absence dit « tu n'as pas encore choisi ». Ce ne sont pas les mêmes phrases. |
+| **RG-D111-4** | Les huit familles de colis partent **acceptées**. Refuser ou surtaxer est un choix explicite. | Un Voyageur qui ne touche à rien publie une annonce ouverte — c'est aussi ce que le serveur comprend d'une liste vide. |
+| **RG-D111-5** | Un forfait « bagage entier » dont la franchise dépasse la capacité annoncée est **suspendu**, et l'écran le dit avec les deux nombres. | RG-B-29. Un champ grisé sans raison fait croire à une panne ; une phrase qui nomme les deux nombres fait comprendre quoi changer. |
+| **RG-D111-6** | Les lieux d'échange proposés dépendent du **mode de transport**, et leurs souplesses dépendent du **type de lieu**. | « Exact » sur une zone de ville ne veut rien dire : une zone n'a pas de point. Un choix qui ne veut rien dire se choisit quand même, et fausse l'annonce. |
+| **RG-D111-7** | Le bouton d'étape reste **actif** quand il manque quelque chose : il nomme ce qui manque. | Un bouton gris ne dit pas pourquoi il est gris (A209). |
+| **RG-D111-8** | L'app ne publie pas « aller-retour ». | Le site propose le choix mais ne crée jamais de second trajet : l'Expéditeur ne trouvera jamais le retour. Tant que le retour n'est pas un vrai trajet, l'app ne le promet pas. |
+| **RG-D111-9** | Le brouillon de publication meurt avec l'app et à la **déconnexion**. | Un trajet non publié n'engage rien ; et un trajet à demi écrit appartient à celui qui l'écrivait, pas au prochain qui prend le téléphone. |
+| **RG-D111-10** | Le dernier écran **redit tout** avant de publier, et chaque bloc se modifie sur place. | C'est le seul écran qui engage. Un récap qu'on ne peut pas corriger sans tout refaire n'est pas un récap. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je tape le « + » de la barre | l'écran de seuil explique ce que publier rapporte ; je ne suis pas encore dans le tunnel |
+| 2 | Je commence, puis je quitte, puis je retape le « + » | on me propose de **reprendre** ou de repartir de zéro — rien ne reprend tout seul |
+| 3 | J'ouvre « Comment voyages-tu ? » | trois modes, et chacun dit **où** se fera l'échange si je le choisis |
+| 4 | Je choisis l'avion, puis « avec escale » | on me demande la ou les villes traversées, et pas avant |
+| 5 | J'arrive sur les dates | le départ est proposé à demain, à la prochaine heure pleine ; l'arrivée reste vide |
+| 6 | Je tape « 2135 » dans une heure | le champ écrit « 21:35 » tout seul ; « 2561 » devient « 23:59 » |
+| 7 | J'arrive sur le prix | un prix et une capacité sont proposés, **et la barre du bas annonce déjà le gain correspondant** |
+| 8 | Je monte ma capacité à 23 kg | le forfait « valise en soute » cesse d'être suspendu |
+| 9 | Je laisse ma capacité à 12 kg avec un forfait soute saisi | l'écran dit qu'il est suspendu, avec les deux nombres — et il n'est pas envoyé |
+| 10 | Je refuse l'électronique et je surtaxe l'alimentaire à 25 % | le récap les nomme ; les six autres familles n'apparaissent pas |
+| 11 | Je tape « Publier » sans avoir choisi de lieu | le bouton ne part pas au serveur : il nomme ce qui manque |
+| 12 | Je publie un trajet complet | le trajet est en ligne, et j'arrive sur sa fiche publique |
+| 13 | Je me déconnecte avec un trajet à moitié écrit | il n'existe plus à la reconnexion |
+
+---
+
+# D111 bis — Publier le retour, et parler comme un humain (25/11/2026)
+
+## Le besoin
+
+Le tunnel natif fonctionnait. Il parlait mal.
+
+Chaque écran expliquait sa propre mécanique au lieu de poser sa question, et les sous-titres
+servaient surtout à remplir le vide laissé par des écrans trop courts. Lu d'affilée sur huit
+captures, l'ensemble sonnait comme une notice — pas comme un produit.
+
+Deux autres choses sont apparues en jouant le parcours en entier :
+
+1. Le Voyageur **rentre**. Il publie son aller, et son retour n'existe nulle part. Le site lui
+   proposait bien « Aller-retour », mais ce choix ne créait jamais de second trajet : aucun
+   Expéditeur ne pouvait trouver le retour. Une promesse non tenue, des deux côtés.
+2. Le billet — celui qui débloque le badge « Voyage vérifié », donc des réservations — était demandé
+   au début du parcours, replié, facultatif. Au moment où on le demandait, le Voyageur n'était pas
+   encore engagé ; au moment où il l'est, on ne le lui demandait plus.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-11** | Un écran pose sa question ; il n'explique pas son mécanisme. Un titre fait quatre mots au plus, un sous-titre n'existe que s'il ajoute une information. | Un écran qui explique comment il marche avoue qu'il n'est pas évident. Et les textes longs ne se lisent pas sur un téléphone : ils se sautent. |
+| **RG-D111-12** | Un compte s'écrit au pluriel de la langue du lecteur. Jamais « (s) ». | « 1 refusée(s) » est la langue d'un formulaire administratif, pas celle d'un produit. |
+| **RG-D111-13** | Une étape n'existe que si sa décision la mérite. | Deux écrans qui demandent trois taps et deux lignes ne « respirent » pas : ils font attendre. |
+| **RG-D111-14** | Après avoir publié, on propose le **retour** : mêmes conditions, villes et lieux inversés, dates à poser. | C'est le seul moment où le Voyageur est convaincu et disponible — il vient de publier, et il rentre. Et le retour ainsi créé est un vrai trajet, que les Expéditeurs trouvent. |
+| **RG-D111-15** | Un lieu de remise au départ devient un lieu de livraison à l'arrivée, et réciproquement. | Même terminal, même café, autre sens de l'échange. Ne pas l'inverser proposerait l'aéroport de départ comme point de récupération à l'arrivée. |
+| **RG-D111-16** | Le billet se demande **à côté du bouton « Publier »**, jamais au début du parcours. | C'est une pièce justificative : on la fournit quand on est engagé, pas quand on explore. |
+| **RG-D111-17** | Le fichier du billet part dès qu'il est choisi ; s'il ne part pas, on le dit à cet endroit-là. | Sous le bouton « Publier », un échec d'image obligerait à choisir entre publier sans billet et tout reprendre. |
+| **RG-D111-18** | Un trajet publié dont le billet n'a pas pu être joint reste **publié**, et l'app le dit. | Mieux vaut un trajet en ligne sans badge qu'un trajet perdu parce qu'une image n'est pas passée. Mais taire l'échec ferait attendre un badge qui ne viendra pas. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je parcours le tunnel | six écrans, trois phases annoncées, aucun écran ne m'explique son fonctionnement |
+| 2 | J'arrive sur le premier écran | mode, type et les deux villes sur **un seul** écran |
+| 3 | Je refuse une famille et j'en surtaxe une | le résumé dit « 1 refusée · 1 surtaxée », sans « (s) » |
+| 4 | Je regarde le récap d'un aller-retour dans la journée | une seule ligne : le jour, puis les deux heures |
+| 5 | Je publie mon trajet | une page de fin, pas une redirection automatique |
+| 6 | Sur cette page, je tape « Publier le retour » | tout est repris sauf les dates ; les lieux de Paris sont passés du côté livraison |
+| 7 | J'ajoute mon billet au dernier écran | il part tout de suite ; s'il échoue, l'erreur est là, à côté du bouton d'ajout |
+| 8 | Mon billet échoue au moment de l'attacher | le trajet est quand même en ligne, et l'app me dit que le billet n'a pas été joint |
+| 9 | Sur le site, à l'étape ① | plus de « Aller simple / Aller-retour » : le choix ne créait jamais de retour |
+
+---
+
+# D111 ter — Le Voyageur ne fixe plus son prix à l'aveugle (25/11/2026)
+
+## Le besoin
+
+Sur le site, le Voyageur voit sous son curseur ce que les trajets comparables se vendent : une
+fourchette basse / médiane / haute, et un verdict qui lui dit s'il est dans le marché. Sur le
+téléphone, il voyait un nombre et rien d'autre.
+
+Les deux erreurs qu'on fait sans repère sont symétriques et coûteuses : trop bas, on laisse de
+l'argent sur la table à chaque kilo ; trop haut, on ne reçoit aucune demande et on ne sait pas
+pourquoi.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-19** | Quand le corridor est connu, l'app montre la fourchette du marché et dit où le tarif choisi se situe. | C'est la seule information qui transforme un nombre en décision. |
+| **RG-D111-20** | Quand le corridor est **inconnu**, l'app ne montre **aucune** fourchette. | Une médiane de repli serait la même de Paris à Lyon et de Paris à Dubaï. Un repère faux est pire qu'un repère absent. |
+| **RG-D111-21** | Le prix proposé d'office est la médiane du corridor, arrondie au demi-euro. | Ça fait gagner un réglage à qui n'a pas d'avis, et n'enlève rien à qui en a un. Les Voyageurs affichent 11,50, pas 11,47. |
+| **RG-D111-22** | Le détail d'une ville est demandé **une fois**, au moment du choix, jamais à chaque frappe. | Chaque appel est facturé. Et avec le même jeton de session, la saisie entière compte pour une seule session. |
+| **RG-D111-23** | Choisir une ville n'attend jamais le réseau. | La fourchette est un confort : elle arrive après, ou elle n'arrive pas. Le parcours, lui, ne s'arrête pas. |
+| **RG-D111-24** | Un code pays que l'app ne connaît pas reste **vide** — jamais deviné. | Le calcul sait retomber sur sa base de repli ; il ne sait pas qu'un code inventé est faux. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je choisis Paris puis Dubaï, j'arrive sur le prix | une fourchette s'affiche, et le prix proposé est la médiane du corridor |
+| 2 | Je monte mon tarif très au-dessus | le verdict passe à « Au-dessus du marché », le repère se déplace sans sortir de la piste |
+| 3 | Je tape une ville à la main, sans choisir de suggestion | aucune fourchette : l'app ne sait pas situer ce corridor et ne fait pas semblant |
+| 4 | Je choisis une ville alors que le réseau est coupé | la ville est retenue tout de suite ; seule la fourchette manque |
+| 5 | Je change de ville juste après en avoir choisi une | la fourchette correspond à la **dernière** ville, jamais à la précédente |
+| 6 | Je compare un Paris → Lyon et un Paris → Dubaï | la médiane du second est nettement plus élevée |
+| 7 | Mon départ est dans deux jours | la suggestion est légèrement **plus basse** : il reste peu de temps pour vendre ses kilos |
+
+---
+
+# D111 quater — Un trajet commencé ne se perd plus (25/11/2026)
+
+## Le besoin
+
+Un Voyageur commence à publier son trajet dans la file d'embarquement. On l'appelle, il range son
+téléphone, l'app est fermée par le système. Jusqu'ici : tout était perdu.
+
+Le site savait déjà enregistrer un brouillon — l'app non. C'était d'autant plus visible que
+l'onglet Activité comptait déjà les « trajets à finaliser » … que le mobile ne savait pas créer.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-25** | Dès que le trajet a un mode et deux villes, il est enregistré comme brouillon, puis à chaque étape franchie. | C'est le minimum que le serveur accepte, et c'est exactement la fin du premier écran. |
+| **RG-D111-26** | L'enregistrement ne bloque jamais la saisie, et son échec ne s'affiche pas. | Sans réseau, le Voyageur doit pouvoir finir. Lui refuser l'écran suivant lui ferait perdre ce que la sauvegarde protège. |
+| **RG-D111-27** | En rouvrant l'app, on propose de reprendre le trajet commencé. | C'est la raison d'être du lot. |
+| **RG-D111-28** | « Recommencer » supprime le brouillon, en mémoire **et** sur le serveur. | Sinon le trajet abandonné serait reproposé au lancement suivant. |
+| **RG-D111-29** | Reprendre un brouillon restaure les lieux **proposés** comme les lieux **en réserve**. | Le serveur ne garde que les lieux actifs ; l'écran doit pouvoir en rallumer un sans tout ressaisir. |
+| **RG-D111-30** | Un billet déjà envoyé n'est pas redemandé à la reprise. | Il est attaché au trajet. Le renvoyer en ferait un doublon. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je remplis le premier écran, puis je tue l'app | en rouvrant, l'onglet Publier propose de reprendre, avec mes deux villes |
+| 2 | Je reprends | tout est là : mode, dates, prix, kilos, conditions, lieux — y compris les lieux que j'avais laissés éteints |
+| 3 | Je passe deux écrans sans réseau | la saisie continue normalement ; rien ne me le signale |
+| 4 | Le réseau revient, je passe l'écran suivant | le brouillon est enregistré, sans que j'aie rien à faire |
+| 5 | Je tape « Recommencer » | le trajet abandonné ne m'est plus proposé, ni maintenant ni au prochain lancement |
+| 6 | Je publie un trajet repris | il part en ligne ; aucun brouillon ne reste derrière |
+| 7 | Je tape deux fois « Continuer » très vite | un seul brouillon est créé, pas deux |
+
+---
+
+# D111 quinquies — Le Voyageur voit tous ses trajets (27/11/2026)
+
+## Le besoin
+
+Un Voyageur qui publie régulièrement a plusieurs trajets en même temps : un brouillon commencé
+l'autre jour, deux annonces en ligne, un voyage déjà fait. Jusqu'ici l'app ne lui en montrait
+**aucun**. Le seuil de publication proposait de reprendre le brouillon **le plus récent**, et c'est
+tout — ce qui suffit tant qu'on en a un, pas quand on en a trois.
+
+Pire, l'onglet Activité affichait un compteur « trajets à finaliser » sur lequel **rien ne
+permettait de taper**. Un chiffre qu'on ne peut pas suivre ne sert à personne : il se périme tout
+seul.
+
+Et un défaut trouvé en chemin, sur de vraies données : **deux trajets publiés, visibles par les
+Expéditeurs, affichaient « Date à choisir »** alors qu'ils ont une date de départ.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D111-31** | « Mes trajets » montre **tous** les trajets du Voyageur, groupés en trois sections : à finaliser, en ligne, passés. | Trois questions différentes : qu'est-ce que je dois finir, qu'est-ce qui travaille pour moi, qu'est-ce qui est derrière moi. |
+| **RG-D111-32** | Une section sans trajet **disparaît** ; elle ne s'affiche pas vide. | Une section vide fait croire à une panne ou à un filtre mal réglé. |
+| **RG-D111-33** | Aucun filtre à choisir. | Une pastille de filtre donne un écran vide dès qu'on en tape une qui ne correspond à rien — et un écran vide qu'on a provoqué soi-même se lit comme une panne. |
+| **RG-D111-34** | Les trajets en ligne sont triés par **date de départ croissante** ; un trajet sans date passe en dernier, jamais au milieu. | Le prochain voyage est celui qui demande une décision. |
+| **RG-D111-35** | Le compte annoncé en tête compte ce qui est **en cours** : brouillons et trajets en ligne, jamais les trajets passés. | « 3 trajets en cours » doit répondre à « combien de choses me demandent quelque chose ». |
+| **RG-D111-36** | Chaque carte met en avant **une seule** action, celle qui fait avancer le trajet. | Une liste n'est pas un tableau de bord. Six boutons par ligne, c'est aucun bouton. |
+| **RG-D111-37** | Un bouton n'apparaît que si le **serveur** autorise le geste. L'app ne le déduit jamais du statut. | Un trajet qui porte une réservation vivante ne s'annule pas (D72), et seul le serveur connaît les réservations. Promettre un geste qu'il refusera est pire que ne pas le proposer. |
+| **RG-D111-38** | Annuler un trajet ou supprimer un brouillon **demande confirmation**. | Ces gestes retirent une annonce que des Expéditeurs ont peut-être déjà repérée. |
+| **RG-D111-39** | Un trajet qui porte des réservations et qu'on tente d'annuler le dit **avec ses mots** : « Ce trajet porte des réservations : annule-les d'abord. » | Un refus technique sans explication laisse le Voyageur croire à une panne. |
+| **RG-D111-40** | La date affichée d'un trajet est **toujours** la date locale du lieu de départ. Quand elle n'a pas été saisie, elle est calculée depuis l'instant de départ **dans le fuseau du lieu**. | Un trajet publié qui annonce « Date à choisir » est un mensonge, et il se range au mauvais endroit dans le tri. |
+| **RG-D111-41** | Ce que le Voyageur a **saisi** l'emporte toujours sur ce qui est calculé. | Les chaînes saisies disent ce qu'il a voulu, pas ce qu'un calcul en pense. |
+| **RG-D111-42** | Au moment de **reprendre un brouillon**, aucune date n'est calculée : si elle manque, elle est redemandée. | Afficher une ligne et préremplir une publication ne se paient pas pareil. Publier à la mauvaise date est pire que redemander la date (D111 quater). |
+| **RG-D111-43** | Le bouton « Publier un trajet » de l'onglet Activité est **actif dès le premier jour**. | C'est ce que la coquille promettait depuis le lot « onglets » : « le bouton naîtra avec le formulaire ». Le même jour, la phrase « arrive dans un prochain lot » disparaît — une coquille honnête cesse de l'être le jour où elle ment. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité et je tape sur le compteur de brouillons | j'arrive sur « Mes trajets » |
+| 2 | J'ai un brouillon, deux trajets en ligne et un voyage fait | trois sections, dans cet ordre, et « 3 trajets en cours » en tête |
+| 3 | Je n'ai aucun brouillon | la section « À finaliser » n'apparaît pas du tout |
+| 4 | Je regarde mes trajets en ligne | le prochain départ est en haut |
+| 5 | Je tape « Continuer » sur un brouillon | le tunnel de publication s'ouvre là où je l'avais laissé |
+| 6 | Je tape « Mettre en pause » sur un trajet en ligne | il quitte la recherche ; il n'est pas annulé |
+| 7 | J'annule un trajet qui porte une réservation | le refus me dit d'annuler les réservations d'abord |
+| 8 | Je supprime un brouillon | on me demande confirmation, et on me dit que personne ne l'a vu |
+| 9 | Je regarde un trajet publié depuis le site ou par un import | sa date de départ s'affiche, juste, dans l'heure du lieu de départ |
+| 10 | Mon trajet part de Dubaï à 03:30, heure locale | c'est bien le jour local de Dubaï qui s'affiche, pas celui de Greenwich |
+| 11 | Je n'ai encore aucun trajet | l'écran le dit et propose d'en publier un |

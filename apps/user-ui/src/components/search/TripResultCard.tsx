@@ -47,6 +47,7 @@ import {
 import { SurchargePills } from "./SurchargePills";
 import { countryName } from "@/lib/country-name";
 import TripPricingPopover from "./TripPricingPopover";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   item: YambaTripResult;
@@ -493,7 +494,7 @@ export default function TripResultCard({
                     strokeWidth={0}
                   />
                   <span className="font-semibold text-slate-900 dark:text-white">
-                    {item.rating.toFixed(1).replace(".", ",")}
+                    {formatRating(item.rating, intlTagFor(locale))}
                   </span>
                   {typeof item.reviewCount === "number" && (
                     <span className="text-slate-400 dark:text-slate-500">

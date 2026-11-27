@@ -1,9 +1,11 @@
 /**
- * tab-bar.tsx — la barre d'onglets DESSINÉE (D88).
- * ================================================
- * Une pilule flottante : icônes seules, le mot sur le SEUL onglet actif,
- * escamotage au défilement. Référence de composition : la barre flottante de
- * YouTube, revue avec l'utilisateur écran en main.
+ * tab-bar.tsx — la barre d'onglets DESSINÉE (D88, révisée par D109).
+ * ==================================================================
+ * Une pilule flottante qui NOMME ses cinq destinations, avec escamotage au
+ * défilement. Référence de composition : la barre flottante de YouTube,
+ * revue avec l'utilisateur écran en main ; référence de STRUCTURE depuis
+ * D109 : la barre de navigation Material 3, dont l'indicateur de sélection
+ * se place derrière l'ICÔNE seule, le libellé vivant dessous et dehors.
  *
  * POURQUOI ELLE N'EST PLUS NATIVE (D88 0A). D36 avait choisi `NativeTabs` —
  * la vraie `UITabBar` d'iOS, la barre Material 3 d'Android — en écartant
@@ -22,19 +24,21 @@
  * ne récupère pas : les retours haptiques idiomatiques et les comportements
  * Material 3 d'Android. C'est le prix explicite du contrôle de la forme.
  *
- * LES LIBELLÉS NE DISPARAISSENT PAS TOUS (D88 2A). YouTube peut montrer
- * quatre icônes nues parce que ses destinations sont apprises depuis dix
- * ans ; Yamba en a cinq, dont deux indevinables (le colis = « Activité », le
- * squircle mango = « Publier »). Le compromis retenu est l'état de l'art
- * Material 3 : l'onglet ACTIF porte son mot, les quatre autres sont des
- * icônes seules. On garde le rendu net ET la compréhension là où elle compte
- * — sur la destination où l'on se trouve.
+ * LES CINQ LIBELLÉS SONT PERMANENTS (D109 1A, qui REVIENT sur D88 2A).
+ * D88 2A ne montrait le mot que sur l'onglet ACTIF, au nom du mode
+ * « étiquette sur le sélectionné » de Material 3. Deux choses lui ont
+ * échappé. D'abord, ce mode vise des destinations DÉJÀ APPRISES, et M3
+ * recommande l'étiquette permanente dès que l'icône est ambiguë — or le
+ * raisonnement de D88 2A nommait lui-même deux icônes indevinables sur cinq
+ * (le colis = « Activité », le squircle = « Publier »). Ensuite et surtout,
+ * le mot était montré là où il ne sert à RIEN : sur l'onglet où l'on se
+ * trouve, que l'écran annonce déjà — pendant que les quatre destinations
+ * possibles restaient anonymes.
  *
- * Le mot est SOUS l'icône, et non à côté (revue du 08/11). À côté, il poussait
- * les quatre autres onglets latéralement à chaque sélection : toute la barre
- * se réorganisait pour un mot. Empilé, il ne coûte que de la hauteur — et
- * cette hauteur est réservée en permanence (`labelSlot`), de sorte que les
- * cinq icônes restent sur UNE seule ligne quel que soit l'onglet actif.
+ * Le mot reste SOUS l'icône, et non à côté (revue du 08/11, arbitrage gardé
+ * par D109) : à côté, il poussait les quatre autres onglets latéralement à
+ * chaque sélection. Il n'y a en revanche plus de fente réservée — il n'y a
+ * plus de vide à réserver, puisque les cinq mots sont là en permanence.
  *
  * LA SÉLECTION N'EST PAS MANGUE (revue du 08/11). La pilule active portait
  * d'abord la teinte des pastilles transport — crème `#FFF6E8` sur clair,
@@ -64,12 +68,9 @@
  */
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Image } from 'expo-image';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeOut,
   LinearTransition,
   useAnimatedStyle,
   withTiming,
@@ -81,6 +82,18 @@ import { useTranslations } from 'use-intl';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 
 import { Brand, Colors, MaxContentWidth, Spacing, TabBar } from '@/constants/theme';
+import {
+  ICON_SIZE,
+  INDICATOR_HEIGHT,
+  LABEL_LINE_HEIGHT,
+  LABEL_SIZE,
+  MARK_GLYPH,
+  MARK_INK,
+  MARK_RADIUS,
+  MARK_SIZE,
+  STACK_GAP,
+  markBackground,
+} from '@/lib/tab-bar-geometry';
 import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBadges } from '@/hooks/use-tab-badges';
@@ -102,7 +115,7 @@ type MciName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 type Onglet =
   | { labelKey: string; set: 'ion'; off: IonName; on: IonName }
   | { labelKey: string; set: 'mci'; off: MciName; on: MciName }
-  | { labelKey: string; set: 'image' };
+  | { labelKey: string; set: 'mark' };
 
 /**
  * Chaque route du groupe, dans l'ordre de la barre — la clé de dictionnaire
@@ -118,52 +131,26 @@ type Onglet =
 const ONGLETS: Record<string, Onglet> = {
   index: { labelKey: 'home', set: 'mci', off: 'home-variant-outline', on: 'home-variant' },
   favorites: { labelKey: 'favorites', set: 'ion', off: 'heart-outline', on: 'heart' },
-  // `publish` n'a pas de glyphe : c'est une MARQUE (le squircle mango), servie
-  // en image, et la même qu'on y soit ou non — une action ne change pas de
-  // dessin selon l'écran où l'on se trouve.
-  publish: { labelKey: 'publish', set: 'image' },
+  // `publish` porte une MARQUE et non un pictogramme : le squircle mangue,
+  // seule tache chaude et saturée de la barre (A210), DESSINÉE dans le code
+  // depuis D109 2A — elle était servie en image matricielle.
+  publish: { labelKey: 'publish', set: 'mark' },
   activity: { labelKey: 'activity', set: 'ion', off: 'cube-outline', on: 'cube' },
   messages: { labelKey: 'messages', set: 'ion', off: 'chatbubbles-outline', on: 'chatbubbles' },
 };
 
-const PUBLISH_SOURCE = require('../../assets/images/tab-publish.png');
-
 /**
- * La taille des glyphes. 22 et non 24 : le mot passe DESSOUS depuis la revue
- * du 08/11, et les deux doivent tenir dans la hauteur de la pilule — 22 de
- * glyphe + 2 d'écart + 12 de ligne = 36, dans une cible de 46.
+ * Le rayon de l'indicateur suit la MÊME LOI que la barre qui le contient :
+ * hauteur / 2. C'est de la géométrie, pas un goût — payé une fois (revue du
+ * 08/11) : aux deux bouts, Accueil et Messages, l'indicateur frôle le bord de
+ * la barre, et l'œil compare alors directement deux courbures. Un angle qui
+ * ne répond pas à son contenant se voit immédiatement. Les trois onglets du
+ * milieu ne touchent aucun bord : le défaut y est invisible, ce qui est
+ * précisément pourquoi il se rate.
  */
-const ICON_SIZE = 22;
+const INDICATOR_RADIUS = INDICATOR_HEIGHT / 2;
 
-/**
- * La hauteur de l'indicateur de sélection.
- *
- * 42 : le contenu empilé pèse 35 (22 d'icône + 2 d'écart + 11 de ligne de
- * mot), il reste 3,5 de respiration de chaque côté. En dessous, le mot
- * touche le bord.
- */
-const PILL_HEIGHT = 42;
-
-/**
- * Son rayon : la MOITIÉ de sa hauteur — un stade, et il n'y a pas le choix.
- *
- * Essayé à 16 à la revue, pour « baisser l'arrondi ». Le défaut ne s'est vu
- * qu'aux DEUX BOUTS — Accueil et Messages — et c'est de la géométrie pure :
- * la barre qui le contient est elle-même un stade (son rayon vaut la moitié
- * de ses 52, soit 26). Aux extrémités, l'indicateur n'a plus que 2 pt de
- * marge, et l'œil compare alors directement deux courbures qui ne se
- * répondent pas — un angle de 16 logé dans un arrondi de 26. Les trois
- * onglets du milieu, eux, ne touchent aucun bord : le défaut y est invisible.
- *
- * Deux sorties possibles : raccourcir l'indicateur pour l'éloigner des
- * bords (il perdrait la largeur qu'on vient de lui donner), ou lui donner la
- * courbure de son contenant. C'est la seconde — et comme la hauteur de
- * l'indicateur n'est pas celle de la barre, « même courbure » veut dire
- * « même LOI » : rayon = hauteur / 2, aux deux niveaux.
- */
-const PILL_RADIUS = PILL_HEIGHT / 2;
-
-/** La transition de largeur de la pilule active. Reanimated respecte seul
+/** La transition de largeur de l'indicateur actif. Reanimated respecte seul
  *  « Réduire les animations » du système (`ReduceMotion.System` par défaut) :
  *  rien à brancher, mais c'est une raison de PASSER par lui. */
 const TRANSITION = LinearTransition.duration(220);
@@ -302,21 +289,27 @@ export function YambaTabBar({ state, navigation }: BottomTabBarProps) {
                 // position annoncée est une liste de boutons anonymes.
                 accessibilityValue={{ text: `${i + 1} / ${state.routes.length}` }}
                 style={({ pressed }) => [styles.hit, pressed && styles.pressed]}>
-                <Animated.View
-                  layout={TRANSITION}
-                  style={[
-                    styles.pill,
-                    focused && styles.pillFocused,
-                    { backgroundColor: fond },
-                  ]}>
+                <View style={styles.stack}>
+                  <Animated.View
+                    layout={TRANSITION}
+                    style={[styles.indicator, { backgroundColor: fond }]}>
                   <View style={styles.iconBox}>
-                  {onglet.set === 'image' ? (
-                    <Image
-                      source={PUBLISH_SOURCE}
-                      style={styles.publishIcon}
-                      contentFit="contain"
-                      transition={0}
-                    />
+                  {onglet.set === 'mark' ? (
+                    <View
+                      style={[
+                        styles.mark,
+                        // Troisième signal d'état pour le SEUL onglet dont le
+                        // glyphe ne peut pas passer du contour au plein. Le
+                        // code disait « la même image qu'on y soit ou non » —
+                        // mais `publish` EST un onglet, il se sélectionne, et
+                        // il lui manquait justement le signal le plus fort
+                        // (D109 2B). La teinte dépend du THÈME : assombrir
+                        // sur une barre sombre rendrait la marque moins
+                        // visible au moment où elle doit l'être le plus.
+                        { backgroundColor: markBackground(dark, focused) },
+                      ]}>
+                      <Ionicons name="add" size={MARK_GLYPH} color={MARK_INK} />
+                    </View>
                   ) : onglet.set === 'mci' ? (
                     <MaterialCommunityIcons
                       name={focused ? onglet.on : onglet.off}
@@ -340,29 +333,30 @@ export function YambaTabBar({ state, navigation }: BottomTabBarProps) {
                   )}
                   </View>
 
-                  {/* L'emplacement du mot est TOUJOURS là, même vide. Sans lui,
-                    l'onglet actif serait le seul à empiler deux choses et son
-                    icône monterait de six points au-dessus des quatre autres :
-                    la rangée d'icônes se tordrait à chaque changement
-                    d'onglet. Réservé, il ne se passe rien — seul le mot
-                    apparaît. */}
-                  <View style={styles.labelSlot}>
-                  {focused && (
-                    <Animated.Text
-                      entering={FadeIn.duration(160)}
-                      exiting={FadeOut.duration(100)}
-                      numberOfLines={1}
-                      // Le Dynamic Type est BORNÉ : au-delà, le mot de
-                      // l'onglet actif pousse les quatre icônes hors de
-                      // l'écran. Une barre de navigation n'est pas du contenu
-                      // à lire.
-                      maxFontSizeMultiplier={1.3}
-                      style={[styles.label, { color: actif }]}>
-                      {label}
-                    </Animated.Text>
-                  )}
-                  </View>
-                </Animated.View>
+                  </Animated.View>
+
+                  {/* D109 1A — LES CINQ onglets portent leur mot, toujours.
+                    D88 2A ne le montrait que sur l'onglet ACTIF : c'est-à-dire
+                    là où il ne sert à rien, puisque l'écran dit déjà où l'on
+                    est, pendant que les quatre destinations possibles
+                    restaient anonymes — dont deux que le fichier lui-même
+                    reconnaissait indevinables (le cube, le squircle).
+                    Il n'y a donc plus de fente réservée : il n'y a plus de
+                    vide à réserver. */}
+                  <Text
+                    numberOfLines={1}
+                    // Le Dynamic Type reste BORNÉ : au-delà, les mots
+                    // pousseraient les icônes hors de l'écran. Une barre de
+                    // navigation n'est pas du contenu à lire.
+                    maxFontSizeMultiplier={1.3}
+                    style={[
+                      styles.label,
+                      focused ? styles.labelFocused : null,
+                      { color: focused ? actif : theme.textSecondary },
+                    ]}>
+                    {label}
+                  </Text>
+                </View>
               </Pressable>
             </View>
           );
@@ -432,37 +426,39 @@ const styles = StyleSheet.create({
     // côte à côte. Seul le bord de la barre devait être protégé, et c'est le
     // rembourrage de la barre elle-même qui s'en charge.
   },
-  pill: {
-    // COLONNE : le mot passe sous l'icône (revue du 08/11). En rangée, le
-    // libellé poussait les quatre autres onglets de côté à chaque sélection ;
-    // empilé, il ne coûte que de la hauteur, et la hauteur est réservée une
-    // fois pour toutes.
+  stack: {
+    // L'EMPILEMENT de la cellule : l'indicateur (qui tient l'icône) puis le
+    // mot, dessous et DEHORS. Le mot est sous l'icône et non à côté — à côté,
+    // il pousserait les quatre autres onglets à chaque sélection (revue du
+    // 08/11, arbitrage conservé par D109).
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    height: PILL_HEIGHT,
-    minWidth: 48,
-    borderRadius: PILL_RADIUS,
-    paddingHorizontal: Spacing.two,
-  },
-  pillFocused: {
-    /**
-     * La pilule active prend TOUTE sa cellule (revue du 08/11 : « largeur
-     * trop courte, élargis encore pour que ça respire »).
-     *
-     * Elle épousait son contenu : ~52 pt dans une cellule de 64, soit un
-     * bloc de couleur qui flottait au milieu d'un vide qu'il ne remplissait
-     * pas. Étirée, elle vaut la cellule moins les 2 pt de `hit` de chaque
-     * côté — ~60 pt. C'est le maximum disponible sans toucher la voisine.
-     *
-     * Rien ne bouge pour autant : les cellules restant égales, c'est
-     * l'intérieur d'une cellule qui se remplit, pas la rangée qui se
-     * réorganise. Et les quatre pilules inactives sont transparentes — leur
-     * largeur n'a aucune conséquence visible.
-     */
     alignSelf: 'stretch',
-    paddingHorizontal: Spacing.one,
+    gap: STACK_GAP,
+  },
+  indicator: {
+    /**
+     * D109 1C — CET INDICATEUR EST DÉCORATIF, ET C'EST ÉCRIT.
+     *
+     * Mesuré sur capture : `#E8E8E9` sur une barre à `#FAFAFB`, soit
+     * **1,17:1**, là où WCAG 1.4.11 demande 3:1 pour un élément d'interface
+     * non textuel. On ne le force PAS à 3:1 : il faudrait un gris sombre qui
+     * pèserait plus que la mangue et volerait à « Publier » la seule tache
+     * chaude de la barre (A210).
+     *
+     * L'état se dit donc en TROIS signaux non colorés — glyphe plein contre
+     * contour (une FORME, donc conforme à WCAG 1.4.1), encre pleine contre
+     * gris de second plan, et graisse du mot. L'indicateur ne fait que les
+     * renforcer.
+     *
+     * Ce qui change vraiment : il ne DICTE plus la géométrie du texte. Il
+     * occupait 42 des 52 pt de la barre pour un signal que personne ne voit.
+     */
+    height: INDICATOR_HEIGHT,
+    borderRadius: INDICATOR_RADIUS,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   iconBox: {
     width: ICON_SIZE,
@@ -470,29 +466,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  publishIcon: {
-    // Le squircle déborde un peu de la boîte des glyphes : c'est voulu, il
-    // doit peser plus lourd que les quatre contours.
-    width: 27,
-    height: 27,
-  },
-  labelSlot: {
-    height: 11,
+  mark: {
+    // Le squircle déborde la boîte des glyphes : voulu, il doit peser plus
+    // lourd que les quatre contours.
+    width: MARK_SIZE,
+    height: MARK_SIZE,
+    borderRadius: MARK_RADIUS,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    // 9 — descendu de 13 (à côté de l'icône) puis de 10 (sous l'icône).
-    // Le rembourrage ramené à 6 suffisait presque à faire tenir « Messages »
-    // (52 pt disponibles pour 44 demandés), mais 8 pt de marge ne tiennent
-    // pas une traduction : l'espagnol arrive (critère de fin du chantier
-    // i18n) et « Mensajes » est plus long. À 9, le mot pèse ~40 pt dans 52 —
-    // la marge absorbe une langue de plus sans retoucher la géométrie.
-    // `letterSpacing` négatif resserre encore de ~1 pt sur huit caractères,
-    // gratuitement.
-    fontSize: 9,
-    lineHeight: 11,
-    fontFamily: Font.bold,
+    /**
+     * 10 pt, et plus 9 (D109 1D).
+     *
+     * 9 était sous le minimum des DEUX plateformes — 10 pt pour un onglet
+     * iOS, 11 sp en Material 3 — et son interligne de 11 donnait un ratio de
+     * 1,22, sous le plancher maison de 1,35. Le fichier était pour cela
+     * exempté NOMMÉMENT de `typography.spec.ts`, avec une raison qui n'était
+     * pas une propriété du texte mais un coût : « toucher à la fente rouvre
+     * D88 ». L'exception est SUPPRIMÉE par ce lot — c'est sa mesure.
+     *
+     * La descente 13 → 10 → 9 avait été forcée par le mot le plus long,
+     * « Messages ». Or le plancher de 1,35 existe justement parce que Plus
+     * Jakarta Sans rogne les jambages : le `g` de « Messages » était le
+     * premier concerné.
+     *
+     * 14 d'interligne pour 10 de corps = 1,40.
+     */
+    fontSize: LABEL_SIZE,
+    lineHeight: LABEL_LINE_HEIGHT,
+    fontFamily: Font.medium,
     letterSpacing: -0.1,
+  },
+  labelFocused: {
+    // Troisième signal d'état, et le seul qui ne coûte ni couleur ni place :
+    // la graisse. Medium au repos, bold à la sélection.
+    fontFamily: Font.bold,
   },
   badge: {
     position: 'absolute',

@@ -1,0 +1,44 @@
+{
+  "title": "My trips",
+  "back": "Back",
+  "count": "{count, plural, =0 {No trip in progress} one {# trip in progress} other {# trips in progress}}",
+  "sections": {
+    "aFinaliser": "To finish",
+    "enLigne": "Live",
+    "passes": "Past"
+  },
+  "status": {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Live",
+    "PAUSED": "Paused",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled",
+    "ARCHIVED": "Archived"
+  },
+  "route": "{from} → {to}",
+  "noRoute": "Trip without a city",
+  "noDate": "Date to choose",
+  "offer": "{price} €/kg · {capacity, number} kg",
+  "offerMissing": "Price to set",
+  "actions": {
+    "continuer": "Continue",
+    "pause": "Pause",
+    "remettre": "Put back online",
+    "restaurer": "Restore",
+    "supprimer": "Delete",
+    "annuler": "Cancel trip",
+    "voir": "See listing"
+  },
+  "confirmCancelTitle": "Cancel this trip?",
+  "confirmCancelBody": "It leaves the search. Shippers who spotted it will not find it any more.",
+  "confirmCancelOk": "Cancel trip",
+  "confirmDeleteTitle": "Delete this draft?",
+  "confirmDeleteBody": "It was never published: nobody saw it.",
+  "confirmDeleteOk": "Delete",
+  "keep": "Keep",
+  "failed": "That is not possible right now.",
+  "failedDeals": "This trip has bookings: cancel them first.",
+  "emptyTitle": "No trip yet",
+  "emptyBody": "Your spare kilos pay off.",
+  "emptyCta": "Publish a trip"
+}

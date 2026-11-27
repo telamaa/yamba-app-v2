@@ -361,4 +361,11 @@ export type CreateTripCopy = {
   almostDoneSub: string;
   stayAndFinish: string;
   leave: string;
+
+  /* ── Panneau de fin (D111) — le retour devient un VRAI second trajet ── */
+  publishedTitle: string;
+  publishedReturnTitle: string;
+  publishedReturnBody: string;
+  publishedReturnCta: string;
+  publishedTripsCta: string;
 };

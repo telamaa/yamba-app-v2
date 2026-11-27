@@ -20,6 +20,7 @@ import {
   useUnfollowUser,
   useUpdateFollowPreferences,
 } from "@/hooks/useFollowMutations";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   item: FollowingItem;
@@ -129,7 +130,7 @@ export default function FollowedTripperCard({ item }: Props) {
                       className="fill-amber-400 stroke-amber-400"
                     />
                     <span className="font-semibold text-slate-700 dark:text-slate-300">
-                      {user.carrierRatingAvg.toFixed(1)}
+                      {formatRating(user.carrierRatingAvg, intlTagFor(locale))}
                     </span>
                     <span>({user.carrierRatingCount})</span>
                   </span>

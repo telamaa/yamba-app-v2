@@ -22,6 +22,7 @@ import PickupNotes from "./PickupNotes";
 import PickupPhotosGrid from "./PickupPhotosGrid";
 import PickupRefuseDialog from "./PickupRefuseDialog";
 import PickupWarningBanner from "./PickupWarningBanner";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 export default function DealPickupDesktop(props: DealPickupViewProps) {
   const t = useTranslations("carrierDealPickup");
@@ -40,7 +41,7 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
   return (
     <>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+        <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
           {/* Header de page */}
           <button
             type="button"

@@ -7,6 +7,7 @@
 import '@/global.css';
 
 import { Platform } from 'react-native';
+import { barHeight } from '@/lib/tab-bar-geometry';
 
 export const Brand = {
   mango: '#FF9900',
@@ -83,14 +84,23 @@ export const Spacing = {
  */
 export const TabBar = {
   /**
-   * Hauteur de la barre. 52 et non 56 : l'indicateur de sélection fait 42
-   * (`PILL_HEIGHT` dans `components/tab-bar.tsx`), il lui reste donc 5 de
-   * chaque côté. La référence de composition est aussi serrée — 38 dans 45
-   * chez YouTube, mesuré sur la capture du 08/11 — et c'est cette étroitesse
-   * qui fait lire l'indicateur comme un bandeau plutôt que comme un bouton
-   * perdu au milieu d'une barre.
+   * Hauteur de la barre — 60 depuis D109.
+   *
+   * Elle ne se déduit plus d'une pilule mais d'un EMPILEMENT, et chaque
+   * terme a sa raison :
+   *
+   *     indicateur 32  (l'icône de 22, centrée, 5 de chaque côté)
+   *   + écart        4
+   *   + ligne du mot 14  (10 pt × 1,4 — au-dessus du plancher maison de 1,35)
+   *   ─────────────────
+   *     contenu      50, plus 5 de respiration de chaque côté → 60
+   *
+   * Les 52 précédents venaient d'un indicateur de 42 qui CONTENAIT le mot :
+   * il ne restait que 11 pt de fente, donc 9 pt de police — sous le minimum
+   * d'iOS (10) comme de Material 3 (11). L'indicateur étant passé derrière
+   * la seule icône (D109 1B), le texte a retrouvé sa place.
    */
-  height: 52,
+  height: barHeight(),
   /** Son écart au bas de la zone sûre : c'est ce vide qui la fait FLOTTER. */
   gap: Spacing.two,
 } as const;

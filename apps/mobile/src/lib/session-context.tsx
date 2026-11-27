@@ -20,6 +20,7 @@ import {
 
 import { usePreferredLocaleSetter } from '@/i18n/provider';
 import { forgetLastSearch } from '@/lib/last-search';
+import { clearPublishMemory } from '@/lib/publish-draft';
 import {
   bootstrapSession,
   login,
@@ -99,6 +100,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // celui qui partait ; ils n'ont pas à survivre à sa sortie, ni à
     // s'afficher au visiteur suivant sur le même téléphone.
     forgetLastSearch();
+    // Même raison : un trajet à demi écrit appartient à celui qui l'écrivait.
+    clearPublishMemory();
   }, [setPreferredLocale]);
 
   const value = useMemo(

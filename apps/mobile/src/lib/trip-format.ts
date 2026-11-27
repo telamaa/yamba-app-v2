@@ -100,6 +100,7 @@ export function calculateCO2SavedKg(
   return (factor * distanceKm * Math.max(weightKg, 0.5)) / 1000;
 }
 
+
 /* ── Dates ───────────────────────────────────────────────────────────────── */
 
 const FR_MONTHS = [

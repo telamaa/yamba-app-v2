@@ -159,6 +159,13 @@ export default function RootLayout() {
                 l'autre, par-dessus l'app. On le termine ou on le quitte — ce
                 n'est pas une destination où l'on navigue. */}
             <Stack.Screen name="booking" />
+            {/* « Mes trajets » : une DESTINATION, pas un tunnel — on y revient
+                entre deux voyages. Poussée par-dessus les onglets. */}
+            <Stack.Screen name="trips/mine" />
+            {/* La PUBLICATION d'un trajet : sept écrans poussés, le pendant
+                Voyageur du tunnel de réservation. Son seuil est l'onglet
+                « + » ; ici vit la pile qui se pousse par-dessus les onglets. */}
+            <Stack.Screen name="publish-trip" />
             {/* Le SUIVI d'un envoi : une destination, pas un tunnel. On y
                 revient pendant des jours — d'où sa pile à part de `booking`,
                 dont le retour retomberait sur une étape de paiement. */}

@@ -14,6 +14,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import { useOpenDealThread } from "@/hooks/useMessaging";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 // ── TON PAIEMENT ──────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export function TrackingParcelCard({ deal }: { deal: DealRequest }) {
 
 export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
   const t = useTranslations("carrierDealTracking");
+  const locale = useLocale();
   const { shipper } = deal;
   const initials = `${shipper.firstName[0] ?? ""}${shipper.lastInitial}`.toUpperCase();
 
@@ -108,7 +110,7 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
             {/* rating absent de l'API réelle — masqué alors */}
-            {shipper.rating != null && <>⭐ {shipper.rating.toFixed(1)} · </>}
+            {shipper.rating != null && <>⭐ {formatRating(shipper.rating, intlTagFor(locale))} · </>}
             {t("shipperCard.subtitle")}
           </div>
         </div>

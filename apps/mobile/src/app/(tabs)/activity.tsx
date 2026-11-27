@@ -13,7 +13,8 @@
  * carte dit honnêtement que le parcours arrive — elle ne renvoie NULLE PART,
  * l'app est full native (A210 b).
  */
-import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTranslations } from 'use-intl';
@@ -50,17 +51,31 @@ function ActivityContent() {
         {isCarrier && (
           <View style={styles.counters}>
             <ThemedText>{t('activity.pendingDeals', { count: badges.pendingDeals })}</ThemedText>
-            <ThemedText>{t('activity.draftTrips', { count: badges.draftTrips })}</ThemedText>
+
+            {/* D111 quinquies — le compteur de brouillons MÈNE quelque part.
+                Il affichait un nombre depuis le lot « onglets » sans que rien
+                ne permette d'y aller : un chiffre sur lequel on ne peut pas
+                taper est une information qui se périme toute seule. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/trips/mine')}
+              style={({ pressed }) => [styles.lien, pressed && styles.pressed]}>
+              <ThemedText type="smallBold">{t('activity.myTrips')}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.lienCompte}>
+                {t('activity.draftTrips', { count: badges.draftTrips })}
+              </ThemedText>
+              <Ionicons name="chevron-forward" size={16} color={Brand.mango} />
+            </Pressable>
           </View>
         )}
 
         <ThemedText themeColor="textSecondary">{t('activity.note')}</ThemedText>
 
-        {/* La porte de « Publier ». PAS de bouton tant que le parcours natif
-            n'existe pas : un CTA désactivé en permanence que rien n'explique
-            viole la doctrine A209 du bouton désactivé, et promettrait un
-            écran absent (A203). La carte INVITE et dit la vérité ; le bouton
-            naîtra avec le formulaire, actif du premier jour. */}
+        {/* La porte de « Publier ». Le bouton est né AVEC le formulaire, et
+            actif du premier jour — c'est ce que cette carte promettait depuis
+            le lot « onglets » : « le bouton naîtra avec le formulaire ». La
+            ligne « arrive dans un prochain lot » a disparu le même jour : une
+            coquille honnête cesse de l'être le jour où elle ment. */}
         <ThemedView type="backgroundElement" style={styles.publishCard}>
           <View style={[styles.publishIcon, { backgroundColor: 'rgba(255,153,0,0.16)' }]}>
             <Ionicons name="airplane-outline" size={22} color={Brand.mango} />
@@ -69,9 +84,14 @@ function ActivityContent() {
           <ThemedText type="small" themeColor="textSecondary">
             {t('activity.publishBody')}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t('activity.publishSoon')}
-          </ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/publish-trip')}
+            style={({ pressed }) => [styles.publishCta, { opacity: pressed ? 0.85 : 1 }]}>
+            <ThemedText type="smallBold" style={styles.publishCtaLabel}>
+              {t('activity.publishCta')}
+            </ThemedText>
+          </Pressable>
         </ThemedView>
       </SafeAreaView>
     </ThemedView>
@@ -113,7 +133,33 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   counters: {
-    gap: Spacing.one,
+    gap: Spacing.two,
+  },
+  lien: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+  },
+  lienCompte: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  publishCta: {
+    backgroundColor: Brand.mango,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.four,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.two,
+  },
+  publishCtaLabel: {
+    color: '#1A1A1A',
+    fontSize: 15,
   },
   publishCard: {
     borderRadius: Spacing.three,

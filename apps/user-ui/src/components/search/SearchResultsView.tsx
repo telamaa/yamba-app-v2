@@ -24,10 +24,11 @@ import type {
   TransportMode,
 } from "./search-results.types";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { conteneurDePage, HAUTEUR_D_EN_TETE } from "@/lib/layout/largeur-de-page";
 
 type FilterMode = "all" | TransportMode;
 
-const HEADER_HEIGHT = 78;
+const HEADER_HEIGHT = HAUTEUR_D_EN_TETE;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
 const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
 const WEIGHT_STORAGE_KEY = "yamba.search.weightKg";
@@ -572,7 +573,7 @@ export default function SearchResultsView() {
         >
           <div className="pb-3 pt-4 transition-all duration-300 ease-out">
             {isPageLoading ? (
-              <div className="mx-auto max-w-7xl px-3">
+              <div className={conteneurDePage()}>
                 <TripSearchBarSkeleton />
               </div>
             ) : (
@@ -604,7 +605,7 @@ export default function SearchResultsView() {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-3 pb-14">
+        <section className={conteneurDePage("pb-14")}>
           <div className="md:hidden" style={{ paddingTop: 16 }} />
           <div className="hidden md:block" style={{ paddingTop: SEARCH_BAR_FIXED_HEIGHT + 24 }} />
 

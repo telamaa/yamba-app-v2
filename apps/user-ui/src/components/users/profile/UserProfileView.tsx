@@ -7,6 +7,7 @@ import UserStatsRow from "./UserStatsRow";
 import TripperBlock from "./TripperBlock";
 import ShipperBlock from "./ShipperBlock";
 import FollowSidebar from "./FollowSidebar";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   user: PublicUser;
@@ -15,8 +16,11 @@ type Props = {
 export default function UserProfileView({ user }: Props) {
   const t = useTranslations("userProfile");
   return (
-    // <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8">
-    <div className="mx-auto max-w-7xl px-4 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    // D110 — NOTÉ, NON CORRIGÉ : le `lg:grid-cols-…` ci-dessous est sans
+    // effet, faute de `lg:grid`. La grille à deux colonnes de cette page n'a
+    // donc jamais fonctionné. C'est un défaut de mise en page et non
+    // d'alignement : le corriger déplacerait tout le contenu, hors de ce lot.
+    <div className={conteneurDePage("py-6 lg:grid-cols-[minmax(0,1fr)_320px]")}>
       {/* D67 (ANO-WEB-21) — le propriétaire voit sa page même masquée : on le lui signale. */}
       {user.hidden && (
         <div role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">

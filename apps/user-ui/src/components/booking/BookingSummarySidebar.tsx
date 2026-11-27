@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 import { countryFlag } from "@/lib/country-name";
 import { useLocale, useTranslations } from "next-intl";
 import type { Draft, PriceBreakdown, Step, TripContext } from "./booking.types";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   trip: TripContext;
@@ -132,7 +133,7 @@ function RecapCard({
                 <Star size={11} fill="#BA7517" stroke="#BA7517" />
                 <span>
                   {trip.carrier.dealCount > 0
-                    ? `${trip.carrier.rating.toFixed(1)} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
+                    ? `${formatRating(trip.carrier.rating, intlTagFor(locale))} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
                     : t("summary.newTripper")}
                 </span>
               </div>

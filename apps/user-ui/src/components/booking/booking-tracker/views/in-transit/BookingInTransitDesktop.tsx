@@ -25,6 +25,7 @@ import {
   SenderParcelCard,
   SenderPaymentCard,
 } from "./SenderTrackingSideCards";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 type Props = {
   booking: Booking;
@@ -41,7 +42,7 @@ export default function BookingInTransitDesktop({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+      <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
         <BookingAcceptedHeader
           booking={booking}
           onBackAction={onCloseAction}

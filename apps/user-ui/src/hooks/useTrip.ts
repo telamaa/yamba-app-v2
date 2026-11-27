@@ -7,7 +7,7 @@ import apiClient from "@/lib/api-client";
 import { track } from "@/lib/analytics";
 import type { Draft } from "@/components/trips/create/create-trip.types";
 import { mapDraftToPayload } from "@/components/trips/create/create-trip.mapper";
-import { withLocalDates, withLocalDatesInList } from "@/components/trips/list/trip-local-dates"; // ANO-WEB-41
+import { withLocalDates, withLocalDatesInList } from "@/lib/trip-local-dates"; // ANO-WEB-41
 import type { TripListItem } from "@/components/trips/list/my-trips.config";
 
 const BASE = "/trips";

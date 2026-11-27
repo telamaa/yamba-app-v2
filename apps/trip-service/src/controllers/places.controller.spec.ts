@@ -6,9 +6,13 @@
  * distinct d'une liste vide.
  */
 const lookupPlaces = jest.fn();
-jest.mock("../services/places.service", () => ({ lookupPlaces: (...args: unknown[]) => lookupPlaces(...args) }));
+const lookupPlaceDetails = jest.fn();
+jest.mock("../services/places.service", () => ({
+  lookupPlaces: (...args: unknown[]) => lookupPlaces(...args),
+  lookupPlaceDetails: (...args: unknown[]) => lookupPlaceDetails(...args),
+}));
 
-import { autocompletePlaces } from "./places.controller";
+import { autocompletePlaces, getPlaceDetails } from "./places.controller";
 
 type Captured = { status: number | null; body: unknown; headers: Record<string, string> };
 
@@ -38,7 +42,10 @@ function run(
   }));
 }
 
-beforeEach(() => lookupPlaces.mockReset());
+beforeEach(() => {
+  lookupPlaces.mockReset();
+  lookupPlaceDetails.mockReset();
+});
 
 describe("GET /places/autocomplete", () => {
   it("rend les propositions du service, sans enveloppe superflue", async () => {
@@ -109,5 +116,84 @@ describe("GET /places/autocomplete", () => {
       language: "fr",
       sessionToken: "m4k2x9-ab12cd34",
     });
+  });
+});
+
+/* ── Détail d'un lieu (D111 ter) ──────────────────────────────────────── */
+
+function runDetails(
+  query: Record<string, unknown>,
+  headers: Record<string, unknown> = {},
+  user?: { preferredLocale?: string | null }
+) {
+  const captured: Captured = { status: null, body: null, headers: {} };
+  const next = jest.fn();
+  const res = {
+    setHeader: (k: string, v: string) => {
+      captured.headers[k] = v;
+    },
+    status: (code: number) => {
+      captured.status = code;
+      return {
+        json: (body: unknown) => {
+          captured.body = body;
+        },
+      };
+    },
+  };
+  return getPlaceDetails({ query, headers, user } as never, res as never, next).then(() => ({
+    captured,
+    next,
+  }));
+}
+
+const PARIS = { city: "Paris", country: "France", countryCode: "FR", lat: 48.85, lng: 2.35 };
+
+describe("GET /places/details", () => {
+  it("rend le détail tel quel, sans enveloppe", async () => {
+    lookupPlaceDetails.mockResolvedValue(PARIS);
+    const { captured, next } = await runDetails({ placeId: "abc", language: "fr" });
+    expect(next).not.toHaveBeenCalled();
+    expect(captured.status).toBe(200);
+    expect(captured.body).toEqual(PARIS);
+    expect(captured.headers["Cache-Control"]).toBe("no-store");
+  });
+
+  it("relaie le jeton de session — c'est lui qui groupe la facturation", async () => {
+    lookupPlaceDetails.mockResolvedValue(PARIS);
+    await runDetails({ placeId: "abc", sessionToken: "jeton-123", language: "fr" });
+    expect(lookupPlaceDetails).toHaveBeenCalledWith(
+      expect.objectContaining({ placeId: "abc", sessionToken: "jeton-123" })
+    );
+  });
+
+  it("un identifiant INCONNU rend 404, pas 503 — il faut refaire la saisie, pas réessayer", async () => {
+    lookupPlaceDetails.mockResolvedValue("unknown");
+    const { captured, next } = await runDetails({ placeId: "perime" });
+    expect(captured.status).toBeNull();
+    const erreur = next.mock.calls[0][0] as { statusCode?: number; details?: { code?: string } };
+    expect(erreur.statusCode).toBe(404);
+    expect(erreur.details?.code).toBe("PLACE_NOT_FOUND");
+  });
+
+  it("un service MUET rend 503 : le parcours continue sans fourchette", async () => {
+    lookupPlaceDetails.mockResolvedValue(null);
+    const { next } = await runDetails({ placeId: "abc" });
+    const erreur = next.mock.calls[0][0] as { statusCode?: number; details?: { code?: string } };
+    expect(erreur.statusCode).toBe(503);
+    expect(erreur.details?.code).toBe("PLACES_UNAVAILABLE");
+  });
+
+  it("une requête sans `placeId` est refusée avant tout appel facturé", async () => {
+    const { next } = await runDetails({});
+    expect(lookupPlaceDetails).not.toHaveBeenCalled();
+    const erreur = next.mock.calls[0][0] as { details?: { code?: string } };
+    expect(erreur.details?.code).toBe("INVALID_QUERY");
+  });
+
+  it("la langue du COMPTE prime sur celle de l'appareil (D44)", async () => {
+    lookupPlaceDetails.mockResolvedValue(PARIS);
+    await runDetails({ placeId: "abc" }, { "x-locale": "en" }, { preferredLocale: "fr" });
+    expect(lookupPlaceDetails).toHaveBeenCalledWith(expect.objectContaining({ language: "fr" }));
   });
 });

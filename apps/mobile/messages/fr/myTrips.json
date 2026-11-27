@@ -1,0 +1,44 @@
+{
+  "title": "Mes trajets",
+  "back": "Retour",
+  "count": "{count, plural, =0 {Aucun trajet en cours} one {# trajet en cours} other {# trajets en cours}}",
+  "sections": {
+    "aFinaliser": "À finaliser",
+    "enLigne": "En ligne",
+    "passes": "Passés"
+  },
+  "status": {
+    "DRAFT": "Brouillon",
+    "PUBLISHED": "En ligne",
+    "PAUSED": "En pause",
+    "COMPLETED": "Terminé",
+    "CANCELLED": "Annulé",
+    "ARCHIVED": "Archivé"
+  },
+  "route": "{from} → {to}",
+  "noRoute": "Trajet sans ville",
+  "noDate": "Date à choisir",
+  "offer": "{price} €/kg · {capacity, number} kg",
+  "offerMissing": "Prix à fixer",
+  "actions": {
+    "continuer": "Continuer",
+    "pause": "Mettre en pause",
+    "remettre": "Remettre en ligne",
+    "restaurer": "Restaurer",
+    "supprimer": "Supprimer",
+    "annuler": "Annuler le trajet",
+    "voir": "Voir l'annonce"
+  },
+  "confirmCancelTitle": "Annuler ce trajet ?",
+  "confirmCancelBody": "Il disparaît de la recherche. Les Expéditeurs qui l'avaient repéré ne le trouveront plus.",
+  "confirmCancelOk": "Annuler le trajet",
+  "confirmDeleteTitle": "Supprimer ce brouillon ?",
+  "confirmDeleteBody": "Il n'a jamais été publié : personne ne l'a vu.",
+  "confirmDeleteOk": "Supprimer",
+  "keep": "Garder",
+  "failed": "Action impossible pour l'instant.",
+  "failedDeals": "Ce trajet porte des réservations : annule-les d'abord.",
+  "emptyTitle": "Aucun trajet pour l'instant",
+  "emptyBody": "Tes kilos libres rapportent.",
+  "emptyCta": "Publier un trajet"
+}

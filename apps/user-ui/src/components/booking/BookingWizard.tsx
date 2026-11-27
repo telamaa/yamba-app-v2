@@ -34,6 +34,7 @@ const StepPayment = dynamic(() => import("./steps/StepPayment"), {
 import StepRecipient from "./steps/StepRecipient";
 import { usePricingParams } from "@/hooks/usePricingParams";
 import { track } from "@/lib/analytics";
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 const EMPTY_ERRORS: ValidationErrors = {};
 
@@ -114,7 +115,7 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
         : t("continue");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
+    <div className={conteneurDePage("pb-16 pt-4 sm:pt-6")}>
       <BookingExitDialog {...exit.dialog} />
       {/* Back link */}
       <button

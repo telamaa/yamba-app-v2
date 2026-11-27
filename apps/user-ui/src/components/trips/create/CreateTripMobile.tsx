@@ -19,7 +19,9 @@ import {
   type ValidationErrors,
 } from "./create-trip.config";
 import { ErrorSummary } from "./TripFormUi";
+import { preparerLeRetour, retourPossible } from "@/lib/trips/retour-de-trajet";
 import TripLiveSummary from "./TripLiveSummary";
+import { TripPublishedPanel } from "./TripPublishedPanel";
 import StepTrip from "./steps/StepTrip";
 import StepConditions from "./steps/StepConditions";
 import StepReview from "./steps/StepReview";
@@ -53,6 +55,10 @@ export default function CreateTripMobile() {
       version: DRAFT_VERSION,
     }
   );
+
+  /** D111 — même fin que le grand formulaire : le retour, préparé avant
+   *  l'effacement du brouillon, et plus aucune redirection automatique. */
+  const [publie, setPublie] = useState<{ retour: Draft | null } | null>(null);
 
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [showExitGuard, setShowExitGuard] = useState(false);
@@ -219,9 +225,9 @@ export default function CreateTripMobile() {
         { draft, publish: true },
         {
           onSuccess: () => {
+            const retour = retourPossible(draft) ? preparerLeRetour(draft) : null;
             clearDraft();
-            setFlashToast({ type: "success", message: isFr ? "Trajet publié avec succès !" : "Trip published successfully!" });
-            router.push("/dashboard/trips");
+            setPublie({ retour });
           },
           onError: (err: any) => {
             const message = err?.response?.data?.message || (isFr ? "Erreur lors de la publication" : "Failed to publish trip");
@@ -262,6 +268,22 @@ export default function CreateTripMobile() {
         <div className="h-full transition-all duration-500" style={{ width: `${((step - 1) / 3) * 100 + completionPercent / 3}%`, backgroundColor: MANGO }} />
       </div>
 
+      {publie !== null ? (
+        <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4">
+          <TripPublishedPanel
+            copy={copy}
+            canPublishReturn={publie.retour !== null}
+            onPublishReturnAction={() => {
+              if (publie.retour === null) return;
+              setDraft(publie.retour);
+              setStep(1);
+              setPublie(null);
+            }}
+            onSeeTripsAction={() => router.push("/dashboard/trips")}
+          />
+        </div>
+      ) : (
+      <>
       {/* Content */}
       <div ref={contentRef} className={["flex-1 overflow-y-auto px-4 pb-32 pt-4", shakeFields ? "animate-[shake_0.4s_ease]" : ""].join(" ")}>
         {showErrors && <ErrorSummary errors={errors} isFr={isFr} />}
@@ -269,7 +291,9 @@ export default function CreateTripMobile() {
         <div key={step} style={{ animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.2s ease` }}>
           {step === 1 && <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
           {step === 2 && <StepConditions copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
-          {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
+          {step === 3 && (
+            <StepReview copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} onGoTo={goTo} />
+          )}
         </div>
       </div>
 
@@ -287,6 +311,8 @@ export default function CreateTripMobile() {
         publishLabel={isEditMode ? (isFr ? "Mettre à jour" : "Update") : copy.publish}
         draftLabel={isEditMode ? "" : copy.saveDraft}
       />
+      </>
+      )}
 
       {/* Exit guard */}
       {showExitGuard && (

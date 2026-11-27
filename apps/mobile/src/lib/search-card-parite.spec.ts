@@ -150,7 +150,14 @@ describe('D99 3A — le gros chiffre est ce que l’envoi coûte', () => {
       const fr = JSON.parse(readFileSync(join(front, 'messages/fr/search.json'), 'utf8')) as {
         card: Record<string, string>;
       };
-      expect(fr.card.totalForWeight).toContain('{kg}');
+      // `{kg` et non `{kg}` : ce qui compte est que la phrase porte le poids
+      // en PARAMÈTRE, pas l'orthographe exacte du gabarit. Épinglé `{kg}` au
+      // littéral, ce test est passé au rouge le jour où le poids a été annoncé
+      // comme un nombre (`{kg, number}`, D108) alors que la règle qu'il défend
+      // n'avait pas bougé — sixième fois ce mois-ci qu'une fiche vise une
+      // ORTHOGRAPHE au lieu d'un USAGE. La localisation, elle, est gardée par
+      // `poids-localise.spec.ts`, dont c'est le sujet.
+      expect(fr.card.totalForWeight).toContain('{kg');
       expect(fr.card.totalForWeight).toContain('estimation');
       // « tout compris » est réaffirmé au tunnel et sur la page du trajet : la
       // ligne de la carte répond à UNE question, pour quel colis.

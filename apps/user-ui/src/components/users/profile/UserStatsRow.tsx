@@ -1,9 +1,10 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Star } from "lucide-react";
 import type { PublicUser } from "@/lib/public-user.types";
 import { calculateGlobalRating } from "@/lib/public-user.helpers";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   user: PublicUser;
@@ -11,6 +12,7 @@ type Props = {
 
 export default function UserStatsRow({ user }: Props) {
   const t = useTranslations("userProfile.stats");
+  const locale = useLocale();
   const globalRating = calculateGlobalRating(user);
 
   return (
@@ -29,7 +31,7 @@ export default function UserStatsRow({ user }: Props) {
           globalRating ? (
             <span className="inline-flex items-center gap-1">
               <Star size={15} className="fill-[#FF9900] text-[#FF9900]" />
-              {globalRating.average.toFixed(1).replace(".", ",")}
+              {formatRating(globalRating.average, intlTagFor(locale))}
             </span>
           ) : (
             <span className="text-sm font-medium italic text-slate-400 dark:text-slate-500">

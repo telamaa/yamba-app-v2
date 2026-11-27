@@ -7,9 +7,10 @@
 "use client";
 
 import { MessageSquare, Phone } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import { useOpenDealThread } from "@/hooks/useMessaging";
+import { formatRating, intlTagFor } from "@/lib/number-format";
 
 type Props = {
   deal: DealRequest;
@@ -17,6 +18,7 @@ type Props = {
 
 export default function PickupContactCard({ deal }: Props) {
   const t = useTranslations("carrierDealPickup");
+  const locale = useLocale();
   const { shipper } = deal;
   const initials = `${shipper.firstName[0] ?? ""}${shipper.lastInitial}`.toUpperCase();
 
@@ -45,7 +47,7 @@ export default function PickupContactCard({ deal }: Props) {
           {/* Stats absentes de l'API réelle (BookingCounterpart) — masquées */}
           {(shipper.rating != null || shipper.shipmentCount != null) && (
             <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              {shipper.rating != null && <>⭐ {shipper.rating.toFixed(1)} ·{" "}</>}
+              {shipper.rating != null && <>⭐ {formatRating(shipper.rating, intlTagFor(locale))} ·{" "}</>}
               {shipper.shipmentCount != null && (
                 <>{t("contactCard.shipments", { count: shipper.shipmentCount })} ·{" "}</>
               )}
