@@ -6,7 +6,15 @@
  * à la gare. Les trois nettoyages de `toE164` viennent de ce que les gens
  * tapent vraiment — ils sont donc testés sur de vraies saisies.
  */
-import { PHONE_PREFIXES, toE164 } from '@/lib/phone-prefixes';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+import {
+  PHONE_PREFIXES,
+  ZERO_DACHEMINEMENT,
+  retireLeZero,
+  toE164,
+} from '@/lib/phone-prefixes';
 
 describe('la liste des indicatifs', () => {
   it('commence par la France — c’est le défaut du brouillon', () => {
@@ -46,7 +54,14 @@ describe('toE164 — les trois nettoyages payés sur de vraies saisies', () => {
 
   it('l’indicatif retapé en double', () => {
     expect(toE164('+33', '33642188112')).toBe('+33642188112');
-    expect(toE164('+242', '242060000000')).toBe('+24260000000');
+    // D121 — cette ligne attendait `+24260000000`, c'est-à-dire le numéro
+    // AMPUTÉ : une fiche verte avait encodé le défaut dans son attendu,
+    // alors même que deux `it.failing` voisines le dénonçaient. Le garde
+    // écrit à l'avance a tenu ; **le voisin, lui, avait déjà adopté le
+    // défaut comme norme.** C'est précisément ce qu'A223 redoutait en
+    // refusant de l'épingler par un test vert — et ça s'est produit à
+    // trois lignes de là.
+    expect(toE164('+242', '242060000000')).toBe('+242060000000');
   });
 
   it('les séparateurs les plus courants sont ignorés', () => {
@@ -69,42 +84,102 @@ describe('toE164 — les trois nettoyages payés sur de vraies saisies', () => {
     expect(toE164('+33', '1234567890123456')).toBeNull();
   });
 
-  it('ne rend jamais un numéro qui commence par zéro après l’indicatif', () => {
+  it('le « 00 » de tête n’est pas le zéro national — les deux se cumulent', () => {
+    // Titre précédent : « ne rend jamais un numéro qui commence par zéro
+    // après l'indicatif ». C'était une règle UNIVERSELLE, et elle était
+    // fausse : au Congo, le numéro commence justement par zéro (D121).
     expect(toE164('+33', '00642188112')).toBe('+33642188112');
   });
 
-  /* ── Le défaut que ce harnais a trouvé, premier jour (A223) ─────────────────
+  /* ── Le défaut trouvé le premier jour (A223), corrigé cinq semaines plus tard (D121) ──
      Le « zéro national » n'existe pas partout. En France, en Belgique, au
      Royaume-Uni, au Maroc, en RD Congo, le 0 est un préfixe d'ACHEMINEMENT
-     qu'on retire pour passer en E.164 — c'est la règle qu'applique
-     `toE164`. Mais au Congo-Brazzaville (+242) et en Côte d'Ivoire (+225),
-     il n'y a PAS de préfixe d'acheminement : le 0 appartient au numéro de
-     l'abonné, et le retirer fabrique un numéro injoignable.
+     qu'on retire pour passer en E.164. Mais au Congo-Brazzaville (+242) et
+     en Côte d'Ivoire (+225), il n'y en a PAS : le 0 appartient au numéro de
+     l'abonné, et le retirer fabriquait un numéro injoignable.
 
      La portée ne tient à aucun corridor en particulier — **Yamba est
      internationale et n'a pas de corridor de référence** (correction de
      l'utilisateur, 28/11/2026 ; la formule venait d'ici et s'était recopiée
      dans trois documents). Elle tient à ceci : c'est par ce numéro que le
      DESTINATAIRE reçoit le code de livraison (D43), donc dans les pays
-     concernés le colis arrive et le code n'arrive pas. Le serveur ne peut pas rattraper : il ne
-     contrôle que la FORME E.164 (`^\+[1-9]\d{6,14}$`), que le numéro
-     amputé respecte. Et le défaut est dans le MIROIR web autant qu'ici
-     (`apps/user-ui/src/components/booking/booking.config.ts`, même fonction
-     ligne pour ligne).
+     concernés le colis arrivait et le code n'arrivait pas. Le serveur ne
+     pouvait pas rattraper : il ne contrôle que la FORME E.164
+     (`^\+[1-9]\d{6,14}$`), que le numéro amputé respecte.
 
-     Le corriger demande une table de préfixes d'acheminement par pays —
-     c'est-à-dire une règle métier, donc une entrée au registre et un lot à
-     part, sur les DEUX fronts. En attendant, ces deux fiches portent
-     l'attendu CORRECT en `it.failing` : elles restent vertes tant que le
-     défaut est là, et deviennent ROUGES le jour où il est corrigé — ce qui
-     obligera à retirer le `.failing` plutôt qu'à l'oublier. Un défaut épinglé
-     par un test vert deviendrait la doctrine ; celui-ci ne peut pas. ── */
+     CES DEUX FICHES ONT VÉCU CINQ SEMAINES EN `it.failing`, portant
+     l'attendu CORRECT : vertes tant que le défaut était là, rouges le jour
+     de la correction — ce qui a obligé à lever le `.failing` plutôt qu'à
+     l'oublier. **Un défaut épinglé par un test vert serait devenu la
+     doctrine.** Et c'est arrivé quand même, trois lignes plus haut : la
+     fiche de l'indicatif retapé en double attendait, elle, le numéro
+     AMPUTÉ. Le garde écrit à l'avance a tenu ; son voisin avait déjà adopté
+     le défaut comme norme. ── */
 
-  it.failing('AXE — un numéro congolais garde son zéro (+242, pas de préfixe d’acheminement)', () => {
+  it('un numéro congolais garde son zéro (+242, pas de préfixe d’acheminement)', () => {
     expect(toE164('+242', '06 000 0000')).toBe('+242060000000');
   });
 
-  it.failing('AXE — un numéro ivoirien garde son zéro (+225, dix chiffres depuis 2021)', () => {
+  it('un numéro ivoirien garde son zéro (+225, dix chiffres depuis 2021)', () => {
     expect(toE164('+225', '07 00 00 00 00')).toBe('+2250700000000');
+  });
+});
+
+describe('la table des préfixes d’acheminement (D121)', () => {
+  it('chaque pays de la liste a une entrée dans la table', () => {
+    // Un pays proposé au choix de l'utilisateur sans règle de zéro
+    // retomberait sur le défaut sans que personne l'ait décidé.
+    const sansRegle = PHONE_PREFIXES.filter((p) => !(p.code in ZERO_DACHEMINEMENT));
+    expect(`sans règle → ${sansRegle.map((p) => p.code).join(', ') || 'aucun'}`).toBe(
+      'sans règle → aucun'
+    );
+  });
+
+  it('les DEUX pays établis gardent leur zéro, et eux seuls pour l’instant', () => {
+    // On corrige ce qui est PROUVÉ. Une table remplie à l'intuition
+    // casserait des pays qui marchent pour en réparer deux.
+    const gardent = Object.entries(ZERO_DACHEMINEMENT)
+      .filter(([, retire]) => !retire)
+      .map(([code]) => code)
+      .sort();
+    expect(gardent).toEqual(['CG', 'CI']);
+  });
+
+  it('chaque `false` porte sa PREUVE en commentaire', () => {
+    // Une exception sans raison écrite est une omission déguisée (A224
+    // lot 5). Ici, chacune doit dire d'où vient la certitude.
+    const source = readFileSync(join(__dirname, 'phone-prefixes.ts'), 'utf8');
+    const table = source.slice(
+      source.indexOf('export const ZERO_DACHEMINEMENT'),
+      source.indexOf('export function retireLeZero')
+    );
+    expect(table.length).toBeGreaterThan(400);
+    expect(table).toContain('+242061234567');
+    expect(table).toContain('2021');
+  });
+
+  it('un pays INCONNU retombe sur le comportement d’avant le lot', () => {
+    // Le serveur peut servir un indicatif que l'app ne connaît pas encore :
+    // on ne change pas de règle sur une absence.
+    expect(retireLeZero('ZZ')).toBe(true);
+    expect(retireLeZero('CG')).toBe(false);
+  });
+
+  it('les deux fronts portent la MÊME table', () => {
+    // Un pays ajouté d'un seul côté serait un numéro juste ici et faux
+    // là-bas — et c'est le DESTINATAIRE qui le paierait.
+    const site = readFileSync(
+      resolve(__dirname, '../../../user-ui/src/components/booking/booking.config.ts'),
+      'utf8'
+    );
+    for (const [code, retire] of Object.entries(ZERO_DACHEMINEMENT)) {
+      expect(`${code} → ${site.includes(`${code}: ${retire},`)}`).toBe(`${code} → true`);
+    }
+  });
+
+  it('le retrait ne mange plus QU’UN zéro', () => {
+    // `^0+` amputait aussi les fautes de frappe à deux zéros : un préfixe
+    // d'acheminement est UN chiffre.
+    expect(toE164('+33', '006 42 18 81 12')).toBe('+33642188112');
   });
 });
