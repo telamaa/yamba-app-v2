@@ -13,6 +13,7 @@ import type { SupportedLocale } from '@packages/api-contracts/locale';
 import authEn from '../../messages/en/auth.json';
 import bookingEn from '../../messages/en/booking.json';
 import favoritesEn from '../../messages/en/favorites.json';
+import myDealsEn from '../../messages/en/myDeals.json';
 import myShipmentsEn from '../../messages/en/myShipments.json';
 import myTripsEn from '../../messages/en/myTrips.json';
 import publishEn from '../../messages/en/publish.json';
@@ -24,6 +25,7 @@ import welcomeEn from '../../messages/en/welcome.json';
 import authFr from '../../messages/fr/auth.json';
 import bookingFr from '../../messages/fr/booking.json';
 import favoritesFr from '../../messages/fr/favorites.json';
+import myDealsFr from '../../messages/fr/myDeals.json';
 import myShipmentsFr from '../../messages/fr/myShipments.json';
 import myTripsFr from '../../messages/fr/myTrips.json';
 import publishFr from '../../messages/fr/publish.json';
@@ -38,6 +40,7 @@ export const MESSAGES = {
     auth: authFr,
     booking: bookingFr,
     favorites: favoritesFr,
+    myDeals: myDealsFr,
     myShipments: myShipmentsFr,
     myTrips: myTripsFr,
     publish: publishFr,
@@ -51,6 +54,7 @@ export const MESSAGES = {
     auth: authEn,
     booking: bookingEn,
     favorites: favoritesEn,
+    myDeals: myDealsEn,
     myShipments: myShipmentsEn,
     myTrips: myTripsEn,
     publish: publishEn,

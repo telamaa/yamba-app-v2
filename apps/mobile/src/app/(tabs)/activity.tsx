@@ -69,7 +69,20 @@ function ActivityContent() {
 
         {isCarrier && (
           <View style={styles.counters}>
-            <ThemedText>{t('activity.pendingDeals', { count: badges.pendingDeals })}</ThemedText>
+            {/* D113 — le compteur de demandes MÈNE quelque part. Il affichait
+                un nombre depuis le lot « onglets » sans que rien ne permette
+                d'y aller : troisième fois que ce dépôt paie le même défaut,
+                et la plus chère — une demande meurt en 24 h (DEA-01). */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/deals/mine')}
+              style={({ pressed }) => [styles.lien, pressed && styles.pressed]}>
+              <ThemedText type="smallBold">{t('activity.myDeals')}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.lienCompte}>
+                {t('activity.pendingDeals', { count: badges.pendingDeals })}
+              </ThemedText>
+              <Ionicons name="chevron-forward" size={16} color={Brand.mango} />
+            </Pressable>
 
             {/* D111 quinquies — le compteur de brouillons MÈNE quelque part.
                 Il affichait un nombre depuis le lot « onglets » sans que rien
@@ -87,8 +100,6 @@ function ActivityContent() {
             </Pressable>
           </View>
         )}
-
-        <ThemedText themeColor="textSecondary">{t('activity.note')}</ThemedText>
 
         {/* La porte de « Publier ». Le bouton est né AVEC le formulaire, et
             actif du premier jour — c'est ce que cette carte promettait depuis

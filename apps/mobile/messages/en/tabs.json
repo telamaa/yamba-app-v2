@@ -51,12 +51,12 @@
     "title": "Activity",
     "pendingDeals": "{count, plural, =0 {No pending requests} one {# pending request} other {# pending requests}}",
     "draftTrips": "{count, plural, =0 {No trips to finish} one {# trip to finish} other {# trips to finish}}",
-    "note": "Details of received requests arrive in an upcoming batch.",
     "publishTitle": "Publish your trip",
     "publishBody": "Your spare kilos can earn. Announce your next journey and receive requests.",
     "myTrips": "My trips",
     "publishCta": "Publish a trip",
     "myShipments": "My shipments",
-    "shipmentsToHandle": "{count, plural, =0 {Nothing to handle} one {# shipment needs you} other {# shipments need you}}"
+    "shipmentsToHandle": "{count, plural, =0 {Nothing to handle} one {# shipment needs you} other {# shipments need you}}",
+    "myDeals": "Requests received"
   }
 }

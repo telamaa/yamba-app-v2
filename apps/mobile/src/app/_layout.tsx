@@ -166,6 +166,10 @@ export default function RootLayout() {
                 PLURIEL n'est pas un caprice — `shipment/mine` serait capté
                 par `shipment/[id]` avec id = « mine ». */}
             <Stack.Screen name="shipments/mine" />
+            {/* Les DEMANDES REÇUES et la demande elle-même (D113). Même
+                convention : pluriel pour la liste, singulier pour la fiche. */}
+            <Stack.Screen name="deals/mine" />
+            <Stack.Screen name="deal/[id]" />
             {/* La PUBLICATION d'un trajet : sept écrans poussés, le pendant
                 Voyageur du tunnel de réservation. Son seuil est l'onglet
                 « + » ; ici vit la pile qui se pousse par-dessus les onglets. */}
