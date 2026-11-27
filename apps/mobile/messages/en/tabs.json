@@ -57,6 +57,15 @@
     "publishCta": "Publish a trip",
     "myShipments": "My shipments",
     "shipmentsToHandle": "{count, plural, =0 {Nothing to handle} one {# shipment needs you} other {# shipments need you}}",
-    "myDeals": "Requests received"
+    "myDeals": "Requests received",
+    "waitingTitle": "What needs you",
+    "nothingWaiting": "Nothing needs you. You are up to date.",
+    "waitingRepondre": "Reply to {name}",
+    "waitingConfirmer": "Confirm receipt",
+    "waitingNoter": "Rate {name}",
+    "waitingSomeone": "someone",
+    "waitingIn": "within {remaining}",
+    "waitingMore": "{count, plural, one {# more} other {# more}}",
+    "doorsTitle": "Your lists"
   }
 }

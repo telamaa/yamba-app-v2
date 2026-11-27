@@ -8,7 +8,7 @@ import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTabBadges } from '@/hooks/use-tab-badges';
+import { useTabBadges } from '@/lib/activite-context';
 
 // Messages : derrière la porte d'identité. Le compteur est celui du serveur
 // (`totalUnread`) — le même que le badge ; les conversations sont un lot à part.

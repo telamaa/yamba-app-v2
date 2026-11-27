@@ -14,6 +14,7 @@ import { FONT_ASSETS } from '@/constants/typography';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { AppIntlProvider } from '@/i18n/provider';
+import { ActiviteProvider } from '@/lib/activite-context';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { handleStripeRedirect } from '@/lib/stripe-sheet';
 import { isWelcomeDismissed } from '@/lib/welcome-state';
@@ -136,6 +137,10 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <AppIntlProvider>
       <SessionProvider>
+        {/* D114 — UNE lecture de l'activité pour tout le monde. Il est DANS
+            la session (il en dépend) et AUTOUR de la pile (la barre
+            d'onglets, l'onglet Messages et le carrefour la partagent). */}
+        <ActiviteProvider>
         <ThemeProvider value={theme}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
@@ -186,6 +191,7 @@ export default function RootLayout() {
           {/* Ne peint rien : il écoute les retours de redirection bancaire (D82 7A). */}
           <StripeRedirectRelay />
         </ThemeProvider>
+        </ActiviteProvider>
       </SessionProvider>
     </AppIntlProvider>
     </SafeAreaProvider>

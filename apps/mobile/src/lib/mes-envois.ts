@@ -72,6 +72,11 @@ export type EnvoiDeLaListe = {
   actions: ActionEnvoi[];
   /** La notation est ouverte ET pas encore faite. */
   peutNoter: boolean;
+  /**
+   * La fin de la fenêtre de notation (D114). Servie, jamais calculée — c'est
+   * une échéance, et le carrefour trie dessus.
+   */
+  noterAvant: string | null;
   /** PENDING : l'instant où la demande tombe (DEA-01), sinon `null`. */
   expireLe: string | null;
 };
@@ -141,6 +146,7 @@ export function envoiDeLApi(brut: unknown): EnvoiDeLaListe | null {
     devise: texte(pricing.currencyCode) || 'EUR',
     actions,
     peutNoter: rating.canRate === true && rating.ratedByMe !== true,
+    noterAvant: texte(rating.windowEndsAt) || null,
     expireLe: statut === 'PENDING' ? texte(envoi.expiresAt) || null : null,
   };
 }

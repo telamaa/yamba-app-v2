@@ -57,6 +57,15 @@
     "publishCta": "Publier un trajet",
     "myShipments": "Mes envois",
     "shipmentsToHandle": "{count, plural, =0 {Rien à traiter} one {# envoi à traiter} other {# envois à traiter}}",
-    "myDeals": "Demandes reçues"
+    "myDeals": "Demandes reçues",
+    "waitingTitle": "Ce qui t'attend",
+    "nothingWaiting": "Rien ne t'attend. Tout est à jour.",
+    "waitingRepondre": "Répondre à {name}",
+    "waitingConfirmer": "Confirmer la réception",
+    "waitingNoter": "Noter {name}",
+    "waitingSomeone": "quelqu'un",
+    "waitingIn": "sous {remaining}",
+    "waitingMore": "{count, plural, one {# autre} other {# autres}}",
+    "doorsTitle": "Tes listes"
   }
 }

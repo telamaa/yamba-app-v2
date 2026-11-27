@@ -68,6 +68,7 @@ describe('① la projection ne fait pas confiance à la base', () => {
       devise: 'EUR',
       actions: ['cancel'],
       peutNoter: false,
+      noterAvant: null,
       expireLe: null,
     });
   });
@@ -293,10 +294,15 @@ describe('⑤ le contrat, dans les DEUX sens', () => {
     // Un compteur calculé à part finit par dire autre chose que l'écran
     // vers lequel il mène — le défaut mesuré sur le site, où « En cours »
     // affiche deux nombres différents à quarante pixels d'écart.
-    const badges = readFileSync(join(MOBILE, 'src/hooks/use-tab-badges.ts'), 'utf8');
-    expect(badges).toContain("from '@/lib/mes-envois'");
-    expect(badges).toContain('sectionDeLEnvoi');
-    expect(badges).not.toMatch(/status === 'DELIVERED'/);
+    //
+    // D114 a déplacé ce calcul de `hooks/use-tab-badges.ts` vers le
+    // fournisseur `lib/activite-context.tsx`, où il DÉRIVE des mêmes listes
+    // que les écrans. La garantie est devenue structurelle ; la fiche reste,
+    // parce qu'une structure se défait aussi.
+    const source = readFileSync(join(MOBILE, 'src/lib/activite-context.tsx'), 'utf8');
+    expect(source).toContain("from '@/lib/mes-envois'");
+    expect(source).toContain('sectionDeLEnvoi');
+    expect(source).not.toMatch(/status === 'DELIVERED'/);
   });
 
   it('l’écran n’a AUCUN filtre — et c’est la décision, pas un oubli', () => {

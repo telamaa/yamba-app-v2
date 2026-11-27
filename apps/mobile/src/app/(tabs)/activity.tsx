@@ -1,4 +1,17 @@
 /**
+ * activity.tsx — l'onglet « Activité », CARREFOUR des deux faces (D114).
+ * ========================================================================
+ * Il listait des PORTES. Une porte dit où aller ; elle ne dit pas ce qu'il
+ * faut faire, ni dans quel ordre. Quelqu'un qui avait un colis à confirmer,
+ * une demande expirant dans deux heures et un Voyageur à noter devait
+ * ouvrir trois écrans pour l'apprendre.
+ *
+ * Il montre donc d'abord CE QUI L'ATTEND, les deux rôles confondus et
+ * ordonnés (`lib/carrefour.ts`), puis les portes, puis l'invitation à
+ * publier. Et quand rien n'attend, il le DIT — « tout est à jour » est une
+ * bonne nouvelle, pas un écran vide.
+ *
+ * ── ancien en-tête ──────────────────────────────────────────────────────
  * activity.tsx — l'onglet « Activité » (ex-« Trajets », A210).
  * ============================================================
  * Il sert les DEUX faces : les envois de l'Expéditeur, les trajets publiés
@@ -26,14 +39,71 @@ import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTabBadges } from '@/hooks/use-tab-badges';
+import { useActivite, useTabBadges } from '@/lib/activite-context';
+import { choseQuiAttendent, teteDePile, type ChoseQuiAttend } from '@/lib/carrefour';
+import { remainingLabel, remainingUntil } from '@/lib/shipment-view';
 import { useSession } from '@/lib/session-context';
 
 function ActivityContent() {
   const t = useTranslations('tabs');
+  // Le décompte parle le dictionnaire de l'écran de suivi : un même délai ne
+  // s'écrit pas de deux façons selon l'écran qui le montre.
+  const tc = useTranslations('shipment');
   const { user } = useSession();
   const badges = useTabBadges();
+  const { envois, demandes, pret } = useActivite();
   const isCarrier = user?.roles.includes('CARRIER') ?? false;
+
+  const attendent = choseQuiAttendent(envois, demandes);
+  const { visibles, reste } = teteDePile(attendent);
+
+  /** Une ligne du carrefour : ce qu'il y a à faire, et où cela mène. */
+  function Attente({ chose }: { chose: ChoseQuiAttend }) {
+    const nom =
+      chose.type === 'repondre'
+        ? chose.demande.expediteur
+        : chose.type === 'noter'
+          ? chose.envoi.voyageur
+          : '';
+    const libelle =
+      chose.type === 'repondre'
+        ? t('activity.waitingRepondre', { name: nom || t('activity.waitingSomeone') })
+        : chose.type === 'noter'
+          ? t('activity.waitingNoter', { name: nom || t('activity.waitingSomeone') })
+          : t('activity.waitingConfirmer');
+
+    // Recalculé au rendu, pas à la seconde.
+    const left = chose.echeance ? remainingUntil(chose.echeance, Date.now()) : null;
+
+    const aller = () => {
+      if (chose.type === 'repondre')
+        router.push({ pathname: '/deal/[id]', params: { id: chose.id } });
+      else if (chose.type === 'noter')
+        router.push({ pathname: '/shipment/[id]/rate', params: { id: chose.id } });
+      else router.push({ pathname: '/shipment/[id]', params: { id: chose.id } });
+    };
+
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={aller}
+        style={({ pressed }) => [styles.attente, pressed && styles.pressed]}>
+        <View style={styles.attenteTexte}>
+          <ThemedText type="smallBold" numberOfLines={1}>
+            {libelle}
+          </ThemedText>
+          {left !== null && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('activity.waitingIn', {
+                remaining: tc(`countdown.${remainingLabel(left).key}`, remainingLabel(left).values),
+              })}
+            </ThemedText>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={Brand.mango} />
+      </Pressable>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -47,6 +117,37 @@ function ActivityContent() {
           </ThemedText>
           <ProfileAvatarButton />
         </View>
+
+        {/* ① CE QUI T'ATTEND. En tête, parce que c'est la seule chose de cet
+            écran qui soit URGENTE — les portes, elles, ne bougent pas. La
+            section DISPARAÎT quand rien n'attend : un bandeau « 0 » posé en
+            permanence n'est pas un signal, et ce dépôt l'a déjà payé trois
+            fois. */}
+        {attendent.length > 0 ? (
+          <View style={styles.bloc}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              {t('activity.waitingTitle')}
+            </ThemedText>
+            {visibles.map((chose) => (
+              <Attente key={`${chose.type}-${chose.id}`} chose={chose} />
+            ))}
+            {reste > 0 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('activity.waitingMore', { count: reste })}
+              </ThemedText>
+            )}
+          </View>
+        ) : (
+          pret && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('activity.nothingWaiting')}
+            </ThemedText>
+          )
+        )}
+
+        <ThemedText type="smallBold" themeColor="textSecondary">
+          {t('activity.doorsTitle')}
+        </ThemedText>
 
         {/* D112 — LA FACE EXPÉDITEUR, qui n'existait pas. `isCarrier &&`
             masquait les seuls compteurs de l'écran : un compte sans rôle
@@ -164,6 +265,19 @@ const styles = StyleSheet.create({
   },
   counters: {
     gap: Spacing.two,
+  },
+  bloc: {
+    gap: Spacing.two,
+  },
+  attente: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+  },
+  attenteTexte: {
+    flex: 1,
+    minWidth: 0,
   },
   lien: {
     flexDirection: 'row',
