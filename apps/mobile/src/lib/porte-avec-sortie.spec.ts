@@ -92,15 +92,68 @@ describe('la porte elle-même tient sa part', () => {
     expect(porte).toContain('onDismiss !== undefined && (');
   });
 
-  it('le vide du bas n’est réservé que là où une barre flotte', () => {
-    // D104 2A — la justification de ce vide (« la barre d'onglets y flotte »)
-    // vaut pour les onglets, pas pour un écran poussé qui n'en a pas.
-    expect(porte).toContain('{onDismiss !== undefined && <View style={styles.spacer} />}');
+  it('AUCUN vide n’est posé au-dessus du contenu — D104 2A est défait', () => {
+    // CETTE FICHE DISAIT L'INVERSE jusqu'au 27/11, et elle avait tort : elle
+    // exigeait un ressort conditionnel AU-DESSUS du bloc, pour « centrer »
+    // le contenu des écrans poussés. Vue à l'écran, cette mise en page
+    // reproduit mot pour mot le défaut que l'en-tête de la porte déclare
+    // avoir corrigé — un titre de page lu à mi-hauteur sous un vide que rien
+    // ne justifie.
+    //
+    // On ne l'a pas supprimée en silence : elle est RETOURNÉE, et sa raison
+    // écrite avec. Une fiche qui a tort change de NATURE, elle ne disparaît
+    // pas (leçon D110) — sinon la règle qu'elle tenait redevient une opinion.
+    expect(porte).not.toContain('{onDismiss !== undefined && <View style={styles.spacer} />}');
   });
 
   it('elle rend la main sans rien dessiner quand la session est ouverte', () => {
     // La porte ne doit JAMAIS s'intercaler pour un membre connecté : ni
     // rangée, ni vide, ni marge.
     expect(porte).toContain("if (status === 'authenticated') return <>{children}</>;");
+  });
+});
+
+/**
+ * D112 bis — LE CONTENU COMMENCE EN HAUT, POUR TOUT LE MONDE.
+ *
+ * D104 2A posait un ressort AU-DESSUS du bloc pour les écrans poussés, afin
+ * de centrer leur contenu « au lieu de le tasser en haut d'un écran aux
+ * trois quarts vide ». Vu à l'écran un mois plus tard : le titre de page
+ * flottait à ~40 % de la hauteur sous un vide que rien ne justifiait —
+ * c'est-à-dire exactement ce que l'en-tête de `identity-gate.tsx` déclare
+ * avoir corrigé le 08/11, dans les mêmes mots.
+ *
+ * Le fichier se contredisait à cent lignes d'écart, et personne ne pouvait
+ * le voir en le lisant : les deux moitiés sont justes séparément. D'où ces
+ * fiches, qui tiennent la seule chose que les deux moitiés se disputaient —
+ * OÙ commence le contenu.
+ */
+describe('la porte ne centre pas son contenu', () => {
+  const porte = readFileSync(resolve(__dirname, '../components/identity-gate.tsx'), 'utf8');
+
+  it('il n’y a qu’UN ressort dans la porte', () => {
+    // Deux ressorts, c'est un contenu centré. Un seul, c'est un contenu en
+    // haut et du vide dessous.
+    expect(porte.match(/styles\.spacer/g) ?? []).toHaveLength(1);
+  });
+
+  it('le ressort vient APRÈS le bloc de contenu, jamais avant', () => {
+    const bloc = porte.indexOf('style={styles.block}');
+    const ressort = porte.indexOf('style={styles.spacer}');
+    // Les deux repères existent vraiment : un `indexOf` qui rend -1 ferait
+    // passer la comparaison pour la pire des raisons (D98).
+    expect(bloc).toBeGreaterThan(0);
+    expect(ressort).toBeGreaterThan(0);
+    expect(ressort).toBeGreaterThan(bloc);
+  });
+
+  it('l’amorçage, LUI, reste centré — et c’est une autre règle', () => {
+    // Un sablier calé en haut se lirait comme un élément d'interface et non
+    // comme une attente. La fiche le dit pour qu'on ne « simplifie » pas les
+    // deux cas en un seul.
+    expect(porte).toContain('loading: {');
+    const styleAmorcage = porte.slice(porte.indexOf('loading: {'));
+    expect(styleAmorcage.length).toBeGreaterThan(0);
+    expect(styleAmorcage.slice(0, 120)).toContain("justifyContent: 'center'");
   });
 });
