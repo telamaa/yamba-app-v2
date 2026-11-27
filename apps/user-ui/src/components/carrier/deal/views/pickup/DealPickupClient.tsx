@@ -12,6 +12,16 @@
  * Refuser  → POST /deals/:id/pickup/refuse (raison seule — A40) → toast
  *   + retour à l'accueil.
  * 409 TRANSITION_NOT_ALLOWED (deal déjà passé ailleurs) → toast + relecture.
+ *
+ * D115 bis — TROIS CORRECTIONS VENUES DE L'ÉCRAN NATIF :
+ *   ① « ce qui manque pour confirmer » vient de `lib/carrier/prise-en-charge`
+ *      et descend aux DEUX arbres. Le ternaire était recopié dans
+ *      `DealPickupDesktop` et `DealPickupMobile`, et il ignorait la remarque
+ *      trop longue — donc un bouton actif pour un envoi voué à l'échec ;
+ *   ② la checklist part dans l'ordre du CONTRAT, plus dans celui des clics ;
+ *   ③ une lecture qui ÉCHOUE n'affiche plus un squelette PERPÉTUEL : l'écran
+ *      disait « je charge » pour toujours, sans sortie (famille D100 — un
+ *      écran ne prétend pas faire ce qu'il ne fait pas).
  */
 
 "use client";
@@ -33,7 +43,12 @@ import type {
   PickupRefuseReason,
 } from "../../deal.types";
 import DealSkeleton from "../../DealSkeleton";
-import { PICKUP_CHECKLIST_ITEMS } from "./PickupChecklist";
+import {
+  checklistAEnvoyer,
+  manquesPriseEnCharge,
+  notesAEnvoyer,
+  peutConfirmerLaPriseEnCharge,
+} from "@/lib/carrier/prise-en-charge";
 import DealPickupDesktop from "./DealPickupDesktop";
 import DealPickupMobile from "./DealPickupMobile";
 
@@ -109,8 +124,18 @@ export default function DealPickupClient({ dealId }: Props) {
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
   }, []);
 
-  const canConfirm =
-    PICKUP_CHECKLIST_ITEMS.every((id) => checked.has(id)) && photos.length >= 1;
+  // UNE SEULE règle, partagée par les deux arbres (D115 bis ①).
+  const etatDuFormulaire = { coches: checked, photos: photos.length, notes };
+  const canConfirm = peutConfirmerLaPriseEnCharge(etatDuFormulaire);
+  const manques = manquesPriseEnCharge(etatDuFormulaire);
+  const blockingHint =
+    manques.length === 0
+      ? null
+      : manques[0].quoi === "points"
+        ? t("validation.checklistIncomplete")
+        : manques[0].quoi === "photo"
+          ? t("validation.photoMissing")
+          : t("validation.notesTooLong", { count: manques[0].deTrop });
 
   /** Après une transition la vérité est en base : on invalide, on ne mute pas. */
   const refreshDeal = useCallback(() => {
@@ -159,9 +184,10 @@ export default function DealPickupClient({ dealId }: Props) {
 
       // 2. La transition : le serveur revalide 5/5 + 1..5 photos et génère le code.
       await confirmPickup(deal.id, {
-        checklist: Array.from(checked),
+        // L'ordre du CONTRAT, pas celui des clics (D115 bis ②).
+        checklist: checklistAEnvoyer(),
         photoUrls,
-        notes: notes.trim() || undefined,
+        notes: notesAEnvoyer(notes),
       });
       toast.success(
         t("confirm.toastSuccess", { shipperFirstName: deal.shipper.firstName }),
@@ -196,10 +222,30 @@ export default function DealPickupClient({ dealId }: Props) {
   };
 
   if (isMobile === null || (!deal && !loadError)) return <DealSkeleton />;
-  if (loadError || !deal) return <DealSkeleton />;
+  // D115 bis ③ — une lecture qui échoue n'est pas un chargement : le
+  // squelette tournait indéfiniment, sans un mot ni une sortie.
+  if (loadError || !deal)
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <p className="text-[15px] font-semibold text-slate-900 dark:text-white">
+          {t("errors.loadTitle")}
+        </p>
+        <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
+          {t("errors.loadBody")}
+        </p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-[14px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+        >
+          {t("errors.loadBack")}
+        </button>
+      </div>
+    );
 
   const shared = {
     deal,
+    blockingHint,
     checked,
     photos,
     notes,
@@ -227,6 +273,8 @@ export default function DealPickupClient({ dealId }: Props) {
 
 export type DealPickupViewProps = {
   deal: DealRequest;
+  /** Ce qui manque pour confirmer, déjà traduit — UNE source pour les deux arbres. */
+  blockingHint: string | null;
   checked: Set<PickupChecklistItemId>;
   photos: PickupPhotoDraft[];
   notes: string;

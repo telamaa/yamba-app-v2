@@ -4,6 +4,11 @@
  * Card sidebar "CONFIRMATION" (desktop) : indicateur de progression
  * (vérification X/5 · photos min 1) + info code + boutons Refuser/Confirmer.
  * Le disabled devient pédagogique : on voit ce qui manque.
+ *
+ * D115 bis — LA PHRASE ARRIVE, ELLE NE SE CALCULE PLUS ICI. Elle était
+ * recopiée à deux endroits (ici pour le bureau, dans `DealPickupMobile` pour
+ * le téléphone) et aucune des deux copies ne connaissait la remarque trop
+ * longue : le bouton restait actif pour un envoi voué à l'échec.
  */
 
 "use client";
@@ -18,6 +23,8 @@ type Props = {
   totalChecks: number;
   photoCount: number;
   canConfirm: boolean;
+  /** Ce qui manque pour confirmer, déjà traduit (`lib/carrier/prise-en-charge`). */
+  blockingHint: string | null;
   isSubmitting?: boolean;
   onRefuseAction: () => void;
   onConfirmAction: () => void;
@@ -30,6 +37,7 @@ export default function PickupConfirmCard({
                                             totalChecks,
                                             photoCount,
                                             canConfirm,
+                                            blockingHint,
                                             isSubmitting = false,
                                             onRefuseAction,
                                             onConfirmAction,
@@ -85,9 +93,9 @@ export default function PickupConfirmCard({
           {isSubmitting ? t("final.submitting") : t("final.confirm")}
         </button>
         {/* ANO-WEB-51 (recette 5.16) : un bouton inactif dit ce qui manque — les textes existaient, personne ne les rendait. */}
-        {!canConfirm && !isSubmitting && (
+        {!canConfirm && !isSubmitting && blockingHint && (
           <p className="text-center text-[12px] text-amber-700 dark:text-amber-400" role="status">
-            {!checklistDone ? t("validation.checklistIncomplete") : t("validation.photoMissing")}
+            {blockingHint}
           </p>
         )}
         <button

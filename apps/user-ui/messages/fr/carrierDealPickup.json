@@ -94,7 +94,8 @@
   },
   "validation": {
     "checklistIncomplete": "Coche les 5 points de vérification avant de confirmer",
-    "photoMissing": "Ajoute au moins 1 photo avant de confirmer"
+    "photoMissing": "Ajoute au moins 1 photo avant de confirmer",
+    "notesTooLong": "Ta remarque dépasse de {count} caractères"
   },
   "refuse": {
     "dialogTitle": "Refuser ce colis ?",
@@ -127,6 +128,9 @@
     "uploadFailed": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — rien n''a été envoyé.",
     "uploadTooLarge": "Une photo dépasse {maxMb} Mo. Réduis-la ou choisis-en une autre — rien n''a été envoyé.",
     "uploadInvalidType": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP). Rien n''a été envoyé.",
-    "dealChanged": "Ce deal a changé entre-temps. On recharge la page."
+    "dealChanged": "Ce deal a changé entre-temps. On recharge la page.",
+    "loadTitle": "Cette prise en charge ne se lit pas",
+    "loadBody": "On n'arrive pas à relire ce deal pour l'instant. Reviens à la demande, rien n'a été envoyé.",
+    "loadBack": "Revenir à la demande"
   }
 }

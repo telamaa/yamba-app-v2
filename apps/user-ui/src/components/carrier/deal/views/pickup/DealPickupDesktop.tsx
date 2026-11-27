@@ -114,6 +114,7 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
                   totalChecks={PICKUP_CHECKLIST_ITEMS.length}
                   photoCount={props.photos.length}
                   canConfirm={props.canConfirm}
+                  blockingHint={props.blockingHint}
                   isSubmitting={props.isSubmitting}
                   onRefuseAction={props.onOpenRefuseAction}
                   onConfirmAction={props.onConfirmAction}
