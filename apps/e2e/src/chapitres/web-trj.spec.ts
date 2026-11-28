@@ -81,7 +81,15 @@ test.describe("WEB-TRJ — publier un trajet et son cycle de vie (chapitre 5.7)"
   test("WEB-TRJ-1 · l'assistant s'ouvre en trois étapes", async ({ navigateurConnecte }) => {
     const { page } = await navigateurConnecte("josephine", { parEcran: true });
     await page.goto("/fr/trips/create", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Ton trajet")).toBeVisible({ timeout: 60_000 });
+    // REMISE À NIVEAU DU 28/11/2026 — la fiche attendait « Ton trajet », qui n'est plus À
+    // L'ÉCRAN depuis le 01/05/2026 : `step1Title` existe toujours dans `create-trip.copy.ts`,
+    // mais son SEUL rendu (`<SectionTitle title={copy.step1Title} …>`) vivait dans le wizard
+    // `create-old/`, supprimé par 00a8d702 comme code mort. Le champ, lui, est resté — et la
+    // fiche a passé sept mois à prouver l'existence d'un texte que personne ne lit.
+    // On vise donc le titre RÉEL de l'assistant, celui que le composant rend (D111 ② a
+    // raccourci le sous-titre, pas le titre).
+    await expect(page.getByRole("heading", { name: "Créer un trajet", level: 1 })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Tes kilos libres rapportent.")).toBeVisible();
     // Trois étapes nommées.
     for (const etape of ["Trajet", "Conditions", "Vérification"]) {
       await expect(page.getByText(etape, { exact: true }).first()).toBeVisible();
@@ -92,8 +100,13 @@ test.describe("WEB-TRJ — publier un trajet et son cycle de vie (chapitre 5.7)"
     for (const mode of ["Avion", "Train", "Voiture"]) {
       await expect(page.getByText(mode, { exact: true }).first()).toBeVisible();
     }
-    // Les justificatifs se déposent dès l'étape 1 (accordéon « Référence & justificatif »).
-    await expect(page.getByRole("button", { name: /Référence & justificatif/ })).toBeVisible();
+    // D111 (c3264a97, 25/11) — le justificatif a QUITTÉ l'étape 1. Il y vivait replié dans un
+    // accordéon « Référence & justificatif », facultatif, en bas d'un écran déjà long, alors
+    // qu'il débloque le badge « Voyage vérifié » : il est remonté à l'étape « Vérification »,
+    // à côté du bouton « Publier », au même endroit que sur le téléphone. La fiche suit la
+    // décision — elle ne redemande pas l'accordéon, elle vérifie qu'il n'est PLUS là (sans quoi
+    // le déplacement aurait laissé une seconde porte).
+    await expect(page.getByRole("button", { name: /Référence & justificatif/ })).toHaveCount(0);
   });
 
   test("WEB-TRJ-2 · étape 1 : mode, itinéraire et dates (⏭ Google Places)", async () => {
@@ -240,7 +253,12 @@ test.describe("WEB-TRJ — publier un trajet et son cycle de vie (chapitre 5.7)"
     await expect(page.getByRole("slider", { name: "Ta capacité" })).toHaveAttribute("max", "30");
     expect(texte, "gain net 264,50 €").toMatch(/264[.,]50/);
     expect(texte, "« Si tes 23 kg partent »").toMatch(/Si tes 23 kg/);
-    expect(texte, "plancher 8 €").toMatch(/moins de 8 €/);
+    // D81 (17/10) — le plancher n'est plus un EURO, il est en KILOS : « moins de 8 € » n'était
+    // vrai que sur un corridor, et le commentaire de `create-trip.copy.ts:118` le dit mot pour
+    // mot. Ce qui est vrai partout, c'est le poids facturé minimum (`BILLING_FLOOR_KG`, 2,3 kg)
+    // multiplié par LE tarif du Voyageur. On vise la règle, pas l'ancien chiffre.
+    const plancherVu = texte.match(/aucun envoi ne te rapporte[^.]*/)?.[0] ?? "(phrase absente)";
+    expect(texte, `plancher en kilos (vu : « ${plancherVu} »)`).toMatch(/moins de 2,3 kg × ton tarif/);
     // La tolérance de poids est dans l'infobulle « Ta capacité ».
     // L'infobulle se referme sur tout défilement (écouteur `scroll` capturé) : on amène le bouton
     // à l'écran AVANT de cliquer, et on réessaie si un défilement résiduel l'a refermée.

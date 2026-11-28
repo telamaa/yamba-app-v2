@@ -145,10 +145,20 @@ test.describe("WEB-MOB — responsive mobile (chapitre 5.30)", () => {
     /* La croix : visible AUSSI sur téléphone (régression WEB-NRG-3). Elle s'appelait « Plus tard »,
        comme le lien du bas et le voile ; depuis le chapitre 5.31 elle s'appelle « Fermer » et le voile
        n'est plus annoncé — on la trouve donc par son nom, et l'on vérifie sa position. */
-    const boitePorte = (await porte.boundingBox())!;
     const croix = await porte.getByRole("button", { name: "Fermer", exact: true }).boundingBox();
     expect(croix, "une croix de fermeture nommée « Fermer »").not.toBeNull();
-    expect(croix!.y, "en haut de la feuille").toBeLessThan(boitePorte.y + boitePorte.height / 3);
+    /* REMISE À NIVEAU DU 28/11/2026 — « en haut de la feuille » était mesuré contre le tiers
+       supérieur de l'ÉCRAN : `porte` est le conteneur PLEIN ÉCRAN du dialogue (mesuré ce jour :
+       y = 0, hauteur = 844 sur un 390 × 844), pas le panneau du bas. Le repère ne tenait que
+       tant que la feuille montait assez haut pour entrer dans ce tiers ; D96 l'a raccourcie (une
+       marche d'adresse au lieu de deux champs), la feuille est descendue de quelques pixels, et
+       la fiche a rougi sans que rien ne soit cassé — un repère GÉOMÉTRIQUE emprunté au mauvais
+       objet. Le bon repère ne dépend pas de la hauteur du contenu : la croix appartient à la
+       RANGÉE D'EN-TÊTE de la feuille, donc elle est au-dessus du titre, et pas n'importe où
+       au-dessus (la rangée fait une poignée de dizaines de pixels, jamais la page entière). */
+    const titre = (await porte.getByRole("heading").first().boundingBox())!;
+    expect(croix!.y, `la croix est au-dessus du titre (croix ${Math.round(croix!.y)}, titre ${Math.round(titre.y)})`).toBeLessThan(titre.y);
+    expect(croix!.y, "et dans la rangée d'en-tête, pas ailleurs dans la page").toBeGreaterThan(titre.y - 120);
     const largeurEcran = await page.evaluate(() => document.documentElement.clientWidth);
     expect(croix!.x + croix!.width, "la croix tient dans l'écran").toBeLessThanOrEqual(largeurEcran + 1);
     expect(croix!.x, "et elle est à droite").toBeGreaterThan(largeurEcran / 2);

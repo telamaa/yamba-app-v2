@@ -60,10 +60,27 @@ function lienVisible(bloc: ReturnType<Navigateur["page"]["getByRole"]>, nom: str
   return bloc.getByRole("link", { name: nom }).filter({ visible: true }).first();
 }
 
-/** Ouvre l'accueil et attend que le squelette ait laissé la place à l'en-tête réel. */
+/**
+ * Ouvre l'accueil et attend que le squelette ait laissé la place à l'en-tête réel.
+ *
+ * REMISE À NIVEAU DU 28/11/2026 — le commentaire disait vrai, le code ne le faisait pas :
+ * `HeaderSkeleton` est un `<header>`, donc un `banner` lui aussi (`Header.tsx:100` monte les
+ * DEUX et masque l'un par `display`), et attendre « un banner visible » était satisfait par le
+ * SQUELETTE. La fiche prenait alors la bascule de langue du squelette, cliquait pendant que
+ * `useUser` se résolvait, et le clic arrivait sur un élément devenu `display: none` — d'où un
+ * échec intermittent (« element is not visible » après une première résolution réussie).
+ *
+ * Le signal fiable n'est pas « un en-tête » mais « la grappe d'authentification a RÉPONDU » :
+ * elle est la seule chose que le squelette ne sait pas rendre (trois pastilles à sa place).
+ * Visiteur → « Connexion » ; membre → son menu ; téléphone → le bouton du menu.
+ */
 async function ouvrirLAccueil(page: Navigateur["page"], locale: "fr" | "en" = "fr"): Promise<void> {
   await page.goto(`/${locale}`, { waitUntil: "networkidle" });
   await expect(enTete(page)).toBeVisible({ timeout: 60_000 });
+  const grappeResolue = enTete(page)
+    .getByRole("link", { name: /^(Connexion|Log in)$/ })
+    .or(enTete(page).getByRole("button", { name: /^(Menu utilisateur|User menu|Ouvrir le menu|Open menu)$/ }));
+  await expect(grappeResolue.filter({ visible: true }).first(), "la grappe d'authentification est résolue (plus de squelette)").toBeVisible({ timeout: 60_000 });
 }
 
 /**
@@ -322,9 +339,19 @@ test.describe("WEB-ACC — découverte, accueil et navigation (chapitre 5.1)", (
       fenetre.getByText("Publier un trajet engage un Voyageur identifié : Yamba a besoin de savoir qui transporte. Ton trajet t'attend après connexion.")
     ).toBeVisible();
     // Le formulaire de connexion lui-même, et le bouton Google.
+    //
+    // D96 (11/11) — la connexion est passée à DEUX marches, ici comme partout : l'adresse et
+    // « Continuer », puis « Continuer avec e-mail et mot de passe » qui révèle le mot de passe.
+    // La porte sert le MÊME `LoginForm` que le reste du site (`AuthGateModal.tsx:136`), donc la
+    // fiche franchit la marche au lieu d'exiger un champ qui n'est pas encore monté.
+    // ORDRE IMPORTANT : Google et l'inscription vivent sur la PREMIÈRE marche ; la seconde ne
+    // porte plus que le mot de passe (choisir la voie « mot de passe » retire les autres voies,
+    // ce qui est juste : on ne propose pas une alternative à qui vient de choisir).
     await expect(fenetre.locator("#email")).toBeVisible();
-    await expect(fenetre.locator("#password")).toBeVisible();
+    await expect(fenetre.getByRole("button", { name: "Continuer", exact: true })).toBeVisible();
     await expect(fenetre.locator("iframe[title*='Google'], [aria-label*='Google'], button:has-text('Google')").first()).toBeVisible();
+    await fenetre.getByRole("button", { name: "Continuer avec e-mail et mot de passe" }).click();
+    await expect(fenetre.locator("#password")).toBeVisible();
     // « Plus tard » (le lien) et la croix — nommée « Fermer » depuis le chapitre 5.31 (elle s'appelait « Plus tard » elle aussi).
     await expect(fenetre.getByRole("button", { name: "Plus tard", exact: true }).filter({ hasText: "Plus tard" })).toBeVisible();
     await expect(fenetre.locator("button[aria-label='Fermer']:has(svg)")).toBeVisible();
