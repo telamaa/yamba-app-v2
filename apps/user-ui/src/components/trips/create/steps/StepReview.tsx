@@ -2,7 +2,8 @@ import { FileText, ShieldCheck } from "lucide-react";
 import type { CreateTripCopy, Draft, Step, TripDocumentDraft } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
 import { CABIN_BAG_KG, CHECKED_BAG_KG, PARCEL_FAMILIES, estimateNetGain, isBagActive } from "../create-trip.config";
-import { formatEur } from "../TripPricingUi";
+import { formatMoney, formatPerKg } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 import { FormField, FormInput, ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
 import DocumentUpload from "../DocumentUpload";
 import TripPublicPreview, { summarizeLocations } from "../TripPublicPreview";
@@ -61,6 +62,7 @@ export default function StepReview({
   setDraft: React.Dispatch<React.SetStateAction<Draft>>;
   onGoTo: (step: Step) => void;
 }) {
+  const tag = intlTagFor(isFr ? "fr" : "en");
   const categoryOptions = getCategoryOptions(isFr);
 
   const refPlaceholder =
@@ -206,7 +208,7 @@ export default function StepReview({
         >
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="text-[18px] font-extrabold tabular-nums" style={{ color: MANGO }}>
-              {formatEur(draft.pricePerKg)} €/kg
+              {formatPerKg(draft.pricePerKg, tag)}
             </span>
             {typeof draft.capacityKg === "number" && draft.capacityKg > 0 && (
               <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
@@ -215,7 +217,7 @@ export default function StepReview({
             )}
             {estimateNetGain(draft) > 0 && (
               <span className="text-[13px] font-semibold text-[#0F766E] dark:text-teal-400">
-                {copy.netGain} {formatEur(estimateNetGain(draft))} €
+                {copy.netGain} {formatMoney(estimateNetGain(draft), tag)}
               </span>
             )}
           </div>
@@ -248,10 +250,10 @@ export default function StepReview({
             isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg)) && (
             <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-slate-600 dark:text-slate-400">
               {isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) && (
-                <span>{copy.checkedBag23} · {formatEur(Number(draft.checkedBag23Price))} € ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
+                <span>{copy.checkedBag23} · {formatMoney(Number(draft.checkedBag23Price), tag)} ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
               )}
               {isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg) && (
-                <span>{copy.cabinBag12} · {formatEur(Number(draft.cabinBag12Price))} € ({copy.bagConsumes(CABIN_BAG_KG)})</span>
+                <span>{copy.cabinBag12} · {formatMoney(Number(draft.cabinBag12Price), tag)} ({copy.bagConsumes(CABIN_BAG_KG)})</span>
               )}
             </div>
           )}
@@ -284,7 +286,7 @@ export default function StepReview({
                     className="text-[13px] font-medium"
                     style={{ color: MANGO }}
                   >
-                    {condition.priceAmount}€
+                    {formatMoney(Number(condition.priceAmount), tag)}
                   </span>
                 )}
               </div>

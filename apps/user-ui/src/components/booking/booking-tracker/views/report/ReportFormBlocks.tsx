@@ -18,6 +18,8 @@ import ReportDescriptionBlock from "./ReportDescriptionBlock";
 import { ReportPledge, ReportProcessInfo } from "./ReportInfoBlocks";
 import ReportPhotosBlock from "./ReportPhotosBlock";
 import ReportRadioGroup from "./ReportRadioGroup";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const CATEGORY_IDS = [
   "NOT_DELIVERED",
@@ -44,7 +46,7 @@ export function ReportFormBody(
 
   const carrierFirstName = booking.carrier.firstName;
   const recipientFirstName = booking.recipient.firstName;
-  const totalPaid = formatEur(booking.payment.totalPaidEur, locale);
+  const totalPaid = formatMoney(booking.payment.totalPaidEur, intlTagFor(locale));
 
   const categoryOptions = CATEGORY_IDS.map((id) => ({
     id,
@@ -312,10 +314,3 @@ export function ReportEmpathyBanner({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

@@ -8,7 +8,9 @@
 "use client";
 
 import { Gavel } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useTranslations, useLocale } from "next-intl";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export type DecisionResolution = {
   outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND";
@@ -43,7 +45,7 @@ export default function MediationDecisionCard({ role, ticket, resolution, retent
   const format = useFormatter();
   if (!resolution && !retentionDecision) return null;
 
-  const money = (cents: number) => format.number(cents / 100, { style: "currency", currency: currencyCode });
+  const money = (cents: number) => formatMoneyFromCents(cents, intlTagFor(useLocale()), currencyCode);
   const when = format.dateTime(new Date(resolution?.resolvedAt ?? retentionDecision!.decidedAt), { day: "numeric", month: "long", year: "numeric" });
 
   let outcomeKey: string;

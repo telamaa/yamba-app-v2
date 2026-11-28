@@ -15,6 +15,8 @@ import { Eye } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   deal: DealRequest;
@@ -49,7 +51,7 @@ export default function PickupDeclaredCard({ deal, compact = false }: Props) {
         />
         <Field
           label={t("declared.valueLabel")}
-          value={formatEur(deal.parcel.declaredValueEur, locale)}
+          value={formatMoney(deal.parcel.declaredValueEur, intlTagFor(locale))}
         />
       </div>
 
@@ -91,10 +93,3 @@ function formatNumber(value: number, locale: string): string {
   }).format(value);
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}

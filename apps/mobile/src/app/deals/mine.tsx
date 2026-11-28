@@ -41,7 +41,7 @@ import {
   type DemandeDeLaListe,
 } from '@/lib/mes-demandes';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoneyFromCents } from '@/lib/pricing-example';
 import { remainingLabel, remainingUntil } from '@/lib/shipment-view';
 import { formatDayMonth } from '@/lib/trip-format';
 
@@ -193,7 +193,7 @@ function MesDemandesContent() {
         <ThemedText type="smallBold">
           {demande.gainCents === null
             ? t('noGain')
-            : t('gain', { amount: `${formatAmountFromCents(demande.gainCents, tag)} €` })}
+            : t('gain', { amount: formatMoneyFromCents(demande.gainCents, tag) })}
         </ThemedText>
 
         {urgence !== null && delai !== null ? (

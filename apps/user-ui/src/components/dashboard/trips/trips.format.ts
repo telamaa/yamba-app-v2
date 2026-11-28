@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import type { ParcelCategory } from "@/components/booking/booking.types";
+import { formatMoney as formatMoneyPartage } from "@/lib/pricing-example";
 // Réutilisé depuis le module shipments — à remonter dans un lib/ partagé
 // si un 3e module en a besoin.
 export { formatRemaining } from "@/components/dashboard/shipments/shipments.types";
@@ -10,12 +11,13 @@ export function intlLocale(locale: string): string {
   return locale === "fr" ? "fr-FR" : "en-US";
 }
 
+/**
+ * D123 — cette fonction portait le MÊME NOM que celle du module partagé, avec
+ * une autre règle de décimales. Un homonyme est pire qu'une copie : on croit
+ * importer la règle.
+ */
 export function formatMoney(locale: string, amount: number): string {
-  return new Intl.NumberFormat(intlLocale(locale), {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
+  return formatMoneyPartage(amount, intlLocale(locale));
 }
 
 export function formatWeight(locale: string, kg: number): string {

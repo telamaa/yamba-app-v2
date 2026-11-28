@@ -44,7 +44,7 @@ import { ApiError } from '@/lib/api/client';
 import { attacherLeBillet, publierLeBrouillon, publierLeTrajet } from '@/lib/api/publish.api';
 import { PHOTO_MAX_MB, uploadTripTicket, type UploadFailureCode } from '@/lib/api/upload.api';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoney, formatMoneyFromCents, formatPerKg } from '@/lib/pricing-example';
 import {
   clearPublishDraft,
   memoriserLeRetour,
@@ -163,7 +163,7 @@ export default function PublishReviewScreen() {
       title={t('review.title')}
       step={6}
       valueLabel={
-        gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
+        gainCents === null ? t('bar.newTrip') : formatMoneyFromCents(gainCents, tag)
       }
       valueHint={gainCents === null ? undefined : t('review.barHint')}
       ctaLabel={envoiEnCours ? t('review.publishing') : t('review.publish')}
@@ -217,13 +217,13 @@ export default function PublishReviewScreen() {
           {draft.prixParKiloEur === null || draft.capaciteKg === null
             ? t('review.offerMissing')
             : t('review.offer', {
-                price: formatAmountFromCents(Math.round(draft.prixParKiloEur * 100), tag),
+                price: formatPerKg(draft.prixParKiloEur, tag),
                 capacity: draft.capaciteKg,
               })}
         </ThemedText>
         {gainCents !== null ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {t('review.gain', { amount: formatAmountFromCents(gainCents, tag) })}
+            {t('review.gain', { amount: formatMoneyFromCents(gainCents, tag) })}
           </ThemedText>
         ) : null}
       </Bloc>
@@ -264,16 +264,10 @@ export default function PublishReviewScreen() {
                 list: [
                   draft.forfaitSouteEur === null
                     ? null
-                    : `${t('families.checkedBag')} ${formatAmountFromCents(
-                        Math.round(draft.forfaitSouteEur * 100),
-                        tag
-                      )} €`,
+                    : `${t('families.checkedBag')} ${formatMoney(draft.forfaitSouteEur, tag)}`,
                   draft.forfaitCabineEur === null
                     ? null
-                    : `${t('families.cabinBag')} ${formatAmountFromCents(
-                        Math.round(draft.forfaitCabineEur * 100),
-                        tag
-                      )} €`,
+                    : `${t('families.cabinBag')} ${formatMoney(draft.forfaitCabineEur, tag)}`,
                 ]
                   .filter(Boolean)
                   .join(' · '),

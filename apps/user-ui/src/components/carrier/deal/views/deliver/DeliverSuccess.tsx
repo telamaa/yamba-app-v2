@@ -10,6 +10,8 @@
 import { Check, PartyPopper } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   deal: DealRequest;
@@ -35,7 +37,7 @@ export default function DeliverSuccess({
     deal.earnings.payoutDelayDays * 24 * 3600 * 1000
   );
 
-  const amount = formatEur(deal.earnings.netForCarrier, locale);
+  const amount = formatMoney(deal.earnings.netForCarrier, intlTagFor(locale));
   const dateStr = formatLongDate(payoutDate, locale);
 
   return (
@@ -93,13 +95,6 @@ export default function DeliverSuccess({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatLongDate(date: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", {

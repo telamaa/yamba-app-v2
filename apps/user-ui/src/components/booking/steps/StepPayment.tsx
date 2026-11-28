@@ -31,6 +31,8 @@ import { MANGO, TipBlock, TrustBadge } from "../BookingFormUi";
 import type { PaymentIntentInfo, PriceBreakdown } from "../booking.types";
 import { acceptedMethods, elementsLocale, hasPayableMethod } from "../payment-methods";
 import type { ConfirmPaymentFn } from "../useBookingCheckout";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   price: PriceBreakdown;
@@ -58,7 +60,11 @@ export default function StepPayment({ price, intent, intentLoading, intentError,
   const stripePromise = useMemo(() => getStripePromise(), []);
   const isDark = useIsDarkMode();
   const afterPayment = AFTER_PAYMENT_KEYS.map((key) => t(`step4.afterPayment.${key}`));
-  const amountLabel = `${(price.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  // D123 — `undefined` comme étiquette, c'est la langue du NAVIGATEUR, pas
+  // celle de l'interface : un visiteur anglophone sur le site en français
+  // lisait un montant à point sur le bouton qui débite. Et le symbole était
+  // collé derrière le nombre, place fausse en anglais.
+  const amountLabel = formatMoney(price.total, intlTagFor(locale));
 
   // Le Payment Element peut échouer à se charger APRÈS un intent valide
   // (clé publiable d'un autre compte que la clé secrète, réseau, adblock…).

@@ -8,6 +8,8 @@ import { quoteShipperPrice } from "@packages/pricing";
 import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
 import { toast } from "sonner";
 import { usePricingParams } from "@/hooks/usePricingParams";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 import {
   FormField,
   FormInput,
@@ -157,7 +159,7 @@ export default function StepParcel({
     value: cat,
     label: t("step1.parcelDetails.categoryOption", {
       label: t(`categories.${cat}`),
-      price: formatEur(trip.categoryPrices[cat] ?? 0, locale),
+      price: formatMoney(trip.categoryPrices[cat] ?? 0, intlTagFor(locale)),
     }),
   }));
 
@@ -210,9 +212,9 @@ export default function StepParcel({
 
   // « +6 € » et « 500 € » étaient écrits en dur dans les traductions : un admin
   // qui change le paramètre (D62) faisait mentir la page. Ils viennent du moteur.
-  const guaranteeCap = formatEur(pricingParams.protectionExtendedCapCents / 100, locale);
+  const guaranteeCap = formatMoney(pricingParams.protectionExtendedCapCents / 100, intlTagFor(locale));
   const guaranteePremium = t("insurance.extended.price", {
-    amount: formatEur(pricingParams.protectionExtendedPremiumCents / 100, locale),
+    amount: formatMoney(pricingParams.protectionExtendedPremiumCents / 100, intlTagFor(locale)),
   });
 
   const sizeIsFlat =
@@ -317,7 +319,7 @@ export default function StepParcel({
                 onClickAction={() => setDraftAction((prev) => ({ ...prev, product: k }))}
               >
                 {label}
-                {cents ? <span className="ml-1 font-bold">{formatEur(cents / 100, locale)}</span> : null}
+                {cents ? <span className="ml-1 font-bold">{formatMoney(cents / 100, intlTagFor(locale))}</span> : null}
               </ChoiceChip>
             ))}
         </div>
@@ -454,7 +456,7 @@ export default function StepParcel({
                 ? null
                 : delta === 0
                   ? t("step1.parcelCard.sizeIncluded")
-                  : t("step1.size.extra", { amount: formatEur(delta / 100, locale) });
+                  : t("step1.size.extra", { amount: formatMoney(delta / 100, intlTagFor(locale)) });
             return (
               <button
                 key={sz}
@@ -839,10 +841,3 @@ function FormFieldWithTooltip({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-GB", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}

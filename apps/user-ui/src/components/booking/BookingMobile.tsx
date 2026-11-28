@@ -28,6 +28,8 @@ const StepPayment = dynamic(() => import("./steps/StepPayment"), {
 });
 import StepRecipient from "./steps/StepRecipient";
 import { usePricingParams } from "@/hooks/usePricingParams";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const EMPTY_ERRORS: ValidationErrors = {};
 
@@ -154,10 +156,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
   );
 }
 
+/** D123 — la règle vit dans `lib/pricing-example.ts` ; ceci n'en est que le raccourci local. */
 function formatPrice(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
+  return formatMoney(amount, intlTagFor(locale));
 }

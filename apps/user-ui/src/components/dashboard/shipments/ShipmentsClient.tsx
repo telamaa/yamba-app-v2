@@ -11,6 +11,8 @@ import CancelShipmentModal from "./CancelShipmentModal";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentsSkeleton from "./ShipmentsSkeleton";
 import { cancelShipment, getMyShipments, getMyShipmentsPreview } from "./shipments.api";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 import {
   getShipmentPresentation,
   type ShipmentGroup,
@@ -75,10 +77,7 @@ export default function ShipmentsClient({
         const result = await cancelShipment(item.id);
         const refund =
           result.refundAmountCents != null
-            ? new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-              style: "currency",
-              currency: result.currencyCode,
-            }).format(result.refundAmountCents / 100)
+            ? formatMoneyFromCents(result.refundAmountCents, intlTagFor(locale), result.currencyCode)
             : null;
         // ANO-WEB-71 (5.20) : une demande EN ATTENTE n'a jamais été débitée (l'empreinte est levée, D40) —
         // « Remboursement de 28,00 € en cours » y était un mensonge ; le remboursement ne se dit qu'après un débit.

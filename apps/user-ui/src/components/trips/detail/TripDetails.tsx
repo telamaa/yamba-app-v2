@@ -18,6 +18,8 @@ import { setFlashToast } from "@/lib/flash-toast";
 import { countryName } from "@/lib/country-name";
 import TripDocumentsManager from "@/components/trips/create/TripDocumentsManager";
 import TripDealsSection from "@/components/dashboard/trips/TripDealsSection";
+import { formatMoneyFromCents, formatPerKg } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 import {
   STATUS_CONFIG, TRANSPORT_LABEL_KEYS, MANGO, TEAL, formatTripDate, isTripPastDeparture,
   type TripStatus, type TransportMode,
@@ -285,6 +287,7 @@ function LocationRow({
 export default function TripDetails({ tripId }: { tripId: string }) {
   const t = useTranslations("myTrips");
   const locale = useLocale();
+  const tag = intlTagFor(locale);
   const router = useRouter();
   const toastOpts = { duration: 6000, closeButton: true };
 
@@ -493,16 +496,16 @@ export default function TripDetails({ tripId }: { tripId: string }) {
                       €/kg{typeof trip.capacityKg === "number" ? ` · ${trip.capacityKg} kg` : ""}
                     </span>
                     <span className="text-[13px] font-semibold" style={{ color: MANGO }}>
-                      {(trip.pricePerKgCents / 100).toFixed(2)} €/kg
+                      {formatPerKg(trip.pricePerKgCents / 100, tag)}
                     </span>
                   </div>
                 )}
                 {categories.map((c: any, i: number) => {
-                  const price = typeof c.priceAmountCents === "number" ? (c.priceAmountCents / 100).toFixed(2) : "—";
+                  const price = typeof c.priceAmountCents === "number" ? formatMoneyFromCents(c.priceAmountCents, tag) : "—";
                   return (
                     <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5 dark:border-slate-800">
                       <span className="text-[13px] font-medium text-slate-900 dark:text-white">{categoryLabel(t, c.category)}</span>
-                      <span className="text-[13px] font-semibold" style={{ color: MANGO }}>{price} €</span>
+                      <span className="text-[13px] font-semibold" style={{ color: MANGO }}>{price}</span>
                     </div>
                   );
                 })}

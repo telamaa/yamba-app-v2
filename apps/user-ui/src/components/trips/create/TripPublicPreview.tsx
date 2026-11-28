@@ -12,7 +12,7 @@ import type {
 } from "./create-trip.types";
 import { getCategoryOptions } from "./create-trip.copy";
 import { PARCEL_FAMILIES } from "./create-trip.config";
-import { formatEur } from "./TripPricingUi";
+import { formatMoney, formatPerKg } from "@/lib/pricing-example";
 import { formatRating, intlTagFor } from "@/lib/number-format";
 
 const MANGO = "#FF9900";
@@ -115,18 +115,19 @@ function getTransportLabel(draft: Draft, copy: CreateTripCopy): string {
 
 function getCategoryDisplayPrice(
   catKey: ParcelCategory,
-  draft: Draft
+  draft: Draft,
+  tag: string
 ): string | null {
   const cond = draft.categoryConditions[catKey];
   if (cond && cond.priceAmount !== "" && Number(cond.priceAmount) > 0) {
-    return `${cond.priceAmount}€`;
+    return formatMoney(Number(cond.priceAmount), tag);
   }
   if (
     draft.useGlobalPrice &&
     draft.globalPrice !== "" &&
     Number(draft.globalPrice) > 0
   ) {
-    return `${draft.globalPrice}€`;
+    return formatMoney(Number(draft.globalPrice), tag);
   }
   return null;
 }
@@ -249,7 +250,7 @@ export default function TripPublicPreview({
               className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
               style={{ backgroundColor: "rgba(255,153,0,0.12)", color: MANGO }}
             >
-              {formatEur(draft.pricePerKg)} €/kg
+              {formatPerKg(draft.pricePerKg, intlTagFor(isFr ? "fr" : "en"))}
             </span>
             {typeof draft.capacityKg === "number" && draft.capacityKg > 0 && (
               <span
@@ -287,7 +288,7 @@ export default function TripPublicPreview({
             {draft.acceptedCategories.map((catKey) => {
               const opt = categoryOptions.find((o) => o.key === catKey);
               if (!opt) return null;
-              const price = getCategoryDisplayPrice(catKey, draft);
+              const price = getCategoryDisplayPrice(catKey, draft, intlTagFor(isFr ? "fr" : "en"));
               return (
                 <span
                   key={catKey}

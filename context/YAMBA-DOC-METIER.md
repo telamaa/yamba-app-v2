@@ -10249,3 +10249,36 @@ Un scénario faux n'est pas un scénario inutile : il est **pire qu'absent**, pa
 | 6 | Expéditeur, je décris un colis au kilo | je choisis une taille, et l'écran montre qu'elle est choisie |
 | 7 | Au clavier seul, je me connecte | la marche 2 pose le curseur dans le mot de passe, sans une tabulation |
 | 8 | Sur téléphone, j'ouvre la porte | la croix est dans la rangée d'en-tête de la feuille, à droite, dans l'écran |
+
+# D123 — L'argent s'écrit dans la langue du lecteur (28/11/2026)
+
+## Le besoin
+
+Un membre anglophone lisait **« You earn 23.00 € »**. Un membre français lisait, selon l'écran,
+« 24 € » ou « 24,00 € » pour le même montant. Sur la page publique d'un Voyageur, un prix de
+24,85 € s'affichait **« 24 € »**.
+
+Un montant est la chose que l'on relit deux fois avant de s'engager. Il doit être écrit comme
+celui qui le lit l'écrit, et il doit être écrit **pareil partout**.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D123-1** | Le **symbole** fait partie du montant et suit la langue : « 24,85 € » en français, « €24.85 » en anglais. | Le coller derrière le nombre est juste en français et faux en anglais — on produisait la bonne forme par accident. |
+| **RG-D123-2** | **Deux décimales, toujours**, pour ce que l'on paie, gagne ou additionne. | « 3 € » et « 24,85 € » dans une colonne se lisent comme deux natures de chiffre ; un montant qui change de précision entre la liste et le paiement coûte de la confiance. |
+| **RG-D123-3** | Un montant **ne perd jamais ses centimes** par un raccourci d'affichage. | Un arrondi vers le bas affichait 24 € pour 24,85 € : le membre lit un prix qui n'existe pas. |
+| **RG-D123-4** | Une **graduation** (crans d'une échelle, pastilles de valeurs usuelles) garde ses décimales significatives. | On la lit d'un coup d'œil ; « 8,00 € » ajoute deux caractères sans information. |
+| **RG-D123-5** | La **devise** est un code (EUR, USD…), jamais un caractère écrit à la main. | Une table maison à une entrée affichait « 24.85 EUR » dès que l'API renvoyait un code. |
+| **RG-D123-6** | Aucune **phrase** (dictionnaire ou copie) n'écrit de symbole monétaire. | Onze clés — dont des anglaises — gravaient la place française du symbole dans le texte. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Je bascule l'application en anglais et je regarde un gain | « You earn €23.00 » |
+| 2 | Je regarde le même gain en français | « Tu gagnes 23,00 € » |
+| 3 | Je compare le récapitulatif et le bouton de paiement | le même montant, écrit pareil |
+| 4 | J'ouvre la page publique d'un Voyageur dont le trajet part à 24,85 € | « 24,85 € », jamais « 24 € » |
+| 5 | Je règle mon tarif au kilo sur l'échelle | les repères disent « 8 € », « 10 € », pas « 8,00 € » |
+| 6 | Un trajet coté dans une autre devise | le symbole de cette devise, placé selon ma langue |

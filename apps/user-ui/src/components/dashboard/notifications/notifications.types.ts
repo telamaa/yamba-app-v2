@@ -1,3 +1,5 @@
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 /**
  * notifications.types.ts — DTO + présentation de la boîte (PR5, Lot 3)
  * =====================================================================
@@ -64,7 +66,7 @@ export function buildNotificationCopy(
   const weight = getWeightKg(p);
   const fmtMoney = (cents: unknown, currency: unknown) =>
     typeof cents === "number"
-      ? new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: typeof currency === "string" ? currency : "EUR" }).format(cents / 100)
+      ? formatMoneyFromCents(cents, intlTagFor(locale), typeof currency === "string" ? currency : undefined)
       : "";
   const fmtDate = (iso: unknown) =>
     typeof iso === "string" ? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "long" }).format(new Date(iso)) : "";

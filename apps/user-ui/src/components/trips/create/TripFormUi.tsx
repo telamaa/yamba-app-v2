@@ -1,4 +1,7 @@
 import type { ValidationErrors } from "./create-trip.config";
+import { useLocale } from "next-intl";
+import { formatMoneyCompact } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const MANGO = "#FF9900";
 const MANGO_10 = "rgba(255, 153, 0, 0.1)";
@@ -372,6 +375,7 @@ export function RevenueBadge({
   max: number;
   label: string;
 }) {
+  const tag = intlTagFor(useLocale());
   if (min === 0 && max === 0) return null;
 
   return (
@@ -380,7 +384,7 @@ export function RevenueBadge({
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
       <span className="text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
-        {label} : {min}€ – {max}€
+        {label} : {formatMoneyCompact(min, tag)} – {formatMoneyCompact(max, tag)}
       </span>
     </div>
   );

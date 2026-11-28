@@ -3,6 +3,8 @@
  */
 
 import type { TransportMode, TripDates, PublicTrip } from "./public-trip.types";
+import { formatMoneyCompact, formatMoneyFromCents } from "./pricing-example";
+import { intlTagFor } from "./number-format";
 
 // ─────────────────────────────────────────────────────────────────
 // Distance Haversine (km)
@@ -112,23 +114,20 @@ export function formatTripDuration(dates: TripDates): string | null {
 // Prix
 // ─────────────────────────────────────────────────────────────────
 
+/**
+ * D123 — ces deux-là étaient JUSTES (symbole placé par `Intl`, repli en cas
+ * d'absence de données, centimes gardés dès qu'il y en a). Elles restent, mais
+ * elles cessent de REDÉCIDER la règle : « une absence » est leur affaire, la
+ * mise en forme est celle du module partagé. C'est la différence entre un
+ * raccourci et une copie.
+ */
 export function formatPrice(
   cents: number | null | undefined,
   currency = "EUR",
   locale: "fr" | "en" = "fr"
 ): string {
   if (cents == null) return "-";
-  const value = cents / 100;
-  try {
-    return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
+  return formatMoneyFromCents(cents, intlTagFor(locale), currency);
 }
 
 export function formatPriceShort(
@@ -137,18 +136,7 @@ export function formatPriceShort(
   locale: "fr" | "en" = "fr"
 ): string {
   if (cents == null) return "-";
-  const value = cents / 100;
-  const isInteger = value === Math.floor(value);
-  try {
-    return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: isInteger ? 0 : 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(isInteger ? 0 : 2)} ${currency}`;
-  }
+  return formatMoneyCompact(cents / 100, intlTagFor(locale), currency);
 }
 
 /**

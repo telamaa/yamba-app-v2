@@ -11,6 +11,8 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   netForCarrier: number;
@@ -34,7 +36,7 @@ export default function DealPaymentBlock({
             {t("payment.netLabel")}
           </span>
           <span className="text-[18px] font-black tabular-nums text-emerald-700 dark:text-emerald-400">
-            {formatEur(netForCarrier, locale)}
+            {formatMoney(netForCarrier, intlTagFor(locale))}
           </span>
         </div>
         <div className="mt-2.5 border-t border-slate-200 pt-2.5 dark:border-slate-700">
@@ -63,7 +65,7 @@ export default function DealPaymentBlock({
           {t("payment.netLabel")}
         </span>
         <span className="text-[20px] font-black tabular-nums text-emerald-700 dark:text-emerald-400">
-          {formatEur(netForCarrier, locale)}
+          {formatMoney(netForCarrier, intlTagFor(locale))}
         </span>
       </div>
 
@@ -95,10 +97,3 @@ export default function DealPaymentBlock({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

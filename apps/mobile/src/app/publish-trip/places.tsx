@@ -34,7 +34,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoneyFromCents } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
 import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import { gainSiToutPartCents } from '@/lib/publish-pricing';
@@ -103,7 +103,7 @@ export default function PublishPlacesScreen() {
       title={t('places.title')}
       step={5}
       valueLabel={
-        gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
+        gainCents === null ? t('bar.newTrip') : formatMoneyFromCents(gainCents, tag)
       }
       valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}

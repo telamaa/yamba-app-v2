@@ -14,6 +14,8 @@ import { AlertTriangle, CheckCircle2, Clock3, Lock, Wallet } from "lucide-react"
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   deal: DealRequest;
@@ -28,7 +30,7 @@ export default function DealPayoutStatusCard({ deal, compact = false }: Props) {
   // D50/A82 — sur une annulation tardive, le montant est la COMPENSATION, pas le net.
   const late = deal.status === "CANCELLED";
   const cents = late && deal.payoutAmountCents != null ? deal.payoutAmountCents : Math.round(deal.earnings.netForCarrier * 100);
-  const amount = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: "EUR" }).format(cents / 100);
+  const amount = formatMoneyFromCents(cents, intlTagFor(locale));
   const day = (iso?: string) => (iso ? format.dateTime(new Date(iso), { day: "numeric", month: "long" }) : "");
 
   type Tone = "teal" | "emerald" | "amber" | "slate";

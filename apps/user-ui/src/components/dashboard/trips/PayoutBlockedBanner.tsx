@@ -11,6 +11,8 @@ import { AlertTriangle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useMyDeals } from "@/hooks/useMyDeals";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export default function PayoutBlockedBanner() {
   const t = useTranslations("myTrips.payoutBanner");
@@ -20,7 +22,7 @@ export default function PayoutBlockedBanner() {
   const blocked = (views ?? []).filter((v) => v.payoutBlocker === "ACCOUNT_NOT_READY");
   if (blocked.length === 0) return null;
   const totalCents = blocked.reduce((sum, v) => sum + v.pricing.transportCents, 0);
-  const amount = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: "EUR" }).format(totalCents / 100);
+  const amount = formatMoneyFromCents(totalCents, intlTagFor(locale));
 
   return (
     <div
