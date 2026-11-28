@@ -46,7 +46,18 @@ async function facettes(contexte: Contexte, query: Record<string, string> = {}):
   return r.json();
 }
 
-const filtres = (page: Page) => page.getByRole("group", { name: "Trier par" }).filter({ visible: true }).first();
+/**
+ * Le panneau des filtres.
+ *
+ * REMISE À NIVEAU DU 28/11/2026 — il s'intitulait « Trier par » jusqu'à
+ * **D100 7A**, qui l'a renommé « Filtres » pour une raison écrite : le
+ * panneau contient le tri, la confiance, le poids et les familles, et il
+ * s'appelait par UNE de ses quatre parties. Le harnais n'étant pas un
+ * contrôle de CI, ce sélecteur réclamait depuis deux semaines un élément
+ * qui n'existe plus. Le tri, lui, garde son nom — c'est le `radiogroup`
+ * INTÉRIEUR qui s'appelle « Trier par ».
+ */
+const filtres = (page: Page) => page.getByRole("group", { name: "Filtres" }).filter({ visible: true }).first();
 const curseurPoids = (page: Page) => page.getByRole("slider", { name: "Poids du colis" });
 const puceFamille = (page: Page, nom: string) => filtres(page).getByRole("button", { name: new RegExp(`^${nom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`) });
 const texteDe = async (page: Page) => (await page.locator("body").innerText()).replace(/ | /g, " ");
@@ -157,11 +168,20 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     const laCarte = carte(page, id);
     await expect(laCarte).toBeVisible({ timeout: 30_000 });
     const texte = (await laCarte.innerText()).replace(/ | /g, " ");
-    expect(texte).toMatch(/prix au kilo/);
-    expect(texte).toMatch(/11,50 €\/kg/);
-    expect(texte).toMatch(/23 kg dispo/);
-    // ex. 2 kg : transport 23,00 + service max(12 %, 3 €) = 26,00 → « ≈ 26 € tout compris »
-    expect(texte).toMatch(/ex\. 2 kg ≈ 26 € tout compris/);
+    // REMISE À NIVEAU DU 28/11/2026 — ce bloc décrivait la carte d'AVANT, et
+    // trois décisions l'ont périmée :
+    //   • **D99 3A** a ÉCHANGÉ les deux chiffres : le gros est désormais ce
+    //     que l'envoi COÛTE (outil de décision), et le prix au kilo — outil
+    //     de comparaison entre offres — a QUITTÉ la carte ;
+    //   • **D99 bis** a réécrit la mention (« estimation pour {kg} kg » tant
+    //     que le poids est supposé) et sorti « tout compris » de la carte,
+    //     qui est redit dans le tunnel ;
+    //   • **D81** facture au poids PLANCHER : un colis supposé de 2 kg est
+    //     facturé 2,3 kg, et c'est ce poids-là que la mention nomme (D100).
+    expect(texte, "un TOTAL à deux décimales (D99 1A)").toMatch(/\d+,\d{2}\s*€/);
+    expect(texte, "la mention nomme le poids FACTURÉ").toMatch(/estimation pour 2,3\s*kg/);
+    expect(texte, "le prix au kilo a quitté la carte (D99 3A)").not.toMatch(/€\s*\/\s*kg|prix au kilo/i);
+    expect(texte, "« tout compris » a quitté la carte (D99 bis)").not.toMatch(/tout compris/);
     expect(texte, "vol direct").toMatch(/Direct/);
     // Ni tiret d'heure, ni prix à zéro, ni note fictive.
     expect(texte, "pas de « — » à la place d'une heure").not.toMatch(/\d{2}:\d{2}\s*→?\s*—|—\s*$/m);
@@ -175,7 +195,11 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     // Le cœur de mise en favori (bouton dans la carte).
     await expect(laCarte.getByRole("button", { name: "Ajouter aux favoris" }).filter({ visible: true }).first()).toBeVisible();
     // La mention du plancher, dans le panneau des filtres.
-    await expect(page.getByText(/Colis léger \(enveloppe, passeport, lunettes…\) : 8 € minimum\./)).toBeVisible();
+    // D81 — le plancher est passé en KILOS : il ne se dit plus « 8 € minimum »
+    // (un montant qui dépendait du prix au kilo du trajet) mais « facturé
+    // 2,3 kg minimum », ce qui est la règle réelle et vaut pour tous les
+    // trajets. C'est le même 2,3 kg que la mention sous le prix.
+    await expect(page.getByText(/Colis léger .*facturé 2,3\s*kg minimum\./).first()).toBeVisible();
   });
 
   test("WEB-RCH-4 et 5 · « Votre colis » : le prix pour 3 kg, puis le prix comparable à 2 kg", async ({ navigateurVisiteur, jeuEssai }) => {
@@ -190,12 +214,23 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await curseurPoids(page).fill("3");
     expect((await reponse).ok()).toBe(true);
     await expect(page.getByText("Prix et tri calculés pour 3 kg · trajets sans assez de place exclus")).toBeVisible({ timeout: 15_000 });
-    // Transport 3 × 11,50 = 34,50 · service 12 % = 4,14 · total 38,64 → l'API le dit au centime,
-    // la carte l'arrondit à l'euro (« ≈ 39 € tout compris pour 3 kg »).
+    // L'API dit le total au centime ; depuis **D99 1A** la carte l'affiche à
+    // DEUX DÉCIMALES et non plus arrondi à l'euro — les deux fronts
+    // montraient « 25 € » et « 24,85 € » pour le même trajet, et la règle
+    // vit désormais dans `pricing-example.ts`. On lit donc le montant de
+    // l'API et on exige la MÊME mise en forme à l'écran, plutôt qu'un
+    // nombre recopié qui périmerait au prochain réglage de prix.
     const { trips } = await rechercherParApi(contexte, { from: "Paris", to: "Brazzaville", weightKg: 3 });
     const item = trips.find((t) => t.id === id);
-    expect(item?.totalForWeight, "total API pour 3 kg").toBeCloseTo(38.64, 2);
-    await expect.poll(async () => (await carte(page, id).innerText()).replace(/ | /g, " "), { timeout: 30_000 }).toMatch(/≈ 39 € tout compris pour 3 kg/);
+    expect(item?.totalForWeight, "total API pour 3 kg").toBeGreaterThan(0);
+    const attendu = (item?.totalForWeight ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    await expect
+      .poll(async () => (await carte(page, id).innerText()).replace(/\u00a0|\u202f/g, " "), { timeout: 30_000 })
+      .toContain(`${attendu} €`);
+    // D99 bis — le poids CHOISI change la phrase : « pour ton colis de … ».
+    await expect
+      .poll(async () => (await carte(page, id).innerText()).replace(/\u00a0|\u202f/g, " "), { timeout: 30_000 })
+      .toMatch(/pour ton colis de 3\s*kg/);
     // Les trajets sans assez de kilos restants le disent ; ceux dont la capacité totale est
     // insuffisante sont exclus (aucun sur le seed : capacités ≥ 15 kg).
     for (const t of trips) {
@@ -208,29 +243,55 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await expect(page.getByText("Prix et tri calculés pour 3 kg · trajets sans assez de place exclus")).toBeVisible({ timeout: 30_000 });
     await expect(curseurPoids(page)).toHaveValue("3");
     expect(await page.evaluate(() => window.localStorage.getItem("yamba.search.weightKg"))).toBe("3");
-    await expect(page.getByText("pour ton colis de 3 kg")).toBeVisible();
+    await expect(page.getByText("pour ton colis de 3 kg").first()).toBeVisible();
 
     // WEB-RCH-5 : « Tout effacer » → référence 2 kg, prix comparables.
     await page.getByRole("button", { name: "Tout effacer" }).filter({ visible: true }).first().click();
-    await expect(page.getByText("Indique le poids : chaque trajet affichera son prix pour ton colis.")).toBeVisible({ timeout: 15_000 });
+    // Le panneau ne dit plus « Indique le poids : … » mais annonce d'abord le
+    // colis de référence, puis invite à donner le sien — D99 bis a fait de
+    // l'estimation une HYPOTHÈSE affichée, et non un ordre.
+    await expect(page.getByText(/Prix affichés pour un colis de 2\s*kg\./).first()).toBeVisible({ timeout: 15_000 });
     await expect(curseurPoids(page)).toHaveValue("2");
-    await expect(page.getByText("pour un colis de 2 kg")).toBeVisible();
-    await expect.poll(async () => (await carte(page, id).innerText()).replace(/ | /g, " "), { timeout: 30_000 }).toMatch(/ex\. 2 kg ≈ 26 € tout compris/);
-    // Un trajet à 9,50 €/kg : 19,00 + 3,00 = 22 €.
-    const aNeufCinquante = trips.find((t) => t.pricePerKg === 9.5);
-    if (aNeufCinquante) expect((await carte(page, aNeufCinquante.id).innerText()).replace(/ | /g, " ")).toMatch(/ex\. 2 kg ≈ 22 € tout compris/);
+    // D99 bis / D100 — poids relâché : la carte revient à l'ESTIMATION et
+    // nomme le poids FACTURÉ (2,3 kg, plancher D81), pas le poids de
+    // référence (2 kg). C'est D100 qui a réparé cette incohérence : la
+    // mention nommait le poids CHOISI à côté du prix du poids FACTURÉ, et
+    // le curseur semblait donc inerte. La phrase du panneau, elle, parle
+    // bien du colis de référence — et elle n'est plus seule à l'écran.
+    await expect(page.getByText("pour un colis de 2 kg").first()).toBeVisible();
+    await expect
+      .poll(async () => (await carte(page, id).innerText()).replace(/\u00a0|\u202f/g, " "), { timeout: 30_000 })
+      .toMatch(/estimation pour 2,3\s*kg/);
     expect(await page.evaluate(() => window.localStorage.getItem("yamba.search.weightKg"))).toBeNull();
   });
 
-  test("WEB-RCH-6 · les trois tris", async ({ navigateurVisiteur }) => {
-    test.setTimeout(3 * 60_000);
+  test("WEB-RCH-6 · les QUATRE tris", async ({ navigateurVisiteur }) => {
+    test.setTimeout(4 * 60_000);
     const { page, contexte } = await navigateurVisiteur();
     await ouvrirLaRecherche(page);
-    const radio = (nom: string) => filtres(page).getByRole("radio", { name: nom });
+    // Ancré au DÉBUT depuis le 28/11, et c'est le seul sélecteur qui marche :
+    //   • une correspondance PARTIELLE attrape deux options — l'indice de
+    //     « Les plus pertinents » est « Près de toi, et les mieux notés » ;
+    //   • une correspondance EXACTE n'en attrape aucune — le nom accessible
+    //     d'une option INCLUT son indice (« Prix le plus bas / pour un colis
+    //     de 2 kg »).
+    const radio = (nom: string) => filtres(page).getByRole("radio", { name: new RegExp(`^${nom}`) });
 
-    // « Départ le plus tôt » est le tri par défaut (déjà coché) : on commence par les deux autres,
-    // puis on y revient — chaque clic est suivi de l'ordre que l'API donne pour ce tri.
-    for (const [nom, sort] of [["Prix le plus bas", "lowestPrice"], ["Mieux notés", "bestRated"], ["Départ le plus tôt", "earliest"]] as const) {
+    // REMISE À NIVEAU DU 28/11/2026 — ce scénario s'intitulait « les TROIS
+    // tris » et commençait par « « Départ le plus tôt » est le tri par
+    // défaut ». **D100 1A/1B** a change les deux :
+    //   • le défaut du SERVEUR est `relevance` depuis D80, et il était
+    //     appliqué SANS être affiché — « Départ le plus tôt » portait son
+    //     résultat, c'est-à-dire que la case cochée mentait ;
+    //   • `relevance` est donc devenu une option NOMMÉE (« Les plus
+    //     pertinents »), et il y en a quatre.
+    // On les parcourt toutes, en terminant par le défaut.
+    for (const [nom, sort] of [
+      ["Prix le plus bas", "lowestPrice"],
+      ["Mieux notés", "bestRated"],
+      ["Départ le plus tôt", "earliest"],
+      ["Les plus pertinents", "relevance"],
+    ] as const) {
       await radio(nom).click();
       await expect(radio(nom)).toHaveAttribute("aria-checked", "true");
       const { trips } = await rechercherParApi(contexte, { sort });
@@ -240,7 +301,11 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
         expect(dates, "départs croissants").toEqual([...dates].sort((a, b) => a - b));
       }
       if (sort === "lowestPrice") {
-        await expect(page.getByText("pour un colis de 2 kg")).toBeVisible();
+        // D99 bis — la mention vit sur CHAQUE carte (« pour ton colis de
+        // {kg} kg » une fois le poids choisi, « estimation pour {kg} kg »
+        // tant qu'il est supposé). Elle n'est donc plus unique à l'écran :
+        // on en exige au moins une, pas exactement une.
+        await expect(page.getByText("pour un colis de 2 kg").first()).toBeVisible();
         expect(trips.every((t) => typeof t.pricePerKg === "number" && t.pricePerKg > 0), "aucun trajet sans prix dans ce tri").toBe(true);
       }
       if (sort === "bestRated") {
@@ -339,7 +404,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
 
   test("WEB-RCH-12 · la page publique d'un trajet", async ({ navigateurVisiteur, jeuEssai }) => {
     test.setTimeout(3 * 60_000);
-    const { page } = await navigateurVisiteur();
+    const { page, contexte } = await navigateurVisiteur();
     const id = jeuEssai.trajet("bzv-perkg");
     await ouvrirLaRecherche(page, { from: "Paris", to: "Brazzaville" });
     await carte(page, id).click();
@@ -349,12 +414,25 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     // (`innerText` rend les intertitres en capitales CSS : comparaison sans casse.)
     const texte = await texteDe(page);
     const minuscule = texte.toLowerCase();
+
+    // Le MONTANT de l'estimation n'est plus écrit en dur : **D81** facture au
+    // poids plancher (un colis de 2 kg est facturé 2,3 kg), et ce plancher est
+    // un paramètre de plateforme (D62) qui peut bouger sans toucher au code.
+    // On lit donc le total de l'API et on exige le MÊME à l'écran — c'est la
+    // seule forme qui ne périme pas au prochain réglage.
+    const { trips: pourDeuxKg } = await rechercherParApi(contexte, { from: "Paris", to: "Brazzaville", weightKg: 2 });
+    const total = pourDeuxKg.find((t) => t.id === id)?.totalForWeight;
+    expect(total, "total API pour 2 kg").toBeGreaterThan(0);
+    expect(texte.replace(/\u00a0|\u202f/g, " ")).toContain(
+      `${(total ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+    );
     for (const attendu of [
       "Avion", "Membre depuis",
       "Ce que tu peux envoyer avec Thomas", "Prix au kilo", "11,50 €/kg", "Disponible", "23 kg",
       "Bagage entier — forfait", "Bagage en soute 23 kg", "230,00 €",
-      "Estimation pour un colis de 2 kg", "≈ 26,00 €", "tout compris (transport + service Yamba)", "Le prix définitif est fixé à la réservation.",
-      "Colis léger (enveloppe, passeport, lunettes…) : 8 € minimum, quel que soit le poids.",
+      "Estimation pour un colis de 2 kg", "tout compris (transport + service Yamba)", "Le prix définitif est fixé à la réservation.",
+      // D81 — le plancher est passé en KILOS : « 8 € minimum » dépendait du prix au kilo du trajet ; « facturé 2,3 kg minimum » est la règle réelle.
+      "Colis léger (enveloppe, passeport, lunettes…) : facturé 2,3 kg minimum, quel que soit son poids.",
       "Lieux de remise & livraison", "Remise", "Livraison",
       "Politique d'annulation", "Remboursement intégral jusqu'à 48 h avant le départ",
       "Moins de 48 h avant le départ : remboursement partiel (une retenue est reversée au Voyageur)",
@@ -410,9 +488,19 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await aminata.page.reload({ waitUntil: "domcontentloaded" });
     await expect(aminata.page.getByText("Trajet proposé par Thomas N.")).toBeVisible({ timeout: 60_000 });
     await expect.poll(vues, { timeout: 15_000 }).toBe(apres + 1);
-    // Sur les résultats, la carte affiche « n vues » (et jamais 0).
+    // REMISE À NIVEAU DU 28/11/2026 — la carte n'affiche PLUS « n vues » à
+    // partir de 1. **D100** a aligné le site sur le téléphone, qui avait
+    // raison : en dessous d'un seuil (`MIN_SHOWN_VIEWS`, `trip-signals.ts`),
+    // afficher le compteur revient à PUBLIER L'IMPOPULARITÉ d'une offre —
+    // « 1 vue » dit au visiteur que personne ne regarde ce trajet.
+    //
+    // Ce que ce scénario prouve — une vue par visiteur et par jour — reste
+    // vérifié ci-dessus, PAR L'API. Ici on vérifie la règle d'affichage :
+    // sous le seuil, la carte se tait.
     await ouvrirLaRecherche(page, { from: "Paris", to: "Brazzaville" });
-    await expect(carte(page, id)).toContainText(new RegExp(`${apres + 1} vues?`), { timeout: 30_000 });
+    const texteCarte = (await carte(page, id).innerText()).replace(/\u00a0|\u202f/g, " ");
+    expect(apres + 1, "le seed reste très en dessous du seuil d'affichage").toBeLessThan(15);
+    expect(texteCarte, "sous le seuil, aucun compteur de vues").not.toMatch(/\d+\s*vues?/);
   });
 
   test("WEB-RCH-14 · un trajet annulé répond « introuvable », sans rien révéler", async ({ navigateurConnecte, navigateurVisiteur }) => {

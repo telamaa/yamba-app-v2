@@ -228,16 +228,14 @@ test.describe("WEB-A11Y — accessibilité clavier de base (chapitre 5.31)", () 
     await expect(confirmation.getByRole("button", { name: "Confirmer" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#password"), "l'étape mot de passe est montée").toBeVisible();
-    /* Le lien « Oublié ? » est posé dans la ligne du libellé du mot de passe : il s'intercale entre
-       les deux champs dans l'ordre de tabulation (motif courant, lisible). On tabule donc jusqu'au champ. */
-    const avantMotDePasse: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      await page.keyboard.press("Tab");
-      const id = await page.evaluate(() => (document.activeElement as HTMLElement | null)?.id ?? "");
-      if (id === "password") break;
-      avantMotDePasse.push(await page.evaluate(() => (document.activeElement?.textContent ?? "").trim().slice(0, 20)));
-    }
-    await expect(page.locator("#password"), "le mot de passe est atteint au clavier").toBeFocused();
+    /* REMISE À NIVEAU DU 28/11/2026 — la fiche tabulait « jusqu'au champ », en commentant que le
+       lien « Oublié ? » s'intercalait entre les deux champs. MESURÉ : le tout premier Tab atteint
+       « Afficher le mot de passe », le voisin IMMÉDIAT du champ dans l'ordre du document — donc le
+       focus était DÉJÀ sur `#password` quand la boucle s'est mise à tabuler. Elle SORTAIT du champ
+       pour aller le chercher, et échouait sur un comportement correct. La marche 2 de D96 donne le
+       focus au mot de passe elle-même : c'est précisément ce que doit prouver une fiche clavier, et
+       la boucle le cachait. On l'épingle, on ne le contourne pas. */
+    await expect(page.locator("#password"), "la marche 2 donne d'elle-même le focus au mot de passe").toBeFocused();
     await page.keyboard.type(MOT_DE_PASSE_SEED);
     /* Jusqu'à la case « Rester connecté », puis Espace. */
     let coche = false;
@@ -268,7 +266,7 @@ test.describe("WEB-A11Y — accessibilité clavier de base (chapitre 5.31)", () 
     await page.keyboard.press("Enter");
     const r = await connexion;
     expect(r.ok(), `la connexion part au clavier (${r.status()})`).toBe(true);
-    test.info().annotations.push({ type: "note", description: `entre l'e-mail et le mot de passe : ${avantMotDePasse.join(" → ") || "rien"} ; après le mot de passe : ${etapes.join(" → ")}` });
+    test.info().annotations.push({ type: "note", description: `le mot de passe reçoit le focus de lui-même à la marche 2 ; après le mot de passe : ${etapes.join(" → ")}` });
   });
 
   test("WEB-A11Y-3 · fermer une fenêtre avec Échap, et retrouver son point de départ", async ({ navigateurVisiteur, navigateurConnecte, jeuEssai }) => {

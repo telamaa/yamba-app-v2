@@ -1,6 +1,9 @@
 import type { CategoryOption, CreateTripCopy } from "./create-trip.types";
+import { formatParcelKg } from "@/lib/parcel-weight";
+import { intlTagFor } from "@/lib/number-format";
 
 export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
+  const langue = intlTagFor(isFr ? "fr" : "en");
   return {
     title: isFr ? "Créer un trajet" : "Create a trip",
     subtitle: isFr ? "Tes kilos libres rapportent." : "Your spare kilos pay off.",
@@ -118,10 +121,21 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     // D81 — le plancher est en KILOS : « moins de X € » n'était vrai que sur un
     // corridor. Ce qui est vrai partout, c'est le poids facturé minimum, qui se
     // multiplie par TON tarif.
+    //
+    // D108, SEPTIÈME occurrence du motif, trouvée par le harnais le 28/11/2026 :
+    // le plancher vaut 2,3 — un DÉCIMAL — et `${kg}` le rendait « 2.3 kg » en
+    // plein français, pendant que les deux autres surfaces qui l'affichent
+    // (`SearchFiltersSidebar`, `OfferCard`) passent par un gabarit next-intl et
+    // écrivaient « 2,3 kg ». Le balayage de D108 ne l'a pas vu parce qu'il
+    // cherchait les FORMES qu'il connaissait (`toFixed`, `.replace('.', ',')`)
+    // et non l'USAGE : un nombre posé dans une phrase visible. Et la bonne
+    // version existait déjà, à trois fichiers d'ici (`formatParcelKg`, D101 5A,
+    // déjà dupliquée octet pour octet et déjà sous fiche) — la première question
+    // n'est pas « comment » mais « où est-ce déjà corrigé ? ».
     minParcelPrice: (kg: number) =>
       isFr
-        ? `Colis léger (enveloppe, passeport, lunettes…) : aucun envoi ne te rapporte moins de ${kg} kg × ton tarif, quel que soit son poids.`
-        : `Light parcel (envelope, passport, glasses…): no shipment earns you less than ${kg} kg × your rate, whatever its weight.`,
+        ? `Colis léger (enveloppe, passeport, lunettes…) : aucun envoi ne te rapporte moins de ${formatParcelKg(kg, langue)} kg × ton tarif, quel que soit son poids.`
+        : `Light parcel (envelope, passport, glasses…): no shipment earns you less than ${formatParcelKg(kg, langue)} kg × your rate, whatever its weight.`,
     priceHint: isFr
       ? "Un seul prix pour tout le trajet : l'Expéditeur paie poids × prix au kilo. La famille du colis ne change pas ce prix."
       : "One price for the whole trip: the sender pays weight × price per kg. The parcel family never changes it.",

@@ -10204,3 +10204,48 @@ plus, et rien dans la chaîne de contrôle ne l'a signalé.
 | 3 | Je place un `import` au-dessus d'un `"use client"` | la fiche rougit **et nomme le fichier** |
 | 4 | J'ouvre une PR | la CI construit les deux fronts |
 | 5 | Un générateur écrit dans un fichier suivi pendant le build | la CI rougit et affiche le diff |
+
+# Remise à niveau du harnais navigateur (28/11/2026)
+
+## Le besoin
+
+Le harnais de recette navigateur décrit, scénario par scénario, **ce que le membre doit voir**.
+Il n'est joué par aucun contrôle de CI : quand une décision change un écran, rien ne dit que la
+description est devenue fausse. Rejoué en entier, il décrivait par endroits un produit disparu
+depuis six semaines — y compris une **porte de réservation** et un **plancher de prix** que le
+membre ne rencontre plus sous cette forme.
+
+Un scénario faux n'est pas un scénario inutile : il est **pire qu'absent**, parce qu'il affirme.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-HAR-1** | Un scénario rouge se tranche en citant **une décision** du registre, ou il reste rouge. | Sinon on « répare » le produit pour faire passer une fiche, ce qui est l'inverse du métier. |
+| **RG-HAR-2** | Un scénario vise ce que le membre **lit** ou **fait** (un rôle, un titre, un jeton `autocomplete`), jamais un exemple de saisie ni un pixel emprunté à un autre objet. | Un texte d'exemple se réécrit à chaque passe de rédaction ; une feuille change de hauteur quand son contenu change. |
+| **RG-HAR-3** | Un geste de saisie **vérifie qu'il a pris** (la taille choisie porte `aria-checked`). | Un clic sur la mauvaise cible ne doit pas pouvoir passer pour un choix. |
+| **RG-HAR-4** | Un nombre montré au membre s'écrit dans **sa** langue, partout — y compris dans une phrase de copie écrite à la main. | « 2.3 kg » en plein français ; le même plancher s'écrivait « 2,3 kg » deux écrans plus loin. |
+| **RG-HAR-5** | La connexion en DEUX marches (D96) vaut **dans toutes les portes** : l'adresse puis le mot de passe, Google et l'inscription sur la première marche seulement. | On ne propose pas une alternative à qui vient de choisir sa voie. |
+
+## Ce que le membre voit, et qui n'avait pas été revérifié
+
+| Écran | Avant (décrit par la fiche) | Aujourd'hui (décision) |
+|---|---|---|
+| « Réserver » sans compte | une page de connexion | la fiche du trajet, porte ouverte par-dessus (#389) |
+| La porte d'identité | e-mail **et** mot de passe d'emblée | l'adresse, puis le mot de passe sur demande (D96) |
+| Publier un trajet, étape 1 | « Ton trajet » + l'accordéon du billet | « Créer un trajet » ; le billet est à la vérification (D111) |
+| Le plancher du Voyageur | « moins de 8 € » | « moins de 2,3 kg × ton tarif » (D81) |
+| La carte de résultat | un prix au kilo | ce que coûte l'envoi (D99 / D99 bis) |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Visiteur, j'ouvre `/trips/:id/book` | je reviens sur la fiche du trajet, la porte ouverte, l'adresse ne ment pas |
+| 2 | Dans la porte, je demande le mot de passe | Google et « Inscris-toi » étaient sur la marche d'avant ; ici, mon mot de passe |
+| 3 | Je me connecte depuis la porte | j'arrive sur le tunnel de réservation, pas sur l'accueil |
+| 4 | Voyageur, j'ouvre la publication | « Créer un trajet », trois étapes nommées, aucun accordéon de billet à l'étape 1 |
+| 5 | J'y lis le plancher | « aucun envoi ne te rapporte moins de **2,3 kg** × ton tarif » — avec une virgule |
+| 6 | Expéditeur, je décris un colis au kilo | je choisis une taille, et l'écran montre qu'elle est choisie |
+| 7 | Au clavier seul, je me connecte | la marche 2 pose le curseur dans le mot de passe, sans une tabulation |
+| 8 | Sur téléphone, j'ouvre la porte | la croix est dans la rangée d'en-tête de la feuille, à droite, dans l'écran |

@@ -21509,3 +21509,123 @@ ligne, puis restauration. Et le scénario WEB-MSG-3, qui échouait, passe désor
 * **Le harnais navigateur n'est toujours pas un contrôle de CI** : il lui faut la pile entière,
   Mailpit et Redpanda. Il reste une recette MANUELLE qu'il faut penser à rejouer — c'est la
   prochaine question à trancher.
+
+# Remise à niveau du harnais navigateur (28/11/2026)
+
+Le harnais Playwright (`apps/e2e`, 550 scénarios, 75 fichiers) **n'est pas un contrôle de CI** :
+rien ne le joue à chaque PR, donc rien ne dit quand une décision le périme. Rejoué en entier le
+28/11, il est revenu avec une série de rouges. **Pas un seul n'était un défaut du produit, sauf
+un** — et c'est tout l'intérêt de l'exercice : un harnais qu'on ne rejoue pas devient un
+inventaire d'affirmations fausses, et une affirmation fausse coûte plus cher qu'une absence
+d'affirmation, parce qu'elle rassure.
+
+La règle suivie pour chaque rouge, et elle n'a pas varié : **si une entrée du registre explique
+l'écart, la fiche est périmée et on la met à jour en citant la décision ; si rien ne l'explique,
+c'est un défaut, et la fiche reste rouge jusqu'à la correction.**
+
+## Ce que six semaines de silence avaient accumulé
+
+| Fiche | Ce qu'elle attendait | Ce qui l'a périmée | Verdict |
+|---|---|---|---|
+| WEB-RSV ①②③ | une PAGE de connexion sur `/trips/:id/book` | **#389** (17/10) : redirection vers la fiche avec `?auth=book` | fiche périmée |
+| WEB-RSV ③ | « Se connecter » / « Créer un compte » | **D96** (11/11) : connexion à DEUX marches, inscription en lien | fiche périmée |
+| WEB-RCH (6) | « €/kg », « tout compris », vues dès 1 | **D99 / D99 bis / D100** | fiche périmée |
+| WEB-TRJ-1 | « Ton trajet » | le seul rendu de `step1Title` est mort le **01/05** | fiche périmée |
+| WEB-TRJ-1 | l'accordéon « Référence & justificatif » à l'étape 1 | **D111** (c3264a97) : le billet remonte à la vérification | fiche périmée |
+| WEB-TRJ-3…9 | « moins de 8 € » | **D81** (17/10) : le plancher passe en KILOS | fiche périmée **+ un vrai défaut** |
+| WEB-ACC-7 | `#password` dès l'ouverture de la porte | **D96** | fiche périmée |
+| WEB-A11Y-2 | quatre tabulations pour atteindre le mot de passe | **D96** : la marche 2 donne le focus elle-même | fiche périmée |
+| WEB-MOB-6 | la croix dans le tiers supérieur de l'ÉCRAN | repère géométrique emprunté au mauvais objet | fiche fausse |
+| WEB-PRO-7 | « En tant que Voyageur » (texte) | la page porte ces mots DEUX fois | fiche fragile |
+| WEB-MNT-4 | la taille, le poids, le destinataire | trois selecteurs de l'objet de page | objet de page cassé |
+
+## L'objet de page de la réservation, cassé sur la moitié des trajets
+
+`apps/e2e/src/pages/reservation.ts` conduit l'assistant en quatre étapes pour **six chapitres**.
+Trois de ses quatre gestes visaient ce qui avait bougé :
+
+- **la taille** était cherchée comme un `button`. Depuis `eeb0d6b3` (17/10) les trois lignes
+  S/M/L portent `role="radio"` dans un `radiogroup` : **un rôle explicite l'emporte sur la
+  balise**, et `getByRole("button")` ne les voit plus ;
+- **le poids** était visé par son exemple de saisie `placeholder="2,5"`, qui ne vit plus que
+  dans `legacyWeightValueBlock` (moteur PER_CATEGORY, déprécié). Sur un trajet **au kilo**, le
+  poids est un pas-à-pas sans `placeholder`, nommé par `aria-label`. Le même code échouait donc
+  **selon le trajet choisi par la fiche** — vert dans un chapitre, rouge dans l'autre ;
+- **le destinataire** était visé par « Marie » et « Mboungou », devenus « Jean » et « Jacques »
+  au fil d'une passe de rédaction, sur un écran qui s'appelle désormais « Où, et à qui ? » parce
+  qu'il porte aussi le lieu du rendez-vous.
+
+Les trois champs du destinataire passent aux **jetons `autocomplete`** (`tel-national`,
+`given-name`, `family-name`, `email`). L'en-tête du fichier assumait de viser les exemples de
+saisie « faute de libellé stable » : il en existe un désormais, et **il vaut mieux qu'un
+libellé** — un exemple de saisie se réécrit, `given-name` est la signification du champ pour le
+navigateur comme pour le gestionnaire de mots de passe. Le clic sur la taille vérifie en outre
+`aria-checked` : un clic sur la mauvaise cible ne peut plus passer pour un choix.
+
+## Le seul vrai défaut : « 2.3 kg » en plein français
+
+En visant la bonne phrase pour le plancher de D81, le harnais a trouvé ceci :
+
+```
+Colis léger (enveloppe, passeport, lunettes…) : aucun envoi ne te rapporte
+moins de 2.3 kg × ton tarif, quel que soit son poids.
+```
+
+`create-trip.copy.ts` interpole `${kg}` **brut**. Le plancher vaut `2.3` — un décimal — et JS
+l'écrit avec un point. Les **deux autres** surfaces qui affichent ce même plancher
+(`SearchFiltersSidebar`, `OfferCard`) passent par un gabarit next-intl et écrivent « 2,3 kg ».
+
+C'est la **septième** occurrence du motif de D108, et la plus instructive : le balayage de D108
+cherchait les **formes** qu'il connaissait (`toFixed`, `.replace('.', ',')`), pas l'**usage** —
+un nombre posé dans une phrase visible. Et la bonne version était déjà dans le dépôt, à trois
+fichiers de là : `formatParcelKg` (D101 5A), déjà dupliquée octet pour octet entre les deux
+fronts et déjà sous fiche. **La première question n'est pas « comment » mais « où est-ce déjà
+corrigé ? »** — troisième fois ce mois-ci.
+
+## Un repère géométrique emprunté au mauvais objet
+
+WEB-MOB-6 vérifiait que la croix de fermeture est « en haut de la feuille » ainsi :
+
+```ts
+expect(croix.y).toBeLessThan(boitePorte.y + boitePorte.height / 3);
+```
+
+`porte` est le conteneur **plein écran** du dialogue — mesuré ce jour : `y = 0`, `height = 844`
+sur un 390 × 844. Le tiers n'était donc pas celui de la feuille mais celui de **l'écran**, et la
+fiche ne tenait que tant que la feuille du bas montait assez haut pour y entrer. D96 l'a
+raccourcie de quelques pixels (une marche d'adresse au lieu de deux champs), la feuille est
+descendue, et la fiche a rougi **sans que rien ne soit cassé**.
+
+Le repère devient indépendant de la hauteur du contenu : la croix appartient à la **rangée
+d'en-tête**, donc elle est au-dessus du titre, et pas n'importe où au-dessus.
+
+## Code mort mesuré en passant
+
+`step1Title` (« Ton trajet ») existe toujours dans `create-trip.copy.ts` ; son seul rendu
+(`<SectionTitle title={copy.step1Title} …>`) vivait dans le wizard `create-old/`, supprimé le
+**01/05/2026** comme code mort. La fiche a donc passé **sept mois** à prouver l'existence d'un
+texte que personne ne lit.
+
+Balayage complet du type `CreateTripCopy` (aucun accès dynamique `copy[…]`, aucune
+déstructuration — vérifié) : **39 champs sur 156 ne sont rendus nulle part**, dont
+`step1Title`, `step1Sub`, `step2Title`, `step2Sub`, `firstTripTitle`, `firstTripSub`,
+`netGainSub`, `instantBooking`, `roundTrip`/`oneWay`. Une copie que personne ne rend est une
+description fausse de l'écran — le même défaut que D110 nommait pour les sources de vérité
+qu'on n'importe pas.
+
+## Reste ouvert (nommé, non corrigé)
+
+- **ANO-WEB — le plancher en euros survit dans l'infobulle legacy.**
+  `messages/fr/booking.json → step1.parcelDetails.weightTooltip` dit « jamais moins de **8 €** »
+  et `StepParcel.tsx:567` le rend avec `{ min: 0.5, floor: 8 }`. C'est la phrase que D81 a
+  déclarée fausse (« vraie sur un corridor seulement »). Elle n'est servie que par
+  `legacyWeightValueBlock`, donc aux trajets PER_CATEGORY publiés avant le moteur au kilo — mais
+  ces trajets existent, et leur Expéditeur lit un chiffre faux. La correction demande de savoir
+  ce que le serveur applique VRAIMENT comme plancher sur ce moteur déprécié : on nomme, on ne
+  devine pas.
+- **Les 39 champs de copie morts** ne sont pas supprimés dans cette passe : c'est du code de
+  produit dans une branche de harnais. Lot à part.
+- **Prérequis d'exploitation non écrit ailleurs que dans le handoff** : les parcours de paiement
+  exigent `PAYMENT_PROVIDER=fake` dans le `.env` **racine** (A220). Il en était absent, et le
+  tunnel servait un vrai formulaire Stripe : « Payer » validait la carte côté navigateur et
+  n'envoyait **aucun** `POST /deals`, ce qui ressemble à s'y méprendre à une panne de fiche.

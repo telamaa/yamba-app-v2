@@ -177,7 +177,10 @@ test.describe("WEB-PRO — profil, avatar et page publique (chapitre 5.5)", () =
     await expect(page.getByText(/Thomas\s+N\.?/).first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/Membre depuis/).first()).toBeVisible();
     // Le bloc Voyageur, avec un NIVEAU nommé (jamais une note « 0.0 » inventée).
-    await expect(page.getByText("En tant que Voyageur")).toBeVisible();
+    // La page porte DEUX fois ces mots depuis que le bloc sans avis l'explique en clair
+    // (« Thomas n'a pas encore reçu d'avis en tant que Voyageur ») : on vise le TITRE du bloc,
+    // par son rôle, et non la phrase qui le cite.
+    await expect(page.getByRole("heading", { name: "En tant que Voyageur" })).toBeVisible();
     const niveaux = ["Nouveau Voyageur", "Voyageur confirmé", "Top Voyageur"];
     await expect(page.locator("main").getByText(new RegExp(niveaux.join("|"))).first()).toBeVisible();
     const corps = await page.locator("body").innerText();

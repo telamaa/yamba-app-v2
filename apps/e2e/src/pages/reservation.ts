@@ -62,21 +62,52 @@ export class AssistantReservation {
   async decrireLeColis(colis: Colis): Promise<void> {
     await this.page.getByRole("button", { name: new RegExp(echapper(colis.famille)) }).first().click();
     if (colis.taille) {
-      await this.page.getByRole("button", { name: new RegExp(`^${colis.taille}\\b`) }).first().click();
+      // REMISE À NIVEAU DU 28/11/2026 — la taille était visée comme un BOUTON. Depuis eeb0d6b3
+      // (17/10), les trois lignes S/M/L portent `role="radio"` dans un `radiogroup` : un rôle
+      // EXPLICITE l'emporte sur la balise, donc `getByRole("button")` ne les voit plus. Le geste
+      // échouait en silence sur tout écran où aucun autre bouton ne commençait par la lettre
+      // demandée — six semaines, parce que le harnais n'est pas un contrôle de CI.
+      //
+      // Et l'on VÉRIFIE que le choix a pris : un clic sur la mauvaise cible ne doit pas pouvoir
+      // passer pour un choix de taille (`aria-checked`), sans quoi la panne revient muette.
+      const pastille = this.page.getByRole("radio", { name: new RegExp(`^${colis.taille}\\b`) }).first();
+      await pastille.click();
+      await expect(pastille, `la taille ${colis.taille} est choisie`).toHaveAttribute("aria-checked", "true");
     }
-    await this.page.locator('input[placeholder="2,5"]').fill(colis.poidsKg);
+    // LE POIDS — deux contrôles selon le moteur de prix du trajet, et l'objet de page doit
+    // connaître les deux. REMISE À NIVEAU DU 28/11/2026 : seul `input[placeholder="2,5"]` était
+    // visé, et ce champ ne vit plus que dans `legacyWeightValueBlock` (le moteur PER_CATEGORY,
+    // déprécié). Sur un trajet au KILO, le poids est un pas-à-pas dont l'entrée n'a pas de
+    // `placeholder` mais un `aria-label` (« Poids ») — d'où un échec qui ne dépendait QUE du
+    // trajet choisi par la fiche, donc invisible pour les chapitres qui jouent sur un trajet
+    // legacy et fatal pour les autres.
+    const champPoids = this.page.locator('input[aria-label="Poids"], input[placeholder="2,5"]').first();
+    await expect(champPoids, "le champ du poids (pas-à-pas au kilo ou champ legacy)").toBeVisible({ timeout: 30_000 });
+    await champPoids.fill(colis.poidsKg);
     await this.page.locator('input[placeholder="150"]').fill(colis.valeurEuros);
     await this.page.locator("textarea").first().fill(colis.description);
   }
 
-  /** Étape 2 — le destinataire. Il n'a pas de compte Yamba : c'est tout l'objet de l'écran. */
+  /**
+   * Étape 2 — le lieu du rendez-vous ET le destinataire. Il n'a pas de compte Yamba : c'est tout
+   * l'objet de l'écran.
+   *
+   * REMISE À NIVEAU DU 28/11/2026 — l'écran s'appelait « À qui livrer ? » et ne portait que le
+   * destinataire ; il s'appelle « Où, et à qui ? » et porte les deux. Les trois champs étaient
+   * visés par leur EXEMPLE DE SAISIE (« Marie », « Mboungou ») : du texte de produit, donc du
+   * texte qui bouge — il dit « Jean » et « Jacques » depuis une passe de rédaction, et la fiche
+   * échouait sur un écran parfaitement sain. L'en-tête de ce fichier assumait cette exception
+   * « faute de libellé stable » : il en existe un désormais, et il est MEILLEUR qu'un libellé —
+   * le jeton `autocomplete`, qui est la SIGNIFICATION du champ pour le navigateur comme pour le
+   * gestionnaire de mots de passe. Un exemple de saisie se récrit, `given-name` ne se récrit pas.
+   */
   async decrireLeDestinataire(d: Destinataire): Promise<void> {
-    await expect(this.page.getByText("À qui livrer ?")).toBeVisible({ timeout: 30_000 });
-    await this.page.locator("select").first().selectOption(d.indicatif);
-    await this.page.locator('input[type="tel"]').fill(d.telephone);
-    await this.page.locator('input[placeholder="Marie"]').fill(d.prenom);
-    await this.page.locator('input[placeholder="Mboungou"]').fill(d.nom);
-    if (d.email) await this.page.locator('input[type="email"]').fill(d.email);
+    await expect(this.page.getByRole("heading", { name: "Où, et à qui ?" })).toBeVisible({ timeout: 30_000 });
+    await this.page.getByRole("combobox", { name: "Indicatif pays" }).selectOption(d.indicatif);
+    await this.page.locator('input[autocomplete="tel-national"]').fill(d.telephone);
+    await this.page.locator('input[autocomplete="given-name"]').fill(d.prenom);
+    await this.page.locator('input[autocomplete="family-name"]').fill(d.nom);
+    if (d.email) await this.page.locator('input[autocomplete="email"]').fill(d.email);
   }
 
   /** Étape 3 — la Charte Expéditeur. Une seule case, mais elle engage juridiquement. */
