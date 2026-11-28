@@ -206,6 +206,51 @@ jobs:
       - name: Build (six services)
         run: npx nx run-many -t build --projects=@yamba-app/api-gateway,auth-service,@yamba-app/trip-service,@yamba-app/deal-service,@yamba-app/notification-service,@yamba-app/message-service --skip-nx-cache
 
+  build-fronts:
+    name: Build des fronts (next)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm (meme version que le poste qui genere le lock)
+        run: npm install -g npm@10.9.8
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # D122 — « la CI construit ce qu'elle deploie ». Ce job etait un
+      # CANDIDAT depuis des mois ; son absence a laisse le site de production
+      # inconstructible pendant une SEMAINE (une directive `"use client"`
+      # precedee d'un import, invisible a `tsc` comme a `jest`).
+      - name: Build (les deux fronts Next)
+        run: npx nx run-many -t build --projects=@yamba-app/user-ui,@yamba-app/admin-ui --skip-nx-cache
+
+      # Le build de production REECRIT `next-env.d.ts` : il y ecrit
+      # `./.next/types/…` la ou `next dev` ecrit `./.next/dev/types/…`, et le
+      # fichier est SUIVI. Cette reecriture est CONNUE et attendue — on la
+      # defait explicitement, puis on exige que plus rien n'ait bouge. Le
+      # garde attrape ainsi toute AUTRE churn : un generateur qui se mettrait
+      # a ecrire dans le depot sans que personne l'ait decide.
+      - name: Defaire la reecriture connue de next-env.d.ts
+        run: git checkout -- apps/user-ui/next-env.d.ts apps/admin-ui/next-env.d.ts || true
+
+      - name: Aucun AUTRE fichier suivi n'a bouge
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Le build a modifie des fichiers suivis, au-dela du next-env.d.ts connu :"
+            git status --short
+            git diff
+            exit 1
+          fi
+
   i18n-messages:
     name: i18n messages (parse + miroir FR/EN)
     runs-on: ubuntu-latest

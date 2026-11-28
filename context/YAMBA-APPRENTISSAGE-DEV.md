@@ -13066,3 +13066,118 @@ reçoit jamais son code, où que ce soit.
   fichiers qui se ressemblent encore.
 * **Contre-épreuve systématique** : le défaut remis en place a fait rougir 3 fiches côté mobile et 2
   côté site. Une correction dont on n'a pas vu les tests échouer n'est pas une correction vérifiée.
+
+
+---
+
+# Chapitre — Ce qu'aucun contrôle ne regarde (D122)
+
+Ce chapitre part d'un fait inconfortable : **vingt contrôles verts ont accompagné pendant une
+semaine un site qui ne se construisait pas.**
+
+## 1. Le défaut, et pourquoi aucun outil en place ne pouvait le voir
+
+```tsx
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";   // ✗ AVANT la directive
+
+/** … */
+"use client";
+```
+
+Next refuse : *« The "use client" directive must be placed before other expressions. »* TypeScript,
+lui, ne voit qu'un import parfaitement valide — c'est **une règle du bundler, pas du langage**.
+
+Conséquence : `tsc` vert, `jest` vert, et `next build` en échec. Or la CI lançait les deux premiers
+et jamais le troisième.
+
+> **Un typecheck vert n'est pas un bundle** — exactement comme, en septembre, *un build vert n'était
+> pas un service démarré* (`esModuleInterop`, qui avait donné `smoke-services.sh`). La même famille
+> d'erreur revient dès qu'on prend une étape de la chaîne pour la chaîne entière.
+
+## 2. Compter les contrôles ne suffit pas : il faut compter ce qu'ils regardent
+
+Ce dépôt a une règle forte — *« CI OK se vérifie en COMPTANT les checks, pas à leur couleur »*. Elle
+est bonne, et elle n'a servi à rien ici : les vingt étaient bien là, bien verts, et bien incomplets.
+
+La question qui manquait n'est pas *combien* mais :
+
+> **Qu'est-ce qu'aucun de ces vingt ne regarde ?**
+
+Fais l'inventaire par ARTEFACT, pas par outil :
+
+| Artefact | Qui le vérifiait ? |
+|---|---|
+| les types | `tsc` ×8 |
+| la logique | `jest` ×7 |
+| les bundles de service | `webpack` ×1 |
+| **les bundles des fronts** | **personne** |
+| le rendu réel dans un navigateur | le harnais… qui n'est pas en CI |
+
+Deux lignes vides dans cette colonne, et elles se sont croisées.
+
+## 3. Le symptôme ne ressemble pas à la cause
+
+Le scénario qui a trouvé le défaut échouait ainsi :
+
+```
+expect(getByText('En attente du Voyageur')).toBeVisible()  →  element(s) not found
+```
+
+Un texte manquant sur une page de suivi. On pense à un libellé changé, à une traduction, à un état
+de donnée. La cause réelle : **la page entière était remplacée par l'écran d'erreur de Next**.
+
+Ce qui a débloqué la lecture : Playwright écrit un `error-context.md` contenant l'**arbre
+d'accessibilité** de la page au moment de l'échec. Il contenait `dialog "Build Error"`.
+
+> Quand un test d'interface échoue sur un élément introuvable, **regarde ce que la page montrait**,
+> pas seulement ce qu'elle ne montrait pas.
+
+## 4. Un filet rapide et un filet large ne se remplacent pas
+
+Deux parades ont été posées, et garder les deux est délibéré :
+
+| | couvre | coût | dit où |
+|---|---|---|---|
+| `next build` en CI | **toute** la classe des erreurs de bundler | ~2 min/PR | non (trace) |
+| une fiche de balayage | cette classe-ci | ~1 s | **oui**, fichier + ligne |
+
+La fiche ne rend pas le build inutile ; le build ne rend pas la fiche redondante.
+
+## 5. Vérifier son propre garde avant de le poser
+
+Le nouveau job contenait au départ :
+
+```yaml
+- name: Aucun fichier suivi n'a bougé
+  run: '[ -z "$(git status --porcelain)" ]'
+```
+
+Testé localement **avant de pousser** : il aurait rougi. Le build de production réécrit
+`next-env.d.ts` (`./.next/types/…` au lieu de `./.next/dev/types/…`) et ce fichier est suivi. Un
+garde qui échoue sur son propre effet de bord se fait désactiver en trois jours.
+
+La version retenue défait la réécriture **connue**, puis exige que plus rien n'ait bougé — ce qui
+garde la valeur du contrôle (détecter une churn **inattendue**) sans le condamner.
+
+> **Un garde se teste comme du code.** Celui qui crie au loup une fois sur deux ne protège rien.
+
+## 6. Une preuve change un arbitrage ; une intention ne le change pas
+
+Ce job était inscrit comme « candidat » dans le suivi depuis des mois, sous son nom exact : *« la CI
+construit ce qu'elle déploie »*. Personne ne s'y opposait ; il n'était simplement jamais prioritaire.
+
+Il a fallu une semaine de site cassé pour que l'arbitrage se rende tout seul — deux minutes de CI
+par PR contre sept jours d'inconstructibilité. **L'arbitrage n'avait jamais été serré ; il n'avait
+jamais été RENDU.**
+
+C'est la justification pratique du registre de ce dépôt : une décision différée sans date revient
+chaque fois au même point, jusqu'à ce qu'un incident la tranche à la place de l'équipe.
+
+## Pour aller plus loin
+
+* **Rejoue tes recettes manuelles après les lots qui touchent leurs pages.** Le harnais navigateur
+  n'est pas en CI (il lui faut la pile entière, Mailpit, Redpanda) : c'est donc une discipline, pas
+  un automatisme — et une discipline s'oublie. Ici, elle a été reprise sur demande, une semaine trop
+  tard.
+* **Un job ajouté ne devient pas requis tout seul** : il faut le cocher dans la protection de
+  branche. Quatre des vingt-et-un contrôles de ce dépôt sont consultatifs pour cette seule raison.

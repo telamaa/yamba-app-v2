@@ -21421,3 +21421,91 @@ restauration.
   forme E.164. Autre règle, autre table, et une source que nous n'avons pas — `libphonenumber` est
   une dépendance que ce dépôt n'a pas voulue.
 * **Dix-huit entrées de la table sont l'héritage**, pas un fait vérifié. C'est écrit dans le fichier.
+
+---
+
+# D122 — La CI construit ce qu'elle déploie (28/11/2026)
+
+**Le site de production ne se construisait plus depuis une semaine**, et vingt contrôles verts ont
+accompagné cette semaine sans rien dire.
+
+## Le défaut
+
+```
+The "use client" directive must be placed before other expressions.
+  ./apps/user-ui/src/components/booking/booking-tracker/BookingTrackerSkeleton.tsx:10
+  ./apps/user-ui/src/components/carrier/deal/DealSkeleton.tsx:11
+```
+
+D110 (21/11) a réécrit une cinquantaine de fichiers pour leur faire importer `conteneurDePage`.
+Dans ces **deux squelettes**, l'import a atterri **au-dessus** de la directive. Next refuse ;
+TypeScript accepte parfaitement.
+
+Les deux écrans concernés sont le **suivi de l'Expéditeur** et la **demande du Voyageur** — deux
+pages de chargement, donc deux pages que personne ne regarde longtemps.
+
+## Pourquoi une semaine : deux filets absents qui se croisent
+
+| Filet | Pourquoi il n'a rien vu |
+|---|---|
+| les 20 contrôles de CI | ils lancent `tsc` et `jest`, **jamais `next build`** |
+| le harnais navigateur | **n'est pas un contrôle de CI**, et n'avait pas été rejoué depuis les lots touchant ces pages |
+
+Le défaut n'a été trouvé **que parce que l'utilisateur a demandé de rejouer le harnais**. Et le
+symptôme ne ressemblait pas à sa cause : le scénario WEB-MSG-3 mourait sur un texte introuvable
+(« En attente du Voyageur »), parce que la page affichait l'écran d'erreur de Next à sa place.
+
+> **« CI OK se compte » ne suffit pas : encore faut-il compter la bonne chose.** Chaque PR était
+> verte sur ce qu'elle mesurait. Ce n'était pas un défaut de rigueur, c'était un défaut de
+> COUVERTURE — et il ne se voit qu'en demandant *« qu'est-ce qu'aucun de ces vingt ne regarde ? »*.
+
+C'est la même famille que la leçon `esModuleInterop` du 05/09 (« un build vert n'est pas un service
+démarré », qui avait donné `scripts/smoke-services.sh`) : **un typecheck vert n'est pas un bundle.**
+
+## Le vingt-et-unième contrôle
+
+```yaml
+- name: Build (les deux fronts Next)
+  run: npx nx run-many -t build --projects=@yamba-app/user-ui,@yamba-app/admin-ui --skip-nx-cache
+```
+
+Deux détails qui comptent :
+
+* **les DEUX fronts**, pas un seul — `admin-ui` est déployé aussi, et rien ne garantit qu'il
+  échappera au prochain balayage de classes ;
+* **un garde de churn**, qui défait d'abord la réécriture CONNUE de `next-env.d.ts` (le build de
+  production y écrit `./.next/types/…` là où `next dev` écrit `./.next/dev/types/…`, et le fichier
+  est suivi) puis exige que **plus rien** n'ait bougé. Vérifié avant de pousser : sans ce
+  traitement, le job aurait rougi sur son propre effet de bord.
+
+## La fiche reste, et elle n'est pas redondante
+
+Un balayage « rien ne précède `"use client"` » tourne dans le harnais du site, sur les deux fronts :
+il répond en **une seconde** là où le build prend deux minutes, et il **nomme** le fichier fautif.
+
+> **Un filet rapide et un filet large ne se remplacent pas.** Le build attrape toute la classe ; la
+> fiche attrape celle-ci, vite et en disant où.
+
+Elle compte ce qu'elle balaye (> 50 directives) — un balayage qui ne balaye rien serait vert pour la
+pire raison — et tolère le commentaire d'en-tête, qui est la convention du dépôt et que Next accepte.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| `nx build user-ui` | **ÉCHEC** (2 erreurs) | **Compiled successfully**, 67 pages |
+| `nx build admin-ui` | OK | OK |
+| Contrôles de CI | 20 | **21** |
+| Fiches user-ui | 331 | **332** |
+
+**Contre-épreuve** : défaut remis sur `DealSkeleton` → la fiche le nomme avec son fichier et sa
+ligne, puis restauration. Et le scénario WEB-MSG-3, qui échouait, passe désormais.
+
+## Reste ouvert
+
+* **Le nouveau job doit être COCHÉ** dans `branches/dev/protection` pour devenir requis. Avec lui,
+  **quatre des vingt-et-un contrôles sont consultatifs** — et celui-ci garde la seule chose que
+  l'utilisateur verra.
+* **Le harnais navigateur n'est toujours pas un contrôle de CI** : il lui faut la pile entière,
+  Mailpit et Redpanda. Il reste une recette MANUELLE qu'il faut penser à rejouer — c'est la
+  prochaine question à trancher.
