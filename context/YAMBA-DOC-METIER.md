@@ -10174,3 +10174,33 @@ forme du numéro, que le numéro amputé respecte.
 | 6 | Je tape deux zéros par erreur devant un numéro français | un seul est retiré, l'autre aussi via le « 00 » international |
 | 7 | Je saisis un numéro trop court ou illisible | il est refusé, aucun numéro n'est fabriqué |
 | 8 | Je compare la table des deux fronts | elles sont identiques, entrée par entrée |
+
+
+---
+
+# D122 — La CI construit ce qu'elle déploie (28/11/2026)
+
+## Le besoin
+
+Pendant une semaine, deux pages du site ont affiché un écran d'erreur au lieu de leur contenu : le
+**suivi d'un envoi** (Expéditeur) et la **demande reçue** (Voyageur). Le site ne se construisait
+plus, et rien dans la chaîne de contrôle ne l'a signalé.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D122-1** | La CI **construit** les deux fronts à chaque PR. | Un typecheck vert n'est pas un bundle ; vingt contrôles verts ont accompagné une semaine de site inconstructible. |
+| **RG-D122-2** | Elle vérifie qu'aucun fichier suivi n'a bougé, **hors la réécriture connue** de `next-env.d.ts`. | Un générateur qui écrirait dans le dépôt sans décision doit se voir. |
+| **RG-D122-3** | Aucune expression ne précède `"use client"` — un commentaire d'en-tête reste permis. | Next refuse ; TypeScript accepte. La règle est invisible aux outils en place. |
+| **RG-D122-4** | Le balayage **nomme** le fichier fautif et **compte** ce qu'il a balayé. | Un balayage qui ne balaye rien est vert pour la pire raison. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre le suivi d'un envoi | la page s'affiche (plus l'écran d'erreur de Next) |
+| 2 | J'ouvre une demande reçue | idem |
+| 3 | Je place un `import` au-dessus d'un `"use client"` | la fiche rougit **et nomme le fichier** |
+| 4 | J'ouvre une PR | la CI construit les deux fronts |
+| 5 | Un générateur écrit dans un fichier suivi pendant le build | la CI rougit et affiche le diff |
