@@ -38,13 +38,11 @@
   },
   "messages": {
     "title": "Messages",
-    "unread": "{count, plural, =0 {Aucun message non lu} one {# message non lu} other {# messages non lus}}",
-    "note": "Les conversations arrivent dans un prochain lot."
+    "unread": "{count, plural, =0 {Aucun message non lu} one {# message non lu} other {# messages non lus}}"
   },
   "profile": {
     "title": "Profil",
     "logout": "Se déconnecter",
-    "note": "La gestion du profil arrive dans un prochain lot.",
     "back": "Retour"
   },
   "activity": {

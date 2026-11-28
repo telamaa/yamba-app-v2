@@ -6,8 +6,7 @@
     "loadError": "Conversations cannot be read right now.",
     "retry": "Try again",
     "you": "You: {body}",
-    "unread": "{count, plural, one {# unread} other {# unread}}",
-    "readOnly": "Read-only"
+    "unread": "{count, plural, one {# unread} other {# unread}}"
   },
   "entry": {
     "open": "Message {name}"
@@ -18,7 +17,6 @@
     "empty": "Nothing said yet",
     "emptyWhy": "Write the first message: a place, a time, something to recognise each other by.",
     "placeholder": "Write your message",
-    "send": "Send",
     "sendAccessibility": "Send the message",
     "remaining": "{count, plural, one {# character left} other {# characters left}}",
     "codeWarning": "The delivery code is given out loud, never here.",
@@ -129,7 +127,6 @@
     "call": "Call {name}",
     "opensAt": "The number will appear on {when}",
     "needsMeetup": "Agree on a hand-over meeting: the number opens two hours before.",
-    "why": "Yamba opens the number just before the meeting, and keeps a record of it.",
     "errors": {
       "tropTot": "The number is not open yet.",
       "sansAncre": "You need a hand-over meeting first, or a departure date.",

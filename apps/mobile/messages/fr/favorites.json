@@ -16,7 +16,12 @@
     "anyDate": "Toutes les dates",
     "nearby": "Villes proches incluses",
     "expires": "Expire le {date}",
-    "paused": "En pause"
+    "emailToggle": "Alerte par e-mail",
+    "emailOn": "E-mail activé",
+    "emailOff": "E-mail coupé",
+    "delete": "Supprimer",
+    "deleteConfirm": "Confirmer",
+    "deleteCancel": "Annuler"
   },
   "carriers": {
     "emptyTitle": "Aucun Voyageur suivi",

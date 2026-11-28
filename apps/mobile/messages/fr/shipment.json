@@ -95,7 +95,6 @@
   },
   "journey": {
     "title": "Étapes du voyage",
-    "departure": "Départ prévu",
     "pickedUp": "Colis pris en charge",
     "AT_AIRPORT": "Arrivé au point de départ",
     "FLIGHT_DEPARTED": "Parti vers {destination}",
@@ -176,7 +175,6 @@
     "authorized": "Autorisé, pas encore débité",
     "capturedOn": "Débité le {date}",
     "frozen": "Gelé le temps de l'examen",
-    "released": "Versé à {carrierFirstName}",
     "refunded": "Remboursé",
     "retained": "Retenu",
     "noteAuthorized": "L'empreinte est posée sur ta carte. Elle ne devient un débit qu'à l'acceptation de {carrierFirstName}.",

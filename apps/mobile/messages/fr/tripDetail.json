@@ -10,7 +10,6 @@
   },
   "itinerary": {
     "title": "Itinéraire",
-    "duration": "Durée : {duration}",
     "layovers": "Escales : {cities}",
     "stops": "Arrêts : {cities}"
   },
@@ -93,9 +92,7 @@
     "title": "Le Voyageur",
     "memberSince": "Membre depuis {date}",
     "newTripper": "Nouveau Voyageur",
-    "rating": "★ {rating} · {count, plural, =1 {# avis} other {# avis}}",
-    "tripsPublished": "{count, plural, one {# trajet publié} other {# trajets publiés}}",
-    "parcelsCarried": "{count, plural, one {# colis transporté} other {# colis transportés}}"
+    "rating": "★ {rating} · {count, plural, =1 {# avis} other {# avis}}"
   },
   "notes": {
     "title": "Notes du Voyageur"
@@ -116,9 +113,7 @@
     "error": "Le favori n'a pas pu être enregistré. Réessaie."
   },
   "co2": {
-    "prefix": "Envoi sans empreinte additionnelle ·",
-    "amount": "{kg, number} kg de CO₂ évités vs fret express",
-    "suffix": "pour un colis de {weight} kg"
+    "amount": "{kg, number} kg de CO₂ évités vs fret express"
   },
   "bar": {
     "from": "À partir de",

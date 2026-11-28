@@ -38,13 +38,11 @@
   },
   "messages": {
     "title": "Messages",
-    "unread": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}",
-    "note": "Conversations arrive in an upcoming batch."
+    "unread": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}"
   },
   "profile": {
     "title": "Profile",
     "logout": "Log out",
-    "note": "Profile management arrives in an upcoming batch.",
     "back": "Back"
   },
   "activity": {

@@ -6,8 +6,7 @@
     "loadError": "Les conversations ne se lisent pas pour l'instant.",
     "retry": "Réessayer",
     "you": "Toi : {body}",
-    "unread": "{count, plural, one {# non lu} other {# non lus}}",
-    "readOnly": "Lecture seule"
+    "unread": "{count, plural, one {# non lu} other {# non lus}}"
   },
   "entry": {
     "open": "Écrire à {name}"
@@ -18,7 +17,6 @@
     "empty": "Rien n'a encore été dit",
     "emptyWhy": "Écris le premier message : un lieu, une heure, un repère pour se reconnaître.",
     "placeholder": "Écris ton message",
-    "send": "Envoyer",
     "sendAccessibility": "Envoyer le message",
     "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
     "codeWarning": "Le code de livraison se donne de vive voix, jamais ici.",
@@ -129,7 +127,6 @@
     "call": "Appeler {name}",
     "opensAt": "Le numéro s'affichera le {when}",
     "needsMeetup": "Il faut d'abord un rendez-vous de prise en charge : le numéro s'ouvre deux heures avant.",
-    "why": "Yamba ouvre le numéro juste avant le rendez-vous, et garde une trace de l'ouverture.",
     "errors": {
       "tropTot": "Le numéro n'est pas encore ouvert.",
       "sansAncre": "Il faut d'abord un rendez-vous de prise en charge, ou une date de départ.",

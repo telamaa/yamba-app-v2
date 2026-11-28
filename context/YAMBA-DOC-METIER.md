@@ -10316,3 +10316,38 @@ produit, pas selon l'état d'une table.
 | 4 | Je consulte la liste dix fois sans rien ouvrir | rien n'est créé, la liste est identique |
 | 5 | Aucun deal engagé | « Aucune conversation », et la phrase est vraie |
 | 6 | Un deal encore en attente d'acceptation | **aucune** ligne — le fil n'existe pas encore |
+
+# D125 — L'écran va à l'essentiel (28/11/2026)
+
+## Le besoin
+
+Trois choses, dans l'ordre où le membre les rencontre :
+
+1. l'écran **Profil** s'ouvrait sur une page vide aux trois quarts, avec le bouton de retour **au
+   milieu**, et une phrase qui annonçait un lot à venir ;
+2. une **alerte de route** se créait depuis le téléphone et ne se supprimait que depuis le site ;
+3. la même alerte pouvait s'afficher **« En pause »** — un état que rien, dans tout le produit, ne
+   sait produire.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D125-1** | Un écran poussé a sa **rangée d'en-tête en haut** ; le contenu commence dessous. | Un retour au milieu de l'écran ne se lit pas comme une sortie. |
+| **RG-D125-2** | Aucun écran n'**annonce** une fonction à venir. | Une promesse occupe la place d'une réponse, et date l'application. |
+| **RG-D125-3** | Tout ce qui se **crée** depuis le téléphone s'y **modifie** et s'y **supprime**. | Un geste de deux secondes ne doit pas obliger à ouvrir un ordinateur. |
+| **RG-D125-4** | Une **suppression** demande confirmation. | On ne détruit pas sur un effleurement. |
+| **RG-D125-5** | Aucun écran n'affiche un état que le produit ne sait pas produire. | « En pause » n'existait ni côté membre, ni côté serveur. |
+| **RG-D125-6** | Toute phrase du produit est **affichée quelque part**, ou elle est supprimée. | 17 textes n'étaient lus par personne. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre mon profil | le retour est **en haut à gauche** ; nom, adresse, déconnexion |
+| 2 | J'y cherche une promesse de fonction | il n'y en a plus |
+| 3 | Sur une alerte, je touche la corbeille | on me demande de confirmer |
+| 4 | Je confirme | l'alerte disparaît de la liste |
+| 5 | Je touche l'enveloppe d'une alerte | l'e-mail passe de « activé » à « coupé », et inversement |
+| 6 | Je cherche « En pause » sur une alerte | il n'y a rien : l'état n'existe pas |
+| 7 | La liste des alertes est vide | un seul bloc : icône, titre, une phrase |
