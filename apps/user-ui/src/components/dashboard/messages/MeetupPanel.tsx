@@ -44,7 +44,11 @@ const toIso = (value: string) => (value ? new Date(value).toISOString() : "");
 export default function MeetupPanel({ thread }: { thread: ConversationThread }) {
   const t = useTranslations("messaging");
   const locale = useLocale();
-  const conversationId = thread.conversation.id;
+  // D124 — le panneau n'est rendu qu'à l'intérieur d'un fil OUVERT : la ligne
+  // vient donc d'être matérialisée et l'identifiant existe. Le `?? ""` est le
+  // repli du typage, pas un cas réel — une proposition partirait en 404 plutôt
+  // que de prétendre viser une conversation.
+  const conversationId = thread.conversation.id ?? "";
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ kind: "PICKUP" as Meetup["kind"], placeLabel: "", placeDetails: "", startAt: "", endAt: "" });
   const [error, setError] = useState<string | null>(null);

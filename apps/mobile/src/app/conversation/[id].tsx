@@ -51,7 +51,7 @@ import { ApiError } from '@/lib/api/client';
 import {
   accepterLeRendezVous,
   envoyerLeMessage,
-  leFil,
+  leFilDuDeal,
   marquerLu,
   reponsesRapides,
   revelerLeNumero,
@@ -100,7 +100,15 @@ function lesReponses(brut: unknown): ReponseRapide[] {
 }
 
 function FilContent() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  /**
+   * D124 — le paramètre de route est un **bookingId**, pas un identifiant de
+   * conversation : un fil peut exister sans ligne en base, donc sans
+   * identifiant. On l'ouvre par le deal, et le serveur matérialise la ligne à
+   * ce moment-là. Les gestes d'ÉCRITURE (envoyer, marquer lu, accepter un
+   * rendez-vous), eux, visent la conversation — dont l'identifiant arrive avec
+   * la réponse, et seulement là.
+   */
+  const { id: bookingId } = useLocalSearchParams<{ id: string }>();
   const t = useTranslations('messaging');
   const theme = useTheme();
   const topInset = useTopInset();
@@ -118,13 +126,16 @@ function FilContent() {
   const [gesteEnCours, setGeste] = useState(false);
   const [refusDuRdv, setRefusDuRdv] = useState<string | null>(null);
 
+  /** L'identifiant de la CONVERSATION — connu seulement une fois le fil lu. */
+  const conversationId = fil?.conversation.id ?? null;
+
   const liste = useRef<FlatList<GroupeAffiche> | null>(null);
   const dernierVu = useRef<string | null>(null);
 
   const relire = useCallback(async () => {
-    if (id === undefined) return;
+    if (bookingId === undefined) return;
     try {
-      const lu = filDeLApi(await leFil(id));
+      const lu = filDeLApi(await leFilDuDeal(bookingId));
       setFil(lu);
       setEnEchec(lu === null);
     } catch {
@@ -132,7 +143,7 @@ function FilContent() {
       // squelette perpétuel — le défaut corrigé deux fois sur le site.
       setEnEchec(true);
     }
-  }, [id]);
+  }, [bookingId]);
 
   /* Le sondage : pendant qu'on REGARDE, et pas en arrière-plan (D117 7A). */
   useFocusEffect(
@@ -169,13 +180,13 @@ function FilContent() {
      pire que le défaut. */
   const dernierId = fil?.messages[fil.messages.length - 1]?.id ?? null;
   useEffect(() => {
-    if (id === undefined || fil === null) return;
+    if (conversationId === null || fil === null) return;
     if (dernierVu.current === dernierId) return;
     dernierVu.current = dernierId;
-    void marquerLu(id)
+    void marquerLu(conversationId)
       .then(() => rafraichir())
       .catch(() => undefined);
-  }, [id, fil, dernierId, rafraichir]);
+  }, [conversationId, fil, dernierId, rafraichir]);
 
   const acces = fil?.conversation.acces ?? {
     peutLire: false,
@@ -186,13 +197,13 @@ function FilContent() {
   const manques = manquesDuMessage({ corps, acces, envoiEnCours });
 
   const envoyer = useCallback(async () => {
-    if (id === undefined) return;
+    if (conversationId === null) return;
     const aEnvoyer = corpsAEnvoyer({ corps, acces, envoiEnCours });
     if (aEnvoyer === null) return;
     setEnvoi(true);
     setRefus(null);
     try {
-      await envoyerLeMessage(id, aEnvoyer);
+      await envoyerLeMessage(conversationId, aEnvoyer);
       // Le texte ne quitte la saisie qu'une fois PARTI.
       setCorps('');
       await relire();
@@ -204,15 +215,15 @@ function FilContent() {
     } finally {
       setEnvoi(false);
     }
-  }, [id, corps, acces, envoiEnCours, relire, rafraichir, t]);
+  }, [conversationId, corps, acces, envoiEnCours, relire, rafraichir, t]);
 
   const accepter = useCallback(
     async (rdvId: string) => {
-      if (id === undefined || gesteEnCours) return;
+      if (conversationId === null || gesteEnCours) return;
       setGeste(true);
       setRefusDuRdv(null);
       try {
-        await accepterLeRendezVous(id, rdvId);
+        await accepterLeRendezVous(conversationId, rdvId);
         await relire();
         void rafraichir();
       } catch (e) {
@@ -228,18 +239,18 @@ function FilContent() {
         setGeste(false);
       }
     },
-    [id, gesteEnCours, relire, rafraichir, t]
+    [conversationId, gesteEnCours, relire, rafraichir, t]
   );
 
   const ouvrirLeNumero = useCallback(async () => {
-    if (id === undefined || gesteEnCours) return;
+    if (conversationId === null || gesteEnCours) return;
     setGeste(true);
     setRefusDuRdv(null);
     try {
       // Geste IDEMPOTENT côté serveur : un second appui rend le même
       // numéro, pas une erreur. On relit plutôt que de poser le numéro
       // dans un état local — la vérité est dans le fil.
-      await revelerLeNumero(id);
+      await revelerLeNumero(conversationId);
       await relire();
     } catch (e) {
       setRefusDuRdv(
@@ -248,7 +259,7 @@ function FilContent() {
     } finally {
       setGeste(false);
     }
-  }, [id, gesteEnCours, relire, t]);
+  }, [conversationId, gesteEnCours, relire, t]);
 
   if (enEchec)
     return (
@@ -450,7 +461,7 @@ function FilContent() {
 
       <MeetupSheet
         visible={proposer}
-        conversationId={id ?? ''}
+        conversationId={conversationId ?? ''}
         peutEcrire={acces.peutEcrire}
         onCloseAction={() => setProposer(false)}
         onProposeAction={() => {
@@ -461,7 +472,7 @@ function FilContent() {
 
       <MessageReportSheet
         visible={aSignaler !== null}
-        conversationId={id ?? ''}
+        conversationId={conversationId ?? ''}
         messageId={aSignaler?.id ?? ''}
         onCloseAction={() => setASignaler(null)}
       />

@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AlertTriangle, ArrowLeft, Eye, Flag, Phone, Send } from "lucide-react";
-import { useMarkConversationRead, usePostMessage, useQuickReplies, useRevealPhone, useThread } from "@/hooks/useMessaging";
+import { useMarkConversationRead, usePostMessage, useQuickReplies, useRevealPhone, useThreadByDeal } from "@/hooks/useMessaging";
 import MeetupPanel from "./MeetupPanel";
 import ReportMessageDialog from "./ReportMessageDialog";
 import {
@@ -40,18 +40,25 @@ function timeLabel(iso: string, locale: string): string {
 }
 
 export default function ConversationThread({
-  conversationId,
+  bookingId,
   focusPhone = false,
   onBack,
 }: {
-  conversationId: string;
+  /**
+   * D124 — on ouvre un fil par son DEAL. Un fil EXISTE dès que le deal est
+   * engagé, mais sa ligne en base n'est écrite qu'à la première ouverture :
+   * l'identifiant de conversation n'est donc pas une adresse. Il arrive avec
+   * la réponse, et ne sert qu'aux gestes d'ÉCRITURE.
+   */
+  bookingId: string;
   /** Vrai quand on arrive par « Appeler » (A137) : le numéro, ou son heure d'ouverture, est mis en avant. */
   focusPhone?: boolean;
   onBack?: () => void;
 }) {
   const t = useTranslations("messaging");
   const locale = useLocale();
-  const { data, isLoading, isError } = useThread(conversationId);
+  const { data, isLoading, isError } = useThreadByDeal(bookingId);
+  const conversationId = data?.conversation.id ?? "";
   const post = usePostMessage(conversationId);
   const markRead = useMarkConversationRead(conversationId);
   const reveal = useRevealPhone(conversationId);
@@ -80,7 +87,7 @@ export default function ConversationThread({
     // chaque ouverture, même quand tout était déjà lu.
     if (data && fautIlMarquerLu(data.conversation)) markRead.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, lastMessageId]);
+  }, [bookingId, lastMessageId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });

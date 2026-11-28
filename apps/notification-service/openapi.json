@@ -18186,7 +18186,15 @@
         "type": "object",
         "properties": {
           "id": {
-            "$ref": "#/components/schemas/ObjectId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null tant que le fil n'a jamais été ouvert — ouvrir par bookingId"
           },
           "bookingId": {
             "$ref": "#/components/schemas/ObjectId"

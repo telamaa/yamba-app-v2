@@ -37,7 +37,7 @@ import {
   type ReportMessageResponse,
   type RevealPhoneResponse,
 } from "@packages/api-contracts";
-import { conversationAccess, conversationExists, counterpartIdOf, roleOf } from "../lib/conversation.rules";
+import { CONVERSATION_OPEN_STATUSES, conversationAccess, conversationExists, counterpartIdOf, roleOf } from "../lib/conversation.rules";
 import { nomDeLaContrepartie } from "../lib/counterpart-label"; // ANO-WEB-83 (D63)
 import { detectContactInfo, normalizeBody, sixDigitCandidates } from "../lib/message-guard.rules";
 import { canAcceptMeetup, nextMeetupOf, validateMeetupSlot } from "../lib/meetup.rules";
@@ -57,6 +57,8 @@ const BOOKING_SELECT = {
   shipperId: true,
   carrierId: true,
   acceptedAt: true,
+  // D124 2A — le repli de tri d'un fil jamais ouvert.
+  createdAt: true,
   completedAt: true,
   closedAt: true,
   deliveryCodeHash: true,
@@ -69,6 +71,7 @@ type BookingRow = {
   shipperId: string;
   carrierId: string;
   acceptedAt: Date | null;
+  createdAt: Date;
   completedAt?: Date | null;
   closedAt?: Date | null;
   deliveryCodeHash: string | null;
@@ -146,6 +149,21 @@ function envelopeFor(conversationId: string, now: Date) {
 
 /** Les champs du fil dont tous les gestes ont besoin (une seule définition : une seule vérité). */
 const CONVERSATION_SELECT = { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } as const;
+
+/**
+ * D124 2A — la « dernière activité » d'un fil, pour le tri.
+ *
+ * Un fil matérialisé la tient de son dernier message ; un fil qui n'a jamais
+ * été ouvert n'en a pas, et prend celle du DEAL — `acceptedAt`, à défaut la
+ * date de création. C'est le moment où le fil a commencé d'EXISTER, ce qui est
+ * exactement la question que la liste pose désormais.
+ */
+function activiteDuFil(item: ConversationSummary, bookings: BookingRow[]): number {
+  if (item.lastMessage) return new Date(item.lastMessage.createdAt).getTime();
+  const booking = bookings.find((b) => b.id === item.bookingId);
+  const quand = booking?.acceptedAt ?? booking?.createdAt ?? null;
+  return quand ? new Date(quand).getTime() : 0;
+}
 
 /** Le client Prisma À L'INTÉRIEUR d'une transaction : même API, mais il n'en ouvre pas une seconde. */
 type TxClient = Prisma.TransactionClient;
@@ -267,58 +285,99 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
   }
 
   return {
-    /** Mes conversations, la plus active d'abord, avec les non-lus et le prochain rendez-vous. */
+    /**
+     * Mes conversations, la plus active d'abord.
+     *
+     * D124 — ELLE PART DES DEALS, PAS DES LIGNES. Cette fonction n'interrogeait
+     * que la collection `Conversation`, qui n'est écrite qu'à la PREMIÈRE
+     * ouverture d'un fil (`loadContext`, création paresseuse assumée). Un
+     * membre ayant trois deals engagés et n'ayant jamais ouvert un fil lisait
+     * donc « Aucune conversation » — sous la phrase « Un fil s'ouvre dès qu'une
+     * demande est acceptée ». Mesuré en base le 28/11/2026 : trois deals
+     * (un PICKED_UP, deux COMPLETED), zéro ligne.
+     *
+     * La règle qui dit si un fil EXISTE est `conversationExists` : elle décidait
+     * déjà de l'accès, elle décide maintenant aussi de la liste. Une seule
+     * définition, et elle est déjà sous fiche.
+     *
+     * Et la liste N'ÉCRIT PAS (CQS, D83) : matérialiser les lignes manquantes
+     * ici rendrait le nombre de lignes dépendant de qui a ouvert quel écran et
+     * ferait d'un GET une opération non idempotente. Le fil se matérialise
+     * quand on l'OUVRE, par `by-deal/:bookingId` — d'où un `id` nullable dans
+     * le résumé.
+     */
     async list(userId: string): Promise<ConversationListResponse> {
       const now = clock();
-      const rows = await prisma.conversation.findMany({
-        where: { OR: [{ shipperId: userId }, { carrierId: userId }] },
-        orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
+      // Les deals où JE suis partie et où le fil existe, au sens de la règle.
+      const bookings = (await prisma.booking.findMany({
+        where: {
+          isDeleted: false,
+          status: { in: [...CONVERSATION_OPEN_STATUSES] },
+          OR: [{ shipperId: userId }, { carrierId: userId }],
+        },
+        select: BOOKING_SELECT,
         take: 100,
-      });
-      if (rows.length === 0) return { items: [], totalUnread: 0 };
-      const bookings = (await prisma.booking.findMany({ where: { id: { in: rows.map((r) => r.bookingId) } }, select: BOOKING_SELECT })) as unknown as BookingRow[];
-      const bookingBy = new Map(bookings.map((b) => [b.id, b]));
-      const counterpartIds = rows.map((r) => (r.shipperId === userId ? r.carrierId : r.shipperId));
+      })) as unknown as BookingRow[];
+      if (bookings.length === 0) return { items: [], totalUnread: 0 };
+
+      const bookingIds = bookings.map((b) => b.id);
+      const rows = await prisma.conversation.findMany({ where: { bookingId: { in: bookingIds } } });
+      const convByBooking = new Map(rows.map((r) => [r.bookingId, r]));
+      const convIds = rows.map((r) => r.id);
+      const counterpartIds = bookings.map((b) => (b.shipperId === userId ? b.carrierId : b.shipperId));
+
       const [users, meetups, lastMessages] = await Promise.all([
         prisma.user.findMany({ where: { id: { in: [...new Set(counterpartIds)] } }, select: { id: true, isDeleted: true, firstName: true, avatar: { select: { url: true } } } }),
-        prisma.meetup.findMany({ where: { conversationId: { in: rows.map((r) => r.id) }, status: { in: ["PROPOSED", "ACCEPTED"] } } }),
-        prisma.message.findMany({ where: { conversationId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "desc" }, take: 200, select: { conversationId: true, body: true, authorRole: true, createdAt: true } }),
+        convIds.length === 0
+          ? Promise.resolve([])
+          : prisma.meetup.findMany({ where: { conversationId: { in: convIds }, status: { in: ["PROPOSED", "ACCEPTED"] } } }),
+        convIds.length === 0
+          ? Promise.resolve([])
+          : prisma.message.findMany({ where: { conversationId: { in: convIds } }, orderBy: { createdAt: "desc" }, take: 200, select: { conversationId: true, body: true, authorRole: true, createdAt: true } }),
       ]);
       const userBy = new Map(users.map((u) => [u.id, u]));
       const lastBy = new Map<string, (typeof lastMessages)[number]>();
       for (const m of lastMessages) if (!lastBy.has(m.conversationId)) lastBy.set(m.conversationId, m);
-      const unreadCounts = await Promise.all(
-        rows.map((r) => {
-          const since = r.shipperId === userId ? r.shipperLastReadAt : r.carrierLastReadAt;
-          return prisma.message.count({
-            where: { conversationId: r.id, authorRole: { not: r.shipperId === userId ? "SHIPPER" : "CARRIER" }, ...(since ? { createdAt: { gt: since } } : {}) },
-          });
-        })
+
+      // Un fil non matérialisé n'a aucun message : zéro non-lu, sans requête.
+      const unreadByConv = new Map<string, number>(
+        await Promise.all(
+          rows.map(async (r): Promise<[string, number]> => {
+            const since = r.shipperId === userId ? r.shipperLastReadAt : r.carrierLastReadAt;
+            const n = await prisma.message.count({
+              where: { conversationId: r.id, authorRole: { not: r.shipperId === userId ? "SHIPPER" : "CARRIER" }, ...(since ? { createdAt: { gt: since } } : {}) },
+            });
+            return [r.id, n];
+          })
+        )
       );
 
       const writeDays = (await settings.get())["messaging.writeDaysAfterEnd"]; // D62
-      const items: ConversationSummary[] = [];
-      rows.forEach((r, i) => {
-        const booking = bookingBy.get(r.bookingId);
-        if (!booking) return;
-        const role = r.shipperId === userId ? "SHIPPER" : "CARRIER";
-        const counterpart = userBy.get(role === "SHIPPER" ? r.carrierId : r.shipperId);
-        const last = lastBy.get(r.id);
-        const mine = meetups.filter((m) => m.conversationId === r.id) as unknown as MeetupRow[];
+      const items: ConversationSummary[] = bookings.map((booking) => {
+        const conv = convByBooking.get(booking.id) ?? null;
+        const role = booking.shipperId === userId ? "SHIPPER" : "CARRIER";
+        const counterpart = userBy.get(role === "SHIPPER" ? booking.carrierId : booking.shipperId);
+        const last = conv ? lastBy.get(conv.id) : undefined;
+        const mine = conv ? (meetups.filter((m) => m.conversationId === conv.id) as unknown as MeetupRow[]) : [];
         const next = nextMeetupOf(mine, now);
-        items.push({
-          id: r.id,
-          bookingId: r.bookingId,
+        return {
+          id: conv?.id ?? null,
+          bookingId: booking.id,
           role,
           counterpart: { id: counterpart?.id ?? "", firstName: nomDeLaContrepartie(counterpart), avatarUrl: counterpart?.avatar?.url ?? null },
           corridor: { originCity: booking.trip.originCity, destinationCity: booking.trip.destinationCity, departureAt: iso(booking.trip.departureAt) },
           bookingStatus: booking.status,
           lastMessage: last ? { body: last.body.slice(0, 140), authorRole: last.authorRole as MessageDto["authorRole"], createdAt: last.createdAt.toISOString() } : null,
-          unreadCount: unreadCounts[i],
+          unreadCount: conv ? (unreadByConv.get(conv.id) ?? 0) : 0,
           nextMeetup: next ? toMeetupDto(next) : null,
           access: conversationAccess(booking, now, writeDays),
-        });
+        };
       });
+
+      // D124 2A — un fil sans message n'a pas de dernière activité : il prend
+      // celle du DEAL (le moment où il a commencé d'exister). Le plus vivant
+      // d'abord, dans les deux cas.
+      items.sort((a, b) => activiteDuFil(b, bookings) - activiteDuFil(a, bookings));
       return { items, totalUnread: items.reduce((a, i) => a + i.unreadCount, 0) };
     },
 

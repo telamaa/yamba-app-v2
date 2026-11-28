@@ -133,11 +133,33 @@ describe('① la réponse du serveur est lue ENTIÈREMENT (D102 rejoué)', () =>
   });
 
   it('une ligne sans identité ne s’affiche pas, les autres survivent', () => {
+    // D124 — l'identité d'un fil est son DEAL. Une ligne sans `bookingId` ne
+    // mène nulle part ; une ligne sans `id` de conversation, elle, est un fil
+    // parfaitement normal qui n'a simplement jamais été ouvert.
     const lu = conversationsDeLApi({
-      items: [conversationBrute(), { id: '' }, conversationBrute({ id: 'c3', role: 'ADMIN' })],
+      items: [conversationBrute(), { bookingId: '' }, conversationBrute({ bookingId: 'b3', role: 'ADMIN' })],
       totalUnread: 0,
     });
     expect(lu.items).toHaveLength(1);
+  });
+
+  it('D124 — un fil JAMAIS OUVERT (sans id de conversation) reste dans la liste', () => {
+    // Le défaut que le lot corrige, vu du client : ce garde refusait toute
+    // entrée sans `id`, et aurait silencieusement jeté exactement les fils que
+    // le serveur vient de rendre visibles. Un filtre écrit pour une forme de
+    // données survit mal au changement de cette forme.
+    const lu = conversationsDeLApi({
+      items: [conversationBrute({ id: null, lastMessage: null, unreadCount: 0 })],
+      totalUnread: 0,
+    });
+    expect(lu.items).toHaveLength(1);
+    expect(lu.items[0].id).toBeNull();
+    expect(lu.items[0].bookingId).toBe('6af02258df22bba0f54c5520');
+  });
+
+  it('D124 — un fil déjà ouvert garde son identifiant de conversation', () => {
+    const lu = conversationDeLApi(conversationBrute());
+    expect(lu?.id).toBe('6af02258df22bba0f54c5516');
   });
 
   it('un compteur négatif ou décimal ne descend pas dans l’écran', () => {

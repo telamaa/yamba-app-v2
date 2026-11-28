@@ -100,7 +100,12 @@ export type MessageDuFil = {
 };
 
 export type ConversationDeLaListe = {
-  id: string;
+  /**
+   * D124 — NULL tant que le fil n'a jamais été ouvert. L'identité d'un fil,
+   * pour un client, c'est le DEAL : c'est `bookingId` qui ouvre, et le serveur
+   * matérialise la ligne à ce moment-là.
+   */
+  id: string | null;
   bookingId: string;
   /** Le rôle de CELUI QUI LIT — c'est lui qui dit quelle bulle est la sienne. */
   monRole: RoleDuFil;
@@ -176,12 +181,20 @@ function accesDeLApi(brut: unknown): AccesAuFil {
   };
 }
 
-/** Une conversation de l'API, ou `null` si elle n'a pas d'identité. */
+/**
+ * Une conversation de l'API, ou `null` si elle n'a pas d'identité.
+ *
+ * D124 — l'identité est le DEAL, pas la ligne de conversation. Ce garde
+ * refusait toute entrée sans `id` : avec la liste qui part désormais des
+ * deals, il aurait silencieusement jeté exactement les fils que le lot rend
+ * visibles. Un filtre écrit pour une forme de données survit mal au
+ * changement de cette forme — il faut le relire quand le contrat bouge.
+ */
 export function conversationDeLApi(brut: unknown): ConversationDeLaListe | null {
   const c = objet(brut);
-  const id = texte(c.id).trim();
+  const bookingId = texte(c.bookingId).trim();
   const role = texte(c.role).trim().toUpperCase();
-  if (id.length === 0) return null;
+  if (bookingId.length === 0) return null;
   if (role !== 'SHIPPER' && role !== 'CARRIER') return null;
 
   const interlocuteur = objet(c.counterpart);
@@ -190,8 +203,8 @@ export function conversationDeLApi(brut: unknown): ConversationDeLaListe | null 
   const roleDuDernier = texte(dernier.authorRole).trim().toUpperCase();
 
   return {
-    id,
-    bookingId: texte(c.bookingId).trim(),
+    id: texteOuNull(c.id),
+    bookingId,
     monRole: role,
     interlocuteur: {
       prenom: texte(interlocuteur.firstName).trim(),
