@@ -8,8 +8,10 @@
 "use client";
 
 import { LifeBuoy, ShieldAlert } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useTranslations, useLocale } from "next-intl";
 import type { Booking } from "../../booking-tracker.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@yamba.app";
 
@@ -45,7 +47,7 @@ export function DisputeFileCard({ booking, compact = false }: { booking: Booking
   const file = booking.dispute;
   const carrierFirstName = booking.carrier.firstName;
   const recipientFirstName = booking.recipient.firstName;
-  const totalPaid = new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(booking.payment.totalPaidEur);
+  const totalPaid = formatMoney(booking.payment.totalPaidEur, intlTagFor(useLocale()));
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 ${compact ? "p-4" : "p-5"}`}>
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -164,7 +166,7 @@ export function DisputeSupportCard({ booking, compact = false }: { booking: Book
 export function DisputedPaymentCard({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
   const t = useTranslations("bookingTracker");
   const carrierFirstName = booking.carrier.firstName;
-  const total = new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(booking.payment.totalPaidEur);
+  const total = formatMoney(booking.payment.totalPaidEur, intlTagFor(useLocale()));
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 ${compact ? "p-4" : "p-5"}`}>
       <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t("payment.title")}</h3>

@@ -1,4 +1,6 @@
 import type { PublicTopRoute, PublicUser } from "./public-user.types";
+import { formatMoneyCompact } from "./pricing-example";
+import { intlTagFor } from "./number-format";
 
 /**
  * Formate une date ISO en "Mois AAAA" pour le memberSince.
@@ -127,14 +129,25 @@ export function calculateGlobalRating(user: PublicUser): {
  * Ex: 2500, "EUR", "fr" → "25 €"
  *     2500, "EUR", "en" → "€25"
  */
+/**
+ * D123 — DEUX fonctions de ce dépôt s'appellent `formatPriceShort`, dans deux
+ * fichiers de `lib/`, et elles ne font pas la même chose.
+ *
+ * Celle de `public-trip.helpers.ts` est juste : `Intl`, les centimes gardés
+ * dès qu'il y en a, et une fiche qui dit « ne raccourcit jamais au point de
+ * changer le montant ». Celle-ci — servie à la page PUBLIQUE d'un Voyageur —
+ * faisait `Math.floor` : 24,85 € s'affichait « 24 € ». Elle plaçait en
+ * revanche le symbole correctement selon la langue, seule du dépôt à le
+ * faire, ce qui montre que la règle était connue et vivait dans un coin.
+ *
+ * Elle délègue désormais au module partagé, comme sa jumelle.
+ */
 export function formatPriceShort(
   cents: number,
   currencyCode: string,
   locale: "fr" | "en"
 ): string {
-  const amount = Math.floor(cents / 100);
-  const symbol = currencyCode === "EUR" ? "€" : currencyCode;
-  return locale === "fr" ? `${amount} ${symbol}` : `${symbol}${amount}`;
+  return formatMoneyCompact(cents / 100, intlTagFor(locale), currencyCode);
 }
 
 /**

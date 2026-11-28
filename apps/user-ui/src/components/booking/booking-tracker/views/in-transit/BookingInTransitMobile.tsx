@@ -20,6 +20,8 @@ import {
 import SenderCodeCard from "./SenderCodeCard";
 import SenderTrackingBanner from "./SenderTrackingBanner";
 import SenderTrackingTimeline from "./SenderTrackingTimeline";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   booking: Booking;
@@ -80,7 +82,7 @@ export default function BookingInTransitMobile({
                 {t("senderTracking.sidebar.debitedLabel")}
               </span>
               <span className="font-medium text-slate-900 dark:text-white">
-                {formatEur(booking.payment.totalPaidEur, locale)}
+                {formatMoney(booking.payment.totalPaidEur, intlTagFor(locale))}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -89,7 +91,7 @@ export default function BookingInTransitMobile({
               </span>
               <span className="font-medium text-emerald-700 dark:text-emerald-400">
                 {t("senderTracking.sidebar.insuranceValue", {
-                  amount: formatEur(insuredAmount, locale),
+                  amount: formatMoney(insuredAmount, intlTagFor(locale)),
                 })}
               </span>
             </div>
@@ -103,13 +105,6 @@ export default function BookingInTransitMobile({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatNumber(value: number, locale: string): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {

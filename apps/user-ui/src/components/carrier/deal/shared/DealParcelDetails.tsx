@@ -11,6 +11,8 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import type { ParcelCategory } from "../deal.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   category: ParcelCategory;
@@ -47,7 +49,7 @@ export default function DealParcelDetails({
           />
           <Field
             label={t("parcelDetails.valueDeclared")}
-            value={formatEur(declaredValueEur, locale)}
+            value={formatMoney(declaredValueEur, intlTagFor(locale))}
           />
         </div>
 
@@ -84,10 +86,3 @@ function formatWeight(kg: number, locale: string): string {
   }).format(kg);
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}

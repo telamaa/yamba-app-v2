@@ -15,6 +15,7 @@ import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import { useOpenDealThread } from "@/hooks/useMessaging";
 import { formatRating, intlTagFor } from "@/lib/number-format";
+import { formatMoney } from "@/lib/pricing-example";
 
 // ── TON PAIEMENT ──────────────────────────────────────────
 
@@ -33,7 +34,7 @@ export function TrackingPaymentCard({ deal }: { deal: DealRequest }) {
           {t("payment.netLabel")}
         </span>
         <span className="text-[20px] font-black tabular-nums text-emerald-700 dark:text-emerald-400">
-          {formatEur(deal.earnings.netForCarrier, locale)}
+          {formatMoney(deal.earnings.netForCarrier, intlTagFor(locale))}
         </span>
       </div>
       <div className="my-3 border-t border-slate-100 dark:border-slate-800" />
@@ -130,13 +131,6 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
 
 // ── helpers ───────────────────────────────────────────────
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatNumber(value: number, locale: string): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {

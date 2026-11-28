@@ -13353,3 +13353,140 @@ Stripe** avec « Votre numéro de carte est incomplet ». Le harnais exige `PAYM
 - `apps/user-ui/src/lib/number-format.ts` et `parcel-weight.ts` — D108 / D101, le domicile des
   nombres montrés.
 - Registre : **#389**, **D81**, **D96**, **D99/D99 bis**, **D100**, **D101**, **D108**, **D111**.
+
+# Chapitre — Localiser un nombre ne s'arrête pas au séparateur décimal (D123)
+
+## 1. Le défaut, et pourquoi il a survécu à sa propre correction
+
+D108 avait posé la règle, son domicile et ses fiches : *un nombre montré à quelqu'un s'écrit dans
+SA langue*. Un mois plus tard, l'application en anglais affichait :
+
+```
+You earn 23.00 €
+```
+
+Le **nombre** était juste. Le **symbole** était à la place française. D108 avait corrigé ce qui se
+voit depuis le français — la virgule — et laissé ce qui ne s'y voit pas.
+
+> **Une règle appliquée depuis une seule langue ne couvre qu'une moitié du problème.** La place du
+> symbole ne se voit qu'en changeant de langue ; personne n'avait regardé l'application en anglais
+> depuis qu'elle existe.
+
+## 2. `Intl` fait le travail entier, si on le lui demande entier
+
+```ts
+// ✗ le nombre suit la langue, le symbole non
+`${(cents / 100).toLocaleString(tag, { minimumFractionDigits: 2 })} €`
+
+// ✓ Intl place le symbole, choisit l'espace, et sait le faire pour toute devise
+(cents / 100).toLocaleString(tag, { style: 'currency', currency, minimumFractionDigits: 2 })
+```
+
+Trois choses que `style: 'currency'` fait et qu'on refaisait mal à la main :
+
+1. **la place du symbole** (`€24.85` / `24,85 €`) ;
+2. **l'espace** : en français c'est une **insécable fine** (`U+202F`), pas une espace ordinaire —
+   fatale à toute comparaison de chaîne naïve, et c'est voulu, un montant ne doit pas se couper en
+   fin de ligne ;
+3. **la devise** : on lui passe un **code ISO 4217**, jamais un caractère. Le dépôt avait deux
+   tables `devise → symbole` à **une seule entrée**, et un endroit où `trip.currency` — un code —
+   servait directement de symbole.
+
+## 3. Compter avec le bon filet
+
+La première mesure cherchait le caractère `€` dans les sources : **15 copies** côté site.
+La fiche du lot, elle, cherchait `style: "currency"` — et en a trouvé **autant de nouvelles**.
+
+```ts
+new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(v)
+//  ↑ met un « € » à l'écran, et n'en écrit AUCUN dans la source
+```
+
+> **Un balayage trouve ce qu'il cherche, pas ce qui existe.** Quand vous chassez une classe de
+> défaut, cherchez-la par son **effet** (ici : « ce code produit un montant ») et pas par son
+> **orthographe** (ici : « ce code contient un € »). Même leçon que le détecteur d'A224 lot 5 qui
+> ne voyait que les guillemets doubles.
+
+Compte final : **39 mises en forme d'un montant** retirées, dans 47 fichiers du site et 15 du
+mobile.
+
+## 4. Trois formes de duplication, par ordre de nocivité croissante
+
+```ts
+// ① la copie — 15 fois le même corps, trois règles de décimales différentes
+function formatEur(amount: number, locale: string) { /* … */ }
+
+// ② l'inline — la langue du NAVIGATEUR, pas celle de l'interface
+new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" })
+
+// ③ l'HOMONYME — même nom que la fonction partagée, autre règle
+export function formatMoney(locale: string, amount: number) { /* … */ }
+```
+
+L'homonyme est le pire : **on croit importer la règle**. Et `undefined` comme étiquette de langue
+est un piège silencieux — il « marche » sur le poste du développeur, dont le navigateur est dans
+la même langue que l'interface qu'il teste. L'un de ces trois portait le montant du **bouton qui
+débite**.
+
+## 5. Le dictionnaire est du code que les balayages ne lisent pas
+
+La moitié du défaut vivait là :
+
+```json
+"gain": "{amount} € si tout part",
+"gain": "{amount} € if everything goes",     ← le dictionnaire ANGLAIS
+```
+
+Onze clés. Aucun balayage de source ne les voyait, aucun typecheck non plus — un gabarit se type
+toujours. La règle qui en sort :
+
+> **Un montant arrive dans une phrase DÉJÀ mis en forme.** Une phrase ne connaît ni symbole, ni
+> séparateur, ni devise. Ce qu'elle connaît, c'est l'ordre des mots — et c'est tout ce qu'une
+> traduction doit avoir le droit de changer.
+
+Deux exceptions, **nommées dans la fiche** pour que personne ne les « corrige » : l'**unité** d'un
+pas-à-pas (« €/kg », qui se lit comme « km/h ») et l'**ornement** d'un champ de saisie. Ni l'une ni
+l'autre n'est un montant.
+
+## 6. Un garde de balayage se règle, lui aussi
+
+Le dépouilleur de commentaires du dépôt porte un garde — sinon un balayage dont la regex mange
+tout est vert pour la pire raison :
+
+```ts
+// ✗ un SEUIL DE LONGUEUR : rougit sur les fichiers surtout faits de commentaire
+expect(net.length).toBeGreaterThan(source.length / 4);
+
+// ✓ une PROPRIÉTÉ : s'il y avait du code, il doit en rester
+const marqueurs = /\b(import|export|const|function|return)\b/;
+if (marqueurs.test(source)) expect(net).toMatch(marqueurs);
+```
+
+Le premier a rougi sur trois fichiers parfaitement sains. **Un faux positif dans un balayage coûte
+autant qu'un trou, parce qu'on finit par le désactiver** (D110, mot pour mot). Le second, lui, a
+trouvé quelque chose : **quatre fichiers `.tsx` entièrement vides**, suivis par git, importés par
+personne. Supprimés.
+
+## 7. La bonne version était déjà là, encore une fois
+
+`formatPriceShort` existe en **deux exemplaires** dans `lib/`, sous le même nom :
+
+| Fichier | Comportement |
+|---|---|
+| `public-trip.helpers.ts` | `Intl`, centimes gardés, **une fiche** qui dit « ne raccourcit jamais au point de changer le montant » |
+| `public-user.helpers.ts` | `Math.floor` → **24,85 € affiché « 24 € »** sur la page publique d'un Voyageur |
+
+Et c'est la mauvaise des deux qui, seule du dépôt, **plaçait le symbole correctement selon la
+langue** : la règle de tout ce chapitre existait, écrite à la main, dans la fonction qui rognait
+les centimes.
+
+> **La première question devant un défaut n'est pas « comment le corriger » mais « où est-il déjà
+> corrigé ? »** — quatrième fois ce mois-ci, et la première où les deux versions portent le même
+> nom.
+
+## Pour aller plus loin
+
+- `apps/*/src/lib/pricing-example.ts` — la règle et ses quatre signatures (le fichier est dupliqué
+  octet pour octet, et une fiche l'exige).
+- `apps/*/src/lib/argent-dans-la-langue.spec.ts` — les deux fiches du lot.
+- `Intl.NumberFormat`, option `style: "currency"` — et la raison de l'espace fine insécable.

@@ -21629,3 +21629,127 @@ qu'on n'importe pas.
   exigent `PAYMENT_PROVIDER=fake` dans le `.env` **racine** (A220). Il en était absent, et le
   tunnel servait un vrai formulaire Stripe : « Payer » validait la carte côté navigateur et
   n'envoyait **aucun** `POST /deals`, ce qui ressemble à s'y méprendre à une panne de fiche.
+
+# D123 — L'argent s'écrit dans la langue du lecteur (28/11/2026)
+
+**Le défaut a été vu sur une capture, pas trouvé par une relecture** : l'application mobile en
+anglais affichait
+
+```
+You earn 23.00 €
+```
+
+Le nombre suivait la langue — **D108** avait fait ce travail le 21/11 — mais le **symbole était
+collé derrière lui**, dans tous les cas. L'anglais écrit « €23.00 » : le symbole précède. La
+moitié du travail de localisation d'un montant n'avait jamais été faite, **et elle est invisible
+depuis le français**, où la place du symbole est précisément celle qu'on produit par accident.
+
+## Le constat, et il a doublé en cours de route
+
+Première mesure, en cherchant `€` dans les sources :
+
+| | Avant |
+|---|---|
+| Mobile | **12 sites**, **quatre** façons de rendre un montant |
+| Site | **15 copies locales** de `formatEur` |
+
+Les quinze copies **divergeaient déjà** : trois règles de décimales (`0` ×3,
+`amount % 1 === 0 ? 0 : 2` ×11, `digits` ×1) et deux étiquettes anglaises (`en-US` ×13,
+`en-GB` ×1). Le même montant s'écrivait « 24 € » sur un écran et « 24,00 € » sur le suivant,
+dans le même tunnel.
+
+**La fiche du lot en a trouvé le double.** Chercher `€` ne montre pas
+`new Intl.NumberFormat(…, { style: "currency" })`, qui n'écrit aucun symbole dans la source.
+Compte final : **39 mises en forme d'un montant retirées**, 47 fichiers du site et 15 du mobile.
+
+Ce que la seconde passe a ajouté :
+
+- **quatre `formatPrice`** (les quatre variantes du tunnel de réservation) et **deux
+  `formatCents`** ;
+- **un `formatMoney` HOMONYME** de la fonction partagée, dans `dashboard/trips/trips.format.ts`,
+  avec une autre règle de décimales. **Un homonyme est pire qu'une copie : on croit importer la
+  règle** ;
+- **trois `new Intl.NumberFormat(undefined, …)`** — `undefined` signifie « la langue du
+  NAVIGATEUR », pas celle de l'interface. **L'un d'eux portait le montant du bouton qui
+  débite** (`StepPayment`) ;
+- **un `formatPriceShort` qui faisait `Math.floor`** : 24,85 € s'affichait « 24 € » sur la page
+  publique d'un Voyageur. Sa **jumelle**, à trois fichiers de là, portait la bonne version *et*
+  une fiche qui dit mot pour mot « ne raccourcit jamais au point de changer le montant ».
+
+## Le dictionnaire aussi écrivait le symbole
+
+**Onze clés** du mobile portaient « {amount} € », « {price} €/kg » — **y compris en anglais**.
+C'est la moitié du défaut, et elle était invisible au code : une phrase traduite n'est pas du
+code, donc aucun balayage de source ne la voyait.
+
+Un montant arrive désormais **déjà mis en forme** ; une phrase n'écrit plus jamais de symbole.
+Deux exceptions, nommées : l'**unité** d'un pas-à-pas (« €/kg », comme « km/h ») et l'**ornement**
+d'un champ de saisie — ni l'une ni l'autre n'est un montant mis en forme.
+
+## La règle, et son domicile
+
+`pricing-example.ts` — le module pur **dupliqué octet pour octet** entre les deux fronts, déjà
+gardé par une fiche qui compare les copies (D99). Il portait déjà `PRICE_FRACTION_DIGITS` et
+`formatAmountFromCents` (le NOMBRE seul) ; il lui manquait le symbole. **On n'a pas ajouté un
+cinquième module : on a fini le premier.**
+
+```ts
+export const DEFAULT_CURRENCY = 'EUR';
+
+/** « 24,85 € » en français, « €24.85 » en anglais. Deux décimales, toujours. */
+export function formatMoneyFromCents(cents, localeTag, currency = DEFAULT_CURRENCY): string
+/** Le même, à partir d'euros. */
+export function formatMoney(amount, localeTag, currency = DEFAULT_CURRENCY): string
+/** « 11,50 €/kg » / « €11.50/kg » — le « /kg » ne se traduit pas. */
+export function formatPerKg(amountPerKg, localeTag, currency = DEFAULT_CURRENCY): string
+/** Une GRADUATION, pas un montant : décimales significatives (« 8 € », pas « 8,00 € »). */
+export function formatMoneyCompact(amount, localeTag, currency = DEFAULT_CURRENCY): string
+```
+
+Trois décisions dans ces quatre signatures :
+
+1. **Deux décimales, toujours** — la règle de D99, étendue à tout l'argent. « 3 € » et
+   « 24,85 € » dans une même colonne ne s'alignent pas et se lisent comme deux natures de
+   chiffre. La variante « entier si rond » est exactement la divergence supprimée : elle avait
+   produit onze copies d'un côté et trois de l'autre.
+2. **Une graduation n'est pas un montant** — les crans d'une échelle et les pastilles de valeurs
+   usuelles se lisent d'un coup d'œil, et quatre d'entre elles débordaient déjà sur deux lignes.
+   Deux fonctions nommées pour deux natures, **dans le même fichier**, ce n'est pas la divergence
+   qu'on supprime : celle-là venait de quinze fichiers qui tranchaient chacun la même question.
+3. **La devise est un CODE ISO 4217, jamais un caractère.** Le dépôt avait deux tables
+   devise→symbole à une seule entrée, et un endroit où `trip.currency` — un code — servait
+   directement de symbole (« 24.85 EUR » si l'API en renvoyait un).
+
+Un `try/catch` enveloppe `Intl` : Hermes sans données `Intl`, ou un code devise refusé, rendent
+un chiffre lisible plutôt qu'un écran qui tombe. Le repli existait déjà dans un composant natif ;
+il vit maintenant au même endroit que la règle, pour les deux fronts.
+
+## Fiches
+
+- `apps/mobile/src/lib/argent-dans-la-langue.spec.ts` — le comportement dans les deux langues, un
+  balayage du code natif, **un balayage des dictionnaires** (c'est lui qui a trouvé les onze clés).
+- `apps/user-ui/src/lib/argent-dans-la-langue.spec.ts` — le même comportement, plus l'interdiction
+  de la seizième copie : aucune `function formatEur`, aucun `style: "currency"` hors du module
+  partagé, aucune table devise→symbole. Les balayages **nomment les fichiers fautifs** dans leur
+  message : un balayage qui rougit doit dire où.
+
+Les deux dépouillent les commentaires avant de chercher. Le garde du dépouilleur a été corrigé en
+route : un seuil de longueur (« il doit rester au moins un quart du fichier ») rougissait sur les
+fichiers de ce dépôt qui sont surtout du commentaire. Il vérifie désormais qu'**il reste une
+déclaration** — et, au premier passage, il a trouvé **quatre fichiers `.tsx` entièrement vides**,
+suivis par git, importés par personne. Supprimés.
+
+## Mesures
+
+- Mobile : **1 565 fiches / 69 suites** (+131, la nouvelle fiche), typecheck des deux programmes vert.
+- Site : **345 fiches / 24 suites** (+13), typecheck vert.
+- 39 mises en forme retirées, 4 fichiers vides supprimés, 11 clés de dictionnaire nettoyées.
+
+## Reste ouvert (nommé)
+
+- **Des montants en dur dans des écrans d'aperçu** : `FinancesPreview`, `Payments`,
+  `NotificationsPreview` affichent « 340€ », « 103,75 € », « Versement effectué : 89,30 € » —
+  des chiffres inventés, dans des composants du tableau de bord. Ce n'est pas un défaut de mise en
+  forme mais un défaut de VÉRITÉ, et il appartient au lot d'épuration.
+- **`booking.copy.ts`** écrit « + 6 € » et « Garantie Yamba 500 € » en dur, alors que les deux
+  valeurs existent dans `pricingParams`. Même famille, autre lot.

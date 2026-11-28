@@ -11,9 +11,12 @@ import { ArrowDownLeft, ArrowUpRight, Clock3, Lock, ShieldAlert, Wallet } from "
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import type { WalletPaymentItem, WalletPayoutItem } from "./wallet.types";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
+/** D123 — raccourci local sur la règle partagée. */
 export function formatCents(cents: number, currency: string, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency }).format(cents / 100);
+  return formatMoneyFromCents(cents, intlTagFor(locale), currency);
 }
 
 type Tone = "teal" | "emerald" | "amber" | "slate" | "red";

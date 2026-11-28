@@ -4,7 +4,9 @@ import React from "react";
 import { Plane, Train, Car, MapPin, CalendarDays, Package, Weight, Coins } from "lucide-react";
 import type { Draft } from "./create-trip.types";
 import { estimateNetGain } from "./create-trip.config";
-import { formatEur } from "./TripPricingUi";
+import { useLocale } from "next-intl";
+import { formatMoney, formatPerKg } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const MANGO = "#FF9900";
 
@@ -20,6 +22,7 @@ function formatDate(d?: Date): string {
 }
 
 export default function TripLiveSummary({ draft }: { draft: Draft }) {
+  const tag = intlTagFor(useLocale());
   const Icon = draft.transportMode ? modeIcons[draft.transportMode] : null;
   const hasRoute = draft.from && draft.to;
   const hasDate = !!draft.departureDate;
@@ -91,7 +94,7 @@ export default function TripLiveSummary({ draft }: { draft: Draft }) {
         <div className="flex items-center gap-1">
           <Weight size={13} className="text-slate-400" />
           <span className="text-[12px] text-slate-600 dark:text-slate-400">
-            {hasPricePerKg && `${formatEur(draft.pricePerKg as number)} €/kg`}
+            {hasPricePerKg && formatPerKg(draft.pricePerKg as number, tag)}
             {hasPricePerKg && hasCapacity && " · "}
             {hasCapacity && `${draft.capacityKg} kg`}
           </span>
@@ -107,7 +110,7 @@ export default function TripLiveSummary({ draft }: { draft: Draft }) {
         <div className="flex items-center gap-1">
           <Coins size={13} style={{ color: "#0F766E" }} />
           <span className="text-[12px] font-semibold text-[#0F766E] dark:text-teal-400">
-            {formatEur(netGain)} €
+            {formatMoney(netGain, tag)}
           </span>
         </div>
       ),

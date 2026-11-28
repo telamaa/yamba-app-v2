@@ -14,9 +14,11 @@
 
 import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { CheckCircle2, Clock3, Info, ShieldAlert, XCircle } from "lucide-react";
 import type { Booking, BookingStatus } from "../../booking-tracker.types";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type NoticeStatus = Extract<
   BookingStatus,
@@ -59,13 +61,13 @@ const MESSAGE_KEYS: Record<NoticeStatus, string> = {
 export default function BookingStatusNotice({ booking, onBackAction }: Props) {
   const t = useTranslations("bookingTracker.statusNotice");
   const format = useFormatter();
+  const locale = useLocale();
   // Les montants sont des CENTS entiers (A2) : la conversion n'a lieu qu'ici.
   // EUR en dur suit le view-model de ce module, qui ne porte pas la devise
   // (`payment.totalPaidEur`, et « {value} € » partout ailleurs). Ce n'est pas
   // une décision : c'est la dette de ce module, et elle se solde en faisant
   // remonter `pricing.currencyCode` jusqu'ici — pas dans cette ligne.
-  const formatCents = (cents: number) =>
-    format.number(cents / 100, { style: "currency", currency: "EUR" });
+  const formatCents = (cents: number) => formatMoneyFromCents(cents, intlTagFor(locale));
   const status = booking.status as NoticeStatus;
   // ANO-WEB-73 (5.21) : un remboursement total tranché par la médiation clôt le deal en CANCELLED — « Demande
   // annulée · Cette demande est close » titrait une décision rendue sur un colis livré. La clôture par la

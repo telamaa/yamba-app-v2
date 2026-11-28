@@ -17,6 +17,8 @@ import {
   ReportFormBody,
 } from "./ReportFormBlocks";
 import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export default function BookingReportDesktop(props: BookingReportViewProps) {
   const t = useTranslations("bookingTracker");
@@ -117,7 +119,7 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
                   />
                   <SideRow
                     label={t("report.sidebar.totalLabel")}
-                    value={formatEur(booking.payment.totalPaidEur, locale)}
+                    value={formatMoney(booking.payment.totalPaidEur, intlTagFor(locale))}
                     highlight
                   />
                 </div>
@@ -203,10 +205,3 @@ function formatTime(date: Date, locale: string): string {
   return locale === "fr" ? h + "h" + m : h + ":" + m;
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

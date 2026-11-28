@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 import {
   ParcelCategory,
   PricesByCategory,
@@ -90,7 +92,7 @@ export default function TripPricingList({
                   key={category}
                   category={category as ParcelCategory}
                   price={price}
-                  currency={trip.currency ?? "€"}
+                  currency={trip.currency ?? undefined}
                   isHighlighted={isHighlighted}
                   isCompact={isCompact}
                 />
@@ -125,11 +127,13 @@ function PriceRow({
                   }: {
   category: ParcelCategory;
   price: number;
-  currency: string;
+  /** D123 — un CODE ISO 4217, jamais un symbole : c'est `Intl` qui l'écrit. */
+  currency: string | undefined;
   isHighlighted: boolean;
   isCompact: boolean;
 }) {
   const t = useTranslations("search.categories");
+  const tag = intlTagFor(useLocale());
 
   return (
     <div
@@ -168,8 +172,7 @@ function PriceRow({
             : "text-slate-900 dark:text-white",
         ].join(" ")}
       >
-        {price}
-        {currency}
+        {formatMoney(price, tag, currency)}
       </span>
     </div>
   );

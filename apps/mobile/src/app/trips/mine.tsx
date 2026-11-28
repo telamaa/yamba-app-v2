@@ -56,7 +56,7 @@ import {
   type TrajetDeLaListe,
 } from '@/lib/mes-trajets';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatPerKg } from '@/lib/pricing-example';
 import { remplacerLeBrouillon } from '@/lib/publish-draft';
 import { brouillonDepuisLeTrajet } from '@/lib/publish-reverse';
 import { formatDayMonth } from '@/lib/trip-format';
@@ -224,7 +224,7 @@ function MesTrajetsContent() {
           {trajet.prixParKiloCents === null || trajet.capaciteKg === null
             ? t('offerMissing')
             : t('offer', {
-                price: formatAmountFromCents(trajet.prixParKiloCents, tag),
+                price: formatPerKg(trajet.prixParKiloCents / 100, tag),
                 capacity: trajet.capaciteKg,
               })}
         </ThemedText>

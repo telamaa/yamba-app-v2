@@ -45,7 +45,7 @@ import {
   type EnvoiDeLaListe,
 } from '@/lib/mes-envois';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoneyFromCents } from '@/lib/pricing-example';
 import { remainingLabel, remainingUntil } from '@/lib/shipment-view';
 import { formatDayMonth } from '@/lib/trip-format';
 
@@ -194,7 +194,7 @@ function MesEnvoisContent() {
           {envoi.voyageur.length > 0 ? t('carrier', { name: envoi.voyageur }) : t('noCarrier')}
           {envoi.totalCents === null
             ? ''
-            : ` · ${formatAmountFromCents(envoi.totalCents, tag)} ${envoi.devise === 'EUR' ? '€' : envoi.devise}`}
+            : ` · ${formatMoneyFromCents(envoi.totalCents, tag, envoi.devise ?? undefined)}`}
         </ThemedText>
 
         {attente === null ? null : (

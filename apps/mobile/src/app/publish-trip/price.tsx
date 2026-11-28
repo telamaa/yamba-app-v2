@@ -40,7 +40,14 @@ import { PublishStepFrame } from '@/components/publish/publish-step-frame';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { intlTagFor } from '@/lib/number-format';
-import { BILLING_FLOOR_KG, formatAmountFromCents } from '@/lib/pricing-example';
+import {
+  BILLING_FLOOR_KG,
+  formatAmountFromCents,
+  formatMoney,
+  formatMoneyCompact,
+  formatMoneyFromCents,
+  formatPerKg,
+} from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
 import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import {
@@ -154,7 +161,7 @@ export default function PublishPriceScreen() {
       subtitle={t('price.subtitle')}
       step={3}
       valueLabel={
-        gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
+        gainCents === null ? t('bar.newTrip') : formatMoneyFromCents(gainCents, tag)
       }
       valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}
@@ -163,6 +170,10 @@ export default function PublishPriceScreen() {
         <ThemedText type="smallBold" themeColor="textSecondary">
           {t('price.perKgTitle')}
         </ThemedText>
+        {/* D123 — seul endroit où le symbole n'est PAS placé par `Intl` : le
+            pas-à-pas affiche un grand nombre et, dessous, une UNITÉ (« €/kg »,
+            comme « km/h »). Une unité n'est pas un montant mis en forme ; le
+            nom accessible, lui, dit bien « Prix au kilo : €10.50 ». */}
         <NumberStepper
           valeur={formatAmountFromCents(Math.round(prix * 100), tag)}
           unite={t('price.perKgUnit')}
@@ -170,9 +181,7 @@ export default function PublishPriceScreen() {
           peutDescendre={peutCranerPrix(prix, -1)}
           labelMoins={t('price.stepDownPrice')}
           labelPlus={t('price.stepUpPrice')}
-          nomDeLaValeur={t('price.priceValue', {
-            value: formatAmountFromCents(Math.round(prix * 100), tag),
-          })}
+          nomDeLaValeur={t('price.priceValue', { value: formatMoney(prix, tag) })}
           onStepAction={(sens) => setPublishDraft({ prixParKiloEur: cranPrix(prix, sens) })}
         />
         <ValeursUsuelles
@@ -180,25 +189,23 @@ export default function PublishPriceScreen() {
           choisie={draft.prixParKiloEur}
           // « 8 €/kg » × 4 débordait sur deux lignes (le dernier orphelin).
           // L'unité est déjà sous le pas-à-pas : la pastille garde le symbole.
-          libelle={(valeur) => `${valeur.toLocaleString(tag)} €`}
+          libelle={(valeur) => formatMoneyCompact(valeur, tag)}
           onPickAction={(valeur) => setPublishDraft({ prixParKiloEur: ramenePrix(valeur) })}
         />
         {fourchette.precis ? (
           <PriceGauge
             prix={prix}
             fourchette={fourchette}
-            marketLabel={t('price.market', {
-              median: formatAmountFromCents(Math.round(fourchette.mediane * 100), tag),
-            })}
+            marketLabel={t('price.market', { median: formatPerKg(fourchette.mediane, tag) })}
             verdictLabels={{
               bas: t('price.verdictBas'),
               juste: t('price.verdictJuste'),
               haut: t('price.verdictHaut'),
             }}
             accessibilityLabel={t('price.gaugeLabel', {
-              low: formatAmountFromCents(Math.round(fourchette.bas * 100), tag),
-              high: formatAmountFromCents(Math.round(fourchette.haut * 100), tag),
-              price: formatAmountFromCents(Math.round(prix * 100), tag),
+              low: formatMoney(fourchette.bas, tag),
+              high: formatPerKg(fourchette.haut, tag),
+              price: formatPerKg(prix, tag),
             })}
           />
         ) : null}

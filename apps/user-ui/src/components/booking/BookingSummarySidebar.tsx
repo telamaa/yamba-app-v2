@@ -13,6 +13,7 @@ import { countryFlag } from "@/lib/country-name";
 import { useLocale, useTranslations } from "next-intl";
 import type { Draft, PriceBreakdown, Step, TripContext } from "./booking.types";
 import { formatRating, intlTagFor } from "@/lib/number-format";
+import { formatMoney } from "@/lib/pricing-example";
 
 type Props = {
   trip: TripContext;
@@ -275,12 +276,9 @@ function PriceRow({
   );
 }
 
+/** D123 — la règle vit dans `lib/pricing-example.ts` ; ceci n'en est que le raccourci local. */
 function formatPrice(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
+  return formatMoney(amount, intlTagFor(locale));
 }
 
 function formatDateShort(iso: string, locale: string): string {

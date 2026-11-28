@@ -12,6 +12,8 @@ import { AlertTriangle, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export function DeliveredPaymentCard({
                                        booking,
@@ -50,7 +52,7 @@ export function DeliveredPaymentCard({
           {t("payment.debitedLabel")}
         </span>
         <span className="text-[20px] font-black tabular-nums text-slate-900 dark:text-white">
-          {formatEur(payment.totalPaidEur, locale)}
+          {formatMoney(payment.totalPaidEur, intlTagFor(locale))}
         </span>
       </div>
 
@@ -167,10 +169,3 @@ export function ReportIssuePrompt({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

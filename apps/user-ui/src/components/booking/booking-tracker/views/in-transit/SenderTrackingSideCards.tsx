@@ -13,6 +13,8 @@ import { ShieldCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export function SenderParcelCard({ booking }: { booking: Booking }) {
   const t = useTranslations("bookingTracker");
@@ -28,7 +30,7 @@ export function SenderParcelCard({ booking }: { booking: Booking }) {
         {t("senderTracking.sidebar.parcelSummary", {
           category: tBooking("categories." + booking.parcel.category),
           weight: formatNumber(booking.parcel.weightKg, locale),
-          value: formatEur(booking.parcel.declaredValueEur, locale),
+          value: formatMoney(booking.parcel.declaredValueEur, intlTagFor(locale)),
         })}
       </div>
       <p className="mt-1 text-[12px] leading-snug text-slate-600 dark:text-slate-400">
@@ -64,7 +66,7 @@ export function SenderPaymentCard({ booking }: { booking: Booking }) {
           {t("senderTracking.sidebar.debitedLabel")}
         </span>
         <span className="text-[20px] font-black tabular-nums text-slate-900 dark:text-white">
-          {formatEur(booking.payment.totalPaidEur, locale)}
+          {formatMoney(booking.payment.totalPaidEur, intlTagFor(locale))}
         </span>
       </div>
       <div className="my-3 border-t border-slate-100 dark:border-slate-800" />
@@ -83,7 +85,7 @@ export function SenderPaymentCard({ booking }: { booking: Booking }) {
           </span>
           <span className="font-semibold text-emerald-700 dark:text-emerald-400">
             {t("senderTracking.sidebar.insuranceValue", {
-              amount: formatEur(insuredAmount, locale),
+              amount: formatMoney(insuredAmount, intlTagFor(locale)),
             })}
           </span>
         </div>
@@ -112,7 +114,7 @@ export function SenderCoverageCard({ booking }: { booking: Booking }) {
       <div className="flex items-center gap-2 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">
         <ShieldCheck size={15} aria-hidden="true" />
         {t("senderTracking.sidebar.coverageTitle", {
-          amount: formatEur(insuredAmount, locale),
+          amount: formatMoney(insuredAmount, intlTagFor(locale)),
         })}
       </div>
       <p className="mt-1.5 text-[12px] leading-snug text-slate-500 dark:text-slate-400">
@@ -122,13 +124,6 @@ export function SenderCoverageCard({ booking }: { booking: Booking }) {
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatNumber(value: number, locale: string): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {

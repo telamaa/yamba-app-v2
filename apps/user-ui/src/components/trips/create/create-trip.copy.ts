@@ -81,10 +81,12 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     fairPriceOk: isFr ? "✓ Prix juste" : "✓ Fair price",
     fairPriceLow: isFr ? "↓ Sous le marché — tu laisses de l'argent" : "↓ Below market — you're leaving money",
     fairPriceHigh: isFr ? "↑ Au-dessus — moins de demandes probables" : "↑ Above — fewer requests likely",
+    // D123 — les montants arrivent DÉJÀ mis en forme (symbole compris, placé
+    // par `Intl`) : une phrase de copie n'écrit plus jamais « € ».
     priceAnchor: (median: string, low: string, high: string) =>
       isFr
-        ? `Les trajets similaires partent à ${median} €/kg en médiane (fourchette ${low}–${high}).`
-        : `Similar trips go for ${median} €/kg on median (range ${low}–${high}).`,
+        ? `Les trajets similaires partent à ${median} en médiane (fourchette ${low}–${high}).`
+        : `Similar trips go for ${median} on median (range ${low}–${high}).`,
     gaugeLow: isFr ? "basse" : "low",
     gaugeMedian: isFr ? "médiane" : "median",
     gaugeHigh: isFr ? "haute" : "high",
@@ -109,7 +111,7 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     yourOffer: isFr ? "Ton offre" : "Your offer",
     whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
     factorBase: (v: string, corridor: string) =>
-      isFr ? `Base du corridor${corridor ? ` ${corridor}` : ""} : ${v} €/kg` : `Corridor base${corridor ? ` ${corridor}` : ""}: ${v} €/kg`,
+      isFr ? `Base du corridor${corridor ? ` ${corridor}` : ""} : ${v}` : `Corridor base${corridor ? ` ${corridor}` : ""}: ${v}`,
     domesticLabel: isFr ? "trajet intérieur (même pays)" : "domestic trip (same country)",
     zoneLabel: (zone: string) =>
       ((isFr
@@ -160,7 +162,7 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     bagsSummary: (n: number) => (isFr ? `${n} forfait${n > 1 ? "s" : ""} proposé${n > 1 ? "s" : ""}` : `${n} flat rate${n > 1 ? "s" : ""} offered`),
     bagNeedsCapacity: (kg: number) =>
       isFr ? `Monte ta capacité à ${kg} kg pour proposer ce forfait` : `Raise your capacity to ${kg} kg to offer this`,
-    bagEquivalent: (v: string) => (isFr ? `≈ ${v} €/kg` : `≈ ${v} €/kg`),
+    bagEquivalent: (v: string) => `≈ ${v}`,
     netGainTitle: (kg: number) => (isFr ? `Si tes ${kg} kg partent` : `If your ${kg} kg get booked`),
     netGainPaid: isFr ? "net, versé à J+4 après livraison" : "net, paid D+4 after delivery",
     optionsAndMessage: isFr ? "Options & message" : "Options & message",

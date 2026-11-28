@@ -48,7 +48,7 @@ import {
 import { demandeDeLApi, peut, type DemandeDeLaListe } from '@/lib/mes-demandes';
 import { useActivite } from '@/lib/activite-context';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoneyFromCents } from '@/lib/pricing-example';
 import { formatDayMonth } from '@/lib/trip-format';
 
 type Etat =
@@ -170,7 +170,7 @@ function DemandeContent() {
   const valeur =
     typeof parcel.declaredValueCents === 'number' && Number.isFinite(parcel.declaredValueCents)
       ? t('detail.declaredValue', {
-          amount: `${formatAmountFromCents(parcel.declaredValueCents, tag)} €`,
+          amount: formatMoneyFromCents(parcel.declaredValueCents, tag),
         })
       : null;
   const description = typeof parcel.description === 'string' ? parcel.description.trim() : '';
@@ -236,7 +236,7 @@ function DemandeContent() {
             <ThemedText type="title" style={styles.gain}>
               {demande.gainCents === null
                 ? t('noGain')
-                : `${formatAmountFromCents(demande.gainCents, tag)} €`}
+                : formatMoneyFromCents(demande.gainCents, tag)}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {t('detail.gainNote')}

@@ -3,7 +3,7 @@
 import { useTranslations, useLocale } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle, Eye } from "lucide-react";
 import { isPopular, showsViews } from "@/lib/trip-signals";
-import { billedKg, formatAmountFromCents } from "@/lib/pricing-example";
+import { billedKg, formatMoney } from "@/lib/pricing-example";
 
 /** D99 3A — même seuil que la carte large : en dessous, la place CONTRAINT. */
 const LOW_CAPACITY_KG = 5;
@@ -52,7 +52,7 @@ export default function YambaTripResultCardMobile({
   const poidsChoisi = typeof weightKg === "number";
   const totalPourLePoids =
     poidsAffiche !== null && typeof item.totalForWeight === "number"
-      ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
+      ? formatMoney(item.totalForWeight, localeTag, item.currency ?? undefined)
       : null;
 
   const transportLabel = t(`transportTabs.${item.transportMode}`);
@@ -185,7 +185,6 @@ export default function YambaTripResultCardMobile({
                     <>
                       <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
                         {totalPourLePoids}
-                        {item.currency ?? "€"}
                       </div>
                       {/* La mention dit une HYPOTHÈSE, jamais un seuil : « pour
                           2 kg » se lisait comme un minimum d'achat. */}
@@ -197,8 +196,7 @@ export default function YambaTripResultCardMobile({
                     </>
                   ) : (
                     <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                      {item.pricePerKg.toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      {item.currency ?? "€"}
+                      {formatMoney(item.pricePerKg, localeTag, item.currency ?? undefined)}
                       <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">/kg</span>
                     </div>
                   )}
@@ -226,8 +224,7 @@ export default function YambaTripResultCardMobile({
                     <span>{t("card.fromPrice")}</span>
                   </button>
                   <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                    {item.minPrice}
-                    {item.currency ?? "€"}
+                    {formatMoney(item.minPrice, localeTag, item.currency ?? undefined)}
                   </div>
                 </>
               )}

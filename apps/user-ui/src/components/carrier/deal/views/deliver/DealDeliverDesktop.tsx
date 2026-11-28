@@ -16,6 +16,8 @@ import DeliverOtpInput from "./DeliverOtpInput";
 import DeliverPhotosBlock from "./DeliverPhotosBlock";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import { conteneurDePage } from "@/lib/layout/largeur-de-page";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export default function DealDeliverDesktop(props: DealDeliverViewProps) {
   const t = useTranslations("carrierDealDeliver");
@@ -148,7 +150,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
                     {t("sidebar.netLabel")}
                   </span>
                   <span className="text-[20px] font-black tabular-nums text-emerald-700 dark:text-emerald-400">
-                    {formatEur(deal.earnings.netForCarrier, locale)}
+                    {formatMoney(deal.earnings.netForCarrier, intlTagFor(locale))}
                   </span>
                 </div>
                 <div className="my-3 border-t border-slate-100 dark:border-slate-800" />
@@ -172,13 +174,6 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatNumber(value: number, locale: string): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {

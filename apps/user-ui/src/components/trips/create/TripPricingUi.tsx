@@ -34,18 +34,16 @@ import {
 import type { FairPriceVerdict, FamilyIconKey, PriceSuggestion } from "./create-trip.config";
 import type { FamilyConditionDraft } from "./create-trip.types";
 import { FieldError, Toggle } from "@/components/trips/create/TripFormUi";
+import { useLocale } from "next-intl";
+import { formatMoney, formatMoneyCompact } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 const MANGO = "#FF9900";
 const MANGO_10 = "rgba(255,153,0,0.10)";
 const TEAL = "#0F766E";
 const TEAL_10 = "rgba(15,118,110,0.10)";
 
-export function formatEur(n: number, digits = 2): string {
-  return n.toLocaleString("fr-FR", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
+
 
 /* ── Icônes des familles / bagages (Lucide, colorables) ─────────── */
 
@@ -288,6 +286,7 @@ export function FairPriceGauge({
   verdict: FairPriceVerdict | null;
   labels: { low: string; median: string; high: string; ok: string; tooLow: string; tooHigh: string };
 }) {
+  const tag = intlTagFor(useLocale());
   const span = suggestion.high - suggestion.low;
   const gMin = suggestion.low - span * 0.45;
   const gMax = suggestion.high + span * 0.45;
@@ -333,7 +332,7 @@ export function FairPriceGauge({
             className="absolute top-full -translate-x-1/2 whitespace-nowrap pt-1 text-[10px] text-slate-400 dark:text-slate-500"
             style={{ left: `${pct(v)}%` }}
           >
-            {formatEur(v)} · {label}
+            {formatMoneyCompact(v, tag)} · {label}
           </span>
         ))}
 
@@ -552,6 +551,7 @@ export function BagFlatRateRow({
 /* ── Carte gain net (D16 : ton prix = ton net) ─────────── */
 
 export function NetGainCard({ title, amount, sub }: { title: string; amount: number; sub: string }) {
+  const tag = intlTagFor(useLocale());
   return (
     <div
       className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-xl border border-[#0F766E]/20 px-4 py-3"
@@ -562,7 +562,7 @@ export function NetGainCard({ title, amount, sub }: { title: string; amount: num
     >
       <span className="text-[12px] font-medium text-slate-500 dark:text-slate-400">{title}</span>
       <span className="text-[22px] font-bold tabular-nums dark:text-teal-400" style={{ color: TEAL }}>
-        {formatEur(amount)} €
+        {formatMoney(amount, tag)}
       </span>
       <span className="text-[11px] text-slate-400 dark:text-slate-500">{sub}</span>
     </div>

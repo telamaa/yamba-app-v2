@@ -17,6 +17,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { ShipmentListItem } from "./shipments.types";
+import { formatMoneyFromCents } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   item: ShipmentListItem | null; // null = fermée
@@ -25,11 +27,9 @@ type Props = {
   onConfirmAction: (item: ShipmentListItem) => void;
 };
 
+/** D123 — raccourci local sur la règle partagée. */
 function formatCents(cents: number, currencyCode: string, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: currencyCode,
-  }).format(cents / 100);
+  return formatMoneyFromCents(cents, intlTagFor(locale), currencyCode);
 }
 
 export default function CancelShipmentModal({

@@ -44,7 +44,8 @@ import { countryFlag, countryName } from '@/lib/country-name';
 import {
   billedKg,
   estimateShipperTotalCents,
-  formatAmountFromCents,
+  formatMoney,
+  formatMoneyFromCents,
   PRICING_EXAMPLE_PARAMS,
 } from '@/lib/pricing-example';
 import { useSession } from '@/lib/session-context';
@@ -119,7 +120,11 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
     .filter(Boolean)
     .join(' ');
 
-  const currency = trip.currency ?? '€';
+  // D123 — `trip.currency` est un CODE ISO 4217, pas un symbole : il était
+  // écrit tel quel à côté du nombre (« 24.85 EUR » si l'API en renvoie un) et
+  // se repliait sur le caractère « € ». C'est `Intl` qui place le symbole, et
+  // sa place change avec la langue.
+  const currency = trip.currency ?? undefined;
   // La constante intermédiaire porte le narrowing pour TS.
   const perKgPrice = trip.pricePerKg != null && trip.pricePerKg > 0 ? trip.pricePerKg : null;
   const duration =
@@ -259,8 +264,8 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                     colonne (le colis, un prix unitaire, la place du trajet). */}
                 <ThemedText style={styles.price}>
                   {totalCents !== null
-                    ? `${formatAmountFromCents(totalCents, intlTagFor(locale))} ${currency}`
-                    : `${formatTwoDecimals(perKgPrice, locale)} ${currency}`}
+                    ? formatMoneyFromCents(totalCents, intlTagFor(locale), currency)
+                    : formatMoney(perKgPrice, intlTagFor(locale), currency)}
                 </ThemedText>
                 {totalCents !== null && (
                   <ThemedText style={[styles.example, { color: theme.textSecondary }]}>
@@ -279,7 +284,7 @@ export function TripResultCard({ trip }: { trip: TripSearchResult }) {
                   {t('card.fromPrice')}
                 </ThemedText>
                 <ThemedText style={styles.price}>
-                  {trip.minPrice} {currency}
+                  {formatMoney(trip.minPrice, intlTagFor(locale), currency)}
                 </ThemedText>
               </>
             )}
@@ -373,22 +378,6 @@ function formatDuration(minutes: number): string {
   if (m === 0) return `${h} h`;
   return `${h} h ${String(m).padStart(2, '0')}`;
 }
-
-/** « 10,00 » / "10.00" — deux décimales, virgule en français (miroir web). */
-function formatTwoDecimals(value: number, locale: string): string {
-  try {
-    return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    // Hermes sans données Intl : chiffre lisible, jamais un crash.
-    return value.toFixed(2);
-  }
-}
-
-/** Cents → « 11 » / « 20,50 » : les centimes ne s'écrivent que s'il y en a
- *  (« 11,00 € » sous un prix au kilo fait du bruit pour rien). */
 
 /** Accents hors jetons de thème — mêmes valeurs que la maquette validée
  *  (slate / red / orange Tailwind, mangue #FF9900). */

@@ -50,7 +50,11 @@ const TOUTES_LES_CARTES: Array<[string, string]> = [
 
 describe('D99 1A — une seule mise en forme du prix, et elle est partagée', () => {
   it.each(TOUTES_LES_CARTES)('%s passe par la règle partagée', (_quoi, chemin) => {
-    expect(lire(chemin)).toContain('formatAmountFromCents');
+    // D123 — la règle partagée ne rend plus seulement le NOMBRE : elle place
+    // aussi le symbole, dont la position change avec la langue. Une carte qui
+    // appelle l'une des fonctions du module est conforme ; une carte qui
+    // compose elle-même est le défaut qu'on vient de supprimer.
+    expect(lire(chemin)).toMatch(/format(AmountFromCents|Money|MoneyFromCents|PerKg|MoneyCompact)\(/);
   });
 
   it.each(TOUTES_LES_CARTES)('%s n’arrondit plus à l’euro', (_quoi, chemin) => {

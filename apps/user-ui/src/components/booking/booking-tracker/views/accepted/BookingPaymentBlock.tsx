@@ -15,6 +15,8 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   booking: Booking;
@@ -46,7 +48,7 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
             {t("payment.debitedLabel")}
           </span>
           <span className="text-[16px] font-black tabular-nums text-slate-900 dark:text-white">
-            {formatEur(payment.totalPaidEur, locale)}
+            {formatMoney(payment.totalPaidEur, intlTagFor(locale))}
           </span>
         </div>
         <div className="mt-2.5 space-y-1.5 border-t border-slate-200 pt-2.5 dark:border-slate-700">
@@ -87,7 +89,7 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
           {t("payment.debitedLabel")}
         </span>
         <span className="text-[20px] font-black tabular-nums text-slate-900 dark:text-white">
-          {formatEur(payment.totalPaidEur, locale)}
+          {formatMoney(payment.totalPaidEur, intlTagFor(locale))}
         </span>
       </div>
 
@@ -123,10 +125,3 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

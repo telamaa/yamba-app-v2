@@ -1,5 +1,5 @@
 "use client";
-import { billedKg, formatAmountFromCents } from "@/lib/pricing-example";
+import { billedKg, formatMoney } from "@/lib/pricing-example";
 
 /**
  * D99 3A — en dessous de ce seuil, la place restante devient une CONTRAINTE et
@@ -160,12 +160,11 @@ export default function TripResultCard({
     0
   );
 
-  const formattedPrice = item.minPrice
-    .toLocaleString(localeTag, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-    .replace(/\u00a0/g, "");
+  // D123 — la règle partagée place le symbole, dont la position change avec la
+  // langue (« 24,85 € » / « €24.85 »). Les trois chiffres de cette carte le
+  // collaient derrière le nombre, et `item.currency` — un code ISO — servait de
+  // caractère de repli.
+  const formattedPrice = formatMoney(item.minPrice, localeTag, item.currency ?? undefined);
 
   const stopsLabel = useMemo(() => {
     if (item.stopovers === undefined || item.stopovers === null) return null;
@@ -184,9 +183,7 @@ export default function TripResultCard({
   // D13 — un trip PER_KG affiche son prix au kilo (le popover legacy n'a plus de sens)
   const isPerKg = typeof item.pricePerKg === "number" && item.pricePerKg > 0;
   const formattedPerKg = isPerKg
-    ? (item.pricePerKg as number)
-        .toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        .replace(/\u00a0/g, "")
+    ? formatMoney(item.pricePerKg as number, localeTag, item.currency ?? undefined)
     : null;
 
   /**
@@ -211,7 +208,7 @@ export default function TripResultCard({
   const poidsChoisi = typeof weightKg === "number";
   const totalPourLePoids =
     poidsAffiche !== null && typeof item.totalForWeight === "number"
-      ? formatAmountFromCents(Math.round(item.totalForWeight * 100), localeTag)
+      ? formatMoney(item.totalForWeight, localeTag, item.currency ?? undefined)
       : null;
 
   const hasPricesByCategory =
@@ -364,18 +361,14 @@ export default function TripResultCard({
               d'exemple disparaît — on remplace, on n'ajoute pas. */}
           <div className="text-[22px] font-black leading-none tracking-tight text-slate-950 dark:text-white">
             {totalPourLePoids !== null ? (
-              <>
-                {totalPourLePoids} {item.currency ?? "€"}
-              </>
+              totalPourLePoids
             ) : isPerKg ? (
               <>
-                {formattedPerKg} {item.currency ?? "€"}
+                {formattedPerKg}
                 <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">/kg</span>
               </>
             ) : (
-              <>
-                {formattedPrice} {item.currency ?? "€"}
-              </>
+              formattedPrice
             )}
           </div>
           {/* D99 bis — la mention dit une HYPOTHÈSE, jamais un seuil.

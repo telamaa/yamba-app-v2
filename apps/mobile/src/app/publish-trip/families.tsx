@@ -38,7 +38,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { intlTagFor } from '@/lib/number-format';
-import { formatAmountFromCents } from '@/lib/pricing-example';
+import { formatMoneyFromCents, formatPerKg } from '@/lib/pricing-example';
 import { setPublishDraft, usePublishDraft } from '@/lib/publish-draft';
 import { sauvegarderLeBrouillon } from '@/lib/publish-sauvegarde';
 import {
@@ -125,7 +125,7 @@ export default function PublishFamiliesScreen() {
       title={t('families.title')}
       step={4}
       valueLabel={
-        gainCents === null ? t('bar.newTrip') : `${formatAmountFromCents(gainCents, tag)} €`
+        gainCents === null ? t('bar.newTrip') : formatMoneyFromCents(gainCents, tag)
       }
       valueHint={gainCents === null ? undefined : t('price.gainBarHint')}
       ctaLabel={t('bar.continue')}
@@ -280,7 +280,7 @@ export default function PublishFamiliesScreen() {
         </View>
         {parKilo !== null && !suspendu ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {t('families.bagPerKg', { value: parKilo.toLocaleString(tag) })}
+            {t('families.bagPerKg', { value: formatPerKg(parKilo, tag) })}
           </ThemedText>
         ) : null}
         {suspendu ? (

@@ -15,6 +15,8 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import type { DealEarningsBreakdown as Earnings } from "@/components/carrier/deal/deal.types";
+import { formatMoney } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 type Props = {
   earnings: Earnings;
@@ -40,7 +42,7 @@ export default function DealEarningsBreakdown({
               {t("earnings.net")}
             </span>
             <span className="text-[18px] font-black tabular-nums text-emerald-600 dark:text-emerald-400">
-              {formatEur(earnings.netForCarrier, locale)}
+              {formatMoney(earnings.netForCarrier, intlTagFor(locale))}
             </span>
           </div>
           <div className="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
@@ -73,13 +75,6 @@ export default function DealEarningsBreakdown({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 function formatAmountNoUnit(amount: number, locale: string): string {
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {

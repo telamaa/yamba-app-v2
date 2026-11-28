@@ -58,10 +58,10 @@ import {
   InfoHint,
   NetGainCard,
   SliderField,
-  formatEur,
 } from "../TripPricingUi";
 import LocationsSection from "../LocationsSection";
-import { BILLING_FLOOR_KG } from "@/lib/pricing-example";
+import { BILLING_FLOOR_KG, formatMoney, formatPerKg } from "@/lib/pricing-example";
+import { intlTagFor } from "@/lib/number-format";
 
 export default function StepConditions({
   copy,
@@ -156,6 +156,7 @@ export default function StepConditions({
   const handleDeliveryChange = (next: TripLocationPoint[]) => setField("deliveryLocations", next);
 
   /* ── Résumés des accordéons ── */
+  const tag = intlTagFor(isFr ? "fr" : "en");
   const familiesSummary = summarizeFamilyConditions(draft.familyConditions, isFr) ?? copy.familiesAllAccepted;
   const bagsCount =
     (isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) ? 1 : 0) +
@@ -201,7 +202,7 @@ export default function StepConditions({
         }}
       />
       <div className="-mt-1 flex items-center gap-1 text-[12px] text-slate-500 dark:text-slate-400">
-        {copy.priceAnchor(formatEur(suggestion.median), formatEur(suggestion.low), formatEur(suggestion.high))}
+        {copy.priceAnchor(formatPerKg(suggestion.median, tag), formatMoney(suggestion.low, tag), formatPerKg(suggestion.high, tag))}
         <InfoHint label={copy.whyThisPrice}>
           <span className="block font-semibold text-slate-800 dark:text-slate-100">{copy.whyThisPrice}</span>
           <ul className="mt-1 space-y-0.5">
@@ -210,7 +211,7 @@ export default function StepConditions({
                 <span>
                   {f.key === "base"
                     ? copy.factorBase(
-                        formatEur(f.value ?? 0),
+                        formatPerKg(f.value ?? 0, tag),
                         f.corridor
                           ? f.corridor.domestic
                             ? copy.domesticLabel
@@ -296,7 +297,7 @@ export default function StepConditions({
               icon={BAG_ICONS.checked}
               label={copy.checkedBag23}
               hint={copy.bagConsumes(CHECKED_BAG_KG)}
-              equivalent={eqChecked !== null ? copy.bagEquivalent(formatEur(eqChecked)) : null}
+              equivalent={eqChecked !== null ? copy.bagEquivalent(formatPerKg(eqChecked, tag)) : null}
               disabledReason={capacity < CHECKED_BAG_KG ? copy.bagNeedsCapacity(CHECKED_BAG_KG) : null}
               value={draft.checkedBag23Price}
               onChangeAction={(v) => setField("checkedBag23Price", v)}
@@ -306,7 +307,7 @@ export default function StepConditions({
               icon={BAG_ICONS.cabin}
               label={copy.cabinBag12}
               hint={copy.bagConsumes(CABIN_BAG_KG)}
-              equivalent={eqCabin !== null ? copy.bagEquivalent(formatEur(eqCabin)) : null}
+              equivalent={eqCabin !== null ? copy.bagEquivalent(formatPerKg(eqCabin, tag)) : null}
               disabledReason={capacity < CABIN_BAG_KG ? copy.bagNeedsCapacity(CABIN_BAG_KG) : null}
               value={draft.cabinBag12Price}
               onChangeAction={(v) => setField("cabinBag12Price", v)}
