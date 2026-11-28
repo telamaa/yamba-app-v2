@@ -1,0 +1,76 @@
+{
+  "list": {
+    "title": "Messages",
+    "empty": "No conversations yet",
+    "emptyWhy": "A thread opens as soon as a request is accepted, so you can agree on a place and a time.",
+    "loadError": "Conversations cannot be read right now.",
+    "retry": "Try again",
+    "you": "You: {body}",
+    "unread": "{count, plural, one {# unread} other {# unread}}",
+    "readOnly": "Read-only"
+  },
+  "entry": {
+    "open": "Message {name}"
+  },
+  "thread": {
+    "back": "Back",
+    "loadError": "This thread cannot be read right now.",
+    "empty": "Nothing said yet",
+    "emptyWhy": "Write the first message: a place, a time, something to recognise each other by.",
+    "placeholder": "Write your message",
+    "send": "Send",
+    "sendAccessibility": "Send the message",
+    "remaining": "{count, plural, one {# character left} other {# characters left}}",
+    "codeWarning": "The delivery code is given out loud, never here.",
+    "contactWarning": "Yamba spotted contact details in this message. Staying on the platform is what keeps you covered if anything goes wrong.",
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "closed": {
+    "litige": "A dispute is open: messages now go through mediation.",
+    "fenetre": "This conversation is closed. It stayed open for fourteen days after the transport ended.",
+    "autre": "This conversation is read-only."
+  },
+  "notice": {
+    "closing": "{count, plural, =0 {This conversation closes today} one {This conversation closes tomorrow} other {This conversation closes in # days}}"
+  },
+  "missing": {
+    "vide": "Write something",
+    "tropLong": "{count, plural, one {# character too many} other {# characters too many}}",
+    "envoi": "Sending…"
+  },
+  "errors": {
+    "codeDeLivraison": "This message contains the delivery code. Give it out loud, never in writing.",
+    "ferme": "This conversation closed in the meantime. Reloading it.",
+    "echec": "The message did not go through: nothing was sent. Check your connection and tap “Send” again."
+  },
+  "quick": {
+    "title": "Quick replies"
+  },
+  "report": {
+    "action": "Report this message",
+    "title": "Report this message",
+    "why": "Yamba reads every report. The message stays visible to you, and the other person is not told.",
+    "reasons": {
+      "OFF_PLATFORM": "Wants to leave Yamba (paying or shipping outside)",
+      "SCAM": "Suspected scam",
+      "HARASSMENT": "Inappropriate or abusive language",
+      "OTHER": "Other"
+    },
+    "details": "Add a word (optional)",
+    "submit": "Report",
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Report sent. Thank you.",
+    "failed": "The report did not go through. Try again."
+  },
+  "system": {
+    "meetup": {
+      "proposed": "A meeting has been proposed.",
+      "accepted": "The meeting is confirmed."
+    },
+    "phone": {
+      "revealed": "The phone number has been shown."
+    }
+  }
+}

@@ -12465,3 +12465,183 @@ exactement une sortie, et elle doit être inconditionnelle.**
   **réordonne** — deux événements écrits dans la même seconde peuvent revenir inversés, et un cran
   inconnu décalerait la séquence.
 * `payoutDueAt` vient du serveur : ne recalcule jamais une échéance que quelqu'un d'autre décide.
+
+
+---
+
+# Chapitre — Le fil : lire ce qu'on reçoit déjà (D117)
+
+Ce chapitre parle de cinq choses utiles partout : un **type qui jette des données**, une **absence
+confondue avec une panne**, un **sondage qui vit trop longtemps**, une **condition qui ne décide
+rien**, et le rendu **en double** d'un composant client.
+
+## 1. Le défaut le plus cher est celui qui ne plante pas
+
+Voici la ligne qui a tenu trois mois :
+
+```ts
+apiFetch<{ totalUnread: number }>('/messages/conversations')
+```
+
+Le serveur répond `{ items, totalUnread }`. TypeScript est content : on déclare ce qu'on *veut*
+lire, et le reste est ignoré. Rien ne plante, rien ne ralentit visiblement, aucun test ne rougit —
+**et la liste entière des conversations traverse le réseau à chaque rafraîchissement pour mourir à
+`JSON.parse`.**
+
+> Un type d'API n'est pas une *demande*, c'est une **promesse de ce que tu sais lire**. Quand il est
+> plus petit que la réponse, la différence est payée et jetée.
+
+La parade n'est pas de typer plus large « au cas où » : c'est de **confronter le type au contrat**.
+
+```ts
+// fil.spec.ts — on vérifie que la simulation est une réponse que le serveur peut SERVIR
+expect(ConversationListResponseSchema.safeParse({ items: [conversationBrute()], totalUnread: 2 }).success)
+  .toBe(true);
+```
+
+Cette fiche a rougi au premier jet : `counterpart.id: 'u1'` n'est pas un ObjectId. **Une simulation
+que le serveur ne pourrait pas servir ne prouve rien** — elle teste un monde qui n'existe pas.
+
+## 2. Une absence et une panne ne se disent pas avec la même phrase
+
+Motif très courant, et presque toujours écrit par confort :
+
+```ts
+// ✗ LE DÉFAUT
+const conversations = await lire().catch(() => null);
+// … plus loin
+{liste.length === 0 && <p>Aucune conversation</p>}
+```
+
+Réseau coupé → liste vide → « aucune conversation ». L'écran **affirme** quelque chose de faux.
+C'est la même famille que le squelette perpétuel et que le bouton « Vérification… » éternel : un
+écran qui prétend savoir.
+
+```ts
+// ✓ LA PARADE : une sentinelle, parce que `null` veut déjà dire « vide »
+const ECHEC = Symbol('lecture en échec');
+const lu = await lire().catch(() => ECHEC);
+const enEchec = lu === ECHEC;
+```
+
+Deux conséquences qu'on ne voit qu'après :
+
+* **la dernière valeur connue vaut mieux qu'une valeur fausse** — un écran un peu vieux bat un écran
+  vide ;
+* **un compteur ne retombe pas à zéro sur une panne** : « tout est lu » est la version silencieuse du
+  même mensonge.
+
+Règle générale : *quand tu persistes ou affiches un état, demande ce que sa valeur VIDE signifie.*
+Ici elle signifiait deux choses — « il n'y a rien » et « je n'ai pas pu savoir ».
+
+## 3. Un sondage a deux façons de survivre à son écran
+
+Sur un téléphone, les deux comptent :
+
+```ts
+useFocusEffect(
+  useCallback(() => {
+    let vivant = true;
+    const battre = () => {
+      if (vivant && AppState.currentState === 'active') void relire();   // ② la poche
+    };
+    void relire();
+    const minuterie = setInterval(battre, RYTHME_DU_FIL_MS);
+    return () => { vivant = false; clearInterval(minuterie); };          // ① la navigation
+  }, [relire])
+);
+```
+
+* `useFocusEffect` + `clearInterval` règlent la **navigation** : un écran empilé dessous garde ses
+  minuteries, et chacune ferait un `setState` sur un composant qu'on ne voit plus ;
+* `AppState` règle la **poche** : une app réduite n'est pas démontée. Un onglet de navigateur s'en
+  sort avec `refetchIntervalInBackground: false` ; un téléphone, non — c'est de la batterie.
+
+Et un détail de méthode : les deux rythmes (3 s pour un fil ouvert, 20 s pour une liste) vivent dans
+un module partagé. **Deux fronts qui sondent à des rythmes différents sont deux produits.**
+
+## 4. Une condition qui ne décide rien n'est pas une condition
+
+```tsx
+// ✗ trouvé sur le site, vivant depuis septembre
+if (data && data.conversation.unreadCount >= 0) markRead.mutate();
+```
+
+Un compteur n'est jamais négatif : la condition est **toujours vraie**. Elle a l'air d'un garde, elle
+n'en est pas un, et elle poste une lecture à chaque ouverture même quand tout est déjà lu.
+
+C'est la même famille que `const disabled = false` avec quatre branches de style mortes (A224), que
+le `filtersActive` toujours vrai de D101, et — trouvée dans le code de ce lot même — une feuille qui
+affichait `{envoye ? t('report.cancel') : t('report.cancel')}`.
+
+> Quand tu lis une condition, demande-toi **quelle valeur la rend fausse**. Si tu n'en trouves pas,
+> ce n'est pas une condition : c'est une décoration.
+
+## 5. Un composant client est rendu DEUX fois — et `Date.now()` ment entre les deux
+
+`apps/user-ui/AGENTS.md` impose de lire `node_modules/next/dist/docs/` avant d'écrire. La page
+« Server and Client Boundary » rappelle ceci :
+
+|                      | Sur le serveur | Dans le navigateur |
+| -------------------- | -------------- | ------------------ |
+| **Server Component** | oui            | non                |
+| **Client Component** | **oui**        | oui                |
+
+Un composant `"use client"` est rendu sur le serveur **puis** hydraté dans le navigateur, et les
+deux passes doivent produire le même balisage. Or j'avais écrit ceci :
+
+```tsx
+{preavisDeFermeture(access.writeClosesAt, Date.now()) !== null && <Bandeau />}
+```
+
+Deux passes, deux horloges : de part et d'autre d'une frontière de jour, le serveur dit « dans 2
+jours » et le navigateur « dans 1 ». La parade est standard et tient en trois lignes :
+
+```tsx
+const [monte, setMonte] = useState(false);
+useEffect(() => setMonte(true), []);
+const preavis = monte ? preavisDeFermeture(access.writeClosesAt, Date.now()) : null;
+```
+
+Le HTML initial ne contient pas le bandeau ; il apparaît après l'hydratation. **Tout ce qui dépend de
+l'instant présent — heure, aléatoire, fuseau — est hors du premier rendu.** La même parade a couvert
+une occurrence **préexistante** une ligne plus haut : quand on apprend une règle, on balaie le
+fichier, pas la ligne.
+
+## 6. Deux pièges de méthode, payés dans ce lot
+
+**Le bundle servi est le juge, pas le typecheck.** Un fichier créé dans une passe puis importé dans
+une passe suivante fait servir à Metro la transformation intermédiaire :
+
+```
+ERROR [ReferenceError: Property 'Font' doesn't exist]
+```
+
+…avec `tsc` vert et 1 357 fiches vertes. La parade est `npx expo start --go --clear` (35 s), et la
+vérification est de **lire le bundle servi**, pas le résultat du typecheck.
+
+**Viser l'usage, pas l'orthographe.** Une fiche de parité cherchait `return 'autre'` dans le jumeau ;
+le jumeau l'écrit dans un ternaire (`brut.length > 0 ? 'autre' : null`). Elle a rougi pour rien —
+sixième fois ce mois-ci. On découpe la fonction et on y cherche les mots :
+
+```ts
+const regle = natif.slice(natif.indexOf('export function motifDeFermeture'),
+                          natif.indexOf('function accesDeLApi'));
+expect(regle.length).toBeGreaterThan(80);   // un découpage raté rend une chaîne VIDE (D98)
+for (const motif of ['litige', 'fenetre', 'autre']) expect(regle).toContain(`'${motif}'`);
+```
+
+La garde de longueur n'est pas du zèle : `slice(indexOf(x), indexOf(y))` aux bornes ratées rend `""`,
+et une chaîne vide **passe tous les `not.toContain`** — verte pour la pire raison.
+
+## Pour aller plus loin
+
+* **Contre-éprouve tes balayages.** Deux fiches de ce lot (export sans appelant, garde
+  d'arrière-plan) ont été vérifiées en **injectant** le défaut : rouges, puis restauration. Une fiche
+  verte du premier coup est une fiche qu'on n'a pas encore vérifiée.
+* **Factorise en devenant le troisième, pas le second.** Une seconde feuille de signalement est
+  assumée et **comptée** par une fiche ; la troisième déclenchera le partage. Une dette comptée se
+  rembourse, une dette promise s'oublie.
+* **Avertir coûte une phrase.** Le serveur détectait les coordonnées depuis septembre et personne ne
+  le disait à l'auteur. Une donnée servie que personne n'affiche n'est pas une fonctionnalité : c'est
+  une intention.

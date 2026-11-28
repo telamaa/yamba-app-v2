@@ -9944,3 +9944,72 @@ suivi que personne ne nourrissait.
 | 2 | Je retire la photo fautive | l'envoi repart |
 | 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette remise ne se lit pas » et un bouton me ramène à la réservation |
 | 4 | Le serveur refuse le code sans servir le prénom | la phrase reste entière |
+
+
+---
+
+# D117 — Le fil de discussion, en natif (27/11/2026)
+
+## Le besoin
+
+Deux inconnus doivent se retrouver, souvent dans un aéroport, parfois sans données mobiles. C'est
+le seul endroit du produit où ils se parlent — donc le seul endroit où Yamba peut perdre la
+transaction en silence, si l'échange part ailleurs. Sur le téléphone, ce lieu n'existait pas :
+l'onglet Messages affichait un compteur et une phrase d'attente.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D117-1** | L'onglet Messages liste les conversations **lisibles**, la plus parlante en tête, avec le corridor et le dernier mot. | Le fil n'est pas un chat : il est attaché à un transport, et c'est ce transport qui le rend reconnaissable. |
+| **RG-D117-2** | Le compteur de non-lus **vient du serveur** et n'est jamais recalculé depuis la liste. | La liste peut être tronquée ; deux comptes qui se contredisent valent moins qu'un seul. |
+| **RG-D117-3** | Une conversation **close** se voit dans la liste, avant d'y entrer. | On sait qu'on ne pourra pas répondre avant d'ouvrir. |
+| **RG-D117-4** | Une **panne** de lecture se dit, et ne se déguise jamais en « aucune conversation ». | Une absence et une panne sont deux faits différents ; les confondre est un mensonge. |
+| **RG-D117-5** | Une panne **ne remet pas** le compteur à zéro. | « Tout est lu » est la version silencieuse du même mensonge. |
+| **RG-D117-6** | La saisie est fermée **par le serveur**, et l'écran dit lequel des deux motifs s'applique (litige, fenêtre écoulée). | L'app ne déduit jamais une fermeture d'un statut ; un champ gris que rien n'explique est un cul-de-sac. |
+| **RG-D117-7** | La fermeture est **annoncée deux jours avant**. | Une porte qui se ferme sans prévenir est de la même famille que le bouton muet. |
+| **RG-D117-8** | Un message contenant le **code de livraison** est refusé, et le refus le dit en toutes lettres. | Le code se donne de vive voix (D43). Ce n'est pas une panne, c'est une règle. |
+| **RG-D117-9** | Un refus **ne vide pas** la saisie. | Le perdre ferait tout retaper. |
+| **RG-D117-10** | Quand le serveur détecte des **coordonnées**, l'auteur est averti **sur sa propre bulle**, et personne d'autre. | Une détection qui ne dit rien ne décourage rien. Mais la détection est une regex qui confond un numéro de vol et un téléphone : accuser l'autre là-dessus serait pire que se taire. |
+| **RG-D117-11** | Un message n'est **jamais bloqué** pour cause de coordonnées. | Bloquer casse des usages légitimes et se contourne en écrivant « zéro six » (D61 5A). |
+| **RG-D117-12** | Les **réponses rapides** remplissent la saisie et n'envoient jamais. | Le geste d'envoi reste à celui qui parle (A142). |
+| **RG-D117-13** | Les messages **système** s'affichent au centre, dans la langue du lecteur. | Ils ne sont de personne ; le serveur envoie une clé, chaque client affiche sa copie. |
+| **RG-D117-14** | Chaque message de l'autre partie peut être **signalé**, sans que l'autre en soit prévenu. | Un fil sans recours est un fil qu'on quitte. |
+| **RG-D117-15** | Le fil **cesse de se rafraîchir** dès qu'on ne le regarde plus. | Un sondage à trois secondes dans une poche est une facture de batterie. |
+| **RG-D117-16** | La porte vers le fil n'apparaît sur une réservation que si une conversation **existe**. | Un fil naît à l'acceptation ; un bouton qui mène à rien est pire qu'un bouton absent. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Messages | mes conversations, avec le trajet et le dernier mot |
+| 2 | Je coupe le réseau puis j'ouvre l'onglet | on me dit que ça ne se lit pas, et on me propose de réessayer — pas « aucune conversation » |
+| 3 | Je coupe le réseau alors que j'avais deux non-lus | la pastille garde deux, elle ne tombe pas à zéro |
+| 4 | J'ouvre un fil | les messages, groupés par journée, le mien à droite |
+| 5 | J'écris et j'envoie | le message part, la saisie se vide, la liste se met à jour |
+| 6 | Je tape le bouton sans rien écrire | on me dit d'écrire quelque chose ; rien n'est envoyé |
+| 7 | Je colle 2 100 caractères | le champ s'arrête à 2 000 et le compteur apparaît à l'approche |
+| 8 | J'écris le code de livraison à six chiffres | le serveur refuse, on me dit pourquoi, **et mon texte est toujours là** |
+| 9 | J'écris un numéro de téléphone | mon message part, et on m'avertit sous MA bulle |
+| 10 | L'autre écrit un numéro de téléphone | aucune pastille sur sa bulle : on ne l'accuse pas |
+| 11 | J'ouvre un fil dont le deal est en litige | la saisie est fermée et dit que les échanges passent par la médiation |
+| 12 | J'ouvre un fil qui se ferme demain | on me l'annonce en haut |
+| 13 | Je touche une réponse rapide | elle remplit la saisie ; rien ne part tant que je n'envoie pas |
+| 14 | Je signale un message | un motif, un mot facultatif, un accusé de réception |
+| 15 | Je quitte l'écran | le sondage s'arrête (aucune requête tant que je suis ailleurs) |
+| 16 | J'ouvre une demande acceptée | un bouton « Écrire à … », avec le nombre de non-lus |
+| 17 | J'ouvre une demande **en attente** | aucun bouton de messagerie : le fil n'existe pas encore |
+
+## D117 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D117bis-1** | Sur le site aussi, l'auteur est averti quand le serveur a vu des coordonnées dans son message. | Le contrat membre le promettait depuis septembre ; seul l'admin le voyait. |
+| **RG-D117bis-2** | Sur le site aussi, la fermeture est annoncée deux jours avant. | `writeClosesAt` était servi et lu nulle part. |
+| **RG-D117bis-3** | La conversation n'est marquée lue que s'il y a **quelque chose à marquer**. | La condition précédente était toujours vraie et postait une lecture à chaque ouverture. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | J'écris un numéro de téléphone | l'avertissement apparaît sous mon message, et sous le mien seulement |
+| 2 | J'ouvre un fil qui se ferme demain | le bandeau l'annonce |
+| 3 | J'ouvre un fil déjà lu | aucune requête de lecture n'est postée |

@@ -1,0 +1,76 @@
+{
+  "list": {
+    "title": "Messages",
+    "empty": "Aucune conversation",
+    "emptyWhy": "Un fil s'ouvre dès qu'une demande est acceptée, pour convenir du lieu et de l'heure.",
+    "loadError": "Les conversations ne se lisent pas pour l'instant.",
+    "retry": "Réessayer",
+    "you": "Toi : {body}",
+    "unread": "{count, plural, one {# non lu} other {# non lus}}",
+    "readOnly": "Lecture seule"
+  },
+  "entry": {
+    "open": "Écrire à {name}"
+  },
+  "thread": {
+    "back": "Retour",
+    "loadError": "Ce fil ne se lit pas pour l'instant.",
+    "empty": "Rien n'a encore été dit",
+    "emptyWhy": "Écris le premier message : un lieu, une heure, un repère pour se reconnaître.",
+    "placeholder": "Écris ton message",
+    "send": "Envoyer",
+    "sendAccessibility": "Envoyer le message",
+    "remaining": "{count, plural, one {# caractère restant} other {# caractères restants}}",
+    "codeWarning": "Le code de livraison se donne de vive voix, jamais ici.",
+    "contactWarning": "Yamba a vu des coordonnées dans ce message. Rester sur la plateforme, c'est garder la protection en cas de problème.",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier"
+  },
+  "closed": {
+    "litige": "Un litige est en cours : les échanges passent par la médiation.",
+    "fenetre": "Cette conversation est close. Elle est restée ouverte quatorze jours après la fin du transport.",
+    "autre": "Cette conversation est en lecture seule."
+  },
+  "notice": {
+    "closing": "{count, plural, =0 {Cette conversation se ferme aujourd'hui} one {Cette conversation se ferme demain} other {Cette conversation se ferme dans # jours}}"
+  },
+  "missing": {
+    "vide": "Écris quelque chose",
+    "tropLong": "{count, plural, one {# caractère de trop} other {# caractères de trop}}",
+    "envoi": "Envoi en cours…"
+  },
+  "errors": {
+    "codeDeLivraison": "Ce message contient le code de livraison. Il se donne de vive voix, jamais par écrit.",
+    "ferme": "Cette conversation s'est fermée entre-temps. On la relit.",
+    "echec": "Le message n'est pas parti : rien n'a été envoyé. Vérifie ta connexion et retouche « Envoyer »."
+  },
+  "quick": {
+    "title": "Réponses rapides"
+  },
+  "report": {
+    "action": "Signaler ce message",
+    "title": "Signaler ce message",
+    "why": "Yamba lit chaque signalement. Le message reste visible pour toi, et l'autre personne n'est pas prévenue.",
+    "reasons": {
+      "OFF_PLATFORM": "Veut sortir de Yamba (paiement ou envoi en dehors)",
+      "SCAM": "Arnaque suspectée",
+      "HARASSMENT": "Propos déplacés ou harcèlement",
+      "OTHER": "Autre"
+    },
+    "details": "Ajoute un mot (facultatif)",
+    "submit": "Signaler",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "done": "Signalement envoyé. Merci.",
+    "failed": "Le signalement n'est pas parti. Réessaye."
+  },
+  "system": {
+    "meetup": {
+      "proposed": "Un rendez-vous a été proposé.",
+      "accepted": "Le rendez-vous est confirmé."
+    },
+    "phone": {
+      "revealed": "Le numéro de téléphone a été affiché."
+    }
+  }
+}

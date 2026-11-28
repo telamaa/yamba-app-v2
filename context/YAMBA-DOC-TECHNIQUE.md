@@ -20906,3 +20906,153 @@ les fichiers mêmes qui appliquaient cette leçon.
 * Quatre dictionnaires portent encore la phrase de cul-de-sac, **comptés** par une fiche.
 * **Suit** : le bloc MESSAGES + NOTIFICATIONS — `message-service` (fil, rendez-vous, numéro révélé à
   H-2) et les notifications in-app n'ont aucun client natif, et l'onglet Messages est une coquille.
+
+---
+
+# D117 — Le fil de discussion, en natif (27/11/2026)
+
+`message-service` sert **quinze routes**. L'app n'en appelait **qu'une**, et seulement pour son
+badge. L'onglet Messages était une coquille qui le disait elle-même : « Les conversations arrivent
+dans un prochain lot ».
+
+**Zéro ligne de serveur, pour la sixième fois d'affilée.**
+
+## Le constat n'est pas une absence, c'est un gaspillage
+
+```ts
+// AVANT — activite-context.tsx:78
+apiFetch<{ totalUnread: number }>('/messages/conversations')
+```
+
+Le serveur répond `{ items, totalUnread }` (`conversation.service.ts:322`). **La liste entière des
+conversations traversait le réseau à chaque rafraîchissement de l'activité et mourait à
+`JSON.parse`.** L'onglet n'attendait pas une requête : il attendait un **type**.
+
+C'est **D102 rejoué mot pour mot** — `SearchFacets` déclarait deux champs là où le serveur en
+servait sept. La leçon de D102 était pourtant écrite : *un contrat se vérifie dans les DEUX sens,
+ce que chaque client peut ÉMETTRE (D101) et ce qu'il peut LIRE*. Les deux fiches existaient… pour la
+recherche seulement. **Une leçon écrite n'est pas une leçon apprise ; ce qui empêche la répétition
+est la structure.**
+
+## Trois fichiers, trois frontières
+
+| Fichier | Rôle | Imports |
+|---|---|---|
+| `lib/fil.ts` | les RÈGLES : lecture défensive, manques, groupement, préavis | **zéro** |
+| `lib/api/messages.api.ts` | le RÉSEAU : six fonctions qui ne projettent rien | `client.ts` |
+| `app/conversation/[id].tsx` | les EFFETS : lire, sonder, envoyer | — |
+
+La séparation n'est pas cosmétique : `messages.api.ts` tire `client.ts` → `base-url.ts` →
+`expo-constants`, que le harnais (`testEnvironment: node`) ne sait pas charger. **Quand un test ne
+peut pas charger ton code, il te dit où est la frontière : on déplace le code, pas la frontière.**
+
+## Ce que le serveur décide, l'écran l'affiche
+
+* `access.canWrite` ferme la saisie et `access.reason` dit **lequel** des deux motifs s'applique.
+  **L'absence ne vaut pas permission** : un accès illisible se lit FERMÉ, et un motif inconnu donne
+  `'autre'` plutôt que `null` — si le serveur ferme pour une raison que l'app ne connaît pas encore,
+  elle dit « c'est fermé » plutôt que de mentir dans l'autre sens.
+* `DELIVERY_CODE_IN_MESSAGE` est une **règle** (D43), pas une panne : elle se dit en toutes lettres,
+  et **le texte reste dans la saisie** — le perdre sur un refus ferait tout retaper.
+* `access.writeClosesAt` annonce la fermeture **deux jours avant**. Une porte qui se ferme sans
+  prévenir est de la même famille que le bouton muet (A209).
+
+## Une détection qui ne dit rien ne décourage rien
+
+Le serveur détecte les coordonnées (`detectContactInfo`) et marque le message (`flaggedContact`).
+L'**admin** l'affiche depuis F-PR3. Le contrat **membre** le sert avec ces mots — « averti, jamais
+bloqué » — et **aucun front membre n'avertissait personne**. La détection alimentait une file de
+modération pendant que l'utilisateur apprenait que ça passe.
+
+Le natif avertit donc l'**AUTEUR**, sur sa propre bulle, et lui seul :
+
+```ts
+export function avertirDesCoordonnees(message: MessageDuFil, monRole: RoleDuFil): boolean {
+  return message.coordonneesDetectees && estDeMoi(message, monRole);
+}
+```
+
+Une pastille sur la bulle de l'autre le désignerait du doigt **sur la foi d'une regex qui ne
+distingue pas un numéro de vol d'un téléphone**. On avertit celui qui peut encore changer de
+comportement.
+
+## Le sondage s'arrête quand personne ne regarde
+
+D61 10A : sondage court tant que le volume le permet. Le site sonde le fil à 3 s et la liste à 20 s ;
+le natif reprend **ces nombres**, dans un module pur, parce que deux fronts qui sondent à des
+rythmes différents sont deux produits. Et il ajoute une règle que le web n'a pas besoin d'écrire :
+
+```ts
+const battre = () => {
+  if (vivant && AppState.currentState === 'active') void relire();
+};
+```
+
+**`useFocusEffect` couvre la navigation, `AppState` couvre la poche** — les deux sont nécessaires,
+parce qu'une app réduite garde ses écrans montés. `refetchIntervalInBackground: false` suffit à un
+onglet de navigateur ; un sondage à 3 s dans un téléphone est une facture de batterie.
+
+## Une absence et une PANNE ne se disent pas avec la même phrase
+
+Le contexte attrapait l'échec en silence (`catch(() => null)`), ce qui aurait donné « aucune
+conversation » sur un réseau coupé — **le mensonge que le site a payé deux fois** (D115 bis ③,
+D116 bis ②). Il porte désormais `conversationsEnEchec`, garde la dernière liste connue, et **ne remet
+pas la pastille à zéro** : « tout est lu » est la version silencieuse du même mensonge.
+
+## La seconde feuille de signalement, assumée et COMPTÉE
+
+`ReportSheet` (D68) signale une annonce ou un membre : autre service, autres motifs, autres refus.
+La généraliser demanderait de faire passer l'espace de noms, la liste, l'appel et la table des refus
+en paramètres — c'est-à-dire de toucher un composant que le tunnel de réservation monte déjà.
+
+On applique D115 3A **dans l'autre sens** : *on factorise en devenant le TROISIÈME, pas le second.*
+Une fiche compte les feuilles à deux. Une dette comptée se rembourse ; une dette promise s'oublie.
+
+## D117 bis — le site, challengé par son jumeau natif
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | `flaggedContact` servi, affiché par l'admin, **par aucun front membre** | la détection documentait l'échec au lieu de le prévenir |
+| ② | `access.writeClosesAt` **typé et lu nulle part** | la conversation se fermait sans prévenir |
+| ③ | `slice(0, 2000)` écrit **deux fois en dur** | la borne du contrat sans domicile (D110, à petite échelle) |
+| ④ | `if (data && data.conversation.unreadCount >= 0)` | **toujours vrai** — un compteur n'est jamais négatif |
+
+Et un cinquième, **trouvé dans mon propre code, par la documentation** : `apps/user-ui/AGENTS.md`
+impose de lire `node_modules/next/dist/docs/` avant d'écrire. La page « Server and Client Boundary »
+rappelle qu'un composant client est **aussi rendu sur le serveur**, et que les deux passes doivent
+produire le même balisage — or j'avais posé `Date.now()` dans le rendu. L'heure n'y entre plus
+qu'après le montage, et **la même parade couvre une occurrence préexistante** une ligne plus haut.
+
+La règle sort du composant vers `lib/messaging/fil.ts` — **sixième règle sortie d'un composant du
+site** après `tunnel.ts` (D93), `search-facets.ts` (D100), `parcel-weight.ts` (D101),
+`prise-en-charge.ts` (D115 bis) et `remise.ts` (D116 bis).
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1294 (63 suites) | **1357 (66 suites)** |
+| Fiches user-ui | 291 (18 suites) | **309 (19 suites)** |
+| Routes de `message-service` consommées par le natif | 1 (pour un badge) | **6** |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* **Deux balayages contre-éprouvés plutôt que crus sur parole** : un export sans appelant ajouté à
+  `messages.api.ts`, et la garde `AppState` retirée du sondage → les deux fiches rouges, puis
+  restauration. *Une fiche verte du premier coup est une fiche qu'on n'a pas encore vérifiée.*
+* La fiche de parité a rougi à son premier jet en visant une **orthographe** (`return 'autre'`) là où
+  le natif écrit un ternaire — sixième fois ce mois-ci qu'aimer le mot plutôt que l'usage se paie.
+* La fiche du contrat a REFUSÉ ma propre simulation : `counterpart.id: 'u1'` n'est pas un ObjectId.
+  Une simulation que le serveur ne pourrait pas servir ne prouve rien.
+* `nx typecheck` (11 projets), `check-i18n-messages` : verts.
+
+## Reste ouvert
+
+* **Le piège de Metro, repayé** : un fichier créé puis importé dans une passe ultérieure fait servir
+  la transformation intermédiaire — `ReferenceError: Property 'Font' doesn't exist` avec typecheck
+  et 1357 fiches vertes. **Le juge est le BUNDLE SERVI**, pas le typecheck (`--clear`, 35 s).
+* **Le fil n'a pas été vu connecté** : il faut une session sur le simulateur, et `simctl` ne tape pas.
+* **Les photos de message** : le contrat en accepte cinq, **aucun front n'en émet** (famille D101).
+* **Suit** : lot 2 — le rendez-vous comme objet et le numéro révélé à H-2 ; lot 3 — les notifications
+  in-app, et la question qu'il faudra trancher alors : le mobile n'a **aucune** notification push.

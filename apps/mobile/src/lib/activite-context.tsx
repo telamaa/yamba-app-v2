@@ -22,8 +22,10 @@ import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import { apiFetch } from '@/lib/api/client';
+import { mesConversations } from '@/lib/api/messages.api';
 import { mesDemandes } from '@/lib/api/my-deals.api';
 import { mesEnvois } from '@/lib/api/shipment.api';
+import { conversationsDeLApi, type ConversationDeLaListe } from '@/lib/fil';
 import { demandeDeLApi, sectionDeLaDemande, type DemandeDeLaListe } from '@/lib/mes-demandes';
 import { envoiDeLApi, sectionDeLEnvoi, type EnvoiDeLaListe } from '@/lib/mes-envois';
 import { useSession } from '@/lib/session-context';
@@ -53,13 +55,56 @@ type ActiviteState = {
   badges: TabBadges;
   envois: EnvoiDeLaListe[];
   demandes: DemandeDeLaListe[];
+  /**
+   * D117 — les conversations, GARDÉES.
+   *
+   * Elles arrivaient déjà : le serveur sert `{ items, totalUnread }` et ce
+   * fichier typait la réponse `{ totalUnread: number }`. La liste entière
+   * traversait le réseau à chaque rafraîchissement et mourait à
+   * `JSON.parse` — D102 rejoué sur un autre contrat. L'onglet Messages la
+   * lit désormais d'ici, et c'est la MÊME lecture que le badge : une
+   * pastille ne peut pas annoncer autre chose que l'écran où elle mène.
+   */
+  conversations: ConversationDeLaListe[];
+  /**
+   * La lecture des conversations a ÉCHOUÉ.
+   *
+   * Sans ce drapeau, une panne réseau donnerait une liste vide, et l'écran
+   * dirait « aucune conversation » — un mensonge, et le même que D115 bis
+   * et D116 bis ont corrigé deux fois sur le site (le squelette perpétuel,
+   * puis la lecture non attrapée). Une absence et une panne ne se disent
+   * pas avec la même phrase.
+   */
+  conversationsEnEchec: boolean;
   /** `false` tant que la première lecture n'est pas revenue. */
   pret: boolean;
 };
 
-const VIDE: ActiviteState = { badges: ZERO, envois: [], demandes: [], pret: false };
+/**
+ * Ce que voient les écrans : les données, PLUS le moyen de les relire.
+ *
+ * L'action est tenue à part de l'état. Une `relire` rangée DANS l'état
+ * qu'elle produit se référencerait elle-même — TypeScript le refuse, et il
+ * a raison : une donnée et le moyen de l'obtenir n'ont pas la même durée
+ * de vie.
+ */
+export type Activite = ActiviteState & { rafraichir: () => Promise<void> };
 
-const ActiviteContext = createContext<ActiviteState | null>(null);
+const VIDE: ActiviteState = {
+  badges: ZERO,
+  envois: [],
+  demandes: [],
+  conversations: [],
+  conversationsEnEchec: false,
+  pret: false,
+};
+
+const ActiviteContext = createContext<Activite | null>(null);
+
+const RIEN: Activite = { ...VIDE, rafraichir: async () => undefined };
+
+/** Sentinelle : une lecture qui a échoué n'est pas une lecture vide. */
+const ECHEC = Symbol('lecture en échec');
 
 function tripsOf(body: MyTripsResponse): TripLike[] {
   if (Array.isArray(body)) return body;
@@ -75,10 +120,13 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
     const [deals, trips, conversations, envoisBruts] = await Promise.all([
       isCarrier ? mesDemandes() : Promise.resolve([]),
       apiFetch<MyTripsResponse>('/trips/my').catch(() => null),
-      apiFetch<{ totalUnread: number }>('/messages/conversations').catch(() => null),
+      mesConversations().catch(() => ECHEC),
       mesEnvois(),
     ]);
 
+    // La réponse ENTIÈRE, enfin lue (D117 0A).
+    const enEchec = conversations === ECHEC;
+    const fils = conversationsDeLApi(enEchec ? null : conversations);
     const demandes = deals
       .map(demandeDeLApi)
       .filter((d): d is DemandeDeLaListe => d !== null);
@@ -86,7 +134,10 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
       .map(envoiDeLApi)
       .filter((e): e is EnvoiDeLaListe => e !== null);
 
-    setEtat({
+    // Forme à UPDATER : le compteur des messages doit pouvoir relire le
+    // précédent quand la lecture a échoué. L'updater reste PUR — il ne fait
+    // que calculer (CQS, leçon D83) ; les effets sont déjà tous derrière.
+    setEtat((precedent) => ({
       // LES COMPTEURS DÉRIVENT DES LISTES : c'est ce qui rend impossible
       // qu'un badge dise autre chose que l'écran vers lequel il mène.
       badges: {
@@ -94,13 +145,20 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
         draftTrips: tripsOf(trips ?? []).filter(
           (t) => t.status === 'DRAFT' || t.status === 'PAUSED'
         ).length,
-        unreadMessages: conversations?.totalUnread ?? 0,
+        // Une panne ne REMET PAS la pastille à zéro : elle garderait le
+        // dernier compte connu plutôt que d'annoncer « tout est lu », ce
+        // qui est la version silencieuse du même mensonge.
+        unreadMessages: enEchec ? precedent.badges.unreadMessages : fils.totalNonLus,
         shipmentsToHandle: envois.filter((e) => sectionDeLEnvoi(e) === 'aTraiter').length,
       },
       envois,
       demandes,
+      // Une panne garde la DERNIÈRE liste connue : un écran qui se vide
+      // pendant que le réseau hoquette est pire qu'un écran un peu vieux.
+      conversations: enEchec ? precedent.conversations : fils.items,
+      conversationsEnEchec: enEchec,
       pret: true,
-    });
+    }));
   }, [isCarrier]);
 
   useEffect(() => {
@@ -115,7 +173,9 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [status, relire]);
 
-  return <ActiviteContext.Provider value={etat}>{children}</ActiviteContext.Provider>;
+  const valeur = useMemo<Activite>(() => ({ ...etat, rafraichir: relire }), [etat, relire]);
+
+  return <ActiviteContext.Provider value={valeur}>{children}</ActiviteContext.Provider>;
 }
 
 /**
@@ -123,8 +183,8 @@ export function ActiviteProvider({ children }: { children: ReactNode }) {
  * jeter : un badge absent n'a jamais à casser un écran (c'est déjà la
  * doctrine de ce hook — « un badge qui échoue vaut zéro »).
  */
-export function useActivite(): ActiviteState {
-  return useContext(ActiviteContext) ?? VIDE;
+export function useActivite(): Activite {
+  return useContext(ActiviteContext) ?? RIEN;
 }
 
 /** Les compteurs seuls. Même signature qu'avant D114 : rien à changer chez les appelants. */
