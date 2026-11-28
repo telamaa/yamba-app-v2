@@ -13181,3 +13181,175 @@ chaque fois au même point, jusqu'à ce qu'un incident la tranche à la place de
   tard.
 * **Un job ajouté ne devient pas requis tout seul** : il faut le cocher dans la protection de
   branche. Quatre des vingt-et-un contrôles de ce dépôt sont consultatifs pour cette seule raison.
+
+# Chapitre — Un test qui n'est jamais joué devient une affirmation fausse
+
+*(remise à niveau du harnais navigateur, 28/11/2026)*
+
+## 1. Le décor
+
+`apps/e2e` est une recette de 550 scénarios qui pilotent un vrai Chrome contre la vraie pile.
+Elle **n'est pas** dans la CI : c'est un choix (elle a besoin des six services, des deux fronts et
+de Mailpit). La conséquence, elle, n'a jamais été choisie : **rien ne dit quand une décision la
+périme**. Rejouée après six semaines, elle décrivait par endroits un produit disparu.
+
+Retenez la formulation, parce qu'elle vaut pour toute documentation exécutable :
+
+> Un test qu'on ne joue pas n'est pas un test endormi. C'est une **affirmation**, et elle vieillit
+> en silence. Une affirmation fausse coûte plus cher qu'une absence d'affirmation, parce qu'elle
+> rassure.
+
+## 2. La règle de tri, et pourquoi elle est la seule honnête
+
+Devant un scénario rouge, deux routes s'ouvrent, et l'une est un piège :
+
+1. **réparer le produit** jusqu'à ce que la fiche passe ;
+2. **réparer la fiche** jusqu'à ce qu'elle passe.
+
+Les deux sont des fautes si on les choisit par confort. La règle appliquée ici :
+
+> Si une entrée du registre explique l'écart → **la fiche est périmée**, on la met à jour **en
+> citant la décision**. Si rien ne l'explique → **c'est un défaut**, et la fiche reste rouge.
+
+Ce n'est pas une politesse envers le registre : c'est ce qui rend la mise à jour **vérifiable**.
+Chaque fiche retouchée ici porte, en commentaire, la décision et sa date — un lecteur de 2027 peut
+contester la décision, il ne peut pas croire à un arrangement.
+
+## 3. Trois façons de viser faux, vues le même jour
+
+### 3.1 Viser une balise quand c'est le RÔLE qui compte
+
+```tsx
+<button type="button" role="radio" aria-checked={active}>S · Une enveloppe…</button>
+```
+
+```ts
+// ✗ ne trouve rien : le rôle EXPLICITE l'emporte sur la balise
+this.page.getByRole("button", { name: /^S\b/ })
+// ✓
+this.page.getByRole("radio", { name: /^S\b/ })
+```
+
+Un `<button role="radio">` **n'est pas** un bouton pour l'arbre d'accessibilité, donc pas pour
+Playwright, donc pas pour un lecteur d'écran. Si votre sélecteur ne le trouve plus, ce n'est pas
+un caprice de l'outil : c'est que **la signification du contrôle a changé**.
+
+### 3.2 Viser un exemple de saisie — du texte de produit
+
+```ts
+// ✗ « Marie » et « Mboungou » sont devenus « Jean » et « Jacques »
+this.page.locator('input[placeholder="Marie"]')
+// ✓ le jeton autocomplete : la signification du champ, pas sa décoration
+this.page.locator('input[autocomplete="given-name"]')
+```
+
+Le fichier assumait cette exception « faute de libellé stable ». La leçon n'est pas « il avait
+tort », c'est : **quand une exception est assumée, elle se revisite** — il existe aujourd'hui un
+repère meilleur qu'un libellé, parce qu'il est lu par le navigateur et par le gestionnaire de mots
+de passe, et qu'on ne le réécrit pas en relisant une maquette.
+
+### 3.3 Emprunter un repère géométrique au mauvais objet
+
+```ts
+// ✗ `porte` est le conteneur PLEIN ÉCRAN du dialogue (mesuré : y=0, h=844)
+expect(croix.y).toBeLessThan(boitePorte.y + boitePorte.height / 3);
+// ✓ indépendant de la hauteur du contenu
+expect(croix.y).toBeLessThan(titre.y);
+expect(croix.y).toBeGreaterThan(titre.y - 120);
+```
+
+Le scénario voulait dire « la croix est en haut de la feuille » et mesurait « la croix est dans le
+tiers supérieur de l'écran ». Tant que la feuille montait haut, les deux phrases coïncidaient. Une
+marche de connexion en moins, la feuille descend de huit pixels, et la fiche rougit **sur un
+produit sain**. Règle générale : **mesurez contre l'objet dont vous parlez** — ou, si vous ne
+savez pas le saisir, contre un repère **sémantique** (le titre) plutôt que métrique.
+
+## 4. Le vrai défaut était dans la phrase qu'on allait écrire
+
+En corrigeant le scénario du plancher (D81 : le plancher est en kilos, plus en euros), il a fallu
+regarder la phrase réellement affichée :
+
+```
+aucun envoi ne te rapporte moins de 2.3 kg × ton tarif
+```
+
+Un point, en français. `create-trip.copy.ts` faisait :
+
+```ts
+`… moins de ${kg} kg × ton tarif …`   // kg vaut 2.3 → "2.3"
+```
+
+alors que les **deux autres** surfaces qui affichent ce même plancher passent par un gabarit
+next-intl et écrivent « 2,3 ». D108 avait déjà donné la règle et son domicile
+(`number-format.ts`) ; son balayage cherchait les **formes** connues — `toFixed`,
+`.replace('.', ',')` — et ne pouvait pas voir celle-ci, qui n'est qu'une interpolation.
+
+> **Un détecteur attrape ce qu'il connaît.** Viser une orthographe plutôt qu'un usage est le
+> défaut que ce dépôt a payé six fois ; ici il était à l'intérieur même du garde-fou.
+
+Et le correctif n'a demandé aucune invention : `formatParcelKg` (D101) existait à trois fichiers
+de là, déjà dupliquée octet pour octet entre les fronts, déjà sous fiche.
+
+> **La première question devant un défaut n'est pas « comment le corriger » mais « où est-il déjà
+> corrigé ? »**
+
+## 5. Une fiche clavier qui sortait du champ pour aller le chercher
+
+```ts
+for (let i = 0; i < 4; i++) { await page.keyboard.press("Tab"); /* … */ }
+await expect(page.locator("#password")).toBeFocused();
+```
+
+Diagnostic obtenu en **une** exécution, en mettant le chemin parcouru dans le message d'échec :
+
+```
+traversé : button:Afficher le mot de passe → input: → button:Se connecter → a:Inscris-toi → …
+```
+
+Le tout premier `Tab` atteint le **voisin immédiat** du champ : le focus y était **déjà**. La
+marche 2 de D96 le pose elle-même — exactement ce qu'une fiche clavier doit prouver, et que la
+boucle cachait. Deux leçons :
+
+- **faites dire au message d'échec ce que la fiche a traversé** : une trace Playwright est un
+  outil puissant et lent ; une phrase dans l'assertion se lit en six mois sans rien rouvrir ;
+- **une boucle « jusqu'à trouver » masque le cas où c'était déjà trouvé.** Vérifiez l'état
+  **avant** d'agir.
+
+## 6. Compter avant d'affirmer
+
+Le scénario attendait « Ton trajet ». La chaîne existe encore dans la copie — mais son seul rendu
+a été supprimé **le 01/05/2026** avec le wizard `create-old/`. Plutôt que de conclure, on compte :
+
+```sh
+# toutes les clés du type CreateTripCopy, confrontées à leur usage réel
+grep -oE '^  [a-zA-Z0-9]+' bloc-du-type.txt | sort -u | while read -r k; do
+  n=$(grep -rl "copy\.$k\b" . --include="*.tsx" | wc -l)
+  [ "$n" = "0" ] && echo "MORT: $k"
+done
+```
+
+**39 champs sur 156** ne sont rendus nulle part (aucun accès `copy[…]`, aucune déstructuration —
+vérifié avant de conclure). Deux pièges de shell payés en route, et ils valent le détour :
+
+- `grep --include=*.tsx` **non quoté** : `zsh` développe le motif avec les fichiers du dossier
+  courant, et l'option reçoit un nom de fichier. Toujours `--include="*.tsx"` ;
+- `for k in $keys` : **zsh ne découpe pas** une variable non quotée en mots (contrairement à
+  bash). La boucle s'exécute **une** fois avec tout le bloc, et ne trouve évidemment rien. Un
+  balayage qui ne balaye rien est vert pour la pire raison — ici il était **silencieux**, ce qui
+  est la même chose. Préférez `… | while read -r k; do`.
+
+## 7. Quand l'échec n'est pas dans le code
+
+`WEB-MNT-4` échouait sur « aucun `POST /deals` ». La capture montrait un **vrai formulaire
+Stripe** avec « Votre numéro de carte est incomplet ». Le harnais exige `PAYMENT_PROVIDER=fake`
+(A220) dans le `.env` **racine** ; la clé en était absente.
+
+> Avant de déboguer une fiche, vérifiez **le prérequis qu'elle n'énonce pas**. Un parcours de
+> paiement qui refuse de partir ressemble à une panne de sélecteur et n'en est pas une.
+
+## Pour aller plus loin
+
+- `apps/e2e/src/pages/reservation.ts` — l'objet de page, et ses commentaires de remise à niveau.
+- `apps/user-ui/src/lib/number-format.ts` et `parcel-weight.ts` — D108 / D101, le domicile des
+  nombres montrés.
+- Registre : **#389**, **D81**, **D96**, **D99/D99 bis**, **D100**, **D101**, **D108**, **D111**.
