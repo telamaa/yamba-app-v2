@@ -22,19 +22,22 @@ export function mesConversations(): Promise<unknown> {
   return apiFetch<unknown>('/messages/conversations');
 }
 
-/** Un fil : la conversation, ses messages, son curseur. */
-export function leFil(conversationId: string): Promise<unknown> {
-  return apiFetch<unknown>(`/messages/conversations/${conversationId}`);
-}
-
-/* `GET /conversations/by-deal/:bookingId` existe au service et n'est PAS
- * appelé ici : la porte depuis l'écran d'une demande trouve sa conversation
- * dans le contexte d'activité, qui porte déjà la liste (D117 0A) — une
- * requête de moins pour ouvrir une porte qu'on ne franchira peut-être pas.
+/**
+ * Le fil d'un DEAL — D124.
  *
- * Une fonction écrite « pour la complétude » a vécu ici une heure. Un export
- * sans appelant est un commentaire (D110), et ce lot en a supprimé six le
- * matin même. */
+ * Cette route existait depuis F-PR1 et n'était appelée par aucun des deux
+ * fronts ; le commentaire qui vivait ici expliquait très bien pourquoi on ne
+ * l'appelait pas, et il avait raison dans son monde : la liste portait déjà
+ * l'identifiant de chaque fil.
+ *
+ * Elle n'a plus raison depuis qu'un fil peut EXISTER sans ligne en base. C'est
+ * cette route qui matérialise la conversation au moment où on l'ouvre — le
+ * geste qui crée le fil est celui qui l'ouvre — et c'est donc elle, désormais,
+ * la seule porte d'entrée d'un fil.
+ */
+export function leFilDuDeal(bookingId: string): Promise<unknown> {
+  return apiFetch<unknown>(`/messages/conversations/by-deal/${bookingId}`);
+}
 
 /** J'écris. Le corps est déjà trimé et borné par `corpsAEnvoyer`. */
 export function envoyerLeMessage(

@@ -56,8 +56,11 @@ function MessagesContent() {
 
   const fils = conversationsLisibles(conversations);
 
-  const ouvrir = useCallback((id: string) => {
-    router.push({ pathname: '/conversation/[id]', params: { id } });
+  // D124 — on ouvre par le DEAL. Un fil peut exister sans ligne en base (il se
+  // matérialise à l'ouverture) : son identifiant de conversation est donc
+  // parfois `null`, et ne peut pas servir d'adresse.
+  const ouvrir = useCallback((bookingId: string) => {
+    router.push({ pathname: '/conversation/[id]', params: { id: bookingId } });
   }, []);
 
   return (
@@ -72,11 +75,11 @@ function MessagesContent() {
 
         <FlatList
           data={fils}
-          keyExtractor={(fil) => fil.id}
+          keyExtractor={(fil) => fil.bookingId}
           contentContainerStyle={fils.length === 0 ? styles.videCorps : styles.listeCorps}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <LigneDeConversation fil={item} tag={tag} onPressAction={() => ouvrir(item.id)} />
+            <LigneDeConversation fil={item} tag={tag} onPressAction={() => ouvrir(item.bookingId)} />
           )}
           ListEmptyComponent={
             // Une absence et une PANNE ne se disent pas avec la même phrase.

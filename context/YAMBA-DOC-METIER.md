@@ -10282,3 +10282,37 @@ celui qui le lit l'écrit, et il doit être écrit **pareil partout**.
 | 4 | J'ouvre la page publique d'un Voyageur dont le trajet part à 24,85 € | « 24,85 € », jamais « 24 € » |
 | 5 | Je règle mon tarif au kilo sur l'échelle | les repères disent « 8 € », « 10 € », pas « 8,00 € » |
 | 6 | Un trajet coté dans une autre devise | le symbole de cette devise, placé selon ma langue |
+
+# D124 — Un fil existe parce que le deal le dit (28/11/2026)
+
+## Le besoin
+
+Un Voyageur avec **trois deals engagés** ouvrait l'onglet Messages et lisait « Aucune
+conversation » — sous une phrase qui lui promettait le contraire. Il n'avait aucun moyen d'écrire
+à l'Expéditeur dont il transportait le colis.
+
+Le fil n'est pas un objet que l'on crée : c'est **la conséquence d'un deal accepté**. Tant que
+l'écran le présente comme une chose qui existe ou non, il doit le présenter selon la règle du
+produit, pas selon l'état d'une table.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D124-1** | Un fil **existe** dès que le deal atteint l'un des six statuts engagés (accepté, pris en charge, livré, en litige, terminé, annulé). | C'est déjà la règle qui décide qui peut lire et écrire ; elle décide maintenant aussi de la liste. |
+| **RG-D124-2** | La liste montre **tous** les fils qui existent, ouverts ou non. | Un fil qu'on n'a jamais ouvert est celui qu'on a le plus besoin de voir. |
+| **RG-D124-3** | Un fil jamais ouvert se présente avec son **corridor, sa contrepartie et le statut du deal**, et s'ouvre sur un fil vide où l'on peut écrire le premier message. | Un fil vide n'est pas un fil absent. |
+| **RG-D124-4** | **Consulter la liste ne crée rien.** | Le nombre de fils ne doit pas dépendre de qui a ouvert quel écran. |
+| **RG-D124-5** | L'ordre : le plus vivant d'abord — dernier message, et à défaut la date où le deal a été accepté. | Un fil muet a quand même une date d'apparition. |
+| **RG-D124-6** | L'état vide ne s'affiche **que** s'il n'y a aucun deal engagé. | Sa phrase (« un fil s'ouvre dès qu'une demande est acceptée ») redevient vraie. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | Voyageur avec trois deals engagés, jamais entré dans un fil | **trois** lignes dans Messages |
+| 2 | J'ouvre l'une d'elles | le fil s'ouvre, vide, et je peux écrire |
+| 3 | J'écris le premier message | il part, et la ligne remonte en tête de liste |
+| 4 | Je consulte la liste dix fois sans rien ouvrir | rien n'est créé, la liste est identique |
+| 5 | Aucun deal engagé | « Aucune conversation », et la phrase est vraie |
+| 6 | Un deal encore en attente d'acceptation | **aucune** ligne — le fil n'existe pas encore |

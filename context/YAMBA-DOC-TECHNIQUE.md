@@ -21753,3 +21753,105 @@ suivis par git, importés par personne. Supprimés.
   forme mais un défaut de VÉRITÉ, et il appartient au lot d'épuration.
 - **`booking.copy.ts`** écrit « + 6 € » et « Garantie Yamba 500 € » en dur, alors que les deux
   valeurs existent dans `pricingParams`. Même famille, autre lot.
+
+# D124 — Un fil existe parce que le deal le dit (28/11/2026)
+
+L'onglet Messages affichait **« Aucune conversation »** — et, trois lignes plus bas, sa propre
+phrase : *« Un fil s'ouvre dès qu'une demande est acceptée. »*
+
+Mesure **en base**, sur le compte de l'utilisateur, avant d'écrire une ligne :
+
+```
+user 69e2847355ce6c6ed0c24eea
+ 6a983c18… COMPLETED   role=VOYAGEUR  conversation=AUCUNE
+ 6a97da70… PICKED_UP   role=VOYAGEUR  conversation=AUCUNE
+ 6a97090d… COMPLETED   role=VOYAGEUR  conversation=AUCUNE
+```
+
+Trois deals engagés, zéro conversation. **L'écran disait vrai sur la règle et faux sur les faits,
+dans le même cadre.**
+
+## Deux mécanismes corrects, une composition fausse
+
+| | Ce qu'il dit | Où |
+|---|---|---|
+| La **règle** | le fil EXISTE pour six statuts de deal | `conversation.rules.ts`, `CONVERSATION_OPEN_STATUSES` |
+| Le **stockage** | la ligne est écrite à la PREMIÈRE ouverture | `loadContext`, création paresseuse assumée |
+| La **liste** | lisait **uniquement** la collection `Conversation` | `list()` |
+
+Aucun des deux premiers n'est un défaut. La création paresseuse est un bon choix (elle évite
+d'écrire une ligne pour un fil que personne n'ouvrira) et la règle des six statuts est juste.
+**Le défaut est dans leur composition** — exactement comme D104, où un bouton de retour correct
+se trouvait du mauvais côté d'une garde correcte.
+
+C'est aussi, une fois de plus, le piège **null-vs-absent** de ce dépôt, transposé à un écran : le
+vide de la collection voulait dire deux choses — « pas de fil » et « fil jamais ouvert ».
+
+> **Quand deux sources de vérité se contredisent, on ne choisit pas la plus pratique : on regarde
+> laquelle est déjà sous fiche.** La règle l'était.
+
+## Ce que le lot change
+
+**(1) `list()` part des DEALS.** Elle interroge les `Booking` dont l'appelant est partie et dont
+le statut est dans `CONVERSATION_OPEN_STATUSES`, puis **joint** les conversations matérialisées.
+La règle qui décidait de l'accès décide maintenant aussi de la liste : une seule définition de
+« le fil existe ».
+
+**(2) Lire n'écrit pas.** La tentation évidente — matérialiser les lignes manquantes pendant le
+listage — est refusée par une règle déjà gravée : **une fonction qui répond à une question n'écrit
+jamais** (CQS, D83, corrigée par SUPPRESSION et verrouillée en comptant les écritures). Une
+lecture qui écrit rendrait le nombre de lignes dépendant de qui a ouvert quel écran, et ferait
+d'un `GET` une opération non idempotente. Une fiche le vérifie (`conversation.create` n'est jamais
+appelé pendant un listage, et deux listages rendent exactement la même chose).
+
+**(3) L'identité d'un fil, pour un client, c'est le deal.** `ConversationSummary.id` devient
+**nullable**, et les deux fronts ouvrent par `bookingId` via `GET /conversations/by-deal/:id` —
+une route qui existe depuis F-PR1 et que **ni l'un ni l'autre n'appelait**. Elle matérialise au
+moment où l'on entre : *le geste qui crée le fil est celui qui l'ouvre*, ce qui était déjà vrai.
+On ne change pas le mécanisme, on cesse de faire dépendre la liste de son résultat.
+
+Une porte de moins, aussi : les clients avaient deux chemins (par `id`, par `bookingId`) ; il n'en
+reste qu'un. Le mobile portait même un commentaire expliquant pourquoi il n'appelait pas
+`by-deal` — il avait raison dans son monde, et ce monde vient de changer.
+
+**(4) L'ordre ne peut plus être `lastMessageAt` seul.** Un fil sans message n'a pas de dernière
+activité : il prend celle du deal (`acceptedAt`, à défaut `createdAt`) — le moment où il a
+commencé d'exister. `acceptedAt` est nullable au schéma, et une fiche pin ce repli : un tri qui le
+suppose présent placerait ces fils au hasard.
+
+## Le piège côté client, et il était déjà posé
+
+```ts
+export function conversationDeLApi(brut: unknown): ConversationDeLaListe | null {
+  const id = texte(c.id).trim();
+  if (id.length === 0) return null;   // ← aurait jeté EXACTEMENT les fils du lot
+```
+
+Le garde défensif du mobile refusait toute entrée sans `id`. Il était juste quand `id` était
+obligatoire ; il serait devenu, en silence, la cause du même écran vide. **Un filtre écrit pour
+une forme de données survit mal au changement de cette forme : quand un contrat bouge, on relit
+les gardes avant de regarder les écrans.**
+
+## Fiches
+
+- `apps/message-service/src/services/conversation-list.service.spec.ts` — **13 fiches** : la liste
+  part des deals (le cas réel à trois deals / zéro conversation est rejoué tel quel), elle demande
+  les six statuts **de la règle** et non une liste recopiée, elle n'écrit rien, un fil jamais
+  ouvert porte `id: null` mais son corridor et sa contrepartie, et l'ordre tient dans les trois
+  cas (fil qui parle, fils muets, deal sans `acceptedAt`).
+- `apps/mobile/src/lib/fil.spec.ts` — le garde d'identité change de clé, et deux fiches épinglent
+  qu'un fil sans `id` survit à la lecture.
+
+## Mesures
+
+- message-service : **79 → 92 fiches / 19 suites**.
+- mobile : **1 565 fiches** (deux fiches ajoutées, deux réécrites), typecheck vert.
+- site : **345 fiches**, typecheck vert.
+- Les cinq `openapi.json` régénérés (le champ devient `["string","null"]` avec sa description).
+
+## Reste ouvert (nommé)
+
+- **Le harnais navigateur n'a pas été rejoué sur ce lot** : `web-msg` et `web-nrg` ont besoin de
+  Mailpit, absent du poste au moment du lot. Deux chapitres à rejouer avant de fusionner.
+- **Notifier un fil jamais ouvert** n'a pas de sens aujourd'hui (il n'a aucun message). La
+  question se reposera si le produit annonce un jour « votre fil est ouvert ».

@@ -66,7 +66,14 @@ export type ConversationAccess = z.infer<typeof ConversationAccessSchema>;
 
 export const ConversationSummarySchema = z
   .object({
-    id: ObjectIdSchema,
+    /**
+     * D124 — NULLABLE. Un fil EXISTE dès que le deal atteint l'un des six
+     * statuts de `CONVERSATION_OPEN_STATUSES` ; sa ligne en base, elle, n'est
+     * écrite qu'à la première ouverture. La liste ne matérialise rien (une
+     * lecture n'écrit pas, D83) : un fil jamais ouvert se présente donc sans
+     * identifiant, et les clients l'ouvrent par `bookingId`.
+     */
+    id: ObjectIdSchema.nullable().describe("null tant que le fil n'a jamais été ouvert — ouvrir par bookingId"),
     bookingId: ObjectIdSchema,
     role: z.enum(["SHIPPER", "CARRIER"]).describe("Le rôle de CELUI qui lit"),
     counterpart: z.object({ id: ObjectIdSchema, firstName: z.string(), avatarUrl: z.string().nullable() }),

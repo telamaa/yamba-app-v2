@@ -46,7 +46,12 @@ export type ConversationAccess = {
 };
 
 export type ConversationSummary = {
-  id: string;
+  /**
+   * D124 — NULL tant que le fil n'a jamais été ouvert : un fil existe dès que
+   * le deal est engagé, sa ligne en base n'est écrite qu'à la première
+   * ouverture. L'adresse d'un fil, c'est `bookingId`.
+   */
+  id: string | null;
   bookingId: string;
   role: "SHIPPER" | "CARRIER";
   counterpart: { id: string; firstName: string; avatarUrl: string | null };

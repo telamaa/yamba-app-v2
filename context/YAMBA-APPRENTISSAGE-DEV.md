@@ -13490,3 +13490,138 @@ les centimes.
   octet pour octet, et une fiche l'exige).
 - `apps/*/src/lib/argent-dans-la-langue.spec.ts` — les deux fiches du lot.
 - `Intl.NumberFormat`, option `style: "currency"` — et la raison de l'espace fine insécable.
+
+# Chapitre — Quand deux décisions justes produisent un écran faux (D124)
+
+## 1. Le symptôme, et pourquoi il est embarrassant
+
+```
+Messages
+  No conversations yet
+  A thread opens as soon as a request is accepted,
+  so you can agree on a place and a time.
+```
+
+L'écran **énonce la règle** et **la contredit** dans le même cadre. C'est un cas rare et précieux :
+le produit se dénonce lui-même, et il suffit de le lire.
+
+## 2. Mesurer avant de raisonner
+
+La tentation est de lire le code de la liste. La bonne première action est de regarder la base :
+
+```ts
+const bookings = await db.booking.findMany({ where: { OR: [{ shipperId: u.id }, { carrierId: u.id }] } });
+for (const b of bookings) {
+  const conv = await db.conversation.findFirst({ where: { bookingId: b.id } });
+  console.log(b.status, conv ? conv.id : "AUCUNE");
+}
+// PICKED_UP  AUCUNE
+// COMPLETED  AUCUNE
+// COMPLETED  AUCUNE
+```
+
+Trois lignes de script répondent à la question que trois heures de lecture auraient posée de
+travers : *« est-ce la liste qui filtre, ou n'y a-t-il réellement rien ? »*
+
+## 3. Le défaut n'est dans aucun des deux fichiers
+
+```ts
+// conversation.rules.ts — la RÈGLE
+export const CONVERSATION_OPEN_STATUSES = ["ACCEPTED", "PICKED_UP", "DELIVERED", "DISPUTED", "COMPLETED", "CANCELLED"];
+export function conversationExists(b) { return CONVERSATION_OPEN_STATUSES.includes(b.status); }
+
+// conversation.service.ts — le STOCKAGE (création paresseuse, assumée)
+if (!conversation) conversation = await prisma.conversation.create({ /* … */ });
+
+// …et la LISTE, qui ne connaissait que le stockage
+const rows = await prisma.conversation.findMany({ where: { OR: [{ shipperId }, { carrierId }] } });
+```
+
+Les deux premiers sont bons. La création paresseuse évite d'écrire une ligne pour un fil que
+personne n'ouvrira ; la règle est exacte. **C'est leur composition qui ment** — et c'est la
+troisième fois que ce dépôt paie ce motif (D104 : un retour correct du mauvais côté d'une garde ;
+D106 : trois mécanismes corrects qui perdaient une recherche).
+
+> **Un défaut qui n'est dans aucun fichier pris isolément ne se trouve pas en relisant les
+> fichiers.** Il se trouve en demandant : *qui répond à cette question à l'écran, et est-ce la même
+> chose qui la décide ailleurs ?*
+
+Et la règle de tri, quand deux sources se contredisent : **celle qui est déjà sous fiche gagne.**
+
+## 4. Lire n'écrit pas — même quand ce serait commode
+
+La correction évidente est de matérialiser les lignes manquantes pendant le listage. Trois lignes,
+et l'écran est juste.
+
+Elle est refusée par une règle que ce dépôt a déjà gravée (**D83**, corrigée *par suppression*) :
+
+> Une fonction qui répond à une question n'écrit jamais.
+
+Les raisons, concrètes : un `GET` deviendrait non idempotent ; le nombre de lignes en base
+dépendrait de qui a ouvert quel écran ; et deux onglets ouverts en même temps feraient la course
+sur un `bookingId` unique — la collision A195, rejouée pour rien.
+
+La fiche le verrouille, et c'est elle qui compte :
+
+```ts
+expect(prismaMock.conversation.create).not.toHaveBeenCalled();
+expect(await service.list(MOI)).toEqual(await service.list(MOI));
+```
+
+## 5. L'identité d'un objet n'est pas toujours sa clé primaire
+
+Si la liste ne matérialise rien, certains fils n'ont **pas** d'identifiant de conversation. Que
+devient l'adresse d'un fil ?
+
+```ts
+id: ObjectIdSchema.nullable()   // la ligne en base
+bookingId: ObjectIdSchema       // le DEAL — toujours là
+```
+
+**Pour un client, l'identité d'un fil est le deal.** La route qui l'ouvre existait depuis le
+premier lot de messagerie (`/conversations/by-deal/:bookingId`) et **aucun des deux fronts ne
+l'appelait** : la liste leur donnait déjà un `id`, donc elle ne servait à rien.
+
+Le mobile portait même un commentaire expliquant *pourquoi* il ne l'appelait pas — et ce
+commentaire avait raison, dans son monde. **Une justification reste vraie dans le contexte qui l'a
+motivée ; elle ne se périme pas toute seule, il faut aller la relire quand le contexte change.**
+
+Conséquence heureuse : les clients avaient **deux** chemins vers un fil, il n'en reste qu'un.
+
+## 6. Le garde défensif qui allait annuler le correctif
+
+```ts
+export function conversationDeLApi(brut: unknown): ConversationDeLaListe | null {
+  const id = texte(c.id).trim();
+  if (id.length === 0) return null;     // ← jetterait EXACTEMENT les fils du lot
+```
+
+Ce garde est bon. Il était juste tant que `id` était obligatoire. Avec le nouveau contrat, il
+aurait silencieusement reproduit l'écran vide **côté client**, et la cause aurait été introuvable :
+le serveur renvoyait bien trois lignes.
+
+> **Quand un contrat bouge, on relit les gardes avant de regarder les écrans.** Un filtre écrit
+> pour une forme de données ne survit pas au changement de cette forme, et il échoue de la pire
+> façon : en silence, avec un résultat plausible.
+
+## 7. Un tri a besoin d'un repli, et le repli a besoin d'une fiche
+
+```ts
+function activiteDuFil(item, bookings) {
+  if (item.lastMessage) return new Date(item.lastMessage.createdAt).getTime();
+  const b = bookings.find((x) => x.id === item.bookingId);
+  return new Date(b?.acceptedAt ?? b?.createdAt ?? 0).getTime();
+}
+```
+
+`acceptedAt` est **nullable** au schéma. Un tri qui le suppose présent place ces fils au hasard —
+et au hasard veut dire « dans l'ordre de Mongo », c'est-à-dire d'une façon qui change sans
+prévenir. La fiche pin les trois cas : un fil qui parle, deux fils muets, un deal sans date
+d'acceptation.
+
+## Pour aller plus loin
+
+- `apps/message-service/src/lib/conversation.rules.ts` — la règle, son domicile.
+- `apps/message-service/src/services/conversation-list.service.spec.ts` — les 13 fiches du lot.
+- Registre : **D61** (le fil comme objet), **D83** (CQS), **D104** et **D106** (deux autres défauts
+  de composition), **A195** (la course à l'ouverture d'un fil).

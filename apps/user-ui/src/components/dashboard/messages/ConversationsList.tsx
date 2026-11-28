@@ -26,8 +26,9 @@ export default function ConversationsList({
   onSelectAction,
 }: {
   items: ConversationSummary[];
+  /** D124 — l'adresse d'un fil est son DEAL : c'est la seule que tout fil possède. */
   selectedId: string | null;
-  onSelectAction: (id: string) => void;
+  onSelectAction: (bookingId: string) => void;
 }) {
   const t = useTranslations("messaging");
   const locale = useLocale();
@@ -45,11 +46,11 @@ export default function ConversationsList({
   return (
     <ul className="divide-y divide-slate-100 dark:divide-slate-800">
       {items.map((c) => {
-        const selected = c.id === selectedId;
+        const selected = c.bookingId === selectedId;
         return (
-          <li key={c.id}>
+          <li key={c.bookingId}>
             <button
-              onClick={() => onSelectAction(c.id)}
+              onClick={() => onSelectAction(c.bookingId)}
               className={`flex w-full items-start gap-3 px-3 py-3 text-left transition-colors ${
                 selected ? "bg-slate-50 dark:bg-slate-800/60" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
               }`}

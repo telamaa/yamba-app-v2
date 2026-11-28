@@ -54,6 +54,30 @@ export function useThread(conversationId: string | null, options?: { active?: bo
   });
 }
 
+/**
+ * Le même fil, ouvert par son DEAL — D124.
+ *
+ * Un fil EXISTE dès que le deal atteint l'un des six statuts de la règle ; sa
+ * ligne en base, elle, n'est écrite qu'à la première ouverture. La liste ne
+ * matérialise rien (une lecture n'écrit pas), donc elle rend parfois un fil
+ * sans identifiant de conversation — et c'est cette requête-ci qui le crée, au
+ * moment où quelqu'un entre.
+ *
+ * La clé de cache reste celle de la CONVERSATION une fois connue : les deux
+ * portes mènent au même fil, elles ne doivent pas en garder deux copies.
+ */
+export function useThreadByDeal(bookingId: string | null, options?: { active?: boolean }) {
+  return useQuery({
+    queryKey: ["messaging", "thread", "by-deal", bookingId ?? "none"],
+    queryFn: () => getThreadByDeal(bookingId as string),
+    enabled: !!bookingId,
+    staleTime: 1_000,
+    refetchInterval: options?.active === false ? false : 3_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useQuickReplies(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["me", "quick-replies"],
@@ -127,8 +151,11 @@ export function useOpenDealThread() {
       focus: input.focus,
     }),
     onSuccess: ({ thread, focus }) => {
-      queryClient.setQueryData(threadQueryKey(thread.conversation.id), thread);
-      const params = new URLSearchParams({ conversation: thread.conversation.id });
+      // D124 — on navigue par le DEAL : c'est la seule adresse qu'un fil a
+      // toujours. L'identifiant de conversation n'existe qu'une fois la ligne
+      // matérialisée, ce que cette requête vient précisément de faire.
+      queryClient.setQueryData(["messaging", "thread", "by-deal", thread.conversation.bookingId], thread);
+      const params = new URLSearchParams({ conversation: thread.conversation.bookingId });
       if (focus) params.set("focus", focus);
       router.push(`/dashboard/messages?${params.toString()}`);
     },
