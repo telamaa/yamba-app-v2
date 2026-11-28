@@ -1,5 +1,3 @@
-import { conteneurDePage } from "@/lib/layout/largeur-de-page";
-
 /**
  * DealRequestSkeleton.tsx
  * =======================
@@ -9,6 +7,8 @@ import { conteneurDePage } from "@/lib/layout/largeur-de-page";
  */
 
 "use client";
+
+import { conteneurDePage } from "@/lib/layout/largeur-de-page";
 
 export default function DealSkeleton() {
   return (
