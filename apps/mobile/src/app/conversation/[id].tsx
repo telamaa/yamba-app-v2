@@ -472,7 +472,7 @@ function FilContent() {
 
       <MessageReportSheet
         visible={aSignaler !== null}
-        conversationId={id ?? ''}
+        conversationId={conversationId ?? ''}
         messageId={aSignaler?.id ?? ''}
         onCloseAction={() => setASignaler(null)}
       />

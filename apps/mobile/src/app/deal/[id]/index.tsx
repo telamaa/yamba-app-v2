@@ -255,7 +255,10 @@ function DemandeContent() {
             <Pressable
               accessibilityRole="button"
               onPress={() =>
-                router.push({ pathname: '/conversation/[id]', params: { id: conversation.id } })
+                // D124 — la route du fil prend un bookingId : c'est la seule adresse
+                // qu'un fil possède toujours, l'identifiant de conversation étant
+                // nul tant que personne n'a ouvert le fil.
+                router.push({ pathname: '/conversation/[id]', params: { id: conversation.bookingId } })
               }
               style={({ pressed }) => [
                 styles.secondaire,
