@@ -25,7 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocale, useTranslations } from 'use-intl';
 
 import { IdentityGate } from '@/components/identity-gate';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
+import { HeaderActions } from '@/components/header-actions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -67,7 +67,7 @@ function MessagesContent() {
           <ThemedText type="title" style={styles.title}>
             {t('list.title')}
           </ThemedText>
-          <ProfileAvatarButton />
+          <HeaderActions />
         </View>
 
         <FlatList

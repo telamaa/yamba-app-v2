@@ -21,7 +21,16 @@
     "booking_rating_reminder": "Remember to leave a rating",
     "booking_rating_revealed": "Ratings revealed",
     "fallback": "Notification",
-    "carrier_payout_failed": "Bank transfer refused: check your bank details"
+    "carrier_payout_failed": "Bank transfer refused: check your bank details",
+    "booking_payment_authorized": "Payment authorised",
+    "booking_refund_issued": "Refund issued",
+    "booking_code_regenerated": "New delivery code",
+    "booking_dispute_carrier_responded": "Dispute response",
+    "booking_dispute_resolved": "Dispute resolved",
+    "conversation_message_posted": "New message",
+    "conversation_meetup_proposed": "Meeting suggested",
+    "conversation_meetup_accepted": "Meeting confirmed",
+    "conversation_phone_revealed": "Phone number shown"
   },
   "bellTitle": "Notifications",
   "markAllRead": "Mark all as read",
@@ -268,6 +277,36 @@
       "CARRIER": {
         "title": "Your side has been sent · {ticket}",
         "line": "{route} · Yamba answers within 48 business hours"
+      }
+    },
+    "conversation_meetup_proposed": {
+      "SHIPPER": {
+        "title": "{name} suggested a meeting",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "{name} suggested a meeting",
+        "line": "{route}"
+      }
+    },
+    "conversation_meetup_accepted": {
+      "SHIPPER": {
+        "title": "Meeting confirmed with {name}",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Meeting confirmed with {name}",
+        "line": "{route}"
+      }
+    },
+    "conversation_phone_revealed": {
+      "SHIPPER": {
+        "title": "Phone number shown",
+        "line": "You can reach {name} directly."
+      },
+      "CARRIER": {
+        "title": "Phone number shown",
+        "line": "You can reach {name} directly."
       }
     }
   }

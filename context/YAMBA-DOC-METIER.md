@@ -10079,3 +10079,60 @@ absurde et fait sortir la transaction de la plateforme.
 |---|---|---|
 | 1 | Je colle 200 caractères dans le lieu | le champ s'arrête à 160 et le compteur apparaît |
 | 2 | Je mets une fin avant le début | on me dit exactement cela |
+
+
+---
+
+# D119 — La boîte aux lettres (27/11/2026)
+
+## Le besoin
+
+Le membre apprenait ce qui arrivait à ses envois et à ses trajets par e-mail, ou en rouvrant l'app
+et en cherchant. La boîte in-app existait côté serveur depuis des mois et n'avait **aucun** client
+mobile. Et le jour où on l'a comptée, quatre des vingt-cinq événements du produit s'affichaient sous
+le titre « Notification » — dont les trois que la messagerie venait de rendre quotidiens.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D119-1** | Chacun des **25 types** d'événement a un nom, dans les deux langues et sur les deux fronts. | Une alerte qui ne dit pas ce qui s'est passé ne sert à rien. |
+| **RG-D119-2** | Un type **inconnu** affiche un repli, jamais un plantage ni un chemin de clé. | Le serveur peut déployer un événement avant les apps. |
+| **RG-D119-3** | Une notification **illisible** est ignorée ; la liste, elle, s'affiche. | Une seule ligne cassée ne doit pas emporter toute la boîte (ANO-API-16). |
+| **RG-D119-4** | Les titres sont **neutres** : « Demande acceptée », jamais « Ta demande a été acceptée ». | Le même événement se lit des deux côtés ; une phrase au mauvais rôle est fausse. |
+| **RG-D119-5** | **Ouvrir la boîte ne marque rien** comme lu. | Une liste parcourue des yeux n'a pas été lue ; vider la pastille ferait perdre ce qu'on n'a pas vu. |
+| **RG-D119-6** | On marque en **touchant** une ligne, ou avec « tout marquer lu ». | Un geste, pas un effet de bord. |
+| **RG-D119-7** | « Tout marquer lu » n'apparaît **que** s'il reste quelque chose à marquer. | Un bouton qui ne fait rien est un bouton de trop. |
+| **RG-D119-8** | Une ligne **mène** à sa réservation — la demande pour le Voyageur, l'envoi pour l'Expéditeur. | C'est la charge utile qui dit lequel on est. |
+| **RG-D119-9** | Une ligne sans réservation (notification système) **ne prétend pas** être cliquable. | Un geste qui ne mène nulle part est pire qu'une ligne inerte. |
+| **RG-D119-10** | Le compteur de la cloche et l'écran comptent la **même** chose. | Une seule lecture, une seule vérité (D114). |
+| **RG-D119-11** | Une **panne** de lecture se dit, et ne se déguise pas en « aucune notification ». | Une absence et une panne sont deux faits différents. |
+| **RG-D119-12** | L'âge d'une notification s'écrit dans la **langue du lecteur**. | Un nombre affiché n'est jamais concaténé à la main (D108). |
+| **RG-D119-13** | La cloche est présente sur les **quatre** destinations. | Même raisonnement que la pastille Profil depuis A210. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'app avec des notifications non lues | une pastille sur la cloche, avec le nombre |
+| 2 | Je touche la cloche | la liste, la plus récente en haut |
+| 3 | Je regarde la liste sans rien toucher, puis je sors | la pastille n'a **pas** bougé |
+| 4 | Je touche une ligne | elle est marquée lue, et j'arrive sur la réservation concernée |
+| 5 | Je touche « tout marquer lu » | la pastille disparaît, le bouton aussi |
+| 6 | Tout est déjà lu | aucun bouton « tout marquer lu » |
+| 7 | Je reçois un message | la notification dit « Nouveau message », pas « Notification » |
+| 8 | Un rendez-vous m'est proposé | la notification le dit, sur les deux fronts |
+| 9 | Je reçois une notification système | elle s'affiche et n'est pas cliquable |
+| 10 | Je coupe le réseau puis j'ouvre la boîte | on me dit que ça ne se lit pas — pas « aucune notification » |
+| 11 | Je coupe le réseau avec trois non-lues | la pastille garde trois |
+| 12 | Je passe l'app en anglais | les titres et les âges suivent |
+
+## D119 bis — le site nomme enfin ses quatre muets
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D119bis-1** | Les quatre types sans nom en reçoivent un, phrases par rôle comprises. | Trois sont devenus quotidiens avec la messagerie ; le quatrième avait ses phrases et pas sa ligne de présentation. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Je reçois une proposition de rendez-vous | la cloche dit « Rendez-vous proposé », plus « Notification » |

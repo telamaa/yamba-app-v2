@@ -12805,3 +12805,145 @@ finit par être désactivé.**
   contrat en pose une (`PickupNotes` D115 bis, le message D117, le lieu et le repère ici).
 * **Compte ce que tu ne factorises pas.** Une seconde bande de jours est assumée et comptée par une
   fiche ; la troisième déclenchera le partage.
+
+
+---
+
+# Chapitre — Compter avant d'écrire (D119)
+
+Ce chapitre parle d'une habitude plus que d'une technique : **avant d'implémenter un écran qui
+affiche une famille de choses, compte la famille.** Et de quatre pièges qui vont avec.
+
+## 1. Une union fermée se couvre en entier — et la couverture se COMPTE
+
+Le contrat des notifications est une union **fermée** :
+
+```ts
+export const NotificationTypeSchema = z.union([
+  BookingEventTypeSchema,              // 20 clés
+  z.enum(SYSTEM_NOTIFICATION_TYPES),   //  1 clé
+  MessagingEventTypeSchema,            //  4 clés
+]);                                     // = 25
+```
+
+Avant d'écrire une ligne d'écran, on compte combien le client sait en nommer :
+
+```ts
+const TYPES = [...BookingEventTypeSchema.options, ...SYSTEM_NOTIFICATION_TYPES, ...MessagingEventTypeSchema.options];
+const muets = TYPES.filter((type) => !presentes.has(type));
+expect(`manquants → ${muets.join(", ") || "aucun"}`).toBe("manquants → aucun");
+```
+
+Résultat : **quatre** événements s'affichaient sous le titre « Notification ». La formulation du
+`expect` n'est pas un détail — en mettant les noms manquants dans la chaîne comparée, l'échec **dit
+lesquels**, au lieu de dire « false ≠ true ».
+
+> Le repli doit exister (le serveur peut déployer un événement avant les apps), mais **c'est un
+> filet, pas une traduction**. Il est là pour l'événement de demain, jamais pour ceux d'hier.
+
+## 2. Deux portes valent une seule serrure
+
+Le plus instructif des quatre défauts : `booking.dispute_carrier_responded` avait ses **phrases
+écrites** (`copy.*`) mais pas sa **ligne de présentation** (`PRESENTATION`). Or c'est la seconde qui
+décide du repli :
+
+```tsx
+const copy = isKnownNotificationType(item.type) ? buildNotificationCopy(...) : { title: t("items.fallback") };
+```
+
+Quelqu'un a fait la moitié du travail et l'a crue entière. **Quand une fonctionnalité a deux
+registres à remplir, la fiche doit vérifier les deux** — sinon elle garde la porte la plus visible
+et laisse l'autre ouverte.
+
+## 3. Mesurer la mauvaise table, c'est compter juste la mauvaise chose
+
+Premier décompte de ce lot : « neuf types n'ont pas de libellé ». Faux. La table mesurée (`items`)
+n'est **que le repli** ; les vrais libellés vivent dans `copy`, et le filtre est `PRESENTATION`. Le
+défaut réel touchait quatre types.
+
+L'erreur n'était pas dans le calcul — elle était dans le **choix de ce qu'on compte**. Avant
+d'annoncer un chiffre, vérifie que la table mesurée est celle que le rendu LIT.
+
+## 4. Deux pièges de fiche, et ce sont des récidives
+
+**Viser un mot qui vit aussi dans le commentaire** (huitième fois ce mois-ci) :
+
+```ts
+// ✗ rougit sur le commentaire du module, qui CITE « il y a 3 h » pour dire
+//   que c'est le dictionnaire qui l'écrit
+expect(source).not.toMatch(/il y a |min ago/);
+
+// ✓ on dépouille, puis on cherche
+const net = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+expect(net.length).toBeGreaterThan(800);   // un dépouillage raté rend une chaîne vide
+expect(net).not.toMatch(/il y a |min ago/);
+```
+
+**Un découpage qui part de l'import au lieu de l'appel** :
+
+```ts
+// ✗ `indexOf('useFocusEffect')` trouve la ligne d'IMPORT : la tranche couvre
+//   tous les imports, dont celui de `marquerToutLu`
+const auFocus = ecran.slice(ecran.indexOf("useFocusEffect"), ecran.indexOf("const ouvrir"));
+
+// ✓ on vise l'APPEL, et on borne la taille attendue
+const auFocus = ecran.slice(ecran.indexOf("useFocusEffect("), ecran.indexOf("const ouvrir"));
+expect(auFocus.length).toBeGreaterThan(40);
+expect(auFocus.length).toBeLessThan(400);
+```
+
+C'est le cousin du découpage vide de D98 : **un découpage trop large ne rougit pas pour rien, il
+rougit pour autre chose** — ce qui est plus difficile à diagnostiquer qu'un vert imbécile.
+
+## 5. Une forme à part se VÉRIFIE, elle ne s'excepte pas
+
+La fiche de couverture a trouvé `booking.tracking_event`, qui range ses phrases **par jalon**
+(`copy.<key>.<ROLE>.AT_AIRPORT.title`), parce que « l'avion a décollé » et « je suis à l'aéroport »
+ne se disent pas pareil. Deux réponses possibles :
+
+```ts
+// ✗ l'excepter — et ne plus jamais rien savoir de lui
+const EXCEPTIONS = ["booking.tracking_event"];
+
+// ✓ connaître sa forme
+if (type === "booking.tracking_event")
+  return ["SHIPPER", "CARRIER"].some((role) => JALONS.some((j) => typeof entree[role]?.[j]?.title !== "string"));
+```
+
+**Une exception se contourne ; une forme se vérifie.**
+
+## 6. Ouvrir n'est pas lire (et ça dépend de l'écran)
+
+Même produit, deux réponses opposées, et les deux sont justes :
+
+| Écran | Ouvrir marque-t-il lu ? | Pourquoi |
+|---|---|---|
+| Un fil de discussion | **oui** | ouvrir une conversation, c'est la lire |
+| Une boîte de notifications | **non** | une liste parcourue des yeux n'a pas été lue |
+
+Vider la pastille à l'ouverture de la boîte ferait perdre ce qu'on n'a pas eu le temps de voir. La
+règle générale : *demande ce que le geste signifie pour l'utilisateur, pas ce qu'il est techniquement
+pratique de déclencher.*
+
+## 7. Le bundle servi, encore
+
+Troisième rappel du mois, et il vaut la peine d'être noté avec l'URL exacte (SDK 57) :
+
+```sh
+curl "http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true" -o /tmp/bundle.js
+grep -c "HeaderActions" /tmp/bundle.js     # les modules du lot sont-ils SERVIS ?
+```
+
+`/index.bundle` répond 404 sur cette version. **Le typecheck ne dit rien de ce que Metro sert.**
+
+## Pour aller plus loin
+
+* **Rends une unité et un nombre, jamais une phrase.** `ancienneteDe()` rend
+  `{ unite: 'heure', valeur: 3 }` ; c'est le dictionnaire qui écrit « il y a 3 h », parce qu'un
+  nombre s'écrit dans la langue de celui qui le lit.
+* **Un titre sans rôle est neutre, ou il est faux.** Le même événement se lit des deux côtés d'un
+  deal.
+* **Grave une décision avant de la coder — ou même sans la coder.** D120 (le push) est engravée le
+  même jour, sans une ligne : l'arbitrage qui compte, *quels événements ont le droit d'interrompre
+  quelqu'un et lesquels ne doivent jamais apparaître sur un écran verrouillé*, se raisonne mieux à
+  froid qu'au milieu d'une intégration d'APNs.

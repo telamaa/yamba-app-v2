@@ -31,7 +31,7 @@ import { useLocale, useTranslations } from 'use-intl';
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { IdentityGate } from '@/components/identity-gate';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
+import { HeaderActions } from '@/components/header-actions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripResultCard } from '@/components/trip-result-card';
@@ -116,7 +116,7 @@ function FavoritesContent() {
           <ThemedText type="title" style={styles.title}>
             {t('title')}
           </ThemedText>
-          <ProfileAvatarButton />
+          <HeaderActions />
         </View>
 
         <SegmentedControl current={segment} onSelectAction={setSegment} />

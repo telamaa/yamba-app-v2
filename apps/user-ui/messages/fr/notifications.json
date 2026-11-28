@@ -21,7 +21,16 @@
     "booking_rating_reminder": "Pense à laisser une note",
     "booking_rating_revealed": "Les notes sont révélées",
     "fallback": "Notification",
-    "carrier_payout_failed": "Virement bancaire refusé : vérifie ton RIB"
+    "carrier_payout_failed": "Virement bancaire refusé : vérifie ton RIB",
+    "booking_payment_authorized": "Paiement autorisé",
+    "booking_refund_issued": "Remboursement émis",
+    "booking_code_regenerated": "Nouveau code de livraison",
+    "booking_dispute_carrier_responded": "Réponse au litige",
+    "booking_dispute_resolved": "Litige tranché",
+    "conversation_message_posted": "Nouveau message",
+    "conversation_meetup_proposed": "Rendez-vous proposé",
+    "conversation_meetup_accepted": "Rendez-vous confirmé",
+    "conversation_phone_revealed": "Numéro affiché"
   },
   "bellTitle": "Notifications",
   "markAllRead": "Tout marquer lu",
@@ -268,6 +277,36 @@
       "CARRIER": {
         "title": "Ta version est transmise · {ticket}",
         "line": "{route} · Yamba te répond sous 48 h ouvrées"
+      }
+    },
+    "conversation_meetup_proposed": {
+      "SHIPPER": {
+        "title": "{name} propose un rendez-vous",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "{name} propose un rendez-vous",
+        "line": "{route}"
+      }
+    },
+    "conversation_meetup_accepted": {
+      "SHIPPER": {
+        "title": "Rendez-vous confirmé avec {name}",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Rendez-vous confirmé avec {name}",
+        "line": "{route}"
+      }
+    },
+    "conversation_phone_revealed": {
+      "SHIPPER": {
+        "title": "Numéro de téléphone affiché",
+        "line": "Tu peux joindre {name} directement."
+      },
+      "CARRIER": {
+        "title": "Numéro de téléphone affiché",
+        "line": "Tu peux joindre {name} directement."
       }
     }
   }
