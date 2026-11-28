@@ -14635,7 +14635,7 @@ toE164('+242', '06 000 0000')  →  '+24260000000'   (mesuré, FAUX)
 
 Pourquoi c'est grave et pourquoi rien ne l'avait vu :
 
-- **Brazzaville est le corridor de référence** de Yamba, présent dans tous les jeux d'essai ;
+- Brazzaville est présent dans tous les jeux d'essai — mais ce n'est **pas** un « corridor de référence » : Yamba est internationale et n'en a aucun (correction du 28/11/2026, la formule s'était recopiée depuis `phone-prefixes.spec.ts`) ;
 - c'est par ce numéro que le **destinataire** reçoit le code de livraison (D43) ;
 - le serveur ne rattrape pas : il ne contrôle que la **forme** E.164
   (`^\+[1-9]\d{6,14}$`, `booking-request.schema.ts`), que le numéro amputé respecte ;
@@ -21302,3 +21302,117 @@ push ne se fera donc pas dans l'outil où se fait toute la recette actuelle.
   boîte se lit « en panne » sur la pile de développement, ce qui est le comportement voulu — mais
   elle n'a donc **pas été vue remplie**.
 * Aucun écran du lot n'a été vu connecté.
+
+---
+
+# D121 — Le zéro qui appartient au numéro (28/11/2026)
+
+Dette nommée par **A223 le 23/10** (« un lot à part, sur les DEUX fronts, arbitrage à rendre »),
+corrigée cinq semaines plus tard.
+
+**Zéro ligne de serveur, neuvième fois** — et pour une raison intéressante : le serveur avait
+raison, il ne pouvait simplement pas savoir.
+
+## Le défaut, et pourquoi il était silencieux
+
+```ts
+n = n.replace(/^0+/, '');          // ✗ le zéro de tête, toujours retiré
+```
+
+C'est vrai en France, en Belgique, au Royaume-Uni, au Maroc, en RD Congo : le 0 y est un préfixe
+d'**acheminement** qu'on retire pour passer en E.164. C'est **faux** au Congo-Brazzaville (+242) et
+en Côte d'Ivoire (+225), où il appartient au numéro de l'abonné.
+
+Et **rien ne le rattrape** : le serveur ne contrôle que la FORME E.164 (`^\+[1-9]\d{6,14}$`), que le
+numéro amputé respecte parfaitement. Conséquence : **le colis arrive et le code de livraison
+n'arrive pas** (D43).
+
+## La règle est une donnée, pas une devinette
+
+Le dépôt prouve lui-même les deux cas voisins les plus faciles à confondre, par ses **propres données
+de recette** :
+
+| Donnée du seed | Ce qu'elle établit |
+|---|---|
+| `+242061234567` | le Congo-Brazzaville **garde** son zéro (neuf chiffres) |
+| `+243812345678` | la RD Congo le **retire** (le 0 de « 081 » disparaît) |
+
+Deux pays frontaliers, deux règles opposées. C'est pourquoi une intuition ne suffit pas, et pourquoi
+la table est explicite, entrée par entrée.
+
+## Le défaut par défaut est celui d'aujourd'hui
+
+La table ne marque `false` que pour les pays **établis** ; tous les autres gardent le comportement
+d'avant le lot, et le fichier le **dit en toutes lettres** :
+
+```ts
+// ── HÉRITAGE : comportement d'avant D121, non revérifié ───────────────
+// Sûr en pratique : le numéro national n'y commence pas par 0, donc le
+// retrait ne retire rien ; et un 0 tapé par habitude est une faute de
+// frappe qu'on pardonne.
+```
+
+> **On corrige ce qui est prouvé et on ne change rien là où il faudrait deviner.** Une table remplie
+> à l'intuition casserait des pays qui marchent pour en réparer deux.
+
+Une fiche exige d'ailleurs que chaque `false` porte sa **preuve** en commentaire — une exception sans
+raison écrite est une omission déguisée (A224 lot 5).
+
+## La vraie leçon : un garde a tenu, son voisin avait déjà cédé
+
+A223 avait refusé d'épingler ce défaut par un test vert, et avait écrit deux `it.failing` portant
+l'attendu **correct** — vertes tant que le défaut était là, **rouges le jour de la correction**. Ça a
+marché : il a fallu lever le `.failing` plutôt que l'oublier.
+
+**Et le défaut était quand même devenu la norme, trois lignes plus haut.** La fiche de « l'indicatif
+retapé en double » utilisait un numéro congolais comme exemple et attendait `+24260000000`,
+c'est-à-dire le numéro **amputé** :
+
+```ts
+expect(toE164('+242', '242060000000')).toBe('+24260000000');   // ✗ le défaut, épinglé en vert
+```
+
+> **Un défaut qu'on n'épingle pas devient la doctrine du premier test qui le croise.** Le garde écrit
+> à l'avance protégeait la règle qu'il nommait ; il ne pouvait rien pour son voisin.
+
+Un titre a aussi dû changer : « ne rend jamais un numéro qui commence par zéro après l'indicatif »
+était une règle **universelle**, et elle était fausse.
+
+## Le site n'avait aucune fiche sur cette fonction
+
+Le miroir web portait le même défaut **ligne pour ligne** et n'était testé nulle part. Il a désormais
+ses huit fiches. **Un miroir assumé doit être un miroir SURVEILLÉ** — sinon c'est une copie qui
+dérive.
+
+## Correction d'une formule, et elle venait de ce dépôt
+
+Le commentaire d'A223 justifiait la gravité par « Brazzaville est le corridor de référence de
+Yamba ». **C'est faux : Yamba est internationale et n'a aucun corridor de référence** (correction de
+l'utilisateur, 28/11/2026). La formule s'était recopiée dans **trois documents** depuis un
+commentaire de fiche — exactement ce que D118 3B venait de nommer, et commis en le citant.
+
+Corrigée à la source (le commentaire) et dans les deux documents **vivants** ; les archives (le
+handoff du 08/11, la ligne A223 du registre) restent intactes, et c'est D121 qui porte la correction.
+**La gravité ne tient à aucun corridor** : elle tient à ce qu'un numéro injoignable ne reçoit jamais
+son code, où que ce soit.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1428 (68 suites) | **1434 (68 suites)** |
+| Fiches user-ui | 322 (21 suites) | **330 (22 suites)** |
+| Pays avec une règle de zéro explicite | 0 | **20 / 20** |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuve
+
+Défaut **remis** sur les deux fronts → **3 fiches rouges côté mobile, 2 côté site**, puis
+restauration.
+
+## Reste ouvert
+
+* **La validation de LONGUEUR par pays** : un numéro français à huit chiffres reste accepté s'il a la
+  forme E.164. Autre règle, autre table, et une source que nous n'avons pas — `libphonenumber` est
+  une dépendance que ce dépôt n'a pas voulue.
+* **Dix-huit entrées de la table sont l'héritage**, pas un fait vérifié. C'est écrit dans le fichier.
