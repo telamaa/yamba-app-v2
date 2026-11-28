@@ -2360,20 +2360,48 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui RESTE — Jalon 4 (mobile : socle + Android)
 
+**ETAT AU 28/11/2026.** Cette liste etait perimee de six semaines : la majorite
+de ce qu'elle annoncait est livree. Relue et corrigee ligne par ligne.
+
 - Socle ouvert le 19/09 (#368) : app Expo SDK 57 dans apps/mobile (D36 gravee
-  le 29/08, D73 confirmee le 19/09 — Android publie d'abord). Reste du socle :
-  client API par tokens (refresh + expo-secure-store) au lieu des cookies web,
-  code partage (pricing, contrats, client OpenAPI genere, i18n JSON reutilises),
-  onglets natifs, push notifications (Expo Notifications, branchees sur
-  notification-service), deep links, expo-dev-client + EAS ; identifiant
-  applicatif et vrais assets avant tout build de store.
-- Parcours Expediteur : recherche (poids, familles), page trajet, reservation
-  4 etapes (Stripe Payment Sheet), suivi, code de livraison, notation.
-- Parcours Voyageur : creation de trajet (formulaire PER_KG), deals recus,
-  accept/decline, pickup + checklist + photos (camera), livraison (code).
-- Qualite : tests Jest/RNTL sur la logique partagee, Detox ou Maestro E2E sur
-  les 2 parcours critiques, CI EAS Build, Play Console (internal testing ->
-  production), politique de confidentialite / data safety.
+  le 29/08, D73 confirmee le 19/09 — Android publie d'abord).
+  - ~~client API par tokens (refresh + expo-secure-store)~~ FAIT (A201).
+  - ~~code partage (pricing, contrats, i18n JSON reutilises)~~ FAIT — avec une
+    frontiere ASSUMEE : les contrats ne sont PAS importables par un ecran
+    (deux programmes TypeScript, A223), les constantes sont RECOPIEES et
+    confrontees au Zod reel par les fiches.
+  - ~~onglets natifs~~ FAITS (A203, redessines en D109 : les cinq destinations
+    se NOMMENT).
+  - **push notifications** : NON FAIT, et desormais DECIDE sans code — **D120**
+    (candidate, 27/11) grave le tri des 25 evenements par droit d'interrompre,
+    la classe qui ne doit JAMAIS sortir du telephone (code de livraison D43,
+    coordonnees du destinataire), le jeton lie a la SESSION, et l'envoi depuis
+    notification-service. Note mesuree : **Expo Go ne recoit plus de push
+    depuis le SDK 53** — la recette du push ne se fera pas dans l'outil ou se
+    fait toute la recette actuelle.
+  - deep links : partiellement la (les routes existent, `simctl openurl`
+    fonctionne en recette depuis D107) ; aucun schema publie ni teste.
+  - expo-dev-client + EAS : NON FAIT ; identifiant applicatif et vrais assets
+    avant tout build de store.
+- Parcours Expediteur : ~~recherche (poids, familles)~~ FAIT (A204, D101, D102),
+  ~~page trajet~~ FAIT (A210), ~~reservation 4 etapes (Stripe Payment Sheet)~~
+  FAIT (A214 → D83), ~~suivi~~ FAIT (D112), ~~code de livraison~~ FAIT (D112),
+  ~~notation~~ FAIT. **Le parcours Expediteur est COMPLET en natif.**
+- Parcours Voyageur : ~~creation de trajet~~ FAIT (D111), ~~deals recus~~ FAIT
+  (D113), ~~accept/decline~~ FAIT (D113), ~~pickup + checklist + photos~~ FAIT
+  (D115), ~~livraison (code)~~ FAIT (D116). **Le parcours Voyageur est COMPLET
+  en natif**, jalons de transport compris.
+- Communication : ~~fil de discussion~~ FAIT (D117), ~~rendez-vous + numero
+  revele a H-2~~ FAIT (D118), ~~boite aux lettres in-app~~ FAIT (D119).
+- Qualite : ~~tests sur la logique partagee~~ FAIT (A223, **1 434 fiches / 68
+  suites au 28/11**) — frontiere assumee, AUCUN rendu de composant ; Detox ou
+  Maestro E2E sur les 2 parcours critiques : NON FAIT ; CI EAS Build : NON
+  FAIT ; Play Console (internal testing -> production), politique de
+  confidentialite / data safety : NON FAIT.
+- **CE QUI N'A PAS ETE VU** : aucun ecran des lots D112 a D121 n'a ete regarde
+  CONNECTE (le simulateur ne sait pas taper, `simctl` ne fait que naviguer).
+  D107 a grave qu'un correctif d'interface non vu est une hypothese deployee :
+  ces lots sont des hypotheses bien testees, pas des faits.
 - Recette ANDROID ouverte le 09/11/2026 (D89, premiere execution sur emulateur
   Pixel 6 API 33) : authentification, cinq onglets, porte d'identite et
   connexion / deconnexion VUS sur Android ; deux defauts corriges (icones
@@ -2544,6 +2572,103 @@ RESTE dans cette passe :
 - Le delai reel d'arrivee du mail de verification n'a jamais ete mesure en
   conditions reelles (Resend).
 
+## Chantier NATIF — le produit entier sur le telephone (14/11 → 28/11/2026)
+
+La passe « page par page » s'est prolongee en un chantier : porter en natif ce
+qui n'existait que sur le site. Meme methode — decision gravee AVANT le code,
+mobile d'abord, puis le site CHALLENGE par son jumeau, PR + docs cumulatifs.
+
+**Le fil conducteur, et il s'est verifie onze fois : ecrire l'ecran natif
+REVELE les defauts du site.** Cinq lots sur dix ont produit un « bis » qui
+corrige le web sur ce que le natif avait mis en lumiere — jamais l'inverse.
+
+### Les lots de la passe de finitions (D100 → D110)
+
+- D100 `feat/ecran-sans-mensonge` — **un ecran n'affirme rien qu'il n'applique**.
+  Quatre controles mentaient ; le pire : `sort` omis « parce que c'est le
+  defaut », alors que D80 avait fait de `relevance` le defaut du SERVEUR.
+- D101 `feat/colis-sur-le-telephone` — le poids du colis devient reglable en
+  natif. **La parite se mesure au CONTRAT que chaque front peut exercer**, pas
+  ecran par ecran : les cinq fiches de parite etaient vertes et l'app ne savait
+  pas emettre `weightKg`.
+- D102 `feat/familles-et-confiance-natives` — sept champs servis, deux lus.
+  **Un contrat se verifie dans les DEUX sens** (emettre / lire).
+- D103 `feat/editeur-de-recherche-honnete` — le depot n'avait **aucun**
+  `SafeAreaProvider` pour 25 consommateurs. Deux ecrans au code identique et au
+  resultat different : la cause n'est pas dans le code compare.
+- D104 `fix/porte-sans-sortie` — la regle etait ecrite, correcte, et du mauvais
+  cote de la condition. **Un defaut peut n'etre dans aucun des deux fichiers.**
+- D105 `fix/un-seul-retour` — quatre costumes pour un seul geste. **Une
+  incoherence de charte ne se lit pas, elle se COMPTE.**
+- D106 `fix/retour-aux-resultats` — trois mecanismes CORRECTS produisaient un
+  ecran faux. **Quand on persiste un etat, demander ce que son vide signifie.**
+- D107 `fix/en-tete-sous-la-barre` — « une cause plausible n'est pas une
+  cause », ecrit trois lots plus tot et rompu sur le meme symptome. La parade
+  est la REDONDANCE, pas la comprehension.
+- D108 `fix/nombres-dans-la-langue` — un nombre s'ecrit dans la langue de celui
+  qui le lit, et cette regle n'a qu'un domicile par front.
+- D109 `fix/barre-qui-se-nomme` — la barre d'onglets nomme ses cinq
+  destinations ; une exception de fiche SUPPRIMEE, pas reconduite.
+- D110 `fix/entete-et-page-alignes` — `max-w-7xl` recopie **51 fois** avec CINQ
+  gouttieres. **Une source de verite qu'on n'importe pas est un commentaire.**
+
+### Le chantier TRANSPORT (D111 → D116, PR #428)
+
+- D111 `feat/publier-un-trajet-natif` — le Voyageur publie son trajet.
+- D112 / D112 bis `feat/mes-envois-natifs` — l'Expediteur retrouve ses envois,
+  **et peut y revenir** (la porte valait plus que l'ecran).
+- D113 — le Voyageur repond aux demandes recues.
+- D114 — l'onglet Activite devient un CARREFOUR : une lecture, une verite.
+- D115 / D115 bis — la prise en charge (cinq points, photo, refus).
+- D116 / D116 bis — la remise (code dicte, verrou serveur, trois jalons).
+  **Zero ligne de serveur sur les quatre lots.**
+
+### Le bloc COMMUNICATION (D117 → D120, PR #429, #430, #431)
+
+- D117 / D117 bis `feat/fil-de-discussion-natif` — le fil. Le constat n'etait
+  pas une absence mais un GASPILLAGE : l'app recevait deja la liste entiere des
+  conversations et n'en lisait que `totalUnread`. **D102 rejoue.** Et une
+  detection de coordonnees qui ne dit rien a son auteur ne decourage rien.
+- D118 / D118 bis `feat/rendez-vous-et-numero` — le rendez-vous comme OBJET et
+  le numero revele a H-2. **Un controle est une grammaire : il decide de ce qui
+  est DICIBLE** — un jour + une heure + une duree rendent quatre refus serveur
+  inexprimables.
+- D119 / D119 bis `feat/boite-aux-lettres-native` — la boite in-app. En
+  COMPTANT avant d'ecrire : quatre des 25 types s'appelaient « Notification »
+  cote site, dont trois que D117/D118 venaient de rendre quotidiens.
+- D120 — **le push, grave SANS code** (candidate). Voir le jalon 4.
+
+### Les dettes fermees en fin de chantier
+
+- D121 `fix/zero-qui-appartient-au-numero` (PR #432) — dette d'A223, ouverte
+  cinq semaines. `toE164` amputait les numeros du Congo-Brazzaville (+242) et
+  de la Cote d'Ivoire (+225) : **le colis arrivait, le code de livraison
+  n'arrivait pas**. Table de prefixes d'acheminement par pays, remplie par
+  PREUVES (les donnees de recette du depot etablissent `+242061234567` contre
+  `+243812345678` — deux pays frontaliers, deux regles opposees), les 18 autres
+  entrees gardant le comportement d'avant et le DISANT.
+- Dette D110 sur `UserProfileView` (PR #433) — notee « la grille a deux
+  colonnes n'a jamais fonctionne ». **MESURE dans le DOM : faux.** La grille
+  marchait (div interieur) ; la declaration exterieure etait une classe MORTE.
+  La retirer n'a deplace aucun pixel. **Une dette decrite de travers coute plus
+  cher que la dette elle-meme** — celle-ci a vecu dix-huit jours.
+
+### Ce que ce chantier a appris, et qui vaut au-dela
+
+1. **Ecrire le jumeau natif revele le site** — onze fois sur onze, jamais
+   l'inverse. La question qui trouve : « et ici, qu'est-ce que le serveur me
+   dit que je n'affiche pas ? »
+2. **Une fiche qui refuse quelque chose doit dire a quelle condition elle
+   changera d'avis.** Celle de D114 a change de camp trois fois ; celle de
+   D117 9A est passee au rouge a la seconde ou D118 a importe `phone`.
+3. **Viser l'usage, pas le mot** — neuf fiches rougies ce mois-ci pour avoir
+   cherche un mot qui vivait aussi dans le commentaire qui l'explique.
+4. **Le juge est le bundle SERVI, pas le typecheck** (piege Metro, paye deux
+   fois) ; **et la verification finale se fait `--skip-nx-cache`** : un run a
+   80 % de cache re-affirme ce qu'il savait deja.
+5. **« CI OK » se COMPTE** : `gh pr checks --watch` est sorti en code 0 avec un
+   controle rouge.
+
 ## Ce qui RESTE — Jalon 5 (iOS)
 
 - Meme base ; Sign in with Apple (obligatoire si login social), Apple Pay
@@ -2561,6 +2686,49 @@ RESTE dans cette passe :
   C-PR8c (MNT1–MNT10).
 
 ## Dettes techniques et TODO vivants (registre §7.2-7.3)
+
+### Dettes NOMMEES pendant le chantier natif (etat au 28/11/2026)
+
+**Fermees :**
+- ~~`toE164` ampute les numeros du Congo-Brazzaville et de la Cote d'Ivoire~~
+  FERMEE par **D121** (PR #432). Les deux `it.failing` d'A223 sont levees.
+- ~~`apps/user-ui` n'a aucune cible de test~~ FERMEE par **A224** (5 lots) :
+  **331 fiches / 22 suites** au 28/11, la ou il y en avait zero.
+- ~~`UserProfileView` : grille a deux colonnes cassee~~ FERMEE (PR #433) — et
+  le diagnostic etait faux : c'etait une classe MORTE, pas une grille cassee.
+- ~~les quatre `conversation.*` sans libelle cote site~~ FERMEE par D119 bis.
+
+**Ouvertes, et pourquoi elles le restent :**
+- **Le push mobile** : decide (D120) et NON code. Demande un build de
+  developpement — Expo Go ne recoit plus de push depuis le SDK 53.
+- **La validation de LONGUEUR de telephone par pays** : un numero francais a
+  huit chiffres reste accepte s'il a la forme E.164. Autre table, et une source
+  que le depot n'a pas (`libphonenumber` refuse comme dependance).
+- **Dix-huit entrees de la table des prefixes d'acheminement sont l'HERITAGE**,
+  pas un fait verifie. C'est ecrit dans le fichier, et une fiche exige que
+  chaque exception porte sa preuve.
+- **L'annulation d'un rendez-vous** : le statut `CANCELLED` existe en base,
+  AUCUNE route membre ne l'expose. On ne l'invente pas depuis le client.
+- **Les photos de message** : le contrat en accepte cinq, **aucun front n'en
+  emet** (famille D101).
+- **Quatre dictionnaires du mobile** portent encore la phrase de cul-de-sac
+  « action impossible » (`pickup`, `myDeals`, `myTrips`) — **comptes a trois
+  par une fiche** : le prochain qui en ajoute une rougit, celui qui en corrige
+  une doit baisser le chiffre.
+- **Le televersement des photos du site** se fait a la confirmation : un echec
+  au milieu laisse des images orphelines chez ImageKit (il faudrait le
+  `fileId`, que ce chemin ne garde pas).
+- **`apps/e2e` n'est pas un controle de CI** et n'a pas ete rejoue depuis les
+  lots D117-D119, qui touchent `ConversationThread` et `MeetupPanel`. Le depot
+  previent : un changement oublie y casse des centaines de scenarios en
+  silence.
+- **Deux controles de CI sur vingt restent CONSULTATIFS** (`TypeScript (fiches
+  de test)`, `Tests unitaires (mobile)`, `Tests unitaires (user-ui)`) tant que
+  personne ne les COCHE dans `branches/dev/protection`. Celui des fiches de
+  test a attrape un defaut reel le 27/11 — pour la deuxieme fois.
+- **`CLAUDE.md` porte deux affirmations perimees** : la ligne de reference des
+  tests (chiffres anterieurs a D112-D121) et « la grille a deux colonnes n'a
+  jamais fonctionne », corrigee ailleurs le 28/11 mais pas la.
 
 - chore/deps : 49 vulnerabilites npm dont 40 hautes au 05/09 (PR dediee, jamais
   npm audit fix --force en pleine PR) · Prisma 6->7.
