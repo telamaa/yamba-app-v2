@@ -19516,6 +19516,11 @@ Troisième, payé en direct : un commentaire JSX `{/* … */}` placé **avant** 
 - **Défaut latent NOMMÉ dans le code, non corrigé** : `UserProfileView.tsx` porte
   `lg:grid-cols-[minmax(0,1fr)_320px]` **sans `lg:grid`** — la grille à deux colonnes de cette page
   n'a donc jamais fonctionné. Le corriger déplace tout le contenu : c'est un lot de mise en page.
+  **CORRIGÉ le 28/11/2026, et cette phrase était FAUSSE** : mesuré dans le DOM, la grille à deux
+  colonnes marchait — portée par le div INTÉRIEUR, qui a bien son `grid`. La déclaration
+  extérieure était une classe MORTE. La retirer n'a déplacé aucun pixel (`main` 932 px à x=104,
+  l'aside 280 px à x=1056, avant comme après). Une dette décrite de travers coûte plus cher que
+  la dette elle-même : celle-ci a vécu dix-huit jours parce que sa description faisait peur.
 
 ---
 

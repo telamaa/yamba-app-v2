@@ -261,3 +261,71 @@ describe("largeur-de-page — la hauteur de l'en-tête, un seul chiffre", () => 
     expect(recopies.map(([f]) => nom(f))).toEqual([]);
   });
 });
+
+describe("aucune déclaration de grille MORTE (28/11/2026)", () => {
+  /**
+   * `grid-template-columns` sans `display: grid` est calculé par le
+   * navigateur et n'a aucun effet. Tailwind ne prévient pas : `lg:grid-cols-2`
+   * est une classe parfaitement valide, et elle ne fait rien tant que
+   * l'élément n'est pas une grille.
+   *
+   * D110 avait noté un cas (`UserProfileView.tsx`) en le décrivant comme
+   * « la grille à deux colonnes n'a jamais fonctionné », et avait reculé
+   * devant la correction. MESURÉ dans le DOM : la grille marchait — portée
+   * par le div INTÉRIEUR — et la déclaration extérieure était un vestige.
+   * La supprimer n'a déplacé aucun pixel.
+   *
+   * **Une dette décrite de travers coûte plus cher que la dette elle-même.**
+   * Celle-ci a vécu dix-huit jours parce que sa description faisait peur.
+   */
+  const AFFICHAGES = /(^|\s|["'`{])(inline-)?grid(\s|["'`}]|$)|:(inline-)?grid(\s|["'`}]|$)/;
+
+  /** La valeur de l'attribut `className` qui contient cet index. */
+  function attributAutour(source: string, index: number): string | null {
+    const debut = source.lastIndexOf("className=", index);
+    if (debut === -1) return null;
+    const ouvrant = source[debut + "className=".length];
+    const finitPar = ouvrant === "{" ? "}" : ouvrant;
+    let fin = debut + "className=".length + 1;
+    let profondeur = ouvrant === "{" ? 1 : 0;
+    while (fin < source.length) {
+      const c = source[fin];
+      if (ouvrant === "{") {
+        if (c === "{") profondeur += 1;
+        if (c === "}") {
+          profondeur -= 1;
+          if (profondeur === 0) break;
+        }
+      } else if (c === finitPar) break;
+      fin += 1;
+    }
+    return fin > index ? source.slice(debut, fin + 1) : null;
+  }
+
+  it("toute déclaration de colonnes vit sur un élément qui EST une grille", () => {
+    const morts: string[] = [];
+    let declarations = 0;
+
+    for (const fichier of sources()) {
+      // On lit le code SANS ses commentaires : celui de `UserProfileView`
+      // cite `lg:grid-cols-…` pour raconter la classe morte qu'on vient de
+      // retirer, et viser le mot plutôt que l'usage est le piège payé neuf
+      // fois ce mois-ci.
+      const source = codeSeul(fichier);
+      for (const trouve of source.matchAll(/grid-cols-/g)) {
+        declarations += 1;
+        const attribut = attributAutour(source, trouve.index);
+        // Un `className` qu'on ne sait pas découper n'est pas une preuve de
+        // défaut : on ne compte que ce qu'on a lu en entier.
+        if (attribut === null) continue;
+        if (!AFFICHAGES.test(attribut)) {
+          morts.push(`${fichier.split("/src/")[1]} — ${attribut.slice(0, 90)}`);
+        }
+      }
+    }
+
+    // Un balayage qui ne balaie rien serait vert pour la pire raison.
+    expect(declarations).toBeGreaterThan(20);
+    expect(`mortes → ${morts.join(" | ") || "aucune"}`).toBe("mortes → aucune");
+  });
+});
