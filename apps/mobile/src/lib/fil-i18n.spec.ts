@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path';
 import { MESSAGE_REPORT_REASONS } from '@packages/api-contracts';
 
 import { MOTIFS_DE_SIGNALEMENT, cleDuRefus, motifDeFermeture } from '@/lib/fil';
+import { DUREES_MINUTES, cleDuRefusDuRendezVous } from '@/lib/rendez-vous';
 
 const MOBILE = resolve(__dirname, '../..');
 const LOCALES = ['fr', 'en'] as const;
@@ -121,6 +122,64 @@ describe('les clés CALCULÉES existent dans les DEUX dictionnaires', () => {
   });
 });
 
+describe('les clés CALCULÉES du rendez-vous et du numéro (D118)', () => {
+  it('chaque refus de rendez-vous a sa phrase, dans les deux langues', () => {
+    // Les clés sont CALCULÉES (`meetup.errors.${cleDuRefus…}`) : ni `tsc`,
+    // ni le contrôle i18n de la CI, ni le harnais ne les voient.
+    const cles = new Set(
+      [
+        ['CONVERSATION_READ_ONLY', null],
+        ['MEETUP_CHANGED', null],
+        ['MEETUP_NOT_ACCEPTABLE', 'OWN_PROPOSAL'],
+        ['MEETUP_NOT_ACCEPTABLE', 'NOT_PROPOSED'],
+        ['MEETUP_NOT_FOUND', null],
+        ['INVALID_MEETUP_SLOT', 'TOO_SOON'],
+        ['INVALID_MEETUP_SLOT', 'TOO_FAR'],
+        ['INVALID_MEETUP_SLOT', 'WINDOW_TOO_LONG'],
+        ['INVALID_MEETUP_SLOT', 'END_BEFORE_START'],
+        ['AUTRE', null],
+      ].map(([code, raison]) => cleDuRefusDuRendezVous(code, raison))
+    );
+    expect(cles.size).toBeGreaterThanOrEqual(8);
+    for (const locale of LOCALES) {
+      const dico = dictionnaire(locale);
+      for (const cle of cles) expect(typeof auChemin(dico, `meetup.errors.${cle}`)).toBe('string');
+      for (const cle of ['tropTot', 'sansAncre', 'echec'])
+        expect(typeof auChemin(dico, `phone.errors.${cle}`)).toBe('string');
+    }
+  });
+
+  it('chaque DURÉE offerte a son libellé — une liste muette serait pire', () => {
+    // `meetup.durations.${d}` est calculée depuis la liste de paliers : en
+    // ajouter une cinquième sans libellé ferait lire son chemin au membre.
+    for (const locale of LOCALES) {
+      const dico = dictionnaire(locale);
+      for (const duree of DUREES_MINUTES) {
+        expect(typeof auChemin(dico, `meetup.durations.${duree}`)).toBe('string');
+      }
+    }
+  });
+
+  it('chaque manque de la proposition a sa phrase', () => {
+    const cles = ['jour', 'heure', 'lieu', 'lieuTropLong', 'detailTropLong', 'envoi'];
+    for (const locale of LOCALES) {
+      const dico = dictionnaire(locale);
+      for (const cle of cles) expect(typeof auChemin(dico, `meetup.missing.${cle}`)).toBe('string');
+    }
+  });
+
+  it('les trois phrases qui comptent un nombre sont des GABARITS pluriels', () => {
+    // Un nombre affiché s'écrit dans la langue du lecteur (D108) : jamais
+    // une concaténation, toujours un gabarit.
+    for (const locale of LOCALES) {
+      const dico = dictionnaire(locale) as Record<string, Record<string, Record<string, string>>>;
+      for (const cle of ['lieu', 'lieuTropLong', 'detailTropLong']) {
+        expect(dico.meetup.missing[cle]).toContain('plural');
+      }
+    }
+  });
+});
+
 describe('aucune clé du dictionnaire ne porte de point', () => {
   it('les clés SYSTÈME sont NICHÉES, jamais écrites « meetup.proposed »', () => {
     // Piège maison (#174) : `use-intl` comme next-intl refuse une clé
@@ -146,6 +205,7 @@ describe('ce que l’écran dit, il le dit dans les deux langues', () => {
       'src/app/conversation/[id].tsx',
       'src/app/(tabs)/messages.tsx',
       'src/components/message-report-sheet.tsx',
+      'src/components/meetup-sheet.tsx',
     ];
     const cles = new Set<string>();
     for (const fichier of fichiers) {

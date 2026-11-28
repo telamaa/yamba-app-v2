@@ -72,5 +72,68 @@
     "phone": {
       "revealed": "Le numéro de téléphone a été affiché."
     }
+  },
+  "meetup": {
+    "title": "Rendez-vous",
+    "none": "Aucun rendez-vous convenu",
+    "noneWhy": "Propose un lieu et une heure : c'est ce qui évite les allers-retours.",
+    "pickup": "Prise en charge",
+    "delivery": "Remise",
+    "propose": "Proposer un rendez-vous",
+    "counter": "Proposer un autre créneau",
+    "accept": "Accepter",
+    "accepted": "Confirmé",
+    "toAccept": "À accepter",
+    "waiting": "En attente de {name}",
+    "slot": "{day}, de {from} à {to}",
+    "kind": "Quel moment ?",
+    "day": "Quel jour ?",
+    "hour": "À quelle heure ?",
+    "duration": "Combien de temps ?",
+    "durations": {
+      "30": "30 min",
+      "60": "1 h",
+      "120": "2 h",
+      "180": "3 h"
+    },
+    "place": "Où ?",
+    "placePlaceholder": "Terminal 2E, porte 4",
+    "detail": "Un repère pour se reconnaître (facultatif)",
+    "detailPlaceholder": "Je porte une veste rouge",
+    "send": "Proposer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "missing": {
+      "jour": "Choisis un jour",
+      "heure": "Choisis une heure",
+      "lieu": "{count, plural, one {Encore # caractère pour le lieu} other {Encore # caractères pour le lieu}}",
+      "lieuTropLong": "{count, plural, one {Lieu : # caractère de trop} other {Lieu : # caractères de trop}}",
+      "detailTropLong": "{count, plural, one {Repère : # caractère de trop} other {Repère : # caractères de trop}}",
+      "envoi": "Envoi en cours…"
+    },
+    "errors": {
+      "ferme": "Cette conversation s'est fermée entre-temps.",
+      "change": "Ce rendez-vous vient de changer. On relit le fil.",
+      "sienne": "C'est toi qui as proposé ce créneau : c'est à l'autre de l'accepter.",
+      "introuvable": "Ce rendez-vous n'existe plus.",
+      "tropTot": "Ce créneau est trop proche. Prends au moins trente minutes d'avance.",
+      "tropLoin": "Ce créneau est trop loin dans le temps.",
+      "tropLong": "Ce créneau est trop long.",
+      "creneau": "Ce créneau n'est pas valable. Choisis un autre jour ou une autre heure.",
+      "echec": "La proposition n'est pas partie : rien n'a été envoyé. Vérifie ta connexion et réessaye."
+    }
+  },
+  "phone": {
+    "title": "Téléphone",
+    "reveal": "Afficher le numéro de {name}",
+    "call": "Appeler {name}",
+    "opensAt": "Le numéro s'affichera le {when}",
+    "needsMeetup": "Il faut d'abord un rendez-vous de prise en charge : le numéro s'ouvre deux heures avant.",
+    "why": "Yamba ouvre le numéro juste avant le rendez-vous, et garde une trace de l'ouverture.",
+    "errors": {
+      "tropTot": "Le numéro n'est pas encore ouvert.",
+      "sansAncre": "Il faut d'abord un rendez-vous de prise en charge, ou une date de départ.",
+      "echec": "Le numéro n'a pas pu s'ouvrir. Réessaye."
+    }
   }
 }

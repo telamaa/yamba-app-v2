@@ -51,7 +51,8 @@
     "end": "End",
     "send": "Propose this meeting",
     "sending": "Sending…",
-    "proposeFailed": "The meeting could not be proposed."
+    "proposeFailed": "The meeting could not be proposed.",
+    "remaining": "{count, plural, one {# character left} other {# characters left}}"
   },
   "system": {
     "meetup": {
@@ -90,7 +91,11 @@
     "meetupTooSoon": "The meeting must start at least 30 minutes from now.",
     "meetupTooFar": "The meeting must take place within 90 days.",
     "meetupTooLong": "A meeting lasts 12 hours at most.",
-    "meetupChanged": "This meeting just changed. Reload the conversation."
+    "meetupChanged": "This meeting just changed. Reload the conversation.",
+    "meetupFinAvantDebut": "The end must come after the start.",
+    "meetupCreneau": "That slot is not valid. Check the day and the times.",
+    "meetupSienne": "You suggested this slot: it is for the other person to accept.",
+    "meetupIntrouvable": "This meeting no longer exists."
   },
   "contactWarning": "Yamba spotted contact details in this message. Staying on the platform is what keeps you covered if anything goes wrong.",
   "notice": {

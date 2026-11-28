@@ -25,6 +25,7 @@ import {
   AppState,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -38,6 +39,7 @@ import { useLocale, useTranslations } from 'use-intl';
 
 import { BackButton } from '@/components/back-button';
 import { IdentityGate } from '@/components/identity-gate';
+import { MeetupSheet } from '@/components/meetup-sheet';
 import { MessageReportSheet } from '@/components/message-report-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,10 +49,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { ApiError } from '@/lib/api/client';
 import {
+  accepterLeRendezVous,
   envoyerLeMessage,
   leFil,
   marquerLu,
   reponsesRapides,
+  revelerLeNumero,
 } from '@/lib/api/messages.api';
 import { useActivite } from '@/lib/activite-context';
 import {
@@ -70,6 +74,15 @@ import {
   type MessageDuFil,
 } from '@/lib/fil';
 import { intlTagFor } from '@/lib/number-format';
+import {
+  attendUneReponse,
+  cleDuRefusDuNumero,
+  cleDuRefusDuRendezVous,
+  etatDuNumero,
+  peutAccepter,
+  type FenetreDuNumero,
+  type RendezVous,
+} from '@/lib/rendez-vous';
 
 type ReponseRapide = { key: string; text: string };
 
@@ -101,6 +114,9 @@ function FilContent() {
   const [refus, setRefus] = useState<string | null>(null);
   const [reponses, setReponses] = useState<ReponseRapide[]>([]);
   const [aSignaler, setASignaler] = useState<MessageDuFil | null>(null);
+  const [proposer, setProposer] = useState(false);
+  const [gesteEnCours, setGeste] = useState(false);
+  const [refusDuRdv, setRefusDuRdv] = useState<string | null>(null);
 
   const liste = useRef<FlatList<GroupeAffiche> | null>(null);
   const dernierVu = useRef<string | null>(null);
@@ -190,6 +206,50 @@ function FilContent() {
     }
   }, [id, corps, acces, envoiEnCours, relire, rafraichir, t]);
 
+  const accepter = useCallback(
+    async (rdvId: string) => {
+      if (id === undefined || gesteEnCours) return;
+      setGeste(true);
+      setRefusDuRdv(null);
+      try {
+        await accepterLeRendezVous(id, rdvId);
+        await relire();
+        void rafraichir();
+      } catch (e) {
+        setRefusDuRdv(
+          t(
+            `meetup.errors.${cleDuRefusDuRendezVous(
+              e instanceof ApiError ? e.code : null,
+              e instanceof ApiError ? e.details?.reason : null
+            )}`
+          )
+        );
+      } finally {
+        setGeste(false);
+      }
+    },
+    [id, gesteEnCours, relire, rafraichir, t]
+  );
+
+  const ouvrirLeNumero = useCallback(async () => {
+    if (id === undefined || gesteEnCours) return;
+    setGeste(true);
+    setRefusDuRdv(null);
+    try {
+      // Geste IDEMPOTENT côté serveur : un second appui rend le même
+      // numéro, pas une erreur. On relit plutôt que de poser le numéro
+      // dans un état local — la vérité est dans le fil.
+      await revelerLeNumero(id);
+      await relire();
+    } catch (e) {
+      setRefusDuRdv(
+        t(`phone.errors.${cleDuRefusDuNumero(e instanceof ApiError ? e.code : null)}`)
+      );
+    } finally {
+      setGeste(false);
+    }
+  }, [id, gesteEnCours, relire, t]);
+
   if (enEchec)
     return (
       <EcranCourt
@@ -247,6 +307,22 @@ function FilContent() {
               </ThemedText>
             </View>
           ) : null}
+
+          {/* ── Le rendez-vous : un OBJET, en tête du fil (D118 4A) ── */}
+          <CarteDuRendezVous
+            rdv={conversation.prochainRendezVous}
+            monRole={conversation.monRole}
+            prenom={conversation.interlocuteur.prenom}
+            peutEcrire={acces.peutEcrire}
+            occupe={gesteEnCours}
+            numero={fil.numero}
+            maintenantMs={Date.now()}
+            tag={tag}
+            refus={refusDuRdv}
+            onProposerAction={() => setProposer(true)}
+            onAccepterAction={(rdvId) => void accepter(rdvId)}
+            onOuvrirLeNumeroAction={() => void ouvrirLeNumero()}
+          />
 
           <FlatList
             ref={liste}
@@ -372,6 +448,17 @@ function FilContent() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
+      <MeetupSheet
+        visible={proposer}
+        conversationId={id ?? ''}
+        peutEcrire={acces.peutEcrire}
+        onCloseAction={() => setProposer(false)}
+        onProposeAction={() => {
+          void relire();
+          void rafraichir();
+        }}
+      />
+
       <MessageReportSheet
         visible={aSignaler !== null}
         conversationId={id ?? ''}
@@ -379,6 +466,172 @@ function FilContent() {
         onCloseAction={() => setASignaler(null)}
       />
     </ThemedView>
+  );
+}
+
+
+/**
+ * CarteDuRendezVous — « où et quand », en tête du fil (D118 4A).
+ *
+ * Elle ne décide rien : `peutAccepter` et `attendUneReponse` disent qui
+ * peut faire quoi (miroir de `canAcceptMeetup` côté serveur), et la porte
+ * du numéro a QUATRE états dont aucun n'est un bouton mort — révélé,
+ * ouvrable, trop tôt (on dit QUAND), sans ancre (on dit QUOI FAIRE).
+ */
+function CarteDuRendezVous({
+  rdv,
+  monRole,
+  prenom,
+  peutEcrire,
+  occupe,
+  numero,
+  maintenantMs,
+  tag,
+  refus,
+  onProposerAction,
+  onAccepterAction,
+  onOuvrirLeNumeroAction,
+}: {
+  rdv: RendezVous | null;
+  monRole: 'SHIPPER' | 'CARRIER';
+  prenom: string;
+  peutEcrire: boolean;
+  occupe: boolean;
+  numero: FenetreDuNumero;
+  maintenantMs: number;
+  tag: string;
+  refus: string | null;
+  onProposerAction: () => void;
+  onAccepterAction: (rdvId: string) => void;
+  onOuvrirLeNumeroAction: () => void;
+}) {
+  const t = useTranslations('messaging');
+  const theme = useTheme();
+
+  const creneau =
+    rdv === null
+      ? ''
+      : t('meetup.slot', {
+          day: new Date(rdv.debutA).toLocaleDateString(tag, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          }),
+          from: new Date(rdv.debutA).toLocaleTimeString(tag, {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          to: new Date(rdv.finA).toLocaleTimeString(tag, {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        });
+
+  const etat = etatDuNumero(numero, maintenantMs);
+
+  return (
+    <View style={[styles.carte, { borderBottomColor: theme.backgroundElement }]}>
+      <View style={styles.carteTitre}>
+        <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('meetup.title')}
+        </ThemedText>
+      </View>
+
+      {rdv === null ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('meetup.noneWhy')}
+        </ThemedText>
+      ) : (
+        <>
+          <ThemedText type="smallBold">
+            {t(rdv.genre === 'PICKUP' ? 'meetup.pickup' : 'meetup.delivery')} · {creneau}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {rdv.lieu}
+            {rdv.detail === null ? '' : ` — ${rdv.detail}`}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {rdv.statut === 'ACCEPTED'
+              ? t('meetup.accepted')
+              : attendUneReponse(rdv, monRole)
+                ? t('meetup.waiting', { name: prenom })
+                : t('meetup.toAccept')}
+          </ThemedText>
+        </>
+      )}
+
+      {refus !== null ? (
+        <ThemedText type="small" style={styles.refus}>
+          {refus}
+        </ThemedText>
+      ) : null}
+
+      <View style={styles.carteGestes}>
+        {peutAccepter(rdv, monRole, peutEcrire) && rdv !== null ? (
+          <Pressable
+            onPress={() => onAccepterAction(rdv.id)}
+            accessibilityRole="button"
+            accessibilityState={{ busy: occupe }}
+            style={[styles.geste, { backgroundColor: Brand.mango }]}>
+            <ThemedText type="small" style={styles.gesteMangue}>
+              {t('meetup.accept')}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
+        {peutEcrire ? (
+          <Pressable
+            onPress={onProposerAction}
+            accessibilityRole="button"
+            style={[styles.geste, styles.gesteBorde, { borderColor: theme.backgroundElement }]}>
+            <ThemedText type="small">
+              {rdv === null ? t('meetup.propose') : t('meetup.counter')}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
+        {/* La porte du numéro : jamais un bouton mort. */}
+        {etat === 'revele' && numero.numero !== null ? (
+          <Pressable
+            onPress={() => void Linking.openURL(`tel:${numero.numero}`)}
+            accessibilityRole="button"
+            style={[styles.geste, styles.gesteBorde, { borderColor: theme.backgroundElement }]}>
+            <Ionicons name="call-outline" size={13} color={theme.text} />
+            <ThemedText type="small">{t('phone.call', { name: prenom })}</ThemedText>
+          </Pressable>
+        ) : etat === 'ouvrable' ? (
+          <Pressable
+            onPress={onOuvrirLeNumeroAction}
+            accessibilityRole="button"
+            accessibilityState={{ busy: occupe }}
+            style={[styles.geste, styles.gesteBorde, { borderColor: theme.backgroundElement }]}>
+            <Ionicons name="call-outline" size={13} color={theme.text} />
+            <ThemedText type="small">{t('phone.reveal', { name: prenom })}</ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Les deux états FERMÉS disent pourquoi, et ce qui les ouvrira. */}
+      {etat === 'trop-tot' && numero.ouvreA !== null ? (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.petit}>
+          {t('phone.opensAt', {
+            when: `${new Date(numero.ouvreA).toLocaleDateString(tag, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })} ${new Date(numero.ouvreA).toLocaleTimeString(tag, {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}`,
+          })}
+        </ThemedText>
+      ) : etat === 'sans-ancre' ? (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.petit}>
+          {t('phone.needsMeetup')}
+        </ThemedText>
+      ) : null}
+    </View>
   );
 }
 
@@ -624,6 +877,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
   },
+  carte: {
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  carteTitre: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  carteGestes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  geste: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+    borderRadius: 20,
+  },
+  gesteBorde: { borderWidth: 1 },
+  gesteMangue: { color: '#1A1A1A', fontFamily: Font.semibold },
+  petit: { fontSize: 11 },
   reessayer: {
     minHeight: 44,
     justifyContent: 'center',

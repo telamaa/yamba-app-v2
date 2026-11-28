@@ -1,8 +1,8 @@
 /**
  * fil.ts — le fil de discussion, côté règles (D117).
  * ====================================================
- * Zéro import : le harnais (A223) doit pouvoir jouer ces règles sous Node,
- * sans Metro, sans React, sans `expo-constants`.
+ * N'importe QUE du pur (`rendez-vous.ts`) : le harnais (A223) doit pouvoir
+ * jouer ces règles sous Node, sans Metro, sans React, sans `expo-constants`.
  *
  * ── CE N'EST PAS UN CHAT, C'EST UNE COORDINATION (D61) ──────────────────
  * Deux inconnus doivent se retrouver, souvent dans un aéroport. D'où trois
@@ -24,6 +24,13 @@
  * contrat se vérifie dans les DEUX sens, et la fiche qui le demandait
  * n'existait que pour la recherche. `conversationsDeLApi` lit les deux.
  */
+
+import {
+  fenetreDuNumero,
+  rendezVousDeLApi,
+  type FenetreDuNumero,
+  type RendezVous,
+} from '@/lib/rendez-vous';
 
 /* ── LES RYTHMES DE SONDAGE (D117 7A) ──────────────────────────────────
  * D61 10A : sondage court tant que le volume le permet. Ces nombres sont
@@ -103,6 +110,15 @@ export type ConversationDeLaListe = {
   dernierMessage: { corps: string; roleAuteur: RoleAuteur; creeA: string } | null;
   nonLus: number;
   acces: AccesAuFil;
+  /**
+   * LE rendez-vous qui compte (D118), calculé par le SERVEUR.
+   *
+   * Lequel des rendez-vous compte — le confirmé à venir, ou la
+   * contre-proposition plus récente que l'acceptation — est une règle du
+   * serveur (`nextMeetupOf`). La refaire ici donnerait deux vérités, et le
+   * jour où ANO-WEB-47 se rejoue, l'une des deux serait fausse.
+   */
+  prochainRendezVous: RendezVous | null;
 };
 
 export type FilComplet = {
@@ -111,6 +127,8 @@ export type FilComplet = {
   messages: MessageDuFil[];
   /** Messages plus ANCIENS à charger, ou `null`. */
   curseur: string | null;
+  /** D118 — la porte du numéro, telle que le serveur l'ouvre. */
+  numero: FenetreDuNumero;
 };
 
 /* ══ Lecture défensive ════════════════════════════════════════════════ */
@@ -195,6 +213,7 @@ export function conversationDeLApi(brut: unknown): ConversationDeLaListe | null 
           },
     nonLus: entier(c.unreadCount),
     acces: accesDeLApi(c.access),
+    prochainRendezVous: rendezVousDeLApi(c.nextMeetup),
   };
 }
 
@@ -249,11 +268,12 @@ export function messageDeLApi(brut: unknown): MessageDuFil | null {
 /**
  * Le fil complet.
  *
- * DEUX CHAMPS SONT IGNORÉS À DESSEIN : `meetups` et `phone`. Ils sont le
- * lot 2 (le rendez-vous comme objet, le numéro révélé à H-2) — les nommer
- * ici plutôt que de les laisser tomber en silence est la différence entre
- * un périmètre et un oubli. Une fiche épingle ce choix : le jour où le lot
- * 2 arrive, elle rougit et demande qu'on la mette à jour.
+ * `phone` est lu depuis D118. **`meetups` reste ignoré, et c'est une
+ * décision, pas un oubli** : le serveur calcule déjà LEQUEL des rendez-vous
+ * compte et le sert dans `conversation.nextMeetup`. Lire la liste entière
+ * pour refaire ce choix donnerait deux vérités — exactement le défaut que
+ * ce lot-ci évite ailleurs. L'historique des rendez-vous, lui, se lit dans
+ * le fil : chaque proposition y laisse un message.
  */
 export function filDeLApi(brut: unknown): FilComplet | null {
   const corps = objet(brut);
@@ -264,6 +284,7 @@ export function filDeLApi(brut: unknown): FilComplet | null {
     conversation,
     messages: lignes.map(messageDeLApi).filter((m): m is MessageDuFil => m !== null),
     curseur: texteOuNull(corps.nextCursor),
+    numero: fenetreDuNumero(corps.phone),
   };
 }
 

@@ -12645,3 +12645,163 @@ et une chaîne vide **passe tous les `not.toContain`** — verte pour la pire ra
 * **Avertir coûte une phrase.** Le serveur détectait les coordonnées depuis septembre et personne ne
   le disait à l'auteur. Une donnée servie que personne n'affiche n'est pas une fonctionnalité : c'est
   une intention.
+
+
+---
+
+# Chapitre — Un contrôle est une grammaire (D118)
+
+Ce chapitre tient en une idée, et elle vaut bien au-delà d'un formulaire de rendez-vous :
+**un contrôle ne valide pas seulement ce qu'on saisit, il décide de ce qu'on PEUT saisir.**
+
+## 1. Le même besoin, deux grammaires
+
+Le serveur pose trois bornes sur un créneau :
+
+```ts
+MEETUP_MIN_LEAD_MINUTES = 30;     // au moins 30 min d'avance
+MEETUP_MAX_WINDOW_HOURS = 12;     // 12 h de fenêtre au plus
+MEETUP_MAX_AHEAD_DAYS   = 90;     // 90 jours au plus
+```
+
+Le site demande **deux** `datetime-local` — début et fin — puis traduit les refus :
+
+```tsx
+<input required type="datetime-local" value={form.startAt} … />
+<input required type="datetime-local" value={form.endAt}   … />
+```
+
+Cette forme peut exprimer « fin avant début », « fenêtre de trois jours », « rendez-vous dans deux
+ans ». Elle doit donc **expliquer** ce qu'elle a laissé écrire. Le natif compose autrement :
+
+```
+un JOUR  (bande bornée)  +  une HEURE  (filtrée)  +  une DURÉE  (paliers)
+```
+
+et les quatre refus deviennent **inexprimables** :
+
+| Refus serveur | Pourquoi il ne peut plus survenir |
+|---|---|
+| `END_BEFORE_START` | la fin est **calculée** : `début + durée` |
+| `WINDOW_TOO_LONG` | la durée vient d'une **liste**, toutes sous 12 h |
+| `TOO_FAR` | la bande s'arrête à 14 jours (borne : 90) |
+| `TOO_SOON` | les heures sous le plancher ne sont **pas offertes** |
+
+> Ce n'est pas de la validation. C'est la forme du contrôle — et c'est le seul garde-fou qui ne
+> demande à personne de s'en souvenir.
+
+**Attention au contresens** : on ne recopie pas les bornes du serveur pour *décider*. On compose un
+contrôle dont la sortie est **toujours** dans leur domaine. Les constantes restent dans le module
+pour que les fiches les confrontent à la source ; elles ne tranchent aucun refus.
+
+```ts
+// la fiche lit la source du serveur, elle ne la devine pas
+const regles = readFileSync(join(SERVEUR, 'meetup.rules.ts'), 'utf8');
+expect(regles).toContain(`MEETUP_MAX_WINDOW_HOURS = ${FENETRE_MAX_HEURES}`);
+```
+
+## 2. Deux pièges que seule l'implémentation révèle
+
+**L'instant doit être figé.** Si « maintenant » est relu à chaque rendu, une heure disparaît sous le
+doigt au passage d'un quart d'heure :
+
+```ts
+const [ouvertA] = useState(() => Date.now());   // figé à l'ouverture de la feuille
+```
+
+**Changer de jour doit RELÂCHER l'heure.** « Demain 8 h » existe, « aujourd'hui 8 h » peut ne plus
+exister. Garder la valeur en silence enverrait un créneau que le serveur refusera :
+
+```ts
+onPressAction={() => { setJour(j); setMinutes(null); }}
+```
+
+Règle générale : *quand un choix dépend d'un autre, changer le premier INVALIDE le second — et
+l'invalider en silence est pire que de le redemander.*
+
+## 3. Ne jamais recalculer ce que le serveur a déjà tranché
+
+Lequel des rendez-vous compte n'est pas évident : c'est le confirmé à venir, **sauf** si une
+contre-proposition est plus récente que l'acceptation. Cette règle vit dans `nextMeetupOf`, côté
+serveur, et le DTO la sert dans `conversation.nextMeetup`.
+
+Le client la **lit**. La refaire donnerait deux vérités, et le jour où la règle évolue, l'une des
+deux serait fausse. Conséquence assumée et **écrite dans le module** : la liste `meetups` reste
+ignorée.
+
+## 4. Quatre états valent mieux qu'un booléen — encore
+
+La porte du numéro :
+
+```ts
+export type EtatDuNumero = 'revele' | 'ouvrable' | 'trop-tot' | 'sans-ancre';
+```
+
+`sans-ancre` est le cas qu'un booléen écrase : `opensAt: null` ne veut pas dire « jamais », il veut
+dire **« aucun rendez-vous accepté, aucune date de départ »**. L'action utile n'est pas d'attendre,
+c'est de convenir d'un rendez-vous. Un `peutOuvrir: boolean` aurait affiché la même phrase dans les
+deux cas, et la plus inutile des deux.
+
+Et sur le site, le motif ne vivait que dans un attribut `title` — **qui n'existe pas sur un
+téléphone**. Une info rendue par un survol est une info absente partout où l'on ne survole pas.
+
+## 5. Une fiche qui refuse doit dire à quelle condition elle changera d'avis
+
+Au lot précédent, une fiche épinglait que `phone` était **délibérément** ignoré. Elle est passée au
+rouge à la seconde où ce lot l'a importé :
+
+```
+● ⑦ ce que le lot ignore à dessein › le fil se lit sans rendez-vous ni numéro
+```
+
+Personne n'a eu à s'en souvenir. C'est la différence entre **une dette comptée et une dette
+promise** — et la seule forme de rappel qui survive à l'oubli.
+
+## 6. Le piège du mot, septième épisode — et le plus net
+
+La correction du lot touchait un commentaire du serveur qui nommait le mauvais objet (« rendez-vous
+de REMISE » là où le code filtre `PICKUP`). La fiche écrite pour le garder faisait ceci :
+
+```ts
+expect(ancre).not.toMatch(/rendez-vous de REMISE/);   // ✗
+```
+
+Elle a rougi **sur la correction elle-même**, qui cite le mot fautif pour expliquer pourquoi il
+l'était. Une interdiction de mot rend impossible d'expliquer ce mot. La parade :
+
+```ts
+const entete = ancre.slice(0, ancre.indexOf('*/'));
+expect(entete).toContain('PRISE EN CHARGE');
+expect(entete).toContain('kind: "PICKUP"');          // ✓ ce que la doc doit AFFIRMER
+```
+
+> Épingle ce qu'un texte doit **dire**, jamais ce qu'il doit **taire**.
+
+## 7. Un balayage avec une liste écrite en dur n'est pas un balayage
+
+La fiche anti-export-mort du lot précédent a rougi — **en ayant raison sur la question et tort sur
+sa portée** : sa liste d'appelants était codée en dur et ce lot a ajouté un cinquième fichier.
+
+```ts
+// ✗ une liste qu'il faut penser à rallonger
+const appelants = [FIL, LISTE, 'src/components/message-report-sheet.tsx'].map(lire).join('\n');
+
+// ✓ un balayage qui se tient à jour tout seul
+const appelants = sourcesDe(join(MOBILE, 'src'))
+  .filter((c) => !c.endsWith('messages.api.ts'))
+  .map((c) => readFileSync(c, 'utf8'))
+  .join('\n');
+```
+
+Même famille que le compteur d'exceptions d'A224 lot 5 : **un détecteur qui demande de la maintenance
+finit par être désactivé.**
+
+## Pour aller plus loin
+
+* **Transpose ce qu'un contrôle DIT, pas sa forme.** Le site garde ses deux champs de date — à la
+  souris, c'est un geste légitime ; il reçoit en revanche les cinq phrases de refus que le natif ne
+  peut même pas déclencher.
+* **Plafonne dans le champ.** Troisième fois que ce dépôt trouve un champ sans borne alors que le
+  contrat en pose une (`PickupNotes` D115 bis, le message D117, le lieu et le repère ici).
+* **Compte ce que tu ne factorises pas.** Une seconde bande de jours est assumée et comptée par une
+  fiche ; la troisième déclenchera le partage.

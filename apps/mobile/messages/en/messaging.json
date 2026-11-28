@@ -72,5 +72,68 @@
     "phone": {
       "revealed": "The phone number has been shown."
     }
+  },
+  "meetup": {
+    "title": "Meeting",
+    "none": "No meeting agreed yet",
+    "noneWhy": "Suggest a place and a time to find each other.",
+    "pickup": "Hand-over",
+    "delivery": "Delivery",
+    "propose": "Suggest a meeting",
+    "counter": "Suggest another slot",
+    "accept": "Accept",
+    "accepted": "Confirmed",
+    "toAccept": "To accept",
+    "waiting": "Waiting for {name}",
+    "slot": "{day}, from {from} to {to}",
+    "kind": "Which moment?",
+    "day": "Which day?",
+    "hour": "What time?",
+    "duration": "How long?",
+    "durations": {
+      "30": "30 min",
+      "60": "1 hr",
+      "120": "2 hrs",
+      "180": "3 hrs"
+    },
+    "place": "Where?",
+    "placePlaceholder": "Terminal 2E, gate 4",
+    "detail": "Something to recognise you by (optional)",
+    "detailPlaceholder": "I'm wearing a red jacket",
+    "send": "Suggest",
+    "cancel": "Cancel",
+    "close": "Close",
+    "missing": {
+      "jour": "Pick a day",
+      "heure": "Pick a time",
+      "lieu": "{count, plural, one {# more character for the place} other {# more characters for the place}}",
+      "lieuTropLong": "{count, plural, one {Place: # character too many} other {Place: # characters too many}}",
+      "detailTropLong": "{count, plural, one {Note: # character too many} other {Note: # characters too many}}",
+      "envoi": "Sending…"
+    },
+    "errors": {
+      "ferme": "This conversation closed in the meantime.",
+      "change": "This meeting just changed. Reloading the thread.",
+      "sienne": "You suggested this slot: it is for the other person to accept.",
+      "introuvable": "This meeting no longer exists.",
+      "tropTot": "That slot is too soon. Leave at least thirty minutes.",
+      "tropLoin": "That slot is too far ahead.",
+      "tropLong": "That slot is too long.",
+      "creneau": "That slot is not valid. Pick another day or time.",
+      "echec": "The suggestion did not go through: nothing was sent. Check your connection and try again."
+    }
+  },
+  "phone": {
+    "title": "Phone",
+    "reveal": "Show {name}'s number",
+    "call": "Call {name}",
+    "opensAt": "The number will appear on {when}",
+    "needsMeetup": "Agree on a hand-over meeting: the number opens two hours before.",
+    "why": "Yamba opens the number just before the meeting, and keeps a record of it.",
+    "errors": {
+      "tropTot": "The number is not open yet.",
+      "sansAncre": "You need a hand-over meeting first, or a departure date.",
+      "echec": "The number could not be opened. Try again."
+    }
   }
 }
