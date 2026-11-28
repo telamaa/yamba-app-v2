@@ -21855,3 +21855,131 @@ les gardes avant de regarder les écrans.**
   Mailpit, absent du poste au moment du lot. Deux chapitres à rejouer avant de fusionner.
 - **Notifier un fil jamais ouvert** n'a pas de sens aujourd'hui (il n'a aucun message). La
   question se reposera si le produit annonce un jour « votre fil est ouvert ».
+
+# D125 — L'écran va à l'essentiel, et « épurer » se mesure (28/11/2026)
+
+Demande de l'utilisateur, mot pour mot : *« il manque des éléments sur certaines pages, des tris,
+filtres… d'autres pages sont trop saturées, il faut tout épurer, ça doit être pro et aller à
+l'essentiel, pas de blabla… pas beaucoup de texte inutile qui fait penser à l'IA »*.
+
+## La première mesure dit le contraire de ce qu'on allait faire
+
+Avant d'enlever un mot, on compte :
+
+| | Mesure |
+|---|---|
+| Chaînes dans les dictionnaires du mobile | **1 569** |
+| Chaînes de **22 mots ou plus** | **8** |
+
+Et les huit sont des textes à **conséquence** : ce qu'un avis rend public, ce qu'un signalement
+gèle, ce que la fermeture d'un fil implique. **La copie du téléphone n'est pas bavarde** — D111 ②
+l'avait déjà raccourcie de douze textes. Raboter là aurait enlevé de l'information utile en
+croyant enlever du bruit.
+
+> **Ce qui encombre un produit ne se voit pas à l'écran** : c'est la clé que personne ne lit, le
+> champ que personne ne rend, le fichier que le routeur ne route pas, et la phrase qui s'excuse.
+
+## Ce qui manquait
+
+**L'écran Profil.** `profile.tsx` posait `justifyContent: 'center'` sur le conteneur qui portait
+**aussi** la rangée de retour : le chevron de D105 se retrouvait **au milieu de l'écran**, au-dessus
+d'un bloc centré, sur une page vide aux trois quarts. Le bouton était juste, sa place ne l'était
+pas — **troisième défaut de composition de la semaine** (D104, D124, celui-ci). La rangée d'en-tête
+est désormais séparée du contenu : elle est en haut, le contenu se centre dans ce qui reste.
+
+Et la phrase **« La gestion du profil arrive dans un prochain lot »** est partie. Un écran qui
+annonce un lot à venir est une promesse, pas une fonction : il occupe la place, ne répond à rien,
+et date l'application. C'est exactement le texte que la demande désignait.
+
+**Les alertes.** La carte du segment « Alertes » était une `ThemedView` : aucun geste. Le site en
+offre trois. **Créable sur le téléphone, supprimable seulement sur le site** — ce que la doctrine
+« mobile full natif » interdit depuis le 11/10. Le natif reçoit **supprimer** (avec confirmation,
+on ne détruit pas sur un effleurement) et la **bascule e-mail**.
+
+## Et la pastille qui nommait un état impossible
+
+La carte affichait « En pause » quand `isActive` était faux. Mesuré **avant** d'écrire quoi que ce
+soit :
+
+```
+isActive : créé à true (3 endroits), filtré sur true (4), écrit à false — NULLE PART
+PATCH /saved-routes/:id accepte earliestDate, latestDate, emailEnabled, includeNearby
+                        — jamais isActive
+```
+
+Ni route membre, ni cron, ni admin. **Le téléphone affichait un état que rien dans le produit ne
+peut produire** — le défaut de D100, « un écran qui affirme ce que le produit ne fait pas ». Et le
+site n'offre pas de pause non plus : sa bascule porte sur l'**e-mail**.
+
+On retire l'affirmation. On n'invente pas la route depuis le client (D118 6A). Mettre une alerte en
+pause reste à décider, serveur compris.
+
+> **Correction en cours de lot :** l'entrée du registre, gravée une heure plus tôt, promettait
+> « mettre en pause » au natif. La mesure l'a contredite, et **l'entrée a été corrigée avant le
+> code** plutôt qu'après. C'est à cela que sert de graver d'abord.
+
+## Ce qui ne servait à rien, compté puis supprimé
+
+| Quoi | Combien |
+|---|---|
+| Clés de dictionnaire sans aucun usage (mobile) | **17** × 2 langues = **34** |
+| Champs de `CreateTripCopy` que le site ne rend nulle part | **39** (92 lignes) |
+| `page.tsx` posé **hors de `app/`**, donc jamais routé par Next | **1** |
+| Styles orphelins après promotion du gabarit | 2 blocs |
+
+Parmi les clés mortes : deux **doublons exacts** (`common.show` à côté de `common.showPassword`),
+la pastille « En pause », et cinq fragments d'un écran de fiche trajet refondu.
+
+## Le piège était dans le détecteur, pour la sixième fois
+
+Une clé peut être **littérale** (`t('wishes.delete')`) ou **calculée** :
+
+```ts
+t(`rating.stars.value${value}`)
+t(`system.${message.cleSysteme}`)
+t(`review.error${refus}`)
+```
+
+Le premier jet du balayage a déclaré mortes **dix clés qui vivaient très bien**, toutes calculées —
+et une onzième (`system.meetup.proposed`) couverte par `system.${…}`. **Un faux positif dans un
+balayage coûte autant qu'un trou, parce qu'on finit par le désactiver.**
+
+Le détecteur final lit les deux formes, et il **se garde lui-même** : au moins 15 dictionnaires,
+200 000 caractères de source, 30 gabarits calculés, 300 clés littérales — sans quoi il serait vert
+pour avoir mal lu. Et le balayage a été **éprouvé par un témoin** : une clé plantée exprès, vue par
+l'orphelinat **et** par le contrôle de parité FR/EN, puis retirée.
+
+## Un état vide est un gabarit, pas une recopie
+
+`EmptyBlock` existait — **dans `favorites.tsx`**, donc importable par personne. Trois autres écrans
+en ont recomposé un à la main avec les mêmes styles. C'est D110 appliqué à un composant plutôt
+qu'à une classe : **une source de vérité que l'on n'importe pas est un commentaire.**
+
+`components/etat-vide.tsx` prend sa place, avec une **action facultative** — et c'est une décision :
+un état vide subi (« aucun message ») n'a pas de bouton, en proposer un invente un geste ; un état
+vide qu'on peut quitter en a un.
+
+## Ce qu'on ne touche PAS, et c'est une décision
+
+Le site filtre ses listes par pastilles comptées ; le téléphone groupe en **sections**, et
+`trips/mine.tsx` écrit pourquoi : *« des pastilles de filtre donneraient un vide qu'on a provoqué
+soi-même, qui se lit comme une panne »*. **Une divergence dont la raison est écrite n'est pas une
+dette** — on ne la corrige pas parce qu'elle dépareille.
+
+Vérifié aussi, et **ce n'était pas un défaut** : les cinq pages `/preview` qui affichent des
+montants inventés sont **déjà** fermées en production (`NODE_ENV === "production"` → `notFound()`)
+et portent un bandeau « mock ». Le reste ouvert de D123 les désignait comme « un défaut de
+vérité » : c'était faux, et la vérification l'a montré avant qu'on y touche.
+
+## Mesures
+
+- Mobile : **1 568 → 1 573 fiches / 70 suites** (`recensement-des-textes.spec.ts`), typecheck vert.
+- Site : **345 fiches / 24 suites**, typecheck vert, 92 lignes de copie morte en moins.
+
+## Reste ouvert (nommé)
+
+- **Trois écrans composent encore leur état vide à la main** (messages, notifications, le fil) :
+  ils portent une logique de reprise en cas de panne que le gabarit ne couvre pas encore.
+- **Mettre une alerte en pause** n'existe nulle part — ni client, ni serveur. À décider.
+- **Prolonger une alerte** existe côté serveur et reste absent du téléphone : l'écran ne sait pas
+  encore dire *de combien*.

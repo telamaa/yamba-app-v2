@@ -13625,3 +13625,167 @@ d'acceptation.
 - `apps/message-service/src/services/conversation-list.service.spec.ts` — les 13 fiches du lot.
 - Registre : **D61** (le fil comme objet), **D83** (CQS), **D104** et **D106** (deux autres défauts
   de composition), **A195** (la course à l'ouverture d'un fil).
+
+# Chapitre — « Épurer » est une mesure, pas un goût (D125)
+
+## 1. La demande, et le piège qu'elle contient
+
+> « il faut tout épurer, ça doit être pro et aller à l'essentiel, pas de blabla… pas beaucoup de
+> texte inutile qui fait penser à l'IA »
+
+C'est la demande la plus facile à **mal exécuter**, parce qu'elle s'exécute à l'œil et qu'elle
+donne immédiatement l'impression d'avoir travaillé. On ouvre trois écrans, on raccourcit six
+phrases, on livre.
+
+La première chose à faire est donc de **compter** :
+
+```
+1 569 chaînes dans les dictionnaires du mobile
+    8 font 22 mots ou plus
+```
+
+Et les huit portent des conséquences : ce qu'un avis rend public, ce qu'un signalement gèle. La
+mesure dit **l'inverse** de ce qu'on allait faire. Raboter là aurait retiré de l'information utile
+en croyant retirer du bruit.
+
+> **Ce qui encombre un produit ne se voit pas à l'écran.** C'est la clé que personne ne lit, le
+> champ que personne ne rend, le fichier que le routeur ne route pas, et la phrase qui s'excuse.
+
+## 2. Un défaut de composition, le troisième de la semaine
+
+```tsx
+<SafeAreaView style={styles.safeArea}>   // justifyContent: 'center'
+  <View style={styles.backRow}>          // ← le retour est DEDANS
+    <BackButton … />
+  </View>
+  <ThemedText type="subtitle">…</ThemedText>
+</SafeAreaView>
+```
+
+Le bouton est juste (D105 lui a donné le chevron commun). Le centrage est juste (le contenu est
+court). **Leur composition met le bouton de retour au milieu de l'écran.** D104 : un retour correct
+du mauvais côté d'une garde. D124 : une règle correcte et un stockage correct qui ne se parlent
+pas. Ici : deux styles corrects dans le même conteneur.
+
+Le correctif est structurel, pas cosmétique — **séparer les deux boîtes** :
+
+```tsx
+<SafeAreaView style={styles.safeArea}>           // plus de centrage ici
+  <View style={styles.enTete}>…</View>           // en haut
+  <View style={styles.contenu}>…</View>          // flex: 1 + centré
+</SafeAreaView>
+```
+
+## 3. Mesurer un état AVANT de l'afficher
+
+La carte d'alerte affichait « En pause » sur `!isActive`. Avant d'écrire la moindre ligne :
+
+```sh
+grep -rn "isActive" apps/auth-service/src | grep -v spec
+#  créé à true   : 3 endroits
+#  filtré sur true : 4 endroits
+#  écrit à false  : AUCUN
+```
+
+Et `PATCH /saved-routes/:id` n'accepte même pas le champ. **L'écran nommait un état que rien ne
+peut produire** — le défaut de D100, pris par l'autre bout : au lieu d'un contrôle qui promet une
+action absente, un libellé qui décrit un état absent.
+
+Deux conséquences de méthode :
+
+- on **retire l'affirmation**, on n'invente pas la route serveur depuis le client (D118 6A) ;
+- l'entrée de registre gravée une heure plus tôt promettait « mettre en pause » au natif : elle a
+  été **corrigée avant le code**. C'est précisément à cela que sert de graver d'abord — une
+  décision fausse coûte une correction de document, pas une correction de produit.
+
+## 4. Le détecteur se trompe avant vous
+
+Un balayage de clés mortes doit connaître les clés **calculées** :
+
+```ts
+t('wishes.delete')                    // littérale
+t(`rating.stars.value${value}`)       // calculée — préfixe `rating.stars.value`
+t(`system.${message.cleSysteme}`)     // calculée — préfixe `system.`
+t(`review.error${refus}`)             // calculée — le suffixe est interpolé
+```
+
+Le premier jet a déclaré mortes **onze clés bien vivantes**. **Un faux positif dans un balayage
+coûte autant qu'un trou, parce qu'on finit par le désactiver** — sixième fois ce mois-ci dans ce
+dépôt, et à chaque fois pour la même raison : on vise une **orthographe** au lieu d'un **usage**.
+
+Deux garde-fous dans la fiche finale :
+
+```ts
+// ① le balayage prouve qu'il a balayé
+expect(DICTIONNAIRES.length).toBeGreaterThanOrEqual(15);
+expect(SOURCES.length).toBeGreaterThan(200_000);
+expect(GABARITS.length).toBeGreaterThanOrEqual(30);
+
+// ② et un TÉMOIN prouve qu'il mord
+//    (clé plantée exprès → vue par l'orphelinat ET par la parité FR/EN → retirée)
+```
+
+**Un balayage qu'on n'a pas vu rougir n'est pas un balayage, c'est une espérance.**
+
+## 5. Supprimer un champ : viser le bloc, pas le fichier
+
+Retirer 39 champs morts d'un type s'écrit en trois lignes de script… et le premier jet en a
+supprimé **43**, dont quatre appartenant à un **autre type du même fichier** (`Draft.globalPrice`,
+`Draft.instantBooking`…). Le typecheck l'a dit tout de suite — mais c'est la même faute que
+« j'ai mesuré la mauvaise table » commise en novembre, répétée :
+
+```python
+# ✗ le motif ^  nom: existe dans TOUS les types du fichier
+re.match(r'^  ([a-zA-Z0-9]+):', ligne)
+
+# ✓ on borne d'abord le bloc, puis on ne touche qu'à lui
+i = index de "export type CreateTripCopy = {"
+j = index du premier "};" après i
+avant, bloc, apres = lignes[:i], lignes[i:j+1], lignes[j+1:]
+```
+
+Et pour avaler une entrée multiligne, on **compte les accolades** plutôt que de chercher la
+première virgule en fin de ligne — sinon une valeur imbriquée coupe l'entrée en deux.
+
+## 6. Vérifier un vert, pas l'absence de rouge
+
+Erreur commise dans ce lot, et elle mérite d'être écrite :
+
+```sh
+# ✗ « pas de ligne "error TS" » ≠ « ça a réussi »
+npx nx typecheck … | grep -E "error TS" | head -3
+
+# ✓ on exige la PREUVE du succès
+npx nx typecheck … | grep -E "error TS|Successfully ran"
+```
+
+Deux lots ont été annoncés verts sur un `grep` qui n'avait rien trouvé — alors que la sortie Nx
+présentait les erreurs dans un **tableau récapitulatif** (`Errors  Files`) que le motif ne
+couvrait pas. Deux vraies erreurs sont passées, dont **une régression du lot précédent** (la porte
+du fil depuis l'écran d'un deal routait encore par un identifiant devenu nullable).
+
+C'est mot pour mot la règle que ce dépôt applique à la CI — *« CI OK se vérifie en COMPTANT, pas à
+la couleur »* — appliquée à la CI et **pas** à son propre terminal.
+
+## 7. Ce qu'on ne corrige pas, et pourquoi c'est un travail aussi
+
+Le site filtre par pastilles comptées, le téléphone groupe en sections. Tentation : uniformiser.
+Mais `trips/mine.tsx` **écrit sa raison** :
+
+> « des pastilles de filtre donneraient un vide qu'on a provoqué soi-même, qui se lit comme une
+> panne »
+
+**Une divergence dont la raison est écrite n'est pas une dette.** Et la vérification vaut dans les
+deux sens : le lot précédent avait noté « des montants inventés en production » à propos des pages
+`/preview` — elles sont en réalité fermées par `NODE_ENV === "production"` et marquées d'un
+bandeau. **Avant de corriger, vérifier que c'est cassé.**
+
+## Pour aller plus loin
+
+- `apps/mobile/src/components/etat-vide.tsx` — le gabarit partagé, et pourquoi l'action est
+  facultative.
+- `apps/mobile/src/lib/recensement-des-textes.spec.ts` — le balayage, ses gardes, sa liste
+  d'exceptions (vide : la suppression est le défaut, l'exception se mérite).
+- Registre : **D100** (un écran qui affirme ce que le produit ne fait pas), **D104**/**D124**
+  (défauts de composition), **D110** (une source de vérité qu'on n'importe pas), **D118 6A** (on
+  n'invente pas une route depuis le client).

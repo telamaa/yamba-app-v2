@@ -57,6 +57,31 @@ export async function listSavedRoutes(): Promise<SavedRoute[]> {
   return page.savedRoutes ?? [];
 }
 
+/**
+ * Supprimer une alerte — D125 1C.
+ *
+ * Elle se créait depuis le téléphone et ne se supprimait que depuis le site :
+ * un geste de deux secondes qui obligeait à ouvrir un ordinateur. La route
+ * existe depuis la première version des alertes.
+ */
+export function deleteSavedRoute(id: string): Promise<unknown> {
+  return apiFetch<unknown>(`/saved-routes/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * L'e-mail d'une alerte, allumé ou éteint — la même bascule que le site.
+ *
+ * C'est le seul interrupteur que le serveur expose : `PATCH /saved-routes/:id`
+ * accepte `emailEnabled`, jamais `isActive`. Mettre une alerte « en pause »
+ * n'existe donc nulle part dans le produit (D125 1D).
+ */
+export function setSavedRouteEmail(id: string, emailEnabled: boolean): Promise<unknown> {
+  return apiFetch<unknown>(`/saved-routes/${id}`, {
+    method: 'PATCH',
+    body: { emailEnabled },
+  });
+}
+
 // ─── Segment « Voyageurs » ──────────────────────────────────────────────
 export type FollowedCarrier = {
   user: {

@@ -193,29 +193,19 @@ export type CategoryOption = {
 export type CreateTripCopy = {
   title: string;
   subtitle: string;
-  firstTripTitle: string;
-  firstTripSub: string;
   steps: string[];
   back: string;
   continue: string;
   saveDraft: string;
   publish: string;
-  summary: string;
-  close: string;
   emptyValue: string;
 
-  step1Title: string;
-  step1Sub: string;
-  step2Title: string;
-  step2Sub: string;
   step3Title: string;
   step3Sub: string;
 
   plane: string;
   train: string;
   car: string;
-  oneWay: string;
-  roundTrip: string;
 
   from: string;
   to: string;
@@ -223,7 +213,6 @@ export type CreateTripCopy = {
   arrivalDate: string;
   departureTime: string;
   arrivalTime: string;
-  swap: string;
 
   tripPathType: string;
   directFlight: string;
@@ -233,25 +222,17 @@ export type CreateTripCopy = {
   directTrip: string;
   detourByAgreement: string;
 
-  flightLayoverCities: string;
-  trainStopCities: string;
   travelReference: string;
 
   docUpload: string;
   docUploadSub: string;
   /** ANO-WEB-25 — message quand la limite de documents est atteinte. */
   docLimitReached: (n: number) => string;
-  docUploadHint: string;
   docPending: string;
-  docVerified: string;
-  docCount: string;
 
   // ── Pricing PER_KG (D13/D14/D15/D19) ──
   pricePerKg: string;
-  pricePerKgSub: string;
   capacity: string;
-  capacitySub: string;
-  capacityTolerance: string;
   fairPriceOk: string;
   fairPriceLow: string;
   fairPriceHigh: string;
@@ -260,18 +241,11 @@ export type CreateTripCopy = {
   gaugeMedian: string;
   gaugeHigh: string;
   families: string;
-  familiesSub: string;
-  familyAccept: string;
-  familySurcharge: string;
-  familyRefuse: string;
   bags: string;
-  bagsSub: string;
   checkedBag23: string;
   cabinBag12: string;
   bagConsumes: (kg: number) => string;
   netGain: string;
-  netGainIfFull: (kg: number) => string;
-  netGainSub: string;
   yourOffer: string;
   whyThisPrice: string;
   factorBase: (v: string, corridor: string) => string;
@@ -305,15 +279,7 @@ export type CreateTripCopy = {
   perKgUnit: string;
   kgUnit: string;
   availableKg: (kg: number) => string;
-  refusedFamilies: string;
 
-  /** @deprecated legacy */
-  categories: string;
-  globalPrice: string;
-  globalPriceSub: string;
-  adjustPrices: string;
-  pricePerCategory: string;
-  price: string;
 
   // Locations
   pickupLocations: string;
@@ -335,7 +301,6 @@ export type CreateTripCopy = {
 
   options: string;
   handOnly: string;
-  instantBooking: string;
 
   notes: string;
   notesPlaceholder: string;
@@ -352,11 +317,6 @@ export type CreateTripCopy = {
   publicPreview: string;
   asSeenByShippers: string;
 
-  revenueEstimate: string;
-  resumeDraft: string;
-  resumeDraftSub: string;
-  startFresh: string;
-  popularRoute: string;
   almostDone: string;
   almostDoneSub: string;
   stayAndFinish: string;

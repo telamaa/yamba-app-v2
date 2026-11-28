@@ -170,7 +170,6 @@ describe("largeur-de-page — le balayage : aucun contournement", () => {
       // lignes et un bouton se lisent mal sur 1 280 px.
       "components/carrier/deal/views/deliver/DealDeliverClient.tsx",
       "components/carrier/deal/views/pickup/DealPickupClient.tsx",
-      "components/dashboard/shipments/preview/page.tsx",
       "components/home/CorridorsSection.tsx",
       "components/home/FinalCtaSection.tsx",
       "components/home/HomePage.tsx",

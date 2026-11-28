@@ -31,6 +31,7 @@ import { useLocale, useTranslations } from 'use-intl';
 import type { SupportedLocale } from '@packages/api-contracts/locale';
 
 import { IdentityGate } from '@/components/identity-gate';
+import { EtatVide } from '@/components/etat-vide';
 import { HeaderActions } from '@/components/header-actions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -40,9 +41,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTabBarHideOnScroll } from '@/lib/tab-bar-visibility';
 import { ApiError } from '@/lib/api/client';
 import {
+  deleteSavedRoute,
   listFavoriteTrips,
   listMyFollowing,
   listSavedRoutes,
+  setSavedRouteEmail,
   type FollowedCarrier,
   type SavedRoute,
 } from '@/lib/api/favorite.api';
@@ -146,7 +149,7 @@ function FavoritesContent() {
             onScroll={onScroll}
             scrollEventThrottle={16}>
             {segment === 'trips' && <TripsSegment trips={state.data.trips} />}
-            {segment === 'wishes' && <WishesSegment wishes={state.data.wishes} />}
+            {segment === 'wishes' && <WishesSegment wishes={state.data.wishes} onChangedAction={load} />}
             {segment === 'carriers' && <CarriersSegment carriers={state.data.carriers} />}
           </Reanimated.ScrollView>
         )}
@@ -208,7 +211,7 @@ function TripsSegment({ trips }: { trips: TripSearchResult[] }) {
   const past = trips.filter(isPast);
 
   if (trips.length === 0) {
-    return <EmptyBlock icon="heart-outline" title={t('trips.emptyTitle')} body={t('trips.emptyBody')} />;
+    return <EtatVide icon="heart-outline" titre={t('trips.emptyTitle')} corps={t('trips.emptyBody')} />;
   }
 
   return (
@@ -238,16 +241,55 @@ function TripsSegment({ trips }: { trips: TripSearchResult[] }) {
 
 /* ── Segment « Souhaits » ────────────────────────────────────────────────── */
 
-function WishesSegment({ wishes }: { wishes: SavedRoute[] }) {
+function WishesSegment({
+  wishes,
+  onChangedAction,
+}: {
+  wishes: SavedRoute[];
+  onChangedAction: () => void;
+}) {
   const t = useTranslations('favorites');
   const locale = useLocale() as SupportedLocale;
+  const theme = useTheme();
+  /** L'alerte dont la suppression attend une confirmation. */
+  const [aSupprimer, setASupprimer] = useState<string | null>(null);
+  const [geste, setGeste] = useState(false);
+
+  const basculerEmail = useCallback(
+    async (alerte: SavedRoute) => {
+      if (geste) return;
+      setGeste(true);
+      try {
+        await setSavedRouteEmail(alerte.id, !alerte.emailEnabled);
+        onChangedAction();
+      } finally {
+        setGeste(false);
+      }
+    },
+    [geste, onChangedAction]
+  );
+
+  const supprimer = useCallback(
+    async (id: string) => {
+      if (geste) return;
+      setGeste(true);
+      try {
+        await deleteSavedRoute(id);
+        setASupprimer(null);
+        onChangedAction();
+      } finally {
+        setGeste(false);
+      }
+    },
+    [geste, onChangedAction]
+  );
 
   if (wishes.length === 0) {
     return (
-      <EmptyBlock
+      <EtatVide
         icon="notifications-outline"
-        title={t('wishes.emptyTitle')}
-        body={t('wishes.emptyBody')}
+        titre={t('wishes.emptyTitle')}
+        corps={t('wishes.emptyBody')}
       />
     );
   }
@@ -256,16 +298,13 @@ function WishesSegment({ wishes }: { wishes: SavedRoute[] }) {
     <View style={styles.list}>
       {wishes.map((wish) => (
         <ThemedView key={wish.id} type="backgroundElement" style={styles.card}>
-          <View style={styles.cardHead}>
-            <ThemedText type="smallBold" style={styles.route}>
-              {wish.originCity} <ThemedText style={styles.arrow}>→</ThemedText> {wish.destinationCity}
-            </ThemedText>
-            {!wish.isActive && (
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('wishes.paused')}
-              </ThemedText>
-            )}
-          </View>
+          {/* D125 1D — la pastille « En pause » est partie : `isActive` est créé
+              à `true`, filtré sur `true`, et écrit à `false` NULLE PART (ni
+              route membre, ni cron, ni admin). Elle nommait un état que rien
+              dans le produit ne peut produire — le défaut de D100. */}
+          <ThemedText type="smallBold" style={styles.route}>
+            {wish.originCity} <ThemedText style={styles.arrow}>→</ThemedText> {wish.destinationCity}
+          </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {wish.earliestDate
               ? formatLongDate(wish.earliestDate, locale)
@@ -275,6 +314,57 @@ function WishesSegment({ wishes }: { wishes: SavedRoute[] }) {
           <ThemedText type="small" themeColor="textSecondary">
             {t('wishes.expires', { date: formatLongDate(wish.expiresAt, locale) })}
           </ThemedText>
+
+          {/* D125 1C — les deux gestes que le serveur sait faire, et rien de
+              plus : la bascule porte sur l'E-MAIL (le seul interrupteur que
+              `PATCH /saved-routes/:id` accepte), et la suppression demande une
+              confirmation — on ne détruit pas sur un effleurement. */}
+          <View style={styles.wishActions}>
+            <Pressable
+              onPress={() => void basculerEmail(wish)}
+              disabled={geste}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: wish.emailEnabled, disabled: geste }}
+              accessibilityLabel={t('wishes.emailToggle')}
+              style={[styles.wishAction, { borderColor: theme.backgroundSelected }]}>
+              <Ionicons
+                name={wish.emailEnabled ? 'mail' : 'mail-outline'}
+                size={15}
+                color={wish.emailEnabled ? Brand.mango : theme.textSecondary}
+              />
+              <ThemedText type="small">
+                {wish.emailEnabled ? t('wishes.emailOn') : t('wishes.emailOff')}
+              </ThemedText>
+            </Pressable>
+
+            {aSupprimer === wish.id ? (
+              <View style={styles.wishConfirm}>
+                <Pressable
+                  onPress={() => void supprimer(wish.id)}
+                  disabled={geste}
+                  accessibilityRole="button"
+                  style={[styles.wishAction, { borderColor: Brand.mango }]}>
+                  <ThemedText type="small">{t('wishes.deleteConfirm')}</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setASupprimer(null)}
+                  accessibilityRole="button"
+                  style={[styles.wishAction, { borderColor: theme.backgroundSelected }]}>
+                  <ThemedText type="small">{t('wishes.deleteCancel')}</ThemedText>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setASupprimer(wish.id)}
+                disabled={geste}
+                accessibilityRole="button"
+                accessibilityLabel={t('wishes.delete')}
+                style={[styles.wishAction, { borderColor: theme.backgroundSelected }]}>
+                <Ionicons name="trash-outline" size={15} color={theme.textSecondary} />
+                <ThemedText type="small">{t('wishes.delete')}</ThemedText>
+              </Pressable>
+            )}
+          </View>
         </ThemedView>
       ))}
     </View>
@@ -290,10 +380,10 @@ function CarriersSegment({ carriers }: { carriers: FollowedCarrier[] }) {
 
   if (carriers.length === 0) {
     return (
-      <EmptyBlock
+      <EtatVide
         icon="people-outline"
-        title={t('carriers.emptyTitle')}
-        body={t('carriers.emptyBody')}
+        titre={t('carriers.emptyTitle')}
+        corps={t('carriers.emptyBody')}
       />
     );
   }
@@ -346,32 +436,27 @@ function CarriersSegment({ carriers }: { carriers: FollowedCarrier[] }) {
 
 /* ── L'état vide, commun aux trois segments ──────────────────────────────── */
 
-function EmptyBlock({
-  icon,
-  title,
-  body,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  body: string;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={styles.empty}>
-      <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundElement }]}>
-        <Ionicons name={icon} size={26} color={theme.textSecondary} />
-      </View>
-      <ThemedText type="smallBold" style={styles.centered}>
-        {title}
-      </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.centered}>
-        {body}
-      </ThemedText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
+  wishActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+  },
+  wishConfirm: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  wishAction: {
+    // 44 pt de haut : la cible tactile minimale de l'application.
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
@@ -458,22 +543,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.one,
     paddingVertical: Spacing.two,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.six,
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
   },
   centered: {
     textAlign: 'center',

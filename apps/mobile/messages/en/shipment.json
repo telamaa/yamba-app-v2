@@ -95,7 +95,6 @@
   },
   "journey": {
     "title": "Journey steps",
-    "departure": "Scheduled departure",
     "pickedUp": "Parcel picked up",
     "AT_AIRPORT": "Arrived at the departure point",
     "FLIGHT_DEPARTED": "Left for {destination}",
@@ -176,7 +175,6 @@
     "authorized": "Authorised, not charged yet",
     "capturedOn": "Charged on {date}",
     "frozen": "Frozen while we review",
-    "released": "Paid out to {carrierFirstName}",
     "refunded": "Refunded",
     "retained": "Retained",
     "noteAuthorized": "The hold is on your card. It only becomes a charge when {carrierFirstName} accepts.",

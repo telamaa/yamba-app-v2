@@ -10,7 +10,6 @@
   },
   "itinerary": {
     "title": "Itinerary",
-    "duration": "Duration: {duration}",
     "layovers": "Layovers: {cities}",
     "stops": "Stops: {cities}"
   },
@@ -93,9 +92,7 @@
     "title": "The Traveler",
     "memberSince": "Member since {date}",
     "newTripper": "New Traveler",
-    "rating": "★ {rating} · {count, plural, =1 {# review} other {# reviews}}",
-    "tripsPublished": "{count, plural, one {# trip published} other {# trips published}}",
-    "parcelsCarried": "{count, plural, one {# parcel carried} other {# parcels carried}}"
+    "rating": "★ {rating} · {count, plural, =1 {# review} other {# reviews}}"
   },
   "notes": {
     "title": "Traveler's notes"
@@ -116,9 +113,7 @@
     "error": "The favourite couldn't be saved. Please try again."
   },
   "co2": {
-    "prefix": "Shipping with no extra footprint ·",
-    "amount": "{kg, number} kg of CO₂ saved vs express freight",
-    "suffix": "for a {weight} kg parcel"
+    "amount": "{kg, number} kg of CO₂ saved vs express freight"
   },
   "bar": {
     "from": "From",

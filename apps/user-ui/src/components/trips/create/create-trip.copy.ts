@@ -7,10 +7,6 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
   return {
     title: isFr ? "Créer un trajet" : "Create a trip",
     subtitle: isFr ? "Tes kilos libres rapportent." : "Your spare kilos pay off.",
-    firstTripTitle: isFr ? "Publie ton premier trajet" : "Publish your first trip",
-    firstTripSub: isFr
-      ? "Ça prend 2 minutes, c'est gratuit."
-      : "It takes 2 minutes, it's free.",
     steps: [
       isFr ? "Trajet" : "Trip",
       isFr ? "Conditions" : "Conditions",
@@ -20,22 +16,14 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     continue: isFr ? "Continuer" : "Continue",
     saveDraft: isFr ? "Brouillon" : "Draft",
     publish: isFr ? "Publier le trajet" : "Publish trip",
-    summary: isFr ? "Résumé" : "Summary",
-    close: isFr ? "Fermer" : "Close",
     emptyValue: isFr ? "À compléter" : "To complete",
 
-    step1Title: isFr ? "Ton trajet" : "Your trip",
-    step1Sub: isFr ? "Mode, villes, dates" : "Mode, cities, dates",
-    step2Title: isFr ? "Tes conditions" : "Your conditions",
-    step2Sub: isFr ? "Prix, conditions, lieux" : "Price, conditions, places",
     step3Title: isFr ? "Vérification" : "Review",
     step3Sub: isFr ? "Vérifie, puis publie" : "Check, then publish",
 
     plane: isFr ? "Avion" : "Plane",
     train: isFr ? "Train" : "Train",
     car: isFr ? "Voiture" : "Car",
-    oneWay: isFr ? "Aller simple" : "One way",
-    roundTrip: isFr ? "Aller-retour" : "Round trip",
 
     from: isFr ? "Départ" : "From",
     to: isFr ? "Destination" : "To",
@@ -43,7 +31,6 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     arrivalDate: isFr ? "Date d'arrivée" : "Arrival date",
     departureTime: isFr ? "Heure de départ" : "Departure time",
     arrivalTime: isFr ? "Heure d'arrivée" : "Arrival time",
-    swap: isFr ? "Inverser" : "Swap",
 
     tripPathType: isFr ? "Type de parcours" : "Trip type",
     directFlight: isFr ? "Vol direct" : "Direct flight",
@@ -53,8 +40,6 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     directTrip: isFr ? "Direct" : "Direct",
     detourByAgreement: isFr ? "Détour possible" : "Detour possible",
 
-    flightLayoverCities: isFr ? "Ville d'escale" : "Layover city",
-    trainStopCities: isFr ? "Ville de correspondance" : "Connection city",
     travelReference: isFr ? "Réf. voyage" : "Travel ref.",
 
     docUpload: isFr ? "Justificatif" : "Proof",
@@ -63,21 +48,11 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       isFr
         ? `${n} documents maximum par trajet — retire un document pour en ajouter un autre.`
         : `${n} documents maximum per trip — remove one to add another.`,
-    docUploadHint: isFr
-      ? "Badge « Voyage vérifié » après validation"
-      : "'Verified trip' badge after review",
     docPending: isFr ? "En attente de vérification" : "Pending verification",
-    docVerified: isFr ? "Vérifié" : "Verified",
-    docCount: isFr ? "fichier(s)" : "file(s)",
 
     // ── Pricing PER_KG (D13/D14/D15/D19) ──
     pricePerKg: isFr ? "Ton prix au kilo" : "Your price per kg",
-    pricePerKgSub: isFr ? "Un seul nombre à fixer" : "One number to set",
     capacity: isFr ? "Ta capacité" : "Your capacity",
-    capacitySub: isFr ? "Réservés dès la première demande" : "Reserved on the first request",
-    capacityTolerance: isFr
-      ? "10 % d'écart tolérés au pickup. Au-delà, tu peux refuser sans pénalité."
-      : "10% weight gap tolerated at pickup. Beyond, you can refuse without penalty.",
     fairPriceOk: isFr ? "✓ Prix juste" : "✓ Fair price",
     fairPriceLow: isFr ? "↓ Sous le marché — tu laisses de l'argent" : "↓ Below market — you're leaving money",
     fairPriceHigh: isFr ? "↑ Au-dessus — moins de demandes probables" : "↑ Above — fewer requests likely",
@@ -91,22 +66,12 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     gaugeMedian: isFr ? "médiane" : "median",
     gaugeHigh: isFr ? "haute" : "high",
     families: isFr ? "Familles de colis" : "Parcel families",
-    familiesSub: isFr ? "Accepter, surtaxer ou refuser" : "Accept, surcharge or refuse",
-    familyAccept: "OK",
-    familySurcharge: "+%",
-    familyRefuse: isFr ? "Non" : "No",
     bags: isFr ? "Bagages entiers — forfait" : "Whole bags — flat rate",
-    bagsSub: isFr ? "Un prix fixe pour une valise" : "A flat price for a suitcase",
     checkedBag23: isFr ? "Bagage soute 23 kg" : "Checked bag 23 kg",
     cabinBag12: isFr ? "Bagage cabine 12 kg" : "Cabin bag 12 kg",
     bagConsumes: (kg: number) =>
       isFr ? `consomme ${kg} kg de ta capacité` : `uses ${kg} kg of your capacity`,
     netGain: isFr ? "Tu gagnes" : "You earn",
-    netGainIfFull: (kg: number) =>
-      isFr ? `Si tes ${kg} kg sont réservés` : `If your ${kg} kg get booked`,
-    netGainSub: isFr
-      ? "Net, versé 4 jours après la livraison."
-      : "Net, paid 4 days after delivery.",
     // ── Refonte UX step 2 : accordéons, popovers, familles en mots ──
     yourOffer: isFr ? "Ton offre" : "Your offer",
     whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
@@ -175,16 +140,7 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     perKgUnit: "€/kg",
     kgUnit: "kg",
     availableKg: (kg: number) => (isFr ? `${kg} kg dispo` : `${kg} kg available`),
-    refusedFamilies: isFr ? "Refusé" : "Refused",
 
-    categories: isFr ? "Catégories acceptées" : "Accepted categories",
-    globalPrice: isFr ? "Prix par défaut" : "Default price",
-    globalPriceSub: isFr
-      ? "Appliqué à toutes les catégories"
-      : "Applied to all categories",
-    adjustPrices: isFr ? "Ajuster par catégorie" : "Adjust per category",
-    pricePerCategory: isFr ? "Prix par catégorie" : "Price per category",
-    price: isFr ? "Prix" : "Price",
 
     // ── Locations ─────────────────────────
     pickupLocations: isFr ? "Lieux de remise" : "Pickup locations",
@@ -209,7 +165,6 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
 
     options: isFr ? "Options" : "Options",
     handOnly: isFr ? "Main propre uniquement" : "Hand delivery only",
-    instantBooking: isFr ? "Réservation instantanée" : "Instant booking",
 
     notes: isFr ? "Message (optionnel)" : "Note (optional)",
     notesPlaceholder: isFr
@@ -229,13 +184,6 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       ? "Tel que vu par les expéditeurs"
       : "As seen by senders",
 
-    revenueEstimate: isFr ? "Revenu estimé" : "Estimated revenue",
-    resumeDraft: isFr ? "Reprendre ton brouillon ?" : "Resume your draft?",
-    resumeDraftSub: isFr
-      ? "Tu avais commencé un trajet."
-      : "You had started a trip.",
-    startFresh: isFr ? "Recommencer" : "Start fresh",
-    popularRoute: isFr ? "Route populaire" : "Popular route",
     almostDone: isFr ? "Tu es presque au bout !" : "You're almost done!",
     almostDoneSub: isFr
       ? "Ton trajet est presque prêt à être publié."

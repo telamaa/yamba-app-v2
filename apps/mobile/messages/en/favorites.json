@@ -16,7 +16,12 @@
     "anyDate": "Any date",
     "nearby": "Nearby cities included",
     "expires": "Expires on {date}",
-    "paused": "Paused"
+    "emailToggle": "Email alert",
+    "emailOn": "Email on",
+    "emailOff": "Email off",
+    "delete": "Delete",
+    "deleteConfirm": "Confirm",
+    "deleteCancel": "Cancel"
   },
   "carriers": {
     "emptyTitle": "No Travelers followed",
