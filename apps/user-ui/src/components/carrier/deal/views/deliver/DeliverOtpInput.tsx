@@ -8,6 +8,11 @@
  *  - inputMode numeric (clavier chiffres sur mobile)
  *  - erreur → animation shake + message + compteur de tentatives
  *  - verrouillé → cases disabled + compte à rebours
+ *
+ * D116 bis — `photoHint` : ce que les PHOTOS retiennent, dit sous le bouton.
+ * Avant, l'appelant fusionnait cet état avec `isSubmitting` et le bouton
+ * affichait « Vérification… » pour toujours quand une photo échouait : il
+ * avait perdu la raison de son attente, donc sa capacité à la dire.
  */
 
 "use client";
@@ -26,6 +31,8 @@ type Props = {
   isLocked: boolean;
   lockCountdown?: string;
   isSubmitting: boolean;
+  /** Ce que les photos retiennent, déjà traduit — `null` si rien. */
+  photoHint?: string | null;
   onSubmitAction: (code: string) => void;
   compact?: boolean;
 };
@@ -38,6 +45,7 @@ export default function DeliverOtpInput({
                                           isLocked,
                                           lockCountdown,
                                           isSubmitting,
+                                          photoHint = null,
                                           onSubmitAction,
                                           compact = false,
                                         }: Props) {
@@ -210,7 +218,7 @@ export default function DeliverOtpInput({
       <button
         type="button"
         onClick={() => onSubmitAction(code)}
-        disabled={!isComplete || isSubmitting || isLocked}
+        disabled={!isComplete || isSubmitting || isLocked || photoHint !== null}
         className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF9900] px-4 font-bold text-slate-950 transition-colors hover:bg-[#F08700] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 ${
           compact ? "min-h-[48px] text-[14px]" : "min-h-[50px] text-[14.5px]"
         }`}
@@ -218,6 +226,16 @@ export default function DeliverOtpInput({
         <Check size={15} strokeWidth={3} aria-hidden="true" />
         {isSubmitting ? t("otp.validating") : t("otp.validate")}
       </button>
+      {/* D116 bis — ce que les PHOTOS retiennent, dit en toutes lettres : un
+          bouton inactif que rien n'explique est un cul-de-sac (A209). */}
+      {photoHint !== null && !isSubmitting && (
+        <p
+          className="mt-2 text-center text-[12px] text-amber-700 dark:text-amber-400"
+          role="status"
+        >
+          {photoHint}
+        </p>
+      )}
     </section>
   );
 }

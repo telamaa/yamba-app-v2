@@ -26,7 +26,8 @@
     "wrongCode": "Ce code n''est pas le bon. Vérifie avec {recipientFirstName} et réessaye.",
     "attemptsLeft": "{count, plural, =1 {Dernière tentative} other {# tentatives restantes}}",
     "locked": "Trop de tentatives. Saisie bloquée pendant {minutes} min pour des raisons de sécurité.",
-    "lockedCountdown": "Réessaye dans {countdown}"
+    "lockedCountdown": "Réessaye dans {countdown}",
+    "wrongCodeNoName": "Ce code n'est pas le bon. Fais-le répéter, chiffre par chiffre."
   },
   "helpCard": {
     "title": "{recipientFirstName} ne se souvient plus du code ?",
@@ -66,7 +67,10 @@
   "error": {
     "toastGeneric": "Erreur lors de la validation. Réessaye.",
     "codeUnavailable": "Aucun code n''a été généré pour ce deal (prise en charge antérieure à la mise à jour). Contacte le support.",
-    "dealChanged": "La saisie n''est pas possible pour le moment (verrou en cours ou deal modifié). On recharge."
+    "dealChanged": "La saisie n''est pas possible pour le moment (verrou en cours ou deal modifié). On recharge.",
+    "loadTitle": "Cette remise ne se lit pas",
+    "loadBody": "On n'arrive pas à relire cette réservation pour l'instant. Reviens-y, rien n'a été envoyé.",
+    "loadBack": "Revenir à la réservation"
   },
   "photos": {
     "title": "Une photo de la remise ?",

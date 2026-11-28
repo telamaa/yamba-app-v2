@@ -43,6 +43,9 @@ export default {
     '^@packages/pricing$': '<rootDir>/../../packages/libs/pricing/src/index.ts',
     '^@packages/api-contracts/locale$':
       '<rootDir>/../../packages/libs/api-contracts/src/locale.ts',
+    // Le contrat COMPLET, pour les fiches seulement (D115 bis) : l'ordre des
+    // deux lignes compte, jest prend la PREMIÈRE qui correspond.
+    '^@packages/api-contracts$': '<rootDir>/../../packages/libs/api-contracts/src/index.ts',
     '^@packages/libs/maintenance$': '<rootDir>/../../packages/libs/maintenance/index.ts',
   },
   coverageDirectory: '../../coverage/apps/user-ui',

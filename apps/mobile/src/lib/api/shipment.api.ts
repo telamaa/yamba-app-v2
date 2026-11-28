@@ -295,3 +295,29 @@ export async function confirmDelivery(shipmentId: string): Promise<ConfirmDelive
     body: {},
   });
 }
+
+/* ── La LISTE (D112) ─────────────────────────────────────────────────────── */
+
+type MyBookingsResponse = { bookings?: ShipperShipmentDto[] } | ShipperShipmentDto[];
+
+/**
+ * Tous mes envois. `GET /me/bookings` sert la vue Expéditeur COMPLÈTE —
+ * exactement le DTO que `getShipment` relit pour un envoi seul : aucun type
+ * nouveau, aucune ligne de serveur. Ce qui manquait n'était pas un contrat,
+ * c'était une PORTE (D112 0A).
+ *
+ * Rend une liste VIDE en cas d'échec : un écran de liste sait dire « rien à
+ * montrer », il ne sait rien faire d'une exception.
+ *
+ * Le code de livraison n'est jamais servi ici (D43, paramètre serveur) — et
+ * c'est bien : une liste se regarde par-dessus l'épaule dans une file
+ * d'embarquement.
+ */
+export async function mesEnvois(): Promise<ShipperShipmentDto[]> {
+  try {
+    const reponse = await apiFetch<MyBookingsResponse>('/me/bookings');
+    return Array.isArray(reponse) ? reponse : (reponse.bookings ?? []);
+  } catch {
+    return [];
+  }
+}

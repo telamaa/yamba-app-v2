@@ -9679,3 +9679,268 @@ Expéditeurs, affichaient « Date à choisir »** alors qu'ils ont une date de d
 | 9 | Je regarde un trajet publié depuis le site ou par un import | sa date de départ s'affiche, juste, dans l'heure du lieu de départ |
 | 10 | Mon trajet part de Dubaï à 03:30, heure locale | c'est bien le jour local de Dubaï qui s'affiche, pas celui de Greenwich |
 | 11 | Je n'ai encore aucun trajet | l'écran le dit et propose d'en publier un |
+
+---
+
+# D112 — L'Expéditeur retrouve ses envois (27/11/2026)
+
+## Le besoin
+
+Un Expéditeur réserve, paie, et voit son suivi : où en est le colis, le code à donner au
+destinataire, le point de rendez-vous. Puis il ferme l'app.
+
+Jusqu'ici, **il ne pouvait plus jamais y revenir**. Le suivi n'était atteignable que depuis l'écran
+qui suit le paiement. Ni le code de livraison, ni le rendez-vous, ni la notation, ni le
+signalement : tout était écrit, et tout était injoignable.
+
+Son onglet Activité, lui, ne lui parlait pas : il n'y voyait qu'une phrase d'attente et une
+invitation à devenir Voyageur.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D112-1** | « Mes envois » montre **tous** les envois de l'Expéditeur, groupés en trois sections : à traiter, en cours, passés. | Trois questions différentes : qu'est-ce qui m'attend, qu'est-ce qui roule, qu'est-ce qui est derrière moi. |
+| **RG-D112-2** | Un envoi n'est « à traiter » que si l'Expéditeur peut le faire **avancer** : confirmer la réception, ou noter le Voyageur. | Un colis en route ne lui demande rien — c'est au Voyageur de déclarer son passage. Une tâche posée sur le bureau de quelqu'un qui ne peut rien faire n'est pas un rappel, c'est un reproche. |
+| **RG-D112-3** | Annuler et signaler ne sont **jamais** des tâches en attente. | Sinon la liste des envois deviendrait une liste de regrets : tout ce qui est annulable y serait « à traiter ». |
+| **RG-D112-4** | Confirmer la réception passe **avant** noter. | Tant que la réception n'est pas confirmée, l'argent du Voyageur est bloqué. Noter peut attendre, pas être payé. |
+| **RG-D112-5** | Une section sans envoi **disparaît**, et il n'y a **aucun filtre** à choisir. | Un écran vide qu'on a provoqué soi-même se lit comme une panne — et un filtre peut cacher ce qui réclame un geste. |
+| **RG-D112-6** | Un bouton n'apparaît que si le **serveur** autorise le geste. | Lui seul connaît le barème d'annulation et l'instant du départ. Promettre une annulation qu'il refusera est pire que ne rien proposer. |
+| **RG-D112-7** | Le compteur de l'onglet Activité et l'écran appliquent la **même** règle. | Un compteur calculé à part finit par dire autre chose que l'écran vers lequel il mène. |
+| **RG-D112-8** | Seule une demande **en attente de réponse** affiche un décompte. | C'est la seule qui meurt toute seule (24 h). Un décompte ailleurs ferait croire que tout expire. |
+| **RG-D112-9** | La date d'un envoi est celle du **lieu de départ**, pas celle du téléphone. | Un vol qui part à 00 h 30 à Dubaï ne part pas « la veille » parce qu'on le regarde depuis Paris. |
+| **RG-D112-10** | Le **code de livraison** n'apparaît jamais dans la liste. | Une liste se regarde par-dessus l'épaule dans une file d'embarquement. Il reste réservé au suivi, pendant le transport. |
+| **RG-D112-11** | Un envoi dont on a perdu le Voyageur reste **lisible**. | C'est le colis de quelqu'un, pas une ligne de base de données. |
+| **RG-D112-12** | La porte « Mes envois » est visible par **tout le monde**, pas seulement par les Voyageurs. | Tout compte peut envoyer un colis, et c'est par là qu'on retrouve son suivi. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité sans être Voyageur | je vois « Mes envois », et ce qu'il me reste à traiter |
+| 2 | Je tape dessus | la liste de mes envois, la plus récente en haut |
+| 3 | Mon colis est en route | il est « En cours » — l'app ne me réclame rien que je ne puisse faire |
+| 4 | Le Voyageur a remis mon colis | l'envoi passe en tête, avec « Confirmer la réception » |
+| 5 | Je confirme | l'envoi quitte « À traiter » dès mon retour sur la liste |
+| 6 | Mon envoi est terminé et la notation est ouverte | il est en tête avec « Noter le Voyageur » |
+| 7 | J'ai déjà noté | il redescend dans « Passés » |
+| 8 | Ma demande attend une réponse | je vois sous combien de temps elle est attendue |
+| 9 | La demande a expiré | on me le dit, on ne montre pas un décompte à zéro |
+| 10 | Je tape une carte | le suivi s'ouvre — le même que juste après le paiement |
+| 11 | Je n'ai aucun envoi | l'écran le dit et propose de chercher un trajet |
+| 12 | Je regarde la liste dans une file d'embarquement | aucun code de livraison n'y est visible |
+
+---
+
+# D113 — Le Voyageur répond à ses demandes (27/11/2026)
+
+## Le besoin
+
+Un Voyageur publie son trajet, des Expéditeurs lui demandent d'emporter un colis… et il ne pouvait
+rien en faire depuis son téléphone. L'app affichait le **nombre** de demandes en attente sur
+l'onglet Activité, et rien ne permettait d'y aller.
+
+C'est le plus coûteux des trois trous : une demande **meurt en 24 h**. L'Expéditeur qui n'obtient
+pas de réponse ne perd pas un écran, il perd son colis — et le Voyageur perd son gain.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D113-1** | « Demandes reçues » montre toutes les demandes du Voyageur, en trois sections : à répondre, en cours, passées. | Trois questions : qu'est-ce qu'on attend de moi, qu'est-ce qui roule, qu'est-ce qui est derrière. |
+| **RG-D113-2** | Une demande n'est « à répondre » que si le **serveur** autorise encore de l'accepter. | Capacité épuisée, trajet annulé, compte restreint : lui seul le sait. Proposer « Accepter » serait promettre un refus. |
+| **RG-D113-3** | La section « à répondre » est triée par **échéance croissante**. | Celle qui tombe en premier se répond en premier. C'est la seule liste où attendre coûte quelque chose à quelqu'un d'autre. |
+| **RG-D113-4** | Une demande sans échéance lisible passe en dernier, jamais au milieu. | Mieux vaut une place assumée qu'un rang inventé. |
+| **RG-D113-5** | L'urgence a **trois** crans : moins de 3 h, moins de 12 h, au-delà. | Au-delà de trois, c'est un nuancier que personne ne décode. Les bornes appartiennent au cran le plus urgent. |
+| **RG-D113-6** | Une demande sans horloge n'affiche **aucune** urgence. | « Calme » dirait « tu as le temps » à propos d'une décision déjà prise. |
+| **RG-D113-7** | On ne peut **pas** accepter depuis la liste. | Accepter engage à transporter le colis et déclenche le débit de l'Expéditeur. Il faut avoir vu ce qu'on accepte. |
+| **RG-D113-8** | L'écran de la demande montre le colis, sa valeur déclarée, l'Expéditeur, le trajet, les deux lieux et le gain. | C'est la matière de la décision. |
+| **RG-D113-9** | Refuser demande confirmation ; accepter non — mais l'acceptation **dit** ce qu'elle engage juste au-dessus du bouton. | L'écran est déjà la délibération. Le refus, lui, est définitif pour l'Expéditeur et se tape vite. |
+| **RG-D113-10** | Le Voyageur voit son **gain**, jamais le total payé par l'Expéditeur ni la commission. | Ce n'est pas son affaire, et le serveur ne le lui sert pas. |
+| **RG-D113-11** | Le **destinataire** n'apparaît pas avant l'acceptation, et son téléphone pas avant la prise en charge. | C'est un tiers qui n'a rien signé, dont les coordonnées ont été confiées pour un seul usage. |
+| **RG-D113-12** | Le contenu du colis s'écrit **en toutes lettres**, jamais en code. | « OTHER_ELECTRONICS » n'est pas une information, c'est un identifiant technique. |
+| **RG-D113-13** | Le compteur de l'onglet Activité mène à la liste. | Un chiffre sur lequel on ne peut pas taper se périme tout seul. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité | je vois « Demandes reçues » et combien m'attendent |
+| 2 | Je tape dessus | mes demandes, celle qui expire le plus tôt en haut |
+| 3 | Une demande expire dans 2 h | elle porte un liseré et le temps restant, en évidence |
+| 4 | Une demande expire dans 20 h | le temps restant s'affiche sans alarme |
+| 5 | Une demande est déjà acceptée | aucun décompte, aucune urgence |
+| 6 | Je tape une demande | je vois le colis, sa valeur, l'Expéditeur, mon trajet, les lieux et mon gain |
+| 7 | Je lis l'écran d'une demande | nulle part le total payé par l'Expéditeur, nulle part le destinataire |
+| 8 | J'accepte | on m'a prévenu que l'Expéditeur est débité maintenant, et je reviens à la liste |
+| 9 | Je refuse | on me demande confirmation et on me dit que c'est définitif |
+| 10 | Le colis est « OTHER_ELECTRONICS » en base | je lis « Autre électronique » |
+| 11 | Je change la langue en anglais | je lis « Other electronics » |
+| 12 | Je n'ai aucune demande | l'écran le dit et propose de publier un trajet |
+
+---
+
+# D114 — Un seul écran dit ce qu'il y a à faire (27/11/2026)
+
+## Le besoin
+
+Après trois lots, le membre avait quatre listes et quatre compteurs. Aucun ne lui disait **par quoi
+commencer**. Un Expéditeur-Voyageur avec un colis à confirmer, une demande qui expire dans deux
+heures et un Voyageur à noter devait ouvrir trois écrans pour l'apprendre.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D114-1** | L'onglet Activité montre d'abord **ce qui attend le membre**, les deux rôles confondus. | Personne ne pense « en tant qu'Expéditeur » puis « en tant que Voyageur » : on pense « qu'est-ce que je dois faire ». |
+| **RG-D114-2** | L'ordre est : répondre à une demande, puis confirmer une réception, puis noter. | Répondre est le seul où quelqu'un d'autre perd quelque chose si l'on tarde. Confirmer débloque l'argent du Voyageur. Noter n'attend personne. |
+| **RG-D114-3** | À rang égal, l'échéance la plus proche d'abord ; sans échéance, en dernier. | Mais jamais devant un rang plus pressant. |
+| **RG-D114-4** | N'apparaît que ce que le membre peut **faire aujourd'hui dans l'app**. | Annoncer un geste dont l'écran n'existe pas, c'est une porte vers rien. |
+| **RG-D114-5** | Quatre lignes au plus, et le reste est annoncé par son nombre. | Un carrefour montre le haut de la pile ; dérouler tout en ferait une quatrième liste. |
+| **RG-D114-6** | Quand rien n'attend, l'écran le **dit** : « tout est à jour ». | C'est une bonne nouvelle, pas un écran vide. |
+| **RG-D114-7** | La section disparaît quand elle est vide — jamais un « 0 » permanent. | Un signal toujours présent n'est pas un signal. |
+| **RG-D114-8** | Le compteur d'un onglet et l'écran vers lequel il mène disent **toujours** le même nombre. | Sinon le membre doute des deux. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre l'onglet Activité avec une demande et un colis à confirmer | la demande est au-dessus du colis |
+| 2 | J'ai deux demandes, l'une expire dans 2 h, l'autre dans 20 h | celle de 2 h est au-dessus |
+| 3 | J'ai un colis à confirmer et un Voyageur à noter | confirmer est au-dessus de noter |
+| 4 | Mon colis est en route | rien ne m'est réclamé à son sujet |
+| 5 | J'ai sept choses en attente | j'en vois quatre, et on me dit qu'il en reste trois |
+| 6 | Je n'ai rien à faire | l'écran me dit que tout est à jour |
+| 7 | Je tape une ligne | j'arrive directement là où le geste se fait |
+| 8 | Je compare le badge de la barre et l'écran | ils disent le même nombre |
+
+
+---
+
+# D115 — Le Voyageur prend le colis en charge (27/11/2026)
+
+## Le besoin
+
+Le Voyageur accepte une demande, retrouve l'Expéditeur à la gare — et là, plus rien. Le geste qui
+transforme un accord en transport (ouvrir le colis, vérifier, photographier, confirmer) n'existait
+que sur le site, c'est-à-dire **nulle part** au moment où il se joue : debout, à deux, colis ouvert.
+Et son issue légitime — refuser un colis douteux — n'existait pas davantage.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D115-1** | Les **cinq** points d'inspection sont obligatoires ; le serveur refuse une inspection partielle. | CNF-04. Le Voyageur déclare avoir vu le contenu ouvert : c'est ce qui le protège en cas de contrôle. |
+| **RG-D115-2** | Les points sont écrits en **phrases**, pas en étiquettes, et « le contenu correspond » passe en tête. | C'est le point qui protège le Voyageur en douane. On déclare, on ne remplit pas un formulaire. |
+| **RG-D115-3** | De **1 à 5 photos** du colis ouvert, et l'appareil photo est proposé **avant** la photothèque. | C'est une preuve, pas une décoration — et on est devant le colis. |
+| **RG-D115-4** | Un téléversement en échec **bloque** l'envoi, et se **réessaie** photo par photo. | Partir sans sa preuve vide l'inspection de son sens. Retirer la photo obligerait à la reprendre, debout. |
+| **RG-D115-5** | Une remarque est facultative, et plafonnée à **500 caractères** — annoncés quand on s'en approche. | C'est le plafond du contrat. Le découvrir au refus du serveur, après le téléversement, est un piège. |
+| **RG-D115-6** | Le bouton **dit ce qui manque** : « il reste deux vérifications », « ajoute une photo ». Jamais muet. | A209. Un bouton éteint que rien n'explique est un cul-de-sac. |
+| **RG-D115-7** | Le Voyageur **ne voit jamais** le code de livraison. | D43 / INV-1 : le serveur le génère à la prise en charge et le révèle à l'Expéditeur seul. Le destinataire le dictera à la remise. |
+| **RG-D115-8** | **Refuser** est une issue visible, en second : remboursement intégral de l'Expéditeur, kilos restitués, aucune pénalité pour le Voyageur. | A40 / CNF-07. Cacher le refus pousserait à accepter un colis douteux — exactement ce que l'inspection cherche à éviter. |
+| **RG-D115-9** | Le refus propose **cinq raisons** du contrat, ou aucune. Jamais un texte libre. | « Sans préciser » est une réponse valable ; un champ libre deviendrait une pièce de dossier non maîtrisée. |
+| **RG-D115-10** | Le **droit** de prendre en charge vient du serveur (`allowedActions`), jamais d'un statut déduit. | Seule la machine à états connaît la fenêtre. Sinon l'écran montrerait un formulaire qu'on ne pourrait pas envoyer. |
+| **RG-D115-11** | Le carrefour annonce « prends en charge le colis de X » **sans compte à rebours**. | L'app ne reçoit du trajet qu'une date locale : un « dans 3 h » serait inventé. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre une demande acceptée | je vois « Confirmer la prise en charge » |
+| 2 | Je tape le bouton sans rien cocher | on me dit qu'il reste cinq vérifications ; rien n'est envoyé |
+| 3 | Je coche les cinq points, sans photo | on me demande une photo |
+| 4 | Une photo échoue à partir | je la touche, elle repart ; l'envoi reste bloqué tant qu'elle n'est pas montée |
+| 5 | Je colle 600 caractères de remarque | on me dit de combien je dépasse, et le champ s'arrête au plafond |
+| 6 | Je confirme | l'écran me dit que l'Expéditeur reçoit son code — et ne me le montre pas |
+| 7 | Je cherche le code à six chiffres sur cet écran | il n'y est pas, nulle part |
+| 8 | Je refuse sans donner de raison | c'est accepté ; l'Expéditeur est remboursé intégralement |
+| 9 | Je choisis une raison, puis la retape | elle se décoche, et « sans préciser » redevient possible |
+| 10 | J'ouvre l'inspection d'un colis déjà pris en charge | l'écran me le dit et me ramène, au lieu d'un formulaire inutile |
+| 11 | J'ouvre l'onglet Activité avec une demande à répondre et un colis à prendre | répondre est au-dessus de prendre en charge |
+| 12 | Je tape « prends en charge le colis de X » | j'arrive directement sur l'inspection, pas sur la demande |
+
+## D115 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D115bis-1** | Sur le site aussi, la remarque est plafonnée **dans le champ** et le compteur apparaît à l'approche. | Le refus arrivait après le téléversement des photos, sur un message générique. |
+| **RG-D115bis-2** | « Ce qui manque » est calculé **une seule fois** et descend au bureau comme au téléphone. | Deux copies de la phrase, c'était deux vérités à tenir d'accord — et aucune ne voyait la remarque trop longue. |
+| **RG-D115bis-3** | Une lecture qui échoue **le dit** et offre une sortie. | Un squelette perpétuel prétend charger pour toujours. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Je tape 500 caractères puis un de plus | le champ s'arrête, le compteur est visible |
+| 2 | J'ouvre l'écran avec une remarque trop longue collée | le bouton est inactif ET la phrase dit pourquoi |
+| 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette prise en charge ne se lit pas » et un bouton me ramène à la demande |
+
+
+---
+
+# D116 — Le Voyageur remet le colis, et raconte le transport (27/11/2026)
+
+## Le besoin
+
+Le Voyageur avait appris à accepter (D113) et à prendre en charge (D115). Puis il atterrissait, et le
+geste qui CLÔT le transport — se faire dicter six chiffres par le destinataire, dans une rue, un hall
+ou un parking — n'existait que sur le site. Il devait sortir de l'app au moment où elle sert le plus,
+et son versement (J+4) attendait ce geste. Entre les deux, pendant le vol, l'Expéditeur regardait un
+suivi que personne ne nourrissait.
+
+## Les règles
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D116-1** | Le code à six chiffres est **dicté par le destinataire**, jamais reçu par le Voyageur. | Il part à l'Expéditeur (D43), qui le transmet. Le Voyageur ne l'a jamais vu (D115 2A). |
+| **RG-D116-2** | Le champ ne propose **aucun remplissage automatique**. | Le téléphone proposerait un code SMS reçu pour autre chose — un contresens, et une erreur devant quelqu'un qui attend. |
+| **RG-D116-3** | Le collage est permis et il n'y a **pas d'autofocus arraché**. | On se fait parfois envoyer le code par message, et le Voyageur peut vouloir photographier d'abord. |
+| **RG-D116-4** | Les essais restants et le verrou viennent du **serveur**, jamais d'un calcul de l'app. | Trois échecs verrouillent quinze minutes ET remettent le compteur à zéro côté serveur (A38). Deux arithmétiques divergent. |
+| **RG-D116-5** | Un refus dit **ce qui s'est passé et ce qui suit** : « ce n'est pas le bon code » puis « réessaye dans 14:59 ». | « Action impossible » est ce que lisait le Voyageur avant ANO-API-15 : vrai, inutile, sans suite. |
+| **RG-D116-6** | Le compte à rebours est un **affichage** : à son terme l'écran relit, il ne déverrouille rien. | Seul le serveur sait si la fenêtre est rouverte. |
+| **RG-D116-7** | Quand le prénom du destinataire n'est pas servi, la phrase existe en **seconde version**. | « Fais-le répéter à  » ne nomme personne (famille D100). |
+| **RG-D116-8** | Les photos de remise sont **facultatives** (deux au plus) et ne bloquent **jamais en silence**. | Le code prouve la remise, la photo prouve l'état (A76). Une photo en échec se réessaie ou se retire, et le bouton dit ce qui le retient. |
+| **RG-D116-9** | Les trois jalons sont **strictement séquentiels** et l'app n'offre que le suivant. | Le serveur refuse celui qui saute son tour (`TRACKING_STEP_NOT_ALLOWED`) ; trois cases libres inviteraient ce refus. |
+| **RG-D116-10** | Les jalons sont **facultatifs** : ne rien cocher n'empêche pas de remettre. | Ils servent l'Expéditeur qui suit son colis, ils ne sont pas une condition du métier. |
+| **RG-D116-11** | Un jalon refusé **n'empêche pas** la remise, et le dit sans drame. | Le récit est un confort ; le colis, lui, doit arriver. |
+| **RG-D116-12** | La date de versement est **servie par le serveur** et affichée telle quelle. | Recalculer « dans quatre jours » créerait une seconde vérité le jour où le délai change. |
+| **RG-D116-13** | Le téléphone du destinataire s'affiche **tel que le serveur le sert**, sans filtre ajouté par l'app. | Il est révélé à partir de la prise en charge (ANO-API-15). Deux règles de confidentialité, et l'une serait fausse. |
+| **RG-D116-14** | Le droit de remettre vient du serveur (`allowedActions`), jamais d'un statut déduit. | Seule la machine à états connaît la fenêtre. |
+| **RG-D116-15** | Le carrefour annonce « remets le colis » **après** « prends en charge » et **avant** « confirmer ». | On ne remet pas ce qu'on n'a pas pris ; et quelqu'un attend le colis, alors que « confirmer » se débloque seul. |
+
+## Tests d'acceptation
+
+| # | Geste | Attendu |
+|---|---|---|
+| 1 | J'ouvre une réservation dont le colis est pris en charge | je vois « Valider la remise » |
+| 2 | Je cherche le code sur mon écran | il n'y est nulle part ; on me dit de le demander au destinataire |
+| 3 | Je touche le champ | clavier numérique, **aucune** proposition de code SMS |
+| 4 | Je tape le bouton avec quatre chiffres | on me dit qu'il manque deux chiffres ; rien n'est envoyé |
+| 5 | Je colle un code reçu par message | il se répartit dans les six cases |
+| 6 | Je me trompe une fois | on me dit de le faire répéter, et combien d'essais restent |
+| 7 | Je me trompe trois fois | la saisie se bloque avec un compte à rebours visible, pas avec « action impossible » |
+| 8 | J'attends la fin du compte à rebours | l'écran **relit** l'état auprès du serveur ; il ne se déverrouille pas seul |
+| 9 | Le destinataire n'est pas nommé par le serveur | la phrase du mauvais code reste entière et ne nomme personne |
+| 10 | Une photo de remise échoue à partir | le bouton dit qu'une photo n'est pas partie ; je la réessaie ou je la retire |
+| 11 | Je remets sans aucune photo | c'est accepté : le code suffit |
+| 12 | J'ouvre les jalons avant d'être à l'aéroport | un seul geste est proposé : « je suis à l'aéroport » |
+| 13 | Je confirme les trois crans | on me dit que tout est dit, et qu'il ne reste que la remise |
+| 14 | Un jalon n'est pas accepté | on me le dit, et je peux quand même remettre le colis |
+| 15 | Je valide la remise | on me dit que c'est terminé et **quand** mon paiement part, sans que l'app le calcule |
+| 16 | Le réseau tombe pendant l'envoi | on me dit que rien n'est parti et que je peux refaire le geste |
+| 17 | Je perds le destinataire de vue | je peux l'appeler depuis l'écran, si le serveur a servi son numéro |
+| 18 | J'ouvre la remise d'un colis qui n'en attend pas | l'écran me le dit et me ramène à la réservation |
+| 19 | J'ouvre l'onglet Activité avec un colis à prendre et un à remettre | prendre est au-dessus de remettre |
+
+## D116 bis — le site est aligné sur ce que le natif a révélé
+
+| N° | Règle | Pourquoi |
+|---|---|---|
+| **RG-D116bis-1** | « Je travaille » et « j'attends une photo » sont **deux états distincts**, jamais fondus dans la même variable. | Une photo en échec mettait le bouton en « Vérification… » pour toujours : il avait perdu la raison de son attente, donc sa capacité à la dire. |
+| **RG-D116bis-2** | Une lecture qui échoue **le dit** et offre une sortie vers la réservation. | Sans `.catch`, le rejet n'était pas même attrapé : squelette perpétuel. |
+| **RG-D116bis-3** | Sur le site aussi, un prénom absent ne troue pas la phrase du mauvais code. | Deux versions de la phrase, comme sur le téléphone. |
+
+| # | Geste (site) | Attendu |
+|---|---|---|
+| 1 | Une photo de remise échoue, je tape Valider | le bouton reste inactif ET une phrase dit que la photo retient l'envoi |
+| 2 | Je retire la photo fautive | l'envoi repart |
+| 3 | Je coupe le réseau puis j'ouvre l'écran | je lis « cette remise ne se lit pas » et un bouton me ramène à la réservation |
+| 4 | Le serveur refuse le code sans servir le prénom | la phrase reste entière |

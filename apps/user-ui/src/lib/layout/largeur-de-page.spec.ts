@@ -165,6 +165,11 @@ describe("largeur-de-page — le balayage : aucun contournement", () => {
       "app/[locale]/share/page.tsx",
       "app/[locale]/u/[slug]/UserProfileClient.tsx",
       "app/[locale]/u/[slug]/not-found.tsx",
+      // D115 bis / D116 bis — le message d'une lecture qui échoue, à la
+      // place d'un squelette perpétuel. Colonne étroite ASSUMÉE : trois
+      // lignes et un bouton se lisent mal sur 1 280 px.
+      "components/carrier/deal/views/deliver/DealDeliverClient.tsx",
+      "components/carrier/deal/views/pickup/DealPickupClient.tsx",
       "components/dashboard/shipments/preview/page.tsx",
       "components/home/CorridorsSection.tsx",
       "components/home/FinalCtaSection.tsx",

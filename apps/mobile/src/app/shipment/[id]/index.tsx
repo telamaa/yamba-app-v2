@@ -76,6 +76,7 @@ import {
   formatZonedTime,
   groupDeliveryCode,
   moneyState,
+  remainingLabel,
   remainingUntil,
   shipmentPhase,
   shipmentReference,
@@ -1003,13 +1004,10 @@ function Deadline({
   // en heures n'a pas besoin d'une horloge, et une horloge réveille l'écran
   // soixante fois par minute pour rien.
   const left = remainingUntil(target, Date.now());
-  const value = left
-    ? left.days > 0
-      ? t('countdown.remainingDays', { days: left.days, hours: left.hours })
-      : left.hours > 0
-        ? t('countdown.remainingHours', { hours: left.hours, minutes: left.minutes })
-        : t('countdown.remainingMinutes', { minutes: left.minutes })
-    : t('countdown.elapsed');
+  // Le choix de la clé vit dans `shipment-view.ts` (D112) : la liste des
+  // envois a besoin du même décompte, et deux cascades divergent.
+  const label = left ? remainingLabel(left) : null;
+  const value = label ? t(`countdown.${label.key}`, label.values) : t('countdown.elapsed');
 
   const isAcceptance = phase === 'AWAITING_CARRIER';
 

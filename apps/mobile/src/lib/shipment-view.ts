@@ -140,6 +140,27 @@ export function remainingUntil(targetIso: string | null | undefined, nowMs: numb
   };
 }
 
+/**
+ * La CLÉ du décompte, et les valeurs qu'elle attend (D112).
+ *
+ * Elle vivait en dur dans l'écran de suivi ; la liste des envois en a besoin
+ * du même coup, et une cascade recopiée dans deux écrans est exactement le
+ * défaut que D110 a corrigé à l'échelle d'une gouttière. Le libellé reste
+ * dans le dictionnaire `shipment` : un décompte s'écrit pareil partout.
+ *
+ * On ne descend d'un cran que lorsque le précédent vaut zéro — « 0 j 5 h »
+ * se lit moins bien que « 5 h », et « 2 j » suffit quand il reste deux jours.
+ */
+export function remainingLabel(left: Remaining): {
+  key: 'remainingDays' | 'remainingHours' | 'remainingMinutes';
+  values: Record<string, number>;
+} {
+  if (left.days > 0) return { key: 'remainingDays', values: { days: left.days, hours: left.hours } };
+  if (left.hours > 0)
+    return { key: 'remainingHours', values: { hours: left.hours, minutes: left.minutes } };
+  return { key: 'remainingMinutes', values: { minutes: left.minutes } };
+}
+
 /* ── Clôture : le bon texte pour la bonne fin ────────────────────────────── */
 
 export type ClosureKey =

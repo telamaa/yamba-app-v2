@@ -11719,3 +11719,749 @@ Elle s'est déclenchée tout de suite — sur la ligne `Starting Metro Bundler`,
 - `apps/mobile/src/lib/trip-local-dates.spec.ts` — les deux chemins, et l'égalité des copies.
 - `apps/user-ui/src/lib/recensement.spec.ts` — le recensement qui a réclamé la fiche du site.
 - Registre, entrée **D111 quinquies**.
+
+---
+
+# Chapitre — Trouver la porte avant d'écrire l'écran (D112)
+
+Ce chapitre raconte un lot où presque tout était déjà écrit, et où le travail a consisté à
+découvrir **pourquoi personne ne pouvait s'en servir**.
+
+## 1. Commencer par l'inventaire, pas par la maquette
+
+La demande était large : « attaque les parties Activité, en natif ». Le réflexe serait d'ouvrir
+l'écran et de dessiner. Le bon premier geste est de **compter ce qui existe** :
+
+```sh
+ls apps/mobile/src/app/\(tabs\)/          # ce que l'app montre
+ls -d apps/mobile/src/app/*/              # ce qu'elle pousse
+grep -rn "me/bookings" apps/mobile/src    # ce qu'elle sait appeler
+```
+
+Le troisième grep n'a **rien** rendu. C'est le genre de silence qui vaut une heure de lecture.
+
+## 2. Un écran orphelin se trouve en cherchant qui l'appelle
+
+```sh
+grep -rn "pathname: '/shipment" apps/mobile/src
+```
+
+Une seule entrée, dans `booking/confirmation.tsx`, en `router.replace`. Et derrière cette unique
+porte : **2 903 lignes** de suivi, de notation et de signalement.
+
+> **Un écran sans porte n'est pas un écran, c'est du code mort qui s'ignore.**
+
+La leçon de méthode vaut au-delà de ce lot : quand vous héritez d'un code, demandez-vous pour
+chaque écran **par où l'on y entre**, et combien de fois. Un seul chemin est un signal ; un seul
+chemin en `replace`, dans un tunnel, en est un plus fort encore.
+
+## 3. Lire la machine à états avant de dessiner des sections
+
+Le site range un envoi par une table de statuts. Tentation : la recopier. Avant cela, on regarde
+ce que le serveur **accorde** vraiment :
+
+```sh
+awk 'NR>=318 && NR<=425 && (/actor: "SHIPPER"/ || /action:/ || /from:/)' \
+  apps/deal-service/src/services/booking-state-machine.ts
+```
+
+Trois gestes, et un seul fait **avancer** l'envoi (`confirmEarly`). Les deux autres défont
+(`cancel`) ou escaladent (`dispute`).
+
+D'où une règle qui ne contient aucune liste de statuts pour sa partie la plus importante :
+
+```ts
+export function sectionDeLEnvoi(envoi: EnvoiDeLaListe): SectionDesEnvois {
+  if (peut(envoi, 'confirmEarly') || envoi.peutNoter) return 'aTraiter';
+  return TERMINES.includes(envoi.statut) ? 'passes' : 'enCours';
+}
+```
+
+Le jour où la machine ouvre un quatrième geste à l'Expéditeur, il entre ici **tout seul**.
+
+## 4. Challenger un écran existant : compter, pas opiner
+
+Trois constats sur « Mes envois » du site, tous vérifiables, aucun affaire de goût :
+
+1. quatre pastilles de filtre au-dessus d'une liste **déjà sectionnée** par les trois mêmes
+   groupes — et « Terminés » cache les deux groupes qui réclament une action ;
+2. « En cours » porte **deux nombres** sur le même écran : le sous-titre somme `action + ongoing`
+   (`ShipmentsClient.tsx:127`), la pastille n'en compte qu'un (`:194`) ;
+3. le même ensemble est « Terminés » dans la pastille et « Historique » dans le titre.
+
+Aucun n'est un bug. Ce sont trois décisions prises séparément, **chacune défendable seule**. C'est
+la marque d'une incohérence de charte, et la méthode pour la voir est toujours la même :
+
+> **Une incohérence de charte ne se lit pas, elle se compte** (D105).
+
+## 5. Ne pas commettre le défaut qu'on dénonce
+
+Le constat n° 2 condamne un compteur calculé à part. Or ce lot ajoute… un compteur, sur l'onglet
+Activité. Il devait donc appeler **la règle de l'écran** :
+
+```ts
+shipmentsToHandle: envois
+  .map(envoiDeLApi)
+  .filter((envoi) => envoi !== null && sectionDeLEnvoi(envoi) === 'aTraiter').length,
+```
+
+et une fiche l'exige en **lisant la source** — car ce fichier tire `expo-constants`, que le harnais
+ne sait pas charger (frontière A223) :
+
+```ts
+expect(badges).toContain("from '@/lib/mes-envois'");
+expect(badges).not.toMatch(/status === 'DELIVERED'/);
+```
+
+Noter la **deuxième** assertion : vérifier que la bonne règle est importée ne suffit pas, il faut
+interdire la mauvaise. Un fichier peut importer ce qu'il n'utilise pas.
+
+Détail qui compte : le badge dit « **N à traiter** », l'écran « **N en cours** ». Deux nombres
+différents — mais **deux mots différents**, pour deux idées différentes. C'est exactement ce qui
+manque au site.
+
+## 6. Tester le contrat dans les deux sens
+
+Leçon D101/D102, appliquée ici à un cas précis : un statut inconnu de la projection fait
+**disparaître** l'envoi de la liste (`envoiDeLApi` rend `null`). Si le serveur en ajoute un, la
+perte serait silencieuse.
+
+```ts
+const unionDuDto = api.slice(
+  api.indexOf('export type ShipmentServerStatus'),
+  api.indexOf('export type ShipmentTrackingStep')
+);
+expect(unionDuDto.length).toBeGreaterThan(0); // la découpe a bien mordu
+const statutsDuDto = [...unionDuDto.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+expect(statutsDuDto).toHaveLength(9);
+```
+
+La ligne `expect(unionDuDto.length).toBeGreaterThan(0)` n'est pas décorative : `slice` entre deux
+`indexOf` rend une chaîne **vide** si l'un des deux repères a bougé, et toutes les assertions
+suivantes passeraient alors pour la pire des raisons (D98).
+
+## 7. Valider contre la vraie base — encore
+
+Comme au lot précédent, les fiches jouent contre des envois que j'ai inventés. La vraie base :
+
+```sh
+curl -c jar.txt -X POST …/auth/login -d '{"email":"aminata.shipper@seed.yamba.dev",…}'
+curl -b jar.txt …/me/bookings -o bk.json
+npx tsx --tsconfig apps/mobile/tsconfig.json verif-envois.ts bk.json
+```
+
+Le `--tsconfig` n'est pas un détail : sans lui, `tsx` ne résout pas l'alias `@/` et le script
+meurt sur `Cannot find module '@/lib/trip-local-dates'`.
+
+Résultat : 13 réservations, 13 projetées, dates dans le fuseau du lieu de départ. **Et aucune dans
+« À traiter »** — ce qui méritait vérification plutôt que soulagement :
+
+```sh
+python3 -c "… print(b.get('rating'))"
+# {"windowEndsAt": "2026-11-27T12:20:00Z", "ratedByMe": false, "canRate": false}
+```
+
+`rating` est bien servi ; la fenêtre de notation est simplement **close**. La règle est juste, pas
+aveugle. **Un résultat vide se vérifie comme un résultat plein.**
+
+## 8. Un détail de nommage qui aurait coûté une soirée
+
+La liste est à `shipments/mine` — au **pluriel**. `shipment/mine` aurait été capté par
+`shipment/[id]` avec `id = "mine"`, et l'écran de suivi aurait tenté de charger une réservation
+nommée « mine ». Expo Router n'aurait rien signalé : une route dynamique accepte n'importe quel
+segment.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-envois.ts` — la règle, et pourquoi elle ne contient pas de table.
+- `apps/mobile/src/lib/mes-envois.spec.ts` — le désaccord avec le site, écrit noir sur blanc.
+- `apps/deal-service/src/services/booking-state-machine.ts` — les trois gestes de l'Expéditeur.
+- Registre, entrée **D112**.
+
+---
+
+# Chapitre — Quand un fichier se contredit, et quand une liste court après une horloge (D112 bis, D113)
+
+## 1. Un fichier peut se contredire sans qu'aucune relecture ne le voie
+
+`identity-gate.tsx` déclare dans son en-tête que **le contenu est en haut et le vide en bas**,
+avec sa mesure (« on lisait à 55 % de la hauteur »). Cent lignes plus bas, un correctif ultérieur
+posait un ressort au-dessus du bloc et recentrait tout.
+
+Les deux moitiés sont **justes séparément**. C'est ce qui rend ce défaut invisible à la lecture :
+il n'y a pas de ligne fausse, il y a deux lignes qui ne se parlent pas.
+
+> **Ce qui attrape ce défaut n'est pas une relecture, c'est un regard** — et une fiche pour que le
+> regard n'ait pas à revenir.
+
+```ts
+it('le ressort vient APRÈS le bloc de contenu, jamais avant', () => {
+  const bloc = porte.indexOf('style={styles.block}');
+  const ressort = porte.indexOf('style={styles.spacer}');
+  expect(bloc).toBeGreaterThan(0);      // les deux repères existent vraiment
+  expect(ressort).toBeGreaterThan(0);
+  expect(ressort).toBeGreaterThan(bloc);
+});
+```
+
+Les deux `toBeGreaterThan(0)` ne sont pas décoratifs : `indexOf` rend `-1` quand le repère a bougé,
+et `-1 > -1` est faux — la fiche passerait pour la pire des raisons (D98).
+
+**Et la fiche qui avait tort a été retournée, pas supprimée.** Une fiche de D104 exigeait
+littéralement le ressort conditionnel ; elle exige désormais son absence, avec sa raison écrite
+dans son corps. Supprimer une fiche fausse fait disparaître la règle avec elle.
+
+## 2. Borner un lot par un métier, pas par une couche
+
+Le Voyageur n'avait rien. La machine à états lui accorde six gestes. La tentation est de « faire la
+liste » et de voir ensuite. Mais une liste de demandes auxquelles on ne peut pas répondre, c'est
+une porte vers un écran absent — le défaut qu'on venait de corriger deux fois.
+
+Le lot s'est donc borné à **répondre** : accepter, refuser. `pickup` et `deliver` restent dehors
+parce qu'ils demandent la caméra, une liste d'inspection et un code à six chiffres — un parcours,
+pas un bouton.
+
+> « Répondre » a une fin nette, une horloge et une preuve. « La liste » n'en a aucune.
+
+## 3. Deux listes voisines, deux tris — et il faut le dire
+
+`grouperLesEnvois` garde l'ordre du serveur. `grouperLesDemandes` trie par échéance croissante.
+C'est délibéré : on **suit** un colis, on **répond** à quelqu'un. Le risque est qu'un jour
+quelqu'un « harmonise » les deux. D'où une fiche qui ne teste pas un tri mais une **intention** :
+
+```ts
+it('« à répondre » est triée par échéance CROISSANTE', () => { … });
+it('les autres sections gardent l’ordre du serveur', () => { … });
+```
+
+## 4. Un seuil se place du côté de l'urgence
+
+```ts
+if (reste <= BIENTOT_MS) return 'bientot';
+```
+
+`<=` et non `<` : à exactement trois heures, c'est « bientôt ». Une borne qui penche vers le calme
+fait rater la dernière heure utile. La fiche épingle la borne, pas seulement l'intervalle.
+
+Et l'absence d'horloge rend `null`, pas « calme » : **« calme » dirait « tu as le temps » à propos
+d'une décision déjà prise.** Un état neutre et une absence d'état ne sont pas la même chose — c'est
+la leçon de D106 sur la valeur vide, transposée à un affichage.
+
+## 5. La vraie base, encore — et cette fois elle montre un code
+
+Treize demandes réelles rejouées à travers la projection :
+
+```
+ACCEPTED   Pauline L.   CLOTHES
+DECLINED   João S.      OTHER_ELECTRONICS
+```
+
+Des **identifiants techniques** affichés à un Voyageur. Deux populations cohabitent, comme les
+dates de D112 : les réservations récentes portent une famille D14, les anciennes une catégorie
+legacy. La règle ne doit donc pas choisir un mot, elle doit dire **quel dictionnaire lire** :
+
+```ts
+export type FamilleDuColis =
+  | { source: 'famille'; code: string }
+  | { source: 'categorie'; code: string }
+  | null;
+```
+
+`null` quand on ne sait rien — afficher le code serait pire que ne rien dire.
+
+**Les clés deviennent alors CALCULÉES** (`families.${code}`), ce qui est un angle mort complet :
+`tsc` ne voit rien (un gabarit se type toujours), et le contrôle i18n de la CI compare FR et EN
+*entre eux* sans savoir quelles clés sont utilisées. D'où une fiche qui énumère les vingt codes et
+vérifie leur présence dans les deux langues — le dispositif de `payment-i18n.spec.ts` (D83).
+
+## 6. Mon propre détecteur s'est trompé, pour la sixième fois du mois
+
+```ts
+expect(source).not.toContain('recipient');   // ROUGE
+```
+
+…sur le **commentaire** qui explique pourquoi `recipient` est interdit. Viser une orthographe
+plutôt qu'un usage, encore. Le remède :
+
+```ts
+function sansCommentaires(source: string): string {
+  const net = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  expect(net.length).toBeGreaterThan(source.length / 3);
+  return net;
+}
+```
+
+La garde sur la longueur est l'autre moitié de la leçon : **un dépouillement qui vide tout fait
+passer toutes les fiches suivantes.**
+
+Second faux positif du même jet : « la coquille *arrive dans un prochain lot* a disparu »
+rougissait sur celles de Messages et Profil — qui **disent encore la vérité**. Interdire le mot
+partout revenait à interdire d'être honnête. Une fiche doit viser la coquille qui ment, pas le
+mot.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/mes-demandes.ts` — l'urgence, le tri, et le code du colis.
+- `apps/mobile/src/lib/mes-demandes.spec.ts` — les deux dictionnaires et le dépouillement.
+- `apps/mobile/src/lib/porte-avec-sortie.spec.ts` — la fiche retournée.
+- Registre, entrées **D112 bis** et **D113**.
+
+---
+
+# Chapitre — Une priorité se nomme, une lecture se partage (D114)
+
+## 1. Une échelle numérique est un choix par défaut qui coûte cher
+
+Le site ordonne ses actions ainsi :
+
+```ts
+const CARRIER_PRIORITY = { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 };
+```
+
+Trois défauts, et aucun n'est un bug :
+
+- **un trou** — personne ne sait ce que vaudrait un 2, donc le prochain qui insère une action
+  devra inventer un nombre ;
+- **deux ex æquo muets** — `PICKUP` et `DELIVER` valent 1 sans que rien ne dise pourquoi ;
+- **aucune raison écrite** — `0` ne dit pas *pourquoi* répondre passe en premier.
+
+```ts
+export const ORDRE: readonly TypeDeChose[] = ['repondre', 'confirmer', 'noter'];
+```
+
+Une liste ordonnée de noms **ne peut pas avoir de trou**, l'étendre oblige à nommer ce qu'on
+ajoute, et le tri se lit : `ORDRE.indexOf(a.type) - ORDRE.indexOf(b.type)`.
+
+> Quand vous écrivez une priorité, demandez-vous si le nombre porte une **information** ou
+> seulement un **rang**. S'il ne porte qu'un rang, écrivez le rang.
+
+## 2. Un hook à état local n'est pas un cache
+
+```ts
+export function useTabBadges(): TabBadges {
+  const [badges, setBadges] = useState(ZERO);
+  useEffect(() => { void refresh(); … }, [status, refresh]);
+  return badges;
+}
+```
+
+Ce code est correct. Il devient coûteux au moment où on l'appelle **plusieurs fois** : chaque
+consommateur a son `useState`, son `useEffect`, et refait les requêtes. Ils étaient trois.
+
+Le repérer ne demande pas un profileur :
+
+```sh
+grep -rn "useTabBadges" apps/mobile/src | grep -v "use-tab-badges.ts"
+# → trois fichiers
+```
+
+**Et le gaspillage n'est pas le pire.** Trois lectures à trois instants peuvent se **contredire** :
+le badge de la barre annonce deux demandes, l'écran en montre une. Séparés par une barre d'onglets,
+les deux nombres ne se voient jamais ensemble — le défaut est donc plus durable que celui du site,
+où les deux nombres sont à quarante pixels l'un de l'autre.
+
+Le remède est le motif déjà présent dans le dépôt (`session-context.tsx`) : un fournisseur, une
+lecture, et des compteurs qui **dérivent** des mêmes listes que les écrans.
+
+> Une garantie tenue par une fiche est une garantie **surveillée**. Une garantie tenue par la
+> structure est une garantie **impossible à rater**. On garde la fiche quand même : une structure
+> se défait aussi.
+
+## 3. Le vide a deux sens, et il faut les distinguer
+
+```tsx
+{attendent.length > 0 ? ( … ) : pret && <ThemedText>{t('activity.nothingWaiting')}</ThemedText>}
+```
+
+`pret` n'est pas une coquetterie. Sans lui, l'écran annonce « tout est à jour » **pendant le
+chargement** — un mensonge d'une demi-seconde, mais un mensonge, et celui-là se reproduit à chaque
+ouverture. C'est la leçon de D106 (« quand vous persistez un état, demandez ce que son vide
+signifie ») appliquée à un rendu : *rien à faire* et *je ne sais pas encore* ne s'affichent pas
+pareil.
+
+## 4. Un carrefour n'est pas une quatrième liste
+
+```ts
+export const TETE_DE_PILE = 4;
+export function teteDePile(choses, combien = TETE_DE_PILE) {
+  return { visibles: choses.slice(0, combien), reste: Math.max(0, choses.length - combien) };
+}
+```
+
+Le `Math.max(0, …)` évite d'annoncer « −2 autres » quand la liste est plus courte que la tête — et
+la fiche le vérifie, parce que c'est exactement le genre de ligne qu'on écrit sans y penser.
+
+## 5. Refuser d'afficher ce qu'on ne sait pas faire
+
+Le serveur autorise `pickup` et `deliver` ; leurs écrans n'existent pas. Les mettre dans le
+carrefour aurait été facile et faux. La fiche qui l'interdit est aussi un **rappel daté** :
+
+```ts
+it('PRENDRE EN CHARGE et REMETTRE n’y sont PAS — leurs écrans n’existent pas', () => { … });
+```
+
+Le jour où ces écrans naissent, cette fiche rougit, et c'est elle qui dira à quoi il faut penser.
+
+## Pour aller plus loin
+
+- `apps/mobile/src/lib/carrefour.ts` — la fusion, l'ordre, la tête de pile.
+- `apps/mobile/src/lib/activite-context.tsx` — une lecture, une vérité.
+- Registre, entrée **D114**.
+
+
+---
+
+# Chapitre — La prise en charge : trois frontières et un grep (D115)
+
+Ce chapitre est utile même si tu ne touches jamais à Yamba : il parle de **où poser une règle**, de
+**ce qu'un hook ne doit pas faire**, et de la différence entre lire du code et le **mesurer**.
+
+## 1. Trois fichiers pour une photo, et pourquoi pas un seul
+
+La prise de photo, c'est trois choses qui n'ont pas la même durée de vie :
+
+```
+lib/photos.ts            ← l'ÉTAT   (pur, zéro import)      : testable sous Node
+hooks/use-photos.ts      ← les EFFETS (expo-image-picker)    : non testable sans simulateur
+components/photo-shelf.tsx ← les PIXELS (React Native)       : non testable sans jsdom
+```
+
+La règle générale : **ce qui décide descend, ce qui a un effet reste en haut.** Si tu mélanges, la
+seule façon de tester « rechoisir la même image ne consomme pas une place » est de lancer un
+téléphone. Séparés, c'est une ligne :
+
+```ts
+expect(ajouterPhotos([photo({ id: 'asset-1' })], [{ id: 'asset-1', uri: '…' }], 5)).toHaveLength(1);
+```
+
+Dans ce dépôt la frontière a un nom (A223 pour le mobile, A224 pour le site) et une conséquence
+mesurée : `apps/mobile` n'a **aucun** test de composant, et 1 241 fiches de règles.
+
+## 2. Un « updater » React doit être PUR — le miroir en `useRef`
+
+Tentation naturelle dans `use-photos.ts` : lire l'état courant au moment où on l'écrit.
+
+```ts
+// ✗ NE FAIS PAS ÇA
+setPhotos((avant) => {
+  const apres = ajouterPhotos(avant, candidates, max);
+  for (const c of candidates) televerser(c);   // ← un EFFET dans un updater
+  return apres;
+});
+```
+
+React peut **rejouer** un updater (mode strict, rendu concurrent) : l'effet part deux fois. Et une
+lecture qui écrit provoque l'erreur que ce dépôt a payée en D83 — « Cannot update a component while
+rendering a different component ». La parade est un miroir explicite :
+
+```ts
+const courant = useRef<readonly PhotoLocale[]>([]);
+const poser = useCallback((suite: readonly PhotoLocale[]) => {
+  courant.current = suite;      // pour LIRE sans rendre
+  setPhotos(suite);             // pour RENDRE
+}, []);
+```
+
+C'est l'application de **CQS** (*Command-Query Separation*) : une fonction qui répond à une question
+n'écrit jamais ; une fonction qui écrit ne répond pas.
+
+Deuxième piège du même fichier, plus subtil : le nombre de places libres est relu **après** l'attente
+de la permission.
+
+```ts
+const permission = await ImagePicker.requestCameraPermissionsAsync();   // ← await
+const places = Math.max(0, max - courant.current.length);               // relu ICI
+```
+
+Toute valeur capturée avant un `await` peut être périmée après. C'est le même raisonnement qu'un
+verrou optimiste côté base.
+
+## 3. Un booléen ne sait pas expliquer
+
+```ts
+// ✗ ce que le site faisait
+const canConfirm = ITEMS.every((id) => checked.has(id)) && photos.length >= 1;
+```
+
+Avec ça, un bouton ne peut qu'être éteint. Pour qu'il **parle**, il faut une liste discriminée :
+
+```ts
+type Manque =
+  | { quoi: 'points'; combien: number }
+  | { quoi: 'photo' }
+  | { quoi: 'notes'; deTrop: number };
+```
+
+TypeScript te donne alors le narrowing gratuitement :
+
+```ts
+manque.quoi === 'points' ? t('missing.points', { count: manque.combien })
+: manque.quoi === 'notes' ? t('missing.notes', { count: manque.deTrop })
+: t(`missing.${manque.quoi}`)
+```
+
+Et le corollaire d'architecture : **l'écran ne re-déduit rien**. S'il recalculait « il manque une
+photo » de son côté, il existerait deux règles, et l'une serait fausse un jour.
+
+## 4. Mesurer plutôt que lire : trois fois dans un seul lot
+
+| Question | Ce que la lecture disait | Ce que le grep a dit |
+|---|---|---|
+| Combien de copies de la prise de photo ? | « trois » (écrit dans la décision) | **deux** pour l'appareil photo, trois pour la photothèque — un billet ne se photographie pas |
+| Qui rend la barre du bas du site ? | un composant à deux variantes | **une seule** ; la variante bureau n'est atteinte par aucun rendu |
+| Où est calculée la phrase de blocage ? | « dans le parent » | **deux copies**, dans deux arbres |
+
+```sh
+grep -rln launchCameraAsync apps/mobile/src
+grep -rn  PickupFooter apps/user-ui/src | grep -v 'PickupFooter.tsx'
+```
+
+Trois secondes chacune. Trois mois d'invisibilité à la lecture. C'est la leçon D105 (« une
+incohérence de charte ne se lit pas, elle se COMPTE ») appliquée à autre chose qu'une charte.
+
+## 5. Une fiche doit viser un USAGE, jamais une orthographe
+
+Premier jet de la fiche qui interdit d'afficher le code de livraison :
+
+```ts
+expect(ecran).not.toMatch(/\bcode\b\s*[:=]/);   // ✗
+```
+
+Rouge immédiatement — sur `erreur.code === 'TRANSITION_NOT_ALLOWED'`, qui n'a rien à voir. **Sixième
+fois ce mois-ci** dans ce dépôt (A224 lot 5 l'avait même trouvé dans son propre détecteur). La
+version qui tient vise les trois façons d'afficher ou de saisir six chiffres :
+
+```ts
+expect(ecran).not.toContain('deliveryCode');
+expect(ecran).not.toContain('maxLength={6}');
+expect(ecran).not.toContain('number-pad');
+expect(Object.keys(corpsDeLaPriseEnCharge(formulaire()) ?? {})).toEqual([
+  'checklist', 'photoUrls', 'notes',
+]);
+```
+
+La dernière ligne est la meilleure : elle ne regarde plus le texte du fichier, elle regarde **ce qui
+part sur le réseau**.
+
+## 6. Un outil qui bloque n'est pas forcément un mur
+
+`npx expo start` refusait de régénérer les types de routes :
+
+```
+Error: Cannot find module 'expo-router/_ctx-shared'
+```
+
+`@expo/router-server` est à la racine, `expo-router` est niché sous `apps/mobile/node_modules` (voulu,
+pour Metro). Node résout `require` depuis le fichier appelant — donc il cherche au mauvais endroit.
+`NODE_PATH` est le **repli** historique de la résolution CJS :
+
+```sh
+NODE_PATH=$PWD/node_modules npx expo start --go
+```
+
+Types écrits en six secondes. Avant de contourner un outil, demande-toi **où il cherche**.
+
+## Pour aller plus loin
+
+* `apps/mobile/src/lib/photos.ts` et sa fiche : un modèle d'état minuscule, dix-neuf fiches.
+* `apps/user-ui/src/lib/carrier/prise-en-charge.ts` : la **quatrième** règle sortie d'un composant du
+  site, après `tunnel.ts` (D93), `search-facets.ts` (D100) et `parcel-weight.ts` (D101).
+* `apps/user-ui/tsconfig.spec.json` : comment un harnais peut déclarer **plus** d'alias que son
+  application (ici `@packages/api-contracts`, pour confronter une copie au contrat Zod sans embarquer
+  zod dans le navigateur).
+
+
+---
+
+# Chapitre — La remise : quand une bonne pratique devient un défaut (D116)
+
+Ce chapitre parle de quatre choses utiles partout : une **bonne pratique qui se retourne**, un
+**booléen qui fait perdre une information**, un **export que personne n'appelle**, et la différence
+entre une règle *écrite* et une règle *relue*.
+
+## 1. `oneTimeCode` : la bonne pratique qui devient un défaut
+
+Un champ à six chiffres sur un téléphone appelle mécaniquement ceci :
+
+```tsx
+<TextInput textContentType="oneTimeCode" autoComplete="sms-otp" />
+```
+
+C'est documenté par Apple et Google, c'est recommandé partout, et **c'est faux ici**. Le code de
+livraison ne vient pas d'un SMS : le destinataire le lit **à voix haute** (D43). Le téléphone
+proposerait donc au Voyageur un code reçu pour autre chose — une banque, un autre service — devant
+quelqu'un qui attend.
+
+> **Une bonne pratique est un pari sur un contexte.** `oneTimeCode` parie que le code arrive par
+> message. Quand le contexte change, la bonne pratique devient un défaut poli.
+
+La parade n'est pas de l'oublier dans ce fichier-là : c'est de rendre le choix **obligatoire et
+nommé** dans la primitive partagée.
+
+```ts
+export function CodeInput({
+  autofill,            // ← pas de valeur par défaut : l'appelant DOIT choisir
+  accessibilityLabel,  // ← EXIGÉ par le type : on ne peut pas poser un champ muet
+  palette,             // ← une AMBIANCE, pas une géométrie
+}: { autofill: boolean; accessibilityLabel: string; palette: CodeInputPalette }) {
+```
+
+Pas de `autofill = true` silencieux. Un défaut silencieux est une décision prise par celui qui a
+écrit le composant à la place de celui qui l'utilise — et il la prendra toujours pour le premier
+appelant, jamais pour le cinquième.
+
+À retenir sur la forme : `accessibilityLabel: string` **non optionnel** est plus fort que n'importe
+quelle convention écrite, parce que `tsc` la fait respecter. C'est la leçon de `BackButton` (D105),
+et sa réciproque : **n'expose aucune prop de taille**. Une charte ne se défait pas par malveillance,
+elle se défait par une prop de trop.
+
+## 2. Un booléen perd l'information que son lecteur doit dire
+
+Voici la ligne qui a tenu un mois sur le site, et le défaut qu'elle cache :
+
+```tsx
+// ✗ LE DÉFAUT
+isSubmitting={props.isSubmitting || !props.photosReady}
+```
+
+Lis le composant qui la reçoit : il affiche « Vérification… » quand `isSubmitting` est vrai. Donc une
+photo en échec — qui n'est pas une vérification en cours — affiche « Vérification… » **pour
+toujours**, debout devant le destinataire.
+
+Le bug n'est pas le `||`. Le bug est **l'effacement du motif** : deux faits distincts entrent, un
+seul bit sort, et le bouton ne sait plus pourquoi il attend — donc il ne peut plus le dire.
+
+```ts
+// ✓ LA PARADE : on rend ce qui RETIENT, pas un bit
+export type ManqueDeLaRemise =
+  | { quoi: 'verrou'; restantMs: number }
+  | { quoi: 'code'; chiffres: number }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' };
+
+export function manquesDeLaRemise({ code, photos, verrouille }): ManqueDeLaRemise[]
+```
+
+Deux conséquences qu'on ne voit qu'après coup :
+
+* **l'ordre devient une décision.** Le verrou passe avant le code : dire « il manque deux chiffres »
+  à quelqu'un dont la saisie est bloquée quinze minutes est *exact et hors sujet*. Un booléen ne
+  pouvait pas porter cette nuance ;
+* **le bouton n'a plus besoin d'être muet** (A209) : il dit ce qui le retient, et il n'est jamais
+  éteint sans raison lisible.
+
+Règle générale : *quand un état est consommé par du texte affiché, ne le réduis pas à un booléen
+avant de l'avoir affiché.*
+
+## 3. Un prédicat qui oblige à refaire le calcul n'est pas le bon prédicat
+
+Variante du même mal, trouvée en relisant ce lot avant commit :
+
+```ts
+// Le module exportait ceci…
+export function photosRetiennent(photos): boolean { … }
+
+// …et son UNIQUE appelant écrivait ceci, parce qu'il voulait la RAISON :
+const manques = manquesDeLaRemise({ code: '0'.repeat(6), photos, verrouille: false });
+const hint = manques[0]?.quoi === 'televersement' ? t('photos.uploading') : t('photos.uploadError');
+```
+
+Le prédicat était inutilisable : son client avait besoin du motif, donc il a recopié le corps de la
+fonction. Le bon export rend **le manque**, pas un oui/non :
+
+```ts
+export function manqueDesPhotos(photos): ManqueDeLaRemise | null
+```
+
+> Quand ton seul appelant contourne ta fonction, ce n'est pas lui qui a tort.
+
+## 4. Un export que personne n'appelle est un commentaire — et parfois une seconde vérité
+
+Même passe de relecture, six exports des deux fronts n'avaient **aucun appelant**. Le contrôle tient
+en une ligne de shell, et il est à faire *avant* de committer un module neuf :
+
+```sh
+for f in $(grep -oE '^export (const|function) [A-Za-z_]+' lib/remise.ts | awk '{print $3}'); do
+  printf '%-22s : ' "$f"; grep -rln "\b$f\b" src | grep -v 'lib/remise'; echo
+done
+```
+
+Les verdicts ne sont pas tous les mêmes, et c'est l'intérêt :
+
+| Cas | Verdict |
+|---|---|
+| `ESSAIS_MAX = 3`, alors que `MAX_DELIVERY_ATTEMPTS = 3` existe et a des lecteurs | **supprimer** : un second domicile pour le même chiffre |
+| `verrouActif(etat, t)`, alors que l'écran fait `resteDuVerrouMs(…) > 0` | **supprimer** : deux façons de poser la même question |
+| `avancementDesJalons()` (« 2 sur 3 ») devant trois lignes déjà visibles | **supprimer** : il compte ce qu'on voit |
+| `jalonEnvoyable(confirmes, jalon)`, qui protège d'un cran périmé | **câbler** : il manquait à l'appui |
+
+Le cas le plus instructif est `ESSAIS_MAX`. Sa seule fiche disait :
+
+```ts
+expect(source).not.toMatch(/ESSAIS_MAX\s*-/);   // « ne t'en sers pas pour soustraire »
+```
+
+**Une constante dont l'unique règle est « ne t'en sers pas » est une seconde vérité qui attend son
+premier lecteur.** On ne la garde pas en l'interdisant : on la supprime, et la fiche vise désormais
+les deux fichiers qui pourraient la refaire.
+
+Attention au piège en écrivant cette fiche — ce dépôt l'a payé cinq fois ce mois-ci, dont une fois
+*dans le détecteur lui-même* (A224 lot 5) : le module **explique en commentaire** pourquoi la
+constante est absente, donc chercher le mot trouve l'explication.
+
+```ts
+expect(sansCommentaires(source)).not.toMatch(/ESSAIS_MAX|MAX_ESSAIS/);   // on vise l'USAGE
+```
+
+## 5. Une règle écrite n'est pas une règle relue
+
+La décision du lot interdisait « action impossible » en propres termes. Le dictionnaire de l'écran
+la portait quand même. Personne n'avait désobéi : la phrase venait d'un dictionnaire voisin, recopiée
+comme repli générique, et la décision n'était pas *présente* au moment du copier-coller.
+
+Deux parades, et seule la seconde survit à l'oubli :
+
+1. réécrire la phrase — nécessaire, insuffisant ;
+2. **la faire compter par une fiche.** Elle vit dans quatre autres dictionnaires ; on ne les aligne
+   pas d'autorité (chaque écran mérite sa phrase), mais la fiche fixe le nombre :
+
+```ts
+expect(porteurs).toEqual(['myDeals', 'myTrips', 'pickup']);
+```
+
+Le prochain qui en ajoute une rougit ; celui qui en corrige une doit **baisser le chiffre**. Une
+dette comptée se rembourse, une dette promise s'oublie — c'est la forme déjà retenue en D115 3A pour
+les trois copies de la prise de photo.
+
+## 6. Détail de langage : `return` dans un `catch`, et le `finally` qui sauve
+
+```ts
+setEnvoi(true);
+try {
+  await remettre(id, corps);
+} catch (e) {
+  if (!(e instanceof ApiError)) {
+    setErreur(t('networkFailed'));
+    return;                 // ← sortie anticipée DANS le catch
+  }
+  …
+} finally {
+  setEnvoi(false);          // ← s'exécute quand même, y compris sur ce return
+}
+```
+
+Le `return` d'un `catch` n'échappe pas au `finally` : c'est précisément ce qui évite ici l'état
+d'attente perpétuel. Sans `finally`, ce `return` laissait `envoi` à `true` pour toujours — le même
+mensonge que le `isSubmitting || !photosReady` du site, fabriqué autrement. **Un état d'attente a
+exactement une sortie, et elle doit être inconditionnelle.**
+
+## Pour aller plus loin
+
+* Séquences imposées par un serveur : n'offre jamais la liste complète si le serveur refuse l'ordre.
+  Ici `jalonSuivant(confirmes)` est la *même* règle que celle du serveur (`SEQUENCE[confirmés.length]`),
+  recopiée et confrontée au contrat Zod par une fiche — le mobile ne peut pas importer le contrat
+  (A223), donc la copie est assumée et **gardée**.
+* Lecture défensive d'une liste venue du réseau : `jalonsConfirmes` filtre sur les codes connus et
+  **réordonne** — deux événements écrits dans la même seconde peuvent revenir inversés, et un cran
+  inconnu décalerait la séquence.
+* `payoutDueAt` vient du serveur : ne recalcule jamais une échéance que quelqu'un d'autre décide.

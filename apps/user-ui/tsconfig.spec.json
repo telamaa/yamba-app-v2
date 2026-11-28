@@ -24,6 +24,11 @@
       "@/*": ["./src/*"],
       "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"],
       "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"],
+      // D115 bis — le harnais déclare PLUS que l'application, exactement
+      // comme le mobile (A223) : une fiche doit pouvoir confronter une
+      // constante RECOPIÉE au contrat Zod réel. L'application, elle, ne
+      // l'importe pas — zod n'a rien à faire dans le bundle du navigateur.
+      "@packages/api-contracts": ["../../packages/libs/api-contracts/src/index.ts"],
       "@packages/libs/maintenance": ["../../packages/libs/maintenance/index.ts"]
     }
   },

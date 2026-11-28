@@ -7,7 +7,6 @@
 
 "use client";
 
-import { PICKUP_CHECKLIST_ITEMS } from "./PickupChecklist"; // ANO-WEB-51
 import { useLocale, useTranslations } from "next-intl";
 import type { DealPickupViewProps } from "./DealPickupClient";
 import PickupChecklist from "./PickupChecklist";
@@ -26,9 +25,10 @@ export default function DealPickupMobile(props: DealPickupViewProps) {
   const { deal } = props;
 
   const shipperFirstName = deal.shipper.firstName;
-  // ANO-WEB-50 (recette 5.16, même famille qu'ANO-WEB-44) : le prénom du destinataire vient du DTO,
-  // plus du premier mot du lieu de livraison (« la remise à Brazzaville »).
-  const recipientFirstName = deal.recipientFirstName || deal.deliveryLocation.city;
+  // Le prénom du DESTINATAIRE ne sert plus ici : la barre du bas dit
+  // « infoShort », qui ne nomme que l'Expéditeur (D115 bis). Il reste lu par
+  // la vue bureau, avec sa raison d'origine — ANO-WEB-50 (recette 5.16) : il
+  // vient du DTO, jamais du premier mot du lieu de livraison.
   const weightKg = formatWeight(deal.parcel.weightKg, locale);
 
   return (
@@ -80,13 +80,11 @@ export default function DealPickupMobile(props: DealPickupViewProps) {
 
         <PickupFooter
           shipperFirstName={shipperFirstName}
-          recipientFirstName={recipientFirstName}
           canConfirm={props.canConfirm}
-          blockingHint={props.checked.size < PICKUP_CHECKLIST_ITEMS.length ? t("validation.checklistIncomplete") : props.photos.length < 1 ? t("validation.photoMissing") : null}
+          blockingHint={props.blockingHint}
           isSubmitting={props.isSubmitting}
           onRefuseAction={props.onOpenRefuseAction}
           onConfirmAction={props.onConfirmAction}
-          variant="mobile"
         />
       </div>
 

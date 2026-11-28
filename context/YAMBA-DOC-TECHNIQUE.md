@@ -20098,3 +20098,811 @@ c'est la saisie qui fait foi).
 - **L'écran n'a pas été vu.** Il demande une session connectée sur le simulateur, et ce poste ne
   peut pas taper dedans (`simctl` sait naviguer, pas toucher — D107). Sa logique est vérifiée
   contre la base réelle de bout en bout ; sa mise en page reste une hypothèse.
+
+---
+
+# D112 — Mes envois, et la porte qui manquait au suivi (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1103 → 1134 fiches** (56 → 57
+suites). **Aucune ligne de serveur**, aucun type nouveau, aucune dépendance.
+
+## Le constat — ce n'est pas « une liste manque »
+
+L'app portait déjà **2 903 lignes** de suivi d'envoi :
+
+```
+apps/mobile/src/app/shipment/[id]/index.tsx    1 455 l.  (suivi, code de livraison, rendez-vous)
+apps/mobile/src/app/shipment/[id]/rate.tsx       661 l.  (notation)
+apps/mobile/src/app/shipment/[id]/report.tsx     718 l.  (signalement)
+```
+
+Un seul chemin y menait :
+
+```tsx
+// apps/mobile/src/app/booking/confirmation.tsx:133
+router.replace({ pathname: '/shipment/[id]', params: { id: bookingId } })
+```
+
+L'écran qui suit le paiement, **en `replace`**. Aucun lien profond, aucune notification, aucune
+liste. L'Expéditeur payait, voyait son suivi une fois, fermait l'app — et ne pouvait plus jamais y
+revenir. **Un écran sans porte n'est pas un écran, c'est du code mort qui s'ignore.**
+
+Et l'onglet Activité était **vide** pour lui : `isCarrier &&` masquait les seuls compteurs, il ne
+restait qu'une phrase d'attente et une carte l'invitant à devenir Voyageur. L'onglet censé servir
+« les deux faces » n'en servait qu'une.
+
+## Zéro ligne de serveur, et même zéro type
+
+`GET /me/bookings` sert la vue Expéditeur **complète** — le `ShipperShipmentDto` que l'écran de
+détail relit déjà : statut, instantané de trajet, prix gelé, `rating`, `trackingEvents`,
+`allowedActions`. La liste ne demandait pas un contrat, elle demandait une **porte**.
+
+```ts
+// apps/mobile/src/lib/api/shipment.api.ts
+export async function mesEnvois(): Promise<ShipperShipmentDto[]> { … }
+```
+
+## « À traiter » se déduit de ce que le serveur accorde
+
+C'est le désaccord assumé avec le site. `getShipmentPresentation` y range un envoi par une **table
+de statuts**, qui met `PICKED_UP` sans événement de suivi dans « À traiter », en urgent.
+
+Or les gestes que la machine à états accorde à l'Expéditeur sont exactement trois :
+
+| Geste | Depuis | Ce qu'il fait |
+|---|---|---|
+| `cancel` | PENDING, ACCEPTED | **défait** |
+| `dispute` | PICKED_UP, DELIVERED | **escalade** |
+| `confirmEarly` | DELIVERED | **fait avancer** |
+
+Plus la notation, qui n'est pas une transition (`rating.canRate`).
+
+En `PICKED_UP`, l'Expéditeur n'a donc **aucun** geste qui fasse avancer l'envoi. Celui qui doit
+agir est le Voyageur : il doit déclarer son passage à l'aéroport. **Une tâche posée sur le bureau
+de quelqu'un qui ne peut rien faire n'est pas un rappel, c'est un reproche.**
+
+```ts
+// apps/mobile/src/lib/mes-envois.ts
+export function sectionDeLEnvoi(envoi: EnvoiDeLaListe): SectionDesEnvois {
+  if (peut(envoi, 'confirmEarly') || envoi.peutNoter) return 'aTraiter';
+  return TERMINES.includes(envoi.statut) ? 'passes' : 'enCours';
+}
+```
+
+Si la machine ouvre un jour un quatrième geste à l'Expéditeur, il entre ici sans qu'on touche à une
+table. Et `cancel` / `dispute` n'y entrent pas : sans quoi la liste des envois deviendrait une
+**liste de regrets** — tout ce qui est annulable serait « à traiter ».
+
+## Trois sections, pas de filtre — ce qu'on refuse de transposer
+
+Le site pose **quatre pastilles** (`Tous · À traiter · En cours · Terminés`) au-dessus d'une liste
+**déjà sectionnée** par les trois mêmes groupes, avec les mêmes comptes affichés **deux fois** (la
+pastille, puis `· N` près du titre).
+
+Trois défauts mesurés le même jour, et aucun n'est un bug — ce sont trois décisions prises
+séparément, chacune défendable seule :
+
+| # | Constat | Où |
+|---|---|---|
+| 1 | taper « En cours » affiche la section déjà visible ; taper « Terminés » **cache les deux groupes qui réclament une action** | `ShipmentsClient.tsx:134` |
+| 2 | « En cours » porte **deux nombres** : le sous-titre somme `action + ongoing`, la pastille n'en compte qu'un | `ShipmentsClient.tsx:127` vs `:194` |
+| 3 | le même ensemble est « **Terminés** » dans la pastille et « **Historique** » dans le titre | `messages/fr/shipments.json` |
+
+**Une incohérence de charte ne se lit pas, elle se compte** (D105).
+
+## Le badge et l'écran disent le même nombre
+
+Conséquence directe du constat n° 2 : le compteur de l'onglet Activité est calculé par
+`sectionDeLEnvoi`, **la règle même qu'applique l'écran** — et une fiche l'exige.
+
+```ts
+// apps/mobile/src/hooks/use-tab-badges.ts
+shipmentsToHandle: envois
+  .map(envoiDeLApi)
+  .filter((envoi) => envoi !== null && sectionDeLEnvoi(envoi) === 'aTraiter').length,
+```
+
+Noter que le badge dit « **N à traiter** » et l'en-tête de l'écran « **N en cours** » : deux
+nombres différents, mais **deux mots différents** pour deux idées différentes. C'est précisément
+ce qui manque au site.
+
+## Au passage : le décompte sort de l'écran de suivi
+
+Le choix de la clé (`remainingDays` / `remainingHours` / `remainingMinutes`) vivait en dur dans
+`shipment/[id]/index.tsx`. La liste en a besoin du même coup — et deux cascades divergent. Elle
+devient `remainingLabel(left)` dans `lib/shipment-view.ts`, appelée des deux côtés. Le libellé,
+lui, reste dans le dictionnaire `shipment` : **un décompte s'écrit pareil partout**.
+
+## Vérifié contre le serveur réel
+
+Trois Expéditeurs de seed, **13 réservations**, la vraie projection rejouée dessus :
+
+```
+aminata : reçus 6 → projetés 6 · en cours = 1
+  [enCours] Paris → Brazzaville  2026-11-02 08:18  PICKED_UP  Thomas N.  4480c  actions=[dispute]
+  [passes]  CANCELLED · COMPLETED · COMPLETED · CANCELLED · EXPIRED
+chinwe  : reçus 3 → projetés 3 · en cours = 2
+  [enCours] Londres → Lagos  2026-11-06 07:18  PICKED_UP  Adebayo O.  5600c
+            Paris → Brazzaville  DISPUTED  Thomas N.
+```
+
+Aucune ligne rejetée, dates dans le fuseau du lieu de départ, actions lues et non déduites.
+**Aucun envoi ne tombe dans « À traiter »** — vérifié, ce n'est pas un trou : `rating` est bien
+servi, avec `canRate: false`, parce que la fenêtre de notation est close sur toutes ces
+réservations.
+
+## Chaque fiche prouvée en la faisant rougir
+
+- on remplace la cible de la porte → **une** fiche rouge (« la porte existe ») ;
+- on fait calculer le badge par un filtre de statut → **une** fiche rouge (« le badge applique la
+  même règle que l'écran »).
+
+## Reste ouvert
+
+- **L'écran n'a pas été vu** : il demande une session connectée sur le simulateur, et `simctl` sait
+  naviguer mais pas taper (D107).
+- **Aucune réservation `DELIVERED` n'existe dans le seed** : la branche « confirmer la réception »
+  est tenue par les fiches, pas par la donnée réelle.
+- Le chemin par **notification** (« ton colis est arrivé ») n'existe sur aucun des deux fronts.
+- `getMyShipmentsPreview()` du site renvoie `mockShipments`, qui part dans le bundle de production.
+
+---
+
+# D112 bis — La porte ne centre plus son contenu (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : `porte-avec-sortie.spec.ts` 15 → 18 fiches.
+
+## Le fichier se contredisait lui-même
+
+`identity-gate.tsx` déclare dans son en-tête, depuis le 08/11 :
+
+> ① **LE CONTENU EST EN HAUT, le vide en bas.** On lisait à 55 % de la hauteur, sous un vide que
+> rien ne justifiait. […] ici l'écran a un titre de page, et un titre de page est en haut.
+
+Et cent lignes plus bas, D104 2A avait ajouté :
+
+```tsx
+{onDismiss !== undefined && <View style={styles.spacer} />}
+```
+
+soit un ressort **au-dessus** du bloc pour les écrans poussés, qui centrait leur contenu. Vu à
+l'écran le 27/11 : le titre de page flottait à ~40 % de la hauteur, sous un vide que rien ne
+justifiait. **Le défaut que l'en-tête déclare avoir corrigé, reproduit dans les mêmes mots.**
+
+Personne ne pouvait le voir en lisant : **les deux moitiés sont justes séparément.**
+
+## Pourquoi D104 2A avait tort
+
+Sa justification : « un écran poussé n'a pas de barre d'onglets, donc le vide du bas est du vide
+sans emploi ». Elle confond deux énoncés :
+
+| Énoncé | Dépend de la barre ? |
+|---|---|
+| le contenu commence en HAUT | **non** — c'est un titre de page |
+| le vide du BAS est inoffensif | oui — la barre y flotte |
+
+Retirer la barre ne change donc rien à **où commence le contenu**. Le ressort disparaît ; il n'en
+reste qu'un, sous le bloc.
+
+## La fiche qui avait tort a été RETOURNÉE, pas supprimée
+
+Une fiche de D104 exigeait littéralement le ressort conditionnel. Elle exige désormais son
+absence, et sa raison est écrite dans son corps — **une fiche qui a tort change de nature, elle ne
+disparaît pas** (leçon D110), sinon la règle qu'elle tenait redevient une opinion.
+
+Deux fiches s'ajoutent : un seul ressort dans la porte, et il vient **après** le bloc (avec la
+garde `indexOf > 0` des deux repères, sans quoi la comparaison passerait pour la pire des raisons
+— D98). L'amorçage, lui, reste centré, et une fiche le dit pour qu'on ne « simplifie » pas les deux
+cas en un seul.
+
+**Correction constatée à l'écran**, pas raisonnée (D98).
+
+---
+
+# D113 — Le Voyageur répond à ses demandes (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1137 → 1175 fiches** (57 → 58
+suites). **Aucune ligne de serveur** — la troisième fois d'affilée.
+
+## Le constat : troisième porte manquante en trois jours
+
+```sh
+grep -rn "me/deals" apps/mobile/src
+# → apps/mobile/src/hooks/use-tab-badges.ts   (et rien d'autre)
+```
+
+Le nombre de demandes en attente s'affichait sur l'onglet Activité, et **rien ne permettait d'y
+aller**. Après le compteur de brouillons (D111 quinquies) et le suivi d'envoi (D112), c'est la
+même famille pour la troisième fois — mais la plus chère : une demande **meurt en 24 h** (DEA-01),
+et l'Expéditeur sans réponse ne reçoit pas un écran vide, il perd son colis.
+
+Le Voyageur n'avait **aucun** écran natif : ni liste, ni demande, ni réponse.
+
+## Le périmètre : « répondre », et il est complet
+
+La machine à états accorde six gestes au Voyageur :
+
+| Geste | Depuis | Dans ce lot ? |
+|---|---|---|
+| `accept` / `decline` | PENDING | **oui** |
+| `cancel` | ACCEPTED | non (annuler un deal accepté : ANN-02) |
+| `pickup` / `refusePickup` | ACCEPTED | non — caméra + liste d'inspection 5/5 (CNF-04) |
+| `deliver` | PICKED_UP | non — code à 6 chiffres, bcrypt, 3 essais, verrou 15 min |
+
+Un lot se borne par un **métier**, pas par une couche technique. « Répondre » a une fin nette, une
+horloge et une preuve.
+
+## On n'accepte pas depuis une ligne de liste
+
+Accepter engage le Voyageur **et déclenche le débit** de l'Expéditeur (capture manuelle, D39). Il
+faut donc avoir vu le colis, sa valeur déclarée, l'Expéditeur, les lieux et le gain. D'où deux
+écrans :
+
+```
+apps/mobile/src/app/deals/mine.tsx    la liste — elle mène, elle ne tranche pas
+apps/mobile/src/app/deal/[id].tsx     la demande — elle porte les deux réponses
+```
+
+Le pluriel/singulier n'est pas une coquetterie : `deals/mine` sous une route dynamique
+`deals/[id]` serait capté avec `id = "mine"`, et Expo Router ne signalerait rien.
+
+**Refuser confirme, accepter non**, et l'asymétrie est raisonnée : l'écran de la demande *est* la
+délibération d'une acceptation ; y ajouter une alerte ferait répéter une décision déjà prise,
+écran en main. Le refus, lui, est terminal pour l'Expéditeur et se tape vite pour « faire de la
+place ». En revanche l'acceptation **dit ce qu'elle engage**, juste au-dessus du bouton.
+
+## Le tri suit l'horloge
+
+`grouperLesDemandes` trie « à répondre » par **échéance croissante**, là où `grouperLesEnvois`
+garde l'ordre du serveur. Deux listes voisines, deux tris, et c'est délibéré : on suit un colis,
+on **répond** à quelqu'un.
+
+Trois crans d'urgence, pas davantage — au-delà c'est un nuancier que personne ne décode :
+
+| Reste | Cran |
+|---|---|
+| ≤ 3 h | `bientot` (liseré mangue sur la carte) |
+| ≤ 12 h | `aujourdhui` |
+| au-delà | `calme` |
+| échue, ou pas d'horloge | `null` — **une demande acceptée n'est pas « calme », elle est hors sujet** |
+
+Les bornes appartiennent au cran le plus urgent : exactement 3 h restantes, c'est « bientôt ». Une
+borne qui penche vers le calme fait rater la dernière heure utile.
+
+## Le défaut trouvé contre la vraie base
+
+Comme à chaque lot, la projection a été rejouée sur le serveur réel — 13 demandes d'un Voyageur de
+seed. Résultat du premier jet :
+
+```
+ACCEPTED   Pauline L.   CLOTHES
+DECLINED   João S.      OTHER_ELECTRONICS
+DISPUTED   Chinwe E.    SMALL_TOYS
+```
+
+**Des codes techniques affichés à un Voyageur** — le défaut D83. Deux populations cohabitent, et
+c'est le même schéma que les dates de D112 :
+
+| Écrites par | `categoryFamily` | `category` |
+|---|---|---|
+| le parcours actuel (`booking-request.ts:301`) | famille D14 | code legacy |
+| le seed, les anciennes réservations | **null** | code legacy (A29) |
+
+La règle rend donc un **code et sa provenance**, jamais un mot :
+
+```ts
+export type FamilleDuColis =
+  | { source: 'famille'; code: string }
+  | { source: 'categorie'; code: string }
+  | null;
+```
+
+et les écrans vont chercher le mot dans l'un des deux dictionnaires. Les libellés sont **recopiés
+mot pour mot** : les huit familles D14 depuis `search.json` du mobile, les douze catégories legacy
+depuis `shipments.json` du site. Trois fiches tiennent l'absence de dérive et l'existence de chaque
+clé **calculée** dans les deux langues — angle mort que ni `tsc` (un gabarit se type toujours) ni
+le contrôle i18n de la CI (il compare FR et EN entre eux) ne couvre.
+
+Après correction, les treize lignes rendent « Vêtements », « Autre électronique », « Petits
+jouets » — et aucune clé absente.
+
+## Ce que ces écrans ne lisent jamais
+
+| Interdit | Pourquoi | Garde |
+|---|---|---|
+| `totalShipperCents`, `commissionCents` | la vue Voyageur ne porte que le GAIN (A13) | fiche |
+| `recipient` | minimisé côté serveur : nom à l'acceptation, téléphone à la prise en charge, jamais l'email (ANO-API-15) | fiche |
+
+Filtrer dans l'app créerait une **seconde** règle de confidentialité, et l'une des deux serait
+fausse un jour.
+
+## Un faux positif dans ma propre fiche, pour la sixième fois du mois
+
+La fiche « aucun écran ne lit le destinataire » est partie au rouge… sur le **commentaire** qui
+explique pourquoi le destinataire est interdit. Le remède n'est pas d'affiner le motif mais de
+viser l'usage :
+
+```ts
+function sansCommentaires(source: string): string {
+  const net = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  expect(net.length).toBeGreaterThan(source.length / 3); // un dépouillement qui vide tout passe tout
+  return net;
+}
+```
+
+Deuxième faux positif du même jet : « la coquille *arrive dans un prochain lot* a disparu »
+rougissait sur celles de **Messages** et **Profil**, qui disent encore la vérité. Condamner le mot
+partout revenait à interdire d'être honnête ; la fiche ne vise plus que l'onglet Activité.
+
+## Reste ouvert
+
+- `pickup`, `deliver`, `refusePickup` — le plus gros lot du chantier Voyageur.
+- **Aucun écran n'a été vu** : la session manque sur le simulateur, et macOS refuse
+  l'automatisation (`osascript` → `-1743`), donc aucun clic programmable.
+- Les familles D14 sont désormais recopiées dans **quatre** dictionnaires du mobile (booking,
+  tripDetail, search, myDeals). La dette est nommée ; la dérive, elle, est tenue par une fiche.
+
+---
+
+# D114 — L'onglet Activité devient un carrefour (27/11/2026)
+
+**Branche** : `feat/mes-envois-natifs` · **Mesures** : mobile **1175 → 1192 fiches** (58 → 59
+suites). Aucune ligne de serveur.
+
+## Le constat
+
+Après les trois lots précédents, l'onglet portait quatre liens et un compteur chacun. **Une porte
+dit où aller ; elle ne dit pas ce qu'il faut faire, ni dans quel ordre.** Un membre ayant un colis
+à confirmer, une demande qui expire dans deux heures et un Voyageur à noter devait ouvrir trois
+écrans pour l'apprendre.
+
+## Les deux rôles confondus, pas juxtaposés
+
+C'est le modèle de la page d'accueil du site (`deriveHomeActions`), et il est juste : **personne ne
+pense « en tant qu'Expéditeur » puis « en tant que Voyageur »**, on pense « qu'est-ce que je dois
+faire ».
+
+```ts
+// apps/mobile/src/lib/carrefour.ts — pur, il ne connaît ni réseau ni écran
+export function choseQuiAttendent(
+  envois: EnvoiDeLaListe[],
+  demandes: DemandeDeLaListe[]
+): ChoseQuiAttend[]
+```
+
+Il réutilise les dérivations existantes — `sectionDeLaDemande` et `actionMiseEnAvant` — sans
+réécrire une seule règle métier.
+
+## L'ordre est nommé, pas numéroté
+
+Le site classe par :
+
+```ts
+const CARRIER_PRIORITY = { RESPOND: 0, PICKUP: 1, DELIVER: 1, RATE: 3 };
+```
+
+Une échelle **à trous** (personne ne sait ce que vaudrait un 2) avec **deux ex æquo muets**. Ici :
+
+```ts
+export const ORDRE: readonly TypeDeChose[] = ['repondre', 'confirmer', 'noter'];
+```
+
+| Rang | Pourquoi |
+|---|---|
+| **répondre** | le seul où quelqu'un d'**autre** perd quelque chose si l'on tarde (24 h, DEA-01) |
+| **confirmer** | l'argent du Voyageur est bloqué ; cela se débloque seul, mais plus tard |
+| **noter** | personne n'attend après — une dette de politesse |
+
+Une liste de noms ne peut pas avoir de trou, et l'étendre oblige à **nommer** ce qu'on ajoute.
+
+Le tri est ensuite : type d'abord, échéance ensuite, sans échéance en dernier **à type égal** — un
+colis à confirmer sans date reste devant une note à donner, parce que l'argent de quelqu'un dort.
+
+## On n'y met que ce que l'app sait faire
+
+`pickup` et `deliver` sont autorisés par le serveur mais leurs écrans n'existent pas (hors
+périmètre D113). Les annoncer recréerait **le défaut que les trois lots précédents ont corrigé**.
+Une fiche l'interdit, et servira de rappel le jour où ces écrans naîtront :
+
+```ts
+expect(ORDRE).not.toContain('prendreEnCharge');
+expect(regle).not.toContain("'pickup'");
+```
+
+## Une seule lecture — et c'est la moitié du lot
+
+`use-tab-badges.ts` était un hook à état **local** avec trois consommateurs :
+
+```
+src/components/tab-bar.tsx        (monté en permanence)
+src/app/(tabs)/messages.tsx
+src/app/(tabs)/activity.tsx
+```
+
+Chacun avec son `useState`/`useEffect`, donc **jusqu'à trois jeux de quatre requêtes** à chaque
+passage de l'app au premier plan — et le carrefour en aurait fait un quatrième.
+
+Le gaspillage n'est pas le pire. **Trois lectures à trois instants peuvent se contredire** : le
+badge de la barre annoncerait deux demandes pendant que l'écran en montre une. C'est le défaut
+mesuré sur le site (« En cours » affichant deux nombres à quarante pixels d'écart), mais séparé
+ici par une barre d'onglets — donc bien plus difficile à voir.
+
+Le hook devient un **fournisseur** (`lib/activite-context.tsx`), monté une fois dans la pile
+racine, et les compteurs **dérivent** des mêmes listes projetées que les écrans :
+
+```ts
+badges: {
+  pendingDeals: demandes.filter((d) => sectionDeLaDemande(d) === 'aRepondre').length,
+  shipmentsToHandle: envois.filter((e) => sectionDeLEnvoi(e) === 'aTraiter').length,
+  …
+}
+```
+
+`useTabBadges()` garde son nom et sa forme : ses trois appelants n'ont rien à changer.
+
+**La règle posée par une fiche en D112 devient structurelle** : il n'y a plus deux calculs à garder
+d'accord, il n'y en a qu'un. La fiche reste quand même — une structure se défait aussi — et elle a
+été mise à jour pour lire le nouveau fichier, avec sa raison écrite.
+
+Une fiche garde enfin l'**unicité** du fournisseur (`match(/<ActiviteProvider>/g)` de longueur 1) :
+deux fournisseurs liraient deux fois et divergeraient, le défaut que D103 a payé avec les
+`SafeAreaProvider`.
+
+## Le vide est une bonne nouvelle
+
+```tsx
+{attendent.length > 0 ? ( … ) : pret && <ThemedText>{t('activity.nothingWaiting')}</ThemedText>}
+```
+
+La section **disparaît** au lieu d'afficher un « 0 » permanent : un signal toujours présent n'est
+pas un signal (quatrième fois dans ce dépôt). Et `pret` évite d'annoncer « tout est à jour » avant
+que la première lecture soit revenue — annoncer le calme pendant le chargement serait un mensonge
+d'une demi-seconde, mais un mensonge.
+
+## Contre-épreuves
+
+- inverser l'ordre → **deux** fiches rouges (la liste nommée, et le tri) ;
+- monter le fournisseur deux fois → **une** fiche rouge.
+
+## Reste ouvert
+
+- `pickup` / `deliver` / `refusePickup` : le plus gros du chantier Voyageur.
+- Aucun écran de ce chantier n'a été **vu** (session requise, et macOS refuse les Apple Events).
+- L'état partagé doit rester petit : il porte deux listes, pas un cache général.
+
+
+---
+
+# D115 — La prise en charge, en natif (27/11/2026)
+
+`POST /deals/:id/pickup` existait depuis B3-PR1 et **n'avait aucun client mobile**. C'est pourtant
+LE geste qui justifie une app : il se fait dans un hall de gare ou devant un comptoir
+d'enregistrement, colis ouvert entre les mains, l'Expéditeur en face. Jamais devant un ordinateur.
+
+**Zéro ligne de serveur, pour la quatrième fois d'affilée.**
+
+## La demande devient une PILE
+
+`deal/[id].tsx` était un écran seul. Il devient `deal/[id]/index.tsx`, avec `deal/_layout.tsx` et
+`deal/[id]/pickup.tsx` à côté — même parti pris que `shipment/` : aucun en-tête natif, chaque écran
+porte son bandeau. Le retour depuis l'inspection retombe sur la demande, pas sur la liste.
+
+Deux détails qui se paient si on les oublie :
+
+* la déclaration racine passe de `<Stack.Screen name="deal/[id]" />` à `name="deal"` — c'est la
+  PILE qu'on déclare, plus l'écran ;
+* **les types de routes d'Expo ne se régénèrent pas tout seuls ici.** `npx expo start` plante sur
+  `Cannot find module 'expo-router/_ctx-shared'` : `@expo/router-server` vit à la racine du dépôt,
+  `expo-router` sous `apps/mobile/node_modules` (niché à dessein, pour Metro et react 19.2.3). La
+  parade mesurée :
+
+```sh
+cd apps/mobile
+NODE_PATH=$PWD/node_modules npx expo start --go   # les types sont écrits en ~6 s, puis on arrête
+```
+
+Sans cela, `nx typecheck @yamba-app/mobile` refuse tout `router.push('/deal/[id]/pickup')` avec un
+TS2322 qui donne l'impression que la route est fausse — alors que c'est le fichier généré qui est
+périmé. Le fichier n'est pas versionné : le symptôme est **local**, et la CI n'en voit rien.
+
+## L'étagère à photos : on factorise au moment où l'on devient le quatrième
+
+Trois écrans sélectionnaient déjà des images, chacun pour soi. Ce lot en aurait fait un quatrième et
+D116 un cinquième. Trois fichiers nouveaux, et une frontière nette :
+
+| Fichier | Rôle | Imports |
+|---|---|---|
+| `lib/photos.ts` | l'ÉTAT d'un lot de photos (pur) | **zéro** |
+| `hooks/use-photos.ts` | les EFFETS : permission, sélection, téléversement, réessai | `expo-image-picker` |
+| `components/photo-shelf.tsx` | les PIXELS : vignettes, voile, croix, boutons | React Native |
+
+Et le compte a **corrigé la décision qui l'a demandé**. D115 3A annonçait « recopiée TROIS fois » ;
+`grep -rln launchCameraAsync` dit deux (`booking/content.tsx`, `shipment/[id]/report.tsx`) —
+`publish-trip/review.tsx` ne prend pas de photo, il **joint un billet**, qui est un fichier déjà
+reçu. La nuance n'est pas comptable : un billet ne se photographie pas, donc cet écran n'était pas
+candidat au composant. Une fiche porte les deux comptes, pas une promesse.
+
+Ce que l'étagère ajoute aux copies : un **réessai par photo**. Les trois copies ne savent que
+*retirer* une photo en échec — le Voyageur devait reprendre la photo du colis ouvert, debout, devant
+l'Expéditeur. Le fichier est déjà sur l'appareil : on le renvoie.
+
+## Ce qui manque est une LISTE, pas un booléen
+
+```ts
+export type ManqueDeLaPriseEnCharge =
+  | { quoi: 'points'; combien: number }
+  | { quoi: 'photo' }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' }
+  | { quoi: 'notes'; deTrop: number };
+```
+
+`canConfirm: boolean` ne permet qu'un bouton éteint. La liste permet une phrase — « il reste deux
+vérifications », « une photo n'est pas partie » — et l'écran n'a **rien à re-déduire** : deux
+déductions divergent, et c'est l'écran qui aurait tort (doctrine A209).
+
+`corpsDeLaPriseEnCharge()` rend `null` plutôt que de jeter : l'écran a déjà la liste des manques, et
+une fonction qui répond à une question ne lève pas d'exception pour dire « pas encore » (CQS, D83).
+La checklist part dans l'ordre du **contrat**, pas dans celui des clics : le serveur vérifie une
+présence, mais un dossier de litige se relit mieux quand deux réservations identiques s'archivent
+pareil.
+
+## Le carrefour tient la promesse de D114
+
+D114 1C avait laissé `pickup` et `deliver` dehors — leurs écrans n'existaient pas — et sa fiche avait
+promis d'être « la première à le rappeler ». L'écran existe : `prendre` entre dans `ORDRE`, à sa
+place nommée (**après** répondre, **avant** confirmer : quelqu'un attend DEBOUT avec un colis, donc
+ce geste passe devant tout ce qui peut se faire assis). `remettre` reste dehors, et la fiche
+continue de le refuser — ce n'est pas un oubli, c'est la même règle qui tient.
+
+Son échéance est `null`, **volontairement** : le rendez-vous a une heure, mais l'app ne reçoit du
+trajet qu'une date locale. Un « dans 3 h » calculé là-dessus serait inventé (D100).
+
+## D115 bis — le site, challengé par son jumeau natif
+
+En écrivant l'écran natif, trois défauts du site se sont montrés. Aucun n'était visible à la
+lecture ; tous l'étaient en demandant « et ici, qu'est-ce qui bloque le bouton ? ».
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | `PickupNotes` n'avait **aucun** `maxLength` alors que le contrat refuse au-delà de 500 | les photos partaient chez ImageKit, puis la confirmation échouait sur un toast générique — et il fallait tout refaire, debout |
+| ② | « ce qui manque » était un ternaire **recopié deux fois** (`DealPickupMobile`, `PickupConfirmCard`), aveugle à la remarque trop longue | bouton ACTIF pour un envoi voué à l'échec |
+| ③ | `if (loadError \|\| !deal) return <DealSkeleton />` | une lecture qui échoue affichait un **squelette perpétuel**, sans un mot ni une sortie (famille D100) |
+
+La règle vit maintenant dans `apps/user-ui/src/lib/carrier/prise-en-charge.ts` (pur, zéro import) et
+descend aux deux arbres. **C'est la quatrième fois qu'une règle sort d'un composant du site** après
+`tunnel.ts` (D93), `search-facets.ts` (D100) et `parcel-weight.ts` (D101) — exactement ce que
+`jest.config.ts` d'A224 annonçait : « le jour où un composant portera une règle qu'on veut tester,
+c'est la règle qu'il faudra sortir, pas le harnais qu'il faudra grossir ».
+
+Trouvé en passant, **mesuré et non lu** : `grep -rn PickupFooter` dit que ce composant n'est importé
+que par la vue téléphone, avec `variant="mobile"`. Sa branche bureau — quarante lignes, ses propres
+boutons, sa propre phrase de blocage — n'était atteinte par **aucun rendu** depuis son écriture (le
+bureau pose sa confirmation en colonne latérale). Du code qu'aucun chemin n'atteint est un piège :
+on l'édite en croyant corriger l'écran, et rien ne change. Supprimée.
+
+Et le harnais du site déclare désormais `@packages/api-contracts` (dans `jest.config.ts` ET
+`tsconfig.spec.json` — `alias.spec.ts` vérifie l'alignement des trois copies) : ses fiches peuvent
+confronter une constante **recopiée** au contrat Zod réel, comme le mobile depuis A223. Le bundle du
+navigateur, lui, ne voit pas zod — l'application n'importe pas cet alias.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1192 (59 suites) | **1241 (61 suites)** |
+| Fiches user-ui | 253 (16 suites) | **273 (17 suites)** |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* `nx typecheck @yamba-app/mobile` (deux programmes) et `nx typecheck user-ui` : verts.
+* `node scripts/check-i18n-messages.mjs` : 30 espaces de noms, miroir parfait.
+* La fiche de recensement du site (`largeur-de-page`) a **rougi** sur la colonne étroite du nouveau
+  message d'erreur, et c'est son travail : elle est désormais recensée avec sa raison (D110).
+
+## Reste ouvert
+
+* **La remise** (`deliver`), le code à six chiffres et les jalons de transport — D116.
+* Côté site, le téléversement reste fait **à la confirmation**, et un échec au milieu laisse les
+  photos déjà montées orphelines chez ImageKit. Nommé, non corrigé : les supprimer demanderait le
+  `fileId`, que ce chemin ne garde pas.
+* Aucun écran de ce lot n'a été **vu** : il faut une session Voyageur avec un deal ACCEPTED sur le
+  simulateur.
+
+---
+
+# D116 — La remise, et le transport raconté en trois jalons (27/11/2026)
+
+`POST /deals/:id/deliver` et `POST /deals/:id/events` existaient depuis B3-PR1 et **n'avaient aucun
+client mobile**. Le parcours natif du Voyageur s'arrêtait donc au milieu d'un métier : il savait
+accepter (D113) et prendre en charge (D115), puis il devait ouvrir le site pour remettre — le geste
+qui clôt le transport et déclenche le versement.
+
+**Zéro ligne de serveur, pour la cinquième fois d'affilée.**
+
+## Trois fichiers, trois frontières
+
+| Fichier | Rôle | Imports |
+|---|---|---|
+| `lib/remise.ts` | l'ÉTAT de la saisie : ce qui retient l'envoi, le verrou, le corps de la requête | `lib/photos` seul |
+| `lib/jalons.ts` | le RÉCIT : trois crans, et le seul geste proposé est le suivant | **zéro** |
+| `components/code-input.tsx` | les PIXELS des six cases, pour toute l'app | React Native |
+| `app/deal/[id]/deliver.tsx` | l'écran : les effets, et rien d'autre | — |
+
+## Ce qui retient l'envoi est une LISTE, jamais un booléen
+
+C'est la leçon de D115 2A, et elle vaut ici double parce que le site venait de montrer ce qu'elle
+coûte quand on l'oublie (voir D116 bis) :
+
+```ts
+export type ManqueDeLaRemise =
+  | { quoi: 'verrou'; restantMs: number }
+  | { quoi: 'code'; chiffres: number }
+  | { quoi: 'televersement' }
+  | { quoi: 'echec' };
+```
+
+L'ORDRE est une décision, pas un détail : **le verrou passe avant le code**. Dire « il manque deux
+chiffres » quand la saisie est bloquée quinze minutes est exact et hors sujet. Le bouton n'est jamais
+désactivé en silence (A209) : il dit ce qui le retient, et une fiche épingle l'ordre des `push`.
+
+## Le serveur compte, l'écran lit (A38)
+
+`essaisRestants` et `verrouJusqua` arrivent de la vue Voyageur à l'ouverture, puis des `details` des
+409 (`DELIVERY_CODE_INVALID` porte `attemptsLeft`, `DELIVERY_LOCKED` porte `lockedUntil`). D'où trois
+choix dans `remise.ts` :
+
+* `apresLeRefus` ne touche l'état **que** pour ces deux codes — `TRANSITION_NOT_ALLOWED` ou
+  `DELIVERY_CODE_UNAVAILABLE` ne consomment pas d'essai, donc ne décrémentent rien ;
+* `resteDuVerrouMs` rend une **valeur**, dont l'écran tire ses deux besoins : le compte à rebours, et
+  « est-ce verrouillé ? » (`> 0`). Une date illisible ne verrouille pas pour toujours ;
+* le compte à rebours ARRONDIT AU SUPÉRIEUR — afficher `0:00` pendant la dernière seconde ferait
+  croire que c'est fini alors que le serveur refuse encore. À son terme l'écran ne décide rien, il
+  **relit** (`verrouExpire`).
+
+**Aucune constante d'essais dans l'app.** Un `ESSAIS_MAX = 3` est né ici le temps d'une relecture :
+personne ne l'appelait, et sa seule fiche INTERDISAIT de s'en servir. Une constante dont l'unique
+règle est « ne t'en sers pas » est une seconde vérité qui attend son premier lecteur.
+
+## Les six cases n'ont qu'une géométrie (D116 2A)
+
+`OtpInput` portait ces cases depuis le lot auth, soudées à deux choses qui n'ont rien à voir avec
+elles : la palette « slate » des écrans d'auth, et un nom accessible lu dans le dictionnaire `auth`.
+La remise avait donc le choix entre importer l'ambiance d'un autre tunnel, ou recopier la géométrie.
+
+`components/code-input.tsx` applique **la forme de `BackButton` (D105)** :
+
+* le nom accessible est **EXIGÉ par la signature** — on ne peut pas poser un champ muet ;
+* **aucune prop de taille**, de couleur de case ou de rayon : une charte ne se défait pas par
+  malveillance, elle se défait par une prop de trop ;
+* les couleurs arrivent en `palette`, parce que les deux appelants vivent dans deux ambiances
+  assumées — c'est une AMBIANCE, pas une géométrie ;
+* `autofill` est **explicite, sans valeur par défaut**. Un code reçu par SMS mérite
+  `textContentType: "oneTimeCode"` ; un code **DICTÉ** ne doit pas le porter (voir le chapitre
+  d'apprentissage : c'est la bonne pratique qui devient un défaut).
+
+`OtpInput` devient son habillage auth : **108 lignes → 50**, un seul appelant à recâbler
+(`otp-verify-view.tsx`), et `OTP_LENGTH = CODE_LENGTH` pour ne pas casser ses lecteurs.
+
+## Les jalons : un récit, pas un formulaire (A39)
+
+Le serveur n'accepte les trois crans que **dans l'ordre** et refuse celui qui saute son tour
+(`TRACKING_STEP_NOT_ALLOWED`). Trois cases à cocher librement inviteraient donc un refus que rien
+n'explique : l'app n'offre que `jalonSuivant(confirmes)`.
+
+Deux détails qui se paient :
+
+* `jalonsConfirmes` **filtre** sur les trois codes connus plutôt que de faire confiance à la liste
+  reçue — un cran inconnu, ajouté côté serveur avant que l'app ne le connaisse, décalerait la
+  séquence et ferait proposer le mauvais geste ; et il réordonne selon le RÉCIT, parce que deux
+  événements écrits dans la même seconde peuvent revenir inversés ;
+* `jalonEnvoyable` est **relu à l'appui**, pas seulement au rendu. Le cran peut avoir été confirmé
+  entre le rendu et le doigt (double appui, relecture arrivée entre-temps).
+
+Ils restent **facultatifs** : ne rien cocher n'empêche pas de remettre, et la liste des manques de la
+remise ne les mentionne nulle part — une fiche le vérifie en lisant `remise.ts`.
+
+## Ce que l'écran ne calcule pas
+
+`payoutDueAt` est **servi par le serveur** (J+4) et affiché tel quel (`versementDeLaReponse`).
+Recalculer « dans quatre jours » côté client créerait une seconde vérité le jour où le délai change —
+et une réponse sans date lisible ne fabrique pas d'échéance, elle n'en montre aucune.
+
+Le destinataire entre dans la projection (`mes-demandes.ts`) : prénom, et téléphone à partir de la
+prise en charge. **L'app n'ajoute AUCUN filtre** — elle affiche ce que le serveur MINIMISE
+(ANO-API-15), sans quoi il existerait deux règles de confidentialité et l'une serait fausse. D113 ne
+le projetait pas et avait raison : ni la liste ni la fiche de demande n'en avaient l'usage.
+
+## Le carrefour accueille « remettre », et la fiche change de camp une seconde fois
+
+`ORDRE` passe de quatre à cinq : répondre, prendre, **remettre**, confirmer, noter. Remettre passe
+après prendre (on ne remet pas ce qu'on n'a pas pris) et avant confirmer — quelqu'un attend le colis,
+et le versement du Voyageur dort jusque-là, alors que « confirmer » se débloque seul. Son échéance
+est `null`, volontairement : le rendez-vous d'arrivée n'arrive pas dans l'app sous forme d'instant,
+et un « dans 3 h » calculé là-dessus serait inventé (D100).
+
+**C'est la troisième fois que la fiche de D114 fait son travail** (prendre en D115, remettre ici) :
+une fiche qui refuse quelque chose doit dire à quelle condition elle changera d'avis.
+
+## Un refus a une SUITE — trouvé en relisant la décision
+
+La décision du lot interdit « action impossible » en propres termes (« ce que lisait le Voyageur avant
+ANO-API-15 »), et le dictionnaire de l'écran la portait quand même, en repli générique. **Écrite une
+fois, une règle ne se relit pas toute seule.** Deux faits distincts, donc deux phrases, et chacune
+donne la suite : le RÉSEAU (rien n'est parti, le geste se refait tel quel) et un refus que l'app ne
+sait pas lire (on retourne voir où en est le colis) — jamais le code technique (D83).
+
+Et le constat se **compte** : la phrase vit dans quatre autres dictionnaires (`pickup` de D115,
+`myDeals`, `myTrips`). On ne les aligne pas d'autorité — chaque écran mérite sa phrase, et une
+réécriture en bloc dirait la même chose partout, qui est le choix de D115 3A sur les copies de la
+prise de photo. Une fiche les **compte à trois** : le prochain qui en ajoute une rougit, celui qui en
+corrige une doit baisser le chiffre. Une dette comptée se rembourse, une dette promise s'oublie.
+
+## D116 bis — le site, challengé par son jumeau natif
+
+Écrire l'écran natif a mis trois défauts du site en pleine lumière. Aucun n'était visible à la
+lecture ; tous l'étaient en demandant « et ici, qu'est-ce qui bloque le bouton ? ».
+
+| # | Défaut mesuré | Conséquence réelle |
+|---|---|---|
+| ① | `isSubmitting={props.isSubmitting \|\| !props.photosReady}` | une photo de remise en échec mettait le bouton en « Vérification… » **pour toujours**, debout devant le destinataire |
+| ② | `getDealRequest(dealId).then(…)` **sans `.catch`** | une lecture qui échoue laissait un squelette perpétuel — et le rejet n'était même pas attrapé |
+| ③ | `t("otp.wrongCode", { recipientFirstName: deal.recipient?.firstName ?? "" })` | « Vérifie avec  et réessaye » quand le prénom n'est pas servi (famille D100) |
+
+Le ① est la pièce maîtresse, et c'est **la même famille que D115 bis** : un état d'attente qui ne
+finit jamais est un mensonge, et il se fabrique toujours pareil — en fusionnant deux conditions dans
+une seule variable. Le bouton ne sait plus POURQUOI il travaille, donc il ne peut plus le dire. La
+parade est structurelle : `photoHint` nomme ce que les photos retiennent, et `isSubmitting` ne porte
+plus que « je travaille ».
+
+La règle sort du composant vers `apps/user-ui/src/lib/carrier/remise.ts` (pur, zéro import, jouable
+par le harnais A224) — **cinquième règle sortie d'un composant du site** après `tunnel.ts` (D93),
+`search-facets.ts` (D100), `parcel-weight.ts` (D101) et `prise-en-charge.ts` (D115 bis).
+
+## Le défaut de D110, commis dans les fichiers écrits pour en appliquer la leçon
+
+Relecture avant commit, et le même mal des deux côtés : **des exports écrits « pour la complétude »
+que personne n'appelle.**
+
+| Export | Ce qu'il était | Verdict |
+|---|---|---|
+| `ESSAIS_MAX` (les deux fronts) | aucun appelant ; côté site, un **second domicile** pour le 3 de `MAX_DELIVERY_ATTEMPTS` (`deal.api.ts`), qui lui a de vrais lecteurs | supprimé |
+| `photosRetiennent` (site) | aucun appelant — et son unique client **recopiait son corps en ligne** pour connaître la RAISON à écrire sous le bouton | devenu `manqueDesPhotos(): Manque \| null` |
+| `peutRemettre` (site) | aucun appelant **possible** : le code vit dans l'état local du champ, et le remonter ferait rentrer la règle dans un composant | supprimé |
+| `verrouActif` (natif) | aucun appelant ; l'écran refait `restantMs > 0` | supprimé |
+| `avancementDesJalons` (natif) | une jauge « 2 sur 3 » devant trois lignes déjà visibles | supprimé |
+| `jalonEnvoyable` (natif) | aucun appelant, alors qu'il protège vraiment | **câblé** à l'appui |
+
+Un prédicat qui oblige son lecteur à refaire le calcul pour en connaître la raison n'est pas le bon
+prédicat. Et une source de vérité que l'on n'importe pas est un commentaire (D110) — ici, écrit dans
+les fichiers mêmes qui appliquaient cette leçon.
+
+## Mesures
+
+| Quoi | Avant | Après |
+|---|---|---|
+| Fiches mobile | 1241 (61 suites) | **1294 (63 suites)** |
+| Fiches user-ui | 273 (17 suites) | **291 (18 suites)** |
+| `otp-input.tsx` | 108 lignes | **50** (habillage) |
+| Lignes de serveur | — | **zéro** |
+
+## Contre-épreuves
+
+* `nx typecheck @yamba-app/mobile` (deux programmes) et `nx typecheck user-ui` : verts.
+* `node scripts/check-i18n-messages.mjs` : 30 espaces de noms, 60 fichiers, miroir parfait.
+* Remettre `isSubmitting || !photosReady` dans une des deux vues du site → **une** fiche rouge.
+* Rendre un cran non suivant envoyable → **deux** fiches rouges (la règle, et l'appel à l'appui).
+* Réintroduire « action impossible » dans `deliver.json` → **une** fiche rouge ; en ajouter une
+  cinquième ailleurs → la fiche de comptage rougit.
+
+## Reste ouvert
+
+* **Aucun écran de ce lot n'a été VU** : il faut une session Voyageur avec un deal `PICKED_UP` sur le
+  simulateur. D107 a gravé qu'un correctif d'interface non vu est une hypothèse déployée — c'est
+  assumé ici, et c'est le premier point de la prochaine passe.
+* La **régénération** du code est un geste de l'EXPÉDITEUR (`/code/regenerate`, cinq au plus) : elle
+  vit dans le suivi d'envoi, pas ici.
+* Quatre dictionnaires portent encore la phrase de cul-de-sac, **comptés** par une fiche.
+* **Suit** : le bloc MESSAGES + NOTIFICATIONS — `message-service` (fil, rendez-vous, numéro révélé à
+  H-2) et les notifications in-app n'ont aucun client natif, et l'onglet Messages est une coquille.

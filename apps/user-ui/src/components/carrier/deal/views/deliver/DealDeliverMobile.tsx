@@ -97,7 +97,8 @@ export default function DealDeliverMobile(props: DealDeliverViewProps) {
           errorMessage={props.errorMessage}
           isLocked={props.isLocked}
           lockCountdown={props.lockCountdown}
-          isSubmitting={props.isSubmitting || !props.photosReady}
+          isSubmitting={props.isSubmitting}
+          photoHint={props.photoHint}
           onSubmitAction={props.onSubmitAction}
           compact
         />

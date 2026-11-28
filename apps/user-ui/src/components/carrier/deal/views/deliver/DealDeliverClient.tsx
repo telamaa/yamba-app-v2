@@ -8,6 +8,16 @@
  * DELIVERY_LOCKED.lockedUntil). Le countdown local n'est qu'un affichage :
  * à l'expiration, le serveur a déjà remis le compteur à zéro.
  * Succès → DeliverSuccess (célébration) puis retour au Deal (DELIVERED).
+ *
+ * D116 bis — TROIS CORRECTIONS VENUES DE L'ÉCRAN NATIF :
+ *   ① une lecture qui ÉCHOUE affichait un squelette PERPÉTUEL — et sans
+ *      `.catch`, le rejet n'était même pas attrapé ;
+ *   ② `isSubmitting || !photosReady` mettait le bouton en « Vérification… »
+ *      POUR TOUJOURS quand une photo de remise échouait. Une disjonction
+ *      dans une prop d'état fait perdre au bouton la raison de son
+ *      attente, donc sa capacité à la DIRE (leçon D115 2A) ;
+ *   ③ « Vérifie avec {prénom} » laissait un trou quand le prénom n'était
+ *      pas servi (famille D100).
  */
 
 "use client";
@@ -28,6 +38,7 @@ import {
   MAX_DELIVERY_ATTEMPTS,
   validateDeliveryCode,
 } from "../../deal.api";
+import { manqueDesPhotos, urlsDeLaRemise } from "@/lib/carrier/remise";
 import type { DealRequest } from "../../deal.types";
 import DealSkeleton from "../../DealSkeleton";
 import DealDeliverDesktop from "./DealDeliverDesktop";
@@ -46,6 +57,7 @@ export default function DealDeliverClient({ dealId }: Props) {
   const queryClient = useQueryClient();
 
   const [deal, setDeal] = useState<DealRequest | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lockedUntil, setLockedUntil] = useState<string | null>(null);
@@ -79,18 +91,36 @@ export default function DealDeliverClient({ dealId }: Props) {
   const handleRemovePhoto = useCallback((photoId: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
   }, []);
-  const photosReady = photos.every((p) => !!p.url && !p.uploading && !p.error);
+  // D116 bis ② — ce qui RETIENT l'envoi, nommé et jamais fondu dans une
+  // disjonction : le bouton doit pouvoir dire POURQUOI il attend.
+  const manquePhoto = manqueDesPhotos(photos);
+  const photosReady = manquePhoto === null;
+  const photoHint =
+    manquePhoto === null
+      ? null
+      : manquePhoto.quoi === "televersement"
+        ? t("photos.uploading")
+        : t("photos.uploadError");
 
   useEffect(() => {
     let cancelled = false;
-    getDealRequest(dealId).then((d) => {
-      if (cancelled) return;
-      setDeal(d);
-      // A38 — état SERVEUR de la saisie : essais déjà consommés, verrou en cours.
-      setAttemptsUsed(MAX_DELIVERY_ATTEMPTS - (d.deliveryAttemptsLeft ?? MAX_DELIVERY_ATTEMPTS));
-      const lock = d.deliveryLockedUntil ?? null;
-      setLockedUntil(lock && new Date(lock).getTime() > Date.now() ? lock : null);
-    });
+    getDealRequest(dealId)
+      .catch(() => {
+        // D116 bis ① — sans ce `catch`, le rejet n'était pas attrapé et
+        // l'écran restait un squelette, sans un mot ni une sortie.
+        if (!cancelled) setLoadError(true);
+        return null;
+      })
+      .then((d) => {
+        if (cancelled || d === null) return;
+        setDeal(d);
+        // A38 — état SERVEUR de la saisie : essais consommés, verrou en cours.
+        setAttemptsUsed(
+          MAX_DELIVERY_ATTEMPTS - (d.deliveryAttemptsLeft ?? MAX_DELIVERY_ATTEMPTS)
+        );
+        const lock = d.deliveryLockedUntil ?? null;
+        setLockedUntil(lock && new Date(lock).getTime() > Date.now() ? lock : null);
+      });
     return () => {
       cancelled = true;
     };
@@ -128,11 +158,7 @@ export default function DealDeliverClient({ dealId }: Props) {
       setIsSubmitting(true);
       setErrorMessage(null);
       try {
-        const result = await validateDeliveryCode(
-          deal.id,
-          code,
-          photos.map((p) => p.url).filter((u): u is string => !!u)
-        );
+        const result = await validateDeliveryCode(deal.id, code, urlsDeLaRemise(photos));
         setDeliveredAt(result.deliveredAt);
         // La vérité est en base : la page Deal relira DELIVERED.
         void queryClient.invalidateQueries({ queryKey: dealQueryKey(deal.id) });
@@ -143,10 +169,13 @@ export default function DealDeliverClient({ dealId }: Props) {
           if (e.code === "DELIVERY_CODE_INVALID") {
             const left = typeof e.details.attemptsLeft === "number" ? e.details.attemptsLeft : 0;
             setAttemptsUsed(MAX_DELIVERY_ATTEMPTS - left);
+            // D116 bis ③ — deux versions de la phrase : un prénom absent ne
+            // laisse pas « Vérifie avec  et réessaye » (famille D100).
+            const prenom = deal.recipient?.firstName ?? "";
             setErrorMessage(
-              t("otp.wrongCode", {
-                recipientFirstName: deal.recipient?.firstName ?? "",
-              })
+              prenom.length > 0
+                ? t("otp.wrongCode", { recipientFirstName: prenom })
+                : t("otp.wrongCodeNoName")
             );
             return;
           }
@@ -180,6 +209,24 @@ export default function DealDeliverClient({ dealId }: Props) {
     [deal, isSubmitting, lockedUntil, queryClient, t, photos, photosReady]
   );
 
+  if (loadError)
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <p className="text-[15px] font-semibold text-slate-900 dark:text-white">
+          {t("error.loadTitle")}
+        </p>
+        <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
+          {t("error.loadBody")}
+        </p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-[14px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+        >
+          {t("error.loadBack")}
+        </button>
+      </div>
+    );
   if (isMobile === null || !deal) return <DealSkeleton />;
 
   // Écran de succès 🎉
@@ -205,6 +252,7 @@ export default function DealDeliverClient({ dealId }: Props) {
     isSubmitting,
     photos,
     photosReady,
+    photoHint,
     onAddPhotoAction: handleAddPhoto,
     onRemovePhotoAction: handleRemovePhoto,
     onBackAction: handleBack,
@@ -228,6 +276,8 @@ export type DealDeliverViewProps = {
   isSubmitting: boolean;
   /** A76 — photos de remise (optionnelles) et leur état d'upload. */
   photos: DeliveryPhotoDraft[];
+  /** Ce que les PHOTOS retiennent, déjà traduit — ou `null` si rien. */
+  photoHint: string | null;
   photosReady: boolean;
   onAddPhotoAction: (photo: DeliveryPhotoDraft) => void;
   onRemovePhotoAction: (photoId: string) => void;

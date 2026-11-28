@@ -164,13 +164,19 @@ export function IdentityGate({
           </View>
         )}
 
-        {/* D104 2A — un vide AU-DESSUS seulement quand il n'y a pas de barre
-            d'onglets : le bloc se centre alors entre le retour et le bas, au
-            lieu de se tasser en haut d'un écran aux trois quarts vide. La
-            rangée de retour, elle, ne bouge pas — elle reste là où l'œil la
-            cherche. */}
-        {onDismiss !== undefined && <View style={styles.spacer} />}
+        {/* D112 bis — IL N'Y A PLUS DE VIDE AU-DESSUS, ET D104 2A EST DÉFAIT.
+            Il posait un ressort ici pour les écrans POUSSÉS, afin que leur
+            bloc se centre « au lieu de se tasser en haut d'un écran aux trois
+            quarts vide ». Vu à l'écran pour la première fois le 27/11, le
+            résultat est exactement ce que l'en-tête de ce fichier déclare
+            avoir corrigé le 08/11, et dans les mêmes mots : « on lisait à
+            55 % de la hauteur, sous un vide que rien ne justifiait ».
 
+            LE FICHIER SE CONTREDISAIT LUI-MÊME, à cent lignes d'écart. La
+            justification de l'épure (①, plus haut) ne parle pas de barre
+            d'onglets : elle dit qu'un TITRE DE PAGE EST EN HAUT. La barre ne
+            servait qu'à expliquer pourquoi le vide du BAS est inoffensif.
+            Retirer la barre ne change donc rien à où commence le contenu. */}
         <View style={styles.block}>
           {/* ① Le titre de page : le plus gros caractère de l'écran. Même
               gabarit que la rangée de titre des écrans CONNECTÉS — il ne doit

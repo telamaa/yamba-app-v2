@@ -110,6 +110,9 @@ function resolveFileName(photo: UploadablePhoto, mimeType: string): string {
 /** Les deux dossiers ImageKit de Yamba, les mêmes que ceux du site. */
 const FOLDER_DECLARED = '/bookings/declared';
 const FOLDER_DISPUTE = '/deals/dispute';
+/** Les PREUVES d'inspection, à la prise en charge (D115). Mêmes dossiers que le site. */
+const FOLDER_PICKUP = '/deals/pickup';
+const FOLDER_DELIVERY = '/deals/delivery';
 /** Le MÊME dossier que le site (`useImageKitUpload("/trips")`) : deux fronts,
  *  un seul rangement — un administrateur qui cherche un billet n'a pas à
  *  savoir par quel appareil il est arrivé. */
@@ -231,4 +234,21 @@ export function uploadDeclaredPhoto(photo: UploadablePhoto): Promise<UploadResul
  */
 export function uploadDisputePhoto(photo: UploadablePhoto): Promise<UploadResult> {
   return uploadTo(photo, FOLDER_DISPUTE);
+}
+
+/**
+ * Une photo d'INSPECTION, prise au moment de la prise en charge (D115).
+ *
+ * Dossier identique à celui du site (`/deals/pickup`) : ces photos sont
+ * lues par la fiche de l'Expéditeur et, le cas échéant, par un dossier de
+ * médiation — deux dossiers ImageKit pour la même preuve rendraient une
+ * moitié des réservations illisible selon le front qui les a créées.
+ */
+export function uploadPickupPhoto(photo: UploadablePhoto): Promise<UploadResult> {
+  return uploadTo(photo, FOLDER_PICKUP);
+}
+
+/** Une photo de REMISE, optionnelle (D116, A76) : le code prouve la remise, la photo prouve l'état. */
+export function uploadDeliveryPhoto(photo: UploadablePhoto): Promise<UploadResult> {
+  return uploadTo(photo, FOLDER_DELIVERY);
 }

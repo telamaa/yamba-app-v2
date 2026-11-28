@@ -1,0 +1,36 @@
+{
+  "title": "Mes envois",
+  "back": "Retour",
+  "count": "{count, plural, =0 {Aucun envoi en cours} one {# envoi en cours} other {# envois en cours}}",
+  "sections": {
+    "aTraiter": "À traiter",
+    "enCours": "En cours",
+    "passes": "Passés"
+  },
+  "status": {
+    "PENDING": "En attente de réponse",
+    "ACCEPTED": "Acceptée",
+    "PICKED_UP": "En route",
+    "DELIVERED": "Remis",
+    "COMPLETED": "Terminé",
+    "DECLINED": "Refusée",
+    "EXPIRED": "Sans réponse",
+    "CANCELLED": "Annulé",
+    "DISPUTED": "Litige ouvert"
+  },
+  "route": "{from} → {to}",
+  "noRoute": "Trajet sans ville",
+  "noDate": "Date inconnue",
+  "carrier": "avec {name}",
+  "noCarrier": "Voyageur inconnu",
+  "expiresIn": "Réponse attendue sous {remaining}",
+  "expired": "La demande a expiré",
+  "actions": {
+    "confirmer": "Confirmer la réception",
+    "noter": "Noter le Voyageur"
+  },
+  "emptyTitle": "Aucun envoi pour l'instant",
+  "emptyBody": "Trouve un Voyageur sur ta route et envoie ton premier colis.",
+  "emptyCta": "Chercher un trajet",
+  "loadError": "Impossible de charger tes envois pour l'instant."
+}

@@ -14,6 +14,7 @@ import { FONT_ASSETS } from '@/constants/typography';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { AppIntlProvider } from '@/i18n/provider';
+import { ActiviteProvider } from '@/lib/activite-context';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { handleStripeRedirect } from '@/lib/stripe-sheet';
 import { isWelcomeDismissed } from '@/lib/welcome-state';
@@ -136,6 +137,10 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <AppIntlProvider>
       <SessionProvider>
+        {/* D114 — UNE lecture de l'activité pour tout le monde. Il est DANS
+            la session (il en dépend) et AUTOUR de la pile (la barre
+            d'onglets, l'onglet Messages et le carrefour la partagent). */}
+        <ActiviteProvider>
         <ThemeProvider value={theme}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
@@ -162,6 +167,16 @@ export default function RootLayout() {
             {/* « Mes trajets » : une DESTINATION, pas un tunnel — on y revient
                 entre deux voyages. Poussée par-dessus les onglets. */}
             <Stack.Screen name="trips/mine" />
+            {/* « Mes envois » : la porte qui manquait au suivi (D112). Le
+                PLURIEL n'est pas un caprice — `shipment/mine` serait capté
+                par `shipment/[id]` avec id = « mine ». */}
+            <Stack.Screen name="shipments/mine" />
+            {/* Les DEMANDES REÇUES et la demande elle-même (D113). Même
+                convention : pluriel pour la liste, singulier pour la fiche. */}
+            <Stack.Screen name="deals/mine" />
+            {/* `deal` est une PILE depuis D115 : la demande, puis l'inspection
+                poussée par-dessus — le retour retombe sur la demande. */}
+            <Stack.Screen name="deal" />
             {/* La PUBLICATION d'un trajet : sept écrans poussés, le pendant
                 Voyageur du tunnel de réservation. Son seuil est l'onglet
                 « + » ; ici vit la pile qui se pousse par-dessus les onglets. */}
@@ -178,6 +193,7 @@ export default function RootLayout() {
           {/* Ne peint rien : il écoute les retours de redirection bancaire (D82 7A). */}
           <StripeRedirectRelay />
         </ThemeProvider>
+        </ActiviteProvider>
       </SessionProvider>
     </AppIntlProvider>
     </SafeAreaProvider>

@@ -26,7 +26,8 @@
     "wrongCode": "That''s not the right code. Check with {recipientFirstName} and try again.",
     "attemptsLeft": "{count, plural, =1 {Last attempt} other {# attempts left}}",
     "locked": "Too many attempts. Entry locked for {minutes} min for security reasons.",
-    "lockedCountdown": "Try again in {countdown}"
+    "lockedCountdown": "Try again in {countdown}",
+    "wrongCodeNoName": "That is not the right code. Have it read out again, digit by digit."
   },
   "helpCard": {
     "title": "{recipientFirstName} can''t remember the code?",
@@ -66,7 +67,10 @@
   "error": {
     "toastGeneric": "Error validating. Try again.",
     "codeUnavailable": "No code was generated for this deal (pickup predates the update). Please contact support.",
-    "dealChanged": "Entry is not possible right now (active lock or the deal changed). Reloading."
+    "dealChanged": "Entry is not possible right now (active lock or the deal changed). Reloading.",
+    "loadTitle": "This hand-over cannot be read",
+    "loadBody": "We cannot read this booking right now. Go back to it — nothing has been sent.",
+    "loadBack": "Back to the booking"
   },
   "photos": {
     "title": "A handover photo?",

@@ -96,7 +96,7 @@ import {
 } from '@/lib/tab-bar-geometry';
 import { Font } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTabBadges } from '@/hooks/use-tab-badges';
+import { useTabBadges } from '@/lib/activite-context';
 import { useTabBarVisibility } from '@/lib/tab-bar-visibility';
 
 type IonName = ComponentProps<typeof Ionicons>['name'];
