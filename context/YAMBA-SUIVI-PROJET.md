@@ -1,15 +1,25 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 28 novembre 2026 · `dev` = `f9e3e742` (merge de **#427**)
+### État au 28 novembre 2026 (soir) · `dev` = merge de **#439**
 
-**Le produit entier existe en natif.** Les parcours Expéditeur ET Voyageur sont complets sur le téléphone — publier un trajet (D111), suivre ses envois (D112), répondre aux demandes (D113), prendre en charge (D115), remettre avec code et jalons (D116) — et le bloc communication est clos : le fil (D117), le rendez-vous et le numéro révélé à H-2 (D118), la boîte aux lettres in-app (D119). **Zéro ligne de serveur sur neuf lots d'affilée** : tout existait déjà côté API et n'avait aucun client mobile.
+**Le produit entier existe en natif**, et la pile ouverte le matin est **close** : neuf PR fusionnées dans la journée, de #427 à #439.
 
-**Six PR ouvertes au 28/11, toutes à 20/20 contrôles** : #428 (parcours Voyageur, D112→D116), #429 (le fil, D117), #430 (rendez-vous et numéro, D118), #431 (boîte aux lettres, D119 + D120 gravée sans code), #432 (D121, le zéro qui appartient au numéro — clôt ANO-MOB-01), #433 (la classe morte de grille, dette D110). **À MERGER DANS CET ORDRE** : la pile est linéaire.
+**Les cinq derniers lots, dans l'ordre où ils sont entrés dans `dev`** :
 
-**Trois PR à FERMER sans merge** : #424, #425, #426 sont ouvertes alors que leur contenu est **déjà dans `dev`** — absorbé par #427 (vérifié : leurs têtes sont des ancêtres de `dev`).
+| PR | Lot | Ce qu'il corrige |
+|---|---|---|
+| #435 | **D122** | le site ne se construisait plus depuis une semaine ; la CI construit désormais ce qu'elle déploie |
+| #436 | — | remise à niveau du harnais navigateur : neuf fiches décrivaient un produit disparu, un objet de page cassé sur la moitié des trajets |
+| #437 | **D123** | l'argent s'écrit dans la langue du lecteur, **symbole compris** — 39 mises en forme supprimées |
+| #438 | **D124** | un fil existe parce que le **deal** le dit, pas parce qu'une ligne existe en base |
+| #439 | **D125** | l'écran va à l'essentiel : ce qui manque, ce qui ment, ce qui ne sert plus |
 
-**Ce qui n'a pas été vu** : aucun écran des lots D112→D121 n'a été regardé CONNECTÉ. `simctl` sait naviguer, pas taper. D107 a gravé qu'un correctif d'interface non vu est une hypothèse déployée — ces lots sont des hypothèses bien testées, pas des faits.
+**LA PROTECTION DE `dev` EST ENFIN COMPLÈTE : 21 contrôles REQUIS sur 21 qui tournent** (coché le 28/11). Les quatre consultatifs de longue date — `TypeScript (fiches de test)`, `Tests unitaires (mobile)`, `Tests unitaires (user-ui)`, `Build des fronts (next)` — bloquent désormais une fusion. **Un job ajouté à `ci.yml` ne devient jamais requis tout seul** : ce trou a coûté une semaine de site inconstructible (D122) et une PR rouge que rien n'aurait arrêtée (#438).
 
-**Chiffres MESURÉS le 28/11** (et non recopiés) : auth **407** · trip **430** · deal **740** · notification **136** · message **79** · mobile **1 434** (68 suites) · user-ui **331** (22 suites) — **3 557 fiches** au total. *Correction de référence : la ligne de `CLAUDE.md` annonce trip-service à 409 et une plateforme à 1 350 ; les deux sont périmées, trip a pris 21 fiches jamais reportées.*
+**Chiffres MESURÉS sur `dev` le 28/11 au soir** (et non recopiés) : auth **407** · trip **430** · deal **740** · notification **136** · message **92** · user-ui **345** (24 suites) · mobile **1 573** (70 suites) — **3 723 fiches** au total.
+
+**Ce qui n'a pas été vu** : aucun écran des lots D112→D125 n'a été regardé CONNECTÉ au simulateur. D107 a gravé qu'un correctif d'interface non vu est une hypothèse déployée.
+
+**Ce qui n'a pas été rejoué** : le harnais navigateur complet (550 scénarios). Onze chapitres sont verts (95 scénarios, 0 échec) ; les 64 autres fichiers et le cahier 02-ADMIN demandent **Mailpit** (Docker), absent du poste. `web-msg` et `web-nrg` n'ont donc pas éprouvé D124.
 
 ---
 
